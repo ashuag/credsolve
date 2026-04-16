@@ -1,0 +1,18 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/health/route": "app/health/route.js",
+  "/applications/page": "app/applications/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/eligibility-criteria/credit-limit-eligibility-check/page": "app/eligibility-criteria/credit-limit-eligibility-check/page.js",
+  "/agents/page": "app/agents/page.js",
+  "/eligibility-criteria/page": "app/eligibility-criteria/page.js",
+  "/eligibility-criteria/profile-eligibility-check/page": "app/eligibility-criteria/profile-eligibility-check/page.js",
+  "/invite/[token]/page": "app/invite/[token]/page.js",
+  "/leads/page": "app/leads/page.js",
+  "/login/page": "app/login/page.js",
+  "/masters/[master]/page": "app/masters/[master]/page.js",
+  "/masters/page": "app/masters/page.js",
+  "/page": "app/page.js",
+  "/partners/page": "app/partners/page.js",
+  "/roles/page": "app/roles/page.js"
+}

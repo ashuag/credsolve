@@ -1,0 +1,8 @@
+.loadingCard {
+  border-radius: 28px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 24px;
+  color: var(--muted);
+  box-shadow: var(--shadow-md);
+}

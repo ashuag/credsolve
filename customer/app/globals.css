@@ -1,0 +1,316 @@
+@config "../tailwind.config.ts";
+@import "tailwindcss";
+
+@layer base {
+  html {
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    background:
+      radial-gradient(circle at top left, rgba(255, 197, 25, 0.24), transparent 26rem),
+      radial-gradient(circle at top right, rgba(20, 150, 243, 0.2), transparent 24rem),
+      linear-gradient(180deg, #fffdf8 0%, #eef5ff 52%, #f6f9ff 100%);
+    color: #12244f;
+    /* Momentum scrolling on iOS */
+    -webkit-overflow-scrolling: touch;
+    /* Prevent bounce/overscroll showing white gaps */
+    overscroll-behavior: none;
+  }
+
+  body {
+    margin: 0;
+    /* dvh tracks visible viewport (respects mobile browser chrome) */
+    min-height: 100dvh;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Prevent flash on tap — affects all interactive elements */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  input,
+  select,
+  a {
+    font: inherit;
+    /* Prevents double-tap zoom, makes taps feel instant */
+    touch-action: manipulation;
+  }
+}
+
+@layer components {
+  /* Shared card panel — used across pages */
+  .mc-card {
+    position: relative;
+    overflow: hidden;
+    padding: 24px;
+    border-radius: 28px;
+    border: 1px solid rgba(18, 36, 79, 0.12);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.86));
+    box-shadow: 0 18px 34px rgba(23, 44, 113, 0.08);
+  }
+
+  .mc-card::before {
+    content: "";
+    position: absolute;
+    left: -34px;
+    bottom: -44px;
+    width: 132px;
+    height: 132px;
+    background: radial-gradient(circle, rgba(255, 197, 25, 0.24), transparent 72%);
+    pointer-events: none;
+  }
+
+  /* Optional blue corner glow used on two-sided cards */
+  .mc-card-glow::after {
+    content: "";
+    position: absolute;
+    right: -28px;
+    top: -28px;
+    width: 120px;
+    height: 120px;
+    background: radial-gradient(circle, rgba(20, 150, 243, 0.16), transparent 74%);
+    pointer-events: none;
+  }
+
+  @media (max-width: 640px) {
+    .mc-card {
+      padding: 20px;
+      border-radius: 24px;
+    }
+  }
+
+  /* Pill label / eyebrow chip */
+  .mc-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(20, 150, 243, 0.08);
+    color: #1496f3;
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  /* Primary navy CTA button */
+  .mc-btn-primary {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 52px;
+    padding: 14px 18px;
+    border: 0;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #1c347d, #12244f 65%);
+    color: #fff8df;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    box-shadow: 0 18px 34px rgba(23, 44, 113, 0.2);
+    cursor: pointer;
+    transition: transform 160ms ease;
+  }
+
+  .mc-btn-primary:hover {
+    transform: translateY(-1px);
+  }
+
+  .mc-btn-primary:disabled {
+    cursor: wait;
+    opacity: 0.78;
+  }
+
+  /* Pill secondary button / link */
+  .mc-btn-secondary {
+    padding: 11px 16px;
+    border-radius: 999px;
+    font-size: 0.94rem;
+    font-weight: 800;
+    transition: transform 160ms ease;
+  }
+
+  .mc-btn-secondary:hover {
+    transform: translateY(-1px);
+  }
+
+  /* Small info card inside panels */
+  .mc-inner-card {
+    padding: 16px 18px;
+    border-radius: 20px;
+    border: 1px solid rgba(18, 36, 79, 0.12);
+    background: rgba(244, 249, 255, 0.86);
+  }
+
+  .mc-highlight-card {
+    opacity: 0;
+    transform: translateY(14px);
+    animation: highlightReveal 520ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+    will-change: transform, opacity;
+  }
+
+  .mc-highlight-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(20, 150, 243, 0.2);
+    box-shadow: 0 20px 36px rgba(23, 44, 113, 0.08);
+  }
+
+  .mc-highlight-badge {
+    transition: transform 180ms ease, box-shadow 180ms ease;
+  }
+
+  .mc-highlight-badge-core {
+    transition: transform 180ms ease, background-color 180ms ease;
+  }
+
+  .mc-highlight-card:hover .mc-highlight-badge {
+    transform: translateY(-1px) scale(1.03);
+    box-shadow: 0 18px 30px rgba(23, 44, 113, 0.12);
+  }
+
+  .mc-highlight-card:hover .mc-highlight-badge-core {
+    transform: scale(1.05);
+    background-color: rgba(255, 255, 255, 0.82);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mc-highlight-card {
+      opacity: 1;
+      transform: none;
+      animation: none;
+      transition: none;
+    }
+
+    .mc-highlight-badge,
+    .mc-highlight-badge-core {
+      transition: none;
+    }
+
+    .mc-highlight-card:hover {
+      transform: none;
+      box-shadow: none;
+    }
+
+    .mc-highlight-card:hover .mc-highlight-badge,
+    .mc-highlight-card:hover .mc-highlight-badge-core {
+      transform: none;
+      box-shadow: none;
+    }
+  }
+}
+
+/* ── Keyframes ─────────────────────────────────────────────────────────────── */
+
+@keyframes mobileBorderPulse {
+  0%, 100% {
+    border-color: rgba(20, 150, 243, 0.46);
+    box-shadow: 0 22px 42px rgba(23, 44, 113, 0.12), 0 0 0 6px rgba(20, 150, 243, 0.08);
+  }
+  50% {
+    border-color: rgba(255, 197, 25, 0.76);
+    box-shadow: 0 22px 42px rgba(23, 44, 113, 0.14), 0 0 0 6px rgba(255, 197, 25, 0.1);
+  }
+}
+
+@keyframes otpBorderPulse {
+  0%, 100% {
+    border-color: rgba(20, 150, 243, 0.46);
+    box-shadow: 0 0 0 4px rgba(20, 150, 243, 0.12), 0 16px 28px rgba(23, 44, 113, 0.1);
+  }
+  50% {
+    border-color: rgba(255, 197, 25, 0.72);
+    box-shadow: 0 0 0 4px rgba(255, 197, 25, 0.14), 0 18px 32px rgba(23, 44, 113, 0.12);
+  }
+}
+
+@keyframes accountBorderPulse {
+  0%, 100% {
+    border-color: rgba(20, 150, 243, 0.45);
+    box-shadow: 0 0 0 4px rgba(20, 150, 243, 0.12);
+  }
+  50% {
+    border-color: rgba(255, 197, 25, 0.78);
+    box-shadow: 0 0 0 4px rgba(255, 197, 25, 0.14);
+  }
+}
+
+@keyframes calendarPopoverIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes rotateOrbit {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes rotateReverse {
+  from { transform: rotate(360deg); }
+  to   { transform: rotate(0deg); }
+}
+
+@keyframes pulseRing {
+  0%, 100% { transform: scale(0.96); opacity: 0.82; }
+  50%       { transform: scale(1.04); opacity: 1; }
+}
+
+@keyframes corePulse {
+  0%, 100% { transform: scale(0.92); }
+  50%       { transform: scale(1.08); }
+}
+
+@keyframes orbitOne {
+  from { transform: rotate(0deg)    translateY(-86px) rotate(0deg); }
+  to   { transform: rotate(360deg)  translateY(-86px) rotate(-360deg); }
+}
+
+@keyframes orbitTwo {
+  from { transform: rotate(360deg)  translateY(-66px) rotate(-360deg); }
+  to   { transform: rotate(0deg)    translateY(-66px) rotate(0deg); }
+}
+
+@keyframes orbitThree {
+  from { transform: rotate(0deg)    translateY(-52px) rotate(0deg); }
+  to   { transform: rotate(-360deg) translateY(-52px) rotate(360deg); }
+}
+
+@keyframes loaderBar {
+  0%, 100% { transform: translateX(-10%); }
+  50%       { transform: translateX(125%); }
+}
+
+@keyframes highlightReveal {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes loaderBarShift {
+  from { background-position: 0% 50%; }
+  to   { background-position: 200% 50%; }
+}
+
+@keyframes sheenPass {
+  0%       { transform: translateX(-120%); }
+  55%, 100% { transform: translateX(120%); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { transform: scale(0.92); opacity: 0.72; }
+  50%       { transform: scale(1.06); opacity: 1; }
+}

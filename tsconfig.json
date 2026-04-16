@@ -1,0 +1,8 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./backend" },
+    { "path": "./los" },
+    { "path": "./customer" }
+  ]
+}

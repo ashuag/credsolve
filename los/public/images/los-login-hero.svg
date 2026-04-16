@@ -1,0 +1,86 @@
+<svg width="1600" height="1100" viewBox="0 0 1600 1100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="glowBlue" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1170 280) rotate(90) scale(360 360)">
+      <stop stop-color="#1496F3" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="#1496F3" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowGold" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(300 250) rotate(90) scale(300 300)">
+      <stop stop-color="#FFC519" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#FFC519" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowSoft" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(700 860) rotate(90) scale(340 340)">
+      <stop stop-color="#FFFFFF" stop-opacity="0.54"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="panelMain" x1="432" y1="175" x2="1144" y2="700" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#E7F3FF" stop-opacity="0.84"/>
+    </linearGradient>
+    <linearGradient id="panelSoft" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#FDFEFF" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#E7F3FF" stop-opacity="0.86"/>
+    </linearGradient>
+    <linearGradient id="navyCard" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#1B357E" stop-opacity="0.96"/>
+      <stop offset="1" stop-color="#1496F3" stop-opacity="0.94"/>
+    </linearGradient>
+    <linearGradient id="goldStroke" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#FFD34A"/>
+      <stop offset="1" stop-color="#F0AF00"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="300" cy="250" r="300" fill="url(#glowGold)"/>
+  <circle cx="1170" cy="280" r="360" fill="url(#glowBlue)"/>
+  <circle cx="700" cy="860" r="340" fill="url(#glowSoft)"/>
+
+  <g opacity="0.94">
+    <rect x="448" y="182" width="710" height="448" rx="42" transform="rotate(-5 448 182)" fill="url(#panelMain)" stroke="#D2E7FF" stroke-width="2"/>
+    <rect x="488" y="238" width="630" height="24" rx="12" transform="rotate(-5 488 238)" fill="#D9ECFF"/>
+    <rect x="488" y="290" width="174" height="144" rx="28" transform="rotate(-5 488 290)" fill="url(#panelSoft)" stroke="#D7EAFE"/>
+    <rect x="690" y="290" width="388" height="144" rx="28" transform="rotate(-5 690 290)" fill="url(#navyCard)"/>
+    <rect x="488" y="458" width="590" height="122" rx="28" transform="rotate(-5 488 458)" fill="url(#panelSoft)" stroke="#D7EAFE"/>
+    <rect x="522" y="332" width="62" height="10" rx="5" transform="rotate(-5 522 332)" fill="#9BCFFF"/>
+    <rect x="522" y="356" width="96" height="10" rx="5" transform="rotate(-5 522 356)" fill="#D1E7FB"/>
+    <rect x="522" y="380" width="76" height="10" rx="5" transform="rotate(-5 522 380)" fill="#D1E7FB"/>
+    <rect x="730" y="332" width="120" height="12" rx="6" transform="rotate(-5 730 332)" fill="#FFFFFF" fill-opacity="0.72"/>
+    <rect x="730" y="360" width="220" height="12" rx="6" transform="rotate(-5 730 360)" fill="#FFFFFF" fill-opacity="0.28"/>
+    <rect x="730" y="388" width="168" height="12" rx="6" transform="rotate(-5 730 388)" fill="#FFFFFF" fill-opacity="0.28"/>
+    <rect x="530" y="498" width="256" height="10" rx="5" transform="rotate(-5 530 498)" fill="#9BCFFF"/>
+    <rect x="530" y="524" width="488" height="10" rx="5" transform="rotate(-5 530 524)" fill="#D1E7FB"/>
+  </g>
+
+  <g opacity="0.98">
+    <rect x="236" y="444" width="256" height="170" rx="30" transform="rotate(-10 236 444)" fill="url(#navyCard)"/>
+    <rect x="274" y="500" width="74" height="54" rx="14" transform="rotate(-10 274 500)" fill="#FFC519" fill-opacity="0.96"/>
+    <rect x="366" y="500" width="88" height="16" rx="8" transform="rotate(-10 366 500)" fill="#FFFFFF" fill-opacity="0.8"/>
+    <rect x="366" y="528" width="58" height="16" rx="8" transform="rotate(-10 366 528)" fill="#FFFFFF" fill-opacity="0.34"/>
+    <rect x="274" y="574" width="180" height="14" rx="7" transform="rotate(-10 274 574)" fill="#FFFFFF" fill-opacity="0.2"/>
+  </g>
+
+  <g opacity="0.94">
+    <rect x="1128" y="566" width="238" height="238" rx="36" transform="rotate(7 1128 566)" fill="url(#panelSoft)" stroke="#D7EAFE" stroke-width="2"/>
+    <path d="M1248 630L1298 654V714C1298 745 1278 772 1248 786C1218 772 1198 745 1198 714V654L1248 630Z" fill="url(#navyCard)"/>
+    <path d="M1226 707L1243 724L1274 687" stroke="url(#goldStroke)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="1292" cy="618" r="22" fill="#FFC519"/>
+    <path d="M1282 618H1302" stroke="#17336F" stroke-width="6" stroke-linecap="round"/>
+    <path d="M1292 608V628" stroke="#17336F" stroke-width="6" stroke-linecap="round"/>
+  </g>
+
+  <g opacity="0.9">
+    <path d="M1110 262C1184 246 1232 216 1280 170C1312 140 1348 124 1396 120" stroke="url(#goldStroke)" stroke-width="14" stroke-linecap="round"/>
+    <path d="M1368 118H1406V156" stroke="url(#goldStroke)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M1100 862C1184 810 1240 760 1294 674" stroke="#1496F3" stroke-width="12" stroke-linecap="round"/>
+    <circle cx="1096" cy="864" r="18" fill="#1496F3"/>
+    <circle cx="1296" cy="672" r="18" fill="#FFC519"/>
+  </g>
+
+  <g opacity="0.82">
+    <circle cx="260" cy="770" r="18" fill="#1496F3"/>
+    <circle cx="310" cy="770" r="18" fill="#FFC519"/>
+    <circle cx="360" cy="770" r="18" fill="#17336F" fill-opacity="0.9"/>
+    <circle cx="410" cy="770" r="18" fill="#1496F3" fill-opacity="0.3"/>
+    <rect x="260" y="822" width="210" height="20" rx="10" fill="#CBE3FF"/>
+    <rect x="260" y="858" width="148" height="20" rx="10" fill="#E1EFFD"/>
+  </g>
+</svg>

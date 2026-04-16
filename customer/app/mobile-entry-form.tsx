@@ -1,0 +1,99 @@
+'use client';
+
+import { useState, type FormEvent } from 'react';
+import { sendCustomerOtp, type SendOtpResponse } from '@/lib/api/auth';
+import { isValidCustomerMobile, normalizeCustomerMobile } from '@/lib/mobile';
+
+const MOBILE_ERROR = 'Please enter a valid mobile number.';
+
+export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOtpResponse) => void }) {
+  const [mobileNumber, setMobileNumber] = useState('');
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const normalizedMobile = normalizeCustomerMobile(mobileNumber);
+
+    if (!isValidCustomerMobile(normalizedMobile)) {
+      setError(MOBILE_ERROR);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      const otpRequest = await sendCustomerOtp(normalizedMobile);
+
+      onSuccess?.(otpRequest);
+    } catch (submissionError) {
+      setError(submissionError instanceof Error ? submissionError.message : 'Unable to send OTP right now. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="grid gap-3 group/form" noValidate>
+      <label
+        className="text-[0.95rem] font-extrabold text-brand-navy transition-colors duration-[180ms] group-focus-within/form:text-brand-blue group-focus-within/form:-translate-y-px"
+        htmlFor="mobile"
+      >
+        Mobile number
+      </label>
+
+      <div
+        className={`group/field relative isolate overflow-hidden grid items-center min-h-[56px] rounded-[16px] border bg-white shadow-[0_10px_18px_rgba(23,44,113,0.04)] transition-all duration-[220ms] focus-within:-translate-y-0.5 focus-within:scale-[1.01] focus-within:border-[rgba(20,150,243,0.46)] focus-within:shadow-[0_22px_42px_rgba(23,44,113,0.12),0_0_0_6px_rgba(20,150,243,0.08)] focus-within:animate-mobile-border-pulse ${error ? 'border-[rgba(193,57,43,0.42)] shadow-[0_0_0_3px_rgba(193,57,43,0.08)]' : 'border-[rgba(18,36,79,0.16)]'}`}
+        style={{ gridTemplateColumns: '78px 1fr' }}
+      >
+          <span
+            className="inline-flex justify-center items-center h-full border-r border-[rgba(18,36,79,0.1)] text-brand-navy font-extrabold transition-colors duration-[180ms] group-focus-within/field:text-brand-blue group-focus-within/field:border-r-[rgba(20,150,243,0.16)]"
+          >
+            +91
+          </span>
+        <input
+          id="mobile"
+          name="mobile"
+          type="tel"
+          inputMode="numeric"
+          autoComplete="tel-national"
+          maxLength={10}
+          placeholder="9876543210"
+          required
+          value={mobileNumber}
+          onChange={(event) => {
+            const nextValue = normalizeCustomerMobile(event.target.value);
+            setMobileNumber(nextValue);
+            if (error && isValidCustomerMobile(nextValue)) {
+              setError('');
+            }
+          }}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? 'mobile-error' : 'mobile-help'}
+          className="w-full h-full px-4 border-0 outline-0 bg-transparent text-brand-navy text-[1.08rem] font-bold tracking-[0.01em] caret-brand-blue placeholder:text-[#93a0c1] placeholder:tracking-normal transition-transform duration-[220ms] group-focus-within/field:translate-x-0.5"
+        />
+      </div>
+
+      <div
+        id={error ? 'mobile-error' : 'mobile-help'}
+        className={`text-[0.9rem] leading-[1.55] ${error ? 'text-[#b2372d]' : 'text-brand-muted'}`}
+      >
+        {error || 'We will send a 6-digit OTP to this number to continue.'}
+      </div>
+
+      <button type="submit" className="mc-btn-primary w-full" disabled={isSubmitting}>
+          <span className="inline-flex items-center justify-center gap-[10px]">
+            {isSubmitting ? (
+              <span
+                className="w-[18px] h-[18px] rounded-full border-2 border-[rgba(255,248,223,0.28)] border-t-[#fff8df] animate-spin-btn"
+                aria-hidden
+              />
+            ) : null}
+            <span>{isSubmitting ? 'Sending OTP...' : 'Get OTP'}</span>
+          </span>
+      </button>
+    </form>
+  );
+}

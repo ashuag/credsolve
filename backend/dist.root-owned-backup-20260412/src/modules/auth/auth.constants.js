@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.CUSTOMER_AUTH_COOKIE_MAX_AGE_MS = exports.CUSTOMER_AUTH_COOKIE_NAME = exports.OTP_MAX_ATTEMPTS = exports.OTP_MAX_REQUESTS_PER_WINDOW = exports.OTP_RATE_LIMIT_WINDOW_SECONDS = exports.OTP_RESEND_AFTER_SECONDS = exports.OTP_EXPIRY_SECONDS = exports.OTP_LENGTH = void 0;
+exports.OTP_LENGTH = 6;
+exports.OTP_EXPIRY_SECONDS = 2 * 60;
+exports.OTP_RESEND_AFTER_SECONDS = 30;
+exports.OTP_RATE_LIMIT_WINDOW_SECONDS = 5 * 60;
+exports.OTP_MAX_REQUESTS_PER_WINDOW = 3;
+exports.OTP_MAX_ATTEMPTS = 5;
+exports.CUSTOMER_AUTH_COOKIE_NAME = 'access_token';
+exports.CUSTOMER_AUTH_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;

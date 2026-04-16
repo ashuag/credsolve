@@ -1,0 +1,18 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/health/route": "/health",
+  "/applications/page": "/applications",
+  "/dashboard/page": "/dashboard",
+  "/eligibility-criteria/credit-limit-eligibility-check/page": "/eligibility-criteria/credit-limit-eligibility-check",
+  "/agents/page": "/agents",
+  "/eligibility-criteria/page": "/eligibility-criteria",
+  "/eligibility-criteria/profile-eligibility-check/page": "/eligibility-criteria/profile-eligibility-check",
+  "/invite/[token]/page": "/invite/[token]",
+  "/leads/page": "/leads",
+  "/login/page": "/login",
+  "/masters/[master]/page": "/masters/[master]",
+  "/masters/page": "/masters",
+  "/page": "/",
+  "/partners/page": "/partners",
+  "/roles/page": "/roles"
+}

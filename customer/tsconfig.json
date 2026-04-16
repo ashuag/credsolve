@@ -1,0 +1,45 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "esnext",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "strict": true,
+    "composite": true,
+    "declaration": true,
+    "tsBuildInfoFile": "/tmp/moneyCash-customer.tsbuildinfo",
+    "esModuleInterop": true,
+    "jsx": "preserve",
+    "moduleResolution": "bundler",
+    "allowJs": true,
+    "incremental": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "next-env.d.ts",
+    ".next-local/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

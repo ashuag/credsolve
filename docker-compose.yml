@@ -1,0 +1,88 @@
+name: moneyCash
+
+services:
+  db:
+    image: mysql:8.0
+    command: --default-authentication-plugin=mysql_native_password
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: moneyCash
+      MYSQL_USER: moneyCash
+      MYSQL_PASSWORD: moneyCash
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3310:3306"
+    volumes:
+      - moneyCash_mysql_data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6385:6379"
+    volumes:
+      - moneyCash_redis_data:/data
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      CORS_ORIGINS: http://localhost:3010,http://localhost:3011,http://localhost:4001
+    depends_on:
+    - db
+    - redis
+    ports:
+      - "4001:4001"
+    working_dir: /workspace/backend
+    command: sh -c "npm install && npm run prisma:migrate:deploy && npm run seed && npm run dev"
+    volumes:
+      - ./backend:/workspace/backend
+      - backend_node_modules:/workspace/backend/node_modules
+
+  los:
+    build:
+      context: .
+      dockerfile: los/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./los/.env
+    environment:
+      API_SERVER_URL: http://backend:4000/api/los
+      NEXT_PUBLIC_API_URL: http://localhost:4001/api/los
+    depends_on:
+      - backend
+    ports:
+      - "3010:3000"
+    working_dir: /workspace/los
+    command: npm run dev
+    volumes:
+      - ./los:/workspace/los
+
+  customer:
+    build:
+      context: .
+      dockerfile: customer/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./customer/.env
+    environment:
+      API_SERVER_URL: http://backend:4000/api
+      NEXT_PUBLIC_API_URL: /api
+    depends_on:
+      - backend
+    ports:
+      - "3011:3001"
+    working_dir: /workspace/customer
+    command: npm run dev
+    volumes:
+      - ./customer:/workspace/customer  
+
+volumes:
+  moneyCash_mysql_data:
+  moneyCash_redis_data:
+  backend_node_modules:
