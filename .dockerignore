@@ -11,3 +11,8 @@ node_modules
 *.md
 .idea
 .vscode
+.claude
+.cursor
+backend/node_modules
+los/node_modules
+customer/node_modules
