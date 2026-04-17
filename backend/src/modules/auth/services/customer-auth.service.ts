@@ -1,4 +1,4 @@
-import {Injectable} from '@nestjs/common';
+import {Injectable, Logger} from '@nestjs/common';
 import {JwtService} from '@nestjs/jwt';
 import {CookieOptions, Request, Response} from 'express';
 import {CUSTOMER_AUTH_COOKIE_MAX_AGE_MS, CUSTOMER_AUTH_COOKIE_NAME} from '../auth.constants';
@@ -18,6 +18,7 @@ type GenerateTokenInput = Omit<CustomerJwtPayload, 'sub'> & { uuid: string };
 export class CustomerAuthService {
     private readonly authCookieOptions: CookieOptions;
     private readonly clearCookieOptions: CookieOptions;
+    private readonly logger = new Logger(CustomerAuthService.name);
 
     constructor(private readonly jwtService: JwtService) {
         const domain = process.env.COOKIE_DOMAIN?.trim() || undefined;

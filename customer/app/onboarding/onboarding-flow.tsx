@@ -6,7 +6,6 @@ import { Spinner } from '@/components/ui/spinner';
 import { SendEmailOtpResponse } from '@/lib/api/auth';
 import { getCustomerLeadStatus } from '@/lib/api/lead';
 import {
-  resolveCustomerFlowPath,
   syncCustomerOnboardingStateFromLeadStatus,
   syncCustomerOnboardingStateFromProfile
 } from '@/lib/customer-flow';
@@ -64,11 +63,6 @@ export function OnboardingFlow() {
 
       syncCustomerOnboardingStateFromLeadStatus(leadState);
 
-      if (leadState?.leadStatus === 'EMAIL_VERIFIED' || leadState?.leadStatus === 'DETAIL_STARTED') {
-        router.replace(resolveCustomerFlowPath(leadState.leadStatus, initialMode));
-        return;
-      }
-
       const onboardingState = readCustomerOnboardingState();
       const resolvedMode = onboardingState.emailMode ?? initialMode;
       const storedEmail = onboardingState.email?.trim() ?? '';
@@ -124,12 +118,12 @@ export function OnboardingFlow() {
 
   return (
     <>
-      {/* Left column — one form visible at a time via hidden attribute */}
+      {/* Left column — mount only active form to avoid premature API calls */}
       <div>
-        <div hidden={step !== 'email'}>
+        {step === 'email' && (
           <EmailEntryStep initialEmail={email} initialMode={emailMode} onNext={handleEmailNext} />
-        </div>
-        <div hidden={step !== 'email-otp'}>
+        )}
+        {step === 'email-otp' && (
           <EmailOtpStep
             email={email}
             mode={emailMode}
@@ -138,8 +132,8 @@ export function OnboardingFlow() {
             onBack={() => setStep('email')}
             onVerified={handleOtpVerified}
           />
-        </div>
-        <div hidden={step !== 'details'}>
+        )}
+        {step === 'details' && (
           <PersonalDetailsStep
             email={email}
             activeSection={detailsSection}
@@ -147,7 +141,7 @@ export function OnboardingFlow() {
             onBack={() => setStep('email-otp')}
             noticeMessage={detailsNotice}
           />
-        </div>
+        )}
       </div>
 
       {/* Right column — contextual aside per step */}

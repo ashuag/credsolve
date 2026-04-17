@@ -62,7 +62,7 @@ export function AccountDetailsForm() {
   const [submitError, setSubmitError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [panError, setPanError] = useState<PanErrorKind>(null);
-  const { cityOptions, genderOptions, isLoading: isLoadingLookups } = useCustomerDetailLookups();
+  const { cityOptions, genderOptions, isLoading: isLoadingLookups } = useCustomerDetailLookups({ enableApiFetch: false });
 
   const selectedDate = parseDobDisplay(dob);
 

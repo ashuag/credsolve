@@ -40,7 +40,7 @@ export function ProfessionalDetailsForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const { occupationOptions, isLoading: isLoadingLookups } = useCustomerDetailLookups();
+  const { occupationOptions, isLoading: isLoadingLookups } = useCustomerDetailLookups({ enableApiFetch: false });
 
   const isSelfEmployed = usesAnnualFinancialMetric(occupation || undefined);
   const usesSalary = usesMonthlyIncomeMetric(occupation || undefined);

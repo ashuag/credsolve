@@ -44,13 +44,28 @@ function dedupeOptions<T extends string>(options: Array<CustomerLookupOption<T>>
   });
 }
 
-export function useCustomerDetailLookups(): CustomerDetailLookupState {
+type UseCustomerDetailLookupsOptions = {
+  enableApiFetch?: boolean;
+};
+
+export function useCustomerDetailLookups(
+  options: UseCustomerDetailLookupsOptions = {}
+): CustomerDetailLookupState {
+  const { enableApiFetch = true } = options;
   const [cityOptions, setCityOptions] = useState<string[]>([]);
   const [genderOptions, setGenderOptions] = useState<Array<CustomerLookupOption<CustomerGenderValue>>>([]);
   const [occupationOptions, setOccupationOptions] = useState<Array<CustomerLookupOption<CustomerOccupationValue>>>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(enableApiFetch);
 
   useEffect(() => {
+    if (!enableApiFetch) {
+      setCityOptions([]);
+      setGenderOptions(CUSTOMER_GENDER_OPTIONS);
+      setOccupationOptions(CUSTOMER_OCCUPATION_OPTIONS);
+      setIsLoading(false);
+      return;
+    }
+
     let isActive = true;
 
     async function loadLookups() {
@@ -129,7 +144,7 @@ export function useCustomerDetailLookups(): CustomerDetailLookupState {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [enableApiFetch]);
 
   return {
     cityOptions,

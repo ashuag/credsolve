@@ -20,41 +20,14 @@ async function requestJson<T>(
   fallbackMessage: string
 ): Promise<T | null> {
   const requestUrl = `${getApiUrl()}${path}`;
-  // #region agent log
-  fetch('http://127.0.0.1:7639/ingest/a8665698-2866-40f5-889d-a7ac7451a90b',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1ec50e'},body:JSON.stringify({sessionId:'1ec50e',runId:'frontend-debug',hypothesisId:'F1',location:'customer/lib/api/client.ts:25',message:'API request start',data:{path,requestUrl,method:init.method ?? 'GET'},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-  console.log('[agent-debug][F1] api request start', {
-    path,
-    requestUrl,
-    method: init.method ?? 'GET',
-  });
   const response = await fetch(requestUrl, {
     credentials: 'include',
     ...init
   });
 
   const data = (await response.json().catch(() => null)) as T | ApiErrorShape | null;
-  // #region agent log
-  fetch('http://127.0.0.1:7639/ingest/a8665698-2866-40f5-889d-a7ac7451a90b',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1ec50e'},body:JSON.stringify({sessionId:'1ec50e',runId:'frontend-debug',hypothesisId:'F2',location:'customer/lib/api/client.ts:33',message:'API response received',data:{path,requestUrl,status:response.status,ok:response.ok,hasMessage:Boolean((data as ApiErrorShape | null)?.message)},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-  console.log('[agent-debug][F2] api response received', {
-    path,
-    requestUrl,
-    status: response.status,
-    ok: response.ok,
-    hasMessage: Boolean((data as ApiErrorShape | null)?.message),
-  });
 
   if (!response.ok) {
-    // #region agent log
-    fetch('http://127.0.0.1:7639/ingest/a8665698-2866-40f5-889d-a7ac7451a90b',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1ec50e'},body:JSON.stringify({sessionId:'1ec50e',runId:'frontend-debug',hypothesisId:'F2',location:'customer/lib/api/client.ts:37',message:'API response not ok',data:{path,requestUrl,status:response.status,errorMessage:extractErrorMessage(data, fallbackMessage)},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    console.log('[agent-debug][F2] api response not ok', {
-      path,
-      requestUrl,
-      status: response.status,
-      errorMessage: extractErrorMessage(data, fallbackMessage),
-    });
     throw new Error(extractErrorMessage(data, fallbackMessage));
   }
 

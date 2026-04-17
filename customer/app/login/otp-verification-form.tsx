@@ -8,7 +8,6 @@ import { AlertBanner } from '@/components/ui/alert-banner';
 import { FlowLoader } from '@/components/ui/flow-loader';
 import { OtpInputGrid } from '@/components/ui/otp-input-grid';
 import {
-  resolveCustomerFlowPath,
   syncCustomerOnboardingStateFromLeadStatus,
   syncCustomerOnboardingStateFromProfile
 } from '@/lib/customer-flow';
@@ -20,6 +19,7 @@ import { setCustomerProfile } from '@/lib/stores/customer-session-store';
 import { MobileEntryForm } from '@/app/mobile-entry-form';
 
 const OTP_LENGTH = 6;
+const EMAIL_VERIFIED_LEAD_STATUSES = new Set(['EMAIL_VERIFIED', 'DETAIL_STARTED', 'SUBMITTED', 'CONVERTED']);
 
 type OtpVerificationFormProps = {
   compact?: boolean;
@@ -74,13 +74,6 @@ export function OtpVerificationForm({
       setStatus('A fresh OTP has been sent to your mobile number.');
       otp.inputRefs.current[0]?.focus();
     } catch (err) {
-      // #region agent log
-      fetch('http://127.0.0.1:7639/ingest/a8665698-2866-40f5-889d-a7ac7451a90b',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1ec50e'},body:JSON.stringify({sessionId:'1ec50e',runId:'frontend-debug',hypothesisId:'F3',location:'customer/app/login/otp-verification-form.tsx:79',message:'Resend OTP failed in UI',data:{currentMobile,errorMessage:err instanceof Error ? err.message : 'unknown_error'},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-      console.log('[agent-debug][F3] resend otp failed', {
-        currentMobile,
-        errorMessage: err instanceof Error ? err.message : 'unknown_error',
-      });
       setError(err instanceof Error ? err.message : 'Unable to resend OTP right now.');
     } finally {
       setIsResending(false);
@@ -134,18 +127,12 @@ export function OtpVerificationForm({
           mobileNumber: nextProfile?.mobileNumber ?? verification.mobileNumber ?? currentMobile,
           leadUuid: leadState?.leadId ?? verification.leadId ?? undefined,
           emailMode: nextOnboardingMode,
+          emailVerified: EMAIL_VERIFIED_LEAD_STATUSES.has(leadState?.leadStatus ?? ''),
         });
 
-        router.push(resolveCustomerFlowPath(leadState?.leadStatus, nextOnboardingMode));
+        router.push(`/onboarding?mode=${nextOnboardingMode}`);
       });
     } catch (err) {
-      // #region agent log
-      fetch('http://127.0.0.1:7639/ingest/a8665698-2866-40f5-889d-a7ac7451a90b',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1ec50e'},body:JSON.stringify({sessionId:'1ec50e',runId:'frontend-debug',hypothesisId:'F4',location:'customer/app/login/otp-verification-form.tsx:138',message:'Verify OTP failed in UI',data:{requestId:otpRequest?.requestId,errorMessage:err instanceof Error ? err.message : 'unknown_error'},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-      console.log('[agent-debug][F4] verify otp failed', {
-        requestId: otpRequest?.requestId,
-        errorMessage: err instanceof Error ? err.message : 'unknown_error',
-      });
       setError(err instanceof Error ? err.message : 'Unable to verify OTP right now.');
       setIsVerifying(false);
     }

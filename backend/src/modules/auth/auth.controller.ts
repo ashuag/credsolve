@@ -10,7 +10,7 @@ import {VerifyOtpResponseDto} from './dto/outputDto/verify-otp-response.dto';
 import {CustomerAuthService} from './services/customer-auth.service';
 import {GetOtpTypesUseCase} from './use-cases/get-otp-types.usecase';
 import {SendOtpUseCase} from './use-cases/send-otp.usecase';
-import {VerifyOtpUseCase, type VerifyOtpResult} from './use-cases/verify-otp.usecase';
+import {type VerifyOtpResult, VerifyOtpUseCase} from './use-cases/verify-otp.usecase';
 import {GoogleOAuthService} from './services/google-oauth.service';
 
 @ApiTags('Auth')
@@ -127,13 +127,11 @@ export class AuthController {
     @ApiOkResponse({type: VerifyOtpResponseDto})
     @Post('verify-otp')
     async verifyOtp(
-        @Body() dto: VerifyOtpDto,
-        @Res({passthrough: true}) response: Response
+        @Body() dto: VerifyOtpDto
     ): Promise<VerifyOtpResponseDto> {
         const verification = await this.verifyOtpUseCase.execute(dto);
 
-        if (dto.type === OTP_TYPE.MOBILE && verification.token) {
-            this.customerAuthService.setAuthCookie(response, verification.token);
+        if (dto.type === OTP_TYPE.MOBILE) {
             return this.buildMobileVerificationResponse(verification);
         }
 
@@ -193,9 +191,7 @@ export class AuthController {
         }
 
         return {
-            authenticated: true,
-            customerId: auth.customer.sub,
-            mobileNumber: auth.customer.mobileNumber
+            authenticated: true
         };
     }
 
