@@ -293,10 +293,10 @@ export class GoogleOAuthService {
     const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
     const callbackUrl = process.env.GOOGLE_CALLBACK_URL?.trim();
-    const frontendCallbackUrl = process.env.GOOGLE_FRONTEND_CALLBACK_URL?.trim() || 'http://localhost:3011/auth/google/callback';
+    const frontendCallbackUrl = process.env.GOOGLE_FRONTEND_CALLBACK_URL?.trim();
     const stateSecret = process.env.GOOGLE_STATE_SECRET?.trim() || process.env.JWT_SECRET?.trim();
 
-    if (!clientId || !clientSecret || !callbackUrl || !stateSecret) {
+    if (!clientId || !clientSecret || !callbackUrl || !frontendCallbackUrl || !stateSecret) {
       throw new UnauthorizedException('Google login is not configured yet.');
     }
 

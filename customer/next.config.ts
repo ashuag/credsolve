@@ -1,6 +1,6 @@
 import type { NextConfig } from 'next';
 
-const extraAllowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? '')
+const allowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? '')
   .split(',')
   .map((value) => value.trim())
   .filter(Boolean);
@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
   // Next dev can intermittently miss generated manifests with custom distDir.
   // Keep default `.next` for development and allow overrides for non-dev runs.
   distDir: isProductionRuntime ? envDistDir || '.next' : '.next',
-  allowedDevOrigins: ['localhost', '127.0.0.1', ...extraAllowedDevOrigins],
+  allowedDevOrigins,
   async rewrites() {
     return [
       {

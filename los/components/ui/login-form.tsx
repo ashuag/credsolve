@@ -3,9 +3,10 @@
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LOS_COOKIE_NAME, LOS_STORAGE_KEY } from '@/lib/auth';
+import { getLosClientApiBase } from '@/lib/api-env';
 import { useNavigationProgress } from '@/components/ui/navigation-progress-provider';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4001/api/los';
+const API_URL = getLosClientApiBase();
 
 type LoginResponse = {
   token?: string;

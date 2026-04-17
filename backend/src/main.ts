@@ -34,8 +34,14 @@ async function bootstrap() {
   const port = Number(process.env.PORT ?? DEFAULT_PORT);
   await app.listen(port);
 
-  Logger.log(`🚀 Backend running on http://localhost:${port}`, 'Bootstrap');
-  Logger.log(`📖 Swagger at http://localhost:${port}/${API_PREFIX}/docs`, 'Bootstrap');
+  const publicBase = process.env.BACKEND_PUBLIC_BASE_URL?.trim().replace(/\/$/, '');
+  if (publicBase) {
+    Logger.log(`🚀 Backend running on ${publicBase}`, 'Bootstrap');
+    Logger.log(`📖 Swagger at ${publicBase}/${API_PREFIX}/docs`, 'Bootstrap');
+  } else {
+    Logger.log(`🚀 Backend listening on port ${port}`, 'Bootstrap');
+    Logger.log(`📖 Swagger at /${API_PREFIX}/docs (set BACKEND_PUBLIC_BASE_URL for full URL in logs)`, 'Bootstrap');
+  }
 }
 
 bootstrap();

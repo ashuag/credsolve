@@ -6,7 +6,9 @@
     "node": ">=20.19.0"
   },
   "scripts": {
-    "dev": "npm --prefix backend run dev & npm --prefix los run dev & npm --prefix customer run dev",
+    "dev": "npm --prefix backend run dev",
+    "dev:apps": "npm --prefix los run dev & npm --prefix customer run dev",
+    "dev:all": "npm --prefix backend run dev & npm --prefix los run dev & npm --prefix customer run dev",
     "build": "npm --prefix backend run build && npm --prefix los run build && npm --prefix customer run build",
     "lint": "npm --prefix backend run lint && npm --prefix los run lint && npm --prefix customer run lint",
     "db:validate": "npm --prefix backend run prisma:validate",

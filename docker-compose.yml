@@ -54,10 +54,11 @@ services:
     environment:
       API_SERVER_URL: http://backend:4001/api/los
       NEXT_PUBLIC_API_URL: http://localhost:4001/api/los
+      NEXT_ALLOWED_DEV_ORIGINS: localhost,127.0.0.1
     depends_on:
       - backend
     ports:
-      - "3010:3000"
+      - "3010:3010"
     working_dir: /workspace/los
     command: npm run dev
     volumes:
@@ -74,10 +75,11 @@ services:
     environment:
       API_SERVER_URL: http://backend:4001/api
       NEXT_PUBLIC_API_URL: /api
+      NEXT_ALLOWED_DEV_ORIGINS: localhost,127.0.0.1
     depends_on:
       - backend
     ports:
-      - "3011:3001"
+      - "3011:3011"
     working_dir: /workspace/customer
     command: npm run dev
     volumes:

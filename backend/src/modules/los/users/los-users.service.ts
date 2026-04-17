@@ -1,5 +1,11 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -247,7 +253,10 @@ export class LosUsersService {
   }
 
   private buildInvitationLink(token: string) {
-    const baseUrl = this.configService.get<string>('LOS_FRONTEND_URL')?.trim() || 'http://localhost:3010';
+    const baseUrl = this.configService.get<string>('LOS_FRONTEND_URL')?.trim();
+    if (!baseUrl) {
+      throw new InternalServerErrorException('LOS_FRONTEND_URL is not configured.');
+    }
 
     return `${baseUrl.replace(/\/+$/, '')}/invite/${token}`;
   }

@@ -1,7 +1,5 @@
-import { DEFAULT_CORS_ORIGINS } from '../common/constants/app.constants';
-
 export function getCorsOrigins() {
-  const configuredOrigins = (process.env.CORS_ORIGINS ?? DEFAULT_CORS_ORIGINS.join(','))
+  const configuredOrigins = (process.env.CORS_ORIGINS ?? '')
     .split(',')
     .map((origin: string) => origin.trim())
     .filter(Boolean);

@@ -1,4 +1,6 @@
-const API_URL = process.env.API_SERVER_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4001/api/los';
+import { getLosClientApiBase, getLosServerApiBase } from './api-env';
+
+const API_URL = getLosServerApiBase();
 const SERVER_REVALIDATE_SECONDS = 30;
 const CLIENT_READ_CACHE_TTL_MS = 30_000;
 
@@ -69,7 +71,7 @@ export async function getPartners() {
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
 function clientApiUrl() {
-  return process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4001/api/los';
+  return getLosClientApiBase();
 }
 
 async function parseJsonResponse(response: Response) {
