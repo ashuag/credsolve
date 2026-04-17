@@ -34,7 +34,6 @@ pnpm-debug.log*
 ## OS files
 .DS_Store
 Thumbs.db
-
 ## Generated code
 /backend/src/generated/prisma/
 los/.next/

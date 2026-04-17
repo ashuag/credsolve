@@ -10,6 +10,10 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
   const [mobileNumber, setMobileNumber] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+
+  const hasActiveMobileBorder = !error && (isFocused || mobileNumber.length > 0);
+  const mobileFieldClassName = `group/field relative isolate overflow-hidden grid items-center min-h-[56px] rounded-[16px] border bg-white transition-all duration-[220ms] ${error ? 'border-[rgba(193,57,43,0.42)] shadow-[0_0_0_3px_rgba(193,57,43,0.08)]' : hasActiveMobileBorder ? 'border-[rgba(20,150,243,0.46)] shadow-[0_22px_42px_rgba(23,44,113,0.12),0_0_0_6px_rgba(20,150,243,0.08)]' : 'border-[rgba(18,36,79,0.16)] shadow-[0_10px_18px_rgba(23,44,113,0.04)]'} ${isFocused ? 'focus-within:-translate-y-0.5 focus-within:scale-[1.01] focus-within:animate-mobile-border-pulse' : ''}`;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,10 +48,7 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
         Mobile number
       </label>
 
-      <div
-        className={`group/field relative isolate overflow-hidden grid items-center min-h-[56px] rounded-[16px] border bg-white shadow-[0_10px_18px_rgba(23,44,113,0.04)] transition-all duration-[220ms] focus-within:-translate-y-0.5 focus-within:scale-[1.01] focus-within:border-[rgba(20,150,243,0.46)] focus-within:shadow-[0_22px_42px_rgba(23,44,113,0.12),0_0_0_6px_rgba(20,150,243,0.08)] focus-within:animate-mobile-border-pulse ${error ? 'border-[rgba(193,57,43,0.42)] shadow-[0_0_0_3px_rgba(193,57,43,0.08)]' : 'border-[rgba(18,36,79,0.16)]'}`}
-        style={{ gridTemplateColumns: '78px 1fr' }}
-      >
+      <div className={mobileFieldClassName} style={{ gridTemplateColumns: '78px 1fr' }}>
           <span
             className="inline-flex justify-center items-center h-full border-r border-[rgba(18,36,79,0.1)] text-brand-navy font-extrabold transition-colors duration-[180ms] group-focus-within/field:text-brand-blue group-focus-within/field:border-r-[rgba(20,150,243,0.16)]"
           >
@@ -63,6 +64,12 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
           placeholder="9876543210"
           required
           value={mobileNumber}
+          onFocus={() => {
+            setIsFocused(true);
+          }}
+          onBlur={() => {
+            setIsFocused(false);
+          }}
           onChange={(event) => {
             const nextValue = normalizeCustomerMobile(event.target.value);
             setMobileNumber(nextValue);
