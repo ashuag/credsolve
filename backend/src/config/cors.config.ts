@@ -110,24 +110,15 @@ export function createCorsOriginMatcher() {
 
   return (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
     if (!origin) {
-      // #region agent log
-      fetch('http://127.0.0.1:7639/ingest/a8665698-2866-40f5-889d-a7ac7451a90b',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1ec50e'},body:JSON.stringify({sessionId:'1ec50e',runId:'pre-fix',hypothesisId:'H2',location:'backend/src/config/cors.config.ts:113',message:'CORS check without origin header',data:{allowedOrigins},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       callback(null, true);
       return;
     }
 
     if (isConfiguredOrigin(origin, allowedOrigins) || isAllowedDevOrigin(origin, allowedOrigins)) {
-      // #region agent log
-      fetch('http://127.0.0.1:7639/ingest/a8665698-2866-40f5-889d-a7ac7451a90b',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1ec50e'},body:JSON.stringify({sessionId:'1ec50e',runId:'pre-fix',hypothesisId:'H2',location:'backend/src/config/cors.config.ts:120',message:'CORS origin allowed',data:{origin,allowedOrigins},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       callback(null, true);
       return;
     }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7639/ingest/a8665698-2866-40f5-889d-a7ac7451a90b',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1ec50e'},body:JSON.stringify({sessionId:'1ec50e',runId:'pre-fix',hypothesisId:'H2',location:'backend/src/config/cors.config.ts:126',message:'CORS origin blocked',data:{origin,allowedOrigins},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     callback(new Error(`CORS blocked for origin: ${origin}`), false);
   };
 }

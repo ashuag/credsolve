@@ -34,12 +34,12 @@ services:
     environment:
       CORS_ORIGINS: http://localhost:3010,http://localhost:3011,http://localhost:4001
     depends_on:
-    - db
-    - redis
+      - db
+      - redis
     ports:
       - "4001:4001"
     working_dir: /workspace/backend
-    command: sh -c "npm install && npm run prisma:migrate:deploy && npm run seed && npm run dev"
+    command: sh -c "npm run prisma:migrate:deploy && npm run seed && npm run dev"
     volumes:
       - ./backend:/workspace/backend
       - backend_node_modules:/workspace/backend/node_modules
@@ -52,7 +52,7 @@ services:
     env_file:
       - ./los/.env
     environment:
-      API_SERVER_URL: http://backend:4000/api/los
+      API_SERVER_URL: http://backend:4001/api/los
       NEXT_PUBLIC_API_URL: http://localhost:4001/api/los
     depends_on:
       - backend
@@ -62,6 +62,7 @@ services:
     command: npm run dev
     volumes:
       - ./los:/workspace/los
+      - los_node_modules:/workspace/los/node_modules
 
   customer:
     build:
@@ -71,7 +72,7 @@ services:
     env_file:
       - ./customer/.env
     environment:
-      API_SERVER_URL: http://backend:4000/api
+      API_SERVER_URL: http://backend:4001/api
       NEXT_PUBLIC_API_URL: /api
     depends_on:
       - backend
@@ -80,9 +81,12 @@ services:
     working_dir: /workspace/customer
     command: npm run dev
     volumes:
-      - ./customer:/workspace/customer  
+      - ./customer:/workspace/customer
+      - customer_node_modules:/workspace/customer/node_modules
 
 volumes:
   moneyCash_mysql_data:
   moneyCash_redis_data:
   backend_node_modules:
+  los_node_modules:
+  customer_node_modules:

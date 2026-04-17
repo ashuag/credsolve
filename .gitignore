@@ -37,3 +37,5 @@ Thumbs.db
 
 ## Generated code
 /backend/src/generated/prisma/
+los/.next/
+customer/.next/
