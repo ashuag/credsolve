@@ -1,7 +1,9 @@
 import 'dotenv/config';
 import {PrismaMariaDb} from '@prisma/adapter-mariadb';
 import {PrismaClient} from '@prisma/client';
-import type {PoolConfig} from 'mariadb';
+
+/** Use the adapter's expected config type so we do not mix two copies of `mariadb` typings (root vs nested). */
+type PrismaMariaDbConfig = ConstructorParameters<typeof PrismaMariaDb>[0];
 
 function getDatabaseUrl() {
   const databaseUrl = process.env.DATABASE_URL?.trim();
@@ -13,7 +15,7 @@ function getDatabaseUrl() {
   return databaseUrl;
 }
 
-function createPoolConfig(databaseUrl: string): PoolConfig | string {
+function createPoolConfig(databaseUrl: string): PrismaMariaDbConfig {
   try {
     const url = new URL(databaseUrl);
 

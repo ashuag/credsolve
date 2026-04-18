@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { RedisService } from '../../../../common/redis/redis.service';
 import type { CustomerSessionPayload } from '../../application/contracts/customer-session-payload.contract';
@@ -34,6 +34,8 @@ function buildCookieOptions(maxAgeMs: number) {
 
 @Injectable()
 export class CustomerSessionService {
+  private readonly logger = new Logger(CustomerSessionService.name);
+
   constructor(
     private readonly redisService: RedisService,
     private readonly settingsRepository: SettingsRepository
@@ -99,55 +101,60 @@ export class CustomerSessionService {
       return;
     }
 
-    const raw = await this.redisService.client.get(this.storageKey(sid));
-    if (!raw) {
-      return;
-    }
-
-    let data: StoredCustomerSession;
     try {
-      data = JSON.parse(raw) as StoredCustomerSession;
-    } catch {
-      await this.redisService.client.del(this.storageKey(sid));
-      return;
-    }
-
-    if (typeof data.sub !== 'string' || typeof data.mobile !== 'string') {
-      await this.redisService.client.del(this.storageKey(sid));
-      return;
-    }
-
-    const xf = req.headers['x-forwarded-for'];
-    const ip =
-      (typeof xf === 'string' && xf.length > 0 ? xf.split(',')[0]?.trim() : undefined) ||
-      req.socket.remoteAddress ||
-      undefined;
-    const ua = typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined;
-
-    const now = new Date().toISOString();
-    data.lastSeenAt = now;
-    data.lastIp = ip;
-    data.lastUa = ua;
-
-    const ttl = settings.sessionTtlMs;
-    const serialized = JSON.stringify(data);
-
-    if (settings.sessionRotateOnUse) {
-      const newSid = this.newSessionId();
-      const pipeline = this.redisService.client.pipeline();
-      pipeline.set(this.storageKey(newSid), serialized, 'PX', ttl);
-      pipeline.del(this.storageKey(sid));
-      await pipeline.exec();
-      res.cookie(settings.authCookieName, newSid, buildCookieOptions(ttl));
-    } else if (settings.sessionSliding) {
-      await this.redisService.client.set(this.storageKey(sid), serialized, 'PX', ttl);
-    } else {
-      const remaining = await this.redisService.client.pttl(this.storageKey(sid));
-      if (remaining > 0) {
-        await this.redisService.client.set(this.storageKey(sid), serialized, 'PX', remaining);
+      const raw = await this.redisService.client.get(this.storageKey(sid));
+      if (!raw) {
+        return;
       }
-    }
 
-    req.customerSession = { sub: data.sub, mobile: data.mobile };
+      let data: StoredCustomerSession;
+      try {
+        data = JSON.parse(raw) as StoredCustomerSession;
+      } catch {
+        await this.redisService.client.del(this.storageKey(sid));
+        return;
+      }
+
+      if (typeof data.sub !== 'string' || typeof data.mobile !== 'string') {
+        await this.redisService.client.del(this.storageKey(sid));
+        return;
+      }
+
+      const xf = req.headers['x-forwarded-for'];
+      const ip =
+        (typeof xf === 'string' && xf.length > 0 ? xf.split(',')[0]?.trim() : undefined) ||
+        req.socket.remoteAddress ||
+        undefined;
+      const ua = typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined;
+
+      const now = new Date().toISOString();
+      data.lastSeenAt = now;
+      data.lastIp = ip;
+      data.lastUa = ua;
+
+      const ttl = settings.sessionTtlMs;
+      const serialized = JSON.stringify(data);
+
+      if (settings.sessionRotateOnUse) {
+        const newSid = this.newSessionId();
+        const pipeline = this.redisService.client.pipeline();
+        pipeline.set(this.storageKey(newSid), serialized, 'PX', ttl);
+        pipeline.del(this.storageKey(sid));
+        await pipeline.exec();
+        res.cookie(settings.authCookieName, newSid, buildCookieOptions(ttl));
+      } else if (settings.sessionSliding) {
+        await this.redisService.client.set(this.storageKey(sid), serialized, 'PX', ttl);
+      } else {
+        const remaining = await this.redisService.client.pttl(this.storageKey(sid));
+        if (remaining > 0) {
+          await this.redisService.client.set(this.storageKey(sid), serialized, 'PX', remaining);
+        }
+      }
+
+      req.customerSession = { sub: data.sub, mobile: data.mobile };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Redis session attach failed (continuing without session): ${msg}`);
+    }
   }
 }

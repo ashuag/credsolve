@@ -36,6 +36,22 @@ function decimalToString(value: { toString(): string } | null | undefined): stri
   return value.toString();
 }
 
+/** ISO date-only string for portal; never throws on bad DB values. */
+function formatDateOfBirthForPortal(dateOfBirth: Date | null | undefined): string | null {
+  if (dateOfBirth == null) {
+    return null;
+  }
+  const t = dateOfBirth.getTime();
+  if (Number.isNaN(t)) {
+    return null;
+  }
+  try {
+    return dateOfBirth.toISOString().slice(0, 10);
+  } catch {
+    return null;
+  }
+}
+
 export function mapGenderDbNameToPortalSlug(name: string | null | undefined): CustomerPortalGenderSlug | null {
   if (!name) return null;
   return GENDER_DB_TO_SLUG[name] ?? null;
@@ -86,10 +102,7 @@ export function formatLeadDetailForPortal(detail: {
     return null;
   }
 
-  const dob =
-    detail.dateOfBirth != null
-      ? detail.dateOfBirth.toISOString().slice(0, 10)
-      : null;
+  const dob = formatDateOfBirthForPortal(detail.dateOfBirth);
 
   const currentCity =
     detail.city != null ? `${detail.city.name}, ${detail.city.state.code}` : null;

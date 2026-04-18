@@ -48,7 +48,8 @@ services:
     ports:
       - "4001:4001"
     working_dir: /workspace/backend
-    command: sh -c "npm run prisma:migrate:deploy && npm run seed && npm run dev"
+    # `npm ci` keeps the named volume in sync with package-lock (avoids stale node_modules after new deps, e.g. ioredis).
+    command: sh -c "npm ci && npm run prisma:migrate:deploy && npm run seed && npm run dev"
     volumes:
       - ./backend:/workspace/backend
       - backend_node_modules:/workspace/backend/node_modules

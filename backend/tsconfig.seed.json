@@ -4,6 +4,6 @@
     "rootDir": ".",
     "outDir": "./build-seed"
   },
-  "include": ["prisma/**/*.ts", "src/common/**/*.ts"],
+  "include": ["prisma/**/*.ts", "src/common/constants/**/*.ts"],
   "exclude": ["node_modules", "build", "dist", "src/generated/**/*"]
 }

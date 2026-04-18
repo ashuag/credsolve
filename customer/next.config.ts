@@ -4,13 +4,24 @@ const allowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? '')
   .split(',')
   .map((value) => value.trim())
   .filter(Boolean);
-const apiProxyTarget = (process.env.API_SERVER_URL ?? process.env.NEXT_PUBLIC_API_URL)?.replace(/\/$/, '');
+
+/** Used only for server-side rewrites; must be an absolute origin (see error below). */
+const rawApiTarget = process.env.API_SERVER_URL ?? process.env.NEXT_PUBLIC_API_URL;
+const apiProxyTarget = rawApiTarget?.replace(/\/$/, '');
 const authProxyTarget = apiProxyTarget?.replace(/\/api$/, '');
 const envDistDir = process.env.NEXT_DIST_DIR?.trim();
 const isProductionRuntime = (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
 
 if (!apiProxyTarget) {
   throw new Error('Missing API_SERVER_URL or NEXT_PUBLIC_API_URL in customer environment.');
+}
+
+if (!/^https?:\/\//i.test(apiProxyTarget)) {
+  throw new Error(
+    'Customer app rewrites need an absolute API URL. Set API_SERVER_URL=http://localhost:4001/api ' +
+      '(host dev) or API_SERVER_URL=http://backend:4001/api (Docker). ' +
+      'Using only NEXT_PUBLIC_API_URL=/api breaks proxying and causes 500s on /api/*.'
+  );
 }
 
 const nextConfig: NextConfig = {

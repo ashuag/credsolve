@@ -1,7 +1,8 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { SendOtpDto } from '../application/dto/send-otp.dto';
+import { VerifyOtpSuccessResponseDto } from '../application/dto/verify-otp-response.dto';
 import { VerifyOtpDto } from '../application/dto/verify-otp.dto';
 import { GetCustomerSessionUseCase } from '../application/use-cases/get-customer-session.use-case';
 import { LogoutUseCase } from '../application/use-cases/logout.use-case';
@@ -40,13 +41,30 @@ export class AuthController {
   }
 
   @Post('verify-otp')
-  @ApiOperation({ summary: 'Verify OTP for mobile (creates session) or email (updates lead email)' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verify OTP for mobile (creates Redis session + Set-Cookie) or email (updates lead email)',
+    description:
+      'On success, the JSON body always includes `success`, `requestId`, `verified`, and `verifiedAt`. ' +
+      'Mobile verification also returns `customerId`, `mobileNumber`, `leadId`, and `leadStatus`. ' +
+      'The session identifier is only sent as an HttpOnly `Set-Cookie` (opaque id), never in this JSON body.',
+  })
+  @ApiOkResponse({
+    type: VerifyOtpSuccessResponseDto,
+    headers: {
+      'Set-Cookie': {
+        description:
+          'After mobile OTP: HttpOnly cookie (e.g. `mc_sid=<opaque>`) with the Redis-backed session id. Not sent for email-only OTP.',
+        schema: { type: 'string' },
+      },
+    },
+  })
   async verifyOtpRoute(@Body() body: VerifyOtpDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const out = await this.verifyOtpFlow.execute(body, req.customerSession, {
       ip: readClientIp(req),
       userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
     });
-    const { sessionCookie, ...json } = out;
+    const { sessionCookie, ...rest } = out;
     if (sessionCookie) {
       res.cookie(sessionCookie.name, sessionCookie.sessionId, {
         httpOnly: true,
@@ -56,7 +74,17 @@ export class AuthController {
         maxAge: sessionCookie.maxAgeMs,
       });
     }
-    return json;
+    const bodyJson: VerifyOtpSuccessResponseDto = {
+      success: rest.success,
+      requestId: rest.requestId,
+      verified: rest.verified,
+      verifiedAt: rest.verifiedAt,
+      customerId: rest.customerId,
+      mobileNumber: rest.mobileNumber,
+      leadId: rest.leadId ?? undefined,
+      leadStatus: rest.leadStatus ?? undefined,
+    };
+    return bodyJson;
   }
 
   @Get('me')

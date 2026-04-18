@@ -32,11 +32,12 @@ export type SendOtpResponse = {
   debugOtp?: string;
 };
 
+/** Matches backend `VerifyOtpSuccessResponseDto` for mobile OTP (session is HttpOnly `Set-Cookie`, not in JSON). */
 export type VerifyCustomerOtpResponse = {
-  success?: boolean;
-  requestId?: string;
-  verified?: boolean;
-  verifiedAt?: string;
+  success: boolean;
+  requestId: string;
+  verified: boolean;
+  verifiedAt: string;
   leadId?: string;
   leadStatus?: string;
   customerId?: string;
