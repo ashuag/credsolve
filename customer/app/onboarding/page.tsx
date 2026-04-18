@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { OnboardingFlow } from './onboarding-flow';
+import { OnboardingFlow } from '@/components/onboarding/onboarding-flow';
 
 export const metadata: Metadata = {
   title: 'Complete Your Profile | MoneyCash',

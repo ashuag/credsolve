@@ -1,9 +1,16 @@
 import { Module } from '@nestjs/common';
+import { RedisIpRateLimitGuard } from '../../common/rate-limit/redis-ip-rate-limit.guard';
+import { CheckLoanEligibilityUseCase } from './application/use-cases/check-loan-eligibility.use-case';
+import { GetCustomerLeadStatusUseCase } from './application/use-cases/get-customer-lead-status.use-case';
 import { GetCustomerSessionUseCase } from './application/use-cases/get-customer-session.use-case';
 import { LogoutUseCase } from './application/use-cases/logout.use-case';
 import { SendOtpUseCase } from './application/use-cases/send-otp.use-case';
+import { SaveLeadDetailsUseCase } from './application/use-cases/save-lead-details.use-case';
+import { SubmitProfessionalApplicationUseCase } from './application/use-cases/submit-professional-application.use-case';
+import { SyncLeadEmailFromGoogleTokenUseCase } from './application/use-cases/sync-lead-email-from-google-token.use-case';
 import { VerifyOtpUseCase } from './application/use-cases/verify-otp.use-case';
 import { OtpCodeGenerator } from './infrastructure/crypto/otp-code.generator';
+import { CustomerGoogleOauthService } from './infrastructure/google/customer-google-oauth.service';
 import { CustomerRepository } from './infrastructure/repositories/customer.repository';
 import { LeadRepository } from './infrastructure/repositories/lead.repository';
 import { LeadStatusRepository } from './infrastructure/repositories/lead-status.repository';
@@ -12,11 +19,23 @@ import { OtpTypeRepository } from './infrastructure/repositories/otp-type.reposi
 import { SettingsRepository } from './infrastructure/repositories/settings.repository';
 import { CustomerSessionService } from './infrastructure/session/customer-session.service';
 import { AuthController } from './presentation/auth.controller';
+import { CustomerLeadsController } from './presentation/customer-leads.controller';
+import { ApplicationsController } from './presentation/applications.controller';
+import { LoansController } from './presentation/loans.controller';
+import { LookupController } from './presentation/lookup.controller';
 import { OptionalCustomerSessionGuard } from './presentation/guards/optional-customer-session.guard';
+import { RequiredCustomerSessionGuard } from './presentation/guards/required-customer-session.guard';
 
 @Module({
-  controllers: [AuthController],
+  controllers: [
+    AuthController,
+    ApplicationsController,
+    CustomerLeadsController,
+    LoansController,
+    LookupController,
+  ],
   providers: [
+    RedisIpRateLimitGuard,
     OtpCodeGenerator,
     CustomerSessionService,
     OtpTypeRepository,
@@ -26,6 +45,13 @@ import { OptionalCustomerSessionGuard } from './presentation/guards/optional-cus
     LeadStatusRepository,
     SettingsRepository,
     OptionalCustomerSessionGuard,
+    RequiredCustomerSessionGuard,
+    CustomerGoogleOauthService,
+    SyncLeadEmailFromGoogleTokenUseCase,
+    SaveLeadDetailsUseCase,
+    GetCustomerLeadStatusUseCase,
+    CheckLoanEligibilityUseCase,
+    SubmitProfessionalApplicationUseCase,
     SendOtpUseCase,
     VerifyOtpUseCase,
     GetCustomerSessionUseCase,

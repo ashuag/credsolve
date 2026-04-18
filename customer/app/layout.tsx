@@ -1,6 +1,15 @@
 import './globals.css';
 import type {Metadata, Viewport} from 'next';
+import {Inter} from 'next/font/google';
 import {ReactNode} from 'react';
+
+const inter = Inter({
+    subsets: ['latin'],
+    display: 'swap',
+    weight: ['400', '600', '700', '800'],
+    variable: '--font-inter',
+    adjustFontFallback: true,
+});
 import {CustomerUtmBootstrap} from '@/components/auth/customer-utm-bootstrap';
 import {BrandHeader} from '@/components/layout/brand-header';
 import {CustomerSessionProvider} from '@/components/providers/customer-session-provider';
@@ -34,14 +43,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({children}: Readonly<{ children: ReactNode }>) {
     return (
-        <html lang="en">
+        <html lang="en" className={`${inter.variable} ${inter.className}`}>
         <head>
-            <link rel="preconnect" href="https://fonts.googleapis.com"/>
-            <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous"/>
-            <link
-                href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"
-                rel="stylesheet"
-            />
             <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>
             <title>Get Instant Loan Upto 50,000</title>
         </head>

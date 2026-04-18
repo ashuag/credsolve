@@ -1,14 +1,20 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
+import { RateLimitByRoute } from '../../../common/rate-limit/rate-limit-route.decorator';
+import { RedisIpRateLimitGuard } from '../../../common/rate-limit/redis-ip-rate-limit.guard';
+import { SaveLeadDetailsDto } from '../application/dto/save-lead-details.dto';
 import { SendOtpDto } from '../application/dto/send-otp.dto';
 import { VerifyOtpSuccessResponseDto } from '../application/dto/verify-otp-response.dto';
 import { VerifyOtpDto } from '../application/dto/verify-otp.dto';
 import { GetCustomerSessionUseCase } from '../application/use-cases/get-customer-session.use-case';
 import { LogoutUseCase } from '../application/use-cases/logout.use-case';
 import { SendOtpUseCase } from '../application/use-cases/send-otp.use-case';
+import { SaveLeadDetailsUseCase } from '../application/use-cases/save-lead-details.use-case';
 import { VerifyOtpUseCase } from '../application/use-cases/verify-otp.use-case';
+import { CustomerGoogleOauthService } from '../infrastructure/google/customer-google-oauth.service';
 import { OptionalCustomerSessionGuard } from './guards/optional-customer-session.guard';
+import { RequiredCustomerSessionGuard } from './guards/required-customer-session.guard';
 
 function readClientIp(req: Request): string | undefined {
   const xf = req.headers['x-forwarded-for'];
@@ -24,16 +30,19 @@ function isProduction(): boolean {
 
 @ApiTags('auth')
 @Controller('auth')
-@UseGuards(OptionalCustomerSessionGuard)
+@UseGuards(RedisIpRateLimitGuard, OptionalCustomerSessionGuard)
 export class AuthController {
   constructor(
     private readonly sendOtpFlow: SendOtpUseCase,
     private readonly verifyOtpFlow: VerifyOtpUseCase,
     private readonly customerSession: GetCustomerSessionUseCase,
-    private readonly logoutFlow: LogoutUseCase
+    private readonly logoutFlow: LogoutUseCase,
+    private readonly customerGoogleOauth: CustomerGoogleOauthService,
+    private readonly saveLeadDetailsFlow: SaveLeadDetailsUseCase
   ) {}
 
   @Post('send-otp')
+  @RateLimitByRoute('send-otp')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Send OTP to mobile or email (email requires an existing mobile session)' })
   sendOtpRoute(@Body() body: SendOtpDto, @Req() req: Request) {
@@ -41,6 +50,7 @@ export class AuthController {
   }
 
   @Post('verify-otp')
+  @RateLimitByRoute('verify-otp')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Verify OTP for mobile (creates Redis session + Set-Cookie) or email (updates lead email)',
@@ -93,9 +103,50 @@ export class AuthController {
     return this.customerSession.execute(req);
   }
 
+  @Get('google/login')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @ApiOperation({
+    summary: 'Start Google OAuth for customer email verification (requires mobile session cookie)',
+  })
+  googleLogin(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Query('mode') mode?: string,
+    @Query('leadId') leadId?: string
+  ): void {
+    const url = this.customerGoogleOauth.buildAuthorizationUrl(req, mode, leadId);
+    res.redirect(302, url);
+  }
+
+  @Get('google/callback')
+  @ApiOperation({ summary: 'Google OAuth redirect target; updates lead email then redirects to the customer SPA' })
+  async googleCallback(
+    @Res() res: Response,
+    @Query('code') code?: string,
+    @Query('state') state?: string,
+    @Query('error') googleError?: string
+  ): Promise<void> {
+    const redirectUrl = await this.customerGoogleOauth.completeOAuthRedirect(code, state, googleError);
+    res.redirect(302, redirectUrl);
+  }
+
   @Post('logout')
+  @RateLimitByRoute('logout')
   @ApiOperation({ summary: 'Revoke server-side session and clear the auth cookie' })
   logoutRoute(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     return this.logoutFlow.execute(req, res);
+  }
+
+  /**
+   * Alias for `POST /api/leads/details` (same handler). Prefer this path when a proxy strips
+   * non-`auth` API segments or an older gateway only forwards `/api/auth/*`.
+   */
+  @Post('lead-details')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @RateLimitByRoute('save-lead-details')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Save onboarding lead details (alias of POST /leads/details)' })
+  saveLeadDetailsAlias(@Req() req: Request, @Body() body: SaveLeadDetailsDto) {
+    return this.saveLeadDetailsFlow.execute(req, body);
   }
 }

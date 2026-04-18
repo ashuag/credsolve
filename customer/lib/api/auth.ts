@@ -54,10 +54,12 @@ export type SendEmailOtpResponse = {
   debugOtp?: string;
 };
 
+/** Matches backend `VerifyOtpSuccessResponseDto` for email OTP (no new cookie). */
 export type VerifyEmailOtpResponse = {
-  requestId?: string;
-  verified?: boolean;
-  verifiedAt?: string;
+  success: boolean;
+  requestId: string;
+  verified: boolean;
+  verifiedAt: string;
 };
 
 async function sendOtpRequest(payload: SendOtpRequestPayload): Promise<SendUnifiedOtpResponse> {
@@ -124,4 +126,9 @@ export async function sendEmailOtp(email: string): Promise<SendEmailOtpResponse>
 
 export async function verifyEmailOtp(requestId: string, otpCode: string): Promise<VerifyEmailOtpResponse> {
   return verifyOtpRequest<VerifyEmailOtpResponse>({ type: 'email', requestId, otpCode });
+}
+
+/** Clears the HttpOnly session cookie and revokes the server-side session. */
+export async function logoutCustomer(): Promise<void> {
+  await apiPost(`${AUTH}/logout`, {}, 'Unable to sign out right now. Please try again.');
 }

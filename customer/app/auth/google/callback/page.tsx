@@ -3,43 +3,8 @@
 import Link from 'next/link';
 import { startTransition, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { syncLeadEmail } from '@/lib/api/lead';
 import { resolveCustomerFlowPath } from '@/lib/customer-flow';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
-import { type AuthenticatedCustomer } from '@/lib/customer-auth';
-
-type GoogleSessionPayload = {
-  customer: AuthenticatedCustomer;
-  verifiedAt: string;
-};
-
-function isOptionalText(value: unknown) {
-  return value === undefined || value === null || typeof value === 'string';
-}
-
-function isGoogleSessionPayload(value: unknown): value is GoogleSessionPayload {
-  if (!value || typeof value !== 'object') return false;
-
-  const session = value as Partial<GoogleSessionPayload>;
-
-  if (typeof session.verifiedAt !== 'string') return false;
-
-  const customer = session.customer;
-
-  return (
-    typeof customer?.customerId === 'string'
-    && isOptionalText(customer?.mobileNumber)
-    && isOptionalText(customer?.email)
-    && isOptionalText(customer?.fullName)
-  );
-}
-
-function decodeBase64Url(value: string) {
-  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
-  const padding = normalized.length % 4 === 0 ? '' : '='.repeat(4 - (normalized.length % 4));
-
-  return window.atob(`${normalized}${padding}`);
-}
 
 export default function GoogleAuthCallbackPage() {
   const router = useRouter();
@@ -51,46 +16,24 @@ export default function GoogleAuthCallbackPage() {
 
     void (async () => {
       const currentUrl = new URL(window.location.href);
-      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-      const encodedSession = hash.get('session');
-      const callbackError = hash.get('error');
-      const emailMode = currentUrl.searchParams.get('mode') === 'login' ? 'login' : 'register';
-      const leadId = currentUrl.searchParams.get('leadId')?.trim() || '';
+      const params = currentUrl.searchParams;
+      const success = params.get('success') === '1';
+      const callbackError = params.get('error');
+      const emailMode = params.get('mode') === 'login' ? 'login' : 'register';
 
       window.history.replaceState(null, '', window.location.pathname);
 
       if (callbackError) {
-        if (isActive) setError(callbackError);
+        if (isActive) setError(decodeURIComponent(callbackError));
         return;
       }
 
-      if (!encodedSession) {
+      if (!success) {
         if (isActive) setError('Google login could not be completed.');
         return;
       }
 
       try {
-        const parsed = JSON.parse(decodeBase64Url(encodedSession)) as unknown;
-
-        if (!isGoogleSessionPayload(parsed)) {
-          if (isActive) setError('Google login returned an invalid session payload.');
-          return;
-        }
-
-        const googleEmail = parsed.customer.email?.trim();
-
-        if (!googleEmail) {
-          if (isActive) setError('Google login did not return an email address.');
-          return;
-        }
-
-        await syncLeadEmail({
-          ...(leadId ? { leadUuid: leadId } : {}),
-          email: googleEmail,
-          emailVerified: true,
-          verificationType: 'google'
-        }).catch(() => null);
-
         const nextSession = await refresh();
         const leadStatus =
           nextSession.authenticated && nextSession.lead ? nextSession.lead.status : null;
@@ -103,7 +46,7 @@ export default function GoogleAuthCallbackPage() {
           setError(
             callbackPayloadError instanceof Error
               ? callbackPayloadError.message
-              : 'Google login returned an unreadable session payload.'
+              : 'Unable to refresh your session after Google sign-in.'
           );
         }
       }

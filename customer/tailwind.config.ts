@@ -7,6 +7,9 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['var(--font-inter)', 'Segoe UI', 'system-ui', 'sans-serif'],
+      },
       colors: {
         'brand-blue': '#1496f3',
         'brand-navy': '#172c71',

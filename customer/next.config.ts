@@ -7,10 +7,45 @@ const allowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? '')
 
 /** Used only for server-side rewrites; must be an absolute origin (see error below). */
 const rawApiTarget = process.env.API_SERVER_URL ?? process.env.NEXT_PUBLIC_API_URL;
-const apiProxyTarget = rawApiTarget?.replace(/\/$/, '');
-const authProxyTarget = apiProxyTarget?.replace(/\/api$/, '');
+
+function ensureNestApiRewriteBase(url: string): string {
+  const trimmed = url.trim().replace(/\/$/, '');
+  if (!/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  try {
+    const u = new URL(trimmed);
+    const pathOnly = (u.pathname.replace(/\/$/, '') || '/') as string;
+    if (pathOnly === '/') {
+      return `${u.origin}/api`;
+    }
+    return trimmed;
+  } catch {
+    return trimmed;
+  }
+}
+
+const apiProxyTarget = rawApiTarget ? ensureNestApiRewriteBase(rawApiTarget) : undefined;
 const envDistDir = process.env.NEXT_DIST_DIR?.trim();
 const isProductionRuntime = (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
+
+const securityHeaders: { key: string; value: string }[] = [
+  { key: 'X-DNS-Prefetch-Control', value: 'on' },
+  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  {
+    key: 'Permissions-Policy',
+    value: 'camera=(), microphone=(), geolocation=(), payment=()',
+  },
+];
+
+if (isProductionRuntime) {
+  securityHeaders.push({
+    key: 'Strict-Transport-Security',
+    value: 'max-age=63072000; includeSubDomains; preload',
+  });
+}
 
 if (!apiProxyTarget) {
   throw new Error('Missing API_SERVER_URL or NEXT_PUBLIC_API_URL in customer environment.');
@@ -25,16 +60,16 @@ if (!/^https?:\/\//i.test(apiProxyTarget)) {
 }
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   // Next dev can intermittently miss generated manifests with custom distDir.
   // Keep default `.next` for development and allow overrides for non-dev runs.
   distDir: isProductionRuntime ? envDistDir || '.next' : '.next',
   allowedDevOrigins,
+  async headers() {
+    return [{ source: '/:path*', headers: securityHeaders }];
+  },
   async rewrites() {
     return [
-      {
-        source: '/auth/google/login',
-        destination: `${authProxyTarget}/auth/google/login`
-      },
       {
         source: '/api/:path*',
         destination: `${apiProxyTarget}/:path*`

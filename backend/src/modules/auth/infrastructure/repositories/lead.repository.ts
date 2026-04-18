@@ -60,4 +60,34 @@ export class LeadRepository {
       },
     });
   }
+
+  findActiveSummaryForCustomer(tx: DbClient | undefined, customerId: bigint) {
+    return this.db(tx).lead.findFirst({
+      where: { customerId, isActive: true },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, uuid: true },
+    });
+  }
+
+  findByUuidForCustomer(tx: DbClient | undefined, uuid: string, customerId: bigint) {
+    return this.db(tx).lead.findFirst({
+      where: { uuid, customerId, isActive: true },
+      select: { id: true, uuid: true },
+    });
+  }
+
+  updateLeadEmailWithVerification(
+    tx: DbClient | undefined,
+    leadId: bigint,
+    email: string,
+    verificationType: EmailVerificationType
+  ) {
+    return this.db(tx).lead.update({
+      where: { id: leadId },
+      data: {
+        email,
+        emailVerificationType: verificationType,
+      },
+    });
+  }
 }

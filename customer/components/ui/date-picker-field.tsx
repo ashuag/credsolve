@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { cn } from '@/lib/cn';
+import {type ChangeEvent, useEffect, useRef, useState} from 'react';
+import {cn} from '@/lib/cn';
 import {
   defaultDobMonth,
   formatDateDisplay,
@@ -36,6 +36,8 @@ function ChevronDownIcon() {
 
 type DatePickerFieldProps = {
   label: string;
+  /** Set false when an outer field wrapper already renders the label. */
+  showInputLabel?: boolean;
   /** Display value in DD/MM/YYYY format. */
   value: string;
   /** Called with the new DD/MM/YYYY string as the user types or selects. */
@@ -62,6 +64,7 @@ const INPUT_CLASS =
 
 export function DatePickerField({
   label,
+  showInputLabel = true,
   value,
   onChange,
   minYear = 1950,
@@ -135,8 +138,8 @@ export function DatePickerField({
 
   return (
     <div ref={wrapperRef} className={cn('relative overflow-visible', isOpen && 'z-[18]', className)}>
-      <div className={cn(FIELD_CLASS, 'group', isOpen && 'z-[5]')}>
-        <span className={LABEL_CLASS}>{label}</span>
+
+        {showInputLabel ? <span className={LABEL_CLASS}>{label}</span> : null}
         <div className="relative">
           <input
             className={cn(INPUT_CLASS, 'pr-[56px]')}
@@ -161,7 +164,6 @@ export function DatePickerField({
         <span className="text-[0.82rem] leading-[1.55] text-brand-muted">
           {hint ?? (selectedDate ? `Selected: ${formatDateDisplay(selectedDate)}` : 'Use the calendar or type DD/MM/YYYY.')}
         </span>
-      </div>
 
       {isOpen && (
         <div className="absolute top-[calc(100%+12px)] left-0 z-[14] w-[min(320px,calc(100vw-32px))]">

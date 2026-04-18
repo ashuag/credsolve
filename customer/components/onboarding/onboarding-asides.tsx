@@ -1,5 +1,5 @@
-import type { PersonalDetailsSection } from '@/app/onboarding/personal-details-step';
-import type { EmailMode } from '@/app/onboarding/email-entry-step';
+import type { PersonalDetailsSection } from '@/components/onboarding/personal-details-step';
+import type { EmailMode } from '@/components/onboarding/email-entry-step';
 
 /* ── Email step aside ──────────────────────────────────────────────────────── */
 

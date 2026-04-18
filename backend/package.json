@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('build', { recursive: true, force: true })\"",
-    "dev": "npm run prisma:generate && tsx watch src/main.ts",
+    "dev": "npm run prisma:generate && nest start --watch --builder tsc --preserveWatchOutput",
     "start": "node build/src/main.js",
     "prebuild": "npm run prisma:generate",
     "build": "tsc -p tsconfig.build.json",
@@ -29,8 +29,10 @@
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
+    "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.2.3",
+    "helmet": "^8.1.0",
     "ioredis": "^5.10.1",
     "mariadb": "^3.4.0",
     "prisma": "^7.0.0",
@@ -40,8 +42,10 @@
   "devDependencies": {
     "@nestjs/cli": "^11.0.14",
     "@types/bcrypt": "^6.0.0",
+    "@types/compression": "^1.8.1",
     "@types/cookie-parser": "^1.4.8",
     "@types/express": "^5.0.0",
+    "@types/helmet": "^0.0.48",
     "@types/node": "^22.15.3",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3"

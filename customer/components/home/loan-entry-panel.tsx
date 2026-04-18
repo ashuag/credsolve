@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState } from 'react';
-import { MobileEntryForm } from '@/app/mobile-entry-form';
+import { MobileEntryForm } from '@/components/forms/mobile-entry-form';
 import { OtpVerificationForm } from '@/app/login/otp-verification-form';
 import { Spinner } from '@/components/ui/spinner';
 import type { SendOtpResponse } from '@/lib/api/auth';

@@ -10,7 +10,7 @@ import { useCustomerSession } from '@/components/providers/customer-session-prov
 import { useCountdown } from '@/lib/hooks/use-countdown';
 import { useOtpInput } from '@/lib/hooks/use-otp-input';
 import { formatCustomerMobile, isValidCustomerMobile } from '@/lib/mobile';
-import { MobileEntryForm } from '@/app/mobile-entry-form';
+import { MobileEntryForm } from '@/components/forms/mobile-entry-form';
 
 const OTP_LENGTH = 6;
 

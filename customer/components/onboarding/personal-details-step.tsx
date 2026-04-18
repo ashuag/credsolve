@@ -1,41 +1,28 @@
 'use client';
 
-import {
-  startTransition,
-  useEffect,
-  useState,
-  type ChangeEvent,
-  type SubmitEvent,
-  type ReactNode,
-} from 'react';
-import { useRouter } from 'next/navigation';
-import { CreditBureauPoweredBy } from '@/components/account/credit-bureau-powered-by';
-import { AlertBanner } from '@/components/ui/alert-banner';
-import { DatePickerField } from '@/components/ui/date-picker-field';
-import { FlowLoader } from '@/components/ui/flow-loader';
-import { SearchableCityInput } from '@/components/ui/searchable-city-input';
-import type { CustomerPortalProfile } from '@/lib/api/customer-session';
-import { saveLeadDetails } from '@/lib/api/lead';
-import { cn } from '@/lib/cn';
+import {type ChangeEvent, type ReactNode, startTransition, type SubmitEvent, useEffect, useState,} from 'react';
+import {useRouter} from 'next/navigation';
+import {CreditBureauPoweredBy} from '@/components/account/credit-bureau-powered-by';
+import {AlertBanner} from '@/components/ui/alert-banner';
+import {DatePickerField} from '@/components/ui/date-picker-field';
+import {FlowLoader} from '@/components/ui/flow-loader';
+import {SearchableCityInput} from '@/components/ui/searchable-city-input';
+import type {CustomerPortalProfile} from '@/lib/api/customer-session';
+import {saveLeadDetails} from '@/lib/api/lead';
+import {cn} from '@/lib/cn';
 import {
   CUSTOMER_CREDIT_CONSENT_TEXT,
-  usesAnnualFinancialMetric,
-  usesMonthlyIncomeMetric,
   type CustomerGenderValue,
   type CustomerOccupationValue,
+  usesAnnualFinancialMetric,
+  usesMonthlyIncomeMetric,
 } from '@/lib/customer-details';
-import {
-  formatDateDisplay,
-  formatDateIso,
-  getAge,
-  parseIsoDate,
-  parseDobDisplay,
-} from '@/lib/date-utils';
-import { useCustomerDetailLookups } from '@/lib/use-customer-detail-lookups';
-import { PINCODE_REGEX } from '@/lib/validators';
+import {formatDateDisplay, formatDateIso, getAge, parseDobDisplay, parseIsoDate,} from '@/lib/date-utils';
+import {useCustomerDetailLookups} from '@/lib/use-customer-detail-lookups';
+import {PINCODE_REGEX} from '@/lib/validators';
 
 const SECTION_CLASS =
-  'grid gap-4 rounded-[24px] border border-[rgba(18,36,79,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,249,255,0.94))] p-4 shadow-[0_14px_28px_rgba(23,44,113,0.08)] sm:p-5';
+  'grid gap-3 rounded-[24px] border border-[rgba(18,36,79,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,249,255,0.94))] p-4 shadow-[0_14px_28px_rgba(23,44,113,0.08)] sm:p-5';
 
 type Fields = {
   fullName: string;
@@ -279,7 +266,7 @@ export function PersonalDetailsStep({
 
       await onSaved();
 
-      startTransition(() => router.push('/account'));
+      startTransition(() => router.push('/pre-approved-loan'));
     } catch (err) {
       setIsNavigating(false);
       setSubmitError(err instanceof Error ? err.message : 'Unable to save your details right now. Please try again.');
@@ -296,11 +283,6 @@ export function PersonalDetailsStep({
         >
           Customer details.
         </h1>
-        <p className="text-brand-muted leading-[1.6]">
-          We need a few more details to process your loan application. All information is encrypted and stored
-          securely.
-        </p>
-
         {noticeMessage && (
           <div className="mt-4">
             <AlertBanner variant="success">{noticeMessage}</AlertBanner>
@@ -310,16 +292,13 @@ export function PersonalDetailsStep({
         <form onSubmit={handleSubmit} className="grid gap-4 mt-5.5" noValidate>
           {activeSection === 'profile' ? (
             <div className={SECTION_CLASS}>
-              <div className="grid gap-1">
-                <span className="text-[0.72rem] font-extrabold uppercase tracking-[0.12em] text-brand-blue">Part 1 of 2</span>
-                <h2 className="text-[1.25rem] font-extrabold tracking-[-0.03em] text-brand-navy">Personal profile</h2>
-                <p className="text-[0.92rem] leading-[1.6] text-brand-muted">
-                  Enter the identity details exactly as they appear on your KYC documents.
-                </p>
-              </div>
-
-              <div className="grid gap-4">
-                <FieldGroup label="Full name" htmlFor="fullName" error={errors.fullName} help="As per your official KYC documents.">
+              <div className="grid gap-3">
+                <FieldGroup
+                  label="Full name as per PAN card"
+                  htmlFor="fullName"
+                  error={errors.fullName}
+                  help="Enter your legal name exactly as it appears on your PAN."
+                >
                   <input
                     id="fullName"
                     name="fullName"
@@ -359,16 +338,17 @@ export function PersonalDetailsStep({
                   error={errors.dob}
                   help={
                     parseDobDisplay(dobDisplay)
-                      ? `Selected: ${formatDateDisplay(parseDobDisplay(dobDisplay)!)}. You must be at least 18 years old.`
-                      : 'You must be at least 18 years old. Type DD/MM/YYYY or use the calendar.'
+                      ? `Selected: ${formatDateDisplay(parseDobDisplay(dobDisplay)!)}`
+                      : 'Must be 18+ (DD/MM/YYYY).'
                   }
                 >
                   <DatePickerField
                     label="Date of birth"
+                    showInputLabel={false}
                     value={dobDisplay}
                     onChange={handleDobChange}
                     maxDate={maxDob}
-                    hint=" "
+                    hint=""
                   />
                 </FieldGroup>
 
@@ -391,7 +371,7 @@ export function PersonalDetailsStep({
                 </FieldGroup>
               </div>
 
-              <div className="flex flex-wrap gap-[10px] mt-1 max-sm:flex-col max-sm:items-stretch">
+              <div className="sticky bottom-3 z-[5] mt-2 flex flex-col gap-2.5 rounded-[18px] border border-[rgba(18,36,79,0.08)] bg-[rgba(255,255,255,0.9)] p-2.5 backdrop-blur-[6px] sm:static sm:flex-row sm:flex-wrap sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-0">
                 <button type="button" onClick={onBack} className="mc-btn-secondary text-brand-navy bg-[rgba(20,150,243,0.08)] text-center">
                   ← Back
                 </button>
@@ -410,7 +390,7 @@ export function PersonalDetailsStep({
                 </p>
               </div>
 
-              <div className="grid gap-4">
+              <div className="grid gap-3">
                 <FieldGroup label="Address line 1" htmlFor="addressLine1" error={errors.addressLine1} help="House number, building, street, or locality.">
                   <input
                     id="addressLine1"
@@ -497,7 +477,7 @@ export function PersonalDetailsStep({
                 )}
 
                 {isSelfEmployed && (
-                  <div className="grid gap-4">
+                  <div className="grid gap-3">
                     <FieldGroup label="Annual turnover" htmlFor="annualTurnover" error={errors.annualTurnover} help="Share your latest annual turnover in INR.">
                       <input
                         id="annualTurnover"
@@ -556,7 +536,7 @@ export function PersonalDetailsStep({
 
               {submitError && <AlertBanner variant="error">{submitError}</AlertBanner>}
 
-              <div className="flex flex-wrap gap-[10px] mt-1 max-sm:flex-col max-sm:items-stretch">
+              <div className="sticky bottom-3 z-[5] mt-2 flex flex-col gap-2.5 rounded-[18px] border border-[rgba(18,36,79,0.08)] bg-[rgba(255,255,255,0.9)] p-2.5 backdrop-blur-[6px] sm:static sm:flex-row sm:flex-wrap sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-0">
                 <button
                   type="button"
                   onClick={() => onSectionChange('profile')}
@@ -609,18 +589,18 @@ type FieldGroupProps = {
   children: ReactNode;
 };
 
-function FieldGroup({ label, htmlFor, error, help, children }: FieldGroupProps) {
+function FieldGroup({ label, htmlFor, error, children }: FieldGroupProps) {
   return (
-    <div className="grid gap-[8px]">
+    <div className="grid gap-[6px]">
       <label htmlFor={htmlFor} className="text-[0.92rem] font-extrabold text-brand-navy">
         {label}
       </label>
       {children}
       <p
-        id={error ? `${htmlFor}-error` : `${htmlFor}-help`}
-        className={`text-[0.875rem] leading-[1.55] ${error ? 'text-[#b2372d]' : 'text-brand-muted'}`}
+        id={error ? `${htmlFor}-error` : ``}
+        className={`text-[0.875rem] leading-[1.55] min-h-[1.2rem] ${error ? 'text-[#b2372d]' : 'text-brand-muted'}`}
       >
-        {error ?? help}
+        {error ?? undefined}
       </p>
     </div>
   );

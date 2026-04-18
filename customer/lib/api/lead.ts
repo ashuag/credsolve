@@ -12,11 +12,13 @@ type SaveLeadDetailsResponse = {
   leadUuid?: string;
 };
 
+/**
+ * Secured sync: backend verifies `googleIdToken` with Google and stores the email on the lead.
+ * (Email via OTP is handled by `POST /auth/verify-otp` with `type: email`.)
+ */
 export type SyncLeadEmailPayload = {
   leadUuid?: string;
-  email: string;
-  emailVerified: boolean;
-  verificationType?: 'otp' | 'google';
+  googleIdToken: string;
 };
 
 export type SaveLeadDetailsPayload = {
@@ -71,29 +73,21 @@ export type CustomerLeadStatusResponse = {
   leadStatus?: string | null;
 };
 
-/**
- * Syncs lead email to the API when the route exists.
- * If the backend has not implemented `/leads/email` yet, fails open so OTP-first flows still work.
- */
+/** Persists Google-verified email on the active lead (requires customer session cookie). */
 export async function syncLeadEmail(payload: SyncLeadEmailPayload): Promise<SyncLeadEmailResponse> {
-  try {
-    return (
-      (await apiPost<SyncLeadEmailResponse>('/leads/email', payload, 'Unable to save your email right now. Please try again.')) ?? {
-        success: true,
-        leadUuid: payload.leadUuid
-      }
-    );
-  } catch (e) {
-    if (e instanceof ApiRequestError && (e.statusCode === 404 || e.statusCode === 405 || e.statusCode === 501)) {
-      return { success: true, leadUuid: payload.leadUuid };
-    }
-    throw e;
-  }
+  return (
+    (await apiPost<SyncLeadEmailResponse>(
+      '/leads/email',
+      payload,
+      'Unable to save your email right now. Please try again.'
+    )) ?? { success: true, leadUuid: payload.leadUuid }
+  );
 }
 
 export async function saveLeadDetails(payload: SaveLeadDetailsPayload): Promise<SaveLeadDetailsResponse> {
+  /** Prefer `/auth/lead-details`: same Nest handler as `/leads/details`, works if only `/api/auth/*` is proxied. */
   return (await apiPost<SaveLeadDetailsResponse>(
-    '/leads/details',
+    '/auth/lead-details',
     payload,
     'Unable to save your details right now. Please try again.'
   )) ?? { success: true };

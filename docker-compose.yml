@@ -83,6 +83,9 @@ services:
     env_file:
       - ./customer/.env
     environment:
+      # Dev server: avoid production distDir/HSTS from a local .env that sets NODE_ENV=production.
+      NODE_ENV: development
+      NEXT_DIST_DIR: .next
       API_SERVER_URL: http://backend:4001/api
       NEXT_PUBLIC_API_URL: /api
       NEXT_ALLOWED_DEV_ORIGINS: localhost,127.0.0.1
@@ -91,7 +94,8 @@ services:
     ports:
       - "3011:3011"
     working_dir: /workspace/customer
-    command: npm run dev
+    # Bind mount hides image .next; prime with `next build` once so routes-manifest.json exists.
+    command: ["sh", "/workspace/customer/docker-dev.sh"]
     volumes:
       - ./customer:/workspace/customer
       - customer_node_modules:/workspace/customer/node_modules

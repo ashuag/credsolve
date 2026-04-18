@@ -3,7 +3,7 @@
 
 @layer base {
   html {
-    font-family: 'Inter', 'Segoe UI', sans-serif;
+    font-family: var(--font-inter), 'Segoe UI', system-ui, sans-serif;
     background:
       radial-gradient(circle at top left, rgba(255, 197, 25, 0.24), transparent 26rem),
       radial-gradient(circle at top right, rgba(20, 150, 243, 0.2), transparent 24rem),
