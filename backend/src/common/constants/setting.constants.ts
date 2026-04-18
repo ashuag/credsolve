@@ -36,13 +36,23 @@ export const SettingKey = {
     },
     CUSTOMER_AUTH_COOKIE_NAME: {
         key: 'CUSTOMER_AUTH_COOKIE_NAME',
-        default: 'access_token',
-        description: 'Server side cookie set for auth',
+        default: 'mc_sid',
+        description: 'HttpOnly cookie name for opaque customer session id (server-side session in Redis)',
     },
-    CUSTOMER_AUTH_COOKIE_MAX_AGE_MS: {
-        key: 'CUSTOMER_AUTH_COOKIE_NAME',
-        default: '2592000',
-        description: 'Cookie lifetime in S',
+    CUSTOMER_SESSION_TTL_MS: {
+        key: 'CUSTOMER_SESSION_TTL_MS',
+        default: '900000',
+        description: 'Customer session lifetime in ms (Redis TTL and cookie max-age; e.g. 900000 = 15 minutes)',
+    },
+    CUSTOMER_SESSION_SLIDING: {
+        key: 'CUSTOMER_SESSION_SLIDING',
+        default: 'true',
+        description: 'When true, extend session TTL on each authenticated request (activity-based)',
+    },
+    CUSTOMER_SESSION_ROTATE_ON_USE: {
+        key: 'CUSTOMER_SESSION_ROTATE_ON_USE',
+        default: 'false',
+        description: 'When true, issue a new session id on each authenticated request (stronger; more Redis writes)',
     },
     LOAN_TENURE: {
         key: 'LOAN_TENURE',

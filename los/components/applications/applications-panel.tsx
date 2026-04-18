@@ -90,7 +90,7 @@ export function ApplicationsPanel() {
   ));
 
   const draftApplications = applications.filter((application) => application.statusCode === 'DRAFT').length;
-  const submittedApplications = applications.filter((application) => application.statusCode === 'SUBMITTED').length;
+  const inReviewApplications = applications.filter((application) => application.statusCode === 'IN_REVIEW').length;
   const approvedApplications = applications.filter((application) => (
     application.statusCode === 'APPROVED' || application.statusCode === 'DISBURSED'
   )).length;
@@ -121,9 +121,9 @@ export function ApplicationsPanel() {
           className="rounded-[8px] border border-[rgba(23,44,113,0.1)] px-4 py-3"
           style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.97), rgba(240,246,255,0.94))' }}
         >
-          <span className="block text-[0.78rem] text-brand-muted">Submitted</span>
+          <span className="block text-[0.78rem] text-brand-muted">In review</span>
           <strong className="block mt-0.5 text-[1.6rem] font-extrabold tracking-[-0.03em] leading-none">
-            {loading ? '—' : submittedApplications}
+            {loading ? '—' : inReviewApplications}
           </strong>
         </article>
         <article

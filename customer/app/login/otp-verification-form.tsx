@@ -3,23 +3,16 @@
 import { startTransition, useEffect, useState, type SubmitEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SendOtpResponse, sendCustomerOtp, verifyCustomerOtp } from '@/lib/api/auth';
-import { getCustomerLeadStatus, type CustomerLeadStatusResponse } from '@/lib/api/lead';
 import { AlertBanner } from '@/components/ui/alert-banner';
 import { FlowLoader } from '@/components/ui/flow-loader';
 import { OtpInputGrid } from '@/components/ui/otp-input-grid';
-import {
-  syncCustomerOnboardingStateFromLeadStatus,
-  syncCustomerOnboardingStateFromProfile
-} from '@/lib/customer-flow';
+import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { useCountdown } from '@/lib/hooks/use-countdown';
 import { useOtpInput } from '@/lib/hooks/use-otp-input';
 import { formatCustomerMobile, isValidCustomerMobile } from '@/lib/mobile';
-import { clearCustomerOnboardingState, updateCustomerOnboardingState } from '@/lib/stores/customer-onboarding-store';
-import { setCustomerProfile } from '@/lib/stores/customer-session-store';
 import { MobileEntryForm } from '@/app/mobile-entry-form';
 
 const OTP_LENGTH = 6;
-const EMAIL_VERIFIED_LEAD_STATUSES = new Set(['EMAIL_VERIFIED', 'DETAIL_STARTED', 'SUBMITTED', 'CONVERTED']);
 
 type OtpVerificationFormProps = {
   compact?: boolean;
@@ -34,6 +27,7 @@ export function OtpVerificationForm({
 }: OtpVerificationFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { refresh: refreshCustomerSession } = useCustomerSession();
   const [otpRequest, setOtpRequest] = useState<SendOtpResponse | null>(initialOtpRequest);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -94,42 +88,10 @@ export function OtpVerificationForm({
     setError('');
 
     try {
-      const verification = await verifyCustomerOtp(otpRequest.requestId, otp.joined);
+      await verifyCustomerOtp(otpRequest.requestId, otp.joined);
       const nextOnboardingMode = mode === 'login' ? 'login' : 'register';
-      const nextProfile = verification.customerId
-        ? {
-            customerId: verification.customerId,
-            mobileNumber: verification.mobileNumber ?? currentMobile,
-          }
-        : null;
-      const leadState: CustomerLeadStatusResponse | null = (
-        verification.leadId || verification.leadStatus
-          ? {
-              leadId: verification.leadId ?? null,
-              leadStatus: verification.leadStatus ?? null
-            }
-          : await getCustomerLeadStatus().catch(() => null)
-      );
-
-      if (nextProfile) {
-        setCustomerProfile(nextProfile);
-      }
-
+      await refreshCustomerSession();
       startTransition(() => {
-        clearCustomerOnboardingState();
-
-        if (nextProfile) {
-          syncCustomerOnboardingStateFromProfile(nextProfile);
-        }
-        syncCustomerOnboardingStateFromLeadStatus(leadState);
-
-        updateCustomerOnboardingState({
-          mobileNumber: nextProfile?.mobileNumber ?? verification.mobileNumber ?? currentMobile,
-          leadUuid: leadState?.leadId ?? verification.leadId ?? undefined,
-          emailMode: nextOnboardingMode,
-          emailVerified: EMAIL_VERIFIED_LEAD_STATUSES.has(leadState?.leadStatus ?? ''),
-        });
-
         router.push(`/onboarding?mode=${nextOnboardingMode}`);
       });
     } catch (err) {

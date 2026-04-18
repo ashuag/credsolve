@@ -1,47 +1,61 @@
-import { RequestMethod, ValidationPipe, Logger } from '@nestjs/common';
+import 'reflect-metadata';
+import 'dotenv/config';
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { API_PREFIX, DEFAULT_PORT } from './common/constants/app.constants';
-import { ApiExceptionFilter } from './common/filters/api-exception.filter';
-import { cookieParserMiddleware } from './common/middleware/cookie-parser.middleware';
-import { createCorsOriginMatcher } from './config/cors.config';
-import { setupSwagger } from './config/swagger';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
+import { ensureApplicationTablesExist } from './prisma/ensure-application-schema';
+import { PrismaService } from './prisma/prisma.service';
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    logger: ['log', 'error', 'warn', 'debug', 'verbose'],
-  });
-
-  app.setGlobalPrefix(API_PREFIX, {
-    exclude: [
-      { path: 'auth/google/login', method: RequestMethod.GET },
-      { path: 'auth/google/callback', method: RequestMethod.GET },
-    ],
-  });
-
-  app.enableCors({
-    origin: createCorsOriginMatcher(),
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    credentials: true,
-  });
-
-  app.use(cookieParserMiddleware);
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  app.useGlobalFilters(new ApiExceptionFilter());
-
-  setupSwagger(app);
-
-  const port = Number(process.env.PORT ?? DEFAULT_PORT);
-  await app.listen(port);
-
-  const publicBase = process.env.BACKEND_PUBLIC_BASE_URL?.trim().replace(/\/$/, '');
-  if (publicBase) {
-    Logger.log(`🚀 Backend running on ${publicBase}`, 'Bootstrap');
-    Logger.log(`📖 Swagger at ${publicBase}/${API_PREFIX}/docs`, 'Bootstrap');
-  } else {
-    Logger.log(`🚀 Backend listening on port ${port}`, 'Bootstrap');
-    Logger.log(`📖 Swagger at /${API_PREFIX}/docs (set BACKEND_PUBLIC_BASE_URL for full URL in logs)`, 'Bootstrap');
+function parseCorsOrigins(): string[] | false {
+  const raw = process.env.CORS_ORIGINS?.trim();
+  if (!raw) {
+    return false;
   }
+  return raw.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
-bootstrap();
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', 1);
+
+  app.use(cookieParser());
+  app.setGlobalPrefix('api');
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    })
+  );
+
+  const origins = parseCorsOrigins();
+  if (origins !== false && origins.length > 0) {
+    app.enableCors({ origin: origins, credentials: true });
+  }
+
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('MoneyCash API')
+    .setDescription('HTTP API for MoneyCash (customer auth and future modules).')
+    .setVersion('1.0')
+    .build();
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('docs', app, document);
+
+  const prisma = app.get(PrismaService);
+  await ensureApplicationTablesExist(prisma.client);
+
+  const port = Number.parseInt(process.env.PORT ?? '4001', 10);
+  await app.listen(port, '0.0.0.0');
+  // eslint-disable-next-line no-console
+  console.log(`[nest] listening on http://0.0.0.0:${port} (OpenAPI: /docs)`);
+}
+
+bootstrap().catch((err) => {
+  // eslint-disable-next-line no-console
+  console.error(err);
+  process.exit(1);
+});

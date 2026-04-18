@@ -2,12 +2,7 @@
 
 import { useEffect, useRef, useState, type SubmitEvent } from 'react';
 import { SendEmailOtpResponse, sendEmailOtp } from '@/lib/api/auth';
-import { syncLeadEmail } from '@/lib/api/lead';
 import { AlertBanner } from '@/components/ui/alert-banner';
-import {
-  getCustomerOnboardingLeadUuid,
-  updateCustomerOnboardingState
-} from '@/lib/stores/customer-onboarding-store';
 import { isValidEmail } from '@/lib/validators';
 
 const GOOGLE_LOGIN_URL = process.env.NEXT_PUBLIC_GOOGLE_LOGIN_URL?.trim() || '/auth/google/login';
@@ -18,10 +13,12 @@ type LoginOption = 'manual' | null;
 type EmailEntryStepProps = {
   initialEmail?: string;
   initialMode?: EmailMode;
+  /** Active lead uuid from the server session (for Google redirect state). */
+  leadUuid?: string | null;
   onNext: (email: string, mode: EmailMode, otpRequest: SendEmailOtpResponse) => void;
 };
 
-export function EmailEntryStep({ initialEmail = '', initialMode = 'register', onNext }: EmailEntryStepProps) {
+export function EmailEntryStep({ initialEmail = '', initialMode = 'register', leadUuid, onNext }: EmailEntryStepProps) {
   const mode = initialMode;
   const [email, setEmail] = useState(initialEmail);
   const [emailError, setEmailError] = useState('');
@@ -56,10 +53,8 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', on
     setOptionError('');
     setEmailError('');
     const searchParams = new URLSearchParams({ mode });
-    const currentLeadUuid = getCustomerOnboardingLeadUuid();
-
-    if (currentLeadUuid) {
-      searchParams.set('leadId', currentLeadUuid);
+    if (leadUuid?.trim()) {
+      searchParams.set('leadId', leadUuid.trim());
     }
 
     const separator = GOOGLE_LOGIN_URL.includes('?') ? '&' : '?';
@@ -86,18 +81,6 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', on
     setEmailError('');
 
     try {
-      const currentLeadUuid = getCustomerOnboardingLeadUuid();
-
-      const syncResult = await syncLeadEmail({
-        ...(currentLeadUuid ? { leadUuid: currentLeadUuid } : {}),
-        email: trimmed,
-        emailVerified: false
-      });
-
-      if (syncResult.leadUuid) {
-        updateCustomerOnboardingState({ leadUuid: syncResult.leadUuid });
-      }
-
       const otpRequest = await sendEmailOtp(trimmed);
       onNext(trimmed, mode, otpRequest);
     } catch (err) {

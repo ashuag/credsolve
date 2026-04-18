@@ -3,6 +3,8 @@
     "target": "ES2022",
     "module": "commonjs",
     "lib": ["ES2022"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
     "strict": true,
     "esModuleInterop": true,
     "moduleResolution": "node",
@@ -10,14 +12,12 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
-    "outDir": "./dist",
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "outDir": "./build"
   },
   "watchOptions": {
     "watchFile": "dynamicprioritypolling",
     "watchDirectory": "dynamicprioritypolling"
   },
-  "include": ["src/**/*.ts", "prisma/**/*.ts"],
-  "exclude": ["node_modules", "dist", "src/generated/**/*"]
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "prisma/**/*.ts"],
+  "exclude": ["node_modules", "dist", "build", "src/generated/**/*"]
 }

@@ -1,11 +1,9 @@
 export const APPLICATION_STATUS = {
-    DRAFT: 'DRAFT',
-    SUBMITTED: 'SUBMITTED',
-    IN_REVIEW: 'IN_REVIEW',
-    KYC_VERIFIED: 'KYC_VERIFIED',
-    APPROVED: 'APPROVED',
-    REJECTED: 'REJECTED',
-    DISBURSED: 'DISBURSED',
+  DRAFT: 'DRAFT',
+  IN_REVIEW: 'IN_REVIEW',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  DISBURSED: 'DISBURSED',
 } as const;
 
-export type ApplicationStatus = typeof APPLICATION_STATUS[keyof typeof APPLICATION_STATUS];
+export type ApplicationStatus = (typeof APPLICATION_STATUS)[keyof typeof APPLICATION_STATUS];

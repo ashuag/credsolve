@@ -1,4 +1,4 @@
-import { apiGet } from './client';
+import { ApiRequestError, apiGet } from './client';
 
 type LookupValueResponse = {
   values: Array<{
@@ -8,12 +8,19 @@ type LookupValueResponse = {
 };
 
 async function fetchLookupValues(endpoint: 'gender' | 'occupations' | 'cities'): Promise<LookupValueResponse['values']> {
-  const data = await apiGet<LookupValueResponse>(
-    `/lookup/${endpoint}`,
-    `Unable to load ${endpoint} right now.`
-  );
+  try {
+    const data = await apiGet<LookupValueResponse>(
+      `/lookup/${endpoint}`,
+      `Unable to load ${endpoint} right now.`
+    );
 
-  return Array.isArray(data?.values) ? data.values : [];
+    return Array.isArray(data?.values) ? data.values : [];
+  } catch (e) {
+    if (e instanceof ApiRequestError && (e.statusCode === 404 || e.statusCode === 405 || e.statusCode === 501)) {
+      return [];
+    }
+    throw e;
+  }
 }
 
 export async function fetchCustomerGenderLookupValues() {

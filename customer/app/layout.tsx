@@ -1,9 +1,9 @@
 import './globals.css';
 import type {Metadata, Viewport} from 'next';
 import {ReactNode} from 'react';
-import {CustomerSessionBootstrap} from '@/components/auth/customer-session-bootstrap';
 import {CustomerUtmBootstrap} from '@/components/auth/customer-utm-bootstrap';
 import {BrandHeader} from '@/components/layout/brand-header';
+import {CustomerSessionProvider} from '@/components/providers/customer-session-provider';
 import {MobileTabBar} from '@/components/layout/mobile-tab-bar';
 
 export const metadata: Metadata = {
@@ -46,7 +46,7 @@ export default function RootLayout({children}: Readonly<{ children: ReactNode }>
             <title>Get Instant Loan Upto 50,000</title>
         </head>
         <body suppressHydrationWarning>
-        <CustomerSessionBootstrap/>
+        <CustomerSessionProvider>
         <CustomerUtmBootstrap/>
         <BrandHeader/>
         <div
@@ -54,6 +54,7 @@ export default function RootLayout({children}: Readonly<{ children: ReactNode }>
             <main className="grid gap-5.5 pt-5.5 max-sm:pt-4.5">{children}</main>
         </div>
         <MobileTabBar/>
+        </CustomerSessionProvider>
         </body>
         </html>
     );

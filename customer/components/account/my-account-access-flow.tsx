@@ -1,70 +1,14 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
 import { MobileEntryForm } from '@/app/mobile-entry-form';
 import { OtpVerificationForm } from '@/app/login/otp-verification-form';
 import { SectionPanel } from '@/components/ui/section-panel';
 import { Spinner } from '@/components/ui/spinner';
 import type { SendOtpResponse } from '@/lib/api/auth';
-import { getCustomerLeadStatus } from '@/lib/api/lead';
-import {
-  resolveCustomerFlowPath,
-  syncCustomerOnboardingStateFromLeadStatus,
-  syncCustomerOnboardingStateFromProfile
-} from '@/lib/customer-flow';
-import { useCustomerSession } from '@/lib/hooks/use-customer-session';
 
 export function MyAccountAccessFlow() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const { profile, hasHydrated } = useCustomerSession();
   const [otpRequest, setOtpRequest] = useState<SendOtpResponse | null>(null);
-  const [isResolvingFlow, setIsResolvingFlow] = useState(false);
-
-  useEffect(() => {
-    if (!hasHydrated) return;
-    if (!profile) return;
-
-    syncCustomerOnboardingStateFromProfile(profile);
-    setIsResolvingFlow(true);
-
-    let isActive = true;
-
-    void getCustomerLeadStatus()
-      .then((leadState) => {
-        if (!isActive) return;
-        syncCustomerOnboardingStateFromLeadStatus(leadState);
-        router.replace(resolveCustomerFlowPath(
-          leadState?.leadStatus,
-          searchParams.get('mode') === 'login' ? 'login' : 'register'
-        ));
-      })
-      .catch(() => {
-        if (!isActive) return;
-        router.replace(resolveCustomerFlowPath(
-          undefined,
-          searchParams.get('mode') === 'login' ? 'login' : 'register'
-        ));
-      })
-      .finally(() => {
-        if (isActive) {
-          setIsResolvingFlow(false);
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [hasHydrated, profile, router, searchParams]);
-
-  if (!hasHydrated || isResolvingFlow) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <Spinner size={40} />
-      </div>
-    );
-  }
 
   return (
     <div className="grid gap-[18px] nav:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">

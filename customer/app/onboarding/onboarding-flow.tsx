@@ -3,18 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Spinner } from '@/components/ui/spinner';
+import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { SendEmailOtpResponse } from '@/lib/api/auth';
-import { getCustomerLeadStatus } from '@/lib/api/lead';
-import {
-  syncCustomerOnboardingStateFromLeadStatus,
-  syncCustomerOnboardingStateFromProfile
-} from '@/lib/customer-flow';
-import { useCustomerSession } from '@/lib/hooks/use-customer-session';
-import {
-  readCustomerOnboardingState,
-  updateCustomerOnboardingState,
-  type CustomerOnboardingMode,
-} from '@/lib/stores/customer-onboarding-store';
+import type { CustomerOnboardingMode } from '@/lib/customer-flow';
 import { EmailEntryStep, type EmailMode } from './email-entry-step';
 import { EmailOtpStep } from './email-otp-step';
 import { PersonalDetailsStep, type PersonalDetailsSection } from './personal-details-step';
@@ -26,12 +17,10 @@ import {
 
 type OnboardingStep = 'email' | 'email-otp' | 'details';
 
-/* ── Flow orchestrator ────────────────────────────────────────────────────── */
-
 export function OnboardingFlow() {
   const router = useRouter();
-  const { profile, hasHydrated } = useCustomerSession();
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const { loading, session, refresh } = useCustomerSession();
+  const [hasResolved, setHasResolved] = useState(false);
   const [step, setStep] = useState<OnboardingStep>('email');
   const [email, setEmail] = useState('');
   const [emailMode, setEmailMode] = useState<EmailMode>('register');
@@ -40,9 +29,11 @@ export function OnboardingFlow() {
   const [detailsNotice, setDetailsNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!hasHydrated) return;
+    if (loading || !session) {
+      return;
+    }
 
-    if (!profile) {
+    if (!session.authenticated || !session.mobileNumber?.trim() || !session.lead) {
       router.replace('/apply-for-loan');
       return;
     }
@@ -50,47 +41,29 @@ export function OnboardingFlow() {
     const requestedMode = new URLSearchParams(window.location.search).get('mode');
     const initialMode: CustomerOnboardingMode = requestedMode === 'login' ? 'login' : 'register';
 
-    let isActive = true;
+    const lead = session.lead;
+    const storedEmail = lead?.email?.trim() ?? '';
+    const emailVerified = lead?.emailVerified ?? false;
 
-    void (async () => {
-      syncCustomerOnboardingStateFromProfile(profile);
+    setEmailMode(initialMode);
+    setEmail(storedEmail);
 
-      const leadState = await getCustomerLeadStatus().catch(() => null);
+    if (emailVerified) {
+      setDetailsSection('profile');
+      setStep('details');
+      setDetailsNotice(
+        storedEmail
+          ? `${storedEmail} is verified. Continue with the next step.`
+          : 'Email is verified. Continue with the next step.'
+      );
+    } else if (storedEmail) {
+      setStep('email-otp');
+    } else {
+      setStep('email');
+    }
 
-      if (!isActive) {
-        return;
-      }
-
-      syncCustomerOnboardingStateFromLeadStatus(leadState);
-
-      const onboardingState = readCustomerOnboardingState();
-      const resolvedMode = onboardingState.emailMode ?? initialMode;
-      const storedEmail = onboardingState.email?.trim() ?? '';
-
-      setEmailMode(resolvedMode);
-      setEmail(storedEmail);
-
-      if (onboardingState.emailVerified) {
-        setDetailsSection('profile');
-        setStep('details');
-        setDetailsNotice(
-          storedEmail
-            ? `${storedEmail} is verified. Continue with the next step.`
-            : 'Email is verified. Continue with the next step.'
-        );
-      } else if (storedEmail) {
-        setStep('email-otp');
-      } else {
-        setStep('email');
-      }
-
-      setHasLoaded(true);
-    })();
-
-    return () => {
-      isActive = false;
-    };
-  }, [profile, hasHydrated, router]);
+    setHasResolved(true);
+  }, [loading, session, router]);
 
   function handleEmailNext(confirmedEmail: string, mode: EmailMode, otpRequest: SendEmailOtpResponse) {
     setEmail(confirmedEmail);
@@ -98,17 +71,34 @@ export function OnboardingFlow() {
     setEmailOtpRequest(otpRequest);
     setStep('email-otp');
     setDetailsNotice(null);
-    updateCustomerOnboardingState({ email: confirmedEmail, emailMode: mode, emailVerified: false });
   }
 
-  function handleOtpVerified() {
+  async function handleOtpVerified() {
+    await refresh();
     setDetailsSection('profile');
     setStep('details');
     setDetailsNotice(email ? `${email} is verified. Continue with the next step.` : 'Email is verified. Continue with the next step.');
-    updateCustomerOnboardingState({ email, emailMode, emailVerified: true });
   }
 
-  if (!hasLoaded) {
+  if (loading || !session || !hasResolved) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Spinner size={40} />
+      </div>
+    );
+  }
+
+  if (!session.authenticated || !session.lead) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Spinner size={40} />
+      </div>
+    );
+  }
+
+  const portalSession = session;
+  const activeLead = portalSession.lead;
+  if (!activeLead) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Spinner size={40} />
@@ -118,10 +108,14 @@ export function OnboardingFlow() {
 
   return (
     <>
-      {/* Left column — mount only active form to avoid premature API calls */}
       <div>
         {step === 'email' && (
-          <EmailEntryStep initialEmail={email} initialMode={emailMode} onNext={handleEmailNext} />
+          <EmailEntryStep
+            initialEmail={email}
+            initialMode={emailMode}
+            leadUuid={activeLead.uuid}
+            onNext={handleEmailNext}
+          />
         )}
         {step === 'email-otp' && (
           <EmailOtpStep
@@ -136,15 +130,19 @@ export function OnboardingFlow() {
         {step === 'details' && (
           <PersonalDetailsStep
             email={email}
+            leadUuid={activeLead.uuid}
+            initialProfile={portalSession.profile}
             activeSection={detailsSection}
             onSectionChange={setDetailsSection}
             onBack={() => setStep('email-otp')}
             noticeMessage={detailsNotice}
+            onSaved={async () => {
+              await refresh();
+            }}
           />
         )}
       </div>
 
-      {/* Right column — contextual aside per step */}
       {step === 'email' && <EmailAside mode={emailMode} />}
       {step === 'email-otp' && <EmailOtpAside mode={emailMode} />}
       {step === 'details' && <PersonalDetailsAside activeSection={detailsSection} />}

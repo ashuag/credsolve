@@ -4,13 +4,8 @@ import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Spinner } from '@/components/ui/spinner';
-import { getCustomerLeadStatus } from '@/lib/api/lead';
-import {
-  resolveCustomerFlowPath,
-  syncCustomerOnboardingStateFromLeadStatus,
-  syncCustomerOnboardingStateFromProfile
-} from '@/lib/customer-flow';
-import { useCustomerSession } from '@/lib/hooks/use-customer-session';
+import { useCustomerSession } from '@/components/providers/customer-session-provider';
+import { resolveCustomerFlowPath } from '@/lib/customer-flow';
 
 type CustomerLeadStatusGateProps = {
   allowedStatuses: readonly string[];
@@ -22,44 +17,37 @@ export function CustomerLeadStatusGate({
   children,
 }: CustomerLeadStatusGateProps) {
   const router = useRouter();
-  const { profile, hasHydrated } = useCustomerSession();
+  const { loading, session } = useCustomerSession();
   const [hasResolvedStatus, setHasResolvedStatus] = useState(false);
 
   useEffect(() => {
-    if (!hasHydrated) return;
+    if (loading || !session) {
+      return;
+    }
 
-    if (!profile) {
+    if (!session.authenticated || !session.mobileNumber?.trim()) {
       router.replace('/apply-for-loan');
       return;
     }
 
-    syncCustomerOnboardingStateFromProfile(profile);
+    const status = session.lead?.status ?? '';
+    if (allowedStatuses.includes(status)) {
+      setHasResolvedStatus(true);
+      return;
+    }
 
-    let isActive = true;
+    router.replace(resolveCustomerFlowPath(status));
+  }, [loading, session, allowedStatuses, router]);
 
-    void getCustomerLeadStatus()
-      .then((leadState) => {
-        if (!isActive) return;
-        syncCustomerOnboardingStateFromLeadStatus(leadState);
+  if (loading || !session) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Spinner size={40} />
+      </div>
+    );
+  }
 
-        if (allowedStatuses.includes(leadState?.leadStatus ?? '')) {
-          setHasResolvedStatus(true);
-          return;
-        }
-
-        router.replace(resolveCustomerFlowPath(leadState?.leadStatus));
-      })
-      .catch(() => {
-        if (!isActive) return;
-        router.replace(resolveCustomerFlowPath(undefined));
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [allowedStatuses, hasHydrated, profile, router]);
-
-  if (!hasHydrated || !hasResolvedStatus) {
+  if (!session.authenticated || !hasResolvedStatus) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <Spinner size={40} />

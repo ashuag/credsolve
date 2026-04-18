@@ -1,6 +1,6 @@
 import type { CustomerGenderValue, CustomerOccupationValue } from '../customer-details';
 import type { PanVerificationStatus } from '../pan-verification';
-import { apiGet, apiPost } from './client';
+import { ApiRequestError, apiGet, apiPost } from './client';
 
 type SyncLeadEmailResponse = {
   success: boolean;
@@ -71,12 +71,24 @@ export type CustomerLeadStatusResponse = {
   leadStatus?: string | null;
 };
 
+/**
+ * Syncs lead email to the API when the route exists.
+ * If the backend has not implemented `/leads/email` yet, fails open so OTP-first flows still work.
+ */
 export async function syncLeadEmail(payload: SyncLeadEmailPayload): Promise<SyncLeadEmailResponse> {
-  return (await apiPost<SyncLeadEmailResponse>(
-    '/leads/email',
-    payload,
-    'Unable to save your email right now. Please try again.'
-  )) ?? { success: true };
+  try {
+    return (
+      (await apiPost<SyncLeadEmailResponse>('/leads/email', payload, 'Unable to save your email right now. Please try again.')) ?? {
+        success: true,
+        leadUuid: payload.leadUuid
+      }
+    );
+  } catch (e) {
+    if (e instanceof ApiRequestError && (e.statusCode === 404 || e.statusCode === 405 || e.statusCode === 501)) {
+      return { success: true, leadUuid: payload.leadUuid };
+    }
+    throw e;
+  }
 }
 
 export async function saveLeadDetails(payload: SaveLeadDetailsPayload): Promise<SaveLeadDetailsResponse> {
@@ -88,10 +100,17 @@ export async function saveLeadDetails(payload: SaveLeadDetailsPayload): Promise<
 }
 
 export async function getCustomerLeadStatus(): Promise<CustomerLeadStatusResponse | null> {
-  return apiGet<CustomerLeadStatusResponse>(
-    '/leads/status',
-    'Unable to load your application status right now.'
-  );
+  try {
+    return await apiGet<CustomerLeadStatusResponse>(
+      '/leads/status',
+      'Unable to load your application status right now.'
+    );
+  } catch (e) {
+    if (e instanceof ApiRequestError && (e.statusCode === 404 || e.statusCode === 405 || e.statusCode === 501)) {
+      return null;
+    }
+    throw e;
+  }
 }
 
 export type SaveProfessionalDetailsResponse = {

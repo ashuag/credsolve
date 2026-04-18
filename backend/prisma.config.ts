@@ -10,7 +10,9 @@ if (!migrateUrl) {
 export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
-    seed: 'npm run seed'
+    // Required in Prisma ORM 7: without `path`, `migrate deploy` may not apply SQL migrations.
+    path: 'prisma/migrations',
+    seed: 'npm run seed',
   },
   datasource: {
     url: migrateUrl

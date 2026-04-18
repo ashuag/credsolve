@@ -3,16 +3,12 @@
 import { startTransition, useEffect, useState, type SubmitEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { SendEmailOtpResponse, sendEmailOtp, verifyEmailOtp } from '@/lib/api/auth';
-import { syncLeadEmail } from '@/lib/api/lead';
 import { AlertBanner } from '@/components/ui/alert-banner';
 import { FlowLoader } from '@/components/ui/flow-loader';
 import { OtpInputGrid } from '@/components/ui/otp-input-grid';
 import { useCountdown } from '@/lib/hooks/use-countdown';
 import { useOtpInput } from '@/lib/hooks/use-otp-input';
-import {
-  getCustomerOnboardingLeadUuid,
-  updateCustomerOnboardingState,
-} from '@/lib/stores/customer-onboarding-store';
+import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import type { EmailMode } from './email-entry-step';
 
 const OTP_LENGTH = 6;
@@ -23,8 +19,8 @@ type EmailOtpStepProps = {
   otpRequest: SendEmailOtpResponse | null;
   onOtpRequestChange: (req: SendEmailOtpResponse) => void;
   onBack: () => void;
-  /** Called in register mode after successful verification. */
-  onVerified: () => void;
+  /** Called in register mode after successful verification (may refresh server session). */
+  onVerified: () => void | Promise<void>;
 };
 
 export function EmailOtpStep({
@@ -36,6 +32,7 @@ export function EmailOtpStep({
   onVerified,
 }: EmailOtpStepProps) {
   const router = useRouter();
+  const { refresh: refreshCustomerSession } = useCustomerSession();
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
   const [isResending, setIsResending] = useState(false);
@@ -59,9 +56,10 @@ export function EmailOtpStep({
 
     void (async () => {
       try {
-        await syncLeadEmailState(email, false);
         const nextRequest = await sendEmailOtp(email);
-        if (active) onOtpRequestChange(nextRequest);
+        if (active) {
+          onOtpRequestChange(nextRequest);
+        }
       } catch (err) {
         if (active) setError(err instanceof Error ? err.message : 'Unable to send OTP right now.');
       } finally {
@@ -73,28 +71,12 @@ export function EmailOtpStep({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [email, otpRequest]);
 
-  async function syncLeadEmailState(nextEmail: string, emailVerified: boolean) {
-    const currentLeadUuid = getCustomerOnboardingLeadUuid();
-    const syncResult = await syncLeadEmail({
-      ...(currentLeadUuid ? { leadUuid: currentLeadUuid } : {}),
-      email: nextEmail,
-      emailVerified,
-      ...(emailVerified ? { verificationType: 'otp' as const } : {})
-    });
-    updateCustomerOnboardingState({
-      email: nextEmail,
-      emailVerified,
-      ...(syncResult.leadUuid ? { leadUuid: syncResult.leadUuid } : {}),
-    });
-  }
-
   async function handleResend() {
     if (!email || resendCountdown > 0 || isBootstrapping) return;
     setIsResending(true);
     setError('');
     setStatus('');
     try {
-      await syncLeadEmailState(email, false);
       const next = await sendEmailOtp(email);
       onOtpRequestChange(next);
       otp.clear();
@@ -122,14 +104,13 @@ export function EmailOtpStep({
 
     try {
       await verifyEmailOtp(otpRequest.requestId, otp.joined);
-      await syncLeadEmailState(email, true);
 
       if (isLogin) {
-        // isVerifying stays true — FlowLoader stays until route change
+        await refreshCustomerSession();
         startTransition(() => router.push('/account'));
       } else {
-        // isVerifying stays true so FlowLoader is visible during the step transition
-        onVerified();
+        await onVerified();
+        setIsVerifying(false);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to verify OTP right now.');

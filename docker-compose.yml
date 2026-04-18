@@ -15,6 +15,12 @@ services:
     volumes:
       - moneyCash_mysql_data:/var/lib/mysql
       - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-uroot', '-proot']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 25s
 
   redis:
     image: redis:7-alpine
@@ -24,6 +30,7 @@ services:
     volumes:
       - moneyCash_redis_data:/data
 
+  # Migrations, seed, then Nest (minimal HTTP on PORT default 4001; add modules under src/).
   backend:
     build:
       context: .
@@ -32,10 +39,12 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      CORS_ORIGINS: http://localhost:3010,http://localhost:3011,http://localhost:4001
+      CORS_ORIGINS: http://localhost:3010,http://localhost:3011,http://localhost:4001,http://127.0.0.1:3010,http://127.0.0.1:3011,http://127.0.0.1:4001
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     ports:
       - "4001:4001"
     working_dir: /workspace/backend

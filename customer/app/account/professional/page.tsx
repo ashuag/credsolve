@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function ProfessionalDetailsPage() {
   return (
-    <CustomerLeadStatusGate allowedStatuses={['DETAIL_STARTED']}>
+    <CustomerLeadStatusGate allowedStatuses={['IN_PROGRESS']}>
       <div className="grid gap-[18px] nav:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
         <SectionPanel
           className="overflow-visible"

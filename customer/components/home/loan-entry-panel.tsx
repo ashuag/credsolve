@@ -1,70 +1,13 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
 import { MobileEntryForm } from '@/app/mobile-entry-form';
 import { OtpVerificationForm } from '@/app/login/otp-verification-form';
 import { Spinner } from '@/components/ui/spinner';
 import type { SendOtpResponse } from '@/lib/api/auth';
-import { getCustomerLeadStatus } from '@/lib/api/lead';
-import {
-  resolveCustomerFlowPath,
-  syncCustomerOnboardingStateFromLeadStatus,
-  syncCustomerOnboardingStateFromProfile
-} from '@/lib/customer-flow';
-import { useCustomerSession } from '@/lib/hooks/use-customer-session';
 
 export function LoanEntryPanel() {
-  const router = useRouter();
-  const { profile, hasHydrated } = useCustomerSession();
   const [otpRequest, setOtpRequest] = useState<SendOtpResponse | null>(null);
-  const [isResolvingFlow, setIsResolvingFlow] = useState(false);
-
-  useEffect(() => {
-    if (!hasHydrated) return;
-    if (!profile) return;
-
-    syncCustomerOnboardingStateFromProfile(profile);
-    setIsResolvingFlow(true);
-
-    let isActive = true;
-
-    void getCustomerLeadStatus()
-      .then((leadState) => {
-        if (!isActive) return;
-        syncCustomerOnboardingStateFromLeadStatus(leadState);
-        router.replace(resolveCustomerFlowPath(leadState?.leadStatus, 'register'));
-      })
-      .catch(() => {
-        if (!isActive) return;
-        router.replace(resolveCustomerFlowPath(undefined, 'register'));
-      })
-      .finally(() => {
-        if (isActive) {
-          setIsResolvingFlow(false);
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [hasHydrated, profile, router]);
-
-  if (!hasHydrated || isResolvingFlow) {
-    return (
-      <div className="flex min-h-[220px] items-center justify-center">
-        <Spinner size={40} />
-      </div>
-    );
-  }
-
-  if (profile) {
-    return (
-      <div className="flex min-h-[220px] items-center justify-center">
-        <Spinner size={40} />
-      </div>
-    );
-  }
 
   if (otpRequest) {
     return (

@@ -18,21 +18,30 @@ export async function seedUser(prisma: Prisma.TransactionClient) {
       email: 'admin@moneycash.test',
       password: hashedPassword,
       roleId: 1,
-    }
+    },
   ];
 
+  const now = new Date();
+
   for (const user of users) {
-    await prisma.$executeRaw`
-      INSERT INTO \`user\` (full_name, email, password, role_id, is_active, updated_at)
-      VALUES (${user.fullName}, ${user.email}, ${user.password}, ${user.roleId}, 1, NOW(3))
-      ON DUPLICATE KEY UPDATE
-        full_name = VALUES(full_name),
-        password = VALUES(password),
-        role_id = VALUES(role_id),
-        is_active = VALUES(is_active),
-        registration_completed_at = NOW(3),
-        updated_at = NOW(3)
-    `;
+    await prisma.user.upsert({
+      where: { email: user.email },
+      create: {
+        fullName: user.fullName,
+        email: user.email,
+        password: user.password,
+        roleId: user.roleId,
+        isActive: true,
+        registrationCompletedAt: now,
+      },
+      update: {
+        fullName: user.fullName,
+        password: user.password,
+        roleId: user.roleId,
+        isActive: true,
+        registrationCompletedAt: now,
+      },
+    });
   }
 
   console.log('Users seeded');

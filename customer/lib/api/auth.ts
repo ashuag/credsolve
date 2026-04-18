@@ -1,7 +1,12 @@
 import type { CustomerUtmParams } from '../customer-auth';
 import { readCustomerUtmParams } from '../customer-utm';
-import { getOtpTypeValuesSnapshot, setOtpTypeStoreValues, type OtpTypeValue } from '../stores/otp-type-store';
 import { apiGet, apiPost } from './client';
+
+/** Unified OTP channel; must match backend `OTP_TYPE` values. */
+export type OtpChannel = 'mobile' | 'email';
+
+/** Relative to `getApiUrl()` (e.g. `/api` in the browser → `/api/auth/...`). */
+const AUTH = '/auth';
 
 type SendUnifiedOtpResponse = {
   requestId: string;
@@ -12,12 +17,8 @@ type SendUnifiedOtpResponse = {
   debugOtp?: string;
 };
 
-type GetOtpTypesResponse = {
-  values: OtpTypeValue[];
-};
-
 type SendOtpRequestPayload = {
-  type: OtpTypeValue;
+  type: OtpChannel;
   value: string | number;
 } & CustomerUtmParams;
 
@@ -58,39 +59,21 @@ export type VerifyEmailOtpResponse = {
   verifiedAt?: string;
 };
 
-export async function fetchOtpTypeValues(): Promise<OtpTypeValue[]> {
-  const data = await apiGet<GetOtpTypesResponse>(
-    '/auth/otp-types',
-    'Unable to load OTP types right now.'
-  );
-  const values = Array.isArray(data?.values) ? data.values : [];
-
-  setOtpTypeStoreValues(values);
-
-  return values;
-}
-
 async function sendOtpRequest(payload: SendOtpRequestPayload): Promise<SendUnifiedOtpResponse> {
-  const storedOtpTypeValues = getOtpTypeValuesSnapshot();
-
-  if (storedOtpTypeValues.length > 0 && !storedOtpTypeValues.includes(payload.type)) {
-    throw new Error('Unsupported OTP type.');
-  }
-
   return (await apiPost<SendUnifiedOtpResponse>(
-    '/auth/send-otp',
+    `${AUTH}/send-otp`,
     payload,
     'Unable to send OTP right now. Please try again.'
   )) as SendUnifiedOtpResponse;
 }
 
 async function verifyOtpRequest<T>(payload: {
-  type: OtpTypeValue;
+  type: OtpChannel;
   requestId: string;
   otpCode: string;
 }): Promise<T> {
   return (await apiPost<T>(
-    '/auth/verify-otp',
+    `${AUTH}/verify-otp`,
     payload,
     'Unable to verify OTP right now. Please try again.'
   )) as T;
@@ -140,12 +123,4 @@ export async function sendEmailOtp(email: string): Promise<SendEmailOtpResponse>
 
 export async function verifyEmailOtp(requestId: string, otpCode: string): Promise<VerifyEmailOtpResponse> {
   return verifyOtpRequest<VerifyEmailOtpResponse>({ type: 'email', requestId, otpCode });
-}
-
-export async function logoutCustomerSession(): Promise<void> {
-  await apiPost<{ success?: boolean }>(
-    '/auth/logout',
-    {},
-    'Unable to logout right now. Please try again.'
-  );
 }

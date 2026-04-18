@@ -19,11 +19,7 @@ import {
   FORM_LABEL_CLASS as LABEL_CLASS,
   FORM_INPUT_CLASS as INPUT_CLASS,
 } from '@/lib/form-styles';
-import {
-  getCustomerOnboardingLeadUuid,
-  readCustomerOnboardingState,
-  updateCustomerOnboardingState,
-} from '@/lib/stores/customer-onboarding-store';
+import { useCustomerSession } from '@/components/providers/customer-session-provider';
 
 type PanErrorKind = 'not_found' | 'name_mismatch' | 'bureau_error' | null;
 
@@ -49,6 +45,7 @@ type FieldErrors = {
 
 export function AccountDetailsForm() {
   const router = useRouter();
+  const { session, refresh } = useCustomerSession();
   const [fullName, setFullName] = useState('');
   const [gender, setGender] = useState<CustomerGenderValue | ''>('');
   const [dob, setDob] = useState(''); // DD/MM/YYYY display format
@@ -67,24 +64,27 @@ export function AccountDetailsForm() {
   const selectedDate = parseDobDisplay(dob);
 
   useEffect(() => {
-    const session = readCustomerOnboardingState();
-    if (!session) return;
+    if (!session?.authenticated || !session.profile) {
+      return;
+    }
 
-    setFullName(session.fullName ?? '');
-    setGender(session.gender ?? '');
-    setAddressLine1(session.addressLine1 ?? '');
-    setAddressLine2(session.addressLine2 ?? '');
-    setCurrentCity(session.currentCity ?? '');
-    setPincode(session.pincode ?? '');
-    setCreditConsentAccepted(session.creditConsentAccepted ?? false);
+    const p = session.profile;
+    setFullName(p.fullName ?? '');
+    setGender((p.gender as CustomerGenderValue) ?? '');
+    setAddressLine1(p.addressLine1 ?? '');
+    setAddressLine2(p.addressLine2 ?? '');
+    setCurrentCity(p.currentCity ?? '');
+    setPincode(p.pincode ?? '');
+    setCreditConsentAccepted(p.creditConsentAccepted ?? false);
+    setPanNumber(p.panNumber?.trim() ? p.panNumber.trim().toUpperCase() : '');
 
-    if (session.dob) {
-      const [year, month, day] = session.dob.split('-');
+    if (p.dob) {
+      const [year, month, day] = p.dob.split('-');
       if (year && month && day) {
         setDob(`${day}/${month}/${year}`);
       }
     }
-  }, []);
+  }, [session]);
 
   function clearFieldError(field: keyof FieldErrors) {
     setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
@@ -132,7 +132,7 @@ export function AccountDetailsForm() {
     }
     setFieldErrors({});
 
-    const leadUuid = getCustomerOnboardingLeadUuid() || undefined;
+    const leadUuid = session?.authenticated ? session.lead?.uuid : undefined;
     const normalizedPan = panNumber.toUpperCase();
     const normalizedAddressLine2 = addressLine2.trim();
     setIsSubmitting(true);
@@ -150,17 +150,7 @@ export function AccountDetailsForm() {
         pincode,
       });
 
-      updateCustomerOnboardingState({
-        leadUuid: response.leadUuid ?? leadUuid,
-        fullName: fullName.trim(),
-        gender: gender || undefined,
-        dob: formatDateIso(selectedDate!),
-        addressLine1: addressLine1.trim(),
-        addressLine2: normalizedAddressLine2 || undefined,
-        currentCity: currentCity.trim(),
-        pincode,
-        creditConsentAccepted,
-      });
+      await refresh();
 
       const panStatus = response.panResult?.status;
 
@@ -361,7 +351,6 @@ export function AccountDetailsForm() {
             onChange={(e) => {
               const next = e.target.checked;
               setCreditConsentAccepted(next);
-              updateCustomerOnboardingState({ creditConsentAccepted: next });
               if (next) setFieldErrors((prev) => ({ ...prev, creditConsent: undefined }));
               if (submitError) setSubmitError('');
             }}

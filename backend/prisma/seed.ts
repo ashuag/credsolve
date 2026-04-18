@@ -13,6 +13,22 @@ import {seedSetting} from "./seeds/setting.seed";
 import {seedEligibilityCriteria} from './seeds/eligibility-criteria.seed';
 import {seedCreditLimitTier} from './seeds/credit-limit-tier.seed';
 
+async function assertMigrationsApplied(prisma: ReturnType<typeof createPrismaClient>) {
+    const rows = await prisma.$queryRaw<{ cnt: bigint }[]>`
+    SELECT COUNT(*) AS cnt
+    FROM information_schema.tables
+    WHERE table_schema = DATABASE() AND table_name = 'gender'
+  `;
+    const cnt = Number(rows[0]?.cnt ?? 0);
+    if (cnt === 0) {
+        throw new Error(
+            'Database has no application tables (e.g. `gender` is missing). Run migrations before seeding:\n' +
+                '  npm run prisma:migrate:deploy\n' +
+                'If you use Docker Compose, ensure the backend startup runs `prisma:migrate:deploy` before `npm run seed`.'
+        );
+    }
+}
+
 async function waitForDatabase(prisma: ReturnType<typeof createPrismaClient>) {
     const maxAttempts = Number(process.env.SEED_DB_MAX_ATTEMPTS ?? 15);
     const retryDelayMs = Number(process.env.SEED_DB_RETRY_DELAY_MS ?? 2_000);
@@ -42,6 +58,7 @@ async function main() {
         console.log('Starting seed...');
         const start = Date.now();
         await waitForDatabase(prisma);
+        await assertMigrationsApplied(prisma);
 
         await seedGender(prisma);
         await seedOccupation(prisma);

@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import { startTransition, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getCustomerLeadStatus, syncLeadEmail, type CustomerLeadStatusResponse } from '@/lib/api/lead';
-import { resolveCustomerFlowPath, syncCustomerOnboardingStateFromLeadStatus } from '@/lib/customer-flow';
-import { clearCustomerOnboardingState, updateCustomerOnboardingState } from '@/lib/stores/customer-onboarding-store';
+import { syncLeadEmail } from '@/lib/api/lead';
+import { resolveCustomerFlowPath } from '@/lib/customer-flow';
+import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { type AuthenticatedCustomer } from '@/lib/customer-auth';
 
 type GoogleSessionPayload = {
@@ -43,6 +43,7 @@ function decodeBase64Url(value: string) {
 
 export default function GoogleAuthCallbackPage() {
   const router = useRouter();
+  const { refresh } = useCustomerSession();
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -83,35 +84,19 @@ export default function GoogleAuthCallbackPage() {
           return;
         }
 
-        const syncResult = await syncLeadEmail({
+        await syncLeadEmail({
           ...(leadId ? { leadUuid: leadId } : {}),
           email: googleEmail,
           emailVerified: true,
           verificationType: 'google'
         }).catch(() => null);
 
-        const liveLeadState = await getCustomerLeadStatus().catch(() => null);
-        const resolvedLeadState: CustomerLeadStatusResponse | null = liveLeadState ?? (
-          syncResult?.leadUuid || leadId
-            ? {
-                leadId: syncResult?.leadUuid ?? leadId,
-                leadStatus: 'EMAIL_VERIFIED'
-              }
-            : null
-        );
-
-        clearCustomerOnboardingState();
-        syncCustomerOnboardingStateFromLeadStatus(resolvedLeadState);
-        updateCustomerOnboardingState({
-          ...(resolvedLeadState?.leadId ? { leadUuid: resolvedLeadState.leadId } : {}),
-          email: googleEmail,
-          emailMode,
-          emailVerified: true,
-          fullName: parsed.customer.fullName ?? undefined
-        });
+        const nextSession = await refresh();
+        const leadStatus =
+          nextSession.authenticated && nextSession.lead ? nextSession.lead.status : null;
 
         startTransition(() => {
-          router.replace(resolveCustomerFlowPath(resolvedLeadState?.leadStatus, emailMode));
+          router.replace(resolveCustomerFlowPath(leadStatus, emailMode));
         });
       } catch (callbackPayloadError) {
         if (isActive) {
@@ -127,7 +112,7 @@ export default function GoogleAuthCallbackPage() {
     return () => {
       isActive = false;
     };
-  }, [router]);
+  }, [router, refresh]);
 
   if (!error) {
     return (

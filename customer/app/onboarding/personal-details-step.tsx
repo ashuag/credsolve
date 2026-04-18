@@ -14,6 +14,7 @@ import { AlertBanner } from '@/components/ui/alert-banner';
 import { DatePickerField } from '@/components/ui/date-picker-field';
 import { FlowLoader } from '@/components/ui/flow-loader';
 import { SearchableCityInput } from '@/components/ui/searchable-city-input';
+import type { CustomerPortalProfile } from '@/lib/api/customer-session';
 import { saveLeadDetails } from '@/lib/api/lead';
 import { cn } from '@/lib/cn';
 import {
@@ -30,10 +31,6 @@ import {
   parseIsoDate,
   parseDobDisplay,
 } from '@/lib/date-utils';
-import {
-  readCustomerOnboardingState,
-  updateCustomerOnboardingState,
-} from '@/lib/stores/customer-onboarding-store';
 import { useCustomerDetailLookups } from '@/lib/use-customer-detail-lookups';
 import { PINCODE_REGEX } from '@/lib/validators';
 
@@ -62,6 +59,9 @@ const PROFILE_FIELDS: Array<keyof Fields> = ['fullName', 'gender', 'dob', 'occup
 
 type PersonalDetailsStepProps = {
   email: string;
+  leadUuid: string;
+  initialProfile: CustomerPortalProfile | null;
+  onSaved: () => void | Promise<void>;
   activeSection: PersonalDetailsSection;
   onSectionChange: (section: PersonalDetailsSection) => void;
   onBack: () => void;
@@ -82,6 +82,9 @@ function hasErrors(errors: FieldError, fields: Array<keyof Fields>): boolean {
 
 export function PersonalDetailsStep({
   email,
+  leadUuid,
+  initialProfile,
+  onSaved,
   activeSection,
   onSectionChange,
   onBack,
@@ -117,27 +120,29 @@ export function PersonalDetailsStep({
   const usesMonthlyIncome = usesMonthlyIncomeMetric(fields.occupation || undefined);
 
   useEffect(() => {
-    const stored = readCustomerOnboardingState();
-    if (!stored) return;
+    if (!initialProfile) {
+      return;
+    }
 
+    const p = initialProfile;
     setFields((prev) => ({
-      fullName: stored.fullName || prev.fullName,
-      gender: stored.gender || prev.gender,
-      dob: stored.dob || prev.dob,
-      occupation: stored.occupation || prev.occupation,
-      addressLine1: stored.addressLine1 || prev.addressLine1,
-      addressLine2: stored.addressLine2 || prev.addressLine2,
-      currentCity: stored.currentCity || prev.currentCity,
-      pincode: stored.pincode || prev.pincode,
-      monthlyIncome: stored.monthlyIncome || (stored.occupation === 'salaried' ? stored.incomeAmount || prev.monthlyIncome : prev.monthlyIncome),
-      annualTurnover: stored.annualTurnover || prev.annualTurnover,
-      annualProfit: stored.annualProfit || prev.annualProfit,
-      creditConsentAccepted: stored.creditConsentAccepted ?? prev.creditConsentAccepted,
+      fullName: p.fullName ?? prev.fullName,
+      gender: (p.gender as Fields['gender']) || prev.gender,
+      dob: p.dob ?? prev.dob,
+      occupation: (p.occupation as Fields['occupation']) || prev.occupation,
+      addressLine1: p.addressLine1 ?? prev.addressLine1,
+      addressLine2: p.addressLine2 ?? prev.addressLine2,
+      currentCity: p.currentCity ?? prev.currentCity,
+      pincode: p.pincode ?? prev.pincode,
+      monthlyIncome: p.monthlyIncome ?? prev.monthlyIncome,
+      annualTurnover: p.annualTurnover ?? prev.annualTurnover,
+      annualProfit: p.annualProfit ?? prev.annualProfit,
+      creditConsentAccepted: p.creditConsentAccepted ?? prev.creditConsentAccepted,
     }));
 
-    const storedDate = stored.dob ? parseIsoDate(stored.dob) : null;
+    const storedDate = p.dob ? parseIsoDate(p.dob) : null;
     if (storedDate) setDobDisplay(formatDateDisplay(storedDate));
-  }, []);
+  }, [initialProfile]);
 
   function handleDobChange(displayValue: string) {
     setDobDisplay(displayValue);
@@ -252,33 +257,12 @@ export function PersonalDetailsStep({
       return;
     }
 
-    const currentSession = readCustomerOnboardingState();
-    const currentLeadUuid = currentSession?.leadUuid?.trim();
-
-    updateCustomerOnboardingState({
-      email,
-      emailVerified: true,
-      fullName: fields.fullName.trim(),
-      gender: fields.gender || undefined,
-      dob: fields.dob,
-      occupation: fields.occupation || undefined,
-      addressLine1: fields.addressLine1.trim(),
-      addressLine2: fields.addressLine2.trim() || undefined,
-      currentCity: fields.currentCity.trim(),
-      pincode: fields.pincode,
-      monthlyIncome: fields.monthlyIncome || undefined,
-      annualTurnover: fields.annualTurnover || undefined,
-      annualProfit: fields.annualProfit || undefined,
-      incomeAmount: fields.monthlyIncome || fields.annualTurnover || undefined,
-      creditConsentAccepted: fields.creditConsentAccepted,
-    });
-
     setSubmitError('');
     setIsNavigating(true);
 
     try {
-      const result = await saveLeadDetails({
-        ...(currentLeadUuid ? { leadUuid: currentLeadUuid } : {}),
+      await saveLeadDetails({
+        leadUuid,
         fullName: fields.fullName.trim(),
         dob: fields.dob,
         gender: fields.gender as CustomerGenderValue,
@@ -293,7 +277,7 @@ export function PersonalDetailsStep({
         creditConsentAccepted: fields.creditConsentAccepted,
       });
 
-      if (result.leadUuid) updateCustomerOnboardingState({ leadUuid: result.leadUuid });
+      await onSaved();
 
       startTransition(() => router.push('/account'));
     } catch (err) {

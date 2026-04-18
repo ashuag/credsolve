@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertBanner } from '@/components/ui/alert-banner';
+import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { saveProfessionalDetails } from '@/lib/api/lead';
 import { cn } from '@/lib/cn';
 import {
@@ -18,11 +19,6 @@ import {
   FORM_INPUT_CLASS,
 } from '@/lib/form-styles';
 import { useCustomerDetailLookups } from '@/lib/use-customer-detail-lookups';
-import {
-  getCustomerOnboardingLeadUuid,
-  readCustomerOnboardingState,
-  updateCustomerOnboardingState,
-} from '@/lib/stores/customer-onboarding-store';
 
 type FieldErrors = {
   occupation?: string;
@@ -33,6 +29,7 @@ type FieldErrors = {
 
 export function ProfessionalDetailsForm() {
   const router = useRouter();
+  const { session, refresh } = useCustomerSession();
   const [occupation, setOccupation] = useState<CustomerOccupationValue | ''>('');
   const [monthlyIncome, setMonthlyIncome] = useState('');
   const [annualTurnover, setAnnualTurnover] = useState('');
@@ -46,14 +43,16 @@ export function ProfessionalDetailsForm() {
   const usesSalary = usesMonthlyIncomeMetric(occupation || undefined);
 
   useEffect(() => {
-    const session = readCustomerOnboardingState();
-    if (!session) return;
+    if (!session?.authenticated || !session.profile) {
+      return;
+    }
 
-    setOccupation(session.occupation ?? '');
-    setMonthlyIncome(session.monthlyIncome ?? '');
-    setAnnualTurnover(session.annualTurnover ?? '');
-    setAnnualProfit(session.annualProfit ?? '');
-  }, []);
+    const p = session.profile;
+    setOccupation((p.occupation as CustomerOccupationValue) ?? '');
+    setMonthlyIncome(p.monthlyIncome ?? '');
+    setAnnualTurnover(p.annualTurnover ?? '');
+    setAnnualProfit(p.annualProfit ?? '');
+  }, [session]);
 
   function handleOccupationChange(value: CustomerOccupationValue | '') {
     setOccupation(value);
@@ -99,7 +98,7 @@ export function ProfessionalDetailsForm() {
     }
     setFieldErrors({});
 
-    const leadUuid = getCustomerOnboardingLeadUuid() || undefined;
+    const leadUuid = session?.authenticated ? session.lead?.uuid : undefined;
     setIsSubmitting(true);
 
     try {
@@ -111,7 +110,7 @@ export function ProfessionalDetailsForm() {
         ...(isSelfEmployed && annualProfit ? { annualProfit } : {}),
       });
 
-      updateCustomerOnboardingState({ leadUuid: response.leadUuid ?? leadUuid });
+      await refresh();
 
       if (response.eligible) {
         const params = new URLSearchParams();
