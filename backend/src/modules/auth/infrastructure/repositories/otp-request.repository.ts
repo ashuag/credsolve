@@ -41,4 +41,8 @@ export class OtpRequestRepository {
       data: { verifiedAt },
     });
   }
+
+  deleteById(tx: DbClient | undefined, id: number) {
+    return this.db(tx).otpRequest.delete({ where: { id } });
+  }
 }

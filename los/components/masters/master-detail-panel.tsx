@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import {
   LOS_LEAD_SOURCE_TYPES,
+  createBank,
   createCity,
   createGender,
   createLeadSource,
   createOccupation,
   createReasonForLoan,
   createState,
+  deleteBank,
   getMasters,
   type LosCityMaster,
   type LosLeadSourceMaster,
@@ -18,6 +20,7 @@ import {
   type LosStateMaster,
   type LosStatusMaster,
   updateApplicationStatus,
+  updateBank,
   updateCity,
   updateGender,
   updateLeadSource,
@@ -42,7 +45,8 @@ type ModalState =
   | { kind: 'city'; item?: LosCityMaster }
   | { kind: 'occupation'; item?: LosNamedMaster }
   | { kind: 'reasonForLoan'; item?: LosNamedMaster }
-  | { kind: 'gender'; item?: LosNamedMaster };
+  | { kind: 'gender'; item?: LosNamedMaster }
+  | { kind: 'bank'; item?: LosNamedMaster };
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -803,6 +807,14 @@ export function MasterDetailPanel({ master }: { master: MasterSlug }) {
     return applyStatusFilter(filtered, statusFilter);
   }, [masters?.genders, search, statusFilter]);
 
+  const filteredBanks = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const filtered = (masters?.banks ?? []).filter((item) => (
+      term === '' || item.name.toLowerCase().includes(term)
+    ));
+    return applyStatusFilter(filtered, statusFilter);
+  }, [masters?.banks, search, statusFilter]);
+
   const currentItems = useMemo(() => {
     switch (master) {
       case 'lead-statuses':
@@ -821,6 +833,8 @@ export function MasterDetailPanel({ master }: { master: MasterSlug }) {
         return masters?.reasonsForLoan ?? [];
       case 'genders':
         return masters?.genders ?? [];
+      case 'banks':
+        return masters?.banks ?? [];
     }
   }, [master, masters]);
 
@@ -1618,6 +1632,110 @@ export function MasterDetailPanel({ master }: { master: MasterSlug }) {
                 </table>
               </PageShell>
             ) : null}
+
+            {master === 'banks' ? (
+              <PageShell
+                title="Banks"
+                description="Manage banks offered in the customer bank-details step. Inactive banks are hidden from the dropdown; delete removes the row permanently."
+                search={search}
+                onSearchChange={setSearch}
+                searchPlaceholder={definition.searchPlaceholder}
+                statusFilter={statusFilter}
+                onStatusFilterChange={setStatusFilter}
+                actionLabel="+ Add Bank"
+                onAction={() => setModal({ kind: 'bank' })}
+              >
+                <table className="w-full border-collapse text-[0.88rem]">
+                  <thead>
+                    <tr className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.82)] text-left">
+                      {['Bank', 'Status', 'Actions'].map((heading) => (
+                        <th key={heading} className="px-4 py-2 text-[0.72rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
+                          {heading}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredBanks.map((item, index) => (
+                      <tr key={item.id} className={cx('border-b border-[rgba(23,44,113,0.05)]', index === filteredBanks.length - 1 && 'border-b-0')}>
+                        <td className="px-4 py-3"><strong>{item.name}</strong></td>
+                        <td className="px-4 py-3"><StatusPill isActive={item.isActive} /></td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <IconButton title="Edit bank" onClick={() => setModal({ kind: 'bank', item })} disabled={busyKey === `bank-${item.id}` || busyKey === `bank-delete-${item.id}`}>
+                              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                              </svg>
+                            </IconButton>
+                            {item.isActive ? (
+                              <IconButton
+                                title="Deactivate bank"
+                                tone="danger"
+                                disabled={busyKey === `bank-${item.id}` || busyKey === `bank-delete-${item.id}`}
+                                onClick={() => {
+                                  void handleSoftToggle(
+                                    `bank-${item.id}`,
+                                    (token) => updateBank(token, item.id, { isActive: false }),
+                                    `Mark ${item.name} as inactive?`,
+                                  );
+                                }}
+                              >
+                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                  <polyline points="3 6 5 6 21 6" />
+                                  <path d="M19 6l-1 14H6L5 6" />
+                                  <path d="M10 11v6" />
+                                  <path d="M14 11v6" />
+                                  <path d="M9 6V4h6v2" />
+                                </svg>
+                              </IconButton>
+                            ) : (
+                              <IconButton
+                                title="Activate bank"
+                                tone="success"
+                                disabled={busyKey === `bank-${item.id}` || busyKey === `bank-delete-${item.id}`}
+                                onClick={() => {
+                                  void handleSoftToggle(
+                                    `bank-${item.id}`,
+                                    (token) => updateBank(token, item.id, { isActive: true }),
+                                    `Mark ${item.name} as active?`,
+                                  );
+                                }}
+                              >
+                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                                  <path d="M3 3v5h5" />
+                                </svg>
+                              </IconButton>
+                            )}
+                            <IconButton
+                              title="Delete bank permanently"
+                              tone="danger"
+                              disabled={busyKey === `bank-${item.id}` || busyKey === `bank-delete-${item.id}`}
+                              onClick={() => {
+                                if (!window.confirm(`Permanently delete "${item.name}"? Existing applications that reference this name are unchanged, but the bank will no longer appear in the master list.`)) return;
+                                void runAction(`bank-delete-${item.id}`, (token) => deleteBank(token, item.id));
+                              }}
+                            >
+                              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                <circle cx="12" cy="12" r="9" />
+                                <line x1="15" y1="9" x2="9" y2="15" />
+                                <line x1="9" y1="9" x2="15" y2="15" />
+                              </svg>
+                            </IconButton>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredBanks.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="px-4 py-8 text-center text-brand-muted">No banks match the current search.</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </PageShell>
+            ) : null}
           </>
         )}
       </div>
@@ -1724,6 +1842,22 @@ export function MasterDetailPanel({ master }: { master: MasterSlug }) {
             onSubmit={(payload) => item
               ? runAction(`gender-${item.id}`, (token) => updateGender(token, item.id, payload))
               : runAction('gender-create', (token) => createGender(token, payload))}
+          />
+        );
+      })() : null}
+
+      {modal?.kind === 'bank' ? (() => {
+        const item = modal.item;
+        return (
+          <NamedMasterModal
+            noun="Bank"
+            initial={item}
+            subtitle="Configure banks shown in the customer bank-details dropdown."
+            maxLength={100}
+            onClose={() => setModal(null)}
+            onSubmit={(payload) => item
+              ? runAction(`bank-${item.id}`, (token) => updateBank(token, item.id, payload))
+              : runAction('bank-create', (token) => createBank(token, payload))}
           />
         );
       })() : null}

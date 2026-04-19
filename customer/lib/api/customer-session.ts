@@ -41,6 +41,11 @@ export type CustomerSessionResponse =
     }
   | { authenticated: false };
 
+/** Customer has started a loan application (active lead exists after mobile OTP / onboarding). */
+export function hasActiveLoanLead(session: CustomerSessionResponse | null | undefined): boolean {
+  return Boolean(session && session.authenticated && session.lead != null);
+}
+
 export async function fetchCustomerSession(): Promise<CustomerSessionResponse> {
   const data = await apiGet<CustomerSessionResponse>('/auth/me', 'Unable to load session.');
   if (!data) {

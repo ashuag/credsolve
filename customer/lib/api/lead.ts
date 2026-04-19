@@ -1,6 +1,6 @@
 import type { CustomerGenderValue, CustomerOccupationValue } from '../customer-details';
 import type { PanVerificationStatus } from '../pan-verification';
-import { ApiRequestError, apiGet, apiPost } from './client';
+import { ApiRequestError, apiGet, apiPost, apiPostFormData } from './client';
 
 type SyncLeadEmailResponse = {
   success: boolean;
@@ -115,6 +115,30 @@ export type SaveProfessionalDetailsResponse = {
   cibilScore: number | null;
 };
 
+export type SaveLoanSelectionPayload = {
+  loanAmount: number;
+  tenureEndDate: string; // YYYY-MM-DD
+};
+
+export type SaveKycDocumentsPayload = {
+  panNumber: string;
+  aadhaarNumber: string;
+  panDocument: File;
+  aadhaarFront: File;
+  aadhaarBack: File;
+};
+
+export type SaveBankDetailsPayload = {
+  accountNumber: string;
+  ifscCode: string;
+  bankName: string;
+  accountHolderName?: string;
+};
+
+export type LoanBanksResponse = {
+  banks: string[];
+};
+
 export async function saveProfessionalDetails(payload: SaveProfessionalDetailsPayload): Promise<SaveProfessionalDetailsResponse> {
   return (await apiPost<SaveProfessionalDetailsResponse>(
     '/applications/professional-details',
@@ -129,4 +153,50 @@ export async function saveApplicationDetails(payload: SaveApplicationDetailsPayl
     payload,
     'Unable to save your details right now. Please try again.'
   )) ?? { success: true, panResult: { status: 'bureau_error' } };
+}
+
+export async function saveLoanSelection(payload: SaveLoanSelectionPayload): Promise<{ success: boolean }> {
+  return (
+    (await apiPost<{ success: boolean }>(
+      '/applications/selection',
+      payload,
+      'Unable to save loan selection right now. Please try again.'
+    )) ?? { success: true }
+  );
+}
+
+export async function saveKycDocuments(payload: SaveKycDocumentsPayload): Promise<{ success: boolean }> {
+  const formData = new FormData();
+  formData.set('panNumber', payload.panNumber);
+  formData.set('aadhaarNumber', payload.aadhaarNumber);
+  formData.set('panDocument', payload.panDocument);
+  formData.set('aadhaarFront', payload.aadhaarFront);
+  formData.set('aadhaarBack', payload.aadhaarBack);
+
+  return (
+    (await apiPostFormData<{ success: boolean }>(
+      '/applications/kyc/documents',
+      formData,
+      'Unable to save KYC documents right now. Please try again.'
+    )) ?? { success: true }
+  );
+}
+
+export async function saveBankDetails(payload: SaveBankDetailsPayload): Promise<{ success: boolean }> {
+  return (
+    (await apiPost<{ success: boolean }>(
+      '/applications/bank-details',
+      payload,
+      'Unable to save bank details right now. Please try again.'
+    )) ?? { success: true }
+  );
+}
+
+export async function getLoanBanks(): Promise<string[]> {
+  const response = await apiGet<LoanBanksResponse>(
+    '/loans/banks',
+    'Unable to load bank list right now. Please try again.'
+  );
+
+  return response?.banks ?? [];
 }

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { EmailModule } from '../../common/email/email.module';
 import { RedisIpRateLimitGuard } from '../../common/rate-limit/redis-ip-rate-limit.guard';
 import { CheckLoanEligibilityUseCase } from './application/use-cases/check-loan-eligibility.use-case';
 import { GetCustomerLeadStatusUseCase } from './application/use-cases/get-customer-lead-status.use-case';
@@ -6,12 +7,16 @@ import { GetCustomerSessionUseCase } from './application/use-cases/get-customer-
 import { LogoutUseCase } from './application/use-cases/logout.use-case';
 import { SendOtpUseCase } from './application/use-cases/send-otp.use-case';
 import { SaveLeadDetailsUseCase } from './application/use-cases/save-lead-details.use-case';
+import { SaveLoanSelectionUseCase } from './application/use-cases/save-loan-selection.use-case';
 import { SubmitProfessionalApplicationUseCase } from './application/use-cases/submit-professional-application.use-case';
 import { SyncLeadEmailFromGoogleTokenUseCase } from './application/use-cases/sync-lead-email-from-google-token.use-case';
 import { VerifyOtpUseCase } from './application/use-cases/verify-otp.use-case';
+import { SaveKycDocumentsUseCase } from './application/use-cases/save-kyc-documents.use-case';
+import { SaveBankDetailsUseCase } from './application/use-cases/save-bank-details.use-case';
 import { OtpCodeGenerator } from './infrastructure/crypto/otp-code.generator';
 import { CustomerGoogleOauthService } from './infrastructure/google/customer-google-oauth.service';
 import { CustomerRepository } from './infrastructure/repositories/customer.repository';
+import { BankRepository } from './infrastructure/repositories/bank.repository';
 import { LeadRepository } from './infrastructure/repositories/lead.repository';
 import { LeadStatusRepository } from './infrastructure/repositories/lead-status.repository';
 import { OtpRequestRepository } from './infrastructure/repositories/otp-request.repository';
@@ -27,6 +32,7 @@ import { OptionalCustomerSessionGuard } from './presentation/guards/optional-cus
 import { RequiredCustomerSessionGuard } from './presentation/guards/required-customer-session.guard';
 
 @Module({
+  imports: [EmailModule],
   controllers: [
     AuthController,
     ApplicationsController,
@@ -41,6 +47,7 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     OtpTypeRepository,
     OtpRequestRepository,
     CustomerRepository,
+    BankRepository,
     LeadRepository,
     LeadStatusRepository,
     SettingsRepository,
@@ -52,6 +59,9 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     GetCustomerLeadStatusUseCase,
     CheckLoanEligibilityUseCase,
     SubmitProfessionalApplicationUseCase,
+    SaveLoanSelectionUseCase,
+    SaveKycDocumentsUseCase,
+    SaveBankDetailsUseCase,
     SendOtpUseCase,
     VerifyOtpUseCase,
     GetCustomerSessionUseCase,

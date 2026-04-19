@@ -3,17 +3,27 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { type MouseEvent as ReactMouseEvent, ReactNode, useEffect, useRef, useState } from 'react';
+import {
+  type FormEvent,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { ELIGIBILITY_SECTION_DEFINITIONS } from '@/components/eligibility/eligibility-definitions';
 import { useNavigationProgress } from '@/components/ui/navigation-progress-provider';
 import { LogoutButton } from '@/components/ui/logout-button';
-import { LOS_STORAGE_KEY } from '@/lib/auth';
+import { updateLosPassword } from '@/lib/api';
+import { LOS_STORAGE_KEY, LOS_THEME_KEY } from '@/lib/auth';
 
 type SessionUser = {
   user?: { fullName?: string; email?: string; role?: string; roleName?: string };
 };
 
 type SidebarMode = 'expanded' | 'icons' | 'hidden';
+type ThemeMode = 'light' | 'dark';
 type NavIcon = 'dashboard' | 'leads' | 'applications' | 'agents' | 'roles' | 'masters' | 'eligibility' | 'partners';
 type NavChildItem = { href: string; label: string };
 type NavItem = { href: string; label: string; icon: NavIcon; badge?: number; children?: NavChildItem[] };
@@ -109,6 +119,7 @@ function isNavActive(pathname: string, item: NavItem) {
 
 function breadcrumbLabel(pathname: string): string {
   if (BREADCRUMBS[pathname]) return BREADCRUMBS[pathname];
+  if (/^\/leads\/[^/]+$/.test(pathname)) return 'Lead detail';
   const seg = pathname.replace(/^\//, '').split('/')[0];
   return seg ? seg.charAt(0).toUpperCase() + seg.slice(1) : 'Home';
 }
@@ -123,6 +134,43 @@ function canStartTrackedNavigation(event: ReactMouseEvent<HTMLDivElement>, ancho
 
 function navigationLabel(href: URL) {
   return breadcrumbLabel(href.pathname);
+}
+
+/**
+ * Renders the brand logo only after mount so the server HTML matches the client's
+ * first paint. Some browser extensions inject nodes next to <img> (e.g. #imgData),
+ * which would otherwise cause a hydration mismatch with next/image.
+ */
+function MoneyCashSidebarLogo({ isIcons }: { isIcons: boolean }) {
+  const [mounted, setMounted] = useState(false);
+
+  useLayoutEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div
+        className={cx(
+          'rounded-[4px] bg-[rgba(23,44,113,0.07)]',
+          isIcons ? 'mx-auto aspect-square w-9' : 'aspect-[540/168] w-[min(190px,100%)] max-w-full',
+        )}
+        aria-hidden
+      />
+    );
+  }
+
+  return (
+    <Image
+      src="/images/moneycash-logo.jpeg"
+      alt="MoneyCash"
+      width={540}
+      height={168}
+      sizes="190px"
+      className={cx('h-auto block', isIcons ? 'w-9' : 'w-[min(190px,100%)]')}
+      priority
+    />
+  );
 }
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -207,7 +255,17 @@ export function CrmShell({
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>('expanded');
   const [isMobileLayout, setIsMobileLayout] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [themeMode, setThemeMode] = useState<ThemeMode>('light');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
   const notificationRef = useRef<HTMLDivElement | null>(null);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
   const crumb = breadcrumbLabel(pathname);
 
   // Load session + sidebar mode from localStorage on mount
@@ -228,6 +286,10 @@ export function CrmShell({
       } catch { /* fall through */ }
     }
     if (window.localStorage.getItem(LEGACY_SIDEBAR_COLLAPSED_KEY) === '1') setSidebarMode('hidden');
+    const storedTheme = window.localStorage.getItem(LOS_THEME_KEY);
+    const mode: ThemeMode = storedTheme === 'dark' ? 'dark' : 'light';
+    setThemeMode(mode);
+    document.documentElement.setAttribute('data-theme', mode);
   }, []);
 
   // Responsive breakpoint
@@ -241,6 +303,10 @@ export function CrmShell({
 
   // Close panels on route change
   useEffect(() => { setSidebarOpen(false); setNotificationsOpen(false); }, [pathname]);
+
+  useEffect(() => {
+    setUserMenuOpen(false);
+  }, [pathname]);
 
   // Mobile body scroll lock
   useEffect(() => {
@@ -264,12 +330,68 @@ export function CrmShell({
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
   }, [notificationsOpen]);
 
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    function onDown(e: MouseEvent) {
+      if (!userMenuRef.current?.contains(e.target as Node)) setUserMenuOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setUserMenuOpen(false);
+    }
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [userMenuOpen]);
+
   function handleRailToggle() {
     if (sidebarMode === 'hidden') return;
     setSidebarMode((cur) => { const next: SidebarMode = cur === 'expanded' ? 'icons' : 'expanded'; persistSidebarMode(next); return next; });
   }
   function handleHideToggle() {
     setSidebarMode((cur) => { const next: SidebarMode = cur === 'hidden' ? 'icons' : 'hidden'; persistSidebarMode(next); return next; });
+  }
+
+  function applyTheme(next: ThemeMode) {
+    setThemeMode(next);
+    window.localStorage.setItem(LOS_THEME_KEY, next);
+    document.documentElement.setAttribute('data-theme', next);
+  }
+
+  async function handlePasswordSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPasswordError(null);
+    setPasswordSuccess(null);
+    if (newPassword.length < 6) {
+      setPasswordError('New password must be at least 6 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New password and confirm password do not match.');
+      return;
+    }
+
+    const raw = window.localStorage.getItem(LOS_STORAGE_KEY);
+    const token = raw ? (JSON.parse(raw) as { token?: string }).token : null;
+    if (!token) {
+      setPasswordError('Session expired - please login again.');
+      return;
+    }
+
+    setPasswordSaving(true);
+    try {
+      await updateLosPassword(token, { currentPassword, newPassword });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordSuccess('Password updated successfully.');
+    } catch (error) {
+      setPasswordError(error instanceof Error ? error.message : 'Unable to update password.');
+    } finally {
+      setPasswordSaving(false);
+    }
   }
 
   function handleLinkCapture(event: ReactMouseEvent<HTMLDivElement>) {
@@ -319,7 +441,7 @@ export function CrmShell({
     <div
       onClickCapture={handleLinkCapture}
       className={cx('min-h-screen flex items-stretch text-brand-text', isMobileLayout && 'block')}
-      style={{ background: 'radial-gradient(circle at top right, rgba(255,197,25,0.12), transparent 30rem), linear-gradient(180deg, #f6faff 0%, #edf4ff 50%, #f4f8ff 100%)' }}
+      style={{ background: 'var(--los-bg)' }}
     >
       {isMobileLayout && sidebarOpen && (
         <button type="button" className="fixed inset-0 z-40 border-0 bg-[rgba(10,28,66,0.3)] backdrop-blur-[2px]" aria-label="Close menu" onClick={() => setSidebarOpen(false)} />
@@ -335,7 +457,7 @@ export function CrmShell({
           <div className={cx('flex flex-col gap-2', isIcons && 'items-center')}>
             <Link href="/dashboard" className="block">
               <div className={cx('flex items-center justify-center border border-[rgba(18,36,79,0.09)] bg-white rounded-[12px] overflow-hidden transition-all duration-[120ms] hover:border-[rgba(20,150,243,0.22)] hover:shadow-[0_4px_14px_rgba(20,150,243,0.1)]', isIcons ? 'p-2' : 'p-2.5')}>
-                <Image src="/images/moneycash-logo.jpeg" alt="MoneyCash" width={540} height={168} sizes="190px" className={cx('h-auto block', isIcons ? 'w-9' : 'w-[min(190px,100%)]')} priority />
+                <MoneyCashSidebarLogo isIcons={isIcons} />
               </div>
             </Link>
             
@@ -550,15 +672,62 @@ export function CrmShell({
                 )}
               </div>
 
-              {/* User chip */}
-              <div className="inline-flex items-center gap-2 min-w-0 px-2 py-1.5 rounded-[9px] bg-[rgba(255,255,255,0.88)] border border-[rgba(23,44,113,0.09)]">
-                <span className="flex-shrink-0 grid place-items-center w-7 h-7 rounded-[7px] bg-[linear-gradient(145deg,#1496f3,#172c71)] text-white text-[0.72rem] font-extrabold" aria-hidden>
-                  {(session?.user?.fullName ?? 'M').slice(0, 1).toUpperCase()}
-                </span>
-                <span className="flex flex-col min-w-0">
-                  <strong className="text-[0.84rem] truncate leading-tight text-brand-navy">{session?.user?.fullName ?? 'MoneyCash Ops'}</strong>
-                  <span className="text-[0.71rem] text-brand-muted truncate leading-tight">{session?.user?.roleName ?? session?.user?.role ?? 'LOS'}</span>
-                </span>
+              {/* User menu */}
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 min-w-0 px-2 py-1.5 rounded-[9px] bg-[rgba(255,255,255,0.88)] border border-[rgba(23,44,113,0.09)] cursor-pointer"
+                  onClick={() => setUserMenuOpen((v) => !v)}
+                  aria-expanded={userMenuOpen}
+                  aria-haspopup="menu"
+                >
+                  <span className="flex-shrink-0 grid place-items-center w-7 h-7 rounded-[7px] bg-[linear-gradient(145deg,#1496f3,#172c71)] text-white text-[0.72rem] font-extrabold" aria-hidden>
+                    {(session?.user?.fullName ?? 'M').slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="flex flex-col min-w-0 text-left">
+                    <strong className="text-[0.84rem] truncate leading-tight text-brand-navy">{session?.user?.fullName ?? 'MoneyCash Ops'}</strong>
+                    <span className="text-[0.71rem] text-brand-muted truncate leading-tight">{session?.user?.roleName ?? session?.user?.role ?? 'LOS'}</span>
+                  </span>
+                </button>
+
+                {userMenuOpen && (
+                  <div
+                    className={cx('absolute top-[calc(100%+8px)] w-[260px] rounded-[12px] border border-[rgba(23,44,113,0.12)] p-2 shadow-[0_12px_36px_rgba(23,44,113,0.14)] z-50 bg-white', isMobileLayout ? 'left-0' : 'right-0')}
+                    role="menu"
+                  >
+                    <button
+                      type="button"
+                      className="w-full text-left min-h-[34px] px-3 rounded-[8px] hover:bg-[rgba(20,150,243,0.08)] text-[0.84rem] font-semibold text-brand-navy cursor-pointer"
+                      onClick={() => {
+                        setShowPasswordModal(true);
+                        setUserMenuOpen(false);
+                        setPasswordError(null);
+                        setPasswordSuccess(null);
+                      }}
+                    >
+                      Update password
+                    </button>
+                    <div className="mt-1 border-t border-[rgba(23,44,113,0.08)] pt-2 px-2">
+                      <p className="m-0 text-[0.72rem] uppercase tracking-[0.08em] text-brand-muted font-extrabold">Theme</p>
+                      <div className="mt-1 flex gap-2">
+                        <button
+                          type="button"
+                          className={cx('min-h-[30px] px-3 rounded-[999px] border text-[0.78rem] font-bold cursor-pointer', themeMode === 'light' ? 'border-brand-blue text-brand-blue bg-[rgba(20,150,243,0.08)]' : 'border-[rgba(23,44,113,0.12)] text-brand-muted bg-white')}
+                          onClick={() => applyTheme('light')}
+                        >
+                          Light
+                        </button>
+                        <button
+                          type="button"
+                          className={cx('min-h-[30px] px-3 rounded-[999px] border text-[0.78rem] font-bold cursor-pointer', themeMode === 'dark' ? 'border-brand-blue text-brand-blue bg-[rgba(20,150,243,0.08)]' : 'border-[rgba(23,44,113,0.12)] text-brand-muted bg-white')}
+                          onClick={() => applyTheme('dark')}
+                        >
+                          Dark
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <LogoutButton className={cx('los-btn-primary', isMobileLayout && 'w-full')} />
@@ -589,6 +758,60 @@ export function CrmShell({
 
         <main className="pt-3">{children}</main>
       </div>
+
+      {showPasswordModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(10,28,66,0.42)] p-4 backdrop-blur-[4px]"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setShowPasswordModal(false);
+          }}
+        >
+          <div className="w-full max-w-[460px] rounded-[16px] border border-[rgba(23,44,113,0.12)] bg-white p-5 shadow-[0_20px_56px_rgba(23,44,113,0.22)]">
+            <h3 className="m-0 text-[1.1rem] font-extrabold text-brand-navy">Update Password</h3>
+            <p className="m-0 mt-1 text-[0.82rem] text-brand-muted">Use your current password to set a new one.</p>
+            <form className="mt-3 grid gap-2" onSubmit={(e) => void handlePasswordSubmit(e)}>
+              <input
+                type="password"
+                className="los-input"
+                placeholder="Current password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+              />
+              <input
+                type="password"
+                className="los-input"
+                placeholder="New password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+              />
+              <input
+                type="password"
+                className="los-input"
+                placeholder="Confirm new password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+              {passwordError ? <p className="m-0 text-[0.82rem] text-[#8d3434]">{passwordError}</p> : null}
+              {passwordSuccess ? <p className="m-0 text-[0.82rem] text-[#166534]">{passwordSuccess}</p> : null}
+              <div className="mt-1 flex gap-2">
+                <button
+                  type="button"
+                  className="min-h-[36px] flex-1 rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent font-bold text-brand-text cursor-pointer"
+                  onClick={() => setShowPasswordModal(false)}
+                >
+                  Close
+                </button>
+                <button type="submit" className="los-btn-primary flex-1" disabled={passwordSaving}>
+                  {passwordSaving ? 'Updating...' : 'Update'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

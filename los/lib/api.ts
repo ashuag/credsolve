@@ -189,6 +189,51 @@ export type LosApplication = {
   updatedAt: string;
 };
 
+export type LosLeadDetails = {
+  uuid: string;
+  customerUuid: string;
+  mobileNumber: string;
+  email: string | null;
+  statusCode: string;
+  statusLabel: string;
+  sourceName: string | null;
+  sourceType: string | null;
+  utm: {
+    source: string | null;
+    medium: string | null;
+    campaign: string | null;
+    term: string | null;
+    content: string | null;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+  profile: {
+    fullName: string | null;
+    panNumber: string | null;
+    pincode: string | null;
+    addressLine1: string | null;
+    addressLine2: string | null;
+    city: string | null;
+    state: string | null;
+    stateCode: string | null;
+    gender: string | null;
+    occupation: string | null;
+    netMonthlyIncome: string | null;
+    annualTurnover: string | null;
+    annualProfit: string | null;
+    cibilConsentAt: string | null;
+  } | null;
+  applications: Array<{
+    uuid: string;
+    statusCode: string;
+    statusLabel: string;
+    loanAmount: string | null;
+    loanTenure: number | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+};
+
 export async function getRoles(token: string): Promise<LosRole[]> {
   return cachedAuthorizedLosGet<LosRole[]>(token, '/roles', 'Failed to fetch roles');
 }
@@ -268,6 +313,30 @@ export async function getNewLeads(token: string): Promise<LosLead[]> {
 
 export async function getApplications(token: string): Promise<LosApplication[]> {
   return cachedAuthorizedLosGet<LosApplication[]>(token, '/applications', 'Failed to fetch applications');
+}
+
+export async function getLeadDetails(token: string, leadUuid: string): Promise<LosLeadDetails> {
+  return cachedAuthorizedLosGet<LosLeadDetails>(token, `/leads/${encodeURIComponent(leadUuid)}`, 'Failed to fetch lead details');
+}
+
+export async function updateLosPassword(
+  token: string,
+  payload: { currentPassword: string; newPassword: string },
+): Promise<{ success: boolean }> {
+  const response = await fetch(`${clientApiUrl()}/auth/password`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const body = await parseJsonResponse(response);
+  if (!response.ok) {
+    throw new Error(messageFromBody(body) ?? 'Failed to update password');
+  }
+  return (body as { success?: boolean })?.success ? { success: true } : { success: true };
 }
 
 export async function createUser(
@@ -405,6 +474,7 @@ export type LosMastersPayload = {
   occupations: LosNamedMaster[];
   reasonsForLoan: LosNamedMaster[];
   genders: LosNamedMaster[];
+  banks: LosNamedMaster[];
 };
 
 export type LosEligibilityCriterion = {
@@ -706,6 +776,47 @@ export async function updateGender(
       body: JSON.stringify(data),
     },
     'Failed to update gender',
+  );
+}
+
+export async function createBank(token: string, data: { name: string }): Promise<LosNamedMaster> {
+  return authorizedLosRequest<LosNamedMaster>(
+    token,
+    '/masters/banks',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    },
+    'Failed to create bank',
+  );
+}
+
+export async function updateBank(
+  token: string,
+  id: number,
+  data: { name?: string; isActive?: boolean },
+): Promise<LosNamedMaster> {
+  return authorizedLosRequest<LosNamedMaster>(
+    token,
+    `/masters/banks/${id}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    },
+    'Failed to update bank',
+  );
+}
+
+export async function deleteBank(token: string, id: number): Promise<{ ok: true }> {
+  return authorizedLosRequest<{ ok: true }>(
+    token,
+    `/masters/banks/${id}`,
+    {
+      method: 'DELETE',
+    },
+    'Failed to delete bank',
   );
 }
 

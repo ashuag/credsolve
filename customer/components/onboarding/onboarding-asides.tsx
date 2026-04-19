@@ -27,7 +27,7 @@ export function EmailAside({ mode }: { mode: EmailMode }) {
           <div className="mc-inner-card bg-gradient-to-br from-[rgba(255,244,204,0.94)] to-[rgba(255,255,255,0.92)]">
             <strong className="text-brand-navy">Step 4</strong>
             <span className="block text-brand-muted leading-[1.6]">
-              Share personal details — name, gender, DOB, occupation, city, and pincode.
+              Share personal details — name, gender, DOB, occupation, income, city, and pincode.
             </span>
           </div>
         )}
@@ -57,7 +57,7 @@ export function EmailOtpAside({ mode }: { mode: EmailMode }) {
           <span className="block text-brand-muted leading-[1.6]">
             {isLogin
               ? 'We create a protected session upon successful OTP verification.'
-              : 'Full name, gender, date of birth, occupation, address, city, and residential pincode.'}
+              : 'Full name, gender, date of birth, occupation, income, address, city, and residential pincode.'}
           </span>
         </div>
         <div className="mc-inner-card bg-gradient-to-br from-[rgba(255,244,204,0.94)] to-[rgba(255,255,255,0.92)]">
@@ -129,14 +129,14 @@ export function PersonalDetailsAside({ activeSection }: { activeSection: Persona
         <SectionSummaryCard
           eyebrow="Part 1"
           title="Personal profile"
-          description="Name, gender, date of birth, and occupation."
+          description="Name, gender, date of birth, occupation, and income."
           isActive={activeSection === 'profile'}
           isComplete={activeSection === 'financial'}
         />
         <SectionSummaryCard
           eyebrow="Part 2"
-          title="Address and income"
-          description="Address, city, pincode, earnings, and final consent."
+          title="Address and consent"
+          description="Address, city, pincode, and final consent."
           isActive={activeSection === 'financial'}
           isComplete={false}
         />

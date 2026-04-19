@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Spinner } from '@/components/ui/spinner';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
@@ -16,10 +16,12 @@ import {
 } from '@/components/onboarding/onboarding-asides';
 
 type OnboardingStep = 'email' | 'email-otp' | 'details';
+const DETAILS_TRANSITION_DELAY_MS = 650;
 
 export function OnboardingFlow() {
   const router = useRouter();
   const { loading, session, refresh } = useCustomerSession();
+  const syncedProfileRef = useRef(false);
   const [hasResolved, setHasResolved] = useState(false);
   const [step, setStep] = useState<OnboardingStep>('email');
   const [email, setEmail] = useState('');
@@ -27,10 +29,17 @@ export function OnboardingFlow() {
   const [emailOtpRequest, setEmailOtpRequest] = useState<SendEmailOtpResponse | null>(null);
   const [detailsSection, setDetailsSection] = useState<PersonalDetailsSection>('profile');
   const [detailsNotice, setDetailsNotice] = useState<string | null>(null);
+  const [isTransitioningToDetails, setIsTransitioningToDetails] = useState(false);
 
   useEffect(() => {
     if (loading || !session) {
       return;
+    }
+
+    // Ensure we hydrate onboarding from the latest server session once on entry.
+    if (!syncedProfileRef.current) {
+      syncedProfileRef.current = true;
+      void refresh();
     }
 
     if (!session.authenticated || !session.mobileNumber?.trim() || !session.lead) {
@@ -48,7 +57,7 @@ export function OnboardingFlow() {
     setEmailMode(initialMode);
     setEmail(storedEmail);
 
-    if (emailVerified) {
+    if (emailVerified && !isTransitioningToDetails) {
       setDetailsSection('profile');
       setStep('details');
       setDetailsNotice(
@@ -63,7 +72,7 @@ export function OnboardingFlow() {
     }
 
     setHasResolved(true);
-  }, [loading, session, router]);
+  }, [isTransitioningToDetails, loading, session, router]);
 
   function handleEmailNext(confirmedEmail: string, mode: EmailMode, otpRequest: SendEmailOtpResponse) {
     setEmail(confirmedEmail);
@@ -74,10 +83,17 @@ export function OnboardingFlow() {
   }
 
   async function handleOtpVerified() {
-    await refresh();
-    setDetailsSection('profile');
-    setStep('details');
-    setDetailsNotice(email ? `${email} is verified. Continue with the next step.` : 'Email is verified. Continue with the next step.');
+    setIsTransitioningToDetails(true);
+
+    try {
+      await refresh();
+      await new Promise((resolve) => setTimeout(resolve, DETAILS_TRANSITION_DELAY_MS));
+      setDetailsSection('profile');
+      setStep('details');
+      setDetailsNotice(email ? `${email} is verified. Continue with the next step.` : 'Email is verified. Continue with the next step.');
+    } finally {
+      setIsTransitioningToDetails(false);
+    }
   }
 
   if (loading || !session || !hasResolved) {

@@ -1,7 +1,9 @@
 'use client';
 
 import { getNewLeads, type LosLead } from '@/lib/api';
+import { getMasters } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 function getToken(): string | null {
@@ -44,6 +46,8 @@ export function LeadsPanel() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statuses, setStatuses] = useState<Array<{ code: string; displayName: string }>>([]);
 
   const loadLeads = useCallback(async () => {
     setLoading(true);
@@ -57,7 +61,12 @@ export function LeadsPanel() {
     }
 
     try {
-      setLeads(await getNewLeads(token));
+      const [leadsResponse, masters] = await Promise.all([getNewLeads(token), getMasters(token)]);
+      setLeads(leadsResponse);
+      setStatuses(masters.leadStatuses.filter((item) => item.isActive).map((item) => ({
+        code: item.code,
+        displayName: item.displayName,
+      })));
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Failed to load leads');
     } finally {
@@ -71,7 +80,8 @@ export function LeadsPanel() {
 
   const searchTerm = search.trim().toLowerCase();
   const filteredLeads = leads.filter((lead) => (
-    searchTerm === ''
+    (statusFilter === 'all' || lead.statusCode === statusFilter)
+    && (searchTerm === ''
     || lead.uuid.toLowerCase().includes(searchTerm)
     || lead.customerUuid.toLowerCase().includes(searchTerm)
     || lead.mobileNumber.toLowerCase().includes(searchTerm)
@@ -79,7 +89,7 @@ export function LeadsPanel() {
     || lead.statusCode.toLowerCase().includes(searchTerm)
     || lead.statusLabel.toLowerCase().includes(searchTerm)
     || sourceLabel(lead).toLowerCase().includes(searchTerm)
-    || (lead.utmCampaign ?? '').toLowerCase().includes(searchTerm)
+    || (lead.utmCampaign ?? '').toLowerCase().includes(searchTerm))
   ));
 
   const leadsWithEmail = leads.filter((lead) => !!lead.email).length;
@@ -150,6 +160,7 @@ export function LeadsPanel() {
         </div>
 
         <div className="grid gap-3 px-4 py-3 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.72)] md:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="grid gap-3 md:grid-cols-2">
           <label className="grid gap-1">
             <span className="text-[0.72rem] font-extrabold tracking-[0.08em] uppercase text-brand-muted">
               Search
@@ -162,6 +173,20 @@ export function LeadsPanel() {
               className="los-input"
             />
           </label>
+          <label className="grid gap-1">
+            <span className="text-[0.72rem] font-extrabold tracking-[0.08em] uppercase text-brand-muted">
+              Status
+            </span>
+            <select className="los-input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="all">All statuses</option>
+              {statuses.map((status) => (
+                <option key={status.code} value={status.code}>
+                  {status.displayName}
+                </option>
+              ))}
+            </select>
+          </label>
+          </div>
 
           <div className="flex items-end text-[0.8rem] text-brand-muted">
             Showing {filteredLeads.length} of {leads.length} leads
@@ -201,7 +226,9 @@ export function LeadsPanel() {
                   >
                     <td className="px-4 py-2.5">
                       <div className="min-w-[200px]">
-                        <strong className="block text-brand-text text-[0.84rem] break-all">{lead.uuid}</strong>
+                        <Link href={`/leads/${lead.uuid}`} className="block text-brand-blue text-[0.84rem] break-all font-extrabold no-underline hover:underline">
+                          {lead.uuid}
+                        </Link>
                         <span className="block text-brand-muted text-[0.75rem] break-all">
                           Customer {lead.customerUuid}
                         </span>

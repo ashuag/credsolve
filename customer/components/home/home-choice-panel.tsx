@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { useCustomerSession } from '@/components/providers/customer-session-provider';
+import { hasActiveLoanLead } from '@/lib/api/customer-session';
 import { buildHrefWithSearch } from '@/lib/navigation';
 
 const APPLY_ACTION = {
@@ -30,9 +32,11 @@ function ArrowIcon() {
 
 export function HomeChoicePanel() {
   const searchParams = useSearchParams();
+  const { loading, session } = useCustomerSession();
 
   const applyHref = buildHrefWithSearch(APPLY_ACTION.href, searchParams);
   const loginHref = buildHrefWithSearch('/my-account', searchParams, { mode: 'login' });
+  const showApplyCard = !loading && !hasActiveLoanLead(session);
 
   return (
     <section className="mc-card mc-card-glow" aria-labelledby="journey-choice-heading">
@@ -42,29 +46,33 @@ export function HomeChoicePanel() {
           id="journey-choice-heading"
           className="m-0 text-[clamp(1.8rem,5vw,2.2rem)] tracking-[-0.04em] text-brand-navy"
         >
-          Apply for a loan or login.
+          {showApplyCard ? 'Apply for a loan or login.' : 'Welcome back'}
         </h2>
         <p className="m-0 leading-[1.6] text-brand-muted">
-          Pick the path you need on the right, then continue with the same secure MoneyCash onboarding flow.
+          {showApplyCard
+            ? 'Pick the path you need on the right, then continue with the same secure MoneyCash onboarding flow.'
+            : 'You already have an application in progress. Login to continue.'}
         </p>
       </div>
 
       <div className="grid gap-3">
-        <Link
-          href={applyHref}
-          className={`group grid gap-3 rounded-[24px] p-[18px] transition-all duration-[180ms] hover:-translate-y-[2px] hover:shadow-[0_20px_34px_rgba(23,44,113,0.16)] ${APPLY_ACTION.accent}`}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-[0.78rem] font-bold uppercase tracking-[0.14em] opacity-75">{APPLY_ACTION.eyebrow}</div>
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-current/15 bg-current/10">
-              <ArrowIcon />
-            </span>
-          </div>
-          <div>
-            <strong className="block text-[1.2rem] leading-[1.2]">{APPLY_ACTION.title}</strong>
-            <span className="mt-2 block text-[0.95rem] leading-[1.6] opacity-85">{APPLY_ACTION.description}</span>
-          </div>
-        </Link>
+        {showApplyCard && (
+          <Link
+            href={applyHref}
+            className={`group grid gap-3 rounded-[24px] p-[18px] transition-all duration-[180ms] hover:-translate-y-[2px] hover:shadow-[0_20px_34px_rgba(23,44,113,0.16)] ${APPLY_ACTION.accent}`}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-[0.78rem] font-bold uppercase tracking-[0.14em] opacity-75">{APPLY_ACTION.eyebrow}</div>
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-current/15 bg-current/10">
+                <ArrowIcon />
+              </span>
+            </div>
+            <div>
+              <strong className="block text-[1.2rem] leading-[1.2]">{APPLY_ACTION.title}</strong>
+              <span className="mt-2 block text-[0.95rem] leading-[1.6] opacity-85">{APPLY_ACTION.description}</span>
+            </div>
+          </Link>
+        )}
 
         <Link
           href={loginHref}

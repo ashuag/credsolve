@@ -3,8 +3,11 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  InternalServerErrorException,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
+import { EmailService } from '../../../../common/email/email.service';
 import type { SendOtpDto } from '../dto/send-otp.dto';
 import type { SendOtpResult } from '../contracts/send-otp-result.contract';
 import { OTP_TYPE } from '../../../../common/constants/otp.constants';
@@ -18,11 +21,14 @@ import { SettingsRepository } from '../../infrastructure/repositories/settings.r
 
 @Injectable()
 export class SendOtpUseCase {
+  private readonly logger = new Logger(SendOtpUseCase.name);
+
   constructor(
     private readonly otpTypes: OtpTypeRepository,
     private readonly otpRequests: OtpRequestRepository,
     private readonly settingsRepository: SettingsRepository,
-    private readonly otpCodeGenerator: OtpCodeGenerator
+    private readonly otpCodeGenerator: OtpCodeGenerator,
+    private readonly emailService: EmailService
   ) {}
 
   async execute(dto: SendOtpDto, ip: string | undefined, customerSession?: CustomerSessionPayload): Promise<SendOtpResult> {
@@ -66,6 +72,22 @@ export class SendOtpUseCase {
       utmTerm: dto.utmTerm ?? null,
       utmContent: dto.utmContent ?? null,
     });
+
+    if (dto.type === OTP_TYPE.EMAIL) {
+      if (this.emailService.isConfigured()) {
+        try {
+          await this.emailService.sendOtpEmail(canonical, otpCode, expiresAt);
+        } catch (error) {
+          this.logger.error(`Failed to send OTP email to ${masked}`, error instanceof Error ? error.stack : error);
+          await this.otpRequests.deleteById(undefined, row.id);
+          throw new InternalServerErrorException('Could not send verification email. Please try again.');
+        }
+      } else {
+        this.logger.warn(
+          `[otp] SMTP not configured; email not sent. to=${masked} request=${row.uuid} (use dev logs / LOG_OTP_TO_CONSOLE for code)`,
+        );
+      }
+    }
 
     const isDev = (process.env.NODE_ENV ?? 'development').toLowerCase() !== 'production';
     if (isDev || process.env.LOG_OTP_TO_CONSOLE === 'true') {

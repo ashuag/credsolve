@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { logoutCustomer } from '@/lib/api/auth';
+import { hasActiveLoanLead } from '@/lib/api/customer-session';
 import { buildHrefWithSearch } from '@/lib/navigation';
 
 export function BrandHeader() {
@@ -20,6 +21,7 @@ export function BrandHeader() {
   const accountHref = buildHrefWithSearch('/my-account', searchParams);
 
   const signedIn = Boolean(!loading && session?.authenticated && session.mobileNumber?.trim());
+  const showApplyForLoan = !loading && !hasActiveLoanLead(session);
 
   const greetingLabel = useMemo(() => {
     if (!session || !session.authenticated) return 'Hi there.';
@@ -76,12 +78,14 @@ export function BrandHeader() {
         </Link>
 
         <nav className="hidden sm:flex items-center gap-2" aria-label="Primary">
-          <Link
-            href={applyHref}
-            className="inline-flex items-center justify-center min-h-[40px] px-[18px] py-[9px] rounded-full border border-[rgba(18,36,79,0.12)] bg-[rgba(255,255,255,0.82)] font-extrabold text-[0.94rem] text-brand-navy shadow-[0_8px_20px_rgba(23,44,113,0.08)] transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-[0_12px_28px_rgba(23,44,113,0.14)]"
-          >
-            Apply for a loan
-          </Link>
+          {showApplyForLoan && (
+            <Link
+              href={applyHref}
+              className="inline-flex items-center justify-center min-h-[40px] px-[18px] py-[9px] rounded-full border border-[rgba(18,36,79,0.12)] bg-[rgba(255,255,255,0.82)] font-extrabold text-[0.94rem] text-brand-navy shadow-[0_8px_20px_rgba(23,44,113,0.08)] transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-[0_12px_28px_rgba(23,44,113,0.14)]"
+            >
+              Apply for a loan
+            </Link>
+          )}
 
           {signedIn ? (
             <div className="relative" ref={menuRef}>

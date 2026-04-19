@@ -97,3 +97,20 @@ export async function apiPost<T>(
     body: JSON.stringify(body)
   }, fallbackMessage);
 }
+
+export async function apiPostFormData<T>(
+  path: string,
+  formData: FormData,
+  fallbackMessage: string,
+  init?: Omit<RequestInit, 'method' | 'body'>
+): Promise<T | null> {
+  return requestJson<T>(
+    path,
+    {
+      ...init,
+      method: 'POST',
+      body: formData,
+    },
+    fallbackMessage
+  );
+}

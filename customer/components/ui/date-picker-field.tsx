@@ -35,6 +35,8 @@ function ChevronDownIcon() {
 /* ── Types ───────────────────────────────────────────────────────────────── */
 
 type DatePickerFieldProps = {
+  id?: string;
+  name?: string;
   label: string;
   /** Set false when an outer field wrapper already renders the label. */
   showInputLabel?: boolean;
@@ -49,6 +51,8 @@ type DatePickerFieldProps = {
   hint?: string;
   /** Additional classes for the outer wrapper. */
   className?: string;
+  ariaInvalid?: boolean;
+  ariaDescribedBy?: string;
 };
 
 /* ── Component ───────────────────────────────────────────────────────────── */
@@ -60,9 +64,11 @@ const LABEL_CLASS =
   'text-[0.84rem] font-extrabold text-brand-navy transition-colors duration-[180ms] group-focus-within:text-brand-blue';
 
 const INPUT_CLASS =
-  'w-full min-h-[56px] px-4 py-[14px] border border-[rgba(18,36,79,0.16)] rounded-[16px] bg-white text-brand-navy font-[inherit] caret-brand-blue shadow-[0_10px_18px_rgba(23,44,113,0.04)] transition-all duration-[160ms] placeholder:text-[rgba(94,103,130,0.86)] focus:outline-none focus:border-[rgba(20,150,243,0.45)] focus:shadow-[0_0_0_4px_rgba(20,150,243,0.12),0_16px_28px_rgba(23,44,113,0.1)]';
+  'w-full min-h-[60px] rounded-[18px] border border-[rgba(18,36,79,0.16)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(246,249,255,0.94))] px-4 pb-[14px] pt-[18px] text-brand-navy font-[inherit] caret-brand-blue shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_12px_24px_rgba(23,44,113,0.05)] transition-all duration-[160ms] placeholder:text-[rgba(94,103,130,0.76)] focus:outline-none focus:border-[rgba(20,150,243,0.45)] focus:bg-white focus:shadow-[0_0_0_4px_rgba(20,150,243,0.12),0_16px_28px_rgba(23,44,113,0.1)]';
 
 export function DatePickerField({
+  id,
+  name,
   label,
   showInputLabel = true,
   value,
@@ -71,6 +77,8 @@ export function DatePickerField({
   maxDate,
   hint,
   className,
+  ariaInvalid,
+  ariaDescribedBy,
 }: DatePickerFieldProps) {
   const effectiveMax = maxDate ?? new Date();
   const maxYear = effectiveMax.getFullYear();
@@ -143,6 +151,8 @@ export function DatePickerField({
         <div className="relative">
           <input
             className={cn(INPUT_CLASS, 'pr-[56px]')}
+            id={id}
+            name={name}
             type="text"
             inputMode="numeric"
             autoComplete="bday"
@@ -150,6 +160,8 @@ export function DatePickerField({
             maxLength={10}
             value={value}
             onChange={handleInputChange}
+            aria-invalid={ariaInvalid}
+            aria-describedby={ariaDescribedBy}
           />
           <button
             type="button"

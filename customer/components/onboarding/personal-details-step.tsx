@@ -42,7 +42,16 @@ type Fields = {
 type FieldError = Partial<Record<keyof Fields, string>>;
 export type PersonalDetailsSection = 'profile' | 'financial';
 
-const PROFILE_FIELDS: Array<keyof Fields> = ['fullName', 'gender', 'dob', 'occupation'];
+/** Fields collected on part 1 (profile + income after occupation). */
+const PROFILE_PAGE_FIELDS: Array<keyof Fields> = [
+  'fullName',
+  'gender',
+  'dob',
+  'occupation',
+  'monthlyIncome',
+  'annualTurnover',
+  'annualProfit',
+];
 
 type PersonalDetailsStepProps = {
   email: string;
@@ -227,9 +236,18 @@ export function PersonalDetailsStep({
 
   function handleContinueToFinancial() {
     const validation = validate();
-    const sectionErrors = pickErrors(validation, PROFILE_FIELDS);
+    const sectionErrors = pickErrors(validation, PROFILE_PAGE_FIELDS);
     if (Object.keys(sectionErrors).length > 0) { setErrors(sectionErrors); return; }
-    setErrors((prev) => ({ ...prev, fullName: undefined, gender: undefined, dob: undefined, occupation: undefined }));
+    setErrors((prev) => ({
+      ...prev,
+      fullName: undefined,
+      gender: undefined,
+      dob: undefined,
+      occupation: undefined,
+      monthlyIncome: undefined,
+      annualTurnover: undefined,
+      annualProfit: undefined,
+    }));
     setSubmitError('');
     onSectionChange('financial');
   }
@@ -240,7 +258,7 @@ export function PersonalDetailsStep({
     const validation = validate();
     if (Object.keys(validation).length > 0) {
       setErrors(validation);
-      onSectionChange(hasErrors(validation, PROFILE_FIELDS) ? 'profile' : 'financial');
+      onSectionChange(hasErrors(validation, PROFILE_PAGE_FIELDS) ? 'profile' : 'financial');
       return;
     }
 
@@ -276,7 +294,6 @@ export function PersonalDetailsStep({
   return (
     <>
       <section className="mc-card mc-card-glow" aria-labelledby="details-heading">
-        <div className="mc-chip">Step 4 of 4</div>
         <h1
           id="details-heading"
           className="mt-3.5 mb-3 text-brand-navy text-[clamp(2.2rem,6vw,3.2rem)] leading-[0.96] tracking-[-0.05em]"
@@ -343,12 +360,16 @@ export function PersonalDetailsStep({
                   }
                 >
                   <DatePickerField
+                    id="dob"
+                    name="dob"
                     label="Date of birth"
                     showInputLabel={false}
                     value={dobDisplay}
                     onChange={handleDobChange}
                     maxDate={maxDob}
                     hint=""
+                    ariaInvalid={Boolean(errors.dob)}
+                    ariaDescribedBy={errors.dob ? 'dob-error' : 'dob-help'}
                   />
                 </FieldGroup>
 
@@ -369,6 +390,65 @@ export function PersonalDetailsStep({
                     ))}
                   </select>
                 </FieldGroup>
+
+                {usesMonthlyIncome && (
+                  <FieldGroup
+                    label={fields.occupation === 'salaried' ? 'Monthly salary' : 'Monthly income'}
+                    htmlFor="monthlyIncome"
+                    error={errors.monthlyIncome}
+                    help="Share your current take-home monthly amount in INR."
+                  >
+                    <input
+                      id="monthlyIncome"
+                      name="monthlyIncome"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="Enter amount in INR"
+                      required
+                      value={fields.monthlyIncome}
+                      onChange={setField('monthlyIncome')}
+                      aria-invalid={Boolean(errors.monthlyIncome)}
+                      aria-describedby={errors.monthlyIncome ? 'monthlyIncome-error' : 'monthlyIncome-help'}
+                      className={inputClass(Boolean(errors.monthlyIncome))}
+                    />
+                  </FieldGroup>
+                )}
+
+                {isSelfEmployed && (
+                  <div className="grid gap-3">
+                    <FieldGroup label="Annual turnover" htmlFor="annualTurnover" error={errors.annualTurnover} help="Share your latest annual turnover in INR.">
+                      <input
+                        id="annualTurnover"
+                        name="annualTurnover"
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="Enter amount in INR"
+                        required
+                        value={fields.annualTurnover}
+                        onChange={setField('annualTurnover')}
+                        aria-invalid={Boolean(errors.annualTurnover)}
+                        aria-describedby={errors.annualTurnover ? 'annualTurnover-error' : 'annualTurnover-help'}
+                        className={inputClass(Boolean(errors.annualTurnover))}
+                      />
+                    </FieldGroup>
+
+                    <FieldGroup label="Annual profit" htmlFor="annualProfit" error={errors.annualProfit} help="Share your latest annual profit in INR.">
+                      <input
+                        id="annualProfit"
+                        name="annualProfit"
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="Enter amount in INR"
+                        required
+                        value={fields.annualProfit}
+                        onChange={setField('annualProfit')}
+                        aria-invalid={Boolean(errors.annualProfit)}
+                        aria-describedby={errors.annualProfit ? 'annualProfit-error' : 'annualProfit-help'}
+                        className={inputClass(Boolean(errors.annualProfit))}
+                      />
+                    </FieldGroup>
+                  </div>
+                )}
               </div>
 
               <div className="sticky bottom-3 z-[5] mt-2 flex flex-col gap-2.5 rounded-[18px] border border-[rgba(18,36,79,0.08)] bg-[rgba(255,255,255,0.9)] p-2.5 backdrop-blur-[6px] sm:static sm:flex-row sm:flex-wrap sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-0">
@@ -376,20 +456,12 @@ export function PersonalDetailsStep({
                   ← Back
                 </button>
                 <button type="button" onClick={handleContinueToFinancial} className="mc-btn-primary flex-1">
-                  Continue to address and income
+                  Continue to address
                 </button>
               </div>
             </div>
           ) : (
             <div className={SECTION_CLASS}>
-              <div className="grid gap-1">
-                <span className="text-[0.72rem] font-extrabold uppercase tracking-[0.12em] text-brand-blue">Part 2 of 2</span>
-                <h2 className="text-[1.25rem] font-extrabold tracking-[-0.03em] text-brand-navy">Address and income</h2>
-                <p className="text-[0.92rem] leading-[1.6] text-brand-muted">
-                  Add your city and income details, then accept consent to complete the application.
-                </p>
-              </div>
-
               <div className="grid gap-3">
                 <FieldGroup label="Address line 1" htmlFor="addressLine1" error={errors.addressLine1} help="House number, building, street, or locality.">
                   <input
@@ -457,60 +529,6 @@ export function PersonalDetailsStep({
                     className={inputClass(Boolean(errors.pincode))}
                   />
                 </FieldGroup>
-
-                {usesMonthlyIncome && (
-                  <FieldGroup label="Monthly income" htmlFor="monthlyIncome" error={errors.monthlyIncome} help="Share your current take-home monthly income in INR.">
-                    <input
-                      id="monthlyIncome"
-                      name="monthlyIncome"
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="Enter amount in INR"
-                      required
-                      value={fields.monthlyIncome}
-                      onChange={setField('monthlyIncome')}
-                      aria-invalid={Boolean(errors.monthlyIncome)}
-                      aria-describedby={errors.monthlyIncome ? 'monthlyIncome-error' : 'monthlyIncome-help'}
-                      className={inputClass(Boolean(errors.monthlyIncome))}
-                    />
-                  </FieldGroup>
-                )}
-
-                {isSelfEmployed && (
-                  <div className="grid gap-3">
-                    <FieldGroup label="Annual turnover" htmlFor="annualTurnover" error={errors.annualTurnover} help="Share your latest annual turnover in INR.">
-                      <input
-                        id="annualTurnover"
-                        name="annualTurnover"
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="Enter amount in INR"
-                        required
-                        value={fields.annualTurnover}
-                        onChange={setField('annualTurnover')}
-                        aria-invalid={Boolean(errors.annualTurnover)}
-                        aria-describedby={errors.annualTurnover ? 'annualTurnover-error' : 'annualTurnover-help'}
-                        className={inputClass(Boolean(errors.annualTurnover))}
-                      />
-                    </FieldGroup>
-
-                    <FieldGroup label="Annual profit" htmlFor="annualProfit" error={errors.annualProfit} help="Share your latest annual profit in INR.">
-                      <input
-                        id="annualProfit"
-                        name="annualProfit"
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="Enter amount in INR"
-                        required
-                        value={fields.annualProfit}
-                        onChange={setField('annualProfit')}
-                        aria-invalid={Boolean(errors.annualProfit)}
-                        aria-describedby={errors.annualProfit ? 'annualProfit-error' : 'annualProfit-help'}
-                        className={inputClass(Boolean(errors.annualProfit))}
-                      />
-                    </FieldGroup>
-                  </div>
-                )}
               </div>
 
               <div className="grid gap-3 rounded-[22px] border border-[rgba(18,36,79,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(244,249,255,0.94))] px-4 py-4 shadow-[0_14px_28px_rgba(23,44,113,0.08)]">
@@ -565,14 +583,15 @@ export function PersonalDetailsStep({
   );
 }
 
-/* ── Local sub-components ──────────────────��─────────────────────────────── */
+/* ── Local sub-components ─────────────────────────────────────────────────── */
 
 function inputClass(hasError: boolean): string {
   return cn(
-    'w-full min-h-[52px] px-4 rounded-[16px] border bg-white',
-    'text-brand-navy text-[1rem] font-bold outline-0',
-    'shadow-[0_10px_18px_rgba(23,44,113,0.04)] transition-all duration-[220ms]',
-    'focus:-translate-y-0.5 focus:scale-[1.005]',
+    'w-full min-h-[60px] rounded-[18px] border px-4 pb-[14px] pt-[18px]',
+    'bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(246,249,255,0.94))]',
+    'text-brand-navy text-[1rem] font-bold outline-0 placeholder:text-[rgba(94,103,130,0.72)]',
+    'shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_12px_24px_rgba(23,44,113,0.05)] transition-all duration-[220ms]',
+    'focus:-translate-y-px focus:bg-white',
     'focus:border-[rgba(20,150,243,0.46)]',
     'focus:shadow-[0_22px_42px_rgba(23,44,113,0.12),0_0_0_6px_rgba(20,150,243,0.08)]',
     hasError
@@ -589,18 +608,30 @@ type FieldGroupProps = {
   children: ReactNode;
 };
 
-function FieldGroup({ label, htmlFor, error, children }: FieldGroupProps) {
+function FieldGroup({ label, htmlFor, error, help, children }: FieldGroupProps) {
   return (
-    <div className="grid gap-[6px]">
-      <label htmlFor={htmlFor} className="text-[0.92rem] font-extrabold text-brand-navy">
-        {label}
-      </label>
-      {children}
+    <div className="grid gap-2">
+      <div className="group relative pt-3">
+        <label
+          htmlFor={htmlFor}
+          className={cn(
+            'absolute top-3 left-4 z-[2] inline-flex max-w-[calc(100%-2rem)] -translate-y-1/2 items-center rounded-full border px-3 py-1',
+            'bg-[rgba(252,253,255,0.96)] text-[0.68rem] font-black uppercase tracking-[0.16em]',
+            'shadow-[0_10px_20px_rgba(23,44,113,0.08)] backdrop-blur-[8px] transition-all duration-[180ms]',
+            error
+              ? 'border-[rgba(193,57,43,0.16)] text-[#b2372d]'
+              : 'border-[rgba(20,150,243,0.14)] text-[rgba(20,150,243,0.92)] group-focus-within:border-[rgba(20,150,243,0.26)] group-focus-within:text-brand-navy',
+          )}
+        >
+          {label}
+        </label>
+        {children}
+      </div>
       <p
-        id={error ? `${htmlFor}-error` : ``}
-        className={`text-[0.875rem] leading-[1.55] min-h-[1.2rem] ${error ? 'text-[#b2372d]' : 'text-brand-muted'}`}
+        id={error ? `${htmlFor}-error` : `${htmlFor}-help`}
+        className={`min-h-[1.2rem] px-1 text-[0.82rem] leading-[1.55] ${error ? 'text-[#b2372d]' : 'text-brand-muted'}`}
       >
-        {error ?? undefined}
+        {error ?? help}
       </p>
     </div>
   );

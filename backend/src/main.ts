@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import 'dotenv/config';
+import './load-env';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';

@@ -191,21 +191,21 @@ export function EmailOtpStep({
 
       {(isVerifying || isBootstrapping) && (
         <FlowLoader
-          eyebrow={isLogin ? 'Authenticating' : 'Verifying email'}
-          title={isBootstrapping ? 'Sending OTP' : isLogin ? 'Logging you in.' : 'Email confirmed.'}
+          eyebrow={isBootstrapping ? 'Verification in progress' : isLogin ? 'Authenticating' : 'Verification in progress'}
+          title={isBootstrapping ? 'Sending OTP' : isLogin ? 'Logging you in.' : 'Verifying your OTP'}
           description={
             isBootstrapping
               ? `We are sending a one-time password to ${email || 'your email address'}.`
               : isLogin
               ? 'We are validating your OTP, securing your session, and opening your account dashboard.'
-              : 'Your email is verified. Loading the next step of your MoneyCash application.'
+              : 'Please wait while we validate your code securely.'
           }
           steps={
             isBootstrapping
               ? ['Validating email', 'Sending OTP', 'Preparing verification screen']
               : isLogin
               ? ['Checking OTP', 'Securing session', 'Opening dashboard']
-              : ['Confirming OTP', 'Verifying email', 'Loading next step']
+              : ['Checking OTP code', 'Validating request', 'Confirming access']
           }
         />
       )}

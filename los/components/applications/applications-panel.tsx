@@ -1,7 +1,8 @@
 'use client';
 
-import { getApplications, type LosApplication } from '@/lib/api';
+import { getApplications, getMasters, type LosApplication } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 function getToken(): string | null {
@@ -51,6 +52,8 @@ export function ApplicationsPanel() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statuses, setStatuses] = useState<Array<{ code: string; displayName: string }>>([]);
 
   const loadApplications = useCallback(async () => {
     setLoading(true);
@@ -64,7 +67,12 @@ export function ApplicationsPanel() {
     }
 
     try {
-      setApplications(await getApplications(token));
+      const [applicationsResponse, masters] = await Promise.all([getApplications(token), getMasters(token)]);
+      setApplications(applicationsResponse);
+      setStatuses(masters.applicationStatuses.filter((item) => item.isActive).map((item) => ({
+        code: item.code,
+        displayName: item.displayName,
+      })));
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Failed to load applications');
     } finally {
@@ -78,7 +86,8 @@ export function ApplicationsPanel() {
 
   const searchTerm = search.trim().toLowerCase();
   const filteredApplications = applications.filter((application) => (
-    searchTerm === ''
+    (statusFilter === 'all' || application.statusCode === statusFilter)
+    && (searchTerm === ''
     || application.uuid.toLowerCase().includes(searchTerm)
     || application.customerUuid.toLowerCase().includes(searchTerm)
     || (application.leadUuid ?? '').toLowerCase().includes(searchTerm)
@@ -86,7 +95,7 @@ export function ApplicationsPanel() {
     || (application.email ?? '').toLowerCase().includes(searchTerm)
     || (application.fullName ?? '').toLowerCase().includes(searchTerm)
     || application.statusCode.toLowerCase().includes(searchTerm)
-    || application.statusLabel.toLowerCase().includes(searchTerm)
+    || application.statusLabel.toLowerCase().includes(searchTerm))
   ));
 
   const draftApplications = applications.filter((application) => application.statusCode === 'DRAFT').length;
@@ -160,6 +169,7 @@ export function ApplicationsPanel() {
         </div>
 
         <div className="grid gap-3 px-4 py-3 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.72)] md:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="grid gap-3 md:grid-cols-2">
           <label className="grid gap-1">
             <span className="text-[0.72rem] font-extrabold tracking-[0.08em] uppercase text-brand-muted">
               Search
@@ -172,6 +182,20 @@ export function ApplicationsPanel() {
               className="los-input"
             />
           </label>
+          <label className="grid gap-1">
+            <span className="text-[0.72rem] font-extrabold tracking-[0.08em] uppercase text-brand-muted">
+              Status
+            </span>
+            <select className="los-input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="all">All statuses</option>
+              {statuses.map((status) => (
+                <option key={status.code} value={status.code}>
+                  {status.displayName}
+                </option>
+              ))}
+            </select>
+          </label>
+          </div>
 
           <div className="flex items-end text-[0.8rem] text-brand-muted">
             Showing {filteredApplications.length} of {applications.length} applications
@@ -213,7 +237,14 @@ export function ApplicationsPanel() {
                       <div className="min-w-[220px]">
                         <strong className="block text-brand-text text-[0.84rem] break-all">{application.uuid}</strong>
                         <span className="block text-brand-muted text-[0.75rem] break-all">
-                          {application.leadUuid ? `Lead ${application.leadUuid}` : `Customer ${application.customerUuid}`}
+                          {application.leadUuid ? (
+                            <>
+                              Lead{' '}
+                              <Link href={`/leads/${application.leadUuid}`} className="text-brand-blue no-underline hover:underline">
+                                {application.leadUuid}
+                              </Link>
+                            </>
+                          ) : `Customer ${application.customerUuid}`}
                         </span>
                       </div>
                     </td>

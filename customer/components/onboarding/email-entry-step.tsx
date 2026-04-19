@@ -108,7 +108,7 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', le
             : 'Choose one of the two options below to continue.'}
         </p>
 
-        <div className="grid gap-3 mt-[22px]">
+        <div className="mt-[22px] grid gap-2">
           <button
             type="button"
             onClick={handleGoogleLogin}

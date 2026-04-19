@@ -33,6 +33,15 @@ export interface AuthOtpSettings {
   sessionRotateOnUse: boolean;
 }
 
+export interface LoanCalculationSettings {
+  minLoanAmount: number;
+  maxLoanAmount: number;
+  loanTenureDays: number;
+  roiPerDayPercent: number;
+  processingFeePercent: number;
+  processingFeeGstPercent: number;
+}
+
 @Injectable()
 export class SettingsRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -90,6 +99,58 @@ export class SettingsRepository {
       sessionTtlMs,
       sessionSliding,
       sessionRotateOnUse,
+    };
+  }
+
+  async loadLoanCalculationSettings(): Promise<LoanCalculationSettings> {
+    const loanKeys = [
+      SettingKey.MIN_LOAN_AMOUNT.key,
+      SettingKey.MAX_LOAN_AMOUNT.key,
+      SettingKey.LOAN_TENURE.key,
+      SettingKey.ROI_PER_DAY.key,
+      SettingKey.PROCESSING_FEE.key,
+      SettingKey.PROCESSING_FEE_GST.key,
+    ] as const;
+
+    const rows = await this.prisma.client.setting.findMany({
+      where: { key: { in: [...loanKeys] }, isActive: true },
+      select: { key: true, value: true },
+    });
+    const map = new Map(rows.map((r) => [r.key, r.value]));
+    const pick = (key: string, def: string) => map.get(key)?.trim() || def;
+
+    const minLoanAmount = Math.max(
+      1000,
+      parseInt(pick(SettingKey.MIN_LOAN_AMOUNT.key, SettingKey.MIN_LOAN_AMOUNT.default), 10) || 5000
+    );
+    const maxLoanAmount = Math.max(
+      minLoanAmount,
+      parseInt(pick(SettingKey.MAX_LOAN_AMOUNT.key, SettingKey.MAX_LOAN_AMOUNT.default), 10) || 50000
+    );
+    const loanTenureDays = Math.min(
+      62,
+      Math.max(1, parseInt(pick(SettingKey.LOAN_TENURE.key, SettingKey.LOAN_TENURE.default), 10) || 30)
+    );
+    const roiPerDayPercent = Math.min(
+      10,
+      Math.max(0, parseFloat(pick(SettingKey.ROI_PER_DAY.key, SettingKey.ROI_PER_DAY.default)) || 1)
+    );
+    const processingFeePercent = Math.min(
+      40,
+      Math.max(0, parseFloat(pick(SettingKey.PROCESSING_FEE.key, SettingKey.PROCESSING_FEE.default)) || 0)
+    );
+    const processingFeeGstPercent = Math.min(
+      40,
+      Math.max(0, parseFloat(pick(SettingKey.PROCESSING_FEE_GST.key, SettingKey.PROCESSING_FEE_GST.default)) || 0)
+    );
+
+    return {
+      minLoanAmount,
+      maxLoanAmount,
+      loanTenureDays,
+      roiPerDayPercent,
+      processingFeePercent,
+      processingFeeGstPercent,
     };
   }
 }

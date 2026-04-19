@@ -79,6 +79,16 @@ export const MASTER_DEFINITIONS = [
     searchPlaceholder: 'Search genders...',
     canCreate: true,
   },
+  {
+    slug: 'banks',
+    label: 'Banks',
+    eyebrow: 'Disbursement',
+    description: 'Add, edit, activate, deactivate, or remove banks shown in the customer bank-details dropdown.',
+    pageTitle: 'Banks',
+    pageSubtitle: 'Manage the bank master list used when customers choose their disbursement bank.',
+    searchPlaceholder: 'Search banks...',
+    canCreate: true,
+  },
 ] as const;
 
 export type MasterSlug = (typeof MASTER_DEFINITIONS)[number]['slug'];

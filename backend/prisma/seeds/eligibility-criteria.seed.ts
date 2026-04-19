@@ -18,6 +18,27 @@ const CRITERIA: Array<{ key: string; label: string; value: string; description: 
   { key: 'no_sma_pwos', label: 'No SMA or PWOS trade lines', value: 'true', description: 'Customer must have no Special Mention Account or Pre-Written-Off Status trades' },
   { key: 'no_active_mfi', label: 'No active MFI loans', value: 'true', description: 'Customer must not have an active microfinance loan' },
   { key: 'max_enquiries_30_days', label: 'Max loan enquiries in last 30 days', value: '10', description: 'Customer must have ≤ this many credit enquiries in the past 30 days' },
+  {
+    key: 'enforce_negative_state',
+    label: 'Enforce negative state list',
+    value: 'true',
+    description:
+      'When true, origination is blocked when the customer address maps to a state present in the negative_state serviceability master.',
+  },
+  {
+    key: 'enforce_negative_pincode',
+    label: 'Enforce negative pincode list',
+    value: 'true',
+    description:
+      'When true, origination is blocked when the customer pincode matches an active row in the negative_pincode serviceability master.',
+  },
+  {
+    key: 'enforce_negative_city',
+    label: 'Enforce negative city list',
+    value: 'true',
+    description:
+      'When true, origination is blocked when the customer city matches an active row in the negative_city serviceability master.',
+  },
 ];
 
 export async function seedEligibilityCriteria(prisma: Prisma.TransactionClient) {
