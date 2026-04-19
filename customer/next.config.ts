@@ -61,6 +61,10 @@ if (!/^https?:\/\//i.test(apiProxyTarget)) {
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  compiler: {
+    // Smaller client bundles in production; keep error/warn for debugging.
+    removeConsole: isProductionRuntime ? { exclude: ['error', 'warn'] } : false,
+  },
   // Next dev can intermittently miss generated manifests with custom distDir.
   // Keep default `.next` for development and allow overrides for non-dev runs.
   distDir: isProductionRuntime ? envDistDir || '.next' : '.next',

@@ -314,7 +314,6 @@ export function PersonalDetailsStep({
                   label="Full name as per PAN card"
                   htmlFor="fullName"
                   error={errors.fullName}
-                  help="Enter your legal name exactly as it appears on your PAN."
                 >
                   <input
                     id="fullName"
@@ -331,7 +330,7 @@ export function PersonalDetailsStep({
                   />
                 </FieldGroup>
 
-                <FieldGroup label="Gender" htmlFor="gender" error={errors.gender} help="Select the gender shown on your documents.">
+                <FieldGroup label="Gender" htmlFor="gender" error={errors.gender}>
                   <select
                     id="gender"
                     name="gender"
@@ -353,11 +352,6 @@ export function PersonalDetailsStep({
                   label="Date of birth"
                   htmlFor="dob"
                   error={errors.dob}
-                  help={
-                    parseDobDisplay(dobDisplay)
-                      ? `Selected: ${formatDateDisplay(parseDobDisplay(dobDisplay)!)}`
-                      : 'Must be 18+ (DD/MM/YYYY).'
-                  }
                 >
                   <DatePickerField
                     id="dob"
@@ -373,7 +367,7 @@ export function PersonalDetailsStep({
                   />
                 </FieldGroup>
 
-                <FieldGroup label="Occupation" htmlFor="occupation" error={errors.occupation} help="Choose the occupation that best describes you.">
+                <FieldGroup label="Occupation" htmlFor="occupation" error={errors.occupation}>
                   <select
                     id="occupation"
                     name="occupation"
@@ -396,7 +390,6 @@ export function PersonalDetailsStep({
                     label={fields.occupation === 'salaried' ? 'Monthly salary' : 'Monthly income'}
                     htmlFor="monthlyIncome"
                     error={errors.monthlyIncome}
-                    help="Share your current take-home monthly amount in INR."
                   >
                     <input
                       id="monthlyIncome"
@@ -416,7 +409,7 @@ export function PersonalDetailsStep({
 
                 {isSelfEmployed && (
                   <div className="grid gap-3">
-                    <FieldGroup label="Annual turnover" htmlFor="annualTurnover" error={errors.annualTurnover} help="Share your latest annual turnover in INR.">
+                    <FieldGroup label="Annual turnover" htmlFor="annualTurnover" error={errors.annualTurnover}>
                       <input
                         id="annualTurnover"
                         name="annualTurnover"
@@ -432,7 +425,7 @@ export function PersonalDetailsStep({
                       />
                     </FieldGroup>
 
-                    <FieldGroup label="Annual profit" htmlFor="annualProfit" error={errors.annualProfit} help="Share your latest annual profit in INR.">
+                    <FieldGroup label="Annual profit" htmlFor="annualProfit" error={errors.annualProfit}>
                       <input
                         id="annualProfit"
                         name="annualProfit"
@@ -463,7 +456,7 @@ export function PersonalDetailsStep({
           ) : (
             <div className={SECTION_CLASS}>
               <div className="grid gap-3">
-                <FieldGroup label="Address line 1" htmlFor="addressLine1" error={errors.addressLine1} help="House number, building, street, or locality.">
+                <FieldGroup label="Address line 1" htmlFor="addressLine1" error={errors.addressLine1}>
                   <input
                     id="addressLine1"
                     name="addressLine1"
@@ -479,7 +472,7 @@ export function PersonalDetailsStep({
                   />
                 </FieldGroup>
 
-                <FieldGroup label="Address line 2" htmlFor="addressLine2" error={errors.addressLine2} help="Landmark, area, or apartment name. Optional.">
+                <FieldGroup label="Address line 2" htmlFor="addressLine2" error={errors.addressLine2}>
                   <input
                     id="addressLine2"
                     name="addressLine2"
@@ -494,7 +487,7 @@ export function PersonalDetailsStep({
                   />
                 </FieldGroup>
 
-                <FieldGroup label="City" htmlFor="currentCity" error={errors.currentCity} help="Search and select your current city.">
+                <FieldGroup label="City" htmlFor="currentCity" error={errors.currentCity}>
                   <SearchableCityInput
                     id="currentCity"
                     name="currentCity"
@@ -512,7 +505,7 @@ export function PersonalDetailsStep({
                   />
                 </FieldGroup>
 
-                <FieldGroup label="Pincode" htmlFor="pincode" error={errors.pincode} help="Your current residential pincode.">
+                <FieldGroup label="Pincode" htmlFor="pincode" error={errors.pincode}>
                   <input
                     id="pincode"
                     name="pincode"
@@ -604,11 +597,10 @@ type FieldGroupProps = {
   label: string;
   htmlFor: string;
   error?: string;
-  help: string;
   children: ReactNode;
 };
 
-function FieldGroup({ label, htmlFor, error, help, children }: FieldGroupProps) {
+function FieldGroup({ label, htmlFor, error, children }: FieldGroupProps) {
   return (
     <div className="grid gap-2">
       <div className="group relative pt-3">
@@ -628,10 +620,10 @@ function FieldGroup({ label, htmlFor, error, help, children }: FieldGroupProps) 
         {children}
       </div>
       <p
-        id={error ? `${htmlFor}-error` : `${htmlFor}-help`}
+        id={error ? `${htmlFor}-error` : `${htmlFor}`}
         className={`min-h-[1.2rem] px-1 text-[0.82rem] leading-[1.55] ${error ? 'text-[#b2372d]' : 'text-brand-muted'}`}
       >
-        {error ?? help}
+        {error ?? ''}
       </p>
     </div>
   );

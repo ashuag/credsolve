@@ -4,7 +4,8 @@ WORKDIR /workspace/backend
 
 COPY backend/package*.json ./
 
-RUN npm ci
+# Fail the image build if lockfile and dependencies drift (avoids empty node_modules in stale volumes).
+RUN npm ci && node -e "require('nodemailer'); require('@nestjs/common')"
 
 EXPOSE 4001
 

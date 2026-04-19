@@ -38,9 +38,17 @@ const partnersFallback = [
   }
 ];
 
+const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
+
+/** Bounded wait so hung API calls do not leave UI pending forever. */
+function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const signal = init?.signal ?? AbortSignal.timeout(DEFAULT_FETCH_TIMEOUT_MS);
+  return fetch(input, { ...init, signal });
+}
+
 export async function getDashboard(): Promise<LosCrmDashboard> {
   try {
-    const response = await fetch(`${API_URL}/dashboard/crm`, {
+    const response = await fetchWithTimeout(`${API_URL}/dashboard/crm`, {
       next: { revalidate: SERVER_REVALIDATE_SECONDS },
     });
     if (!response.ok) return fallback;
@@ -58,7 +66,7 @@ export async function getDashboard(): Promise<LosCrmDashboard> {
 
 export async function getPartners() {
   try {
-    const response = await fetch(`${API_URL}/partners`, {
+    const response = await fetchWithTimeout(`${API_URL}/partners`, {
       next: { revalidate: SERVER_REVALIDATE_SECONDS },
     });
     if (!response.ok) return partnersFallback;
@@ -120,7 +128,7 @@ async function cachedAuthorizedLosGet<T>(
   }
 
   const request = (async () => {
-    const response = await fetch(`${clientApiUrl()}${path}`, {
+    const response = await fetchWithTimeout(`${clientApiUrl()}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
     });
@@ -239,7 +247,7 @@ export async function getRoles(token: string): Promise<LosRole[]> {
 }
 
 export async function createRole(token: string, data: { name: string; hierarchyLevel: number }): Promise<LosRole> {
-  const response = await fetch(`${clientApiUrl()}/roles`, {
+  const response = await fetchWithTimeout(`${clientApiUrl()}/roles`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(data),
@@ -255,7 +263,7 @@ export async function updateRole(
   id: number,
   data: { name?: string; hierarchyLevel?: number }
 ): Promise<LosRole> {
-  const response = await fetch(`${clientApiUrl()}/roles/${id}`, {
+  const response = await fetchWithTimeout(`${clientApiUrl()}/roles/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(data),
@@ -267,7 +275,7 @@ export async function updateRole(
 }
 
 export async function toggleRoleStatus(token: string, id: number): Promise<LosRole> {
-  const response = await fetch(`${clientApiUrl()}/roles/${id}/status`, {
+  const response = await fetchWithTimeout(`${clientApiUrl()}/roles/${id}/status`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -323,7 +331,7 @@ export async function updateLosPassword(
   token: string,
   payload: { currentPassword: string; newPassword: string },
 ): Promise<{ success: boolean }> {
-  const response = await fetch(`${clientApiUrl()}/auth/password`, {
+  const response = await fetchWithTimeout(`${clientApiUrl()}/auth/password`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -343,7 +351,7 @@ export async function createUser(
   token: string,
   data: { fullName: string; email: string; roleId: number; managerId?: string | null }
 ): Promise<LosUser> {
-  const response = await fetch(`${clientApiUrl()}/users`, {
+  const response = await fetchWithTimeout(`${clientApiUrl()}/users`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(data),
@@ -359,7 +367,7 @@ export async function updateUser(
   id: string,
   data: { fullName?: string; email?: string; roleId?: number; managerId?: string | null }
 ): Promise<LosUser> {
-  const response = await fetch(`${clientApiUrl()}/users/${id}`, {
+  const response = await fetchWithTimeout(`${clientApiUrl()}/users/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(data),
@@ -371,7 +379,7 @@ export async function updateUser(
 }
 
 export async function toggleUserStatus(token: string, id: string): Promise<LosUser> {
-  const response = await fetch(`${clientApiUrl()}/users/${id}/status`, {
+  const response = await fetchWithTimeout(`${clientApiUrl()}/users/${id}/status`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -382,7 +390,7 @@ export async function toggleUserStatus(token: string, id: string): Promise<LosUs
 }
 
 export async function resendUserInvitation(token: string, id: string): Promise<LosUser> {
-  const response = await fetch(`${clientApiUrl()}/users/${id}/resend-invitation`, {
+  const response = await fetchWithTimeout(`${clientApiUrl()}/users/${id}/resend-invitation`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -402,7 +410,7 @@ export type LosInvitationPreview = {
 };
 
 export async function getInvitationPreview(token: string): Promise<LosInvitationPreview> {
-  const response = await fetch(`${clientApiUrl()}/auth/invitations/${encodeURIComponent(token)}`, {
+  const response = await fetchWithTimeout(`${clientApiUrl()}/auth/invitations/${encodeURIComponent(token)}`, {
     cache: 'no-store',
   });
   const body = await parseJsonResponse(response);
@@ -411,7 +419,7 @@ export async function getInvitationPreview(token: string): Promise<LosInvitation
 }
 
 export async function acceptInvitation(token: string, data: { password: string }): Promise<{ message: string }> {
-  const response = await fetch(`${clientApiUrl()}/auth/invitations/${encodeURIComponent(token)}/accept`, {
+  const response = await fetchWithTimeout(`${clientApiUrl()}/auth/invitations/${encodeURIComponent(token)}/accept`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -507,7 +515,7 @@ async function authorizedLosRequest<T>(
   fallbackMessage: string,
 ): Promise<T> {
   const method = (init.method ?? 'GET').toUpperCase();
-  const response = await fetch(`${clientApiUrl()}${path}`, {
+  const response = await fetchWithTimeout(`${clientApiUrl()}${path}`, {
     ...init,
     headers: {
       ...(init.headers ?? {}),

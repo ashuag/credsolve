@@ -72,7 +72,7 @@ function AmountVisual({
   loading?: boolean;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-[34px] border border-[rgba(255,255,255,0.12)] bg-[linear-gradient(155deg,#0d1e56,#17327e_52%,#1496f3_140%)] p-6 shadow-[0_28px_64px_rgba(17,33,88,0.28)] max-sm:p-5">
+    <div className="relative overflow-hidden rounded-[34px] border border-[rgba(255,255,255,0.12)] bg-[linear-gradient(155deg,#0d1e56,#17327e_52%,#1496f3_140%)] p-6 shadow-[0_28px_64px_rgba(17,33,88,0.28)] max-sm:p-5 min-w-0">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         <div className="absolute left-[-10%] top-[-14%] h-[14rem] w-[14rem] rounded-full bg-[radial-gradient(circle,rgba(255,197,25,0.3),transparent_70%)] blur-[4px]" />
         <div className="absolute right-[-16%] bottom-[-18%] h-[18rem] w-[18rem] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.14),transparent_72%)]" />
@@ -235,8 +235,8 @@ export default function PreApprovedLoanPage() {
           <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.16)_42%,transparent_66%)] -translate-x-[120%] animate-sheen" />
         </div>
 
-        <div className="relative grid gap-8 nav:grid-cols-[minmax(0,1fr)_minmax(320px,430px)] nav:items-center">
-          <div className="grid gap-6">
+        <div className="relative z-[1] grid gap-8 nav:grid-cols-[minmax(0,1fr)_minmax(280px,430px)] nav:items-center">
+          <div className="grid min-w-0 gap-6">
             <div className="flex flex-wrap items-center gap-2">
               <span className="mc-chip">Pre-approved loan</span>
               <span className="inline-flex items-center rounded-full bg-[rgba(20,150,243,0.08)] px-3 py-2 text-[0.8rem] font-bold text-brand-navy">
@@ -246,12 +246,10 @@ export default function PreApprovedLoanPage() {
 
             <div className="grid gap-3">
               <div className="text-[0.8rem] font-black uppercase tracking-[0.16em] text-brand-blue">Decision</div>
-              <div className="min-w-0 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <h1 className="m-0 whitespace-nowrap text-[clamp(1rem,3.5vw,3.25rem)] leading-tight tracking-[-0.06em] text-brand-navy">
-                  You are pre-approved for{' '}
-                  <span className="font-black tabular-nums">{formattedAmount}</span>
-                </h1>
-              </div>
+              <h1 className="m-0 min-w-0 max-w-full text-[clamp(1.15rem,3.4vw,3.25rem)] leading-snug tracking-[-0.06em] text-brand-navy text-balance">
+                You are pre-approved for{' '}
+                <span className="inline-block font-black tabular-nums [overflow-wrap:anywhere]">{formattedAmount}</span>
+              </h1>
               <p className="m-0 max-w-[34rem] text-[1rem] leading-[1.75] text-brand-muted">
                 This is the loan amount you can continue with right now. Complete your account details to move ahead.
               </p>
@@ -301,7 +299,9 @@ export default function PreApprovedLoanPage() {
             </div>
           </div>
 
-          <AmountVisual amount={formattedAmount} caption="Pre-approved from the quick eligibility check." />
+          <div className="relative z-[1] min-w-0">
+            <AmountVisual amount={formattedAmount} caption="Pre-approved from the quick eligibility check." />
+          </div>
         </div>
       </section>
 

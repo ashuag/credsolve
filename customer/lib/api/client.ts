@@ -1,5 +1,9 @@
 import { getApiUrl } from '../api-url';
 
+/** Default 30s; override with NEXT_PUBLIC_API_FETCH_TIMEOUT_MS (milliseconds). */
+const API_FETCH_TIMEOUT_MS =
+  Number.parseInt(process.env.NEXT_PUBLIC_API_FETCH_TIMEOUT_MS ?? '', 10) || 30_000;
+
 type ApiErrorShape = {
   message?: string | string[] | Record<string, unknown>;
   error?: string;
@@ -51,9 +55,11 @@ async function requestJson<T>(
   fallbackMessage: string
 ): Promise<T | null> {
   const requestUrl = `${getApiUrl()}${path}`;
+  const signal = init.signal ?? AbortSignal.timeout(API_FETCH_TIMEOUT_MS);
   const response = await fetch(requestUrl, {
     credentials: 'include',
-    ...init
+    ...init,
+    signal,
   });
 
   const data = (await response.json().catch(() => null)) as T | ApiErrorShape | null;

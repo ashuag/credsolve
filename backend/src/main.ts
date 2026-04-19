@@ -25,6 +25,7 @@ function isProductionNodeEnv(): boolean {
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.enableShutdownHooks();
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.set('trust proxy', 1);
   expressApp.disable('x-powered-by');

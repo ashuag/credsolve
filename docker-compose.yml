@@ -39,6 +39,8 @@ services:
     env_file:
       - ./backend/.env
     environment:
+      # Dev stack: ensure devDependencies (e.g. @types/*) install; overrides NODE_ENV=production in .env for `npm ci`.
+      NODE_ENV: development
       CORS_ORIGINS: http://localhost:3010,http://localhost:3011,http://localhost:4001,http://127.0.0.1:3010,http://127.0.0.1:3011,http://127.0.0.1:4001
     depends_on:
       db:
@@ -49,7 +51,7 @@ services:
       - "4001:4001"
     working_dir: /workspace/backend
     # `npm ci` keeps the named volume in sync with package-lock (avoids stale node_modules after new deps, e.g. ioredis).
-    command: sh -c "npm ci && npm run prisma:migrate:deploy && npm run seed && npm run dev"
+    command: sh -c "npm ci --include=dev && npm run prisma:migrate:deploy && npm run seed && npm run dev"
     volumes:
       - ./backend:/workspace/backend
       - backend_node_modules:/workspace/backend/node_modules

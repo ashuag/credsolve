@@ -2,6 +2,10 @@ import './globals.css';
 import type {Metadata, Viewport} from 'next';
 import {Inter} from 'next/font/google';
 import {ReactNode} from 'react';
+import {CustomerUtmBootstrap} from '@/components/auth/customer-utm-bootstrap';
+import {BrandHeader} from '@/components/layout/brand-header';
+import {CustomerSessionProvider} from '@/components/providers/customer-session-provider';
+import {MobileTabBar} from '@/components/layout/mobile-tab-bar';
 
 const inter = Inter({
     subsets: ['latin'],
@@ -10,10 +14,6 @@ const inter = Inter({
     variable: '--font-inter',
     adjustFontFallback: true,
 });
-import {CustomerUtmBootstrap} from '@/components/auth/customer-utm-bootstrap';
-import {BrandHeader} from '@/components/layout/brand-header';
-import {CustomerSessionProvider} from '@/components/providers/customer-session-provider';
-import {MobileTabBar} from '@/components/layout/mobile-tab-bar';
 
 export const metadata: Metadata = {
     title: {
