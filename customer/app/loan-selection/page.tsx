@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { ApiRequestError } from '@/lib/api/client';
+import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import {
   fetchLoanCalculationSettings,
   fetchLoanEligibility,
   type LoanCalculationSettingsResponse,
 } from '@/lib/api/eligibility';
 import { saveLoanSelection } from '@/lib/api/lead';
+import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { Spinner } from '@/components/ui/spinner';
 
 const MIN_LOAN_AMOUNT = 5_000;
@@ -65,7 +67,7 @@ function formatInr(amount: number): string {
 export default function LoanSelectionPage() {
   const router = useRouter();
   const [settings, setSettings] = useState<LoanCalculationSettingsResponse>(DEFAULT_LOAN_SETTINGS);
-  const [loadingSettings, setLoadingSettings] = useState(true);
+  const [loadingSettings, setLoadingSettings] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [eligibleAmount, setEligibleAmount] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -73,6 +75,7 @@ export default function LoanSelectionPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      setLoadingSettings(true);
       try {
         const [next, eligibility] = await Promise.all([
           fetchLoanCalculationSettings(),
@@ -153,30 +156,7 @@ export default function LoanSelectionPage() {
     };
   }, [selectedAmount, settings.processingFeeGstPercent, settings.processingFeePercent, settings.roiPerDayPercent, tenureDays]);
 
-  if (loadingSettings) {
-    return (
-      <CustomerJourneyGuard>
-        <div className="flex min-h-[300px] items-center justify-center gap-3 text-brand-muted">
-          <Spinner size={34} />
-          <span>Loading loan settings...</span>
-        </div>
-      </CustomerJourneyGuard>
-    );
-  }
-
-  if (settingsError) {
-    return (
-      <CustomerJourneyGuard>
-        <div className="mc-card grid gap-4">
-          <div className="mc-chip">Loan settings</div>
-          <p className="m-0 text-brand-navy font-semibold">{settingsError}</p>
-          <Link href="/pre-approved-loan" className="mc-btn-secondary self-start">
-            Back
-          </Link>
-        </div>
-      </CustomerJourneyGuard>
-    );
-  }
+  const { refresh } = useCustomerSession();
 
   async function handleContinue() {
     setIsSaving(true);
@@ -185,113 +165,161 @@ export default function LoanSelectionPage() {
         loanAmount: selectedAmount,
         tenureEndDate: selectedEndDate,
       });
-      router.push('/kyc');
+      await refresh();
+      router.push('/kyc/upload-documents');
     } catch (e) {
       setSettingsError(e instanceof Error ? e.message : 'Unable to save loan selection.');
       setIsSaving(false);
     }
   }
 
-  return (
-    <CustomerJourneyGuard>
-      <div className="grid gap-[18px] nav:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-      <section className="mc-card flex flex-col gap-5">
-        <div className="mc-chip">Select loan amount</div>
-        <h1 className="text-brand-navy text-[clamp(2rem,5vw,3rem)] tracking-[-0.05em] leading-[1.1]">
-          Choose your loan.
+  if (settingsError) {
+    return (
+      <CustomerJourneyGuard>
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+          <div className="mc-card max-w-md w-full grid gap-4 text-center">
+            <div className="mc-chip mx-auto">Error</div>
+            <p className="m-0 text-brand-navy font-semibold">{settingsError}</p>
+            <Link href="/pre-approved-loan" className="mc-btn-primary">
+              Back to Offer
+            </Link>
+          </div>
+        </div>
+      </CustomerJourneyGuard>
+    );
+  }
+
+  const leftInfographic = (
+    <div className="w-full max-w-[380px] bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/20 shadow-2xl">
+      <div className="text-[0.7rem] font-black text-blue-200 uppercase tracking-[0.2em] mb-4">Loan Calculation</div>
+      <div className="grid gap-3">
+        <SummaryItem label="Principal" value={formatInr(calculations.principal)} />
+        <SummaryItem label="Interest" value={formatInr(calculations.interestAmount)} subValue={`${settings.roiPerDayPercent}% per day`} />
+        <SummaryItem label="Processing Fee" value={formatInr(calculations.processingFeeAmount)} subValue={`${settings.processingFeePercent}%`} />
+        <SummaryItem label="GST (18%)" value={formatInr(calculations.gstOnProcessing)} />
+        <div className="h-px bg-white/10 my-2" />
+        <div className="flex justify-between items-center">
+          <div className="text-white/60 text-[0.8rem] font-bold uppercase">Repayment</div>
+          <div className="text-white text-xl font-black">{formatInr(calculations.totalRepaymentAmount)}</div>
+        </div>
+        <div className="flex justify-between items-center bg-white/10 rounded-xl p-3 border border-white/10">
+          <div className="text-blue-200 text-[0.7rem] font-bold uppercase">In-hand Amount</div>
+          <div className="text-[#facc15] text-lg font-black">{formatInr(calculations.totalDisbursementAmount)}</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const journeyPanel = (
+    <div className="h-full flex flex-col justify-center">
+      <div className="mb-8">
+        <div className="flex items-center gap-2 mb-8">
+          <div className="flex gap-1.5">
+            <div className="h-2 w-8 rounded-full bg-blue-600"></div>
+            <div className="h-2 w-8 rounded-full bg-blue-600"></div>
+            <div className="h-2 w-8 rounded-full bg-blue-600"></div>
+            <div className="h-2 w-8 rounded-full bg-blue-600"></div>
+            <div className="h-2 w-8 rounded-full bg-blue-600"></div>
+          </div>
+          <span className="ml-3 text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Step 4 — Selection</span>
+        </div>
+
+        <h1 className="text-2xl md:text-[2.2rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">
+          Customize your loan.
         </h1>
-        <p className="text-brand-muted leading-[1.7]">
-          Select an amount between {formatInr(settings.minLoanAmount)} and {formatInr(maxSelectableAmount)}.
+        <p className="text-[0.95rem] text-slate-500 mb-8 leading-relaxed">
+          Adjust the amount and date to fit your needs. Your summary will update instantly on the left.
         </p>
 
-        <div className="mc-inner-card grid gap-3">
-          <label htmlFor="loanAmountRange" className="text-[0.88rem] font-extrabold uppercase tracking-[0.1em] text-brand-blue">
-            Loan amount
-          </label>
-          <input
-            id="loanAmountRange"
-            type="range"
-            min={settings.minLoanAmount}
-            max={maxSelectableAmount}
-            step={500}
-            value={selectedAmount}
-            onChange={(e) => setSelectedAmount(Number(e.target.value))}
-            className="w-full accent-brand-blue"
-          />
-          <input
-            type="number"
-            min={settings.minLoanAmount}
-            max={maxSelectableAmount}
-            step={500}
-            value={selectedAmount}
-            onChange={(e) => {
-              const value = Number.parseInt(e.target.value, 10);
-              if (!Number.isFinite(value)) return;
-              setSelectedAmount(
-                Math.max(settings.minLoanAmount, Math.min(maxSelectableAmount, value))
-              );
-            }}
-            className="w-full min-h-[52px] px-4 rounded-[16px] border border-[rgba(18,36,79,0.16)] bg-white text-brand-navy text-[1rem] font-bold outline-0"
-          />
+        <div className="grid gap-6">
+          <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
+            <div className="flex justify-between items-end mb-4">
+              <label className="text-[0.75rem] font-bold text-slate-500 uppercase tracking-wider">Loan Amount</label>
+              <div className="text-xl font-black text-brand-blue">{formatInr(selectedAmount)}</div>
+            </div>
+            <input
+              type="range"
+              min={settings.minLoanAmount}
+              max={maxSelectableAmount}
+              step={500}
+              value={selectedAmount}
+              onChange={(e) => setSelectedAmount(Number(e.target.value))}
+              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand-blue"
+            />
+            <div className="flex justify-between mt-2 text-[0.65rem] font-bold text-slate-400">
+              <span>{formatInr(settings.minLoanAmount)}</span>
+              <span>{formatInr(maxSelectableAmount)}</span>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
+            <label htmlFor="loanEndDate" className="block text-[0.75rem] font-bold text-slate-500 uppercase tracking-wider mb-3">
+              Repayment Date
+            </label>
+            <input
+              id="loanEndDate"
+              type="date"
+              min={toDateInputValue(minEndDate)}
+              max={toDateInputValue(maxEndDate)}
+              value={selectedEndDate}
+              onChange={(e) => setSelectedEndDate(e.target.value)}
+              className="w-full h-[54px] rounded-xl border border-slate-200 bg-white px-4 text-[1rem] font-bold text-brand-navy focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
+            />
+            <div className="mt-3 flex justify-between items-center">
+              <span className="text-[0.8rem] text-slate-500">Selected tenure:</span>
+              <span className="text-[0.8rem] font-bold text-brand-navy">{tenureDays} days</span>
+            </div>
+          </div>
         </div>
 
-        <div className="mc-inner-card grid gap-3">
-          <label htmlFor="loanEndDate" className="text-[0.88rem] font-extrabold uppercase tracking-[0.1em] text-brand-blue">
-            Loan tenure end date (within next 2 months)
-          </label>
-          <input
-            id="loanEndDate"
-            type="date"
-            min={toDateInputValue(minEndDate)}
-            max={toDateInputValue(maxEndDate)}
-            value={selectedEndDate}
-            onChange={(e) => setSelectedEndDate(e.target.value)}
-            className="w-full min-h-[52px] px-4 rounded-[16px] border border-[rgba(18,36,79,0.16)] bg-white text-brand-navy text-[1rem] font-bold outline-0"
-          />
-          <p className="text-[0.9rem] text-brand-muted m-0">
-            Selected tenure: <strong className="text-brand-navy">{tenureDays} days</strong>
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          <button type="button" onClick={() => void handleContinue()} className="mc-btn-primary" disabled={isSaving}>
-            {isSaving ? 'Saving...' : 'Continue'}
+        <div className="mt-10 flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={handleContinue}
+            disabled={isSaving}
+            className="mc-btn-primary flex-1 py-4 text-[1rem]"
+          >
+            {isSaving ? 'Processing...' : 'Confirm Loan Details'}
           </button>
-          <Link href="/pre-approved-loan" className="mc-btn-secondary">
+          <Link
+            href="/pre-approved-loan"
+            className="py-4 px-6 rounded-xl font-bold text-[1rem] text-slate-600 bg-white hover:bg-slate-50 transition-colors text-center border border-slate-200"
+          >
             Back
           </Link>
         </div>
-      </section>
+      </div>
+    </div>
+  );
 
-      <aside className="mc-card">
-        <div className="mc-chip">Full calculation</div>
-        <h2 className="mt-[14px] mb-[10px] text-brand-navy text-[clamp(1.7rem,4vw,2.3rem)] tracking-[-0.04em]">
-          Loan summary.
-        </h2>
-
-        <div className="grid gap-2.5">
-          <SummaryRow label="Selected loan amount" value={formatInr(calculations.principal)} />
-          <SummaryRow label="Selected loan tenure" value={`${tenureDays} days`} />
-          <SummaryRow label="ROI (per day)" value={`${settings.roiPerDayPercent}%`} />
-          <SummaryRow label="Interest amount" value={formatInr(calculations.interestAmount)} />
-          <SummaryRow label="Processing fee" value={`${settings.processingFeePercent}%`} />
-          <SummaryRow label="Processing fee amount" value={formatInr(calculations.processingFeeAmount)} />
-          <SummaryRow
-            label="GST on processing fee"
-            value={`${settings.processingFeeGstPercent}% (${formatInr(calculations.gstOnProcessing)})`}
-          />
-          <SummaryRow label="Total repayment amount" value={formatInr(calculations.totalRepaymentAmount)} strong />
-          <SummaryRow label="Total disbursement amount" value={formatInr(calculations.totalDisbursementAmount)} strong />
-        </div>
-      </aside>
+  return (
+    <CustomerJourneyGuard>
+      <div className="min-h-screen bg-[linear-gradient(135deg,#f8faff,#e6f0ff)] flex items-center justify-center p-4 sm:p-6 md:p-8">
+        <LoanLandingShell
+          journeyPanel={journeyPanel}
+          leftTitle={<>Loan <span className="text-[#60a5fa]">Summary</span></>}
+          leftDescription="Review your final loan calculations. We believe in 100% transparency with zero hidden charges."
+          leftInfographic={leftInfographic}
+        />
       </div>
     </CustomerJourneyGuard>
   );
 }
 
+function SummaryItem({ label, value, subValue }: { label: string; value: string; subValue?: string }) {
+  return (
+    <div className="flex justify-between items-start">
+      <div>
+        <div className="text-white/60 text-[0.75rem] font-bold uppercase tracking-tight">{label}</div>
+        {subValue && <div className="text-white/40 text-[0.6rem] font-medium">{subValue}</div>}
+      </div>
+      <div className="text-white text-[0.95rem] font-bold">{value}</div>
+    </div>
+  );
+}
+
 function SummaryRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className="mc-inner-card flex items-center justify-between gap-3">
+    <div className="flex items-center justify-between gap-3 rounded-[12px] border border-[rgba(18,36,79,0.08)] bg-[rgba(244,249,255,0.74)] px-3.5 py-3">
       <span className="text-brand-muted text-[0.9rem]">{label}</span>
       <span className={strong ? 'text-brand-navy font-extrabold' : 'text-brand-navy font-semibold'}>{value}</span>
     </div>

@@ -101,18 +101,36 @@ export function OtpVerificationForm({
   }
 
   const verificationCard = (
-    <section className="mc-card mc-card-glow">
-      <div className="mc-chip">Step 2 of 4</div>
-      <h1 className="mt-[14px] mb-3 text-brand-navy text-[clamp(2.2rem,6vw,3.0rem)] leading-[0.96] tracking-[-0.05em]">
-        Verify your mobile number.
-      </h1>
-      <p className="text-brand-muted leading-[1.6]">
-        We sent a one-time password to <strong>{displayMobile}</strong>. Enter the code below to continue your
-        MoneyCash journey.
-      </p>
+    <section className={compact ? "h-full flex flex-col justify-center" : "mc-card mc-card-glow"}>
+      <div className="mb-8">
+        <div className="flex items-center gap-2 mb-8">
+          <div className="flex gap-1.5">
+            <div className="h-2 w-8 rounded-full bg-blue-600"></div>
+            <div className="h-2 w-8 rounded-full bg-slate-100"></div>
+            <div className="h-2 w-8 rounded-full bg-slate-100"></div>
+          </div>
+          <span className="ml-3 text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Step 1 — Onboarding</span>
+        </div>
+
+        <h2 className="text-2xl md:text-[1.8rem] font-extrabold text-brand-navy mb-6 tracking-tight leading-[1.1] whitespace-nowrap">
+          Verify Your <span className="text-brand-blue">Identity</span> ✨
+        </h2>
+
+        {/* Premium Info Box */}
+        <div className="flex items-start gap-4 p-4 mb-2 rounded-2xl bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border border-blue-100/60 shadow-sm">
+          <div className="p-2 bg-white rounded-xl shadow-sm text-blue-600 shrink-0">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <p className="text-[0.95rem] text-slate-600 leading-relaxed m-0 pt-0.5">
+            We sent a secure code to <strong className="text-slate-900 font-bold tracking-wider">{displayMobile}</strong>. Enter it below to continue.
+          </p>
+        </div>
+      </div>
 
       <form onSubmit={handleVerifyOtp} className="grid gap-[14px]">
-        <div className="my-[22px] mb-[18px]">
+        <div className="mb-2">
           <OtpInputGrid
             digits={otp.digits}
             inputRefs={otp.inputRefs}
@@ -131,15 +149,15 @@ export function OtpVerificationForm({
         {error && <AlertBanner variant="error">{error}</AlertBanner>}
         {status && <AlertBanner variant="success">{status}</AlertBanner>}
 
-        <button type="submit" className="mc-btn-primary w-full" disabled={isVerifying}>
-          {isVerifying ? 'Verifying...' : 'Verify OTP'}
+        <button type="submit" className="mc-btn-primary w-full mt-2" disabled={isVerifying}>
+          {isVerifying ? 'Verifying securely...' : 'Verify & Continue'}
         </button>
       </form>
 
-      <div className="flex flex-wrap gap-[10px] mt-4 max-sm:flex-col max-sm:items-stretch">
+      <div className="flex flex-wrap gap-[10px] mt-6 max-sm:flex-col max-sm:items-stretch">
         <button
           type="button"
-          className="mc-btn-secondary text-brand-navy bg-[rgba(20,150,243,0.08)] text-center"
+          className="flex-1 py-3 px-4 rounded-xl font-bold text-[0.95rem] text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors text-center border border-slate-200"
           onClick={() => {
             setOtpRequest(null);
             otp.clear();
@@ -150,7 +168,7 @@ export function OtpVerificationForm({
         </button>
         <button
           type="button"
-          className="mc-btn-secondary text-brand-navy bg-[rgba(255,197,25,0.16)] border-0 cursor-pointer disabled:cursor-wait disabled:opacity-[0.76] disabled:translate-y-0 text-center"
+          className="flex-1 py-3 px-4 rounded-xl font-bold text-[0.95rem] text-brand-blue bg-blue-50 hover:bg-blue-100 transition-colors text-center disabled:opacity-50 border border-blue-100"
           onClick={handleResendOtp}
           disabled={isResending || resendCountdown > 0 || !isValidCustomerMobile(currentMobile)}
         >
@@ -158,9 +176,26 @@ export function OtpVerificationForm({
         </button>
       </div>
 
-      <div className="mt-4 pt-4 border-t border-[rgba(18,36,79,0.08)] text-brand-muted leading-[1.6]">
-        OTPs expire in two minutes. Request a fresh code if the timer completes or you entered the wrong mobile number.
-      </div>
+      {/* Trust Footer */}
+      {compact && (
+        <div className="mt-8 pt-6 border-t border-slate-100">
+          <div className="flex items-center justify-center gap-4 mb-4">
+            <div className="flex items-center gap-1.5 text-[0.7rem] font-extrabold text-slate-400 uppercase tracking-widest">
+              <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              256-bit Secure
+            </div>
+            <div className="w-1.5 h-1.5 rounded-full bg-slate-200"></div>
+            <div className="flex items-center gap-1.5 text-[0.7rem] font-extrabold text-slate-400 uppercase tracking-widest">
+              <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+              RBI Approved
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 

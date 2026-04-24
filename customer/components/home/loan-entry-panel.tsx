@@ -25,8 +25,8 @@ export function LoanEntryPanel() {
 
   if (loading || hasActiveLead) {
     return (
-      <section className="mc-card mc-card-glow">
-        <div className="flex min-h-[220px] items-center justify-center">
+      <section className="h-full w-full">
+        <div className="flex min-h-[220px] h-full items-center justify-center">
           <Spinner size={32} />
         </div>
       </section>
@@ -37,7 +37,7 @@ export function LoanEntryPanel() {
     return (
       <Suspense
         fallback={
-          <div className="flex min-h-[220px] items-center justify-center">
+          <div className="flex min-h-[220px] h-full items-center justify-center">
             <Spinner size={32} />
           </div>
         }
@@ -52,15 +52,33 @@ export function LoanEntryPanel() {
   }
 
   return (
-    <section className="mc-card mc-card-glow" aria-labelledby="entry-heading">
-      <div className="mb-[18px] grid gap-[10px]">
-        <div className="mc-chip">Step 1 of 4 — Onboarding</div>
-        <h2 id="entry-heading" className="m-0 text-[clamp(1.8rem,5vw,2.2rem)] tracking-[-0.04em] text-brand-navy">
-          Enter mobile number
+    <section className="h-full flex flex-col justify-center" aria-labelledby="entry-heading">
+      <div className="mb-8">
+        {/* Modern Visual Stepper */}
+        <div className="flex items-center gap-2 mb-8">
+          <div className="flex gap-1.5">
+            <div className="h-2 w-8 rounded-full bg-blue-600"></div>
+            <div className="h-2 w-8 rounded-full bg-slate-100"></div>
+            <div className="h-2 w-8 rounded-full bg-slate-100"></div>
+          </div>
+          <span className="ml-3 text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Step 1 — Onboarding</span>
+        </div>
+
+        <h2 id="entry-heading" className="text-2xl md:text-[1.8rem] font-extrabold text-brand-navy mb-6 tracking-tight leading-[1.1] whitespace-nowrap">
+          Unlock Your <span className="text-brand-blue">Instant Loan</span> ✨
         </h2>
-        <p className="m-0 leading-[1.6] text-brand-muted">
-          We will send a one-time password to continue your loan journey securely.
-        </p>
+        
+        {/* Premium Info Box */}
+        <div className="flex items-start gap-4 p-4 mb-2 rounded-2xl bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border border-blue-100/60 shadow-sm">
+          <div className="p-2 bg-white rounded-xl shadow-sm text-blue-600 shrink-0">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <p className="text-[0.95rem] text-slate-600 leading-relaxed m-0 pt-0.5">
+            Enter your mobile number to begin. We'll send a <strong className="text-slate-900 font-bold">secure 6-digit OTP</strong> to verify your identity.
+          </p>
+        </div>
       </div>
 
       <Suspense
@@ -73,18 +91,25 @@ export function LoanEntryPanel() {
         <MobileEntryForm onSuccess={setOtpRequest} />
       </Suspense>
 
-      <div className="mt-4 text-sm leading-[1.6] text-brand-muted">
-        By continuing, you agree to verification checks and consent to receive an OTP on the entered mobile number.
-      </div>
-
-      <div className="mt-[18px] grid grid-cols-2 gap-3 max-sm:grid-cols-1">
-        <div className="mc-inner-card grid gap-1">
-          <span className="text-[0.78rem] font-bold uppercase tracking-[0.11em] text-brand-blue">Journey</span>
-          <strong className="text-brand-navy">Eligibility to payout</strong>
+      {/* Trust & Legal Footer */}
+      <div className="mt-8 pt-6 border-t border-slate-100">
+        <div className="flex items-center justify-center gap-4 mb-4">
+           <div className="flex items-center gap-1.5 text-[0.7rem] font-extrabold text-slate-400 uppercase tracking-widest">
+             <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+             </svg>
+             256-bit Secure
+           </div>
+           <div className="w-1.5 h-1.5 rounded-full bg-slate-200"></div>
+           <div className="flex items-center gap-1.5 text-[0.7rem] font-extrabold text-slate-400 uppercase tracking-widest">
+             <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+             </svg>
+             RBI Approved
+           </div>
         </div>
-        <div className="mc-inner-card grid gap-1">
-          <span className="text-[0.78rem] font-bold uppercase tracking-[0.11em] text-brand-blue">Instant Cash</span>
-          <strong className="text-brand-navy">Short Term Loan</strong>
+        <div className="text-[0.75rem] text-center leading-relaxed text-slate-400">
+          By continuing, you agree to our <a href="#" className="text-blue-600 hover:text-blue-700 font-bold hover:underline transition-colors">Terms of Service</a> & <a href="#" className="text-blue-600 hover:text-blue-700 font-bold hover:underline transition-colors">Privacy Policy</a>.
         </div>
       </div>
     </section>

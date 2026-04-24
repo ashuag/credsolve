@@ -23,6 +23,7 @@ import {PINCODE_REGEX} from '@/lib/validators';
 
 const SECTION_CLASS =
   'grid gap-3 rounded-[24px] border border-[rgba(18,36,79,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,249,255,0.94))] p-4 shadow-[0_14px_28px_rgba(23,44,113,0.08)] sm:p-5';
+const DETAILS_DRAFT_KEY_PREFIX = 'mc:details:draft:';
 
 type Fields = {
   fullName: string;
@@ -114,6 +115,25 @@ export function PersonalDetailsStep({
 
   const isSelfEmployed = usesAnnualFinancialMetric(fields.occupation || undefined);
   const usesMonthlyIncome = usesMonthlyIncomeMetric(fields.occupation || undefined);
+  const draftStorageKey = `${DETAILS_DRAFT_KEY_PREFIX}${leadUuid}`;
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(draftStorageKey);
+      if (!raw) {
+        return;
+      }
+      const parsed = JSON.parse(raw) as { fields?: Fields; dobDisplay?: string };
+      if (parsed.fields) {
+        setFields((prev) => ({ ...prev, ...parsed.fields }));
+      }
+      if (typeof parsed.dobDisplay === 'string') {
+        setDobDisplay(parsed.dobDisplay);
+      }
+    } catch {
+      // Ignore bad draft data and continue with server/session values.
+    }
+  }, [draftStorageKey]);
 
   useEffect(() => {
     if (!initialProfile) {
@@ -139,6 +159,20 @@ export function PersonalDetailsStep({
     const storedDate = p.dob ? parseIsoDate(p.dob) : null;
     if (storedDate) setDobDisplay(formatDateDisplay(storedDate));
   }, [initialProfile]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        draftStorageKey,
+        JSON.stringify({
+          fields,
+          dobDisplay,
+        })
+      );
+    } catch {
+      // Best effort only.
+    }
+  }, [draftStorageKey, fields, dobDisplay]);
 
   function handleDobChange(displayValue: string) {
     setDobDisplay(displayValue);
@@ -282,6 +316,12 @@ export function PersonalDetailsStep({
         creditConsentAccepted: fields.creditConsentAccepted,
       });
 
+      try {
+        window.localStorage.removeItem(draftStorageKey);
+      } catch {
+        // Ignore storage cleanup failures.
+      }
+
       await onSaved();
 
       startTransition(() => router.push('/pre-approved-loan'));
@@ -293,42 +333,63 @@ export function PersonalDetailsStep({
 
   return (
     <>
-      <section className="mc-card mc-card-glow" aria-labelledby="details-heading">
-        <h1
-          id="details-heading"
-          className="mt-3.5 mb-3 text-brand-navy text-[clamp(2.2rem,6vw,3.2rem)] leading-[0.96] tracking-[-0.05em]"
-        >
-          Customer details.
-        </h1>
+      <section className="h-full flex flex-col justify-center py-4" aria-labelledby="details-heading">
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-5">
+            <div className="flex gap-1.5">
+              <div className="h-2 w-8 rounded-full bg-blue-600"></div>
+              <div className="h-2 w-8 rounded-full bg-blue-600"></div>
+              <div className="h-2 w-8 rounded-full bg-slate-100"></div>
+            </div>
+            <span className="ml-3 text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Step 2 — Profile</span>
+          </div>
+
+          <h2
+            id="details-heading"
+            className="text-2xl md:text-[1.8rem] font-extrabold text-brand-navy mb-6 tracking-tight leading-[1.1] whitespace-nowrap"
+          >
+            Complete Your <span className="text-brand-blue">Profile</span> ✨
+          </h2>
+
+          <div className="flex items-start gap-4 p-4 mb-0 rounded-2xl bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border border-blue-100/60 shadow-sm">
+            <div className="p-2 bg-white rounded-xl shadow-sm text-blue-600 shrink-0">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+            <p className="text-[0.95rem] text-slate-600 leading-relaxed m-0 pt-0.5">
+              Please provide your personal and financial details to complete your loan profile.
+            </p>
+          </div>
+        </div>
+
         {noticeMessage && (
-          <div className="mt-4">
+          <div className="mb-4">
             <AlertBanner variant="success">{noticeMessage}</AlertBanner>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="grid gap-4 mt-5.5" noValidate>
+        <form onSubmit={handleSubmit} className="grid gap-4 mt-2" noValidate>
           {activeSection === 'profile' ? (
-            <div className={SECTION_CLASS}>
-              <div className="grid gap-3">
-                <FieldGroup
-                  label="Full name as per PAN card"
-                  htmlFor="fullName"
-                  error={errors.fullName}
-                >
-                  <input
-                    id="fullName"
-                    name="fullName"
-                    type="text"
-                    autoComplete="name"
-                    placeholder="XXX YYY"
-                    required
-                    value={fields.fullName}
-                    onChange={setField('fullName')}
-                    aria-invalid={Boolean(errors.fullName)}
-                    aria-describedby={errors.fullName ? 'fullName-error' : 'fullName-help'}
-                    className={inputClass(Boolean(errors.fullName))}
-                  />
-                </FieldGroup>
+            <div className="w-full">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
+                <div className="md:col-span-2">
+                  <FieldGroup label="Full name as per PAN card" htmlFor="fullName" error={errors.fullName}>
+                    <input
+                      id="fullName"
+                      name="fullName"
+                      type="text"
+                      autoComplete="name"
+                      placeholder="XXX YYY"
+                      required
+                      value={fields.fullName}
+                      onChange={setField('fullName')}
+                      aria-invalid={Boolean(errors.fullName)}
+                      aria-describedby={errors.fullName ? 'fullName-error' : undefined}
+                      className={inputClass(Boolean(errors.fullName))}
+                    />
+                  </FieldGroup>
+                </div>
 
                 <FieldGroup label="Gender" htmlFor="gender" error={errors.gender}>
                   <select
@@ -338,7 +399,7 @@ export function PersonalDetailsStep({
                     onChange={setField('gender')}
                     disabled={isLoadingLookups}
                     aria-invalid={Boolean(errors.gender)}
-                    aria-describedby={errors.gender ? 'gender-error' : 'gender-help'}
+                    aria-describedby={errors.gender ? 'gender-error' : undefined}
                     className={inputClass(Boolean(errors.gender))}
                   >
                     <option value="">{isLoadingLookups ? 'Loading gender...' : 'Select gender'}</option>
@@ -348,11 +409,7 @@ export function PersonalDetailsStep({
                   </select>
                 </FieldGroup>
 
-                <FieldGroup
-                  label="Date of birth"
-                  htmlFor="dob"
-                  error={errors.dob}
-                >
+                <FieldGroup label="Date of birth" htmlFor="dob" error={errors.dob}>
                   <DatePickerField
                     id="dob"
                     name="dob"
@@ -363,52 +420,56 @@ export function PersonalDetailsStep({
                     maxDate={maxDob}
                     hint=""
                     ariaInvalid={Boolean(errors.dob)}
-                    ariaDescribedBy={errors.dob ? 'dob-error' : 'dob-help'}
+                    ariaDescribedBy={errors.dob ? 'dob-error' : undefined}
                   />
                 </FieldGroup>
 
-                <FieldGroup label="Occupation" htmlFor="occupation" error={errors.occupation}>
-                  <select
-                    id="occupation"
-                    name="occupation"
-                    value={fields.occupation}
-                    onChange={setField('occupation')}
-                    disabled={isLoadingLookups}
-                    aria-invalid={Boolean(errors.occupation)}
-                    aria-describedby={errors.occupation ? 'occupation-error' : 'occupation-help'}
-                    className={inputClass(Boolean(errors.occupation))}
-                  >
-                    <option value="">{isLoadingLookups ? 'Loading occupations...' : 'Select occupation'}</option>
-                    {occupationOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                </FieldGroup>
+                <div className="md:col-span-2">
+                  <FieldGroup label="Occupation" htmlFor="occupation" error={errors.occupation}>
+                    <select
+                      id="occupation"
+                      name="occupation"
+                      value={fields.occupation}
+                      onChange={setField('occupation')}
+                      disabled={isLoadingLookups}
+                      aria-invalid={Boolean(errors.occupation)}
+                      aria-describedby={errors.occupation ? 'occupation-error' : undefined}
+                      className={inputClass(Boolean(errors.occupation))}
+                    >
+                      <option value="">{isLoadingLookups ? 'Loading occupations...' : 'Select occupation'}</option>
+                      {occupationOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </FieldGroup>
+                </div>
 
                 {usesMonthlyIncome && (
-                  <FieldGroup
-                    label={fields.occupation === 'salaried' ? 'Monthly salary' : 'Monthly income'}
-                    htmlFor="monthlyIncome"
-                    error={errors.monthlyIncome}
-                  >
-                    <input
-                      id="monthlyIncome"
-                      name="monthlyIncome"
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="Enter amount in INR"
-                      required
-                      value={fields.monthlyIncome}
-                      onChange={setField('monthlyIncome')}
-                      aria-invalid={Boolean(errors.monthlyIncome)}
-                      aria-describedby={errors.monthlyIncome ? 'monthlyIncome-error' : 'monthlyIncome-help'}
-                      className={inputClass(Boolean(errors.monthlyIncome))}
-                    />
-                  </FieldGroup>
+                  <div className="md:col-span-2">
+                    <FieldGroup
+                      label={fields.occupation === 'salaried' ? 'Monthly salary' : 'Monthly income'}
+                      htmlFor="monthlyIncome"
+                      error={errors.monthlyIncome}
+                    >
+                      <input
+                        id="monthlyIncome"
+                        name="monthlyIncome"
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="Enter amount in INR"
+                        required
+                        value={fields.monthlyIncome}
+                        onChange={setField('monthlyIncome')}
+                        aria-invalid={Boolean(errors.monthlyIncome)}
+                        aria-describedby={errors.monthlyIncome ? 'monthlyIncome-error' : undefined}
+                        className={inputClass(Boolean(errors.monthlyIncome))}
+                      />
+                    </FieldGroup>
+                  </div>
                 )}
 
                 {isSelfEmployed && (
-                  <div className="grid gap-3">
+                  <>
                     <FieldGroup label="Annual turnover" htmlFor="annualTurnover" error={errors.annualTurnover}>
                       <input
                         id="annualTurnover"
@@ -420,7 +481,7 @@ export function PersonalDetailsStep({
                         value={fields.annualTurnover}
                         onChange={setField('annualTurnover')}
                         aria-invalid={Boolean(errors.annualTurnover)}
-                        aria-describedby={errors.annualTurnover ? 'annualTurnover-error' : 'annualTurnover-help'}
+                        aria-describedby={errors.annualTurnover ? 'annualTurnover-error' : undefined}
                         className={inputClass(Boolean(errors.annualTurnover))}
                       />
                     </FieldGroup>
@@ -436,16 +497,16 @@ export function PersonalDetailsStep({
                         value={fields.annualProfit}
                         onChange={setField('annualProfit')}
                         aria-invalid={Boolean(errors.annualProfit)}
-                        aria-describedby={errors.annualProfit ? 'annualProfit-error' : 'annualProfit-help'}
+                        aria-describedby={errors.annualProfit ? 'annualProfit-error' : undefined}
                         className={inputClass(Boolean(errors.annualProfit))}
                       />
                     </FieldGroup>
-                  </div>
+                  </>
                 )}
               </div>
 
-              <div className="sticky bottom-3 z-[5] mt-2 flex flex-col gap-2.5 rounded-[18px] border border-[rgba(18,36,79,0.08)] bg-[rgba(255,255,255,0.9)] p-2.5 backdrop-blur-[6px] sm:static sm:flex-row sm:flex-wrap sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-0">
-                <button type="button" onClick={onBack} className="mc-btn-secondary text-brand-navy bg-[rgba(20,150,243,0.08)] text-center">
+              <div className="mt-6 flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-100">
+                <button type="button" onClick={onBack} className="py-3 px-4 rounded-xl font-bold text-[0.95rem] text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors text-center border border-slate-200">
                   ← Back
                 </button>
                 <button type="button" onClick={handleContinueToFinancial} className="mc-btn-primary flex-1">
@@ -454,38 +515,42 @@ export function PersonalDetailsStep({
               </div>
             </div>
           ) : (
-            <div className={SECTION_CLASS}>
-              <div className="grid gap-3">
-                <FieldGroup label="Address line 1" htmlFor="addressLine1" error={errors.addressLine1}>
-                  <input
-                    id="addressLine1"
-                    name="addressLine1"
-                    type="text"
-                    autoComplete="address-line1"
-                    placeholder="Flat / House no, Building, Street"
-                    required
-                    value={fields.addressLine1}
-                    onChange={setField('addressLine1')}
-                    aria-invalid={Boolean(errors.addressLine1)}
-                    aria-describedby={errors.addressLine1 ? 'addressLine1-error' : 'addressLine1-help'}
-                    className={inputClass(Boolean(errors.addressLine1))}
-                  />
-                </FieldGroup>
+            <div className="w-full">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
+                <div className="md:col-span-2">
+                  <FieldGroup label="Address line 1" htmlFor="addressLine1" error={errors.addressLine1}>
+                    <input
+                      id="addressLine1"
+                      name="addressLine1"
+                      type="text"
+                      autoComplete="address-line1"
+                      placeholder="Flat / House no, Building, Street"
+                      required
+                      value={fields.addressLine1}
+                      onChange={setField('addressLine1')}
+                      aria-invalid={Boolean(errors.addressLine1)}
+                      aria-describedby={errors.addressLine1 ? 'addressLine1-error' : undefined}
+                      className={inputClass(Boolean(errors.addressLine1))}
+                    />
+                  </FieldGroup>
+                </div>
 
-                <FieldGroup label="Address line 2" htmlFor="addressLine2" error={errors.addressLine2}>
-                  <input
-                    id="addressLine2"
-                    name="addressLine2"
-                    type="text"
-                    autoComplete="address-line2"
-                    placeholder="Landmark / Area / Apartment name"
-                    value={fields.addressLine2}
-                    onChange={setField('addressLine2')}
-                    aria-invalid={Boolean(errors.addressLine2)}
-                    aria-describedby={errors.addressLine2 ? 'addressLine2-error' : 'addressLine2-help'}
-                    className={inputClass(Boolean(errors.addressLine2))}
-                  />
-                </FieldGroup>
+                <div className="md:col-span-2">
+                  <FieldGroup label="Address line 2" htmlFor="addressLine2" error={errors.addressLine2}>
+                    <input
+                      id="addressLine2"
+                      name="addressLine2"
+                      type="text"
+                      autoComplete="address-line2"
+                      placeholder="Landmark / Area / Apartment name"
+                      value={fields.addressLine2}
+                      onChange={setField('addressLine2')}
+                      aria-invalid={Boolean(errors.addressLine2)}
+                      aria-describedby={errors.addressLine2 ? 'addressLine2-error' : undefined}
+                      className={inputClass(Boolean(errors.addressLine2))}
+                    />
+                  </FieldGroup>
+                </div>
 
                 <FieldGroup label="City" htmlFor="currentCity" error={errors.currentCity}>
                   <SearchableCityInput
@@ -501,7 +566,7 @@ export function PersonalDetailsStep({
                     placeholder="Start typing your city"
                     isLoading={isLoadingLookups}
                     ariaInvalid={Boolean(errors.currentCity)}
-                    ariaDescribedBy={errors.currentCity ? 'currentCity-error' : 'currentCity-help'}
+                    ariaDescribedBy={errors.currentCity ? 'currentCity-error' : undefined}
                   />
                 </FieldGroup>
 
@@ -518,42 +583,43 @@ export function PersonalDetailsStep({
                     value={fields.pincode}
                     onChange={setField('pincode')}
                     aria-invalid={Boolean(errors.pincode)}
-                    aria-describedby={errors.pincode ? 'pincode-error' : 'pincode-help'}
+                    aria-describedby={errors.pincode ? 'pincode-error' : undefined}
                     className={inputClass(Boolean(errors.pincode))}
                   />
                 </FieldGroup>
               </div>
 
-              <div className="grid gap-3 rounded-[22px] border border-[rgba(18,36,79,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(244,249,255,0.94))] px-4 py-4 shadow-[0_14px_28px_rgba(23,44,113,0.08)]">
-                <label className="flex items-start gap-3">
+              <div className="mt-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <label className="flex items-start gap-3 cursor-pointer">
                   <input
                     id="creditConsentAccepted"
                     name="creditConsentAccepted"
                     type="checkbox"
                     checked={fields.creditConsentAccepted}
                     onChange={setConsent}
-                    className="mt-1 h-4 w-4 rounded border border-[rgba(18,36,79,0.24)] accent-brand-blue"
+                    className="mt-1 h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-[0.94rem] leading-[1.65] text-brand-navy">{CUSTOMER_CREDIT_CONSENT_TEXT}</span>
+                  <span className="text-[0.85rem] leading-relaxed text-slate-600">{CUSTOMER_CREDIT_CONSENT_TEXT}</span>
                 </label>
-                <p
-                  id={errors.creditConsentAccepted ? 'creditConsentAccepted-error' : 'creditConsentAccepted-help'}
-                  className={`text-[0.875rem] leading-[1.55] ${errors.creditConsentAccepted ? 'text-[#b2372d]' : 'text-brand-muted'}`}
-                >
-                  {errors.creditConsentAccepted ?? 'This consent is required so lending partners can complete credit checks.'}
-                </p>
-                <CreditBureauPoweredBy />
+                {errors.creditConsentAccepted && (
+                  <p id="creditConsentAccepted-error" className="mt-2 text-[#b2372d] text-sm font-medium">
+                    {errors.creditConsentAccepted}
+                  </p>
+                )}
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <CreditBureauPoweredBy />
+                </div>
               </div>
 
               {submitError && <AlertBanner variant="error">{submitError}</AlertBanner>}
 
-              <div className="sticky bottom-3 z-[5] mt-2 flex flex-col gap-2.5 rounded-[18px] border border-[rgba(18,36,79,0.08)] bg-[rgba(255,255,255,0.9)] p-2.5 backdrop-blur-[6px] sm:static sm:flex-row sm:flex-wrap sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-0">
+              <div className="mt-6 flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => onSectionChange('profile')}
-                  className="mc-btn-secondary text-brand-navy bg-[rgba(20,150,243,0.08)] text-center"
+                  className="py-3 px-4 rounded-xl font-bold text-[0.95rem] text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors text-center border border-slate-200"
                 >
-                  ← Back to personal profile
+                  ← Back
                 </button>
                 <button type="submit" className="mc-btn-primary flex-1" disabled={isNavigating}>
                   {isNavigating ? 'Submitting...' : 'Complete application'}
@@ -580,16 +646,11 @@ export function PersonalDetailsStep({
 
 function inputClass(hasError: boolean): string {
   return cn(
-    'w-full min-h-[60px] rounded-[18px] border px-4 pb-[14px] pt-[18px]',
-    'bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(246,249,255,0.94))]',
-    'text-brand-navy text-[1rem] font-bold outline-0 placeholder:text-[rgba(94,103,130,0.72)]',
-    'shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_12px_24px_rgba(23,44,113,0.05)] transition-all duration-[220ms]',
-    'focus:-translate-y-px focus:bg-white',
-    'focus:border-[rgba(20,150,243,0.46)]',
-    'focus:shadow-[0_22px_42px_rgba(23,44,113,0.12),0_0_0_6px_rgba(20,150,243,0.08)]',
-    hasError
-      ? 'border-[rgba(193,57,43,0.42)] shadow-[0_0_0_3px_rgba(193,57,43,0.08)]'
-      : 'border-[rgba(18,36,79,0.16)]',
+    'w-full h-[48px] rounded-xl border px-3',
+    'bg-white text-slate-900 text-[0.95rem] font-semibold outline-none transition-all',
+    'placeholder:text-slate-400 placeholder:font-normal',
+    'focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 shadow-sm',
+    hasError ? 'border-red-400 focus:ring-red-500/10' : 'border-slate-200'
   );
 }
 
@@ -602,29 +663,12 @@ type FieldGroupProps = {
 
 function FieldGroup({ label, htmlFor, error, children }: FieldGroupProps) {
   return (
-    <div className="grid gap-2">
-      <div className="group relative pt-3">
-        <label
-          htmlFor={htmlFor}
-          className={cn(
-            'absolute top-3 left-4 z-[2] inline-flex max-w-[calc(100%-2rem)] -translate-y-1/2 items-center rounded-full border px-3 py-1',
-            'bg-[rgba(252,253,255,0.96)] text-[0.68rem] font-black uppercase tracking-[0.16em]',
-            'shadow-[0_10px_20px_rgba(23,44,113,0.08)] backdrop-blur-[8px] transition-all duration-[180ms]',
-            error
-              ? 'border-[rgba(193,57,43,0.16)] text-[#b2372d]'
-              : 'border-[rgba(20,150,243,0.14)] text-[rgba(20,150,243,0.92)] group-focus-within:border-[rgba(20,150,243,0.26)] group-focus-within:text-brand-navy',
-          )}
-        >
-          {label}
-        </label>
-        {children}
-      </div>
-      <p
-        id={error ? `${htmlFor}-error` : `${htmlFor}`}
-        className={`min-h-[1.2rem] px-1 text-[0.82rem] leading-[1.55] ${error ? 'text-[#b2372d]' : 'text-brand-muted'}`}
-      >
-        {error ?? ''}
-      </p>
+    <div className="flex flex-col gap-1.5 w-full">
+      <label htmlFor={htmlFor} className="text-[0.75rem] font-bold text-slate-500 uppercase tracking-wider pl-1">
+        {label}
+      </label>
+      {children}
+      {error && <p id={`${htmlFor}-error`} className="text-[#b2372d] text-[0.75rem] pl-1 font-medium m-0">{error}</p>}
     </div>
   );
 }

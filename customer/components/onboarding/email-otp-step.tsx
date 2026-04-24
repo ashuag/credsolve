@@ -120,21 +120,38 @@ export function EmailOtpStep({
 
   return (
     <>
-      <section className="mc-card mc-card-glow" aria-labelledby="email-otp-heading">
-        <div className="mc-chip">{stepLabel}</div>
-        <h1
-          id="email-otp-heading"
-          className="mt-[14px] mb-3 text-brand-navy text-[clamp(2.2rem,6vw,3.2rem)] leading-[0.96] tracking-[-0.05em]"
-        >
-          {isLogin ? 'Verify to log in.' : 'Verify your email.'}
-        </h1>
-        <p className="text-brand-muted leading-[1.6]">
-          We sent a one-time password to <strong>{otpRequest?.maskedEmail ?? email}</strong>. Enter the 6-digit code
-          below.
-        </p>
+      <section className="h-full flex flex-col justify-center" aria-labelledby="email-otp-heading">
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-8">
+            <div className="flex gap-1.5">
+              <div className="h-2 w-8 rounded-full bg-blue-600"></div>
+              <div className="h-2 w-8 rounded-full bg-slate-100"></div>
+              <div className="h-2 w-8 rounded-full bg-slate-100"></div>
+            </div>
+            <span className="ml-3 text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Step 1 — Onboarding</span>
+          </div>
 
-        <form onSubmit={handleVerify} className="grid gap-[14px] mt-[22px]">
-          <div className="mb-[4px]">
+          <h2
+            id="email-otp-heading"
+            className="text-2xl md:text-[1.8rem] font-extrabold text-brand-navy mb-6 tracking-tight leading-[1.1] whitespace-nowrap"
+          >
+            {isLogin ? 'Verify to ' : 'Verify your '}<span className="text-brand-blue">{isLogin ? 'log in' : 'email'}</span> ✨
+          </h2>
+
+          <div className="flex items-start gap-4 p-4 mb-2 rounded-2xl bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border border-blue-100/60 shadow-sm">
+            <div className="p-2 bg-white rounded-xl shadow-sm text-blue-600 shrink-0">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <p className="text-[0.95rem] text-slate-600 leading-relaxed m-0 pt-0.5">
+              We sent a secure code to <strong className="text-slate-900 font-bold tracking-wider">{otpRequest?.maskedEmail ?? email}</strong>. Enter it below.
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleVerify} className="grid gap-[14px]">
+          <div className="mb-2">
             <OtpInputGrid
               digits={otp.digits}
               inputRefs={otp.inputRefs}
@@ -153,7 +170,7 @@ export function EmailOtpStep({
           {error && <AlertBanner variant="error">{error}</AlertBanner>}
           {status && <AlertBanner variant="success">{status}</AlertBanner>}
 
-          <button type="submit" className="mc-btn-primary w-full" disabled={isVerifying}>
+          <button type="submit" className="mc-btn-primary w-full mt-2" disabled={isVerifying}>
             <span className="inline-flex items-center justify-center gap-[10px]">
               {isVerifying && (
                 <span
@@ -161,31 +178,27 @@ export function EmailOtpStep({
                   aria-hidden
                 />
               )}
-              <span>{isVerifying ? 'Verifying...' : isLogin ? 'Login' : 'Verify email'}</span>
+              <span>{isVerifying ? 'Verifying securely...' : isLogin ? 'Login' : 'Verify & Continue'}</span>
             </span>
           </button>
         </form>
 
-        <div className="flex flex-wrap gap-[10px] mt-4 max-sm:flex-col max-sm:items-stretch">
+        <div className="flex flex-wrap gap-[10px] mt-6 max-sm:flex-col max-sm:items-stretch">
           <button
             type="button"
+            className="flex-1 py-3 px-4 rounded-xl font-bold text-[0.95rem] text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors text-center border border-slate-200"
             onClick={onBack}
-            className="mc-btn-secondary text-brand-navy bg-[rgba(20,150,243,0.08)] text-center"
           >
             ← Change email
           </button>
           <button
             type="button"
+            className="flex-1 py-3 px-4 rounded-xl font-bold text-[0.95rem] text-brand-blue bg-blue-50 hover:bg-blue-100 transition-colors text-center disabled:opacity-50 border border-blue-100"
             onClick={handleResend}
             disabled={isResending || isBootstrapping || resendCountdown > 0}
-            className="mc-btn-secondary text-brand-navy bg-[rgba(255,197,25,0.16)] border-0 cursor-pointer disabled:cursor-wait disabled:opacity-[0.76] disabled:translate-y-0 text-center"
           >
             {isResending ? 'Sending...' : resendCountdown > 0 ? `Resend in ${resendCountdown}s` : 'Resend OTP'}
           </button>
-        </div>
-
-        <div className="mt-4 pt-4 border-t border-[rgba(18,36,79,0.08)] text-brand-muted text-sm leading-[1.6]">
-          OTPs expire in two minutes. Request a fresh code if needed.
         </div>
       </section>
 

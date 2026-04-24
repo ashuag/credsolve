@@ -73,35 +73,27 @@ function AmountVisual({
   loading?: boolean;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-[34px] border border-[rgba(255,255,255,0.12)] bg-[linear-gradient(155deg,#0d1e56,#17327e_52%,#1496f3_140%)] p-6 shadow-[0_28px_64px_rgba(17,33,88,0.28)] max-sm:p-5 min-w-0">
+    <div className="relative overflow-hidden rounded-[22px] border border-[rgba(255,255,255,0.12)] bg-[linear-gradient(145deg,#0f1f57,#1b3788_58%,#1b91e8_120%)] p-4 shadow-[0_18px_40px_rgba(17,33,88,0.24)] sm:rounded-[24px] sm:p-5 min-w-0">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-        <div className="absolute left-[-10%] top-[-14%] h-[14rem] w-[14rem] rounded-full bg-[radial-gradient(circle,rgba(255,197,25,0.3),transparent_70%)] blur-[4px]" />
-        <div className="absolute right-[-16%] bottom-[-18%] h-[18rem] w-[18rem] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.14),transparent_72%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.08)_42%,transparent_66%)] -translate-x-[120%] animate-sheen" />
+        <div className="absolute left-[-15%] top-[-20%] h-[12rem] w-[12rem] rounded-full bg-[radial-gradient(circle,rgba(255,197,25,0.24),transparent_70%)]" />
+        <div className="absolute right-[-20%] bottom-[-20%] h-[16rem] w-[16rem] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.12),transparent_74%)]" />
       </div>
 
-      <div className="absolute left-5 top-5 inline-flex rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.08)] px-3 py-2 text-[0.74rem] font-black uppercase tracking-[0.14em] text-[#fff1bb]">
+      <div className="absolute left-4 top-4 inline-flex rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.08)] px-3 py-1.5 text-[0.68rem] font-black uppercase tracking-[0.14em] text-[#fff1bb]">
         Eligible now
       </div>
 
-      <div className="absolute right-5 top-5 inline-flex rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(7,17,48,0.18)] px-3 py-2 text-[0.74rem] font-bold text-[rgba(236,243,255,0.86)]">
+      <div className="absolute right-4 top-4 inline-flex rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(7,17,48,0.18)] px-3 py-1.5 text-[0.68rem] font-bold text-[rgba(236,243,255,0.86)]">
         Secure flow
       </div>
 
-      <div className="relative grid min-h-[390px] place-items-center max-sm:min-h-[340px]">
-        <div className="absolute h-[320px] w-[320px] rounded-full border border-[rgba(255,255,255,0.1)] animate-orbit max-sm:h-[260px] max-sm:w-[260px]" />
-        <div className="absolute h-[250px] w-[250px] rounded-full border border-dashed border-[rgba(255,197,25,0.34)] animate-orbit-rev max-sm:h-[208px] max-sm:w-[208px]" />
-        <div className="absolute h-[192px] w-[192px] rounded-full border border-[rgba(20,150,243,0.36)] animate-pulse-ring max-sm:h-[156px] max-sm:w-[156px]" />
-        <div className="absolute h-[290px] w-[290px] rounded-full bg-[radial-gradient(circle,rgba(20,150,243,0.2),transparent_68%)] animate-pulse-glow max-sm:h-[236px] max-sm:w-[236px]" />
-        <div
-          className="absolute h-[282px] w-[282px] rounded-full animate-scan-beam opacity-80 max-sm:h-[230px] max-sm:w-[230px]"
-          style={{ background: 'conic-gradient(from 220deg, transparent 0deg, rgba(20,150,243,0.26) 58deg, transparent 120deg)' }}
-        />
-        <span className="absolute h-[12px] w-[12px] rounded-full bg-white shadow-[0_0_18px_rgba(255,255,255,0.42)] animate-orbit-1" />
-        <span className="absolute h-[10px] w-[10px] rounded-full bg-brand-gold shadow-[0_0_18px_rgba(255,197,25,0.42)] animate-orbit-2" />
-        <span className="absolute h-[9px] w-[9px] rounded-full bg-brand-blue shadow-[0_0_18px_rgba(20,150,243,0.42)] animate-orbit-3" />
+      <div className="relative grid min-h-[238px] place-items-center sm:min-h-[280px]">
+        <div className="absolute h-[226px] w-[226px] rounded-full border border-[rgba(255,255,255,0.1)] sm:h-[250px] sm:w-[250px]" />
+        <div className="absolute h-[184px] w-[184px] rounded-full border border-dashed border-[rgba(255,197,25,0.24)] sm:h-[206px] sm:w-[206px]" />
+        <div className="absolute h-[140px] w-[140px] rounded-full border border-[rgba(20,150,243,0.32)] sm:h-[156px] sm:w-[156px]" />
+        <div className="absolute h-[208px] w-[208px] rounded-full bg-[radial-gradient(circle,rgba(20,150,243,0.16),transparent_68%)] sm:h-[230px] sm:w-[230px]" />
 
-        <div className="mc-highlight-card relative z-[1] w-full min-w-0 max-w-[min(19rem,100%)] rounded-[30px] border border-[rgba(255,255,255,0.16)] bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.08))] px-4 py-7 text-center shadow-[0_24px_48px_rgba(5,13,40,0.26)] backdrop-blur-[12px] sm:px-6">
+        <div className="relative z-[1] w-full min-w-0 max-w-[min(17rem,100%)] rounded-[20px] border border-[rgba(255,255,255,0.16)] bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.08))] px-4 py-5 text-center shadow-[0_16px_32px_rgba(5,13,40,0.26)] backdrop-blur-[10px] sm:max-w-[min(19rem,100%)] sm:rounded-[24px] sm:px-6 sm:py-6">
           <div className="text-[0.76rem] font-black uppercase tracking-[0.16em] text-[#fff1bb]">Eligible loan amount</div>
           {loading ? (
             <div className="mt-6 grid justify-items-center gap-4">
@@ -109,15 +101,15 @@ function AmountVisual({
               <div className="text-[0.92rem] font-bold text-[rgba(236,243,255,0.88)]">Checking your amount</div>
             </div>
           ) : (
-            <div className="mt-3 w-full min-w-0 break-words text-[clamp(1.35rem,4.2vw,2.65rem)] font-bold leading-[1.08] tracking-[-0.05em] text-white [overflow-wrap:anywhere]">
+            <div className="mt-3 w-full min-w-0 break-words text-[clamp(1.5rem,7vw,2.4rem)] font-bold leading-[1.08] tracking-[-0.05em] text-white [overflow-wrap:anywhere]">
               {amount}
             </div>
           )}
-          <p className="mt-4 mb-0 text-[0.94rem] leading-[1.7] text-[rgba(236,243,255,0.76)]">{caption}</p>
+          <p className="mt-3 mb-0 text-[0.94rem] leading-[1.6] text-[rgba(236,243,255,0.76)]">{caption}</p>
         </div>
       </div>
 
-      <div className="absolute bottom-5 left-5 rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.08)] px-3 py-2 text-[0.74rem] font-bold text-[rgba(236,243,255,0.86)]">
+      <div className="absolute bottom-4 left-4 rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.08)] px-3 py-1.5 text-[0.68rem] font-bold text-[rgba(236,243,255,0.86)]">
         Quick eligibility result
       </div>
     </div>
@@ -126,40 +118,19 @@ function AmountVisual({
 
 function LoadingState() {
   return (
-    <section className="relative overflow-hidden rounded-[36px] border border-[rgba(18,36,79,0.08)] bg-[linear-gradient(135deg,#fffefb,#f4f8ff_52%,#eef5ff)] p-6 shadow-[0_24px_54px_rgba(23,44,113,0.08)] max-sm:rounded-[30px] max-sm:p-5">
-      <div className="relative z-[1] grid gap-8 nav:grid-cols-[minmax(0,1fr)_minmax(280px,430px)] nav:items-center">
-        <div className="grid min-w-0 gap-6">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="mc-chip">Pre-approved loan</span>
-            <span className="inline-flex items-center rounded-full bg-[rgba(20,150,243,0.08)] px-3 py-2 text-[0.8rem] font-bold text-brand-navy">
-              Checking your amount
-            </span>
-          </div>
-
-          <div className="grid gap-3">
-            <div className="text-[0.8rem] font-black uppercase tracking-[0.16em] text-brand-blue">Decision</div>
-            <h1 className="m-0 text-[clamp(2.2rem,5vw,3.7rem)] leading-[0.94] tracking-[-0.06em] text-brand-navy">
-              Preparing your pre-approved loan amount.
-            </h1>
-            <p className="m-0 max-w-[34rem] text-[1rem] leading-[1.75] text-brand-muted">
-              We are loading the amount you are eligible for and preparing your next step.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {BENEFIT_TAGS.map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex rounded-full border border-[rgba(18,36,79,0.08)] bg-[rgba(255,255,255,0.82)] px-3 py-2 text-[0.84rem] font-bold text-brand-navy"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
+    <section className="grid gap-3">
+      <div className="rounded-[22px] border border-[rgba(18,36,79,0.08)] bg-white/90 p-4 shadow-[0_12px_24px_rgba(23,44,113,0.07)]">
+        <div className="inline-flex rounded-full bg-[rgba(20,150,243,0.08)] px-3 py-1.5 text-[0.72rem] font-black uppercase tracking-[0.14em] text-brand-blue">
+          Pre-approved loan
         </div>
-
-        <AmountVisual amount="..." caption="Finalizing your eligible amount from the quick check." loading />
+        <h1 className="m-0 mt-3 text-[clamp(1.35rem,6.8vw,2.1rem)] leading-tight tracking-[-0.03em] text-brand-navy">
+          Preparing your pre-approved amount.
+        </h1>
+        <p className="m-0 mt-2 text-[0.92rem] leading-[1.55] text-brand-muted">
+          We are loading your eligible amount and the next step.
+        </p>
       </div>
+      <AmountVisual amount="..." caption="Finalizing your eligible amount from the quick check." loading />
     </section>
   );
 }
@@ -183,6 +154,8 @@ function ErrorState({ error }: { error: string }) {
     </section>
   );
 }
+
+import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 
 export default function PreApprovedLoanPage() {
   const router = useRouter();
@@ -217,110 +190,85 @@ export default function PreApprovedLoanPage() {
     };
   }, [router]);
 
+  let content;
+
+  if (error) {
+    content = <ErrorState error={error} />;
+  } else if (amountInr === null) {
+    content = (
+      <div className="h-full flex flex-col justify-center">
+        <LoadingState />
+      </div>
+    );
+  } else {
+    content = (
+      <div className="h-full flex flex-col justify-center py-4">
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-6">
+            <div className="flex gap-1.5">
+              <div className="h-2 w-8 rounded-full bg-blue-600"></div>
+              <div className="h-2 w-8 rounded-full bg-blue-600"></div>
+              <div className="h-2 w-8 rounded-full bg-blue-600"></div>
+              <div className="h-2 w-8 rounded-full bg-blue-600"></div>
+            </div>
+            <span className="ml-3 text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Step 3 — Offer</span>
+          </div>
+
+          <div className="mb-8">
+            <AmountVisual amount={formatInr(amountInr)} caption="Secured offer generated." />
+          </div>
+          
+          <p className="text-[1rem] text-slate-600 leading-relaxed mb-8 font-medium">
+            Great news! You have been pre-approved for the amount shown above. Complete your account selection to move ahead to disbursement.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Link href="/loan-selection" className="mc-btn-primary flex-1 text-center py-4 text-[1rem]">
+              Continue to Selection
+            </Link>
+            <Link
+              href="/"
+              className="py-4 px-6 rounded-xl font-bold text-[1rem] text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors text-center border border-slate-200"
+            >
+              Back to Home
+            </Link>
+          </div>
+
+          <div className="mt-10 flex flex-nowrap justify-between items-center gap-2 py-1 w-full border-t border-slate-100 pt-6">
+            {BENEFIT_TAGS.map((tag) => (
+              <div
+                key={tag}
+                className="flex items-center gap-1.5 text-[0.75rem] font-bold text-slate-500 uppercase tracking-tight"
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                {tag}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const leftTitle = (
+    <>
+      Congratulations! <span className="text-[#facc15]">🎉</span>
+    </>
+  );
+
   return (
     <CustomerJourneyGuard>
-      {error ? (
-        <ErrorState error={error} />
-      ) : amountInr === null ? (
-        <LoadingState />
-      ) : (
-        <div className="grid gap-5">
-          <section className="relative overflow-hidden rounded-[36px] border border-[rgba(18,36,79,0.08)] bg-[linear-gradient(135deg,#fffefb,#f4f8ff_52%,#eef5ff)] p-6 shadow-[0_24px_54px_rgba(23,44,113,0.08)] max-sm:rounded-[30px] max-sm:p-5">
-            <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden>
-              <div className="absolute left-[-8%] top-[-12%] h-[14rem] w-[14rem] rounded-full bg-[radial-gradient(circle,rgba(255,197,25,0.22),transparent_70%)]" />
-              <div className="absolute right-[-10%] top-[6%] h-[18rem] w-[18rem] rounded-full bg-[radial-gradient(circle,rgba(20,150,243,0.16),transparent_72%)]" />
-              <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.16)_42%,transparent_66%)] -translate-x-[120%] animate-sheen" />
-            </div>
-
-            <div className="relative z-[1] grid gap-8 nav:grid-cols-[minmax(0,1fr)_minmax(280px,430px)] nav:items-center">
-              <div className="grid min-w-0 gap-6">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="mc-chip">Pre-approved loan</span>
-                  <span className="inline-flex items-center rounded-full bg-[rgba(20,150,243,0.08)] px-3 py-2 text-[0.8rem] font-bold text-brand-navy">
-                    Ready to continue
-                  </span>
-                </div>
-
-                <div className="grid gap-3">
-                  <div className="text-[0.8rem] font-black uppercase tracking-[0.16em] text-brand-blue">Decision</div>
-                  <h1 className="m-0 min-w-0 max-w-full text-[clamp(1rem,2.35vw,2.2rem)] leading-snug tracking-[-0.05em] text-brand-navy text-balance">
-                    You are pre-approved for{' '}
-                    <span className="inline-block font-bold tabular-nums [overflow-wrap:anywhere]">
-                      {formatInr(amountInr)}
-                    </span>
-                  </h1>
-                  <p className="m-0 max-w-[34rem] text-[1rem] leading-[1.75] text-brand-muted">
-                    This is the loan amount you can continue with right now. Complete your account details to move ahead.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <Link href="/loan-selection" className="mc-btn-primary min-w-[176px]">
-                    Continue
-                  </Link>
-                  <Link
-                    href="/"
-                    className="mc-btn-secondary rounded-[18px] bg-[rgba(20,150,243,0.08)] px-[18px] py-[14px] text-brand-navy"
-                  >
-                    Back to home
-                  </Link>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {SUMMARY_ITEMS.map((item, index) => (
-                    <article
-                      key={item.label}
-                      className="mc-highlight-card rounded-[22px] border border-[rgba(18,36,79,0.08)] bg-[rgba(255,255,255,0.82)] px-4 py-4 shadow-[0_16px_30px_rgba(23,44,113,0.05)]"
-                      style={{ animationDelay: `${index * 90}ms` }}
-                    >
-                      <div className="flex items-start gap-3">
-                        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[linear-gradient(135deg,rgba(20,150,243,0.12),rgba(255,197,25,0.22))] text-brand-navy">
-                          <SummaryIcon kind={item.kind} />
-                        </span>
-                        <div>
-                          <div className="text-[0.76rem] font-black uppercase tracking-[0.16em] text-brand-blue">
-                            {item.label}
-                          </div>
-                          <div className="mt-1 text-[1rem] font-bold text-brand-navy">{item.value}</div>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {BENEFIT_TAGS.map((tag) => (
-                    <span
-                      key={tag}
-                      className="inline-flex rounded-full border border-[rgba(18,36,79,0.08)] bg-[rgba(255,255,255,0.82)] px-3 py-2 text-[0.84rem] font-bold text-brand-navy"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="relative z-[1] min-w-0">
-                <AmountVisual amount={formatInr(amountInr)} caption="Pre-approved from the quick eligibility check." />
-              </div>
-            </div>
-          </section>
-
-          <section className="mc-card mc-card-glow">
-            <div className="grid gap-3 nav:grid-cols-[1fr_auto] nav:items-center">
-              <div>
-                <div className="text-[0.8rem] font-black uppercase tracking-[0.16em] text-brand-blue">What happens next</div>
-                <p className="mt-2 mb-0 max-w-[42rem] text-[0.98rem] leading-[1.75] text-brand-muted">
-                  Continue to account setup now. Final approval and disbursal move forward after lending partner verification.
-                </p>
-              </div>
-              <Link href="/loan-selection" className="mc-btn-primary">
-                Continue
-              </Link>
-            </div>
-          </section>
-        </div>
-      )}
+      <div className="min-h-screen bg-[linear-gradient(135deg,#f8faff,#e6f0ff)] flex items-center justify-center p-4 sm:p-6 md:p-8">
+        <LoanLandingShell
+          journeyPanel={content}
+          leftTitle={amountInr !== null ? leftTitle : undefined}
+          leftDescription={
+            amountInr !== null
+              ? "Your financial profile has been verified. We have generated a custom loan offer just for you. Proceed to claim your amount."
+              : "We are securely calculating your eligible loan amount based on your profile."
+          }
+        />
+      </div>
     </CustomerJourneyGuard>
   );
 }

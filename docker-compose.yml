@@ -1,7 +1,7 @@
 name: moneyCash
 
 x-node-defaults: &node-defaults
-  image: node:22-alpine
+  image: node:22-bookworm-slim
   restart: "no"
   init: true
   tty: true
@@ -30,7 +30,7 @@ services:
     <<: *node-defaults
     env_file: ./los/.env
     ports:
-      - "3020:3000"
+      - "3020:3010"
     working_dir: /workspace/los
     volumes:
       - ./los:/workspace/los:cached
@@ -45,7 +45,7 @@ services:
     <<: *node-defaults
     env_file: ./customer/.env
     ports:
-      - "3021:3001"
+      - "3021:3011"
     working_dir: /workspace/customer
     volumes:
       - ./customer:/workspace/customer:cached

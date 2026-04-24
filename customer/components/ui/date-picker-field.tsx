@@ -178,8 +178,8 @@ export function DatePickerField({
         </span>
 
       {isOpen && (
-        <div className="absolute top-[calc(100%+12px)] left-0 z-[14] w-[min(320px,calc(100vw-32px))]">
-          <div className="relative overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.82)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(240,247,255,0.92))] p-[22px] shadow-[0_28px_58px_rgba(23,44,113,0.18)] backdrop-blur-[18px] animate-calendar-in">
+        <div className="absolute top-[calc(100%+12px)] left-0 z-[14] w-[min(360px,calc(100vw-24px))] max-w-[calc(100vw-24px)]">
+          <div className="relative overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.82)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(240,247,255,0.92))] p-[18px] shadow-[0_28px_58px_rgba(23,44,113,0.18)] backdrop-blur-[18px] animate-calendar-in sm:p-[22px]">
             <div className="relative grid gap-5">
               {/* Header */}
               <div className="flex items-start justify-between gap-3">
@@ -203,10 +203,10 @@ export function DatePickerField({
               </div>
 
               {/* Month / Year selects */}
-              <div className="grid grid-cols-[minmax(0,1fr)_88px] gap-2.5">
+              <div className="grid grid-cols-[minmax(0,1fr)_110px] gap-2.5 sm:grid-cols-[minmax(0,1fr)_120px]">
                 <div className="relative min-w-0">
                   <select
-                    className="h-11 w-full appearance-none rounded-[16px] border border-[rgba(255,255,255,0.86)] bg-[rgba(255,255,255,0.8)] px-4 pr-10 text-[0.92rem] font-extrabold text-brand-navy shadow-[inset_0_1px_0_rgba(255,255,255,0.74),0_10px_18px_rgba(23,44,113,0.06)] outline-none"
+                    className="h-11 w-full appearance-none rounded-[16px] border border-[rgba(255,255,255,0.86)] bg-[rgba(255,255,255,0.8)] px-3 pr-8 text-[0.9rem] font-extrabold text-brand-navy shadow-[inset_0_1px_0_rgba(255,255,255,0.74),0_10px_18px_rgba(23,44,113,0.06)] outline-none sm:px-4 sm:pr-10 sm:text-[0.92rem]"
                     value={visibleMonth.getMonth()}
                     onChange={(e) =>
                       setVisibleMonth(new Date(visibleMonth.getFullYear(), Number(e.target.value), 1))
@@ -222,7 +222,7 @@ export function DatePickerField({
                 </div>
                 <div className="relative min-w-0">
                   <select
-                    className="h-11 w-full appearance-none rounded-[16px] border border-[rgba(255,255,255,0.86)] bg-[rgba(255,255,255,0.8)] px-4 pr-10 text-[0.92rem] font-extrabold text-brand-navy shadow-[inset_0_1px_0_rgba(255,255,255,0.74),0_10px_18px_rgba(23,44,113,0.06)] outline-none"
+                    className="h-11 w-full appearance-none rounded-[16px] border border-[rgba(255,255,255,0.86)] bg-[rgba(255,255,255,0.8)] px-3 pr-8 text-[0.9rem] font-extrabold text-brand-navy shadow-[inset_0_1px_0_rgba(255,255,255,0.74),0_10px_18px_rgba(23,44,113,0.06)] outline-none sm:px-4 sm:pr-10 sm:text-[0.92rem]"
                     value={visibleMonth.getFullYear()}
                     onChange={(e) =>
                       setVisibleMonth(new Date(Number(e.target.value), visibleMonth.getMonth(), 1))

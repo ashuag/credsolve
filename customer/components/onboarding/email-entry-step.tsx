@@ -94,21 +94,39 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', le
 
   return (
     <>
-      <section className="mc-card mc-card-glow" aria-labelledby="email-heading">
-        <div className="mc-chip">{isLogin ? 'Returning user' : 'Step 3 of 4'}</div>
-        <h1
-          id="email-heading"
-          className="mt-[14px] mb-3 text-brand-navy text-[clamp(2.2rem,6vw,3.2rem)] leading-[0.96] tracking-[-0.05em]"
-        >
-          {isLogin ? 'Choose login method.' : 'Your email address.'}
-        </h1>
-        <p className="text-brand-muted leading-[1.6]">
-          {isLogin
-            ? 'Choose Google login or enter your email id manually to continue.'
-            : 'Choose one of the two options below to continue.'}
-        </p>
+      <section className="h-full flex flex-col justify-center" aria-labelledby="email-heading">
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-8">
+            <div className="flex gap-1.5">
+              <div className="h-2 w-8 rounded-full bg-blue-600"></div>
+              <div className="h-2 w-8 rounded-full bg-slate-100"></div>
+              <div className="h-2 w-8 rounded-full bg-slate-100"></div>
+            </div>
+            <span className="ml-3 text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Step 1 — Onboarding</span>
+          </div>
 
-        <div className="mt-[22px] grid gap-2">
+          <h2
+            id="email-heading"
+            className="text-2xl md:text-[1.8rem] font-extrabold text-brand-navy mb-6 tracking-tight leading-[1.1] whitespace-nowrap"
+          >
+            {isLogin ? 'Welcome ' : 'Verify Your '}<span className="text-brand-blue">{isLogin ? 'Back' : 'Email'}</span> ✨
+          </h2>
+
+          <div className="flex items-start gap-4 p-4 mb-2 rounded-2xl bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border border-blue-100/60 shadow-sm">
+            <div className="p-2 bg-white rounded-xl shadow-sm text-blue-600 shrink-0">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+              </svg>
+            </div>
+            <p className="text-[0.95rem] text-slate-600 leading-relaxed m-0 pt-0.5">
+              {isLogin
+                ? 'Choose Google login or enter your email ID manually to continue.'
+                : 'Choose an option below to securely link your email address.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-3">
           <button
             type="button"
             onClick={handleGoogleLogin}
