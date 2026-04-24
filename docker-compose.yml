@@ -1,110 +1,63 @@
 name: moneyCash
 
+x-node-defaults: &node-defaults
+  image: node:22-alpine
+  restart: "no"
+  init: true
+  tty: true
+  networks:
+    - shared-net
+
 services:
-  db:
-    image: mysql:8.0
-    command: --default-authentication-plugin=mysql_native_password
-    restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: moneyCash
-      MYSQL_USER: moneyCash
-      MYSQL_PASSWORD: moneyCash
-      MYSQL_ROOT_PASSWORD: root
-    ports:
-      - "3310:3306"
-    volumes:
-      - moneyCash_mysql_data:/var/lib/mysql
-      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-uroot', '-proot']
-      interval: 5s
-      timeout: 5s
-      retries: 30
-      start_period: 25s
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    ports:
-      - "6385:6379"
-    volumes:
-      - moneyCash_redis_data:/data
-
-  # Migrations, seed, then Nest (minimal HTTP on PORT default 4001; add modules under src/).
   backend:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    restart: unless-stopped
-    env_file:
-      - ./backend/.env
-    environment:
-      # Dev stack: ensure devDependencies (e.g. @types/*) install; overrides NODE_ENV=production in .env for `npm ci`.
-      NODE_ENV: development
-      CORS_ORIGINS: http://localhost:3010,http://localhost:3011,http://localhost:4001,http://127.0.0.1:3010,http://127.0.0.1:3011,http://127.0.0.1:4001
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
+    <<: *node-defaults
+    env_file: ./backend/.env
     ports:
       - "4001:4001"
     working_dir: /workspace/backend
-    # `npm ci` keeps the named volume in sync with package-lock (avoids stale node_modules after new deps, e.g. ioredis).
-    command: sh -c "npm ci --include=dev && npm run prisma:migrate:deploy && npm run seed && npm run dev"
     volumes:
-      - ./backend:/workspace/backend
-      - backend_node_modules:/workspace/backend/node_modules
-
+      - ./backend:/workspace/backend:cached
+    command: >
+      sh -c "
+        if [ -f package-lock.json ] && [ ! -d node_modules ]; then npm ci;
+        elif [ ! -d node_modules ]; then npm install;
+        fi &&
+        npm run prisma:generate &&
+        npm run prisma:migrate:deploy &&
+        npm run dev
+      "
   los:
-    build:
-      context: .
-      dockerfile: los/Dockerfile
-    restart: unless-stopped
-    env_file:
-      - ./los/.env
-    environment:
-      API_SERVER_URL: http://backend:4001/api/los
-      NEXT_PUBLIC_API_URL: http://localhost:4001/api/los
-      NEXT_ALLOWED_DEV_ORIGINS: localhost,127.0.0.1
-    depends_on:
-      - backend
+    <<: *node-defaults
+    env_file: ./los/.env
     ports:
-      - "3010:3010"
+      - "3020:3000"
     working_dir: /workspace/los
-    command: npm run dev
     volumes:
-      - ./los:/workspace/los
-      - los_node_modules:/workspace/los/node_modules
-
+      - ./los:/workspace/los:cached
+    command: >
+      sh -c "
+        if [ -f package-lock.json ] && [ ! -d node_modules ]; then npm ci;
+        elif [ ! -d node_modules ]; then npm install;
+        fi &&
+        npm run dev
+      "
   customer:
-    build:
-      context: .
-      dockerfile: customer/Dockerfile
-    restart: unless-stopped
-    env_file:
-      - ./customer/.env
-    environment:
-      # Dev server: avoid production distDir/HSTS from a local .env that sets NODE_ENV=production.
-      NODE_ENV: development
-      NEXT_DIST_DIR: .next
-      API_SERVER_URL: http://backend:4001/api
-      NEXT_PUBLIC_API_URL: /api
-      NEXT_ALLOWED_DEV_ORIGINS: localhost,127.0.0.1
-    depends_on:
-      - backend
+    <<: *node-defaults
+    env_file: ./customer/.env
     ports:
-      - "3011:3011"
+      - "3021:3001"
     working_dir: /workspace/customer
-    # Bind mount hides image .next; prime with `next build` once so routes-manifest.json exists.
-    command: ["sh", "/workspace/customer/docker-dev.sh"]
     volumes:
-      - ./customer:/workspace/customer
-      - customer_node_modules:/workspace/customer/node_modules
+      - ./customer:/workspace/customer:cached
+    command: >
+      sh -c "
+        if [ -f package-lock.json ] && [ ! -d node_modules ]; then npm ci;
+        elif [ ! -d node_modules ]; then npm install;
+        fi &&
+        npm run dev
+      "
 
-volumes:
-  moneyCash_mysql_data:
-  moneyCash_redis_data:
-  backend_node_modules:
-  los_node_modules:
-  customer_node_modules:
+networks:
+  shared-net:
+    external: true
+    name: shared-net

@@ -1,18 +1,9 @@
 {
-  "name": "moneyCash",
+  "name": "workspace",
   "private": true,
-  "version": "0.1.0",
-  "engines": {
-    "node": ">=20.19.0"
-  },
   "scripts": {
-    "dev": "npm --prefix backend run dev",
-    "dev:apps": "npm --prefix los run dev & npm --prefix customer run dev",
-    "dev:all": "npm --prefix backend run dev & npm --prefix los run dev & npm --prefix customer run dev",
-    "build": "npm --prefix backend run build && npm --prefix los run build && npm --prefix customer run build",
-    "lint": "npm --prefix backend run lint && npm --prefix los run lint && npm --prefix customer run lint",
-    "db:validate": "npm --prefix backend run prisma:validate",
-    "db:generate": "npm --prefix backend run prisma:generate",
-    "db:migrate": "npm --prefix backend run prisma:migrate:dev"
+    "dev:backend": "cd backend && npm run dev",
+    "dev:crm": "cd crm && npm run dev",
+    "dev:customer": "cd customer && npm run dev"
   }
 }

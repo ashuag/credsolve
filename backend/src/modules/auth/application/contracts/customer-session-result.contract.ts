@@ -28,6 +28,17 @@ export type CustomerPortalProfileSnapshot = {
   creditConsentAccepted: boolean;
 };
 
+export type CustomerPortalJourneySnapshot = {
+  /** Lead detail + consent are complete enough to proceed to pre-approved offer. */
+  detailsCompleted: boolean;
+  /** Customer has selected a loan amount + tenure (application_details populated). */
+  loanSelectionCompleted: boolean;
+  /** Customer has completed KYC (documents uploaded / verified). */
+  kycCompleted: boolean;
+  /** Customer has provided bank details (disbursement details). */
+  bankDetailsCompleted: boolean;
+};
+
 export type CustomerSessionResult =
   | {
       authenticated: true;
@@ -35,5 +46,6 @@ export type CustomerSessionResult =
       mobileNumber: string;
       lead: CustomerPortalLeadSnapshot | null;
       profile: CustomerPortalProfileSnapshot | null;
+      journey: CustomerPortalJourneySnapshot;
     }
   | { authenticated: false };

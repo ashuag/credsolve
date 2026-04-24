@@ -1,16 +1,19 @@
 ## Dependencies
 node_modules/
 backend/node_modules/
+los/node_modules/
 customer/node_modules/
 los/node_modules/
 
 ## Build and coverage outputs
 .next/
+out/
 dist/
 build/
 coverage/
 .turbo/
 *.tsbuildinfo
+.vercel/
 
 ## Environment and local secrets
 .env
@@ -31,10 +34,15 @@ pnpm-debug.log*
 .cursor/
 .claude/
 
-## OS files
+## OS and editor swap/lock files
 .DS_Store
 Thumbs.db
+*.~lock.*
+.~lock.*
+
 ## Generated code
 /backend/src/generated/prisma/
 los/.next/
 customer/.next/
+los/.next/
+los/public/image

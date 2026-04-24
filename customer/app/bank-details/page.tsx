@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { getLoanBanks, saveBankDetails } from '@/lib/api/lead';
 
 export default function BankDetailsPage() {
@@ -72,12 +73,13 @@ export default function BankDetailsPage() {
   }
 
   return (
-    <div className="mc-card grid gap-5 max-w-2xl">
-      <div className="mc-chip">Bank details</div>
-      <h1 className="m-0 text-brand-navy text-[clamp(1.9rem,5vw,2.8rem)] tracking-[-0.05em] leading-[1.08]">
-        Add your bank details.
-      </h1>
-      <form onSubmit={handleSubmit} className="grid gap-3">
+    <CustomerJourneyGuard>
+      <div className="mc-card grid gap-5 max-w-2xl">
+        <div className="mc-chip">Bank details</div>
+        <h1 className="m-0 text-brand-navy text-[clamp(1.9rem,5vw,2.8rem)] tracking-[-0.05em] leading-[1.08]">
+          Add your bank details.
+        </h1>
+        <form onSubmit={handleSubmit} className="grid gap-3">
         <label className="grid gap-1">
           <span className="text-[0.88rem] font-bold text-brand-navy">Account holder name</span>
           <input
@@ -139,8 +141,9 @@ export default function BankDetailsPage() {
             Back
           </button>
         </div>
-      </form>
-    </div>
+        </form>
+      </div>
+    </CustomerJourneyGuard>
   );
 }
 

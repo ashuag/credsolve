@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { Spinner } from '@/components/ui/spinner';
 import { fetchLoanEligibility } from '@/lib/api/eligibility';
 import { ApiRequestError } from '@/lib/api/client';
@@ -100,7 +101,7 @@ function AmountVisual({
         <span className="absolute h-[10px] w-[10px] rounded-full bg-brand-gold shadow-[0_0_18px_rgba(255,197,25,0.42)] animate-orbit-2" />
         <span className="absolute h-[9px] w-[9px] rounded-full bg-brand-blue shadow-[0_0_18px_rgba(20,150,243,0.42)] animate-orbit-3" />
 
-        <div className="mc-highlight-card relative z-[1] w-full max-w-[19rem] rounded-[30px] border border-[rgba(255,255,255,0.16)] bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.08))] px-6 py-7 text-center shadow-[0_24px_48px_rgba(5,13,40,0.26)] backdrop-blur-[12px]">
+        <div className="mc-highlight-card relative z-[1] w-full min-w-0 max-w-[min(19rem,100%)] rounded-[30px] border border-[rgba(255,255,255,0.16)] bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.08))] px-4 py-7 text-center shadow-[0_24px_48px_rgba(5,13,40,0.26)] backdrop-blur-[12px] sm:px-6">
           <div className="text-[0.76rem] font-black uppercase tracking-[0.16em] text-[#fff1bb]">Eligible loan amount</div>
           {loading ? (
             <div className="mt-6 grid justify-items-center gap-4">
@@ -108,7 +109,7 @@ function AmountVisual({
               <div className="text-[0.92rem] font-bold text-[rgba(236,243,255,0.88)]">Checking your amount</div>
             </div>
           ) : (
-            <div className="mt-4 text-[clamp(3rem,8vw,4.2rem)] font-extrabold leading-none tracking-[-0.06em] text-white">
+            <div className="mt-3 w-full min-w-0 break-words text-[clamp(1.35rem,4.2vw,2.65rem)] font-bold leading-[1.08] tracking-[-0.05em] text-white [overflow-wrap:anywhere]">
               {amount}
             </div>
           )}
@@ -126,8 +127,8 @@ function AmountVisual({
 function LoadingState() {
   return (
     <section className="relative overflow-hidden rounded-[36px] border border-[rgba(18,36,79,0.08)] bg-[linear-gradient(135deg,#fffefb,#f4f8ff_52%,#eef5ff)] p-6 shadow-[0_24px_54px_rgba(23,44,113,0.08)] max-sm:rounded-[30px] max-sm:p-5">
-      <div className="relative grid gap-8 nav:grid-cols-[minmax(0,1fr)_minmax(320px,430px)] nav:items-center">
-        <div className="grid gap-6">
+      <div className="relative z-[1] grid gap-8 nav:grid-cols-[minmax(0,1fr)_minmax(280px,430px)] nav:items-center">
+        <div className="grid min-w-0 gap-6">
           <div className="flex flex-wrap items-center gap-2">
             <span className="mc-chip">Pre-approved loan</span>
             <span className="inline-flex items-center rounded-full bg-[rgba(20,150,243,0.08)] px-3 py-2 text-[0.8rem] font-bold text-brand-navy">
@@ -216,108 +217,110 @@ export default function PreApprovedLoanPage() {
     };
   }, [router]);
 
-  if (error) {
-    return <ErrorState error={error} />;
-  }
-
-  if (amountInr === null) {
-    return <LoadingState />;
-  }
-
-  const formattedAmount = formatInr(amountInr);
-
   return (
-    <div className="grid gap-5">
-      <section className="relative overflow-hidden rounded-[36px] border border-[rgba(18,36,79,0.08)] bg-[linear-gradient(135deg,#fffefb,#f4f8ff_52%,#eef5ff)] p-6 shadow-[0_24px_54px_rgba(23,44,113,0.08)] max-sm:rounded-[30px] max-sm:p-5">
-        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-          <div className="absolute left-[-8%] top-[-12%] h-[14rem] w-[14rem] rounded-full bg-[radial-gradient(circle,rgba(255,197,25,0.22),transparent_70%)]" />
-          <div className="absolute right-[-10%] top-[6%] h-[18rem] w-[18rem] rounded-full bg-[radial-gradient(circle,rgba(20,150,243,0.16),transparent_72%)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.16)_42%,transparent_66%)] -translate-x-[120%] animate-sheen" />
-        </div>
-
-        <div className="relative z-[1] grid gap-8 nav:grid-cols-[minmax(0,1fr)_minmax(280px,430px)] nav:items-center">
-          <div className="grid min-w-0 gap-6">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="mc-chip">Pre-approved loan</span>
-              <span className="inline-flex items-center rounded-full bg-[rgba(20,150,243,0.08)] px-3 py-2 text-[0.8rem] font-bold text-brand-navy">
-                Ready to continue
-              </span>
+    <CustomerJourneyGuard>
+      {error ? (
+        <ErrorState error={error} />
+      ) : amountInr === null ? (
+        <LoadingState />
+      ) : (
+        <div className="grid gap-5">
+          <section className="relative overflow-hidden rounded-[36px] border border-[rgba(18,36,79,0.08)] bg-[linear-gradient(135deg,#fffefb,#f4f8ff_52%,#eef5ff)] p-6 shadow-[0_24px_54px_rgba(23,44,113,0.08)] max-sm:rounded-[30px] max-sm:p-5">
+            <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden>
+              <div className="absolute left-[-8%] top-[-12%] h-[14rem] w-[14rem] rounded-full bg-[radial-gradient(circle,rgba(255,197,25,0.22),transparent_70%)]" />
+              <div className="absolute right-[-10%] top-[6%] h-[18rem] w-[18rem] rounded-full bg-[radial-gradient(circle,rgba(20,150,243,0.16),transparent_72%)]" />
+              <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.16)_42%,transparent_66%)] -translate-x-[120%] animate-sheen" />
             </div>
 
-            <div className="grid gap-3">
-              <div className="text-[0.8rem] font-black uppercase tracking-[0.16em] text-brand-blue">Decision</div>
-              <h1 className="m-0 min-w-0 max-w-full text-[clamp(1.15rem,3.4vw,3.25rem)] leading-snug tracking-[-0.06em] text-brand-navy text-balance">
-                You are pre-approved for{' '}
-                <span className="inline-block font-black tabular-nums [overflow-wrap:anywhere]">{formattedAmount}</span>
-              </h1>
-              <p className="m-0 max-w-[34rem] text-[1rem] leading-[1.75] text-brand-muted">
-                This is the loan amount you can continue with right now. Complete your account details to move ahead.
-              </p>
-            </div>
+            <div className="relative z-[1] grid gap-8 nav:grid-cols-[minmax(0,1fr)_minmax(280px,430px)] nav:items-center">
+              <div className="grid min-w-0 gap-6">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="mc-chip">Pre-approved loan</span>
+                  <span className="inline-flex items-center rounded-full bg-[rgba(20,150,243,0.08)] px-3 py-2 text-[0.8rem] font-bold text-brand-navy">
+                    Ready to continue
+                  </span>
+                </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Link href="/loan-selection" className="mc-btn-primary min-w-[176px]">
+                <div className="grid gap-3">
+                  <div className="text-[0.8rem] font-black uppercase tracking-[0.16em] text-brand-blue">Decision</div>
+                  <h1 className="m-0 min-w-0 max-w-full text-[clamp(1rem,2.35vw,2.2rem)] leading-snug tracking-[-0.05em] text-brand-navy text-balance">
+                    You are pre-approved for{' '}
+                    <span className="inline-block font-bold tabular-nums [overflow-wrap:anywhere]">
+                      {formatInr(amountInr)}
+                    </span>
+                  </h1>
+                  <p className="m-0 max-w-[34rem] text-[1rem] leading-[1.75] text-brand-muted">
+                    This is the loan amount you can continue with right now. Complete your account details to move ahead.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <Link href="/loan-selection" className="mc-btn-primary min-w-[176px]">
+                    Continue
+                  </Link>
+                  <Link
+                    href="/"
+                    className="mc-btn-secondary rounded-[18px] bg-[rgba(20,150,243,0.08)] px-[18px] py-[14px] text-brand-navy"
+                  >
+                    Back to home
+                  </Link>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {SUMMARY_ITEMS.map((item, index) => (
+                    <article
+                      key={item.label}
+                      className="mc-highlight-card rounded-[22px] border border-[rgba(18,36,79,0.08)] bg-[rgba(255,255,255,0.82)] px-4 py-4 shadow-[0_16px_30px_rgba(23,44,113,0.05)]"
+                      style={{ animationDelay: `${index * 90}ms` }}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[linear-gradient(135deg,rgba(20,150,243,0.12),rgba(255,197,25,0.22))] text-brand-navy">
+                          <SummaryIcon kind={item.kind} />
+                        </span>
+                        <div>
+                          <div className="text-[0.76rem] font-black uppercase tracking-[0.16em] text-brand-blue">
+                            {item.label}
+                          </div>
+                          <div className="mt-1 text-[1rem] font-bold text-brand-navy">{item.value}</div>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {BENEFIT_TAGS.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex rounded-full border border-[rgba(18,36,79,0.08)] bg-[rgba(255,255,255,0.82)] px-3 py-2 text-[0.84rem] font-bold text-brand-navy"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="relative z-[1] min-w-0">
+                <AmountVisual amount={formatInr(amountInr)} caption="Pre-approved from the quick eligibility check." />
+              </div>
+            </div>
+          </section>
+
+          <section className="mc-card mc-card-glow">
+            <div className="grid gap-3 nav:grid-cols-[1fr_auto] nav:items-center">
+              <div>
+                <div className="text-[0.8rem] font-black uppercase tracking-[0.16em] text-brand-blue">What happens next</div>
+                <p className="mt-2 mb-0 max-w-[42rem] text-[0.98rem] leading-[1.75] text-brand-muted">
+                  Continue to account setup now. Final approval and disbursal move forward after lending partner verification.
+                </p>
+              </div>
+              <Link href="/loan-selection" className="mc-btn-primary">
                 Continue
               </Link>
-              <Link
-                href="/"
-                className="mc-btn-secondary rounded-[18px] bg-[rgba(20,150,243,0.08)] px-[18px] py-[14px] text-brand-navy"
-              >
-                Back to home
-              </Link>
             </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              {SUMMARY_ITEMS.map((item, index) => (
-                <article
-                  key={item.label}
-                  className="mc-highlight-card rounded-[22px] border border-[rgba(18,36,79,0.08)] bg-[rgba(255,255,255,0.82)] px-4 py-4 shadow-[0_16px_30px_rgba(23,44,113,0.05)]"
-                  style={{ animationDelay: `${index * 90}ms` }}
-                >
-                  <div className="flex items-start gap-3">
-                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[linear-gradient(135deg,rgba(20,150,243,0.12),rgba(255,197,25,0.22))] text-brand-navy">
-                      <SummaryIcon kind={item.kind} />
-                    </span>
-                    <div>
-                      <div className="text-[0.76rem] font-black uppercase tracking-[0.16em] text-brand-blue">{item.label}</div>
-                      <div className="mt-1 text-[1rem] font-bold text-brand-navy">{item.value}</div>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {BENEFIT_TAGS.map((tag) => (
-                <span
-                  key={tag}
-                  className="inline-flex rounded-full border border-[rgba(18,36,79,0.08)] bg-[rgba(255,255,255,0.82)] px-3 py-2 text-[0.84rem] font-bold text-brand-navy"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="relative z-[1] min-w-0">
-            <AmountVisual amount={formattedAmount} caption="Pre-approved from the quick eligibility check." />
-          </div>
+          </section>
         </div>
-      </section>
-
-      <section className="mc-card mc-card-glow">
-        <div className="grid gap-3 nav:grid-cols-[1fr_auto] nav:items-center">
-          <div>
-            <div className="text-[0.8rem] font-black uppercase tracking-[0.16em] text-brand-blue">What happens next</div>
-            <p className="mt-2 mb-0 max-w-[42rem] text-[0.98rem] leading-[1.75] text-brand-muted">
-              Continue to account setup now. Final approval and disbursal move forward after lending partner verification.
-            </p>
-          </div>
-          <Link href="/loan-selection" className="mc-btn-primary">
-            Continue
-          </Link>
-        </div>
-      </section>
-    </div>
+      )}
+    </CustomerJourneyGuard>
   );
 }

@@ -1,17 +1,28 @@
+# Dependencies
 **/node_modules
+
+# Build outputs
 **/.next
 **/dist
 **/coverage
+
+# Logs
 *.log
+
+# OS / editor
 .DS_Store
+.idea
+.vscode
+.claude
+.cursor
+
+# Git
+.git
+.gitignore
+
+# Env files (keep example, ignore actual secrets in image)
 .env
 .env.*
 **/.env
 **/.env.*
 !.env.example
-.git
-.gitignore
-.idea
-.vscode
-.claude
-.cursor

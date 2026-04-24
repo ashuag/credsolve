@@ -1,13 +1,37 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { MobileEntryForm } from '@/components/forms/mobile-entry-form';
 import { OtpVerificationForm } from '@/app/login/otp-verification-form';
+import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { Spinner } from '@/components/ui/spinner';
 import type { SendOtpResponse } from '@/lib/api/auth';
+import { getCustomerJourneyResumePath, hasActiveLoanLead } from '@/lib/api/customer-session';
 
 export function LoanEntryPanel() {
+  const router = useRouter();
+  const { loading, session } = useCustomerSession();
   const [otpRequest, setOtpRequest] = useState<SendOtpResponse | null>(null);
+  const hasActiveLead = useMemo(() => hasActiveLoanLead(session), [session]);
+  const resumePath = useMemo(() => getCustomerJourneyResumePath(session), [session]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (hasActiveLead) {
+      router.replace(resumePath);
+    }
+  }, [hasActiveLead, loading, resumePath, router]);
+
+  if (loading || hasActiveLead) {
+    return (
+      <section className="mc-card mc-card-glow">
+        <div className="flex min-h-[220px] items-center justify-center">
+          <Spinner size={32} />
+        </div>
+      </section>
+    );
+  }
 
   if (otpRequest) {
     return (

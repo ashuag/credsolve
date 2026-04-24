@@ -38,12 +38,36 @@ export type CustomerSessionResponse =
       mobileNumber: string;
       lead: CustomerPortalLead | null;
       profile: CustomerPortalProfile | null;
+      journey: {
+        detailsCompleted: boolean;
+        loanSelectionCompleted: boolean;
+        kycCompleted: boolean;
+        bankDetailsCompleted: boolean;
+      };
     }
   | { authenticated: false };
 
 /** Customer has started a loan application (active lead exists after mobile OTP / onboarding). */
 export function hasActiveLoanLead(session: CustomerSessionResponse | null | undefined): boolean {
   return Boolean(session && session.authenticated && session.lead != null);
+}
+
+/**
+ * Returns the most relevant page to continue a signed-in customer's in-progress journey.
+ */
+export function getCustomerJourneyResumePath(
+  session: CustomerSessionResponse | null | undefined
+): string {
+  if (!session?.authenticated || !session.lead) {
+    return '/my-account?mode=login';
+  }
+
+  const journey = session.journey;
+  if (!journey.detailsCompleted) return '/onboarding?mode=login';
+  if (!journey.loanSelectionCompleted) return '/pre-approved-loan';
+  if (!journey.kycCompleted) return '/kyc/upload-documents';
+  if (!journey.bankDetailsCompleted) return '/bank-details';
+  return '/thank-you';
 }
 
 export async function fetchCustomerSession(): Promise<CustomerSessionResponse> {

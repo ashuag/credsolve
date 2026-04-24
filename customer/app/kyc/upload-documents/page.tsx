@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
+import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { AlertBanner } from '@/components/ui/alert-banner';
 import { saveKycDocuments } from '@/lib/api/lead';
@@ -176,18 +177,19 @@ export default function UploadDocumentsPage() {
   }
 
   return (
-    <section className="mc-card mc-card-glow mx-auto max-w-lg">
-      <div className="mb-6 grid gap-2">
-        <span className="mc-chip w-fit">KYC</span>
-        <h1 className="m-0 text-[1.5rem] font-extrabold tracking-[-0.03em] text-brand-navy">
-          Upload documents
-        </h1>
-        <p className="m-0 text-[0.94rem] leading-relaxed text-brand-muted">
-          Enter your PAN and Aadhaar numbers, then attach one PAN file and Aadhaar front and back (JPG, PNG or PDF, up to 5MB each).
-        </p>
-      </div>
+    <CustomerJourneyGuard>
+      <section className="mc-card mc-card-glow mx-auto max-w-lg">
+        <div className="mb-6 grid gap-2">
+          <span className="mc-chip w-fit">KYC</span>
+          <h1 className="m-0 text-[1.5rem] font-extrabold tracking-[-0.03em] text-brand-navy">
+            Upload documents
+          </h1>
+          <p className="m-0 text-[0.94rem] leading-relaxed text-brand-muted">
+            Enter your PAN and Aadhaar numbers, then attach one PAN file and Aadhaar front and back (JPG, PNG or PDF, up to 5MB each).
+          </p>
+        </div>
 
-      <form onSubmit={handleSubmit} className="grid gap-5" noValidate>
+        <form onSubmit={handleSubmit} className="grid gap-5" noValidate>
         <label
           className={cn(
             FORM_FIELD_CLASS,
@@ -313,7 +315,8 @@ export default function UploadDocumentsPage() {
             {isSubmitting ? 'Saving…' : 'Continue'}
           </button>
         </div>
-      </form>
-    </section>
+        </form>
+      </section>
+    </CustomerJourneyGuard>
   );
 }

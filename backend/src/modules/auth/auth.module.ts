@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { EmailModule } from '../../common/email/email.module';
 import { RedisIpRateLimitGuard } from '../../common/rate-limit/redis-ip-rate-limit.guard';
+import { PrismaModule } from '../../prisma/prisma.module';
 import { CheckLoanEligibilityUseCase } from './application/use-cases/check-loan-eligibility.use-case';
 import { GetCustomerLeadStatusUseCase } from './application/use-cases/get-customer-lead-status.use-case';
 import { GetCustomerSessionUseCase } from './application/use-cases/get-customer-session.use-case';
@@ -32,7 +33,7 @@ import { OptionalCustomerSessionGuard } from './presentation/guards/optional-cus
 import { RequiredCustomerSessionGuard } from './presentation/guards/required-customer-session.guard';
 
 @Module({
-  imports: [EmailModule],
+  imports: [EmailModule, PrismaModule],
   controllers: [
     AuthController,
     ApplicationsController,

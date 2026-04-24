@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { ApiRequestError } from '@/lib/api/client';
 import {
   fetchLoanCalculationSettings,
@@ -154,22 +155,26 @@ export default function LoanSelectionPage() {
 
   if (loadingSettings) {
     return (
-      <div className="flex min-h-[300px] items-center justify-center gap-3 text-brand-muted">
-        <Spinner size={34} />
-        <span>Loading loan settings...</span>
-      </div>
+      <CustomerJourneyGuard>
+        <div className="flex min-h-[300px] items-center justify-center gap-3 text-brand-muted">
+          <Spinner size={34} />
+          <span>Loading loan settings...</span>
+        </div>
+      </CustomerJourneyGuard>
     );
   }
 
   if (settingsError) {
     return (
-      <div className="mc-card grid gap-4">
-        <div className="mc-chip">Loan settings</div>
-        <p className="m-0 text-brand-navy font-semibold">{settingsError}</p>
-        <Link href="/pre-approved-loan" className="mc-btn-secondary self-start">
-          Back
-        </Link>
-      </div>
+      <CustomerJourneyGuard>
+        <div className="mc-card grid gap-4">
+          <div className="mc-chip">Loan settings</div>
+          <p className="m-0 text-brand-navy font-semibold">{settingsError}</p>
+          <Link href="/pre-approved-loan" className="mc-btn-secondary self-start">
+            Back
+          </Link>
+        </div>
+      </CustomerJourneyGuard>
     );
   }
 
@@ -188,7 +193,8 @@ export default function LoanSelectionPage() {
   }
 
   return (
-    <div className="grid gap-[18px] nav:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+    <CustomerJourneyGuard>
+      <div className="grid gap-[18px] nav:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
       <section className="mc-card flex flex-col gap-5">
         <div className="mc-chip">Select loan amount</div>
         <h1 className="text-brand-navy text-[clamp(2rem,5vw,3rem)] tracking-[-0.05em] leading-[1.1]">
@@ -278,7 +284,8 @@ export default function LoanSelectionPage() {
           <SummaryRow label="Total disbursement amount" value={formatInr(calculations.totalDisbursementAmount)} strong />
         </div>
       </aside>
-    </div>
+      </div>
+    </CustomerJourneyGuard>
   );
 }
 
