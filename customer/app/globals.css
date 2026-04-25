@@ -333,3 +333,222 @@
 .animation-delay-4000 {
   animation-delay: 4s;
 }
+
+/* ═══════════════════════════════════════════════════
+   Landing Page Redesign — New Animations & Utilities
+═══════════════════════════════════════════════════ */
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(32px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInLeft {
+  from { opacity: 0; transform: translateX(-28px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes fadeInRight {
+  from { opacity: 0; transform: translateX(28px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleInAnim {
+  from { opacity: 0; transform: scale(0.88); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes floatAnim {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-16px); }
+}
+
+@keyframes marqueeScroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+@keyframes textGradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50%       { background-position: 100% 50%; }
+}
+
+@keyframes ringPop {
+  0%   { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+@keyframes gradientBorderSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Scroll Reveal System ── */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.68s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.68s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal.in-view { opacity: 1; transform: none; }
+
+.reveal-left {
+  opacity: 0;
+  transform: translateX(-28px);
+  transition: opacity 0.68s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.68s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal-left.in-view { opacity: 1; transform: none; }
+
+.reveal-right {
+  opacity: 0;
+  transform: translateX(28px);
+  transition: opacity 0.68s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.68s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal-right.in-view { opacity: 1; transform: none; }
+
+.reveal-scale {
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal-scale.in-view { opacity: 1; transform: none; }
+
+/* Stagger helpers */
+.stagger-1 { transition-delay: 80ms; }
+.stagger-2 { transition-delay: 160ms; }
+.stagger-3 { transition-delay: 240ms; }
+.stagger-4 { transition-delay: 320ms; }
+.stagger-5 { transition-delay: 400ms; }
+.stagger-6 { transition-delay: 480ms; }
+
+/* ── New Animation Utilities ── */
+.animate-float { animation: floatAnim 5s ease-in-out infinite; }
+.animate-float-alt { animation: floatAnim 6.5s ease-in-out 1.2s infinite; }
+.animate-float-slow { animation: floatAnim 8s ease-in-out 2.5s infinite; }
+.animate-marquee-scroll { animation: marqueeScroll 32s linear infinite; }
+.animate-fade-in-up { animation: fadeInUp 0.65s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-scale-in { animation: scaleInAnim 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-ring-pop { animation: ringPop 2.2s ease-out infinite; }
+
+/* ── Design System Tokens ── */
+.hero-mesh {
+  background:
+    radial-gradient(ellipse 80% 60% at 80% 0%, rgba(20, 150, 243, 0.22) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 50% at 0% 100%, rgba(255, 197, 25, 0.14) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 50% 50%, rgba(28, 52, 125, 0.25) 0%, transparent 70%),
+    linear-gradient(160deg, #080f22 0%, #0c1830 50%, #0f1d40 100%);
+}
+
+.stats-mesh {
+  background:
+    radial-gradient(ellipse 60% 80% at 20% 50%, rgba(20, 150, 243, 0.18) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 80% 50%, rgba(255, 197, 25, 0.1) 0%, transparent 60%),
+    linear-gradient(180deg, #0a1628 0%, #0e1e3a 100%);
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-white {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.text-grad-gold {
+  background: linear-gradient(135deg, #ffc519 0%, #ffdb6b 50%, #f0af00 100%);
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: textGradientShift 3.5s ease infinite;
+}
+
+.text-grad-blue {
+  background: linear-gradient(135deg, #1496f3 0%, #60c3ff 50%, #1496f3 100%);
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: textGradientShift 3.5s ease infinite;
+}
+
+.glow-gold {
+  box-shadow: 0 4px 28px rgba(255, 197, 25, 0.35), 0 8px 60px rgba(255, 197, 25, 0.18);
+  transition: box-shadow 0.3s ease, transform 0.2s ease;
+}
+.glow-gold:hover {
+  box-shadow: 0 6px 50px rgba(255, 197, 25, 0.55), 0 14px 80px rgba(255, 197, 25, 0.28);
+  transform: translateY(-2px);
+}
+.glow-blue {
+  box-shadow: 0 4px 28px rgba(20, 150, 243, 0.25), 0 8px 50px rgba(20, 150, 243, 0.12);
+}
+
+/* Loan product card gradient accents */
+.loan-card-accent::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  border-radius: 4px 4px 0 0;
+  background: var(--accent-color, #1496f3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .reveal-left, .reveal-right, .reveal-scale {
+    opacity: 1; transform: none; transition: none;
+  }
+  .animate-float, .animate-float-alt, .animate-float-slow,
+  .animate-marquee-scroll, .animate-fade-in-up, .animate-scale-in,
+  .animate-ring-pop, .text-grad-gold, .text-grad-blue {
+    animation: none;
+  }
+  .text-grad-gold, .text-grad-blue {
+    -webkit-text-fill-color: currentColor;
+    background: none;
+  }
+}
+
+/* Custom Range Slider */
+.mc-range-slider {
+  -webkit-appearance: none;
+  width: 100%;
+  background: rgba(18, 36, 79, 0.06);
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+}
+
+.mc-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  background: #1496f3;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(20, 150, 243, 0.3);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.mc-range-slider:active::-webkit-slider-thumb {
+  transform: scale(1.1);
+  box-shadow: 0 6px 18px rgba(20, 150, 243, 0.4);
+}
+
+.mc-range-slider.accent-\[\#ffc519\]::-webkit-slider-thumb {
+  background: #ffc519;
+  box-shadow: 0 4px 12px rgba(255, 197, 25, 0.3);
+}
+
+.mc-range-slider.accent-\[\#ffc519\]:active::-webkit-slider-thumb {
+  box-shadow: 0 6px 18px rgba(255, 197, 25, 0.4);
+}

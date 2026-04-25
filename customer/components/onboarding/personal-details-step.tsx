@@ -374,7 +374,7 @@ export function PersonalDetailsStep({
             <div className="w-full">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
                 <div className="md:col-span-2">
-                  <FieldGroup label="Full name as per PAN card" htmlFor="fullName" error={errors.fullName}>
+                  <FieldGroup label="Full name" htmlFor="fullName" error={errors.fullName}>
                     <input
                       id="fullName"
                       name="fullName"

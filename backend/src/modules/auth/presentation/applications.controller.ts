@@ -56,7 +56,7 @@ export class ApplicationsController {
       limits: { fileSize: 5 * 1024 * 1024 },
     })
   )
-  @ApiOperation({ summary: 'Save KYC numbers + uploaded PAN card and Aadhaar front/back images' })
+  @ApiOperation({ summary: 'Save KYC numbers + uploaded Aadhaar front/back images' })
   @ApiOkResponse({ description: 'KYC document references stored' })
   kycDocumentsRoute(
     @Req() req: Request,

@@ -258,17 +258,15 @@ export default function PreApprovedLoanPage() {
 
   return (
     <CustomerJourneyGuard>
-      <div className="min-h-screen bg-[linear-gradient(135deg,#f8faff,#e6f0ff)] flex items-center justify-center p-4 sm:p-6 md:p-8">
-        <LoanLandingShell
-          journeyPanel={content}
-          leftTitle={amountInr !== null ? leftTitle : undefined}
-          leftDescription={
-            amountInr !== null
-              ? "Your financial profile has been verified. We have generated a custom loan offer just for you. Proceed to claim your amount."
-              : "We are securely calculating your eligible loan amount based on your profile."
-          }
-        />
-      </div>
+      <LoanLandingShell
+        journeyPanel={content}
+        leftTitle={amountInr !== null ? leftTitle : undefined}
+        leftDescription={
+          amountInr !== null
+            ? "Your financial profile has been verified. We have generated a custom loan offer just for you. Proceed to claim your amount."
+            : "We are securely calculating your eligible loan amount based on your profile."
+        }
+      />
     </CustomerJourneyGuard>
   );
 }

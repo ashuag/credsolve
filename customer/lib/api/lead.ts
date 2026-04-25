@@ -121,8 +121,8 @@ export type SaveLoanSelectionPayload = {
 };
 
 export type SaveKycDocumentsPayload = {
-  panNumber: string;
-  aadhaarNumber: string;
+  panNumber?: string;
+  aadhaarNumber?: string;
   panDocument: File;
   aadhaarFront: File;
   aadhaarBack: File;
@@ -167,8 +167,8 @@ export async function saveLoanSelection(payload: SaveLoanSelectionPayload): Prom
 
 export async function saveKycDocuments(payload: SaveKycDocumentsPayload): Promise<{ success: boolean }> {
   const formData = new FormData();
-  formData.set('panNumber', payload.panNumber);
-  formData.set('aadhaarNumber', payload.aadhaarNumber);
+  if (payload.panNumber) formData.set('panNumber', payload.panNumber);
+  if (payload.aadhaarNumber) formData.set('aadhaarNumber', payload.aadhaarNumber);
   formData.set('panDocument', payload.panDocument);
   formData.set('aadhaarFront', payload.aadhaarFront);
   formData.set('aadhaarBack', payload.aadhaarBack);

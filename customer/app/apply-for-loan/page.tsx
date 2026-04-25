@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { LoanEntryPanel } from '@/components/home/loan-entry-panel';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 
+export const dynamic = 'force-static';
+
 export const metadata: Metadata = {
   title: 'Apply for a loan',
   description:

@@ -87,7 +87,7 @@ export class GetCustomerSessionUseCase {
       this.prisma.client.customerKyc.findFirst({
         where: { customerId: customer.id },
         orderBy: { createdAt: 'desc' },
-        select: { id: true, panVerifiedAt: true, kycVerifiedAt: true },
+        select: { id: true, kycVerifiedAt: true },
       }),
     ]);
 
@@ -100,7 +100,6 @@ export class GetCustomerSessionUseCase {
       : 0;
     const kycCompleted = Boolean(
       latestCustomerKyc &&
-        latestCustomerKyc.panVerifiedAt &&
         (latestCustomerKyc.kycVerifiedAt != null || kycDocsCount >= 3)
     );
 

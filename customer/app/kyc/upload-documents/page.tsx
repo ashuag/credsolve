@@ -1,22 +1,19 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { AlertBanner } from '@/components/ui/alert-banner';
+import { ApiRequestError } from '@/lib/api/client';
 import { saveKycDocuments } from '@/lib/api/lead';
 import { cn } from '@/lib/cn';
-import { isValidPan } from '@/lib/validators';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_FILES = 'image/*,.pdf,application/pdf';
-const AADHAAR_REGEX = /^\d{12}$/;
 
 type FieldErrors = {
-  panNumber?: string;
-  aadhaarNumber?: string;
   panDocument?: string;
   aadhaarFront?: string;
   aadhaarBack?: string;
@@ -34,32 +31,13 @@ function validateFile(file: File | null, label: string): string | null {
 
 function normalizeApiError(message: string): string {
   const normalized = message.trim();
-  const lower = normalized.toLowerCase();
-
-  if (
-    lower.includes('pannumber must match') ||
-    normalized.includes('/^[A-Z]{5}[0-9]{4}[A-Z]$/')
-  ) {
-    return 'Please enter a valid PAN number (e.g. ABCDE1234F).';
-  }
-
-  if (lower.includes('aadhaarnumber') || lower.includes('aadhaar number')) {
-    return 'Please enter a valid 12-digit Aadhaar number.';
-  }
-
   return normalized || 'Unable to save KYC documents right now. Please try again.';
 }
 
 export default function UploadDocumentsPage() {
   const router = useRouter();
-  const { session, refresh } = useCustomerSession();
-  const storedPan =
-    session?.authenticated && session.profile?.panNumber?.trim()
-      ? session.profile.panNumber.trim().toUpperCase()
-      : '';
+  const { refresh } = useCustomerSession();
 
-  const [panNumber, setPanNumber] = useState('');
-  const [aadhaarNumber, setAadhaarNumber] = useState('');
   const [panDocument, setPanDocument] = useState<File | null>(null);
   const [aadhaarFront, setAadhaarFront] = useState<File | null>(null);
   const [aadhaarBack, setAadhaarBack] = useState<File | null>(null);
@@ -67,33 +45,12 @@ export default function UploadDocumentsPage() {
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (storedPan) {
-      setPanNumber(storedPan);
-    }
-  }, [storedPan]);
-
-  const isPanLocked = Boolean(storedPan);
-
   function clearFieldError(field: keyof FieldErrors) {
     setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
-    if (submitError) {
-      setSubmitError('');
-    }
+    if (submitError) setSubmitError('');
   }
 
-  function handlePanChange(event: ChangeEvent<HTMLInputElement>) {
-    const next = event.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 10);
-    setPanNumber(next);
-    clearFieldError('panNumber');
-  }
-
-  function handleAadhaarChange(event: ChangeEvent<HTMLInputElement>) {
-    setAadhaarNumber(event.target.value.replace(/\D/g, '').slice(0, 12));
-    clearFieldError('aadhaarNumber');
-  }
-
-  function handleFileChange(field: keyof Pick<FieldErrors, 'panDocument' | 'aadhaarFront' | 'aadhaarBack'>) {
+  function handleFileChange(field: keyof FieldErrors) {
     return (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0] ?? null;
       if (field === 'panDocument') {
@@ -107,25 +64,14 @@ export default function UploadDocumentsPage() {
     };
   }
 
-  function validateForm(normalizedPan: string, normalizedAadhaar: string): FieldErrors {
+  function validateForm(): FieldErrors {
     const errors: FieldErrors = {};
-
-    if (!isValidPan(normalizedPan)) {
-      errors.panNumber = 'Invalid PAN.';
-    }
-    if (!AADHAAR_REGEX.test(normalizedAadhaar)) {
-      errors.aadhaarNumber = '12-digit Aadhaar.';
-    }
-
     const panFileError = validateFile(panDocument, 'PAN card');
     if (panFileError) errors.panDocument = panFileError;
-
     const aadhaarFrontError = validateFile(aadhaarFront, 'front');
     if (aadhaarFrontError) errors.aadhaarFront = aadhaarFrontError;
-
     const aadhaarBackError = validateFile(aadhaarBack, 'back');
     if (aadhaarBackError) errors.aadhaarBack = aadhaarBackError;
-
     return errors;
   }
 
@@ -133,10 +79,7 @@ export default function UploadDocumentsPage() {
     event.preventDefault();
     setSubmitError('');
 
-    const normalizedPan = panNumber.trim().toUpperCase();
-    const normalizedAadhaar = aadhaarNumber.replace(/\D/g, '');
-    const nextErrors = validateForm(normalizedPan, normalizedAadhaar);
-
+    const nextErrors = validateForm();
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors(nextErrors);
       return;
@@ -147,8 +90,6 @@ export default function UploadDocumentsPage() {
 
     try {
       await saveKycDocuments({
-        panNumber: normalizedPan,
-        aadhaarNumber: normalizedAadhaar,
         panDocument: panDocument!,
         aadhaarFront: aadhaarFront!,
         aadhaarBack: aadhaarBack!,
@@ -156,6 +97,11 @@ export default function UploadDocumentsPage() {
       if (refresh) await refresh();
       router.push('/bank-details');
     } catch (error) {
+      if (error instanceof ApiRequestError && error.statusCode === 401) {
+        setSubmitError('Your session has expired. Redirecting you to sign in…');
+        setTimeout(() => router.replace('/apply-for-loan'), 1500);
+        return;
+      }
       setSubmitError(
         normalizeApiError(error instanceof Error ? error.message : '')
       );
@@ -186,43 +132,6 @@ export default function UploadDocumentsPage() {
         </p>
 
         <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
-          <div>
-            <label className="block text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">PAN Number</label>
-            <input
-              className={cn(
-                "w-full h-[52px] rounded-xl border px-4 text-[0.95rem] font-bold text-brand-navy focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all",
-                fieldErrors.panNumber ? "border-red-300 bg-red-50" : "border-slate-200 bg-white",
-                isPanLocked && "bg-slate-50 cursor-not-allowed opacity-70"
-              )}
-              type="text"
-              placeholder="ABCDE1234F"
-              value={panNumber}
-              onChange={handlePanChange}
-              readOnly={isPanLocked}
-              autoComplete="off"
-            />
-            {fieldErrors.panNumber && <p className="mt-1 ml-1 text-[0.75rem] font-bold text-red-500">{fieldErrors.panNumber}</p>}
-          </div>
-
-          <div>
-            <label className="block text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">Aadhaar Number</label>
-            <input
-              className={cn(
-                "w-full h-[52px] rounded-xl border px-4 text-[0.95rem] font-bold text-brand-navy focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all",
-                fieldErrors.aadhaarNumber ? "border-red-300 bg-red-50" : "border-slate-200 bg-white"
-              )}
-              type="text"
-              placeholder="12 digits"
-              value={aadhaarNumber}
-              onChange={handleAadhaarChange}
-              inputMode="numeric"
-              autoComplete="off"
-            />
-            {fieldErrors.aadhaarNumber && <p className="mt-1 ml-1 text-[0.75rem] font-bold text-red-500">{fieldErrors.aadhaarNumber}</p>}
-          </div>
-
-          <div className="h-px bg-slate-100 my-2" />
-
           <div className="grid gap-3">
             <FileUploadField 
               label="PAN Card Image" 
@@ -271,30 +180,28 @@ export default function UploadDocumentsPage() {
 
   return (
     <CustomerJourneyGuard>
-      <div className="min-h-screen bg-[linear-gradient(135deg,#f8faff,#e6f0ff)] flex items-center justify-center p-4 sm:p-6 md:p-8">
-        <LoanLandingShell
-          journeyPanel={journeyPanel}
-          leftTitle={<>Bank Grade <span className="text-[#60a5fa]">Security</span></>}
-          leftDescription="We use industry-standard encryption to protect your sensitive documents. Your data is 100% safe with us."
-          leftInfographic={
-            <svg viewBox="0 0 400 400" className="w-full h-full drop-shadow-2xl" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="kycGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#60a5fa" />
-                  <stop offset="100%" stopColor="#1e40af" />
-                </linearGradient>
-              </defs>
-              <g transform="translate(100, 100)">
-                <rect x="0" y="20" width="200" height="160" rx="20" fill="url(#kycGrad)" stroke="rgba(255,255,255,0.2)" strokeWidth="4" />
-                <path d="M60 20 V0 C60 -10 70 -20 80 -20 H120 C130 -20 140 -10 140 0 V20" stroke="#facc15" strokeWidth="12" fill="none" strokeLinecap="round" />
-                <circle cx="100" cy="100" r="30" fill="rgba(255,255,255,0.15)" />
-                <rect x="92" y="90" width="16" height="20" rx="4" fill="#facc15" />
-                <path d="M100 110 V125" stroke="#facc15" strokeWidth="6" strokeLinecap="round" />
-              </g>
-            </svg>
-          }
-        />
-      </div>
+      <LoanLandingShell
+        journeyPanel={journeyPanel}
+        leftTitle={<>Bank Grade <span className="text-[#60a5fa]">Security</span></>}
+        leftDescription="We use industry-standard encryption to protect your sensitive documents. Your data is 100% safe with us."
+        leftInfographic={
+          <svg viewBox="0 0 400 400" className="w-full h-full drop-shadow-2xl" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="kycGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#60a5fa" />
+                <stop offset="100%" stopColor="#1e40af" />
+              </linearGradient>
+            </defs>
+            <g transform="translate(100, 100)">
+              <rect x="0" y="20" width="200" height="160" rx="20" fill="url(#kycGrad)" stroke="rgba(255,255,255,0.2)" strokeWidth="4" />
+              <path d="M60 20 V0 C60 -10 70 -20 80 -20 H120 C130 -20 140 -10 140 0 V20" stroke="#facc15" strokeWidth="12" fill="none" strokeLinecap="round" />
+              <circle cx="100" cy="100" r="30" fill="rgba(255,255,255,0.15)" />
+              <rect x="92" y="90" width="16" height="20" rx="4" fill="#facc15" />
+              <path d="M100 110 V125" stroke="#facc15" strokeWidth="6" strokeLinecap="round" />
+            </g>
+          </svg>
+        }
+      />
     </CustomerJourneyGuard>
   );
 }

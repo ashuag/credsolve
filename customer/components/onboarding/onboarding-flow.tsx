@@ -57,23 +57,27 @@ export function OnboardingFlow() {
     const storedEmail = lead?.email?.trim() ?? '';
     const emailVerified = lead?.emailVerified ?? false;
 
+    // If email is already verified, always enforce the details step —
+    // even after hasResolved, so the Back button can't strand the user on the OTP screen.
+    if (emailVerified && !isTransitioningToDetails && step !== 'details') {
+      if (!hasResolved) {
+        setEmailMode(initialMode);
+        setEmail(storedEmail);
+        setHasResolved(true);
+      }
+      setDetailsSection('profile');
+      setStep('details');
+      setDetailsNotice(null);
+      return;
+    }
+
     if (!hasResolved) {
       setEmailMode(initialMode);
       setEmail(storedEmail);
-
-      if (emailVerified && !isTransitioningToDetails) {
-        setDetailsSection('profile');
-        setStep('details');
-        setDetailsNotice(null);
-      } else if (storedEmail) {
-        setStep('email-otp');
-      } else {
-        setStep('email');
-      }
-
+      setStep(storedEmail ? 'email-otp' : 'email');
       setHasResolved(true);
     }
-  }, [isTransitioningToDetails, loading, session, router]);
+  }, [isTransitioningToDetails, loading, session, router, step]);
 
   function handleEmailNext(confirmedEmail: string, mode: EmailMode, otpRequest: SendEmailOtpResponse) {
     setEmail(confirmedEmail);
@@ -212,7 +216,7 @@ export function OnboardingFlow() {
           initialProfile={portalSession.profile}
           activeSection={detailsSection}
           onSectionChange={setDetailsSection}
-          onBack={() => setStep('email-otp')}
+          onBack={() => setStep('email')}
           noticeMessage={detailsNotice}
           onSaved={async () => {
             await refresh();

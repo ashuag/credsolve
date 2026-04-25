@@ -293,14 +293,12 @@ export default function LoanSelectionPage() {
 
   return (
     <CustomerJourneyGuard>
-      <div className="min-h-screen bg-[linear-gradient(135deg,#f8faff,#e6f0ff)] flex items-center justify-center p-4 sm:p-6 md:p-8">
-        <LoanLandingShell
-          journeyPanel={journeyPanel}
-          leftTitle={<>Loan <span className="text-[#60a5fa]">Summary</span></>}
-          leftDescription="Review your final loan calculations. We believe in 100% transparency with zero hidden charges."
-          leftInfographic={leftInfographic}
-        />
-      </div>
+      <LoanLandingShell
+        journeyPanel={journeyPanel}
+        leftTitle={<>Loan <span className="text-[#60a5fa]">Summary</span></>}
+        leftDescription="Review your final loan calculations. We believe in 100% transparency with zero hidden charges."
+        leftInfographic={leftInfographic}
+      />
     </CustomerJourneyGuard>
   );
 }

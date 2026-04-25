@@ -4,8 +4,6 @@ import type { UploadedFileLike } from '../../../../common/types/uploaded-file';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 
-const PAN_RE = /^[A-Z]{5}[0-9]{4}[A-Z]$/i;
-const AADHAAR_RE = /^\d{12}$/;
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 const DOC_SPECS = [
@@ -15,17 +13,6 @@ const DOC_SPECS = [
 ] as const;
 
 type DocField = (typeof DOC_SPECS)[number]['field'];
-
-function firstBodyValue(body: Record<string, unknown>, key: string): string | undefined {
-  const raw = body[key];
-  if (typeof raw === 'string') {
-    return raw;
-  }
-  if (Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'string') {
-    return raw[0];
-  }
-  return undefined;
-}
 
 function assertUpload(file: UploadedFileLike | undefined, label: string): void {
   if (!file?.buffer?.length) {
@@ -58,16 +45,6 @@ export class SaveKycDocumentsUseCase {
       throw new UnauthorizedException('Customer not found.');
     }
 
-    const panNumberRaw = firstBodyValue(body, 'panNumber')?.trim().toUpperCase();
-    const aadhaarNumberRaw = firstBodyValue(body, 'aadhaarNumber')?.replace(/\D/g, '') ?? '';
-
-    if (!panNumberRaw || !PAN_RE.test(panNumberRaw)) {
-      throw new BadRequestException('Please enter a valid PAN number.');
-    }
-    if (!AADHAAR_RE.test(aadhaarNumberRaw)) {
-      throw new BadRequestException('Please enter a valid 12-digit Aadhaar number.');
-    }
-
     const byField = new Map<string, UploadedFileLike>();
     for (const file of files) {
       byField.set(file.fieldname, file);
@@ -87,16 +64,6 @@ export class SaveKycDocumentsUseCase {
         customerKyc = await tx.customerKyc.create({
           data: {
             customerId: customer.id,
-            panNumber: panNumberRaw,
-            panVerifiedAt: new Date(),
-          },
-        });
-      } else {
-        await tx.customerKyc.update({
-          where: { id: customerKyc.id },
-          data: {
-            panNumber: panNumberRaw,
-            panVerifiedAt: new Date(),
           },
         });
       }
@@ -166,11 +133,6 @@ export class SaveKycDocumentsUseCase {
       if (!lead) {
         throw new NotFoundException('No active lead found.');
       }
-      await tx.leadDetail.upsert({
-        where: { leadId: lead.id },
-        create: { leadId: lead.id, panNumber: panNumberRaw },
-        update: { panNumber: panNumberRaw },
-      });
     });
 
     return { success: true };
