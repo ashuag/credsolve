@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
-import { Spinner } from '@/components/ui/spinner';
-import { fetchLoanEligibility } from '@/lib/api/eligibility';
-import { ApiRequestError } from '@/lib/api/client';
+import {useRouter} from 'next/navigation';
+import {useEffect, useState} from 'react';
+import {CustomerJourneyGuard} from '@/components/auth/customer-journey-guard';
+import {Spinner} from '@/components/ui/spinner';
+import {fetchLoanEligibility} from '@/lib/api/eligibility';
+import {ApiRequestError} from '@/lib/api/client';
+import {LoanLandingShell} from '@/components/home/loan-landing-shell';
 
 const SUMMARY_ITEMS = [
   {
@@ -26,7 +27,7 @@ const SUMMARY_ITEMS = [
   }
 ] as const;
 
-const BENEFIT_TAGS = ['100% digital', 'Secure verification', 'Continue in minutes'] as const;
+const BENEFIT_TAGS = ['100% Digital', 'Secure verification', 'Continue in minutes'] as const;
 
 function formatInr(amount: number) {
   return new Intl.NumberFormat('en-IN', {
@@ -154,8 +155,6 @@ function ErrorState({ error }: { error: string }) {
     </section>
   );
 }
-
-import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 
 export default function PreApprovedLoanPage() {
   const router = useRouter();

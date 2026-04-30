@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useSearchParams } from 'next/navigation';
-import { buildHrefWithSearch } from '@/lib/navigation';
-import { useState } from 'react';
+import {useSearchParams} from 'next/navigation';
+import {buildHrefWithSearch} from '@/lib/navigation';
+import {useState} from 'react';
 
 const NAV_LINKS = [
   { label: 'Home', href: '/', active: true },
@@ -48,12 +48,12 @@ export function LandingNavbar() {
           {/* Logo */}
           <Link href="/" className="shrink-0">
             <Image
-              src="/images/moneycash-logo.jpeg"
+              src="/images/moneycash-logo.png"
               alt="MoneyCash Instant Digital Loans"
               width={536}
               height={136}
               priority
-              className="h-auto w-[clamp(130px,16vw,168px)] rounded-xl"
+              className="h-[36px] sm:h-[44px] w-auto object-contain"
             />
           </Link>
 

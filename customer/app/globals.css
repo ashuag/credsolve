@@ -436,10 +436,10 @@
 /* ── Design System Tokens ── */
 .hero-mesh {
   background:
-    radial-gradient(ellipse 80% 60% at 80% 0%, rgba(20, 150, 243, 0.22) 0%, transparent 70%),
-    radial-gradient(ellipse 60% 50% at 0% 100%, rgba(255, 197, 25, 0.14) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 60% at 50% 50%, rgba(28, 52, 125, 0.25) 0%, transparent 70%),
-    linear-gradient(160deg, #080f22 0%, #0c1830 50%, #0f1d40 100%);
+    radial-gradient(ellipse 80% 60% at 80% 0%, rgba(255, 255, 255, 0.15) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 50% at 0% 100%, rgba(255, 197, 25, 0.2) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 50% 50%, rgba(20, 150, 243, 0.4) 0%, transparent 70%),
+    linear-gradient(160deg, #1fa2ff 0%, #1496f3 50%, #0c84d9 100%);
 }
 
 .stats-mesh {

@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { AlertBanner } from '@/components/ui/alert-banner';
-import { useCustomerSession } from '@/components/providers/customer-session-provider';
-import { saveProfessionalDetails } from '@/lib/api/lead';
-import { cn } from '@/lib/cn';
+import {useEffect, useState} from 'react';
+import {useRouter} from 'next/navigation';
+import {AlertBanner} from '@/components/ui/alert-banner';
+import {useCustomerSession} from '@/components/providers/customer-session-provider';
+import {saveProfessionalDetails} from '@/lib/api/lead';
+import {cn} from '@/lib/cn';
 import {
   type CustomerOccupationValue,
   usesAnnualFinancialMetric,
@@ -13,12 +13,12 @@ import {
 } from '@/lib/customer-details';
 import {
   FORM_FIELD_CLASS,
-  FORM_FIELD_NORMAL_CLASS,
   FORM_FIELD_ERROR_CLASS,
-  FORM_LABEL_CLASS,
+  FORM_FIELD_NORMAL_CLASS,
   FORM_INPUT_CLASS,
+  FORM_LABEL_CLASS,
 } from '@/lib/form-styles';
-import { useCustomerDetailLookups } from '@/lib/use-customer-detail-lookups';
+import {useCustomerDetailLookups} from '@/lib/use-customer-detail-lookups';
 
 type FieldErrors = {
   occupation?: string;
@@ -155,7 +155,7 @@ export function ProfessionalDetailsForm() {
       {usesSalary && (
         <label className={cn(FORM_FIELD_CLASS, fieldErrors.monthlyIncome ? FORM_FIELD_ERROR_CLASS : FORM_FIELD_NORMAL_CLASS, 'group')}>
           <span className={FORM_LABEL_CLASS}>
-            {occupation === 'salaried' ? 'Monthly salary' : 'Monthly income'}
+            {occupation === 'salaried' ? 'Net Monthly salary' : 'Monthly income'}
           </span>
           <input
             className={FORM_INPUT_CLASS}

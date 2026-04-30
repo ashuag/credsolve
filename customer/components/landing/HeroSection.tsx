@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { buildHrefWithSearch } from '@/lib/navigation';
-import { useEffect, useRef, useState } from 'react';
+import {useSearchParams} from 'next/navigation';
+import {buildHrefWithSearch} from '@/lib/navigation';
+import {useEffect, useRef, useState} from 'react';
 
 function CountUp({
   to,
@@ -54,13 +54,17 @@ export function HeroSection() {
   const applyHref = buildHrefWithSearch('/apply-for-loan', searchParams);
 
   return (
-    <section className="relative overflow-hidden hero-mesh">
+    <section className="relative overflow-hidden bg-white">
+      {/* Light sophisticated top glow matching logo color */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[120vw] h-[800px] bg-[radial-gradient(ellipse_at_top,_rgba(20,150,243,0.08)_0%,_transparent_70%)] pointer-events-none" />
+      <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-[#1496f3]/5 to-transparent pointer-events-none" />
+      
       {/* Grid mesh overlay */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.045]"
+        className="pointer-events-none absolute inset-0 opacity-[0.04]"
         style={{
           backgroundImage:
-            'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
+            'linear-gradient(rgba(20,150,243,1) 1px, transparent 1px), linear-gradient(90deg, rgba(20,150,243,1) 1px, transparent 1px)',
           backgroundSize: '64px 64px',
         }}
       />
@@ -88,44 +92,50 @@ export function HeroSection() {
             {/* Live badge */}
             <div className="flex items-center gap-3 animate-fade-in-up">
               <div className="relative flex h-3 w-3">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-                <span className="relative inline-flex h-3 w-3 rounded-full bg-green-500" />
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
+                <span className="relative inline-flex h-3 w-3 rounded-full bg-green-600" />
               </div>
-              <span className="text-[0.7rem] font-[900] uppercase tracking-[0.22em] text-white/55">
+              <span className="text-[0.7rem] font-[900] uppercase tracking-[0.22em] text-[#64748b]">
                 RBI Registered NBFC &bull; Trusted by 50,000+ Customers
               </span>
             </div>
 
             {/* Headline */}
-            <div className="animate-fade-in-up flex flex-col gap-4" style={{ animationDelay: '80ms' }}>
-              <h1 className="text-[clamp(2.6rem,5.5vw,4.2rem)] font-[900] leading-[1.08] tracking-tight text-white">
-                Fast Loans up to{' '}
-                <span className="text-grad-gold">₹50,000</span>
-                <br />
-                <span className="text-white/90">Direct to Your Bank.</span>
+            <div className="animate-fade-in-up flex flex-col gap-5" style={{ animationDelay: '80ms' }}>
+              <h1 className="flex flex-col font-[900] tracking-tight">
+                <span className="text-[clamp(1.8rem,3.5vw,2.5rem)] leading-[1.2] text-[#0f172a] drop-shadow-sm">
+                  Fast Loans up to
+                </span>
+                <span className="text-[clamp(4.5rem,9vw,7.5rem)] leading-[1.02] text-transparent bg-clip-text bg-gradient-to-br from-[#1fa2ff] to-[#1496f3] drop-shadow-[0_0_24px_rgba(20,150,243,0.15)] my-1">
+                  ₹50,000
+                </span>
+                <span className="text-[clamp(1.8rem,3.5vw,2.5rem)] leading-[1.2] text-[#0f172a] drop-shadow-sm">
+                  Direct to Your Bank.
+                </span>
               </h1>
-              <p className="max-w-lg text-lg font-medium leading-relaxed text-white/50">
+              <p className="max-w-xl text-[1.1rem] md:text-[1.2rem] font-[500] leading-relaxed text-[#475569]">
                 100% digital &bull; zero paperwork &bull; instant disbursal.
-                Get approved in <span className="font-[800] text-white/80">2 minutes</span> and money in your account in{' '}
-                <span className="font-[800] text-white/80">10 minutes</span>.
+                <br className="hidden sm:block" />
+                Get approved in <span className="font-[800] text-[#0f172a]">2 minutes</span> and money in your account in{' '}
+                <span className="font-[800] text-[#0f172a]">10 minutes</span>.
               </p>
             </div>
 
             {/* Trust chips */}
-            <div className="flex animate-fade-in-up flex-wrap gap-2" style={{ animationDelay: '160ms' }}>
+            <div className="flex animate-fade-in-up flex-wrap gap-2.5" style={{ animationDelay: '160ms' }}>
               {[
                 { icon: (
-                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 shrink-0 text-green-400" fill="currentColor">
+                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 shrink-0 text-emerald-500" fill="currentColor">
                     <path d="M13.854 3.646a.5.5 0 010 .708l-7 7a.5.5 0 01-.708 0l-3.5-3.5a.5.5 0 11.708-.708L6.5 10.293l6.646-6.647a.5.5 0 01.708 0z"/>
                   </svg>
                 ), label: 'No Hidden Charges' },
                 { icon: (
-                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-[#ffc519]" fill="currentColor">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-[#f59e0b]" fill="currentColor">
                     <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
                   </svg>
                 ), label: 'Instant Approval' },
                 { icon: (
-                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-[#1496f3]" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-[#1496f3]" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <rect x="5" y="11" width="14" height="11" rx="2" strokeLinecap="round"/>
                     <path d="M8 11V7a4 4 0 018 0v4" strokeLinecap="round"/>
                   </svg>
@@ -133,7 +143,7 @@ export function HeroSection() {
               ].map((chip) => (
                 <div
                   key={chip.label}
-                  className="flex items-center gap-2 rounded-full border border-white/10 bg-white/6 px-4 py-2 text-xs font-[700] text-white/65 glass"
+                  className="flex items-center gap-2 rounded-full border border-[#1496f3]/15 bg-white px-4 py-2.5 text-[0.78rem] font-[800] tracking-wide text-[#334155] shadow-[0_4px_16px_rgba(20,150,243,0.06)] transition-all duration-300 hover:bg-[#f8fafc] hover:border-[#1496f3]/30 hover:-translate-y-0.5"
                 >
                   {chip.icon}
                   {chip.label}
@@ -143,37 +153,27 @@ export function HeroSection() {
 
             {/* CTAs */}
             <div
-              className="flex animate-fade-in-up flex-col gap-4 sm:flex-row sm:items-center"
+              className="flex animate-fade-in-up flex-col gap-4 sm:flex-row sm:items-center mt-2"
               style={{ animationDelay: '240ms' }}
             >
               <Link
                 href={applyHref}
-                className="group relative inline-flex items-center justify-center gap-3 overflow-hidden rounded-2xl bg-[#ffc519] px-10 py-5 text-[1.05rem] font-[900] text-[#0a1628] glow-gold"
+                className="group relative inline-flex items-center justify-center gap-3 overflow-hidden rounded-full bg-gradient-to-r from-[#ffc519] to-[#ffaa00] px-12 py-5 text-[1.1rem] font-[900] text-[#0a1628] shadow-[0_8px_32px_rgba(255,197,25,0.35)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_48px_rgba(255,197,25,0.5)] hover:from-[#ffd040] hover:to-[#ffbb00]"
               >
-                Apply Now — It&apos;s Free
-                <svg viewBox="0 0 20 20" className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-1" fill="currentColor">
+                Apply Now
+                <svg viewBox="0 0 20 20" className="h-5 w-5 transition-transform duration-300 group-hover:translate-x-1.5" fill="currentColor">
                   <path d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" />
                 </svg>
                 {/* Sheen effect */}
-                <span className="absolute inset-0 overflow-hidden rounded-2xl">
-                  <span className="absolute -left-full top-0 h-full w-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-sheen" />
+                <span className="absolute inset-0 overflow-hidden rounded-full">
+                  <span className="absolute -left-[150%] top-0 h-full w-[150%] -skew-x-12 bg-gradient-to-r from-transparent via-white/40 to-transparent transition-all duration-700 ease-in-out group-hover:left-[150%]" />
                 </span>
-              </Link>
-
-              <Link
-                href={applyHref}
-                className="inline-flex items-center gap-2.5 rounded-2xl border border-white/14 bg-white/5 px-8 py-5 text-base font-[700] text-white/75 backdrop-blur-sm transition-all hover:border-white/28 hover:bg-white/10"
-              >
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                Check My Eligibility
               </Link>
             </div>
 
             {/* Animated stats */}
             <div
-              className="animate-fade-in-up flex flex-wrap gap-x-10 gap-y-5 border-t border-white/8 pt-8"
+              className="animate-fade-in-up grid grid-cols-2 gap-x-6 gap-y-5 border-t border-slate-200 pt-8 min-[560px]:grid-cols-4"
               style={{ animationDelay: '320ms' }}
             >
               {[
@@ -182,11 +182,11 @@ export function HeroSection() {
                 { label: 'Approval Time', to: 2, prefix: '', suffix: ' Min' },
                 { label: 'Approval Rate', to: 98, prefix: '', suffix: '%' },
               ].map((s, i) => (
-                <div key={i} className="flex flex-col gap-1">
-                  <div className="text-[1.9rem] font-[900] tabular-nums text-white">
+                <div key={i} className="min-w-0 flex flex-col gap-1">
+                  <div className="text-[clamp(1.7rem,3vw,1.9rem)] font-[900] tabular-nums text-[#0f172a]">
                     <CountUp to={s.to} prefix={s.prefix} suffix={s.suffix} />
                   </div>
-                  <div className="text-[0.65rem] font-[800] uppercase tracking-[0.2em] text-white/30">
+                  <div className="text-[0.62rem] font-[800] uppercase tracking-[0.18em] text-[#64748b]">
                     {s.label}
                   </div>
                 </div>
@@ -207,6 +207,9 @@ export function HeroSection() {
                 style={{ animationDuration: '5s' }}
               >
                 <defs>
+                  <clipPath id="screenClip">
+                    <rect x="14" y="14" width="272" height="552" rx="38" />
+                  </clipPath>
                   <linearGradient id="phoneGrad" x1="0" y1="0" x2="1" y2="1">
                     <stop offset="0%" stopColor="#172c71" />
                     <stop offset="100%" stopColor="#0c1a4a" />
@@ -285,82 +288,84 @@ export function HeroSection() {
 
                 {/* Collect button */}
                 <rect x="44" y="392" width="212" height="52" rx="26" fill="url(#btnGrad)" />
-                <text x="150" y="423" textAnchor="middle" fontSize="15" fontWeight="900" fill="#0a1628" fontFamily="system-ui, sans-serif">Collect Now  →</text>
+                <text x="150" y="423" textAnchor="middle" fontSize="15" fontWeight="900" fill="#0a1628" fontFamily="system-ui, sans-serif">Continue  →</text>
 
-                {/* Bottom nav */}
-                <rect x="14" y="460" width="272" height="106" rx="0" fill="rgba(14,29,74,0.7)" />
-                <line x1="14" y1="460" x2="286" y2="460" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+                {/* Bottom nav (Clipped to prevent sharp corners poking out) */}
+                <g clipPath="url(#screenClip)">
+                  <rect x="14" y="460" width="272" height="106" rx="0" fill="rgba(14,29,74,0.7)" />
+                  <line x1="14" y1="460" x2="286" y2="460" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
 
-                {/* Nav icons */}
-                <circle cx="68" cy="496" r="18" fill="rgba(255,255,255,0.05)" />
-                <path d="M61 496 h14 M68 489 v14" stroke="rgba(255,255,255,0.25)" strokeWidth="1.8" strokeLinecap="round" />
-                <text x="68" y="522" textAnchor="middle" fontSize="8" fill="rgba(255,255,255,0.2)" fontFamily="system-ui">Home</text>
+                  {/* Nav icons */}
+                  <circle cx="68" cy="496" r="18" fill="rgba(255,255,255,0.05)" />
+                  <path d="M61 496 h14 M68 489 v14" stroke="rgba(255,255,255,0.25)" strokeWidth="1.8" strokeLinecap="round" />
+                  <text x="68" y="522" textAnchor="middle" fontSize="8" fill="rgba(255,255,255,0.2)" fontFamily="system-ui">Home</text>
 
-                <circle cx="150" cy="496" r="18" fill="rgba(20,150,243,0.25)" />
-                <path d="M146 492 h8 M146 496 h8 M146 500 h8" stroke="#1496f3" strokeWidth="1.8" strokeLinecap="round" />
-                <text x="150" y="522" textAnchor="middle" fontSize="8" fill="#1496f3" fontFamily="system-ui">Loans</text>
+                  <circle cx="150" cy="496" r="18" fill="rgba(20,150,243,0.25)" />
+                  <path d="M146 492 h8 M146 496 h8 M146 500 h8" stroke="#1496f3" strokeWidth="1.8" strokeLinecap="round" />
+                  <text x="150" y="522" textAnchor="middle" fontSize="8" fill="#1496f3" fontFamily="system-ui">Loans</text>
 
-                <circle cx="232" cy="496" r="18" fill="rgba(255,255,255,0.05)" />
-                <circle cx="232" cy="490" r="6" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" fill="none" />
-                <path d="M222 502 q10-6 20 0" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" fill="none" />
-                <text x="232" y="522" textAnchor="middle" fontSize="8" fill="rgba(255,255,255,0.2)" fontFamily="system-ui">Account</text>
+                  <circle cx="232" cy="496" r="18" fill="rgba(255,255,255,0.05)" />
+                  <circle cx="232" cy="490" r="6" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" fill="none" />
+                  <path d="M222 502 q10-6 20 0" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" fill="none" />
+                  <text x="232" y="522" textAnchor="middle" fontSize="8" fill="rgba(255,255,255,0.2)" fontFamily="system-ui">Account</text>
 
-                {/* Home indicator */}
-                <rect x="118" y="550" width="64" height="5" rx="2.5" fill="rgba(255,255,255,0.25)" />
+                  {/* Home indicator */}
+                  <rect x="118" y="550" width="64" height="5" rx="2.5" fill="rgba(255,255,255,0.25)" />
+                </g>
               </svg>
 
               {/* Floating badge: ₹50K Credited */}
-              <div
-                className="absolute -top-6 -right-4 sm:-right-10 animate-float-alt glass rounded-2xl p-4 shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-500/20">
-                    <svg viewBox="0 0 20 20" className="h-5 w-5 text-green-400" fill="currentColor">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="text-[0.58rem] font-[900] uppercase tracking-[0.15em] text-white/40">Credited</div>
-                    <div className="text-base font-[900] text-white">₹50,000</div>
-                  </div>
-                </div>
-              </div>
+              {/*<div*/}
+              {/*  className="absolute -top-6 -right-4 sm:-right-10 animate-float-alt glass rounded-2xl p-4 shadow-[0_20px_60px_rgba(0,0,0,0.5)]"*/}
+              {/*>*/}
+                {/*<div className="flex items-center gap-3">*/}
+                {/*  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-500/20">*/}
+                {/*    <svg viewBox="0 0 20 20" className="h-5 w-5 text-green-400" fill="currentColor">*/}
+                {/*      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />*/}
+                {/*    </svg>*/}
+                {/*  </div>*/}
+                {/*  <div>*/}
+                {/*    <div className="text-[0.58rem] font-[900] uppercase tracking-[0.15em] text-white/40">Credited</div>*/}
+                {/*    <div className="text-base font-[900] text-white">₹50,000</div>*/}
+                {/*  </div>*/}
+                {/*</div>*/}
+              {/*</div>*/}
 
               {/* Floating badge: Speed */}
-              <div
-                className="absolute -bottom-4 -left-4 sm:-left-10 animate-float glass rounded-2xl p-4 shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
-                style={{ animationDelay: '2s' }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ffc519]/15">
-                    <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#ffc519]" fill="currentColor">
-                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="text-[0.58rem] font-[900] uppercase tracking-[0.15em] text-white/40">Approved in</div>
-                    <div className="text-base font-[900] text-[#ffc519]">47 Seconds</div>
-                  </div>
-                </div>
-              </div>
+              {/*<div*/}
+              {/*  className="absolute -bottom-4 -left-4 sm:-left-10 animate-float glass rounded-2xl p-4 shadow-[0_20px_60px_rgba(0,0,0,0.5)]"*/}
+              {/*  style={{ animationDelay: '2s' }}*/}
+              {/*>*/}
+                {/*<div className="flex items-center gap-3">*/}
+                {/*  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ffc519]/15">*/}
+                {/*    <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#ffc519]" fill="currentColor">*/}
+                {/*      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />*/}
+                {/*    </svg>*/}
+                {/*  </div>*/}
+                {/*  <div>*/}
+                {/*    <div className="text-[0.58rem] font-[900] uppercase tracking-[0.15em] text-white/40">Approved in</div>*/}
+                {/*    <div className="text-base font-[900] text-[#ffc519]">47 Seconds</div>*/}
+                {/*  </div>*/}
+                {/*</div>*/}
+              {/*</div>*/}
 
               {/* Floating badge: Security (desktop only) */}
-              <div
-                className="absolute top-[38%] -right-4 hidden animate-float-slow xl:block glass rounded-2xl px-4 py-3 shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
-                style={{ animationDelay: '1s' }}
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#1496f3]/20">
-                    <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#1496f3]" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="text-[0.58rem] font-[900] uppercase tracking-[0.12em] text-white/38">Security</div>
-                    <div className="text-sm font-[900] text-white">256-bit SSL</div>
-                  </div>
-                </div>
-              </div>
+              {/*<div*/}
+              {/*  className="absolute top-[38%] -right-4 hidden animate-float-slow xl:block glass rounded-2xl px-4 py-3 shadow-[0_20px_60px_rgba(0,0,0,0.5)]"*/}
+              {/*  style={{ animationDelay: '1s' }}*/}
+              {/*>*/}
+                {/*<div className="flex items-center gap-2.5">*/}
+                {/*  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#1496f3]/20">*/}
+                {/*    <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#1496f3]" fill="none" stroke="currentColor" strokeWidth="2.5">*/}
+                {/*      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round" />*/}
+                {/*    </svg>*/}
+                {/*  </div>*/}
+                {/*  <div>*/}
+                {/*    <div className="text-[0.58rem] font-[900] uppercase tracking-[0.12em] text-white/38">Security</div>*/}
+                {/*    <div className="text-sm font-[900] text-white">256-bit SSL</div>*/}
+                {/*  </div>*/}
+                {/*</div>*/}
+              {/*</div>*/}
 
               {/* Glow behind phone */}
               <div className="pointer-events-none absolute inset-0 -z-10 scale-75 rounded-full bg-[#1496f3]/20 blur-[80px]" />
@@ -369,15 +374,15 @@ export function HeroSection() {
         </div>
 
         {/* Trust strip */}
-        <div className="border-t border-white/6 py-5">
+        <div className="border-t border-slate-200 py-5">
           <div className="flex flex-wrap items-center justify-center gap-6 md:gap-12">
             {[
               { label: 'RBI Registered NBFC', path: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z' },
               { label: 'Bank-Grade Security', path: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
-              { label: '256-bit Encryption', path: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z' },
+              { label: '100% Paperless Process', path: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
               { label: 'Trusted by 50,000+', path: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
             ].map((item, i) => (
-              <div key={i} className="flex items-center gap-2.5 text-white/35">
+              <div key={i} className="flex items-center gap-2.5 text-[#64748b]">
                 <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d={item.path} strokeLinecap="round" strokeLinejoin="round" />
                 </svg>

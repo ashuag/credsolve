@@ -63,25 +63,25 @@ export function BrandHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-20 border-b border-b-[rgba(18,36,79,0.09)] bg-[rgba(255,253,248,0.88)] backdrop-blur-[18px] shadow-[0_2px_24px_rgba(23,44,113,0.06)]">
-      <div className="flex items-center justify-between gap-4 py-[10px] mx-auto max-w-[min(1180px,calc(100%-24px))]">
-        <Link href="/" className="inline-flex items-center shrink-0" aria-label="MoneyCash home">
+    <header className="sticky top-0 z-20 border-b border-b-[rgba(18,36,79,0.09)] bg-[rgba(255,253,248,0.95)] backdrop-blur-[24px] shadow-[0_4px_32px_rgba(23,44,113,0.08)]">
+      <div className="flex items-center justify-between gap-6 py-3 mx-auto max-w-[min(1280px,calc(100%-32px))]">
+        <Link href="/" className="inline-flex items-center shrink-0 transition-transform duration-200 hover:scale-[1.02]" aria-label="MoneyCash home">
           <Image
             src="/images/moneycash-logo.jpeg"
             alt="MoneyCash Instant Digital Loans"
             width={536}
             height={136}
-            sizes="(max-width: 720px) 40vw, 180px"
+            sizes="(max-width: 720px) 45vw, 200px"
             priority
-            className="w-[clamp(130px,22vw,180px)] h-auto block rounded-[10px]"
+            className="w-[clamp(140px,25vw,190px)] h-auto block rounded-[10px]"
           />
         </Link>
 
-        <nav className="hidden sm:flex items-center gap-2" aria-label="Primary">
+        <nav className="hidden sm:flex items-center gap-4" aria-label="Primary">
           {showApplyForLoan && (
             <Link
               href={applyHref}
-              className="inline-flex items-center justify-center min-h-[40px] px-[18px] py-[9px] rounded-full border border-[rgba(18,36,79,0.12)] bg-[rgba(255,255,255,0.82)] font-extrabold text-[0.94rem] text-brand-navy shadow-[0_8px_20px_rgba(23,44,113,0.08)] transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-[0_12px_28px_rgba(23,44,113,0.14)]"
+              className="inline-flex items-center justify-center min-h-[42px] px-6 py-2.5 rounded-full border border-[rgba(18,36,79,0.15)] bg-white font-extrabold text-[0.96rem] text-brand-navy shadow-[0_8px_24px_rgba(23,44,113,0.12)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(23,44,113,0.2)]"
             >
               Apply for a loan
             </Link>
@@ -95,7 +95,7 @@ export function BrandHeader() {
                 aria-expanded={menuOpen}
                 aria-haspopup="menu"
                 aria-label={greetingLabel}
-                className="inline-flex items-center justify-center gap-1.5 min-h-[40px] min-w-0 max-w-[min(280px,calc(100vw-12rem))] pl-[20px] pr-[16px] py-[9px] rounded-full font-extrabold text-[0.94rem] text-[#fff8df] bg-[linear-gradient(135deg,#1c347d_0%,#12244f_100%)] shadow-[0_8px_24px_rgba(23,44,113,0.22)] transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-[0_12px_28px_rgba(23,44,113,0.3)]"
+                className="inline-flex items-center justify-center gap-2 min-h-[42px] min-w-0 max-w-[min(320px,calc(100vw-12rem))] pl-6 pr-5 py-2.5 rounded-full font-extrabold text-[0.96rem] text-[#fff8df] bg-[linear-gradient(135deg,#1c347d_0%,#12244f_100%)] shadow-[0_12px_28px_rgba(23,44,113,0.25)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(23,44,113,0.35)]"
               >
                 <span className="truncate">{greetingLabel}</span>
                 <svg
@@ -119,7 +119,7 @@ export function BrandHeader() {
                   <Link
                     href={accountHref}
                     role="menuitem"
-                    className="block px-4 py-2.5 text-[0.94rem] font-bold text-brand-navy hover:bg-[rgba(20,150,243,0.08)]"
+                    className="block px-5 py-3 text-base font-bold text-brand-navy hover:bg-[rgba(20,150,243,0.08)] transition-colors duration-150"
                     onClick={closeMenu}
                   >
                     My account
@@ -127,7 +127,7 @@ export function BrandHeader() {
                   <button
                     type="button"
                     role="menuitem"
-                    className="w-full text-left px-4 py-2.5 text-[0.94rem] font-bold text-brand-navy hover:bg-[rgba(20,150,243,0.08)]"
+                    className="w-full text-left px-5 py-3 text-base font-bold text-brand-navy hover:bg-[rgba(20,150,243,0.08)] transition-colors duration-150"
                     onClick={() => void handleLogout()}
                   >
                     Log out
@@ -138,7 +138,7 @@ export function BrandHeader() {
           ) : (
             <Link
               href={loginHref}
-              className="inline-flex items-center justify-center min-h-[40px] px-[22px] py-[9px] rounded-full font-extrabold text-[0.94rem] text-[#fff8df] bg-[linear-gradient(135deg,#1c347d_0%,#12244f_100%)] shadow-[0_8px_24px_rgba(23,44,113,0.22)] transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-[0_12px_28px_rgba(23,44,113,0.3)]"
+              className="inline-flex items-center justify-center min-h-[42px] px-8 py-2.5 rounded-full font-extrabold text-[0.96rem] text-[#fff8df] bg-[linear-gradient(135deg,#1c347d_0%,#12244f_100%)] shadow-[0_12px_28px_rgba(23,44,113,0.25)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(23,44,113,0.35)]"
             >
               Log in
             </Link>
