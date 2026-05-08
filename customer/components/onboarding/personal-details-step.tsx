@@ -20,6 +20,7 @@ import {
 import {formatDateDisplay, formatDateIso, getAge, parseDobDisplay, parseIsoDate,} from '@/lib/date-utils';
 import {useCustomerDetailLookups} from '@/lib/use-customer-detail-lookups';
 import {PINCODE_REGEX} from '@/lib/validators';
+import {useJourneyProgressOptional} from '@/components/journey/journey-progress-context';
 
 const SECTION_CLASS =
   'grid gap-3 rounded-[24px] border border-[rgba(18,36,79,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,249,255,0.94))] p-4 shadow-[0_14px_28px_rgba(23,44,113,0.08)] sm:p-5';
@@ -39,6 +40,37 @@ type Fields = {
   annualProfit: string;
   creditConsentAccepted: boolean;
 };
+
+function computeProfileCompletionRatio(fields: Fields, dobDisplay: string): number {
+  const checks: boolean[] = [];
+  checks.push(fields.fullName.trim().length >= 2);
+  checks.push(Boolean(fields.gender));
+  checks.push(Boolean(dobDisplay.trim() && fields.dob));
+  checks.push(Boolean(fields.occupation));
+  const occ = fields.occupation;
+  if (occ && usesMonthlyIncomeMetric(occ)) {
+    checks.push(Boolean(fields.monthlyIncome && Number(fields.monthlyIncome) > 0));
+  }
+  if (occ && usesAnnualFinancialMetric(occ)) {
+    checks.push(Boolean(fields.annualTurnover && Number(fields.annualTurnover) > 0));
+    checks.push(Boolean(fields.annualProfit && Number(fields.annualProfit) > 0));
+  }
+  return checks.length === 0 ? 0 : checks.filter(Boolean).length / checks.length;
+}
+
+function computeFinancialCompletionRatio(fields: Fields): number {
+  const core = [
+    fields.addressLine1.trim().length >= 5,
+    Boolean(fields.currentCity.trim()),
+    PINCODE_REGEX.test(fields.pincode),
+    fields.creditConsentAccepted,
+  ];
+  let score = core.filter(Boolean).length / core.length;
+  if (fields.addressLine2.trim()) {
+    score = Math.min(1, score + 0.05);
+  }
+  return score;
+}
 
 type FieldError = Partial<Record<keyof Fields, string>>;
 export type PersonalDetailsSection = 'profile' | 'financial';
@@ -116,6 +148,18 @@ export function PersonalDetailsStep({
   const isSelfEmployed = usesAnnualFinancialMetric(fields.occupation || undefined);
   const usesMonthlyIncome = usesMonthlyIncomeMetric(fields.occupation || undefined);
   const draftStorageKey = `${DETAILS_DRAFT_KEY_PREFIX}${leadUuid}`;
+  const setCompletion01 = useJourneyProgressOptional()?.setCompletion01;
+
+  useEffect(() => {
+    if (!setCompletion01) return;
+    if (activeSection === 'profile') {
+      const r = computeProfileCompletionRatio(fields, dobDisplay);
+      setCompletion01(0.15 + r * 0.36);
+    } else {
+      const r = computeFinancialCompletionRatio(fields);
+      setCompletion01(0.52 + r * 0.47);
+    }
+  }, [fields, dobDisplay, activeSection, setCompletion01]);
 
   useEffect(() => {
     try {
@@ -646,7 +690,7 @@ export function PersonalDetailsStep({
 
 function inputClass(hasError: boolean): string {
   return cn(
-    'w-full h-[48px] rounded-xl border px-3',
+    'mc-autofill-fix w-full h-[48px] rounded-xl border px-3',
     'bg-white text-slate-900 text-[0.95rem] font-semibold outline-none transition-all',
     'placeholder:text-slate-400 placeholder:font-normal',
     'focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 shadow-sm',

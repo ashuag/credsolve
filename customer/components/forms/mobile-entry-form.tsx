@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import { sendCustomerOtp, type SendOtpResponse } from '@/lib/api/auth';
 import { isValidCustomerMobile, normalizeCustomerMobile } from '@/lib/mobile';
@@ -11,6 +12,7 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const hasActiveMobileBorder = !error && (isFocused || mobileNumber.length > 0);
   const mobileFieldClassName = `group/field relative isolate overflow-hidden grid items-center min-h-[56px] rounded-[16px] border bg-white transition-all duration-[220ms] ${error ? 'border-[rgba(193,57,43,0.42)] shadow-[0_0_0_3px_rgba(193,57,43,0.08)]' : hasActiveMobileBorder ? 'border-[rgba(20,150,243,0.46)] shadow-[0_22px_42px_rgba(23,44,113,0.12),0_0_0_6px_rgba(20,150,243,0.08)]' : 'border-[rgba(18,36,79,0.16)] shadow-[0_10px_18px_rgba(23,44,113,0.04)]'} ${isFocused ? 'focus-within:-translate-y-0.5 focus-within:scale-[1.01] focus-within:animate-mobile-border-pulse' : ''}`;
@@ -22,6 +24,11 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
 
     if (!isValidCustomerMobile(normalizedMobile)) {
       setError(MOBILE_ERROR);
+      return;
+    }
+
+    if (!acceptedTerms) {
+      setError('Please accept the Terms & Conditions and Privacy Policy to continue.');
       return;
     }
 
@@ -90,7 +97,43 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
         {error || 'We will send a 6-digit OTP to this number to continue.'}
       </div>
 
-      <button type="submit" className="mc-btn-primary w-full" disabled={isSubmitting}>
+      <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/60 px-4 py-3 text-[0.85rem] leading-snug text-slate-700 transition-colors hover:bg-slate-50">
+        <input
+          type="checkbox"
+          name="acceptTerms"
+          checked={acceptedTerms}
+          onChange={(e) => {
+            setAcceptedTerms(e.target.checked);
+            if (error?.includes('accept')) setError('');
+          }}
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-brand-blue focus:ring-brand-blue"
+        />
+        <span>
+          I agree to the{' '}
+          <Link
+            href="/terms-and-conditions"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-bold text-brand-blue underline underline-offset-2 hover:text-brand-navy"
+            onClick={(e) => e.stopPropagation()}
+          >
+            Terms &amp; Conditions
+          </Link>{' '}
+          and{' '}
+          <Link
+            href="/privacy-policy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-bold text-brand-blue underline underline-offset-2 hover:text-brand-navy"
+            onClick={(e) => e.stopPropagation()}
+          >
+            Privacy Policy
+          </Link>{' '}
+          of MoneyCash.
+        </span>
+      </label>
+
+      <button type="submit" className="mc-btn-primary w-full" disabled={isSubmitting || !acceptedTerms}>
           <span className="inline-flex items-center justify-center gap-[10px]">
             {isSubmitting ? (
               <span

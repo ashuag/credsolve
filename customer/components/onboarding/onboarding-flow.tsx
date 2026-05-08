@@ -16,12 +16,14 @@ import {
   PersonalDetailsAside,
 } from '@/components/onboarding/onboarding-asides';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
+import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 
 type OnboardingStep = 'email' | 'email-otp' | 'details';
 const DETAILS_TRANSITION_DELAY_MS = 650;
 
 export function OnboardingFlow() {
   const router = useRouter();
+  const journeyProgress = useJourneyProgressOptional();
   const { loading, session, refresh } = useCustomerSession();
   const syncedProfileRef = useRef(false);
   const [hasResolved, setHasResolved] = useState(false);
@@ -78,6 +80,13 @@ export function OnboardingFlow() {
       setHasResolved(true);
     }
   }, [isTransitioningToDetails, loading, session, router, step]);
+
+  useEffect(() => {
+    if (!journeyProgress) return;
+    if (step === 'email') journeyProgress.setCompletion01(0.07);
+    else if (step === 'email-otp') journeyProgress.setCompletion01(0.16);
+    else if (step === 'details') journeyProgress.setCompletion01(0.2);
+  }, [step, journeyProgress]);
 
   function handleEmailNext(confirmedEmail: string, mode: EmailMode, otpRequest: SendEmailOtpResponse) {
     setEmail(confirmedEmail);

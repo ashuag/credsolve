@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { JourneyProgressProvider } from '@/components/journey/journey-progress-context';
 import { OnboardingFlow } from '@/components/onboarding/onboarding-flow';
 
 export const metadata: Metadata = {
@@ -8,5 +9,9 @@ export const metadata: Metadata = {
 };
 
 export default function OnboardingPage() {
-  return <OnboardingFlow />;
+  return (
+    <JourneyProgressProvider>
+      <OnboardingFlow />
+    </JourneyProgressProvider>
+  );
 }

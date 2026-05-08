@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MobileEntryForm } from '@/components/forms/mobile-entry-form';
@@ -109,7 +110,20 @@ export function LoanEntryPanel() {
            </div>
         </div>
         <div className="text-[0.75rem] text-center leading-relaxed text-slate-400">
-          By continuing, you agree to our <a href="#" className="text-blue-600 hover:text-blue-700 font-bold hover:underline transition-colors">Terms of Service</a> & <a href="#" className="text-blue-600 hover:text-blue-700 font-bold hover:underline transition-colors">Privacy Policy</a>.
+          Legal:{' '}
+          <Link
+            href="/terms-and-conditions"
+            className="font-bold text-blue-600 underline-offset-2 hover:text-blue-700 hover:underline"
+          >
+            Terms &amp; Conditions
+          </Link>
+          {' · '}
+          <Link
+            href="/privacy-policy"
+            className="font-bold text-blue-600 underline-offset-2 hover:text-blue-700 hover:underline"
+          >
+            Privacy Policy
+          </Link>
         </div>
       </div>
     </section>

@@ -42,6 +42,18 @@
 }
 
 @layer components {
+  /* Kill Chrome / Safari yellow autofill background on our white inputs */
+  .mc-autofill-fix:-webkit-autofill,
+  .mc-autofill-fix:-webkit-autofill:hover,
+  .mc-autofill-fix:-webkit-autofill:focus,
+  .mc-autofill-fix:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+    box-shadow: 0 0 0 1000px #ffffff inset !important;
+    -webkit-text-fill-color: #0f172a;
+    caret-color: #12244f;
+    transition: background-color 50000s ease-in-out 0s;
+  }
+
   /* Shared card panel — used across pages */
   .mc-card {
     position: relative;

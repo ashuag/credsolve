@@ -39,7 +39,7 @@ export function LoanLandingShell({
     <div className="w-full max-w-[1240px] flex flex-col lg:flex-row bg-white rounded-[2.5rem] shadow-[0_24px_80px_rgba(23,44,113,0.12),0_8px_32px_rgba(23,44,113,0.06)] overflow-hidden border border-slate-100 relative z-10 animate-fade-in-up">
       
       {/* ── Left panel ── */}
-      <div className="w-full lg:w-5/12 hidden lg:flex flex-col relative bg-[#0a1628] overflow-hidden">
+      <div className="w-full lg:w-5/12 hidden lg:flex min-h-0 flex-col relative bg-[#0a1628] overflow-hidden">
         
         {/* Background Mesh */}
         <div className="absolute inset-0 stats-mesh opacity-90 pointer-events-none" />
@@ -49,35 +49,35 @@ export function LoanLandingShell({
         <div className="absolute top-1/2 right-0 w-80 h-80 bg-[#ffc519] rounded-full mix-blend-screen blur-[100px] opacity-15 animate-blob animation-delay-2000" />
         <div className="absolute -bottom-20 -left-16 w-80 h-80 bg-[#818cf8] rounded-full mix-blend-screen blur-[100px] opacity-25 animate-blob animation-delay-4000" />
 
-        {/* Content wrapper */}
-        <div className="relative z-10 flex flex-col h-full p-10 xl:p-12 gap-8">
+        {/* Content wrapper — tighter spacing so the left rail fits common laptop heights without scrolling */}
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col py-6 px-8 xl:px-10 gap-4 xl:gap-5">
           
           {/* Speedometer */}
-          <div className="flex justify-center pt-4">
+          <div className="flex shrink-0 justify-center">
             <JourneySpeedometer />
           </div>
 
-          <div className="w-full h-px bg-white/10" />
+          <div className="w-full shrink-0 h-px bg-white/10" />
 
           {/* Headline */}
-          <div className="text-center">
-            <h1 className="text-3xl xl:text-[2.5rem] font-[900] text-white tracking-tight leading-[1.1] mb-4">
+          <div className="text-center shrink-0">
+            <h1 className="text-2xl xl:text-[2.1rem] font-[900] text-white tracking-tight leading-[1.1] mb-2">
               {leftTitle || defaultTitle}
             </h1>
-            <p className="text-[1.05rem] text-slate-300 leading-relaxed max-w-sm mx-auto font-[500]">
+            <p className="text-[0.98rem] text-slate-300 leading-snug max-w-sm mx-auto font-[500]">
               {leftDescription || 'Experience a seamless digital journey. Get your loan approved in minutes without the hassle of paperwork.'}
             </p>
           </div>
 
           {/* Infographic OR feature list */}
           {leftInfographic ? (
-            <div className="flex justify-center flex-1 items-center">
-              <div className="w-full max-w-[320px] aspect-square transition-transform hover:scale-[1.03] duration-500 drop-shadow-[0_20px_40px_rgba(0,0,0,0.3)]">
+            <div className="flex min-h-0 flex-1 justify-center items-center py-1">
+              <div className="w-full max-w-[280px] aspect-square transition-transform hover:scale-[1.03] duration-500 drop-shadow-[0_20px_40px_rgba(0,0,0,0.3)]">
                 {leftInfographic}
               </div>
             </div>
           ) : (
-            <div className="flex flex-col gap-4 max-w-sm mx-auto w-full flex-1 justify-center">
+            <div className="flex flex-col gap-3 max-w-sm mx-auto w-full min-h-0 flex-1 justify-center">
               {DEFAULT_FEATURES.map((f, i) => (
                 <div key={f.label} className="flex items-center gap-3.5 group">
                   <div className="shrink-0 flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-sm transition-all duration-300 group-hover:bg-[#1496f3]/20 group-hover:border-[#1496f3]/40 group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(20,150,243,0.3)]">
@@ -92,7 +92,7 @@ export function LoanLandingShell({
           )}
 
           {/* Stats bar */}
-          <div className="border-t border-white/10 pt-8 flex justify-around">
+          <div className="mt-auto shrink-0 border-t border-white/10 pt-4 flex justify-around">
             {stats.map((stat) => (
               <div key={stat.label} className="text-center">
                 <div className="text-[1.75rem] font-[900] text-white leading-none tracking-tight mb-1">{stat.value}</div>
