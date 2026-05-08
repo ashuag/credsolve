@@ -235,7 +235,11 @@ export default function BankDetailsPage() {
               Verify Security Code.
             </h1>
             <p className="text-[0.95rem] text-slate-500 mb-8 leading-relaxed">
-              We've sent a 6-digit security code to <span className="font-bold text-brand-navy">{session?.mobileNumber}</span>. Please enter it to authorize the disbursement.
+              We've sent a 6-digit security code to{' '}
+              <span className="font-bold text-brand-navy">
+                {session?.authenticated ? session.mobileNumber : 'your registered mobile'}
+              </span>
+              . Please enter it to authorize the disbursement.
             </p>
 
             <div className="grid gap-4">
