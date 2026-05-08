@@ -1,4 +1,6 @@
 import type { NextConfig } from 'next';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const allowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? '')
   .split(',')
@@ -28,6 +30,7 @@ function ensureNestApiRewriteBase(url: string): string {
 const apiProxyTarget = rawApiTarget ? ensureNestApiRewriteBase(rawApiTarget) : undefined;
 const envDistDir = process.env.NEXT_DIST_DIR?.trim();
 const isProductionRuntime = (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
+const configDir = path.dirname(fileURLToPath(import.meta.url));
 
 const securityHeaders: { key: string; value: string }[] = [
   { key: 'X-DNS-Prefetch-Control', value: 'on' },
@@ -68,6 +71,8 @@ const nextConfig: NextConfig = {
   // Next dev can intermittently miss generated manifests with custom distDir.
   // Keep default `.next` for development and allow overrides for non-dev runs.
   distDir: isProductionRuntime ? envDistDir || '.next' : '.next',
+  // Avoid monorepo root inference when multiple lockfiles are present in production.
+  outputFileTracingRoot: configDir,
   allowedDevOrigins,
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];

@@ -66,7 +66,7 @@ export function LandingFooter() {
           <div className="flex flex-col gap-6 lg:col-span-4">
             <Link href="/" className="inline-block">
               <Image
-                src="/images/moneycash-logo.jpeg"
+                src="/images/moneycash-logo.png"
                 alt="MoneyCash Instant Digital Loans"
                 width={536}
                 height={136}
