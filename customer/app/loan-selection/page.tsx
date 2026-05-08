@@ -114,6 +114,7 @@ export default function LoanSelectionPage() {
   }, [today]);
   const maxEndDate = useMemo(() => addMonths(today, 2), [today]);
 
+  const [loanPurpose, setLoanPurpose] = useState('');
   const [selectedAmount, setSelectedAmount] = useState(Math.min(maxSelectableAmount, 25_000));
   const defaultEndDate = useMemo(() => {
     const bySetting = new Date(today);
@@ -164,6 +165,7 @@ export default function LoanSelectionPage() {
       await saveLoanSelection({
         loanAmount: selectedAmount,
         tenureEndDate: selectedEndDate,
+        loanPurpose: loanPurpose || undefined,
       });
       await refresh();
       router.push('/kyc/upload-documents');
@@ -252,6 +254,8 @@ export default function LoanSelectionPage() {
             </div>
           </div>
 
+          <LoanPurposePicker value={loanPurpose} onChange={setLoanPurpose} />
+
           <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
             <label htmlFor="loanEndDate" className="block text-[0.75rem] font-bold text-slate-500 uppercase tracking-wider mb-3">
               Repayment Date
@@ -320,6 +324,51 @@ function SummaryRow({ label, value, strong = false }: { label: string; value: st
     <div className="flex items-center justify-between gap-3 rounded-[12px] border border-[rgba(18,36,79,0.08)] bg-[rgba(244,249,255,0.74)] px-3.5 py-3">
       <span className="text-brand-muted text-[0.9rem]">{label}</span>
       <span className={strong ? 'text-brand-navy font-extrabold' : 'text-brand-navy font-semibold'}>{value}</span>
+    </div>
+  );
+}
+
+const LOAN_PURPOSES = [
+  { label: 'Medical',      icon: '🏥' },
+  { label: 'Education',    icon: '🎓' },
+  { label: 'Home Repair',  icon: '🏠' },
+  { label: 'Travel',       icon: '✈️' },
+  { label: 'Wedding',      icon: '💍' },
+  { label: 'Business',     icon: '💼' },
+  { label: 'Electronics',  icon: '📱' },
+  { label: 'Other',        icon: '📋' },
+];
+
+function LoanPurposePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
+      <div className="text-[0.75rem] font-bold text-slate-500 uppercase tracking-wider mb-4">
+        Purpose of Loan
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        {LOAN_PURPOSES.map((p) => {
+          const active = value === p.label;
+          return (
+            <button
+              key={p.label}
+              type="button"
+              onClick={() => onChange(active ? '' : p.label)}
+              className={`flex flex-col items-center justify-center gap-1.5 rounded-xl py-3 px-1 border text-center transition-all duration-150 ${
+                active
+                  ? 'border-brand-blue bg-blue-50 shadow-sm'
+                  : 'border-slate-200 bg-white hover:border-brand-blue/40 hover:bg-blue-50/40'
+              }`}
+            >
+              <span className="text-xl leading-none">{p.icon}</span>
+              <span className={`text-[0.6rem] font-extrabold uppercase tracking-wide leading-tight ${
+                active ? 'text-brand-blue' : 'text-slate-500'
+              }`}>
+                {p.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -46,14 +46,18 @@ export function LandingNavbar() {
       <nav className="border-b border-[rgba(18,36,79,0.06)] bg-white/92 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2.5 sm:px-6 lg:px-8">
           {/* Logo */}
-          <Link href="/" className="shrink-0">
+          <Link href="/" className="shrink-0 transition-transform duration-200 hover:scale-[1.03]">
             <Image
               src="/images/moneycash-logo.png"
               alt="MoneyCash Instant Digital Loans"
               width={536}
               height={136}
               priority
-              className="h-[36px] sm:h-[44px] w-auto object-contain"
+              className="h-13 sm:h-17 w-auto object-contain"
+              style={{
+                filter:
+                  'drop-shadow(1px 1px 0px rgba(18,36,79,0.28)) drop-shadow(2px 2px 0px rgba(18,36,79,0.18)) drop-shadow(3px 3px 0px rgba(18,36,79,0.10)) drop-shadow(4px 5px 10px rgba(18,36,79,0.15))',
+              }}
             />
           </Link>
 

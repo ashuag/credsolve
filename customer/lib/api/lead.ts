@@ -118,6 +118,7 @@ export type SaveProfessionalDetailsResponse = {
 export type SaveLoanSelectionPayload = {
   loanAmount: number;
   tenureEndDate: string; // YYYY-MM-DD
+  loanPurpose?: string;
 };
 
 export type SaveKycDocumentsPayload = {

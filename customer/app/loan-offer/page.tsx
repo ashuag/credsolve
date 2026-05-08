@@ -11,13 +11,14 @@ function formatInr(amount: number) {
   }).format(amount);
 }
 
-export default function LoanOfferPage({
+export default async function LoanOfferPage({
   searchParams,
 }: {
-  searchParams: { amount?: string; score?: string };
+  searchParams: Promise<{ amount?: string; score?: string }>;
 }) {
-  const approvedAmount = searchParams.amount ? parseInt(searchParams.amount, 10) : null;
-  const cibilScore     = searchParams.score   ? parseInt(searchParams.score,  10) : null;
+  const q = await searchParams;
+  const approvedAmount = q.amount ? parseInt(q.amount, 10) : null;
+  const cibilScore     = q.score   ? parseInt(q.score,  10) : null;
 
   return (
     <div className="grid gap-[18px] nav:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">

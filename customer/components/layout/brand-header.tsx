@@ -67,13 +67,17 @@ export function BrandHeader() {
       <div className="flex items-center justify-between gap-6 py-3 mx-auto max-w-[min(1280px,calc(100%-32px))]">
         <Link href="/" className="inline-flex items-center shrink-0 transition-transform duration-200 hover:scale-[1.02]" aria-label="MoneyCash home">
           <Image
-            src="/images/moneycash-logo.jpeg"
+            src="/images/moneycash-logo.png"
             alt="MoneyCash Instant Digital Loans"
             width={536}
             height={136}
-            sizes="(max-width: 720px) 45vw, 200px"
+            sizes="(max-width: 720px) 45vw, 220px"
             priority
-            className="w-[clamp(140px,25vw,190px)] h-auto block rounded-[10px]"
+            className="w-[clamp(160px,28vw,220px)] h-auto block"
+            style={{
+              filter:
+                'drop-shadow(1px 1px 0px rgba(18,36,79,0.28)) drop-shadow(2px 2px 0px rgba(18,36,79,0.18)) drop-shadow(3px 3px 0px rgba(18,36,79,0.10)) drop-shadow(4px 5px 10px rgba(18,36,79,0.15))',
+            }}
           />
         </Link>
 
