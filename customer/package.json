@@ -2,6 +2,7 @@
   "name": "moneyCash-customer-journey",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev -p 3011 --turbo",
     "build": "next build",
