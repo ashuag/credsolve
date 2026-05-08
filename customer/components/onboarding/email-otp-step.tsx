@@ -9,6 +9,7 @@ import { OtpInputGrid } from '@/components/ui/otp-input-grid';
 import { useCountdown } from '@/lib/hooks/use-countdown';
 import { useOtpInput } from '@/lib/hooks/use-otp-input';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
+import { cn } from '@/lib/cn';
 import type { EmailMode } from './email-entry-step';
 
 const OTP_LENGTH = 6;
@@ -21,6 +22,8 @@ type EmailOtpStepProps = {
   onBack: () => void;
   /** Called in register mode after successful verification (may refresh server session). */
   onVerified: () => void | Promise<void>;
+  /** Tighter vertical rhythm when embedded in the loan journey split layout. */
+  compact?: boolean;
 };
 
 export function EmailOtpStep({
@@ -30,6 +33,7 @@ export function EmailOtpStep({
   onOtpRequestChange,
   onBack,
   onVerified,
+  compact = false,
 }: EmailOtpStepProps) {
   const router = useRouter();
   const { refresh: refreshCustomerSession } = useCustomerSession();
@@ -121,8 +125,8 @@ export function EmailOtpStep({
   return (
     <>
       <section className="h-full flex flex-col justify-center" aria-labelledby="email-otp-heading">
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-8">
+        <div className={cn(compact ? 'mb-4' : 'mb-8')}>
+          <div className={cn('flex items-center gap-2', compact ? 'mb-4' : 'mb-8')}>
             <div className="flex gap-1.5">
               <div className="h-2 w-8 rounded-full bg-blue-600"></div>
               <div className="h-2 w-8 rounded-full bg-slate-100"></div>
@@ -133,12 +137,20 @@ export function EmailOtpStep({
 
           <h2
             id="email-otp-heading"
-            className="text-2xl md:text-[1.8rem] font-extrabold text-brand-navy mb-6 tracking-tight leading-[1.1] whitespace-nowrap"
+            className={cn(
+              'text-2xl md:text-[1.8rem] font-extrabold text-brand-navy tracking-tight leading-[1.1] whitespace-nowrap',
+              compact ? 'mb-4' : 'mb-6',
+            )}
           >
             {isLogin ? 'Verify to ' : 'Verify your '}<span className="text-brand-blue">{isLogin ? 'log in' : 'email'}</span> ✨
           </h2>
 
-          <div className="flex items-start gap-4 p-4 mb-2 rounded-2xl bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border border-blue-100/60 shadow-sm">
+          <div
+            className={cn(
+              'flex items-start gap-4 mb-2 rounded-2xl bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border border-blue-100/60 shadow-sm',
+              compact ? 'p-3' : 'p-4',
+            )}
+          >
             <div className="p-2 bg-white rounded-xl shadow-sm text-blue-600 shrink-0">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -183,7 +195,12 @@ export function EmailOtpStep({
           </button>
         </form>
 
-        <div className="flex flex-wrap gap-[10px] mt-6 max-sm:flex-col max-sm:items-stretch">
+        <div
+          className={cn(
+            'flex flex-wrap gap-[10px] max-sm:flex-col max-sm:items-stretch',
+            compact ? 'mt-4' : 'mt-6',
+          )}
+        >
           <button
             type="button"
             className="flex-1 py-3 px-4 rounded-xl font-bold text-[0.95rem] text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors text-center border border-slate-200"
