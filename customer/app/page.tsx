@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { LandingNavbar } from '@/components/landing/LandingNavbar';
 import { HeroSection } from '@/components/landing/HeroSection';
 import { FeaturesSection } from '@/components/landing/FeaturesSection';
@@ -24,35 +25,37 @@ export const metadata: Metadata = {
 export default function CustomerLandingPage() {
   return (
     <div className="flex min-h-screen flex-col selection:bg-[#ffc519]/30">
-      <LandingNavbar />
+      <Suspense fallback={<div className="min-h-screen bg-[#fffdf8]" aria-hidden />}>
+        <LandingNavbar />
 
-      <main className="grow">
-        {/* Hero — dark navy, animated phone illustration */}
-        <HeroSection />
+        <main className="grow">
+          {/* Hero — dark navy, animated phone illustration */}
+          <HeroSection />
 
-        {/* 3 trust-signal feature cards */}
-        <FeaturesSection />
+          {/* 3 trust-signal feature cards */}
+          <FeaturesSection />
 
-        {/* 5 short-term loan products up to ₹50K */}
-        <LoanProducts />
+          {/* 5 short-term loan products up to ₹50K */}
+          <LoanProducts />
 
-        {/* Animated stats on dark background */}
-        <StatsSection />
+          {/* Animated stats on dark background */}
+          <StatsSection />
 
-        {/* Interactive EMI calculator */}
-        <HomeCalculator />
+          {/* Interactive EMI calculator */}
+          <HomeCalculator />
 
-        {/* 3-step process — animated timeline */}
-        <ProcessSteps />
+          {/* 3-step process — animated timeline */}
+          <ProcessSteps />
 
-        {/* Customer testimonials */}
-        <TestimonialsSection />
+          {/* Customer testimonials */}
+          <TestimonialsSection />
 
-        {/* Strong CTA section */}
-        <CTASection />
-      </main>
+          {/* Strong CTA section */}
+          <CTASection />
+        </main>
 
-      <LandingFooter />
+        <LandingFooter />
+      </Suspense>
     </div>
   );
 }
