@@ -8,8 +8,9 @@ import { MobileTabBar } from '@/components/layout/mobile-tab-bar';
 export function LayoutWrapper({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isLandingPage = pathname === '/';
+  const isApplyPage = pathname === '/apply-for-loan';
 
-  if (isLandingPage) {
+  if (isLandingPage || isApplyPage) {
     return <>{children}</>;
   }
 

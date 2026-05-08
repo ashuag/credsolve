@@ -64,20 +64,16 @@ export function BrandHeader() {
 
   return (
     <header className="sticky top-0 z-20 border-b border-b-[rgba(18,36,79,0.09)] bg-[rgba(255,253,248,0.95)] backdrop-blur-[24px] shadow-[0_4px_32px_rgba(23,44,113,0.08)]">
-      <div className="flex items-center justify-between gap-6 py-3 mx-auto max-w-[min(1280px,calc(100%-32px))]">
-        <Link href="/" className="inline-flex items-center shrink-0 transition-transform duration-200 hover:scale-[1.02]" aria-label="MoneyCash home">
+      <div className="mx-auto flex h-[72px] max-w-[min(1280px,calc(100%-32px))] items-center justify-between gap-6 sm:h-20">
+        <Link href="/" className="inline-flex h-full items-center shrink-0 transition-transform duration-200 hover:scale-[1.02]" aria-label="MoneyCash home">
           <Image
             src="/images/moneycash-logo.png"
             alt="MoneyCash Instant Digital Loans"
-            width={536}
-            height={136}
-            sizes="(max-width: 720px) 45vw, 220px"
+            width={670}
+            height={761}
+            sizes="(max-width: 640px) 56px, 64px"
             priority
-            className="w-[clamp(160px,28vw,220px)] h-auto block"
-            style={{
-              filter:
-                'drop-shadow(1px 1px 0px rgba(18,36,79,0.28)) drop-shadow(2px 2px 0px rgba(18,36,79,0.18)) drop-shadow(3px 3px 0px rgba(18,36,79,0.10)) drop-shadow(4px 5px 10px rgba(18,36,79,0.15))',
-            }}
+            className="block h-14 w-auto object-contain sm:h-16"
           />
         </Link>
 

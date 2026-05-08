@@ -24,7 +24,7 @@ export function LoanLandingShell({
   leftStats,
 }: LoanLandingShellProps) {
   const defaultTitle = (
-    <>Fast. Secure. <span className="text-[#60a5fa]">Instant.</span></>
+    <>Fast. Secure. <span className="text-transparent bg-clip-text bg-gradient-to-br from-[#1fa2ff] to-[#1496f3] drop-shadow-[0_0_12px_rgba(20,150,243,0.3)]">Instant.</span></>
   );
 
   const defaultStats = [
@@ -36,21 +36,24 @@ export function LoanLandingShell({
   const stats = leftStats || defaultStats;
 
   return (
-    <div className="w-full max-w-[1200px] flex flex-col nav:flex-row bg-white rounded-[2rem] shadow-[0_20px_60px_rgba(23,44,113,0.12)] overflow-hidden border border-white relative z-10">
-
+    <div className="w-full max-w-[1240px] flex flex-col lg:flex-row bg-white rounded-[2.5rem] shadow-[0_24px_80px_rgba(23,44,113,0.12),0_8px_32px_rgba(23,44,113,0.06)] overflow-hidden border border-slate-100 relative z-10 animate-fade-in-up">
+      
       {/* ── Left panel ── */}
-      <div className="w-full nav:w-1/2 hidden nav:flex flex-col relative bg-gradient-to-br from-[#1496f3] via-[#1c347d] to-[#12244f] overflow-hidden">
+      <div className="w-full lg:w-5/12 hidden lg:flex flex-col relative bg-[#0a1628] overflow-hidden">
+        
+        {/* Background Mesh */}
+        <div className="absolute inset-0 stats-mesh opacity-90 pointer-events-none" />
 
         {/* Ambient blobs */}
-        <div className="absolute -top-24 -left-24 w-80 h-80 bg-[#0ea5e9] rounded-full mix-blend-screen blur-[90px] opacity-35 animate-blob" />
-        <div className="absolute -bottom-20 -right-16 w-80 h-80 bg-[#818cf8] rounded-full mix-blend-screen blur-[90px] opacity-35 animate-blob animation-delay-2000" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[#1496f3] rounded-full mix-blend-screen blur-[80px] opacity-20 animate-blob animation-delay-4000" />
+        <div className="absolute -top-24 -left-24 w-96 h-96 bg-[#1496f3] rounded-full mix-blend-screen blur-[100px] opacity-30 animate-blob" />
+        <div className="absolute top-1/2 right-0 w-80 h-80 bg-[#ffc519] rounded-full mix-blend-screen blur-[100px] opacity-15 animate-blob animation-delay-2000" />
+        <div className="absolute -bottom-20 -left-16 w-80 h-80 bg-[#818cf8] rounded-full mix-blend-screen blur-[100px] opacity-25 animate-blob animation-delay-4000" />
 
         {/* Content wrapper */}
-        <div className="relative z-10 flex flex-col h-full p-8 lg:p-10 gap-7">
-
+        <div className="relative z-10 flex flex-col h-full p-10 xl:p-12 gap-8">
+          
           {/* Speedometer */}
-          <div className="flex justify-center pt-2">
+          <div className="flex justify-center pt-4">
             <JourneySpeedometer />
           </div>
 
@@ -58,45 +61,42 @@ export function LoanLandingShell({
 
           {/* Headline */}
           <div className="text-center">
-            <h1 className="text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-tight mb-3">
+            <h1 className="text-3xl xl:text-[2.5rem] font-[900] text-white tracking-tight leading-[1.1] mb-4">
               {leftTitle || defaultTitle}
             </h1>
-            <p className="text-[0.95rem] text-blue-100 leading-relaxed max-w-xs mx-auto">
+            <p className="text-[1.05rem] text-slate-300 leading-relaxed max-w-sm mx-auto font-[500]">
               {leftDescription || 'Experience a seamless digital journey. Get your loan approved in minutes without the hassle of paperwork.'}
             </p>
           </div>
 
           {/* Infographic OR feature list */}
           {leftInfographic ? (
-            <div className="flex justify-center">
-              <div className="w-full max-w-[280px] aspect-square transition-transform hover:scale-[1.03] duration-500">
+            <div className="flex justify-center flex-1 items-center">
+              <div className="w-full max-w-[320px] aspect-square transition-transform hover:scale-[1.03] duration-500 drop-shadow-[0_20px_40px_rgba(0,0,0,0.3)]">
                 {leftInfographic}
               </div>
             </div>
           ) : (
-            <div className="flex flex-col gap-3 max-w-xs mx-auto w-full">
-              {DEFAULT_FEATURES.map((f) => (
-                <div key={f.label} className="flex items-center gap-3">
-                  <div className="shrink-0 flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm">
-                    <svg viewBox="0 0 24 24" className="h-4 w-4 text-yellow-300" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <div className="flex flex-col gap-4 max-w-sm mx-auto w-full flex-1 justify-center">
+              {DEFAULT_FEATURES.map((f, i) => (
+                <div key={f.label} className="flex items-center gap-3.5 group">
+                  <div className="shrink-0 flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-sm transition-all duration-300 group-hover:bg-[#1496f3]/20 group-hover:border-[#1496f3]/40 group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(20,150,243,0.3)]">
+                    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5 text-[#ffc519] transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d={f.icon} />
                     </svg>
                   </div>
-                  <span className="text-[0.85rem] text-blue-100 font-[600] leading-snug">{f.label}</span>
+                  <span className="text-[0.95rem] text-slate-200 font-[600] leading-snug transition-colors duration-300 group-hover:text-white">{f.label}</span>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Push stats to bottom */}
-          <div className="flex-1" />
-
           {/* Stats bar */}
-          <div className="border-t border-white/10 pt-6 flex justify-around">
+          <div className="border-t border-white/10 pt-8 flex justify-around">
             {stats.map((stat) => (
               <div key={stat.label} className="text-center">
-                <div className="text-2xl font-[900] text-white leading-none">{stat.value}</div>
-                <div className="text-[0.62rem] text-blue-200 uppercase tracking-widest font-[700] mt-1.5">{stat.label}</div>
+                <div className="text-[1.75rem] font-[900] text-white leading-none tracking-tight mb-1">{stat.value}</div>
+                <div className="text-[0.68rem] text-[#1496f3] uppercase tracking-[0.15em] font-[800]">{stat.label}</div>
               </div>
             ))}
           </div>
@@ -104,12 +104,19 @@ export function LoanLandingShell({
       </div>
 
       {/* ── Right panel: journey form ── */}
-      <div className="w-full nav:w-1/2 flex flex-col justify-center p-8 nav:p-14 bg-white relative">
-        <div className="w-full max-w-[500px] mx-auto h-full">
+      <div className="w-full lg:w-7/12 flex flex-col justify-center p-6 sm:p-10 lg:p-14 bg-white relative">
+        <div className="w-full max-w-[480px] mx-auto h-full">
           {/* Mobile-only header */}
-          <div className="mb-8 nav:hidden text-center">
-            <h1 className="text-3xl font-extrabold text-brand-navy mb-2">Instant Loan</h1>
-            <p className="text-brand-muted">Start your seamless digital journey.</p>
+          <div className="mb-8 lg:hidden text-center flex flex-col items-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-[0.7rem] font-[800] tracking-widest uppercase mb-4">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+              </span>
+              100% Digital Process
+            </div>
+            <h1 className="text-[2rem] font-[900] text-brand-navy mb-2 tracking-tight leading-tight">Instant Loan</h1>
+            <p className="text-brand-muted font-[500] text-[1.05rem]">Start your seamless digital journey.</p>
           </div>
           {journeyPanel}
         </div>
