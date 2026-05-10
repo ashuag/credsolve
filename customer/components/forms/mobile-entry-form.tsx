@@ -85,19 +85,29 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
             }
           }}
           aria-invalid={Boolean(error)}
-          aria-describedby={error ? 'mobile-error' : 'mobile-help'}
+          aria-describedby={error ? 'mobile-error' : 'mobile-help-sr'}
           className="w-full h-full px-4 border-0 outline-0 bg-transparent text-brand-navy text-[1.08rem] font-bold tracking-[0.01em] caret-brand-blue placeholder:text-[#93a0c1] placeholder:tracking-normal transition-transform duration-[220ms] group-focus-within/field:translate-x-0.5"
         />
       </div>
 
-      <div
-        id={error ? 'mobile-error' : 'mobile-help'}
-        className={`text-[0.9rem] leading-[1.55] ${error ? 'text-[#b2372d]' : 'text-brand-muted'}`}
-      >
-        {error || 'We will send a 6-digit OTP to this number to continue.'}
-      </div>
+      <p className="-mt-0.5 flex items-center gap-2 text-[0.72rem] font-extrabold uppercase tracking-[0.12em] text-slate-400">
+        <svg className="h-3.5 w-3.5 text-[#1496f3]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+          <path d="M12 3l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V7l8-4z" strokeLinejoin="round" />
+          <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        OTP · SMS
+      </p>
 
-      <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/60 px-4 py-3 text-[0.85rem] leading-snug text-slate-700 transition-colors hover:bg-slate-50">
+      <span id="mobile-help-sr" className="sr-only">
+        We send a one-time 6-digit code by SMS to verify your mobile number.
+      </span>
+      {error ? (
+        <div id="mobile-error" className="text-[0.9rem] leading-[1.55] text-[#b2372d]">
+          {error}
+        </div>
+      ) : null}
+
+      <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[rgba(18,36,79,0.08)] bg-gradient-to-br from-white to-[rgba(244,249,255,0.95)] px-4 py-3.5 text-[0.82rem] leading-snug text-slate-700 shadow-[0_8px_24px_rgba(23,44,113,0.05)] transition-[border-color,box-shadow] hover:border-[rgba(20,150,243,0.22)] hover:shadow-[0_12px_28px_rgba(23,44,113,0.07)]">
         <input
           type="checkbox"
           name="acceptTerms"
@@ -117,9 +127,9 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
             className="font-bold text-brand-blue underline underline-offset-2 hover:text-brand-navy"
             onClick={(e) => e.stopPropagation()}
           >
-            Terms &amp; Conditions
-          </Link>{' '}
-          and{' '}
+            Terms
+          </Link>
+          {' · '}
           <Link
             href="/privacy-policy"
             target="_blank"
@@ -127,9 +137,8 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
             className="font-bold text-brand-blue underline underline-offset-2 hover:text-brand-navy"
             onClick={(e) => e.stopPropagation()}
           >
-            Privacy Policy
-          </Link>{' '}
-          of MoneyCash.
+            Privacy
+          </Link>
         </span>
       </label>
 

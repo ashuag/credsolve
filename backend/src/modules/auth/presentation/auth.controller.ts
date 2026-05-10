@@ -7,11 +7,14 @@ import { SaveLeadDetailsDto } from '../application/dto/save-lead-details.dto';
 import { SendOtpDto } from '../application/dto/send-otp.dto';
 import { VerifyOtpSuccessResponseDto } from '../application/dto/verify-otp-response.dto';
 import { VerifyOtpDto } from '../application/dto/verify-otp.dto';
+import { VerifyPanDto } from '../application/dto/verify-pan.dto';
 import { GetCustomerSessionUseCase } from '../application/use-cases/get-customer-session.use-case';
+import { GetCustomerLoansDashboardUseCase } from '../application/use-cases/get-customer-loans-dashboard.use-case';
 import { LogoutUseCase } from '../application/use-cases/logout.use-case';
 import { SendOtpUseCase } from '../application/use-cases/send-otp.use-case';
 import { SaveLeadDetailsUseCase } from '../application/use-cases/save-lead-details.use-case';
 import { VerifyOtpUseCase } from '../application/use-cases/verify-otp.use-case';
+import { VerifyPanUseCase } from '../application/use-cases/verify-pan.use-case';
 import { CustomerGoogleOauthService } from '../infrastructure/google/customer-google-oauth.service';
 import { OptionalCustomerSessionGuard } from './guards/optional-customer-session.guard';
 import { RequiredCustomerSessionGuard } from './guards/required-customer-session.guard';
@@ -36,9 +39,11 @@ export class AuthController {
     private readonly sendOtpFlow: SendOtpUseCase,
     private readonly verifyOtpFlow: VerifyOtpUseCase,
     private readonly customerSession: GetCustomerSessionUseCase,
+    private readonly customerLoansDashboard: GetCustomerLoansDashboardUseCase,
     private readonly logoutFlow: LogoutUseCase,
     private readonly customerGoogleOauth: CustomerGoogleOauthService,
-    private readonly saveLeadDetailsFlow: SaveLeadDetailsUseCase
+    private readonly saveLeadDetailsFlow: SaveLeadDetailsUseCase,
+    private readonly verifyPanFlow: VerifyPanUseCase
   ) {}
 
   @Post('send-otp')
@@ -103,6 +108,15 @@ export class AuthController {
     return this.customerSession.execute(req);
   }
 
+  @Get('my-loans')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @ApiOperation({
+    summary: 'Dashboard data: active loans, past loans, in-flight applications, repayment lines',
+  })
+  myLoans(@Req() req: Request) {
+    return this.customerLoansDashboard.execute(req);
+  }
+
   @Get('google/login')
   @UseGuards(RequiredCustomerSessionGuard)
   @ApiOperation({
@@ -148,5 +162,16 @@ export class AuthController {
   @ApiOperation({ summary: 'Save onboarding lead details (alias of POST /leads/details)' })
   saveLeadDetailsAlias(@Req() req: Request, @Body() body: SaveLeadDetailsDto) {
     return this.saveLeadDetailsFlow.execute(req, body);
+  }
+
+  @Post('verify-pan')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @RateLimitByRoute('verify-pan')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verify PAN via Tenacio (pan-name-dob), compare name with profile, audit vendor log',
+  })
+  verifyPanRoute(@Req() req: Request, @Body() body: VerifyPanDto) {
+    return this.verifyPanFlow.execute(req, body);
   }
 }

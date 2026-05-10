@@ -2,6 +2,7 @@
 
 import { createUser, getRoles, getUsers, toggleUserStatus, updateUser, type LosRole, type LosUser } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
+import Link from 'next/link';
 import { FormEvent, Fragment, useCallback, useEffect, useRef, useState } from 'react';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -493,7 +494,7 @@ function AgentModal({
             {activeRoles.length === 0 ? (
               <p className="text-[0.84rem] text-[#8d3434]">
                 No active roles available.{' '}
-                <a href="/roles" className="underline text-brand-blue">Add roles first.</a>
+                <Link href="/roles" className="underline text-brand-blue">Add roles first.</Link>
               </p>
             ) : (
               <select

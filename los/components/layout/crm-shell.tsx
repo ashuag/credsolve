@@ -17,6 +17,7 @@ import { useNavigationProgress } from '@/components/ui/navigation-progress-provi
 import { LogoutButton } from '@/components/ui/logout-button';
 import { updateLosPassword } from '@/lib/api';
 import { LOS_STORAGE_KEY, LOS_THEME_KEY } from '@/lib/auth';
+import { cx } from '@/lib/cx';
 
 type SessionUser = {
   user?: { fullName?: string; email?: string; role?: string; roleName?: string };
@@ -103,10 +104,6 @@ const BREADCRUMBS: Record<string, string> = {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function cx(...values: Array<string | false | null | undefined>) {
-  return values.filter(Boolean).join(' ');
-}
 
 function persistSidebarMode(mode: SidebarMode) {
   window.localStorage.setItem(SIDEBAR_MODE_KEY, JSON.stringify({ mode }));

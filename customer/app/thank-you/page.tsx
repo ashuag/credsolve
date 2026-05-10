@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 
 export default function ThankYouPage() {
@@ -49,43 +50,42 @@ export default function ThankYouPage() {
           </div>
         </div>
 
-        <Link 
-          href="/" 
-          className="mc-btn-primary block w-full py-4 text-center text-[1rem]"
-        >
-          Return to Dashboard
+        <Link href="/dashboard" className="mc-btn-primary block w-full py-4 text-center text-[1rem]">
+          Go to My accounts
         </Link>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(135deg,#f0fdf4,#e6f0ff)] flex items-center justify-center p-4 sm:p-6 md:p-8">
-      <LoanLandingShell
-        journeyPanel={journeyPanel}
-        leftTitle={<>Awesome! <span className="text-green-400">Success.</span></>}
-        leftDescription="Your loan application journey is complete. Sit back and relax while we handle the rest."
-        leftInfographic={
-          <svg viewBox="0 0 400 400" className="w-full h-full drop-shadow-2xl" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="successGrad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#4ade80" />
-                <stop offset="100%" stopColor="#22c55e" />
-              </linearGradient>
-            </defs>
-            <circle cx="200" cy="200" r="160" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.2)" strokeWidth="4" />
-            <g transform="translate(100, 100)">
-              <rect x="0" y="0" width="200" height="200" rx="40" fill="url(#successGrad)" />
-              {/* Giant Checkmark */}
-              <path d="M50 100 L85 135 L150 70" stroke="white" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
-              {/* Confetti-like bits */}
-              <circle cx="30" cy="30" r="6" fill="#facc15" />
-              <rect x="160" y="40" width="8" height="8" rx="2" fill="#60a5fa" transform="rotate(45 164 44)" />
-              <circle cx="170" cy="160" r="5" fill="#f87171" />
-            </g>
-          </svg>
-        }
-      />
-    </div>
+    <CustomerJourneyGuard>
+      <div className="min-h-screen bg-[linear-gradient(135deg,#f0fdf4,#e6f0ff)] flex items-center justify-center p-4 sm:p-6 md:p-8">
+        <LoanLandingShell
+          journeyPanel={journeyPanel}
+          leftTitle={<>Awesome! <span className="text-green-400">Success.</span></>}
+          leftDescription="Your loan application journey is complete. Sit back and relax while we handle the rest."
+          leftInfographic={
+            <svg viewBox="0 0 400 400" className="w-full h-full drop-shadow-2xl" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="successGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="#4ade80" />
+                  <stop offset="100%" stopColor="#22c55e" />
+                </linearGradient>
+              </defs>
+              <circle cx="200" cy="200" r="160" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.2)" strokeWidth="4" />
+              <g transform="translate(100, 100)">
+                <rect x="0" y="0" width="200" height="200" rx="40" fill="url(#successGrad)" />
+                {/* Giant Checkmark */}
+                <path d="M50 100 L85 135 L150 70" stroke="white" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
+                {/* Confetti-like bits */}
+                <circle cx="30" cy="30" r="6" fill="#facc15" />
+                <rect x="160" y="40" width="8" height="8" rx="2" fill="#60a5fa" transform="rotate(45 164 44)" />
+                <circle cx="170" cy="160" r="5" fill="#f87171" />
+              </g>
+            </svg>
+          }
+        />
+      </div>
+    </CustomerJourneyGuard>
   );
 }

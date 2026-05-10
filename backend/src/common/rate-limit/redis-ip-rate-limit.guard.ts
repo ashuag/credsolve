@@ -22,6 +22,7 @@ function clientIp(req: Request): string {
 const DEFAULTS: Record<RateLimitRouteId, { max: number; windowSec: number }> = {
   'send-otp': { max: 40, windowSec: 3600 },
   'verify-otp': { max: 120, windowSec: 3600 },
+  'verify-pan': { max: 40, windowSec: 3600 },
   logout: { max: 60, windowSec: 3600 },
   'sync-lead-email': { max: 30, windowSec: 3600 },
   'save-lead-details': { max: 40, windowSec: 3600 },

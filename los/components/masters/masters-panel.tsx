@@ -2,10 +2,7 @@
 
 import Link from 'next/link';
 import { MASTER_DEFINITIONS } from './master-definitions';
-
-function cx(...values: Array<string | false | null | undefined>) {
-  return values.filter(Boolean).join(' ');
-}
+import { cx } from '@/lib/cx';
 
 export function MastersPanel() {
   return (

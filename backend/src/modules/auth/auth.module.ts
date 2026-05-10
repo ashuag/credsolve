@@ -5,6 +5,7 @@ import { PrismaModule } from '../../prisma/prisma.module';
 import { CheckLoanEligibilityUseCase } from './application/use-cases/check-loan-eligibility.use-case';
 import { GetCustomerLeadStatusUseCase } from './application/use-cases/get-customer-lead-status.use-case';
 import { GetCustomerSessionUseCase } from './application/use-cases/get-customer-session.use-case';
+import { GetCustomerLoansDashboardUseCase } from './application/use-cases/get-customer-loans-dashboard.use-case';
 import { LogoutUseCase } from './application/use-cases/logout.use-case';
 import { SendOtpUseCase } from './application/use-cases/send-otp.use-case';
 import { SaveLeadDetailsUseCase } from './application/use-cases/save-lead-details.use-case';
@@ -12,6 +13,7 @@ import { SaveLoanSelectionUseCase } from './application/use-cases/save-loan-sele
 import { SubmitProfessionalApplicationUseCase } from './application/use-cases/submit-professional-application.use-case';
 import { SyncLeadEmailFromGoogleTokenUseCase } from './application/use-cases/sync-lead-email-from-google-token.use-case';
 import { VerifyOtpUseCase } from './application/use-cases/verify-otp.use-case';
+import { VerifyPanUseCase } from './application/use-cases/verify-pan.use-case';
 import { SaveKycDocumentsUseCase } from './application/use-cases/save-kyc-documents.use-case';
 import { SaveBankDetailsUseCase } from './application/use-cases/save-bank-details.use-case';
 import { OtpCodeGenerator } from './infrastructure/crypto/otp-code.generator';
@@ -65,7 +67,9 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     SaveBankDetailsUseCase,
     SendOtpUseCase,
     VerifyOtpUseCase,
+    VerifyPanUseCase,
     GetCustomerSessionUseCase,
+    GetCustomerLoansDashboardUseCase,
     LogoutUseCase,
   ],
 })

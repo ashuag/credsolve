@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ComponentType } from 'react';
+import { useCustomerSession } from '@/components/providers/customer-session-provider';
+import { isCustomerPortalSignedIn } from '@/lib/api/customer-session';
 
 type IconProps = { active: boolean };
 
@@ -41,16 +43,12 @@ type Tab = {
   exact?: boolean;
 };
 
-const TABS: Tab[] = [
-  { href: '/',          label: 'Home',     Icon: HomeIcon,   exact: true },
-  { href: '/my-account', label: 'Account', Icon: ShieldIcon },
-  { href: '/payments',  label: 'Payments', Icon: CardIcon },
-];
-
-function isActive(pathname: string, tab: Tab) {
+function isActive(pathname: string, tab: Tab, accountHref: string) {
   if (tab.exact) return pathname === tab.href;
-  if (tab.href === '/my-account') {
+  if (tab.href === '__account__') {
     return (
+      pathname === accountHref ||
+      pathname === '/dashboard' ||
       pathname === '/my-account' ||
       pathname === '/apply-for-loan' ||
       pathname === '/login' ||
@@ -62,6 +60,15 @@ function isActive(pathname: string, tab: Tab) {
 
 export function MobileTabBar() {
   const pathname = usePathname();
+  const { session } = useCustomerSession();
+  const signedIn = isCustomerPortalSignedIn(session);
+  const accountHref = signedIn ? '/dashboard' : '/my-account';
+
+  const tabs: Tab[] = [
+    { href: '/', label: 'Home', Icon: HomeIcon, exact: true },
+    { href: '__account__', label: signedIn ? 'Accounts' : 'Account', Icon: ShieldIcon },
+    { href: '/payments', label: 'Payments', Icon: CardIcon },
+  ];
 
   return (
     <nav
@@ -77,14 +84,15 @@ export function MobileTabBar() {
           WebkitBackdropFilter: 'blur(20px)',
         }}
       >
-        <div className="grid h-[60px]" style={{ gridTemplateColumns: `repeat(${TABS.length}, 1fr)` }}>
-          {TABS.map((tab) => {
-            const active = isActive(pathname, tab);
+        <div className="grid h-[60px]" style={{ gridTemplateColumns: `repeat(${tabs.length}, 1fr)` }}>
+          {tabs.map((tab) => {
+            const href = tab.href === '__account__' ? accountHref : tab.href;
+            const active = isActive(pathname, tab, accountHref);
 
             return (
               <Link
-                key={tab.href}
-                href={tab.href}
+                key={tab.href === '__account__' ? `account-${accountHref}` : tab.href}
+                href={href}
                 className="relative flex flex-col items-center justify-center gap-[3px] transition-all duration-150 active:scale-95"
                 aria-label={tab.label}
                 aria-current={active ? 'page' : undefined}

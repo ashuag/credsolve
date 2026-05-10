@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -12,8 +13,12 @@ import { PrismaModule } from './prisma/prisma.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      // Same keys as `src/load-env.ts`. Later files override earlier; `backend/.env` wins over cwd `.env`.
-      envFilePath: [join(process.cwd(), '.env'), join(process.cwd(), 'backend', '.env')],
+      envFilePath: [
+        join(process.cwd(), '.env'),
+        join(process.cwd(), 'backend', '.env'),
+        // Same file `load-env.ts` resolves when cwd is not `backend/` (Nest compiled lives in `build/src/`).
+        join(__dirname, '..', '..', '.env'),
+      ].filter((p) => existsSync(p)),
     }),
     PrismaModule,
     RedisModule,

@@ -9,6 +9,8 @@ export type CustomerPortalProfileSnapshot = {
   fullName: string | null;
   dob: string | null;
   panNumber: string | null;
+  panVerified: boolean;
+  panVerifiedAt: string | null;
   gender: 'male' | 'female' | 'others' | null;
   occupation:
     | 'salaried'

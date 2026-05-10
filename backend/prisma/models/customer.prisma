@@ -1,0 +1,63 @@
+// ============================================================
+// CUSTOMER
+// ============================================================
+//
+// Customer identity + KYC. A customer can have many leads/applications
+// but at most one active KYC bundle.
+
+model Customer {
+  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid          String    @unique @default(uuid()) @db.Char(36)
+  mobileNumber  String    @unique @map("mobile_number") @db.Char(10)
+  kycVerifiedAt DateTime? @map("kyc_verified_at")
+  isBlacklisted Boolean   @default(false) @map("is_blacklisted")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  leads        Lead[]
+  applications Application[]
+  customerKycs CustomerKyc[]
+
+  @@map("customer")
+}
+
+model CustomerKyc {
+  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid          String    @unique @default(uuid()) @db.Char(36)
+  customerId    BigInt    @map("customer_id") @db.UnsignedBigInt
+  panNumber     String?   @map("pan_number") @db.Char(10)
+  panVerifiedAt DateTime? @map("pan_verified_at")
+  fullName      String?   @map("full_name") @db.VarChar(100)
+  dateOfBirth   DateTime? @map("date_of_birth") @db.Date
+  kycVerifiedAt DateTime? @map("kyc_verified_at")
+  expiresAt     DateTime? @map("expires_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  customer             Customer              @relation(fields: [customerId], references: [id])
+  customerKycDocuments CustomerKycDocument[]
+
+  @@index([customerId])
+  @@index([panNumber])
+  @@index([kycVerifiedAt])
+  @@index([expiresAt])
+  @@map("customer_kyc")
+}
+
+model CustomerKycDocument {
+  id             BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid           String    @unique @default(uuid()) @db.Char(36)
+  customerKycId  BigInt    @map("customer_kyc_id") @db.UnsignedBigInt
+  documentTypeId Int       @map("document_type_id") @db.SmallInt
+  kycProviderId  Int       @map("kyc_provider_id") @db.SmallInt
+  fileName       String?   @map("file_name") @db.VarChar(255)
+  verifiedAt     DateTime? @map("verified_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  customerKyc  CustomerKyc @relation(fields: [customerKycId], references: [id])
+  kycProvider  KycProvider @relation(fields: [kycProviderId], references: [id])
+  documentType KycDocument @relation(fields: [documentTypeId], references: [id])
+
+  @@index([customerKycId])
+  @@map("customer_kyc_document")
+}

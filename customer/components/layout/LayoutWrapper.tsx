@@ -9,8 +9,9 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isLandingPage = pathname === '/';
   const isApplyPage = pathname === '/apply-for-loan';
+  const isAccountLoginPage = pathname === '/my-account';
 
-  if (isLandingPage || isApplyPage) {
+  if (isLandingPage || isApplyPage || isAccountLoginPage) {
     return <>{children}</>;
   }
 

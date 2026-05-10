@@ -1,0 +1,28 @@
+// ============================================================
+// ENUMS
+// ============================================================
+//
+// Shared across the schema. Keep this file enum-only — models go in
+// their own domain-named files under `prisma/models/`.
+
+enum LeadSourceType {
+  ADS
+  CONNECTOR
+  SALES
+  ORGANIC
+  PARTNER
+  API
+}
+
+enum EmailVerificationType {
+  GOOGLE
+  OTP
+}
+
+enum VendorHttpMethod {
+  GET
+  POST
+  PUT
+  PATCH
+  DELETE
+}

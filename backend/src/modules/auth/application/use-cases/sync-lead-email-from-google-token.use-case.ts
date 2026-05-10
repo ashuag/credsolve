@@ -56,6 +56,7 @@ export class SyncLeadEmailFromGoogleTokenUseCase {
 
     await this.prisma.client.$transaction(async (tx) => {
       await this.leads.updateLeadEmailWithVerification(tx, lead.id, email, EmailVerificationType.GOOGLE);
+      await this.leads.applyInProgressAfterEmailVerified(tx, lead);
     });
 
     return { success: true, leadUuid: lead.uuid };

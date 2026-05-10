@@ -2,19 +2,41 @@
 
 import { usePathname } from 'next/navigation';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
+import { useCustomerSession } from '@/components/providers/customer-session-provider';
+import { isCustomerPortalSignedIn } from '@/lib/api/customer-session';
 
 const JOURNEY_STEPS = ['Onboarding', 'Apply', 'KYC', 'Bank', 'Done'] as const;
 
-/** Uniform progress: each step covers an equal slice (20% … 100%). */
-function progressForStep(stepIndex: number): number {
-  return Math.min(100, Math.max(0, (stepIndex + 1) * 20));
+/**
+ * Milestones (each +20%): mobile OTP done → 20%, then details → loan → KYC → bank → 100%.
+ * Guest (not signed in) → 0% on the mobile / OTP screens.
+ */
+function milestonesCompleted(session: ReturnType<typeof useCustomerSession>['session']): number {
+  if (!session || session.authenticated !== true) return 0;
+  const j = session.journey;
+  let m = 1;
+  if (j.detailsCompleted) m++;
+  if (j.loanSelectionCompleted) m++;
+  if (j.kycCompleted) m++;
+  if (j.bankDetailsCompleted) m++;
+  return Math.min(5, m);
+}
+
+function progressPercentFromMilestones(m: number): number {
+  return Math.min(100, Math.max(0, m * 20));
+}
+
+/** Active stage index 0…4 for the dot row — aligns with milestones after mobile verify. */
+function stepIndexFromMilestones(m: number): number {
+  if (m <= 0) return 0;
+  return Math.min(4, m - 1);
 }
 
 /**
  * Order matters: first match wins. Labels always match `JOURNEY_STEPS[stepIndex]`.
  * Journey: entry / profile → loan offer & selection → KYC → bank → done.
  */
-function getStepIndex(pathname: string): number {
+function getStepIndexFromPathname(pathname: string): number {
   const p = pathname || '';
   if (p.includes('/thank-you')) return 4;
   if (p.includes('/bank-details')) return 3;
@@ -32,14 +54,28 @@ function getStepIndex(pathname: string): number {
 
 export function JourneySpeedometer() {
   const pathname = usePathname() || '';
-  const stepIndex = getStepIndex(pathname);
-  const pathnameProgress = progressForStep(stepIndex);
+  const { session } = useCustomerSession();
   const journeyInline = useJourneyProgressOptional();
 
-  /** On `/onboarding`, needle moves smoothly from ~20%→39% as the user completes email → OTP → profile → address. */
-  let progress = pathnameProgress;
-  if (pathname.includes('/onboarding') && journeyInline) {
-    progress = Math.round(20 + journeyInline.completion01 * 19);
+  const pathStep = getStepIndexFromPathname(pathname);
+  const m = milestonesCompleted(session);
+
+  /** Guests: 0% until OTP succeeds; stage dots follow URL (usually Onboarding). */
+  let progress = progressPercentFromMilestones(m);
+  let stepIndex = m > 0 ? stepIndexFromMilestones(m) : pathStep;
+
+  if (!isCustomerPortalSignedIn(session)) {
+    progress = 0;
+    stepIndex = pathStep;
+  } else {
+    /** If the URL is ahead of saved milestones (e.g. deep link), align the stage label only; % stays milestone-based. */
+    if (pathStep > stepIndex) {
+      stepIndex = pathStep;
+    }
+    /** Onboarding form: smooth 20%→39% while completing profile after mobile verify (milestone 1). */
+    if (pathname.includes('/onboarding') && journeyInline && m === 1) {
+      progress = Math.round(20 + journeyInline.completion01 * 19);
+    }
   }
 
   const stepText = JOURNEY_STEPS[stepIndex];

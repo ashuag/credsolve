@@ -1,39 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import { useScrollReveal } from '@/lib/hooks/use-scroll-reveal';
-
-function CountUp({ to, prefix = '', suffix = '', duration = 2000 }: {
-  to: number; prefix?: string; suffix?: string; duration?: number;
-}) {
-  const [val, setVal] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
-  const ran = useRef(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !ran.current) {
-          ran.current = true;
-          const t0 = performance.now();
-          const tick = (t: number) => {
-            const p = Math.min((t - t0) / duration, 1);
-            setVal(Math.round((1 - (1 - p) ** 3) * to));
-            if (p < 1) requestAnimationFrame(tick);
-          };
-          requestAnimationFrame(tick);
-        }
-      },
-      { threshold: 0.4 }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [to, duration]);
-
-  return <span ref={ref} className="tabular-nums">{prefix}{val.toLocaleString('en-IN')}{suffix}</span>;
-}
+import { CountUp } from '@/components/ui/count-up';
 
 const STATS = [
   {

@@ -151,6 +151,7 @@ export class VerifyOtpUseCase {
         throw new BadRequestException('No active lead for this account. Complete mobile verification first.');
       }
       await this.leads.updateEmailFromOtp(tx, lead.id, request.value);
+      await this.leads.applyInProgressAfterEmailVerified(tx, lead);
     });
 
     return {

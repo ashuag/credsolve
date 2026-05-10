@@ -16,24 +16,36 @@ function getDatabaseUrl() {
 }
 
 function createPoolConfig(databaseUrl: string): PrismaMariaDbConfig {
+  let url: URL;
   try {
-    const url = new URL(databaseUrl);
-
-    return {
-      host: url.hostname,
-      port: url.port ? Number(url.port) : 3306,
-      user: decodeURIComponent(url.username),
-      password: decodeURIComponent(url.password),
-      database: url.pathname.replace(/^\/+/, ''),
-      connectTimeout: Number(process.env.DB_CONNECT_TIMEOUT_MS ?? 10_000),
-      acquireTimeout: Number(process.env.DB_ACQUIRE_TIMEOUT_MS ?? 60_000),
-      initializationTimeout: Number(process.env.DB_INITIALIZATION_TIMEOUT_MS ?? 60_000),
-      connectionLimit: Number(process.env.DB_CONNECTION_LIMIT ?? 10),
-      timezone: 'Z'
-    };
-  } catch {
-    return databaseUrl;
+    url = new URL(databaseUrl);
+  } catch (cause) {
+    throw new Error(
+      'Invalid DATABASE_URL: expected mysql://user:pass@host:port/db. See backend/.env.example.',
+      { cause: cause as Error }
+    );
   }
+
+  if (!url.hostname) {
+    throw new Error('Invalid DATABASE_URL: hostname is missing.');
+  }
+  const database = url.pathname.replace(/^\/+/, '');
+  if (!database) {
+    throw new Error('Invalid DATABASE_URL: database name is missing from the URL path.');
+  }
+
+  return {
+    host: url.hostname,
+    port: url.port ? Number(url.port) : 3306,
+    user: decodeURIComponent(url.username),
+    password: decodeURIComponent(url.password),
+    database,
+    connectTimeout: Number(process.env.DB_CONNECT_TIMEOUT_MS ?? 10_000),
+    acquireTimeout: Number(process.env.DB_ACQUIRE_TIMEOUT_MS ?? 60_000),
+    initializationTimeout: Number(process.env.DB_INITIALIZATION_TIMEOUT_MS ?? 60_000),
+    connectionLimit: Number(process.env.DB_CONNECTION_LIMIT ?? 10),
+    timezone: 'Z',
+  };
 }
 
 export function createPrismaAdapter() {

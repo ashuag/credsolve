@@ -85,15 +85,18 @@ export default function UploadDocumentsPage() {
       return;
     }
 
+    if (!panDocument || !aadhaarFront || !aadhaarBack) {
+      // Defensive: validateForm() already guarantees these are present, but
+      // narrow for the type-checker without using non-null assertions.
+      setSubmitError('Please attach all three documents and try again.');
+      return;
+    }
+
     setFieldErrors({});
     setIsSubmitting(true);
 
     try {
-      await saveKycDocuments({
-        panDocument: panDocument!,
-        aadhaarFront: aadhaarFront!,
-        aadhaarBack: aadhaarBack!,
-      });
+      await saveKycDocuments({ panDocument, aadhaarFront, aadhaarBack });
       if (refresh) await refresh();
       router.push('/bank-details');
     } catch (error) {

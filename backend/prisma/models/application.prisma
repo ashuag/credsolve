@@ -1,0 +1,99 @@
+// ============================================================
+// APPLICATION
+// ============================================================
+//
+// Application aggregate: one row per loan application, with a small set
+// of 1:1 sub-aggregates (details, eligibility, agreement, disbursement).
+
+model Application {
+  id                  BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                String    @unique @default(uuid()) @db.Char(36)
+  customerId          BigInt    @map("customer_id") @db.UnsignedBigInt
+  leadId              BigInt    @map("lead_id") @db.UnsignedBigInt
+  applicationStatusId Int       @map("application_status_id") @db.SmallInt
+  kycCompletedAt      DateTime? @map("kyc_completed_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  customer          Customer                 @relation(fields: [customerId], references: [id])
+  lead              Lead                     @relation(fields: [leadId], references: [id])
+  applicationStatus ApplicationStatus        @relation(fields: [applicationStatusId], references: [id])
+  details           ApplicationDetails?
+  eligibility       ApplicationEligibility?
+  agreement         ApplicationAgreement?
+  disbursement      ApplicationDisbursement?
+
+  @@index([customerId, applicationStatusId])
+  @@index([leadId])
+  @@index([applicationStatusId])
+  @@map("application")
+}
+
+model ApplicationDetails {
+  id                   BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                 String    @unique @default(uuid()) @db.Char(36)
+  applicationId        BigInt    @unique @map("application_id") @db.UnsignedBigInt
+  reasonForLoanId      Int?      @map("reason_for_loan_id") @db.SmallInt
+  loanAmount           Decimal?  @map("loan_amount") @db.Decimal(12, 2)
+  loanTenure           Int?      @map("loan_tenure") @db.MediumInt
+  interestRate         Decimal?  @map("interest_rate") @db.Decimal(5, 2)
+  interestAmount       Decimal?  @map("interest_amount") @db.Decimal(12, 2)
+  processingFee        Decimal?  @map("processing_fee") @db.Decimal(5, 2)
+  processingFeeAmount  Decimal?  @map("processing_fee_amount") @db.Decimal(12, 2)
+  gstAmount            Decimal?  @map("gst_amount") @db.Decimal(12, 2)
+  loanDisbursementDate DateTime? @map("loan_disbursement_date") @db.Date
+  loanMaturityDate     DateTime? @map("loan_maturity_date") @db.Date
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  application   Application    @relation(fields: [applicationId], references: [id])
+  reasonForLoan ReasonForLoan? @relation(fields: [reasonForLoanId], references: [id])
+
+  @@map("application_details")
+}
+
+model ApplicationEligibility {
+  id               BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  applicationId    BigInt   @unique @map("application_id") @db.UnsignedBigInt
+  isEligible       Boolean  @map("is_eligible")
+  approvedAmount   Decimal? @map("approved_amount") @db.Decimal(12, 2)
+  cibilScore       Int?     @map("cibil_score")
+  ineligibleReason String?  @map("ineligible_reason") @db.VarChar(500)
+  checkedAt        DateTime @default(now()) @map("checked_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  application Application @relation(fields: [applicationId], references: [id])
+
+  @@map("application_eligibility")
+}
+
+model ApplicationAgreement {
+  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid          String    @unique @default(uuid()) @db.Char(36)
+  applicationId BigInt    @unique @map("application_id") @db.UnsignedBigInt
+  documentName  String?   @map("document_name") @db.VarChar(255)
+  ipAddress     String?   @map("ip_address") @db.VarChar(45)
+  signedAt      DateTime? @map("signed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  application Application @relation(fields: [applicationId], references: [id])
+
+  @@map("application_agreement")
+}
+
+model ApplicationDisbursement {
+  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid          String    @unique @default(uuid()) @db.Char(36)
+  applicationId BigInt    @unique @map("application_id") @db.UnsignedBigInt
+  amount        Decimal?  @db.Decimal(12, 2)
+  accountNumber String?   @map("account_number") @db.VarChar(20)
+  ifscCode      String?   @map("ifsc_code") @db.VarChar(11)
+  bankName      String?   @map("bank_name") @db.VarChar(100)
+  utr           String?   @db.VarChar(50)
+  disbursedAt   DateTime? @map("disbursed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  application Application @relation(fields: [applicationId], references: [id])
+
+  @@map("application_disbursement")
+}

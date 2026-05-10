@@ -32,7 +32,6 @@ export class SaveKycDocumentsUseCase {
 
   async execute(
     req: Request,
-    body: Record<string, unknown>,
     files: UploadedFileLike[]
   ): Promise<{ success: true }> {
     const session = req.customerSession;

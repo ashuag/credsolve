@@ -24,7 +24,7 @@ backend/
 - `npm run prisma:migrate:deploy` — apply existing migrations (CI / production)  
 - `npm run seed` — compile seeds (`tsconfig.seed.json`: `prisma/` + `src/common/` only, not the Nest app) and run `prisma/seed.ts`  
 - `npm run lint` — `tsc --noEmit` on `src/` + prisma TS  
-- `npm run dev` — Prisma generate + Nest dev (`tsx watch`)  
+- `npm run dev` — Prisma generate + Nest dev (`nest start --watch --builder tsc`)  
 - `npm run nest -- …` — Nest CLI (e.g. `npm run nest -- g module users`)
 
 ### Inside Docker (`docker exec -it <backend-container> sh`)

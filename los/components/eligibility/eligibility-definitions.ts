@@ -13,9 +13,3 @@ export const ELIGIBILITY_SECTION_DEFINITIONS = [
     href: '/eligibility-criteria/profile-eligibility-check',
   },
 ] as const;
-
-export type EligibilitySectionSlug = (typeof ELIGIBILITY_SECTION_DEFINITIONS)[number]['slug'];
-
-export function getEligibilitySectionDefinition(slug: string) {
-  return ELIGIBILITY_SECTION_DEFINITIONS.find((item) => item.slug === slug);
-}

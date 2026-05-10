@@ -81,4 +81,10 @@ export class SaveLeadDetailsDto {
   @ApiProperty()
   @IsBoolean()
   creditConsentAccepted!: boolean;
+
+  @ApiPropertyOptional({ description: '10-character PAN (optional if already verified earlier).' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i)
+  panNumber?: string;
 }

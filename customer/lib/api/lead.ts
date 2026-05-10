@@ -35,6 +35,21 @@ export type SaveLeadDetailsPayload = {
   annualTurnover?: string;
   annualProfit?: string;
   creditConsentAccepted: boolean;
+  panNumber?: string;
+};
+
+export type VerifyLeadPanPayload = {
+  leadUuid?: string;
+  panNumber: string;
+  fullName: string;
+  dob: string;
+};
+
+export type VerifyLeadPanResponse = {
+  success: boolean;
+  matched: boolean;
+  panVerified: boolean;
+  vendorFullName: string | null;
 };
 
 export type SaveApplicationDetailsPayload = {
@@ -91,6 +106,17 @@ export async function saveLeadDetails(payload: SaveLeadDetailsPayload): Promise<
     payload,
     'Unable to save your details right now. Please try again.'
   )) ?? { success: true };
+}
+
+/** Tenacio `pan-name-dob` — runs before the address step; sets `pan_verified` when name matches. */
+export async function verifyLeadPan(payload: VerifyLeadPanPayload): Promise<VerifyLeadPanResponse> {
+  return (
+    (await apiPost<VerifyLeadPanResponse>(
+      '/auth/verify-pan',
+      payload,
+      'Unable to verify your PAN right now. Please try again.'
+    )) ?? { success: false, matched: false, panVerified: false, vendorFullName: null }
+  );
 }
 
 export async function getCustomerLeadStatus(): Promise<CustomerLeadStatusResponse | null> {

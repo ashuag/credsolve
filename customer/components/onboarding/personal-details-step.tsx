@@ -19,7 +19,7 @@ import {
 } from '@/lib/customer-details';
 import {formatDateDisplay, formatDateIso, getAge, parseDobDisplay, parseIsoDate,} from '@/lib/date-utils';
 import {useCustomerDetailLookups} from '@/lib/use-customer-detail-lookups';
-import {PINCODE_REGEX} from '@/lib/validators';
+import {isValidPan, PINCODE_REGEX} from '@/lib/validators';
 import {useJourneyProgressOptional} from '@/components/journey/journey-progress-context';
 
 const SECTION_CLASS =
@@ -30,6 +30,7 @@ type Fields = {
   fullName: string;
   gender: CustomerGenderValue | '';
   dob: string; // YYYY-MM-DD ISO, derived from dobDisplay
+  panNumber: string;
   occupation: CustomerOccupationValue | '';
   addressLine1: string;
   addressLine2: string;
@@ -46,6 +47,7 @@ function computeProfileCompletionRatio(fields: Fields, dobDisplay: string): numb
   checks.push(fields.fullName.trim().length >= 2);
   checks.push(Boolean(fields.gender));
   checks.push(Boolean(dobDisplay.trim() && fields.dob));
+  checks.push(isValidPan(fields.panNumber.trim()));
   checks.push(Boolean(fields.occupation));
   const occ = fields.occupation;
   if (occ && usesMonthlyIncomeMetric(occ)) {
@@ -80,6 +82,7 @@ const PROFILE_PAGE_FIELDS: Array<keyof Fields> = [
   'fullName',
   'gender',
   'dob',
+  'panNumber',
   'occupation',
   'monthlyIncome',
   'annualTurnover',
@@ -124,6 +127,7 @@ export function PersonalDetailsStep({
     fullName: '',
     gender: '',
     dob: '',
+    panNumber: '',
     occupation: '',
     addressLine1: '',
     addressLine2: '',
@@ -189,6 +193,7 @@ export function PersonalDetailsStep({
       fullName: p.fullName ?? prev.fullName,
       gender: (p.gender as Fields['gender']) || prev.gender,
       dob: p.dob ?? prev.dob,
+      panNumber: p.panNumber ?? prev.panNumber,
       occupation: (p.occupation as Fields['occupation']) || prev.occupation,
       addressLine1: p.addressLine1 ?? prev.addressLine1,
       addressLine2: p.addressLine2 ?? prev.addressLine2,
@@ -294,6 +299,9 @@ export function PersonalDetailsStep({
       next.dob = 'You must be at least 18 years old to apply.';
     }
     if (!fields.gender) next.gender = 'Please select your gender.';
+    if (!isValidPan(fields.panNumber.trim())) {
+      next.panNumber = 'Please enter a valid 10-character PAN.';
+    }
     if (!fields.occupation) next.occupation = 'Please select your occupation.';
     if (!fields.addressLine1.trim() || fields.addressLine1.trim().length < 5) {
       next.addressLine1 = 'Please enter your address line 1.';
@@ -315,12 +323,16 @@ export function PersonalDetailsStep({
   function handleContinueToFinancial() {
     const validation = validate();
     const sectionErrors = pickErrors(validation, PROFILE_PAGE_FIELDS);
-    if (Object.keys(sectionErrors).length > 0) { setErrors(sectionErrors); return; }
+    if (Object.keys(sectionErrors).length > 0) {
+      setErrors(sectionErrors);
+      return;
+    }
     setErrors((prev) => ({
       ...prev,
       fullName: undefined,
       gender: undefined,
       dob: undefined,
+      panNumber: undefined,
       occupation: undefined,
       monthlyIncome: undefined,
       annualTurnover: undefined,
@@ -350,6 +362,7 @@ export function PersonalDetailsStep({
         dob: fields.dob,
         gender: fields.gender as CustomerGenderValue,
         occupation: fields.occupation as CustomerOccupationValue,
+        panNumber: fields.panNumber.trim().toUpperCase(),
         addressLine1: fields.addressLine1.trim(),
         ...(fields.addressLine2.trim() ? { addressLine2: fields.addressLine2.trim() } : {}),
         currentCity: fields.currentCity.trim(),
@@ -412,6 +425,11 @@ export function PersonalDetailsStep({
             <AlertBanner variant="success">{noticeMessage}</AlertBanner>
           </div>
         )}
+        {submitError && activeSection === 'profile' && (
+          <div className="mb-4">
+            <AlertBanner variant="error">{submitError}</AlertBanner>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="grid gap-4 mt-2" noValidate>
           {activeSection === 'profile' ? (
@@ -467,6 +485,30 @@ export function PersonalDetailsStep({
                     ariaDescribedBy={errors.dob ? 'dob-error' : undefined}
                   />
                 </FieldGroup>
+
+                <div className="md:col-span-2">
+                  <FieldGroup label="PAN" htmlFor="panNumber" error={errors.panNumber}>
+                    <input
+                      id="panNumber"
+                      name="panNumber"
+                      type="text"
+                      autoComplete="off"
+                      placeholder="ABCDE1234F"
+                      maxLength={10}
+                      required
+                      value={fields.panNumber}
+                      onChange={(event) => {
+                        const v = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+                        setFields((prev) => ({ ...prev, panNumber: v }));
+                        if (submitError) setSubmitError('');
+                        if (errors.panNumber) setErrors((prev) => ({ ...prev, panNumber: undefined }));
+                      }}
+                      aria-invalid={Boolean(errors.panNumber)}
+                      aria-describedby={errors.panNumber ? 'panNumber-error' : undefined}
+                      className={inputClass(Boolean(errors.panNumber))}
+                    />
+                  </FieldGroup>
+                </div>
 
                 <div className="md:col-span-2">
                   <FieldGroup label="Occupation" htmlFor="occupation" error={errors.occupation}>

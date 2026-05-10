@@ -34,7 +34,15 @@ function defaultPathForStage(stage: JourneyStage): string {
 }
 
 function isPathAllowedForStage(stage: JourneyStage, path: string): boolean {
-  if (path === '/apply-for-loan' || path === '/login' || path === '/') return true;
+  if (
+    path === '/apply-for-loan' ||
+    path === '/login' ||
+    path === '/' ||
+    path === '/thank-you' ||
+    path === '/dashboard'
+  ) {
+    return true;
+  }
   if (path.startsWith('/onboarding')) return true;
 
   switch (stage) {
@@ -65,17 +73,19 @@ export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (loading || !pathname) return;
 
-    // Not signed in → push to start.
+    // Not signed in → push to start (thank-you is public so customers still see confirmation after submit or via link).
     if (!session?.authenticated) {
-      if (pathname !== '/apply-for-loan') {
+      if (pathname !== '/apply-for-loan' && pathname !== '/thank-you') {
         router.replace('/apply-for-loan');
       }
       return;
     }
 
-    // Signed in but no active lead → start flow.
+    // Signed in but no active lead → start flow (still allow confirmation page).
     if (!session.lead) {
-      router.replace('/apply-for-loan');
+      if (pathname !== '/thank-you') {
+        router.replace('/apply-for-loan');
+      }
       return;
     }
 

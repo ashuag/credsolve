@@ -42,11 +42,63 @@ export interface LoanCalculationSettings {
   processingFeeGstPercent: number;
 }
 
+/**
+ * In-process TTL for cached auth/OTP settings. Override via env when running
+ * pods that should pick up admin setting changes faster (e.g. set to 5_000 in
+ * staging). Falls back to a 30s default which is long enough to flatten the
+ * "every authenticated request reloads settings" hot path and short enough
+ * that pods catch up on changes within a minute without explicit invalidation.
+ */
+function authOtpCacheTtlMs(): number {
+  const raw = process.env.AUTH_OTP_SETTINGS_CACHE_TTL_MS?.trim();
+  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+  if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 600_000) return parsed;
+  return 30_000;
+}
+
 @Injectable()
 export class SettingsRepository {
+  private authOtpCache: { value: AuthOtpSettings; expiresAt: number } | null = null;
+  private authOtpInflight: Promise<AuthOtpSettings> | null = null;
+
   constructor(private readonly prisma: PrismaService) {}
 
   async loadAuthOtpSettings(): Promise<AuthOtpSettings> {
+    const ttl = authOtpCacheTtlMs();
+    const now = Date.now();
+
+    if (ttl > 0 && this.authOtpCache && this.authOtpCache.expiresAt > now) {
+      return this.authOtpCache.value;
+    }
+
+    // Coalesce concurrent reloads so a thundering herd of expired-cache
+    // requests doesn't stampede the DB.
+    if (this.authOtpInflight) {
+      return this.authOtpInflight;
+    }
+
+    this.authOtpInflight = this.fetchAuthOtpSettings()
+      .then((value) => {
+        if (ttl > 0) {
+          this.authOtpCache = { value, expiresAt: Date.now() + ttl };
+        } else {
+          this.authOtpCache = null;
+        }
+        return value;
+      })
+      .finally(() => {
+        this.authOtpInflight = null;
+      });
+
+    return this.authOtpInflight;
+  }
+
+  /** Test/admin hook: clear the in-process auth/OTP settings cache. */
+  invalidateAuthOtpSettingsCache(): void {
+    this.authOtpCache = null;
+  }
+
+  private async fetchAuthOtpSettings(): Promise<AuthOtpSettings> {
     const rows = await this.prisma.client.setting.findMany({
       where: { key: { in: [...KEYS] }, isActive: true },
       select: { key: true, value: true },

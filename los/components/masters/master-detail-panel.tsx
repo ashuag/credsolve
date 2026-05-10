@@ -29,7 +29,8 @@ import {
   updateReasonForLoan,
   updateState,
 } from '@/lib/api';
-import { LOS_STORAGE_KEY } from '@/lib/auth';
+import { getLosToken } from '@/lib/auth';
+import { cx } from '@/lib/cx';
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { getMasterDefinition, type MasterSlug } from './master-definitions';
 
@@ -47,21 +48,6 @@ type ModalState =
   | { kind: 'reasonForLoan'; item?: LosNamedMaster }
   | { kind: 'gender'; item?: LosNamedMaster }
   | { kind: 'bank'; item?: LosNamedMaster };
-
-function getToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.localStorage.getItem(LOS_STORAGE_KEY);
-    if (!raw) return null;
-    return (JSON.parse(raw) as { token?: string }).token ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function cx(...values: Array<string | false | null | undefined>) {
-  return values.filter(Boolean).join(' ');
-}
 
 function formatLeadSourceType(type: LosLeadSourceType) {
   return type
@@ -688,7 +674,7 @@ export function MasterDetailPanel({ master }: { master: MasterSlug }) {
   const [modal, setModal] = useState<ModalState | null>(null);
 
   const loadMasters = useCallback(async (tokenOverride?: string) => {
-    const token = tokenOverride ?? getToken();
+    const token = tokenOverride ?? getLosToken();
     if (!token) {
       setFetchError('Session expired - please log in again.');
       setLoading(false);
@@ -713,7 +699,7 @@ export function MasterDetailPanel({ master }: { master: MasterSlug }) {
   }, [loadMasters]);
 
   async function runAction<T>(key: string, task: (token: string) => Promise<T>) {
-    const token = getToken();
+    const token = getLosToken();
     if (!token) {
       setActionError('Session expired - please log in again.');
       throw new Error('Session expired - please log in again.');

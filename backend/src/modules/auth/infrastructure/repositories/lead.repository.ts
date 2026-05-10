@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { EmailVerificationType } from '@prisma/client';
+import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import type { DbClient } from './db.client';
 
@@ -58,6 +59,29 @@ export class LeadRepository {
         email,
         emailVerificationType: EmailVerificationType.OTP,
       },
+    });
+  }
+
+  /**
+   * After verified email is persisted (OTP or Google), set lead to IN_PROGRESS.
+   * No-op when the lead is already CONVERTED.
+   */
+  async applyInProgressAfterEmailVerified(
+    tx: DbClient | undefined,
+    lead: { id: bigint; leadStatus: { name: string } }
+  ) {
+    if (lead.leadStatus.name === LEAD_STATUS.CONVERTED) {
+      return;
+    }
+    const inProgress = await this.db(tx).leadStatus.findFirst({
+      where: { name: LEAD_STATUS.IN_PROGRESS, isActive: true },
+    });
+    if (!inProgress) {
+      throw new InternalServerErrorException('Lead status IN_PROGRESS is missing. Run database seeds.');
+    }
+    return this.db(tx).lead.update({
+      where: { id: lead.id },
+      data: { leadStatusId: inProgress.id },
     });
   }
 

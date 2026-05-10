@@ -3,7 +3,13 @@
   "private": true,
   "scripts": {
     "dev:backend": "cd backend && npm run dev",
-    "dev:crm": "cd crm && npm run dev",
-    "dev:customer": "cd customer && npm run dev"
+    "dev:los": "cd los && npm run dev",
+    "dev:customer": "cd customer && npm run dev",
+    "dev": "(cd backend && npm run dev) & (cd los && npm run dev) & (cd customer && npm run dev) & wait",
+    "lint:backend": "cd backend && npm run lint",
+    "lint:los": "cd los && npm run lint",
+    "lint:customer": "cd customer && npm run lint",
+    "lint": "npm run lint:backend && npm run lint:los && npm run lint:customer",
+    "typecheck": "backend/node_modules/.bin/tsc -b --noEmit"
   }
 }

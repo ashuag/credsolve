@@ -1,0 +1,74 @@
+// ============================================================
+// GEOGRAPHY / SERVICEABILITY
+// ============================================================
+//
+// State + city masters and the negative lists used by serviceability
+// rules during lead origination.
+
+model State {
+  id            Int            @id @default(autoincrement())
+  name          String         @unique @db.VarChar(100)
+  code          String         @unique @db.VarChar(5)
+  isActive      Boolean        @default(true) @map("is_active")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  cities        City[]
+  negativeState NegativeState?
+
+  @@map("state")
+}
+
+model City {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(100)
+  stateId   Int      @map("state_id")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  state        State         @relation(fields: [stateId], references: [id])
+  leadDetails  LeadDetail[]
+  negativeCity NegativeCity?
+
+  @@unique([name, stateId])
+  @@index([stateId])
+  @@map("city")
+}
+
+/// Serviceability: blocklisted 6-digit Indian pincodes (no FK — pincodes may exist outside `city` master).
+model NegativePincode {
+  id        Int      @id @default(autoincrement())
+  pincode   String   @unique @db.Char(6)
+  reason    String?  @db.VarChar(500)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("negative_pincode")
+}
+
+/// Serviceability: entire `state` blocked for origination.
+model NegativeState {
+  id        Int      @id @default(autoincrement())
+  stateId   Int      @unique @map("state_id")
+  reason    String?  @db.VarChar(500)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  state State @relation(fields: [stateId], references: [id], onDelete: Cascade)
+
+  @@map("negative_state")
+}
+
+/// Serviceability: single `city` blocked for origination.
+model NegativeCity {
+  id        Int      @id @default(autoincrement())
+  cityId    Int      @unique @map("city_id")
+  reason    String?  @db.VarChar(500)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  city City @relation(fields: [cityId], references: [id], onDelete: Cascade)
+
+  @@map("negative_city")
+}

@@ -18,12 +18,15 @@ type OtpVerificationFormProps = {
   compact?: boolean;
   onChangeNumber?: () => void;
   initialOtpRequest?: SendOtpResponse | null;
+  /** After OTP success, navigate here (e.g. `/dashboard` for account login). Overrides default onboarding redirect. */
+  successRedirect?: string;
 };
 
 export function OtpVerificationForm({
   compact = false,
   onChangeNumber,
   initialOtpRequest = null,
+  successRedirect,
 }: OtpVerificationFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -89,10 +92,17 @@ export function OtpVerificationForm({
 
     try {
       await verifyCustomerOtp(otpRequest.requestId, otp.joined);
-      const nextOnboardingMode = mode === 'login' ? 'login' : 'register';
       await refreshCustomerSession();
       startTransition(() => {
-        router.push(`/onboarding?mode=${nextOnboardingMode}`);
+        if (successRedirect) {
+          router.push(successRedirect);
+          return;
+        }
+        if (mode === 'login') {
+          router.push('/dashboard');
+          return;
+        }
+        router.push('/onboarding?mode=register');
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to verify OTP right now.');

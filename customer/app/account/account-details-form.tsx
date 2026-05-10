@@ -130,6 +130,12 @@ export function AccountDetailsForm() {
       setFieldErrors(errors);
       return;
     }
+    if (!selectedDate) {
+      // Belt-and-braces: validate() already enforces this, but keep the
+      // type-checker happy without a non-null assertion below.
+      setFieldErrors({ dob: 'Please enter a valid date of birth (DD/MM/YYYY).' });
+      return;
+    }
     setFieldErrors({});
 
     const leadUuid = session?.authenticated ? session.lead?.uuid : undefined;
@@ -142,7 +148,7 @@ export function AccountDetailsForm() {
         leadUuid,
         fullName: fullName.trim(),
         gender,
-        dob: formatDateIso(selectedDate!),
+        dob: formatDateIso(selectedDate),
         panNumber: normalizedPan,
         addressLine1: addressLine1.trim(),
         ...(normalizedAddressLine2 ? { addressLine2: normalizedAddressLine2 } : {}),

@@ -60,10 +60,9 @@ export class ApplicationsController {
   @ApiOkResponse({ description: 'KYC document references stored' })
   kycDocumentsRoute(
     @Req() req: Request,
-    @Body() body: Record<string, unknown>,
     @UploadedFiles() files: Array<UploadedFileLike>
   ) {
-    return this.saveKycDocuments.execute(req, body, files ?? []);
+    return this.saveKycDocuments.execute(req, files ?? []);
   }
 
   @Post('bank-details')

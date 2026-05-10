@@ -14,6 +14,14 @@ export type LoanLandingShellProps = {
   leftDescription?: string;
   leftInfographic?: ReactNode;
   leftStats?: Array<{ label: string; value: string }>;
+  /** When set, replaces the default marketing bullet list on the dark left rail. */
+  leftFeatures?: Array<{ icon: string; label: string }>;
+  /** Overrides small-screen hero above the form (defaults match apply-for-loan). */
+  mobileChip?: string;
+  mobileTitle?: ReactNode;
+  mobileSubtitle?: string;
+  /** Show journey progress dial on the dark left rail (apply-for-loan default). */
+  showSpeedometer?: boolean;
 };
 
 export function LoanLandingShell({
@@ -22,6 +30,11 @@ export function LoanLandingShell({
   leftDescription,
   leftInfographic,
   leftStats,
+  leftFeatures,
+  mobileChip = '100% Digital Process',
+  mobileTitle,
+  mobileSubtitle = 'Start your seamless digital journey.',
+  showSpeedometer = true,
 }: LoanLandingShellProps) {
   const defaultTitle = (
     <>Fast. Secure. <span className="text-transparent bg-clip-text bg-gradient-to-br from-[#1fa2ff] to-[#1496f3] drop-shadow-[0_0_12px_rgba(20,150,243,0.3)]">Instant.</span></>
@@ -34,6 +47,7 @@ export function LoanLandingShell({
   ];
 
   const stats = leftStats || defaultStats;
+  const featureList = leftFeatures ?? DEFAULT_FEATURES;
 
   return (
     <div className="w-full max-w-[1240px] flex flex-col lg:flex-row bg-white rounded-[2.5rem] shadow-[0_24px_80px_rgba(23,44,113,0.12),0_8px_32px_rgba(23,44,113,0.06)] overflow-hidden border border-slate-100 relative z-10 animate-fade-in-up">
@@ -51,13 +65,14 @@ export function LoanLandingShell({
 
         {/* Content wrapper — tighter spacing so the left rail fits common laptop heights without scrolling */}
         <div className="relative z-10 flex min-h-0 flex-1 flex-col py-6 px-8 xl:px-10 gap-4 xl:gap-5">
-          
-          {/* Speedometer */}
-          <div className="flex shrink-0 justify-center">
-            <JourneySpeedometer />
-          </div>
-
-          <div className="w-full shrink-0 h-px bg-white/10" />
+          {showSpeedometer ? (
+            <>
+              <div className="flex shrink-0 justify-center">
+                <JourneySpeedometer />
+              </div>
+              <div className="w-full shrink-0 h-px bg-white/10" />
+            </>
+          ) : null}
 
           {/* Headline */}
           <div className="text-center shrink-0">
@@ -71,14 +86,14 @@ export function LoanLandingShell({
 
           {/* Infographic OR feature list */}
           {leftInfographic ? (
-            <div className="flex min-h-0 flex-1 justify-center items-center py-1">
-              <div className="w-full max-w-[280px] aspect-square transition-transform hover:scale-[1.03] duration-500 drop-shadow-[0_20px_40px_rgba(0,0,0,0.3)]">
+            <div className="flex min-h-0 flex-1 justify-center items-center py-2">
+              <div className="flex w-full max-w-[min(360px,94%)] items-center justify-center transition-transform duration-500 hover:scale-[1.015]">
                 {leftInfographic}
               </div>
             </div>
           ) : (
             <div className="flex flex-col gap-3 max-w-sm mx-auto w-full min-h-0 flex-1 justify-center">
-              {DEFAULT_FEATURES.map((f, i) => (
+              {featureList.map((f, i) => (
                 <div key={f.label} className="flex items-center gap-3.5 group">
                   <div className="shrink-0 flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-sm transition-all duration-300 group-hover:bg-[#1496f3]/20 group-hover:border-[#1496f3]/40 group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(20,150,243,0.3)]">
                     <svg viewBox="0 0 24 24" className="h-4.5 w-4.5 text-[#ffc519] transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -113,10 +128,12 @@ export function LoanLandingShell({
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
               </span>
-              100% Digital Process
+              {mobileChip}
             </div>
-            <h1 className="text-[2rem] font-[900] text-brand-navy mb-2 tracking-tight leading-tight">Instant Loan</h1>
-            <p className="text-brand-muted font-[500] text-[1.05rem]">Start your seamless digital journey.</p>
+            <h1 className="text-[2rem] font-[900] text-brand-navy mb-2 tracking-tight leading-tight">
+              {mobileTitle ?? 'Instant Loan'}
+            </h1>
+            <p className="text-brand-muted font-[500] text-[1.05rem]">{mobileSubtitle}</p>
           </div>
           {journeyPanel}
         </div>

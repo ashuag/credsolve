@@ -1,0 +1,32 @@
+// ============================================================
+// OTP
+// ============================================================
+//
+// Audit log for one-time-password requests across send/verify channels.
+// `OtpType` (mobile vs email) lives in masters.prisma.
+
+model OtpRequest {
+  id           Int       @id @default(autoincrement())
+  uuid         String    @unique @default(uuid()) @db.Char(36)
+  value        String    @db.VarChar(100)
+  typeId       Int       @map("type_id") @db.SmallInt
+  otpCode      String    @map("otp_code") @db.VarChar(6)
+  ipAddress    String?   @map("ip_address") @db.VarChar(45)
+  attemptCount Int       @default(0) @map("attempt_count") @db.SmallInt
+  lastSentAt   DateTime  @default(now()) @map("last_sent_at")
+  expiresAt    DateTime  @map("expires_at")
+  utmSource    String?   @map("utm_source") @db.VarChar(100)
+  utmMedium    String?   @map("utm_medium") @db.VarChar(100)
+  utmCampaign  String?   @map("utm_campaign") @db.VarChar(100)
+  utmTerm      String?   @map("utm_term") @db.VarChar(100)
+  utmContent   String?   @map("utm_content") @db.VarChar(100)
+  verifiedAt   DateTime? @map("verified_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  type OtpType @relation(fields: [typeId], references: [id])
+
+  @@index([value, typeId])
+  @@index([expiresAt])
+  @@index([verifiedAt])
+  @@map("otp_request")
+}

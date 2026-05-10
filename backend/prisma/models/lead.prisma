@@ -1,0 +1,107 @@
+// ============================================================
+// LEAD
+// ============================================================
+//
+// Lead aggregate: one row per customer-intent funnel run, with optional
+// detail (form payload), UTM history, and external vendor call logs.
+
+model Lead {
+  id                    BigInt                 @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                  String                 @unique @default(uuid()) @db.Char(36)
+  customerId            BigInt                 @map("customer_id") @db.UnsignedBigInt
+  email                 String?                @db.VarChar(100)
+  emailVerificationType EmailVerificationType? @map("email_verification_type")
+  leadStatusId          Int                    @default(1) @map("lead_status_id") @db.SmallInt
+  sourceId              Int?                   @map("source_id")
+  isActive              Boolean                @default(true) @map("is_active")
+  expiresAt             DateTime?              @map("expires_at")
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+
+  customer      Customer       @relation(fields: [customerId], references: [id])
+  leadStatus    LeadStatus     @relation(fields: [leadStatusId], references: [id])
+  source        LeadSource?    @relation(fields: [sourceId], references: [id])
+  leadDetail    LeadDetail?
+  leadUtms      LeadUtm[]
+  applications  Application[]
+  vendorApiLogs VendorApiLog[]
+
+  @@index([customerId, createdAt])
+  @@index([email])
+  @@index([leadStatusId])
+  @@index([sourceId])
+  @@index([expiresAt])
+  @@index([createdAt])
+  @@map("lead")
+}
+
+model LeadDetail {
+  id               BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid             String    @unique @default(uuid()) @db.Char(36)
+  leadId           BigInt    @unique @map("lead_id") @db.UnsignedBigInt
+  fullName         String?   @map("full_name") @db.VarChar(100)
+  dateOfBirth      DateTime? @map("date_of_birth") @db.Date
+  genderId         Int?      @map("gender_id") @db.SmallInt
+  panNumber        String?   @map("pan_number") @db.Char(10)
+  panVerified      Boolean   @default(false) @map("pan_verified")
+  panVerifiedAt    DateTime? @map("pan_verified_at")
+  cityId           Int?      @map("city_id")
+  pincode          String?   @db.Char(6)
+  addressLine1     String?   @map("address_line_1") @db.TinyText
+  addressLine2     String?   @map("address_line_2") @db.TinyText
+  occupationId     Int?      @map("occupation_id") @db.SmallInt
+  netMonthlyIncome Decimal?  @map("net_monthly_income") @db.Decimal(12, 2)
+  annualTurnover   Decimal?  @map("annual_turnover") @db.Decimal(12, 2)
+  annualProfit     Decimal?  @map("annual_profit") @db.Decimal(12, 2)
+  cibilConsentAt   DateTime? @map("cibil_consent_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  lead       Lead        @relation(fields: [leadId], references: [id])
+  gender     Gender?     @relation(fields: [genderId], references: [id])
+  occupation Occupation? @relation(fields: [occupationId], references: [id])
+  city       City?       @relation(fields: [cityId], references: [id])
+
+  @@index([cityId])
+  @@index([pincode])
+  @@map("lead_detail")
+}
+
+/// External vendor HTTP calls (Tenacio, etc.) for audit and debugging.
+model VendorApiLog {
+  id              BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid            String           @unique @default(uuid()) @db.Char(36)
+  providerName    String           @map("provider_name") @db.VarChar(100)
+  serviceName     String           @map("service_name") @db.VarChar(120)
+  requestMethod   VendorHttpMethod @map("request_method")
+  leadId          BigInt?          @map("lead_id") @db.UnsignedBigInt
+  requestPayload  Json             @map("request_payload")
+  responsePayload Json?            @map("response_payload")
+  httpStatus      Int?             @map("http_status")
+  requestedAt     DateTime         @map("requested_at")
+  respondedAt     DateTime         @map("responded_at")
+
+  lead Lead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([leadId])
+  @@index([providerName, requestedAt])
+  @@map("vendor_api_log")
+}
+
+model LeadUtm {
+  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid        String   @unique @default(uuid()) @db.Char(36)
+  leadId      BigInt   @map("lead_id") @db.UnsignedBigInt
+  utmSource   String?  @map("utm_source") @db.VarChar(100)
+  utmMedium   String?  @map("utm_medium") @db.VarChar(100)
+  utmCampaign String?  @map("utm_campaign") @db.VarChar(100)
+  utmTerm     String?  @map("utm_term") @db.VarChar(100)
+  utmContent  String?  @map("utm_content") @db.VarChar(100)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  lead Lead @relation(fields: [leadId], references: [id])
+
+  @@index([leadId])
+  @@index([createdAt])
+  @@map("lead_utm")
+}

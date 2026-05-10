@@ -108,6 +108,10 @@ export class SaveLeadDetailsUseCase {
     const annualProfit = parseOptionalInrAmount(dto.annualProfit);
 
     const consentAt = dto.creditConsentAccepted ? new Date() : null;
+    const panPatch =
+      dto.panNumber?.trim() != null && dto.panNumber.trim().length > 0
+        ? { panNumber: dto.panNumber.trim().toUpperCase() }
+        : {};
 
     await this.prisma.client.leadDetail.upsert({
       where: { leadId: leadRow.id },
@@ -125,6 +129,7 @@ export class SaveLeadDetailsUseCase {
         annualTurnover,
         annualProfit,
         cibilConsentAt: consentAt,
+        ...panPatch,
       },
       update: {
         fullName: dto.fullName.trim(),
@@ -139,6 +144,7 @@ export class SaveLeadDetailsUseCase {
         annualTurnover,
         annualProfit,
         cibilConsentAt: consentAt,
+        ...panPatch,
       },
     });
 

@@ -1,10 +1,14 @@
 import { CrmShell } from '@/components/layout/crm-shell';
 import { PartnerCreateForm } from '@/components/ui/partner-create-form';
-import { getPartners } from '@/lib/api';
+import { getPartners, type LosPartner } from '@/lib/api';
 import styles from '@/app/partners/partners.module.css';
 
 export default async function PartnersPage() {
   const partners = await getPartners();
+
+  const activeCount = partners.filter((p) => p.status === 'ACTIVE').length;
+  const pendingCount = partners.filter((p) => p.status === 'PENDING_REGISTRATION').length;
+  const teamMemberCount = partners.reduce((count, p) => count + p.teamMembers.length, 0);
 
   return (
     <CrmShell title="Partner Network">
@@ -16,15 +20,15 @@ export default async function PartnersPage() {
           </article>
           <article className={styles.statCard}>
             <span className={styles.statLabel}>Active</span>
-            <strong className={styles.statValue}>{partners.filter((partner: any) => partner.status === 'ACTIVE').length}</strong>
+            <strong className={styles.statValue}>{activeCount}</strong>
           </article>
           <article className={styles.statCard}>
             <span className={styles.statLabel}>Pending</span>
-            <strong className={styles.statValue}>{partners.filter((partner: any) => partner.status === 'PENDING_REGISTRATION').length}</strong>
+            <strong className={styles.statValue}>{pendingCount}</strong>
           </article>
           <article className={styles.statCard}>
             <span className={styles.statLabel}>Team members</span>
-            <strong className={styles.statValue}>{partners.reduce((count: number, partner: any) => count + partner.teamMembers.length, 0)}</strong>
+            <strong className={styles.statValue}>{teamMemberCount}</strong>
           </article>
         </section>
 
@@ -37,7 +41,7 @@ export default async function PartnersPage() {
             </div>
 
             <div className={styles.partnerList}>
-              {partners.map((partner: any) => (
+              {partners.map((partner: LosPartner) => (
                 <article key={partner.id} className={styles.partnerItem}>
                   <div className={styles.row}>
                     <div>

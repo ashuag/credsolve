@@ -52,18 +52,7 @@ export class GetCustomerSessionUseCase {
       leadRow.emailVerificationType
     );
 
-    const profile = formatLeadDetailForPortal(leadRow.leadDetail);
-
-    const detailsCompleted = Boolean(
-      profile?.fullName?.trim() &&
-        profile?.dob?.trim() &&
-        profile?.gender &&
-        profile?.occupation &&
-        profile?.addressLine1?.trim() &&
-        profile?.currentCity?.trim() &&
-        profile?.pincode?.trim() &&
-        profile?.creditConsentAccepted
-    );
+    let profile = formatLeadDetailForPortal(leadRow.leadDetail);
 
     const application = await this.prisma.client.application.findFirst({
       where: { leadId: leadRow.id },
@@ -87,9 +76,25 @@ export class GetCustomerSessionUseCase {
       this.prisma.client.customerKyc.findFirst({
         where: { customerId: customer.id },
         orderBy: { createdAt: 'desc' },
-        select: { id: true, kycVerifiedAt: true },
+        select: { id: true, kycVerifiedAt: true, fullName: true },
       }),
     ]);
+
+    const kycDisplayName = latestCustomerKyc?.fullName?.trim();
+    if (profile && kycDisplayName && !profile.fullName?.trim()) {
+      profile = { ...profile, fullName: kycDisplayName };
+    }
+
+    const detailsCompleted = Boolean(
+      profile?.fullName?.trim() &&
+        profile?.dob?.trim() &&
+        profile?.gender &&
+        profile?.occupation &&
+        profile?.addressLine1?.trim() &&
+        profile?.currentCity?.trim() &&
+        profile?.pincode?.trim() &&
+        profile?.creditConsentAccepted
+    );
 
     const loanSelectionCompleted = Boolean(appDetails?.loanAmount != null && appDetails?.loanTenure != null);
 

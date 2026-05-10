@@ -15,7 +15,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
     title: {
-        default: 'MoneyCash Customer Portal',
+        default: 'Get Instant Loan Upto 50,000 | MoneyCash',
         template: '%s | MoneyCash'
     },
     description: 'MoneyCash customer portal for secure OTP login, account access, payments, and loan application progress.',
@@ -47,9 +47,6 @@ export const viewport: Viewport = {
 export default function RootLayout({children}: Readonly<{ children: ReactNode }>) {
     return (
         <html lang="en" className={inter.variable}>
-        <head>
-            <title>Get Instant Loan Upto 50,000</title>
-        </head>
         <body suppressHydrationWarning>
             <CustomerSessionProvider>
                 <CustomerUtmBootstrap/>

@@ -3,7 +3,6 @@ node_modules/
 backend/node_modules/
 los/node_modules/
 customer/node_modules/
-los/node_modules/
 
 ## Build and coverage outputs
 .next/
@@ -14,6 +13,8 @@ coverage/
 .turbo/
 *.tsbuildinfo
 .vercel/
+los/.next/
+customer/.next/
 
 ## Environment and local secrets
 .env
@@ -42,7 +43,4 @@ Thumbs.db
 
 ## Generated code
 /backend/src/generated/prisma/
-los/.next/
-customer/.next/
-los/.next/
 los/public/image

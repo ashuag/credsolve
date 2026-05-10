@@ -97,28 +97,28 @@ export class SubmitProfessionalApplicationUseCase {
     const cibilScore = randomDemoCibilScore();
     const eligible = preApprovedAmountInr >= 5_000;
 
-    const [convertedStatus, inReviewAppStatus] = await Promise.all([
+    const [convertedStatus, appStatuses] = await Promise.all([
       this.prisma.client.leadStatus.findFirst({
         where: { name: LEAD_STATUS.CONVERTED, isActive: true },
         select: { id: true },
       }),
-      this.prisma.client.applicationStatus.findFirst({
-        where: { name: APPLICATION_STATUS.IN_REVIEW, isActive: true },
-        select: { id: true },
+      this.prisma.client.applicationStatus.findMany({
+        where: {
+          name: { in: [APPLICATION_STATUS.IN_REVIEW, APPLICATION_STATUS.DRAFT] },
+          isActive: true,
+        },
+        select: { id: true, name: true },
       }),
     ]);
 
     if (!convertedStatus) {
       throw new BadRequestException('Lead status CONVERTED is not configured.');
     }
+    const inReviewAppStatus = appStatuses.find((s) => s.name === APPLICATION_STATUS.IN_REVIEW);
+    const draftStatus = appStatuses.find((s) => s.name === APPLICATION_STATUS.DRAFT);
     if (!inReviewAppStatus) {
       throw new BadRequestException('Application status IN_REVIEW is not configured.');
     }
-
-    const draftStatus = await this.prisma.client.applicationStatus.findFirst({
-      where: { name: APPLICATION_STATUS.DRAFT, isActive: true },
-      select: { id: true },
-    });
     if (!draftStatus) {
       throw new BadRequestException('Application status DRAFT is not configured.');
     }

@@ -2,10 +2,7 @@
 
 import Link from 'next/link';
 import { ELIGIBILITY_SECTION_DEFINITIONS } from './eligibility-definitions';
-
-function cx(...values: Array<string | false | null | undefined>) {
-  return values.filter(Boolean).join(' ');
-}
+import { cx } from '@/lib/cx';
 
 export function EligibilityOverviewPanel() {
   return (

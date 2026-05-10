@@ -5,6 +5,7 @@ export const RATE_LIMIT_ROUTE_KEY = 'rate_limit_route';
 export type RateLimitRouteId =
   | 'send-otp'
   | 'verify-otp'
+  | 'verify-pan'
   | 'logout'
   | 'sync-lead-email'
   | 'save-lead-details'

@@ -1,24 +1,14 @@
 'use client';
 
-import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { ReactNode, useEffect } from 'react';
+import { cx } from '@/lib/cx';
 
 export type StatusFilter = 'all' | 'active' | 'inactive';
 
-export function getLosToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.localStorage.getItem(LOS_STORAGE_KEY);
-    if (!raw) return null;
-    return (JSON.parse(raw) as { token?: string }).token ?? null;
-  } catch {
-    return null;
-  }
-}
-
-export function cx(...values: Array<string | false | null | undefined>) {
-  return values.filter(Boolean).join(' ');
-}
+// Re-exported from canonical homes so existing importers continue to work.
+// Prefer importing directly from `@/lib/auth` / `@/lib/cx` in new code.
+export { getLosToken } from '@/lib/auth';
+export { cx };
 
 export function applyStatusFilter<T extends { isActive: boolean }>(items: T[], filter: StatusFilter) {
   if (filter === 'active') return items.filter((item) => item.isActive);

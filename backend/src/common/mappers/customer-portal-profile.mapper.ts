@@ -73,6 +73,8 @@ export function formatLeadDetailForPortal(detail: {
   fullName: string | null;
   dateOfBirth: Date | null;
   panNumber: string | null;
+  panVerified?: boolean;
+  panVerifiedAt?: Date | null;
   addressLine1: string | null;
   addressLine2: string | null;
   pincode: string | null;
@@ -97,6 +99,8 @@ export function formatLeadDetailForPortal(detail: {
   annualTurnover: string | null;
   annualProfit: string | null;
   creditConsentAccepted: boolean;
+  panVerified: boolean;
+  panVerifiedAt: string | null;
 } | null {
   if (!detail) {
     return null;
@@ -111,6 +115,8 @@ export function formatLeadDetailForPortal(detail: {
     fullName: detail.fullName,
     dob,
     panNumber: detail.panNumber,
+    panVerified: detail.panVerified ?? false,
+    panVerifiedAt: detail.panVerifiedAt?.toISOString() ?? null,
     gender: mapGenderDbNameToPortalSlug(detail.gender?.name),
     occupation: mapOccupationDbNameToPortalSlug(detail.occupation?.name),
     addressLine1: detail.addressLine1,

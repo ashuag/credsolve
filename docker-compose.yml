@@ -1,31 +1,43 @@
 name: moneyCash
 
+# Per-app install logic lives in `docker/entrypoint-dev.sh`. It uses a
+# lockfile-signature stamp + filesystem mutex so concurrent containers
+# don't trample each other's `npm ci`. See that script for details.
 x-node-defaults: &node-defaults
   image: node:22-bookworm-slim
   restart: "no"
   init: true
-  tty: true
+  # Invoked via `sh` so the script doesn't need the executable bit
+  # set on disk (git tracks it as 0644 across clones).
+  entrypoint: ["sh", "/usr/local/bin/entrypoint-dev.sh"]
   networks:
     - shared-net
+
+x-entrypoint-mount: &entrypoint-mount
+  type: bind
+  source: ./docker/entrypoint-dev.sh
+  target: /usr/local/bin/entrypoint-dev.sh
+  read_only: true
 
 services:
   backend:
     <<: *node-defaults
+    tty: true
     env_file: ./backend/.env
     ports:
       - "4001:4001"
     working_dir: /workspace/backend
     volumes:
       - ./backend:/workspace/backend:cached
-    command: >
-      sh -c "
-        if [ -f package-lock.json ] && [ ! -d node_modules ]; then npm ci;
-        elif [ ! -d node_modules ]; then npm install;
-        fi &&
-        npm run prisma:generate &&
-        npm run prisma:migrate:deploy &&
-        npm run dev
-      "
+      - *entrypoint-mount
+    # The entrypoint handles `npm ci` + `prisma generate`. We only need
+    # the runtime command here: deploy migrations, then start Nest in
+    # watch mode.
+    command:
+      - sh
+      - -c
+      - npm run prisma:migrate:deploy && npm run dev
+
   los:
     <<: *node-defaults
     env_file: ./los/.env
@@ -34,13 +46,9 @@ services:
     working_dir: /workspace/los
     volumes:
       - ./los:/workspace/los:cached
-    command: >
-      sh -c "
-        if [ -f package-lock.json ] && [ ! -d node_modules ]; then npm ci;
-        elif [ ! -d node_modules ]; then npm install;
-        fi &&
-        npm run dev
-      "
+      - *entrypoint-mount
+    command: ["npm", "run", "dev"]
+
   customer:
     <<: *node-defaults
     env_file: ./customer/.env
@@ -49,13 +57,8 @@ services:
     working_dir: /workspace/customer
     volumes:
       - ./customer:/workspace/customer:cached
-    command: >
-      sh -c "
-        if [ -f package-lock.json ] && [ ! -d node_modules ]; then npm ci;
-        elif [ ! -d node_modules ]; then npm install;
-        fi &&
-        npm run dev
-      "
+      - *entrypoint-mount
+    command: ["npm", "run", "dev"]
 
 networks:
   shared-net:
