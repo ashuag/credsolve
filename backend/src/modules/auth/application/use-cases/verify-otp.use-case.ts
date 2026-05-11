@@ -79,13 +79,16 @@ export class VerifyOtpUseCase {
       const leadExpireAt = new Date();
       leadExpireAt.setUTCDate(leadExpireAt.getUTCDate() + settings.leadExpireDays);
 
-      let activeLead = await this.leads.findActiveByCustomerId(tx, cust.id);
+      let activeLead = await this.leads.findActiveByCustomerId(cust.id, tx);
       if (!activeLead) {
-        activeLead = await this.leads.createForCustomer(tx, {
-          customerId: cust.id,
-          leadStatusId: newStatus.id,
-          expiresAt: leadExpireAt,
-        });
+        activeLead = await this.leads.createForCustomer(
+          {
+            customerId: cust.id,
+            leadStatusId: newStatus.id,
+            expiresAt: leadExpireAt,
+          },
+          tx
+        );
       }
       return { customer: cust, lead: activeLead };
     });
@@ -146,12 +149,12 @@ export class VerifyOtpUseCase {
 
     await this.prisma.client.$transaction(async (tx) => {
       await this.otpRequests.markVerified(tx, request.id, verifiedAt);
-      const lead = await this.leads.findActiveByCustomerId(tx, customer.id);
+      const lead = await this.leads.findActiveByCustomerId(customer.id, tx);
       if (!lead) {
         throw new BadRequestException('No active lead for this account. Complete mobile verification first.');
       }
-      await this.leads.updateEmailFromOtp(tx, lead.id, request.value);
-      await this.leads.applyInProgressAfterEmailVerified(tx, lead);
+      await this.leads.updateEmailFromOtp(lead.id, request.value, tx);
+      await this.leads.applyInProgressAfterEmailVerified(lead, tx);
     });
 
     return {

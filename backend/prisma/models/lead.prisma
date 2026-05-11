@@ -36,7 +36,7 @@ model LeadDetail {
   dateOfBirth      DateTime? @map("date_of_birth") @db.Date
   genderId         Int?      @map("gender_id") @db.SmallInt
   panNumber        String?   @map("pan_number") @db.Char(10)
-  panVerified      Boolean   @default(false) @map("pan_verified")
+  panVerified      Int?      @default(0) @map("pan_verified") @db.SmallInt
   panVerifiedAt    DateTime? @map("pan_verified_at")
   cityId           Int?      @map("city_id")
   pincode          String?   @db.Char(6)

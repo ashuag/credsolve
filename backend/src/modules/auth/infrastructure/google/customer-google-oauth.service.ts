@@ -164,7 +164,7 @@ export class CustomerGoogleOauthService {
       return fail('Your session is no longer valid. Sign in again with mobile OTP.');
     }
 
-    const lead = await this.leads.findActiveByCustomerId(undefined, customer.id);
+    const lead = await this.leads.findActiveByCustomerId(customer.id);
     if (!lead) {
       return fail('No active lead for this account.');
     }
@@ -197,8 +197,8 @@ export class CustomerGoogleOauthService {
     }
 
     await this.prisma.client.$transaction(async (tx) => {
-      await this.leads.updateLeadEmailWithVerification(tx, lead.id, email, EmailVerificationType.GOOGLE);
-      await this.leads.applyInProgressAfterEmailVerified(tx, lead);
+      await this.leads.updateLeadEmailWithVerification(lead.id, email, EmailVerificationType.GOOGLE, tx);
+      await this.leads.applyInProgressAfterEmailVerified(lead, tx);
     });
 
     const ok = new URLSearchParams({

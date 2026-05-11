@@ -4,10 +4,8 @@ import {PrismaService} from '../../../../prisma/prisma.service';
 import {VendorApiService} from '../../../../common/vendor/vendor-api.service';
 import {CustomerRepository} from '../../infrastructure/repositories/customer.repository';
 import {LeadRepository} from '../../infrastructure/repositories/lead.repository';
+import {SettingsRepository} from '../../infrastructure/repositories/settings.repository';
 import type {VerifyPanDto} from '../dto/verify-pan.dto';
-
-
-const logger = new Logger();
 
 function parseDobUtc(dob: string): Date {
   const [y, m, d] = dob.split('-').map((p) => Number.parseInt(p, 10));
@@ -72,6 +70,9 @@ export type VerifyPanResult = {
  * `VendorApiService` (provider, service, path, method, payloads, status,
  * timings).
  *
+ * If `PAN_VERIFICATION_ENABLED` is off in `setting` (cached in Redis), the
+ * NSDL call is skipped and `panVerified=false` is returned after persisting details.
+ *
  * If the vendor call fails for any reason — missing creds, network error,
  * non-2xx — we still save the user-supplied details and return
  * `panVerified=false`. The user proceeds without being held up by vendor
@@ -86,6 +87,7 @@ export class VerifyPanUseCase {
     private readonly leads: LeadRepository,
     private readonly prisma: PrismaService,
     private readonly vendorApi: VendorApiService,
+    private readonly settings: SettingsRepository,
   ) {}
 
   async execute(req: Request, dto: VerifyPanDto): Promise<VerifyPanResult> {
@@ -100,8 +102,8 @@ export class VerifyPanUseCase {
     }
 
     const leadRow = dto.leadUuid
-      ? await this.leads.findByUuidForCustomer(undefined, dto.leadUuid, customer.id)
-      : await this.leads.findActiveSummaryForCustomer(undefined, customer.id);
+      ? await this.leads.findByUuidForCustomer(dto.leadUuid, customer.id)
+      : await this.leads.findActiveSummaryForCustomer(customer.id);
 
     if (!leadRow) {
       throw new NotFoundException('No matching active lead was found.');
@@ -127,12 +129,15 @@ export class VerifyPanUseCase {
       },
     });
 
-    const verification = await this.callPanVerificationNsdl({
-      leadId: leadRow.id,
-      panNumber: panUpper,
-      fullName: fullNameTrimmed,
-      dobIso: dto.dob,
-    });
+    const panVerificationEnabled = await this.settings.isPanVerificationEnabled();
+    const verification = panVerificationEnabled
+      ? await this.callPanVerificationNsdl({
+          leadId: leadRow.id,
+          panNumber: panUpper,
+          fullName: fullNameTrimmed,
+          dobIso: dto.dob,
+        })
+      : { panVerified: false, matched: false, vendorFullName: null };
 
     if (verification.panVerified) {
       await this.prisma.client.leadDetail.update({

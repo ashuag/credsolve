@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { SettingKey } from '../../../../common/constants/setting.constants';
-import { PrismaService } from '../../../../prisma/prisma.service';
+import {Injectable, Logger} from '@nestjs/common';
+import {LOOKUP_CACHE_TTL_SECONDS} from '../../../../common/constants/app.constants';
+import {SettingKey} from '../../../../common/constants/setting.constants';
+import {RedisService} from '../../../../common/redis/redis.service';
+import {PrismaService} from '../../../../prisma/prisma.service';
 
 const KEYS = [
   SettingKey.OTP_EXPIRE_DURATION.key,
@@ -56,12 +58,55 @@ function authOtpCacheTtlMs(): number {
   return 30_000;
 }
 
+function settingRedisKey(settingKey: string): string {
+  return `setting:${settingKey}`;
+}
+
 @Injectable()
 export class SettingsRepository {
+  private readonly logger = new Logger(SettingsRepository.name);
   private authOtpCache: { value: AuthOtpSettings; expiresAt: number } | null = null;
   private authOtpInflight: Promise<AuthOtpSettings> | null = null;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
+  ) {}
+
+  /**
+   * Whether PAN NSDL verification should run. Redis first (`setting:PAN_VERIFICATION_ENABLED`),
+   * then DB; on miss the DB value is written back to Redis with TTL.
+   */
+  async isPanVerificationEnabled(): Promise<boolean> {
+    const meta = SettingKey.PAN_VERIFICATION_ENABLED;
+    const redisKey = settingRedisKey(meta.key);
+
+    try {
+      const cached = await this.redis.client.get(redisKey);
+      if (cached !== null) {
+        return parseBool(cached, false);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Redis read failed for ${redisKey} (falling back to DB): ${msg}`);
+    }
+
+    const row = await this.prisma.client.setting.findFirst({
+      where: { key: meta.key, isActive: true },
+      select: { value: true },
+    });
+    const raw = row?.value?.trim() ?? meta.default;
+    const enabled = parseBool(raw, false);
+
+    try {
+      await this.redis.client.set(redisKey, enabled ? '1' : '0', 'EX', LOOKUP_CACHE_TTL_SECONDS);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Redis write failed for ${redisKey}: ${msg}`);
+    }
+
+    return enabled;
+  }
 
   async loadAuthOtpSettings(): Promise<AuthOtpSettings> {
     const ttl = authOtpCacheTtlMs();
@@ -96,6 +141,58 @@ export class SettingsRepository {
   /** Test/admin hook: clear the in-process auth/OTP settings cache. */
   invalidateAuthOtpSettingsCache(): void {
     this.authOtpCache = null;
+  }
+
+  async loadLoanCalculationSettings(): Promise<LoanCalculationSettings> {
+    const loanKeys = [
+      SettingKey.MIN_LOAN_AMOUNT.key,
+      SettingKey.MAX_LOAN_AMOUNT.key,
+      SettingKey.LOAN_TENURE.key,
+      SettingKey.ROI_PER_DAY.key,
+      SettingKey.PROCESSING_FEE.key,
+      SettingKey.PROCESSING_FEE_GST.key,
+    ] as const;
+
+    const rows = await this.prisma.client.setting.findMany({
+      where: { key: { in: [...loanKeys] }, isActive: true },
+      select: { key: true, value: true },
+    });
+    const map = new Map(rows.map((r) => [r.key, r.value]));
+    const pick = (key: string, def: string) => map.get(key)?.trim() || def;
+
+    const minLoanAmount = Math.max(
+      1000,
+      parseInt(pick(SettingKey.MIN_LOAN_AMOUNT.key, SettingKey.MIN_LOAN_AMOUNT.default), 10) || 5000
+    );
+    const maxLoanAmount = Math.max(
+      minLoanAmount,
+      parseInt(pick(SettingKey.MAX_LOAN_AMOUNT.key, SettingKey.MAX_LOAN_AMOUNT.default), 10) || 50000
+    );
+    const loanTenureDays = Math.min(
+      62,
+      Math.max(1, parseInt(pick(SettingKey.LOAN_TENURE.key, SettingKey.LOAN_TENURE.default), 10) || 30)
+    );
+    const roiPerDayPercent = Math.min(
+      10,
+      Math.max(0, parseFloat(pick(SettingKey.ROI_PER_DAY.key, SettingKey.ROI_PER_DAY.default)) || 1)
+    );
+    const processingFeePercent = Math.min(
+      40,
+      Math.max(0, parseFloat(pick(SettingKey.PROCESSING_FEE.key, SettingKey.PROCESSING_FEE.default)) || 0)
+    );
+    const processingFeeGstPercent = Math.min(
+      40,
+      Math.max(0, parseFloat(pick(SettingKey.PROCESSING_FEE_GST.key, SettingKey.PROCESSING_FEE_GST.default)) || 0)
+    );
+
+    return {
+      minLoanAmount,
+      maxLoanAmount,
+      loanTenureDays,
+      roiPerDayPercent,
+      processingFeePercent,
+      processingFeeGstPercent,
+    };
   }
 
   private async fetchAuthOtpSettings(): Promise<AuthOtpSettings> {
@@ -151,58 +248,6 @@ export class SettingsRepository {
       sessionTtlMs,
       sessionSliding,
       sessionRotateOnUse,
-    };
-  }
-
-  async loadLoanCalculationSettings(): Promise<LoanCalculationSettings> {
-    const loanKeys = [
-      SettingKey.MIN_LOAN_AMOUNT.key,
-      SettingKey.MAX_LOAN_AMOUNT.key,
-      SettingKey.LOAN_TENURE.key,
-      SettingKey.ROI_PER_DAY.key,
-      SettingKey.PROCESSING_FEE.key,
-      SettingKey.PROCESSING_FEE_GST.key,
-    ] as const;
-
-    const rows = await this.prisma.client.setting.findMany({
-      where: { key: { in: [...loanKeys] }, isActive: true },
-      select: { key: true, value: true },
-    });
-    const map = new Map(rows.map((r) => [r.key, r.value]));
-    const pick = (key: string, def: string) => map.get(key)?.trim() || def;
-
-    const minLoanAmount = Math.max(
-      1000,
-      parseInt(pick(SettingKey.MIN_LOAN_AMOUNT.key, SettingKey.MIN_LOAN_AMOUNT.default), 10) || 5000
-    );
-    const maxLoanAmount = Math.max(
-      minLoanAmount,
-      parseInt(pick(SettingKey.MAX_LOAN_AMOUNT.key, SettingKey.MAX_LOAN_AMOUNT.default), 10) || 50000
-    );
-    const loanTenureDays = Math.min(
-      62,
-      Math.max(1, parseInt(pick(SettingKey.LOAN_TENURE.key, SettingKey.LOAN_TENURE.default), 10) || 30)
-    );
-    const roiPerDayPercent = Math.min(
-      10,
-      Math.max(0, parseFloat(pick(SettingKey.ROI_PER_DAY.key, SettingKey.ROI_PER_DAY.default)) || 1)
-    );
-    const processingFeePercent = Math.min(
-      40,
-      Math.max(0, parseFloat(pick(SettingKey.PROCESSING_FEE.key, SettingKey.PROCESSING_FEE.default)) || 0)
-    );
-    const processingFeeGstPercent = Math.min(
-      40,
-      Math.max(0, parseFloat(pick(SettingKey.PROCESSING_FEE_GST.key, SettingKey.PROCESSING_FEE_GST.default)) || 0)
-    );
-
-    return {
-      minLoanAmount,
-      maxLoanAmount,
-      loanTenureDays,
-      roiPerDayPercent,
-      processingFeePercent,
-      processingFeeGstPercent,
     };
   }
 }

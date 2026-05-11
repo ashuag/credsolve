@@ -43,7 +43,7 @@ export class SaveLoanSelectionUseCase {
       throw new UnauthorizedException('Customer not found.');
     }
 
-    const lead = await this.leads.findActiveSummaryForCustomer(undefined, customer.id);
+    const lead = await this.leads.findActiveSummaryForCustomer(customer.id);
     if (!lead) {
       throw new NotFoundException('No active lead found.');
     }

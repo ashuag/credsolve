@@ -21,7 +21,7 @@ export class GetCustomerLeadStatusUseCase {
       return { leadId: null, leadStatus: null };
     }
 
-    const lead = await this.leads.findActiveByCustomerId(undefined, customer.id);
+    const lead = await this.leads.findActiveByCustomerId(customer.id);
     if (!lead) {
       return { leadId: null, leadStatus: null };
     }

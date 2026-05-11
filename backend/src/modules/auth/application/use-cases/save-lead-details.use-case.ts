@@ -67,8 +67,8 @@ export class SaveLeadDetailsUseCase {
     }
 
     const leadRow = dto.leadUuid
-      ? await this.leads.findByUuidForCustomer(undefined, dto.leadUuid, customer.id)
-      : await this.leads.findActiveSummaryForCustomer(undefined, customer.id);
+      ? await this.leads.findByUuidForCustomer(dto.leadUuid, customer.id)
+      : await this.leads.findActiveSummaryForCustomer(customer.id);
 
     if (!leadRow) {
       throw new NotFoundException('No matching active lead was found.');

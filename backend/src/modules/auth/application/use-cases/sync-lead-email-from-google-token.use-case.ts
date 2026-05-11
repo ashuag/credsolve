@@ -46,7 +46,7 @@ export class SyncLeadEmailFromGoogleTokenUseCase {
       throw new UnauthorizedException('Session is no longer valid.');
     }
 
-    const lead = await this.leads.findActiveByCustomerId(undefined, customer.id);
+    const lead = await this.leads.findActiveByCustomerId(customer.id);
     if (!lead) {
       throw new BadRequestException('No active lead for this account. Complete mobile verification first.');
     }
@@ -55,8 +55,8 @@ export class SyncLeadEmailFromGoogleTokenUseCase {
     }
 
     await this.prisma.client.$transaction(async (tx) => {
-      await this.leads.updateLeadEmailWithVerification(tx, lead.id, email, EmailVerificationType.GOOGLE);
-      await this.leads.applyInProgressAfterEmailVerified(tx, lead);
+      await this.leads.updateLeadEmailWithVerification(lead.id, email, EmailVerificationType.GOOGLE, tx);
+      await this.leads.applyInProgressAfterEmailVerified(lead, tx);
     });
 
     return { success: true, leadUuid: lead.uuid };

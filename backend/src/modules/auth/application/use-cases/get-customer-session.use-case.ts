@@ -28,7 +28,7 @@ export class GetCustomerSessionUseCase {
       return { authenticated: false };
     }
 
-    const leadRow = await this.leads.findActiveByCustomerId(undefined, customer.id);
+    const leadRow = await this.leads.findActiveByCustomerId(customer.id);
     if (!leadRow) {
       return {
         authenticated: true,

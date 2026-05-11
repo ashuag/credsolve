@@ -12,7 +12,7 @@ export class LeadRepository {
     return tx ?? this.prisma.client;
   }
 
-  findActiveByCustomerId(tx: DbClient | undefined, customerId: bigint) {
+  findActiveByCustomerId(customerId: bigint, tx?: DbClient) {
     return this.db(tx).lead.findFirst({
       where: { customerId, isActive: true },
       orderBy: { createdAt: 'desc' },
@@ -30,8 +30,8 @@ export class LeadRepository {
   }
 
   createForCustomer(
-    tx: DbClient | undefined,
-    params: { customerId: bigint; leadStatusId: number; expiresAt: Date }
+    params: { customerId: bigint; leadStatusId: number; expiresAt: Date },
+    tx?: DbClient
   ) {
     return this.db(tx).lead.create({
       data: {
@@ -52,7 +52,7 @@ export class LeadRepository {
     });
   }
 
-  updateEmailFromOtp(tx: DbClient | undefined, leadId: bigint, email: string) {
+  updateEmailFromOtp(leadId: bigint, email: string, tx?: DbClient) {
     return this.db(tx).lead.update({
       where: { id: leadId },
       data: {
@@ -67,8 +67,8 @@ export class LeadRepository {
    * No-op when the lead is already CONVERTED.
    */
   async applyInProgressAfterEmailVerified(
-    tx: DbClient | undefined,
-    lead: { id: bigint; leadStatus: { name: string } }
+    lead: { id: bigint; leadStatus: { name: string } },
+    tx?: DbClient
   ) {
     if (lead.leadStatus.name === LEAD_STATUS.CONVERTED) {
       return;
@@ -85,7 +85,7 @@ export class LeadRepository {
     });
   }
 
-  findActiveSummaryForCustomer(tx: DbClient | undefined, customerId: bigint) {
+  findActiveSummaryForCustomer(customerId: bigint, tx?: DbClient) {
     return this.db(tx).lead.findFirst({
       where: { customerId, isActive: true },
       orderBy: { createdAt: 'desc' },
@@ -93,7 +93,7 @@ export class LeadRepository {
     });
   }
 
-  findByUuidForCustomer(tx: DbClient | undefined, uuid: string, customerId: bigint) {
+  findByUuidForCustomer(uuid: string, customerId: bigint, tx?: DbClient) {
     return this.db(tx).lead.findFirst({
       where: { uuid, customerId, isActive: true },
       select: { id: true, uuid: true },
@@ -101,10 +101,10 @@ export class LeadRepository {
   }
 
   updateLeadEmailWithVerification(
-    tx: DbClient | undefined,
     leadId: bigint,
     email: string,
-    verificationType: EmailVerificationType
+    verificationType: EmailVerificationType,
+    tx?: DbClient
   ) {
     return this.db(tx).lead.update({
       where: { id: leadId },
