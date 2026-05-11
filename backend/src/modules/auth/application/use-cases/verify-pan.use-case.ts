@@ -1,5 +1,7 @@
 import {BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException} from '@nestjs/common';
+import type {Prisma} from '@prisma/client';
 import type {Request} from 'express';
+import {isPanVerifiedFromDb} from '../../../../common/mappers/customer-portal-profile.mapper';
 import {PrismaService} from '../../../../prisma/prisma.service';
 import {VendorApiService} from '../../../../common/vendor/vendor-api.service';
 import {CustomerRepository} from '../../infrastructure/repositories/customer.repository';
@@ -42,7 +44,7 @@ function formatLeadDetailSnapshotForLog(detail: {
   panNumber: string | null;
   fullName: string | null;
   dateOfBirth: Date | null;
-  panVerified: number | null;
+  panVerified: boolean | number | null;
   panVerifiedAt: Date | null;
 }): string {
   return JSON.stringify({
@@ -50,7 +52,7 @@ function formatLeadDetailSnapshotForLog(detail: {
     panNumber: maskPanForAudit(detail.panNumber ?? undefined),
     fullName: detail.fullName,
     dateOfBirth: detail.dateOfBirth ? toIsoDateOnly(detail.dateOfBirth) : null,
-    panVerified: detail.panVerified != null && detail.panVerified !== 0,
+    panVerified: isPanVerifiedFromDb(detail.panVerified),
     panVerifiedAt: detail.panVerifiedAt?.toISOString() ?? null,
   });
 }
@@ -176,10 +178,6 @@ export class VerifyPanUseCase {
       select: leadDetailSelect,
     });
 
-    this.logger.log(
-      `verify-pan: saved lead_detail upsert leadId=${leadRow.id.toString()} detail=${formatLeadDetailSnapshotForLog(detail)}`,
-    );
-
     const panVerificationEnabled = await this.settings.isPanVerificationEnabled();
     const verification = panVerificationEnabled
       ? await this.callPanVerificationNsdl({
@@ -193,10 +191,12 @@ export class VerifyPanUseCase {
     if (verification.panVerified) {
       detail = await this.prisma.client.leadDetail.update({
         where: { leadId: leadRow.id },
+        // `lead_detail.pan_verified` is BOOLEAN (migration 20260510120000). After
+        // `npx prisma generate`, `panVerified` is typed as boolean and this cast can be removed.
         data: {
-          panVerified: 1,
+          panVerified: true,
           panVerifiedAt: new Date(),
-        },
+        } as unknown as Prisma.LeadDetailUpdateInput,
         select: leadDetailSelect,
       });
     }
@@ -211,7 +211,7 @@ export class VerifyPanUseCase {
         panNumber: detail.panNumber,
         fullName: detail.fullName,
         dateOfBirth: detail.dateOfBirth ? toIsoDateOnly(detail.dateOfBirth) : null,
-        panVerified: detail.panVerified != null && detail.panVerified !== 0,
+        panVerified: isPanVerifiedFromDb(detail.panVerified),
         panVerifiedAt: detail.panVerifiedAt?.toISOString() ?? null,
       },
     };

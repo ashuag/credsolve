@@ -11,12 +11,13 @@ export function CTASection() {
   const sectionRef = useScrollReveal();
 
   return (
-    <section ref={sectionRef} className="relative overflow-hidden bg-[#12244f] py-20 lg:py-28">
+    <section ref={sectionRef} className="relative overflow-hidden bg-[#0a1628] py-20 lg:py-28">
       {/* Animated blobs */}
-      <div className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-[#ffc519]/20 blur-[80px] animate-blob" />
-      <div className="pointer-events-none absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-[#1496f3]/20 blur-[80px] animate-blob animation-delay-2000" />
+      <div className="pointer-events-none absolute -top-28 -right-28 h-72 w-72 rounded-full bg-[#ffc519]/25 blur-[90px] animate-blob" />
+      <div className="pointer-events-none absolute -bottom-28 -left-28 h-72 w-72 rounded-full bg-[#1496f3]/25 blur-[90px] animate-blob animation-delay-2000" />
+      <div className="pointer-events-none absolute top-1/2 left-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#8b5cf6]/15 blur-[80px] animate-blob animation-delay-4000" />
 
-      {/* Decorative grid */}
+      {/* Grid texture */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.04]"
         style={{
@@ -26,11 +27,12 @@ export function CTASection() {
       />
 
       {/* Gold accent top border */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#ffc519] to-transparent opacity-60" />
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#ffc519] to-transparent opacity-70" />
 
       <div className="relative z-10 mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
-        {/* Pill */}
-        <div className="reveal mb-8 inline-flex items-center gap-2.5 rounded-full border border-[#ffc519]/30 bg-[#ffc519]/10 px-5 py-2.5">
+
+        {/* Pill badge */}
+        <div className="reveal mb-8 inline-flex items-center gap-2.5 rounded-full border border-[#ffc519]/30 bg-[#ffc519]/10 px-5 py-2.5 shadow-[0_4px_20px_rgba(255,197,25,0.15)]">
           <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#ffc519]" fill="currentColor">
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
           </svg>
@@ -47,13 +49,13 @@ export function CTASection() {
           Slow You Down.
         </h2>
 
-        <p className="reveal mx-auto mt-6 max-w-xl text-lg font-[600] leading-relaxed text-white/50 stagger-2">
+        <p className="reveal mx-auto mt-6 max-w-xl text-[1.05rem] font-[600] leading-relaxed text-white/55 stagger-2">
           Apply in 30 seconds. Get approved in 2 minutes. Money in your account in under 10 minutes.
           RBI regulated. Zero hidden charges.
         </p>
 
-        {/* Benefits row */}
-        <div className="reveal mt-10 flex flex-wrap items-center justify-center gap-4 stagger-3">
+        {/* Benefit chips */}
+        <div className="reveal mt-10 flex flex-wrap items-center justify-center gap-3 stagger-3">
           {[
             '✓ No branch visit',
             '✓ PAN & Aadhaar only',
@@ -62,18 +64,18 @@ export function CTASection() {
           ].map((item) => (
             <span
               key={item}
-              className="rounded-full border border-white/10 bg-white/6 px-5 py-2 text-sm font-[700] text-white/65"
+              className="rounded-full border border-white/12 bg-white/6 px-5 py-2 text-sm font-[700] text-white/70 backdrop-blur-sm transition-all hover:border-white/25 hover:bg-white/10 hover:text-white"
             >
               {item}
             </span>
           ))}
         </div>
 
-        {/* CTA buttons */}
-        <div className="reveal mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center stagger-4">
+        {/* CTA Buttons */}
+        <div className="reveal mt-12 flex flex-col items-center gap-4 sm:flex-row sm:justify-center stagger-4">
           <Link
             href={applyHref}
-            className="group relative inline-flex items-center justify-center gap-3 overflow-hidden rounded-2xl bg-[#ffc519] px-12 py-5 text-xl font-[900] text-[#0a1628] glow-gold transition-all"
+            className="group relative inline-flex items-center justify-center gap-3 overflow-hidden rounded-2xl bg-[#ffc519] px-12 py-5 text-xl font-[900] text-[#0a1628] glow-gold transition-all active:scale-[0.97]"
           >
             Apply Now — It&apos;s Free
             <svg viewBox="0 0 20 20" className="h-5 w-5 transition-transform group-hover:translate-x-1" fill="currentColor">
@@ -87,7 +89,7 @@ export function CTASection() {
 
           <Link
             href={applyHref}
-            className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-10 py-5 text-base font-[700] text-white/75 backdrop-blur-sm transition-all hover:border-white/30 hover:bg-white/10"
+            className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/6 px-10 py-5 text-base font-[700] text-white/80 backdrop-blur-sm transition-all hover:border-white/30 hover:bg-white/12 hover:text-white"
           >
             Check Eligibility First
             <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor">
@@ -98,9 +100,23 @@ export function CTASection() {
         </div>
 
         {/* Trust note */}
-        <p className="reveal mt-8 text-xs font-[700] text-white/25 stagger-5">
+        <p className="reveal mt-8 text-xs font-[700] text-white/30 stagger-5">
           Checking eligibility won&apos;t affect your credit score &bull; Takes 30 seconds &bull; RBI regulated
         </p>
+
+        {/* Floating social proof counter */}
+        <div className="reveal mt-12 flex items-center justify-center gap-6 stagger-6">
+          {[
+            { value: '50,000+', label: 'Happy customers' },
+            { value: '₹500Cr+', label: 'Disbursed' },
+            { value: '98%', label: 'Approval rate' },
+          ].map((s) => (
+            <div key={s.label} className="flex flex-col items-center gap-1">
+              <span className="text-[1.5rem] font-[900] text-[#ffc519]">{s.value}</span>
+              <span className="text-[0.6rem] font-[700] uppercase tracking-[0.16em] text-white/35">{s.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );

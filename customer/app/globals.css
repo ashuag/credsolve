@@ -395,6 +395,21 @@
   to   { transform: rotate(360deg); }
 }
 
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(32px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ── Scroll Reveal System ── */
 .reveal {
   opacity: 0;
@@ -444,6 +459,8 @@
 .animate-fade-in-up { animation: fadeInUp 0.65s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .animate-scale-in { animation: scaleInAnim 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .animate-ring-pop { animation: ringPop 2.2s ease-out infinite; }
+.animate-shimmer { animation: shimmer 2.5s ease-in-out infinite; }
+.animate-slide-in-right { animation: slideInRight 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
 /* ── Design System Tokens ── */
 .hero-mesh {
@@ -529,38 +546,56 @@
   }
 }
 
-/* Custom Range Slider */
+/* Custom Range Slider — full hit height from parent; native thumb hidden via opacity in hero calculator */
 .mc-range-slider {
   -webkit-appearance: none;
+  appearance: none;
   width: 100%;
-  background: rgba(18, 36, 79, 0.06);
+  height: 100%;
+  min-height: 2.75rem;
+  background: transparent;
   border-radius: 999px;
   outline: none;
   cursor: pointer;
 }
 
+/* Native thumb hidden (custom thumb in React); keep hit target — no transform transition (jank while dragging). */
 .mc-range-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 24px;
-  height: 24px;
-  background: #1496f3;
-  border: 4px solid #fff;
-  border-radius: 50%;
-  box-shadow: 0 4px 12px rgba(20, 150, 243, 0.3);
-  transition: transform 150ms ease, box-shadow 150ms ease;
+  width: 20px;
+  height: 20px;
+  margin-top: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
-.mc-range-slider:active::-webkit-slider-thumb {
-  transform: scale(1.1);
-  box-shadow: 0 6px 18px rgba(20, 150, 243, 0.4);
+.mc-range-slider::-webkit-slider-runnable-track {
+  height: 12px;
+  background: transparent;
+  border-radius: 999px;
+}
+
+.mc-range-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+}
+
+.mc-range-slider::-moz-range-track {
+  height: 12px;
+  background: transparent;
+  border-radius: 999px;
 }
 
 .mc-range-slider.accent-\[\#ffc519\]::-webkit-slider-thumb {
-  background: #ffc519;
-  box-shadow: 0 4px 12px rgba(255, 197, 25, 0.3);
+  background: transparent;
 }
 
-.mc-range-slider.accent-\[\#ffc519\]:active::-webkit-slider-thumb {
-  box-shadow: 0 6px 18px rgba(255, 197, 25, 0.4);
+.mc-range-slider.accent-\[\#ffc519\]::-moz-range-thumb {
+  background: transparent;
 }

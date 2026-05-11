@@ -69,7 +69,7 @@ export function isLeadEmailVerifiedForPortal(leadStatusName: string, email: stri
   return Boolean(email?.trim()) && emailVerificationType != null;
 }
 
-function isPanVerifiedFromDb(value: boolean | number | null | undefined): boolean {
+export function isPanVerifiedFromDb(value: boolean | number | null | undefined): boolean {
   if (value == null) return false;
   if (typeof value === 'boolean') return value;
   return value !== 0;

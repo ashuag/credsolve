@@ -2,7 +2,6 @@ import type {Metadata} from 'next';
 import {Suspense} from 'react';
 import {LandingNavbar} from '@/components/landing/LandingNavbar';
 import {HeroSection} from '@/components/landing/HeroSection';
-import {FeaturesSection} from '@/components/landing/FeaturesSection';
 import {LoanProducts} from '@/components/landing/LoanProducts';
 import {StatsSection} from '@/components/landing/StatsSection';
 import {ProcessSteps} from '@/components/landing/ProcessSteps';
@@ -30,9 +29,6 @@ export default function CustomerLandingPage() {
         <main className="grow">
           {/* Hero — dark navy, animated phone illustration */}
           <HeroSection />
-
-          {/* 3 trust-signal feature cards */}
-          <FeaturesSection />
 
           {/* 5 short-term loan products up to ₹50K */}
           <LoanProducts />
