@@ -8,7 +8,7 @@ import {DatePickerField} from '@/components/ui/date-picker-field';
 import {FlowLoader} from '@/components/ui/flow-loader';
 import {SearchableCityInput} from '@/components/ui/searchable-city-input';
 import type {CustomerPortalProfile} from '@/lib/api/customer-session';
-import {saveLeadDetails} from '@/lib/api/lead';
+import {saveLeadDetails, verifyLeadPan} from '@/lib/api/lead';
 import {cn} from '@/lib/cn';
 import {
   CUSTOMER_CREDIT_CONSENT_TEXT,
@@ -142,6 +142,7 @@ export function PersonalDetailsStep({
   const [dobDisplay, setDobDisplay] = useState('');
   const [errors, setErrors] = useState<FieldError>({});
   const [isNavigating, setIsNavigating] = useState(false);
+  const [isVerifyingPan, setIsVerifyingPan] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const { cityOptions, genderOptions, occupationOptions, isLoading: isLoadingLookups } = useCustomerDetailLookups();
 
@@ -320,7 +321,9 @@ export function PersonalDetailsStep({
     return next;
   }
 
-  function handleContinueToFinancial() {
+  async function handleContinueToFinancial() {
+    if (isVerifyingPan) return;
+
     const validation = validate();
     const sectionErrors = pickErrors(validation, PROFILE_PAGE_FIELDS);
     if (Object.keys(sectionErrors).length > 0) {
@@ -339,7 +342,30 @@ export function PersonalDetailsStep({
       annualProfit: undefined,
     }));
     setSubmitError('');
-    onSectionChange('financial');
+
+    // Persist PAN/name/DOB and run vendor PAN-NSDL verification. The backend
+    // saves the user-supplied details first, so even if the vendor flakes
+    // we don't lose what the user typed.
+    setIsVerifyingPan(true);
+    try {
+      const result = await verifyLeadPan({
+        ...(leadUuid ? { leadUuid } : {}),
+        panNumber: fields.panNumber.trim().toUpperCase(),
+        fullName: fields.fullName.trim(),
+        dob: fields.dob,
+      });
+      if (!result.success) {
+        setSubmitError('Unable to verify your PAN right now. Please try again.');
+        return;
+      }
+      onSectionChange('financial');
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message : 'Unable to verify your PAN right now. Please try again.'
+      );
+    } finally {
+      setIsVerifyingPan(false);
+    }
   }
 
   async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
@@ -595,8 +621,14 @@ export function PersonalDetailsStep({
                 <button type="button" onClick={onBack} className="py-3 px-4 rounded-xl font-bold text-[0.95rem] text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors text-center border border-slate-200">
                   ← Back
                 </button>
-                <button type="button" onClick={handleContinueToFinancial} className="mc-btn-primary flex-1">
-                  Continue to address
+                <button
+                  type="button"
+                  onClick={handleContinueToFinancial}
+                  disabled={isVerifyingPan}
+                  aria-busy={isVerifyingPan}
+                  className="mc-btn-primary flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isVerifyingPan ? 'Verifying PAN…' : 'Continue to address'}
                 </button>
               </div>
             </div>

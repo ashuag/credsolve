@@ -1,10 +1,3 @@
-// ============================================================
-// LEAD
-// ============================================================
-//
-// Lead aggregate: one row per customer-intent funnel run, with optional
-// detail (form payload), UTM history, and external vendor call logs.
-
 model Lead {
   id                    BigInt                 @id @default(autoincrement()) @db.UnsignedBigInt
   uuid                  String                 @unique @default(uuid()) @db.Char(36)
@@ -64,6 +57,7 @@ model LeadDetail {
 
   @@index([cityId])
   @@index([pincode])
+  @@index([panVerified, panVerifiedAt])
   @@map("lead_detail")
 }
 
@@ -74,7 +68,11 @@ model VendorApiLog {
   providerName    String           @map("provider_name") @db.VarChar(100)
   serviceName     String           @map("service_name") @db.VarChar(120)
   requestMethod   VendorHttpMethod @map("request_method")
+  /// Endpoint path (relative to the provider base URL), e.g. `pan-name-dob`.
+  requestPath     String?          @map("request_path") @db.VarChar(255)
   leadId          BigInt?          @map("lead_id") @db.UnsignedBigInt
+  /// Outbound request headers (sensitive values redacted by VendorApiService).
+  requestHeaders  Json?            @map("request_headers")
   requestPayload  Json             @map("request_payload")
   responsePayload Json?            @map("response_payload")
   httpStatus      Int?             @map("http_status")

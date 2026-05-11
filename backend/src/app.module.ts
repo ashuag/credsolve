@@ -5,6 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { RedisModule } from './common/redis/redis.module';
+import { VendorApiModule } from './common/vendor/vendor-api.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { LosModule } from './modules/los/los.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -22,6 +23,7 @@ import { PrismaModule } from './prisma/prisma.module';
     }),
     PrismaModule,
     RedisModule,
+    VendorApiModule,
     AuthModule,
     LosModule,
   ],

@@ -84,4 +84,9 @@ export const SettingKey = {
         default: '30000',
         description: 'Maximum loan amount that can be offered',
     },
+    PAN_VERIFICATION_ENABLED: {
+        key: 'PAN_VERIFICATION_ENABLED',
+        default: '0',
+        description:  'Need to check Pan is verified or not',
+    },
 } as const;
