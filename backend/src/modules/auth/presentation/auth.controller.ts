@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Logger, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { RateLimitByRoute } from '../../../common/rate-limit/rate-limit-route.decorator';
@@ -35,6 +35,8 @@ function isProduction(): boolean {
 @Controller('auth')
 @UseGuards(RedisIpRateLimitGuard, OptionalCustomerSessionGuard)
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private readonly sendOtpFlow: SendOtpUseCase,
     private readonly verifyOtpFlow: VerifyOtpUseCase,
@@ -172,6 +174,11 @@ export class AuthController {
     summary: 'Verify PAN via Tenacio (pan-name-dob), compare name with profile, audit vendor log',
   })
   verifyPanRoute(@Req() req: Request, @Body() body: VerifyPanDto) {
+    const pan = body.panNumber?.trim().toUpperCase() ?? '';
+    const panTail = pan.length >= 4 ? pan.slice(-4) : '????';
+    this.logger.log(
+      `POST /api/auth/verify-pan ip=${readClientIp(req) ?? 'unknown'} leadUuid=${body.leadUuid ?? '(active lead)'} pan=******${panTail}`,
+    );
     return this.verifyPanFlow.execute(req, body);
   }
 }

@@ -32,6 +32,38 @@ function maskDobForAudit(dob: string | undefined): string {
   return `**-**-${dob.slice(-4)}`;
 }
 
+function toIsoDateOnly(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+/** Log line only — PAN masked; Nest `Logger.log` has no metadata object; put JSON in the message. */
+function formatLeadDetailSnapshotForLog(detail: {
+  uuid: string;
+  panNumber: string | null;
+  fullName: string | null;
+  dateOfBirth: Date | null;
+  panVerified: boolean | null;
+  panVerifiedAt: Date | null;
+}): string {
+  return JSON.stringify({
+    uuid: detail.uuid,
+    panNumber: maskPanForAudit(detail.panNumber ?? undefined),
+    fullName: detail.fullName,
+    dateOfBirth: detail.dateOfBirth ? toIsoDateOnly(detail.dateOfBirth) : null,
+    panVerified: Boolean(detail.panVerified),
+    panVerifiedAt: detail.panVerifiedAt?.toISOString() ?? null,
+  });
+}
+
+const leadDetailSelect = {
+  uuid: true,
+  panNumber: true,
+  fullName: true,
+  dateOfBirth: true,
+  panVerified: true,
+  panVerifiedAt: true,
+} as const;
+
 type panNsdlBody = {
   input: {
     panNumber: string;
@@ -62,6 +94,15 @@ export type VerifyPanResult = {
   matched: boolean;
   panVerified: boolean;
   vendorFullName: string | null;
+  /** Persisted `lead_detail` after this request (PAN/name/DOB + optional NSDL flags). */
+  leadDetail: {
+    uuid: string;
+    panNumber: string | null;
+    fullName: string | null;
+    dateOfBirth: string | null;
+    panVerified: boolean;
+    panVerifiedAt: string | null;
+  };
 };
 
 /**
@@ -91,6 +132,7 @@ export class VerifyPanUseCase {
   ) {}
 
   async execute(req: Request, dto: VerifyPanDto): Promise<VerifyPanResult> {
+    this.logger.debug('Executing VerifyPanUseCase with DTO:', dto);
     const session = req.customerSession;
     if (!session) {
       throw new UnauthorizedException('Sign in with mobile OTP before continuing.');
@@ -109,12 +151,16 @@ export class VerifyPanUseCase {
       throw new NotFoundException('No matching active lead was found.');
     }
 
+    this.logger.log(
+      `verify-pan: resolved lead leadId=${leadRow.id.toString()} leadUuid=${leadRow.uuid} customerId=${customer.id.toString()}`,
+    );
+
     const panUpper = dto.panNumber.trim().toUpperCase();
     const fullNameTrimmed = dto.fullName.trim();
     const dateOfBirth = parseDobUtc(dto.dob);
 
     // Save user-supplied details first so the work isn't lost on vendor flake.
-    await this.prisma.client.leadDetail.upsert({
+    let detail = await this.prisma.client.leadDetail.upsert({
       where: { leadId: leadRow.id },
       create: {
         leadId: leadRow.id,
@@ -127,7 +173,12 @@ export class VerifyPanUseCase {
         fullName: fullNameTrimmed,
         dateOfBirth,
       },
+      select: leadDetailSelect,
     });
+
+    this.logger.log(
+      `verify-pan: saved lead_detail upsert leadId=${leadRow.id.toString()} detail=${formatLeadDetailSnapshotForLog(detail)}`,
+    );
 
     const panVerificationEnabled = await this.settings.isPanVerificationEnabled();
     const verification = panVerificationEnabled
@@ -140,12 +191,13 @@ export class VerifyPanUseCase {
       : { panVerified: false, matched: false, vendorFullName: null };
 
     if (verification.panVerified) {
-      await this.prisma.client.leadDetail.update({
+      detail = await this.prisma.client.leadDetail.update({
         where: { leadId: leadRow.id },
         data: {
           panVerified: true,
           panVerifiedAt: new Date(),
         },
+        select: leadDetailSelect,
       });
     }
 
@@ -154,6 +206,14 @@ export class VerifyPanUseCase {
       matched: verification.matched,
       panVerified: verification.panVerified,
       vendorFullName: verification.vendorFullName,
+      leadDetail: {
+        uuid: detail.uuid,
+        panNumber: detail.panNumber,
+        fullName: detail.fullName,
+        dateOfBirth: detail.dateOfBirth ? toIsoDateOnly(detail.dateOfBirth) : null,
+        panVerified: Boolean(detail.panVerified),
+        panVerifiedAt: detail.panVerifiedAt?.toISOString() ?? null,
+      },
     };
   }
 

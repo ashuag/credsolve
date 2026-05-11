@@ -50,6 +50,14 @@ export type VerifyLeadPanResponse = {
   matched: boolean;
   panVerified: boolean;
   vendorFullName: string | null;
+  leadDetail?: {
+    uuid: string;
+    panNumber: string | null;
+    fullName: string | null;
+    dateOfBirth: string | null;
+    panVerified: boolean;
+    panVerifiedAt: string | null;
+  };
 };
 
 export type SaveApplicationDetailsPayload = {
@@ -115,7 +123,12 @@ export async function verifyLeadPan(payload: VerifyLeadPanPayload): Promise<Veri
       '/auth/verify-pan',
       payload,
       'Unable to verify your PAN right now. Please try again.'
-    )) ?? { success: false, matched: false, panVerified: false, vendorFullName: null }
+    )) ?? {
+      success: false,
+      matched: false,
+      panVerified: false,
+      vendorFullName: null,
+    }
   );
 }
 
