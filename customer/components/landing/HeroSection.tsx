@@ -36,10 +36,10 @@ export function HeroSection() {
       />
 
       <div className="relative z-10 mx-auto max-w-[88rem] px-4 sm:px-6 lg:px-8">
-        <div className="grid min-h-[min(88svh,900px)] items-center gap-10 py-14 lg:grid-cols-[1fr_520px] lg:gap-12 lg:py-16 xl:grid-cols-[1fr_600px] xl:gap-14 2xl:grid-cols-[1fr_640px]">
+        <div className="grid min-h-[auto] items-center gap-8 py-10 sm:py-12 lg:min-h-[min(88svh,900px)] lg:grid-cols-[1fr_520px] lg:gap-12 lg:py-16 xl:grid-cols-[1fr_600px] xl:gap-14 2xl:grid-cols-[1fr_640px]">
 
           {/* ── Copy column ── */}
-          <div className="flex max-w-xl flex-col gap-7 lg:max-w-none xl:pr-4">
+          <div className="flex max-w-xl flex-col gap-5 lg:gap-7 lg:max-w-none xl:pr-4">
 
             {/* Trust badge */}
             <div className="flex flex-wrap items-center gap-3 animate-fade-in-up">
@@ -61,7 +61,7 @@ export function HeroSection() {
                 <span className="block text-[clamp(0.95rem,2vw,1.2rem)] font-[800] uppercase tracking-[0.3em] text-[#64748b]">
                   Instant digital loan
                 </span>
-                <span className="mt-3 block text-[clamp(2.4rem,5.4vw,4rem)] leading-[1.06]">
+                <span className="mt-2 block text-[clamp(2rem,5.4vw,4rem)] leading-[1.06]">
                   Up to{' '}
                   <span className="relative inline-block">
                     <span className="bg-[linear-gradient(135deg,#1fa2ff_0%,#1496f3_45%,#1c347d_100%)] bg-clip-text text-transparent">
@@ -82,11 +82,11 @@ export function HeroSection() {
             </div>
 
             {/* Trust pills */}
-            <ul className="animate-fade-in-up flex flex-wrap gap-2" style={{animationDelay: '120ms'}}>
+            <ul className="animate-fade-in-up flex flex-wrap gap-1.5 sm:gap-2" style={{animationDelay: '120ms'}}>
               {['No hidden charges', 'Instant decision', '256-bit security', '0% processing fee'].map((label) => (
                 <li
                   key={label}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-white/80 bg-white/80 px-3.5 py-2 text-[0.72rem] font-[800] text-[#334155] shadow-[0_2px_12px_rgba(18,36,79,0.06)] backdrop-blur-sm transition-all hover:shadow-[0_4px_20px_rgba(20,150,243,0.12)] hover:-translate-y-0.5"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/80 bg-white/80 px-3 py-1.5 text-[0.68rem] font-[800] text-[#334155] shadow-[0_2px_12px_rgba(18,36,79,0.06)] backdrop-blur-sm sm:px-3.5 sm:py-2 sm:text-[0.72rem]"
                 >
                   <svg viewBox="0 0 16 16" className="h-3 w-3 shrink-0 text-emerald-500" fill="currentColor" aria-hidden>
                     <path d="M13.854 3.646a.5.5 0 010 .708l-7 7a.5.5 0 01-.708 0l-3.5-3.5a.5.5 0 11.708-.708L6.5 10.293l6.646-6.647a.5.5 0 01.708 0z" />
@@ -124,7 +124,7 @@ export function HeroSection() {
 
             {/* Stats strip */}
             <dl
-              className="animate-fade-in-up grid grid-cols-2 gap-x-6 gap-y-5 border-t border-[#0c1929]/8 pt-7 sm:grid-cols-4"
+              className="animate-fade-in-up grid grid-cols-2 gap-x-4 gap-y-4 border-t border-[#0c1929]/8 pt-5 sm:grid-cols-4 sm:gap-x-6 sm:gap-y-5 sm:pt-7"
               style={{animationDelay: '240ms'}}
             >
               {[

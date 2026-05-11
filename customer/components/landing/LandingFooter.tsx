@@ -125,7 +125,7 @@ export function LandingFooter() {
           </div>
 
           {/* Links */}
-          <div className="grid grid-cols-2 gap-8 lg:col-span-8 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 lg:col-span-8 lg:grid-cols-3">
             {/* Loans */}
             <div>
               <h4 className="mb-5 text-[0.62rem] font-[900] uppercase tracking-[0.24em] text-[#1496f3]">Loan Products</h4>

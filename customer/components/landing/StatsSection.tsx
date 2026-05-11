@@ -114,11 +114,11 @@ export function StatsSection() {
         </div>
 
         {/* Stats grid */}
-        <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
           {STATS.map((s, idx) => (
             <div
               key={idx}
-              className={`reveal reveal-scale glass group flex flex-col items-center gap-4 rounded-[28px] p-6 text-center transition-all duration-300 hover:-translate-y-2 hover:bg-white/10 stagger-${Math.min(idx + 1, 6)}`}
+              className={`reveal reveal-scale glass group flex flex-col items-center gap-3 rounded-[24px] p-4 sm:p-6 text-center transition-all duration-300 hover:-translate-y-2 hover:bg-white/10 stagger-${Math.min(idx + 1, 6)}`}
             >
               {/* Icon */}
               <div className="transition-transform duration-300 group-hover:scale-110">
@@ -148,7 +148,7 @@ export function StatsSection() {
         </div>
 
         {/* Trust badges strip */}
-        <div className="reveal mt-14 flex flex-wrap items-center justify-center gap-6 border-t border-white/8 pt-10 stagger-6">
+        <div className="reveal mt-10 flex flex-wrap items-center justify-center gap-3 border-t border-white/8 pt-8 sm:mt-14 sm:gap-6 sm:pt-10 stagger-6">
           {[
             'ISO 27001 Certified',
             'DPDP Compliant',

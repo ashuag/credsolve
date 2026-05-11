@@ -91,7 +91,7 @@ export function LoanProducts() {
         </div>
 
         {/* Cards */}
-        <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
           {LOAN_TYPES.map((loan, idx) => (
             <div
               key={loan.id}
@@ -99,7 +99,7 @@ export function LoanProducts() {
               style={{ background: loan.bg, borderColor: loan.border }}
             >
               {/* Illustration zone */}
-              <div className="relative h-44 w-full overflow-hidden">
+              <div className="relative h-36 w-full overflow-hidden sm:h-44">
                 {/* Radial glow behind image */}
                 <div
                   className="pointer-events-none absolute inset-0 opacity-30 blur-2xl"
@@ -119,10 +119,10 @@ export function LoanProducts() {
               </div>
 
               {/* Content */}
-              <div className="flex flex-col gap-4 bg-white/70 px-5 py-5 backdrop-blur-sm">
+              <div className="flex flex-col gap-3 bg-white/70 px-4 py-4 backdrop-blur-sm sm:gap-4 sm:px-5 sm:py-5">
                 <div className="text-center">
-                  <div className="text-[1rem] font-black tracking-tight text-[#12244f]">{loan.title}</div>
-                  <div className="mt-0.5 text-[0.7rem] font-semibold text-[#12244f]/45">{loan.subtitle}</div>
+                  <div className="text-[0.9rem] font-black tracking-tight text-[#12244f] sm:text-[1rem]">{loan.title}</div>
+                  <div className="mt-0.5 text-[0.65rem] font-semibold text-[#12244f]/45 sm:text-[0.7rem]">{loan.subtitle}</div>
                 </div>
 
                 {/* Mini stats */}

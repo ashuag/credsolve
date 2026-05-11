@@ -67,7 +67,7 @@ function HomeCalculatorInner({embed, applyHref}: HomeCalculatorInnerProps) {
         <div
           className={`rounded-[36px] border border-[rgba(18,36,79,0.07)] bg-white shadow-[0_40px_100px_rgba(18,36,79,0.1)] ${
             embed
-              ? 'rounded-[40px] p-7 shadow-[0_28px_90px_rgba(18,36,79,0.14)] sm:p-8 lg:p-10 xl:p-11'
+              ? 'rounded-[32px] p-5 shadow-[0_28px_90px_rgba(18,36,79,0.14)] sm:rounded-[40px] sm:p-7 lg:p-10 xl:p-11'
               : 'p-8 lg:p-12'
           }`}
         >
@@ -81,7 +81,7 @@ function HomeCalculatorInner({embed, applyHref}: HomeCalculatorInnerProps) {
               </span>
             </div>
           )}
-          <div className={`grid lg:grid-cols-2 ${embed ? 'gap-12' : 'gap-10'}`}>
+          <div className={`grid lg:grid-cols-2 ${embed ? 'gap-8 sm:gap-12' : 'gap-10'}`}>
             {/* Amount slider */}
             <div className="flex flex-col gap-5">
               <div className="flex items-start justify-between">

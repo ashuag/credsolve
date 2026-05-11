@@ -86,7 +86,7 @@ export function ProcessSteps() {
       <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 
         {/* Header */}
-        <div className="mb-20 text-center">
+        <div className="mb-12 text-center lg:mb-20">
           <div className="reveal mb-5 inline-flex items-center gap-2.5 rounded-full bg-[#10b981]/10 px-5 py-2.5 shadow-[0_4px_20px_rgba(16,185,129,0.1)]">
             <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-[#10b981]" fill="currentColor">
               <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
@@ -107,7 +107,7 @@ export function ProcessSteps() {
         </div>
 
         {/* Steps — open, box-free layout */}
-        <div className="relative grid grid-cols-1 gap-16 lg:grid-cols-3 lg:gap-8">
+        <div className="relative grid grid-cols-1 gap-10 sm:gap-12 lg:grid-cols-3 lg:gap-8">
 
           {/* Dashed connector (desktop only) */}
           <div className="pointer-events-none absolute top-[7.5rem] left-[calc(16.6%+3rem)] right-[calc(16.6%+3rem)] hidden lg:block">
@@ -128,13 +128,18 @@ export function ProcessSteps() {
             </svg>
           </div>
 
+          {/* Vertical connector (mobile only) */}
+          <div className="pointer-events-none absolute top-36 bottom-36 left-[2.25rem] w-px lg:hidden"
+            style={{ background: 'linear-gradient(to bottom, rgba(20,150,243,0.3), rgba(245,158,11,0.3), rgba(16,185,129,0.3))' }}
+          />
+
           {STEPS.map((step, idx) => (
             <div
               key={idx}
-              className={`reveal group relative flex flex-col items-center text-center stagger-${idx + 1}`}
+              className={`reveal group relative flex flex-row items-start gap-5 text-left lg:flex-col lg:items-center lg:gap-0 lg:text-center stagger-${idx + 1}`}
             >
               {/* Floating illustration circle */}
-              <div className="relative mb-8">
+              <div className="relative mb-0 shrink-0 lg:mb-8">
                 {/* Outer glow ring */}
                 <div
                   className="absolute -inset-4 rounded-full opacity-0 blur-xl transition-opacity duration-500 group-hover:opacity-100"
@@ -143,16 +148,16 @@ export function ProcessSteps() {
 
                 {/* Image / icon container — NO border box, just a soft circle background */}
                 <div
-                  className="relative flex h-36 w-36 items-center justify-center rounded-full transition-transform duration-500 ease-out group-hover:scale-105 group-hover:-translate-y-2"
+                  className="relative flex h-20 w-20 items-center justify-center rounded-full transition-transform duration-500 ease-out group-hover:scale-105 group-hover:-translate-y-2 lg:h-36 lg:w-36"
                   style={{ background: `radial-gradient(circle at 50% 50%, ${step.glowColor}, rgba(248,250,255,0.4) 75%)` }}
                 >
-                  <div className="relative h-28 w-28">
+                  <div className="relative h-14 w-14 lg:h-28 lg:w-28">
                     <Image
                       src={step.image}
                       alt={step.title}
                       fill
                       className="object-contain drop-shadow-xl"
-                      sizes="112px"
+                      sizes="(max-width: 1024px) 56px, 112px"
                       onError={(e) => {
                         // fallback to SVG icon if image not yet copied
                         (e.target as HTMLImageElement).style.display = 'none';
@@ -167,7 +172,7 @@ export function ProcessSteps() {
 
                 {/* Step number — floating chip above circle */}
                 <div
-                  className="absolute -top-2 -right-2 flex h-8 w-8 items-center justify-center rounded-xl text-[0.65rem] font-[900] text-white shadow-lg"
+                  className="absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center rounded-xl text-[0.6rem] font-[900] text-white shadow-lg lg:h-8 lg:w-8 lg:text-[0.65rem]"
                   style={{ backgroundColor: step.badgeColor, boxShadow: `0 4px 12px ${step.glowColor}` }}
                 >
                   {step.number}
@@ -175,22 +180,24 @@ export function ProcessSteps() {
               </div>
 
               {/* Text */}
-              <h3 className="mb-2 text-xl font-[900] tracking-tight text-[#12244f]">{step.title}</h3>
-              <p className="mb-5 max-w-[260px] text-sm font-[600] leading-relaxed text-[#12244f]/50">
-                {step.description}
-              </p>
+              <div className="flex-1 pt-1 lg:flex-none lg:text-center">
+                <h3 className="mb-1.5 text-lg font-[900] tracking-tight text-[#12244f] lg:mb-2 lg:text-xl">{step.title}</h3>
+                <p className="mb-4 text-sm font-[600] leading-relaxed text-[#12244f]/50 lg:mb-5 lg:max-w-[260px]">
+                  {step.description}
+                </p>
 
-              {/* Badge pill */}
-              <div
-                className="inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-xs font-[800] uppercase tracking-[0.14em]"
-                style={{
-                  borderColor: `${step.badgeColor}30`,
-                  color: step.badgeColor,
-                  backgroundColor: `${step.badgeColor}08`,
-                }}
-              >
-                <span className="flex h-1.5 w-1.5 rounded-full animate-pulse" style={{ backgroundColor: step.badgeColor }} />
-                {step.badge}
+                {/* Badge pill */}
+                <div
+                  className="inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 text-xs font-[800] uppercase tracking-[0.12em] lg:px-4 lg:py-2 lg:tracking-[0.14em]"
+                  style={{
+                    borderColor: `${step.badgeColor}30`,
+                    color: step.badgeColor,
+                    backgroundColor: `${step.badgeColor}08`,
+                  }}
+                >
+                  <span className="flex h-1.5 w-1.5 rounded-full animate-pulse" style={{ backgroundColor: step.badgeColor }} />
+                  {step.badge}
+                </div>
               </div>
             </div>
           ))}

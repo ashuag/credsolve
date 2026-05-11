@@ -42,7 +42,7 @@ export function CTASection() {
         </div>
 
         {/* Headline */}
-        <h2 className="reveal text-[clamp(2.4rem,5vw,3.8rem)] font-[900] leading-[1.1] tracking-tight text-white stagger-1">
+        <h2 className="reveal text-[clamp(1.9rem,5vw,3.8rem)] font-[900] leading-[1.1] tracking-tight text-white stagger-1">
           Don&apos;t Let Financial{' '}
           <span className="text-grad-gold">Emergencies</span>
           <br />
@@ -72,10 +72,10 @@ export function CTASection() {
         </div>
 
         {/* CTA Buttons */}
-        <div className="reveal mt-12 flex flex-col items-center gap-4 sm:flex-row sm:justify-center stagger-4">
+        <div className="reveal mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center stagger-4">
           <Link
             href={applyHref}
-            className="group relative inline-flex items-center justify-center gap-3 overflow-hidden rounded-2xl bg-[#ffc519] px-12 py-5 text-xl font-[900] text-[#0a1628] glow-gold transition-all active:scale-[0.97]"
+            className="group relative inline-flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-[#ffc519] px-10 py-4 text-lg font-[900] text-[#0a1628] glow-gold transition-all active:scale-[0.97] sm:w-auto sm:px-12 sm:py-5 sm:text-xl"
           >
             Apply Now — It&apos;s Free
             <svg viewBox="0 0 20 20" className="h-5 w-5 transition-transform group-hover:translate-x-1" fill="currentColor">
@@ -89,7 +89,7 @@ export function CTASection() {
 
           <Link
             href={applyHref}
-            className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/6 px-10 py-5 text-base font-[700] text-white/80 backdrop-blur-sm transition-all hover:border-white/30 hover:bg-white/12 hover:text-white"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/6 px-8 py-4 text-sm font-[700] text-white/80 backdrop-blur-sm transition-all hover:border-white/30 hover:bg-white/12 hover:text-white sm:w-auto sm:px-10 sm:py-5 sm:text-base"
           >
             Check Eligibility First
             <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor">
