@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('build', { recursive: true, force: true })\"",
-    "dev": "node scripts/run-prisma-cli.cjs generate --config prisma.config.ts && nest start --watch --builder tsc --preserveWatchOutput",
+    "dev": "node scripts/run-prisma-cli.cjs generate --config prisma.config.ts && nest start --watch --builder tsc --preserveWatchOutput --no-shell",
     "start": "node build/src/main.js",
     "prebuild": "npm run prisma:generate",
     "build": "tsc -p tsconfig.build.json",

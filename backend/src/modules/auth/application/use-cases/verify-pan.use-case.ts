@@ -42,7 +42,7 @@ function formatLeadDetailSnapshotForLog(detail: {
   panNumber: string | null;
   fullName: string | null;
   dateOfBirth: Date | null;
-  panVerified: boolean | null;
+  panVerified: number | null;
   panVerifiedAt: Date | null;
 }): string {
   return JSON.stringify({
@@ -50,7 +50,7 @@ function formatLeadDetailSnapshotForLog(detail: {
     panNumber: maskPanForAudit(detail.panNumber ?? undefined),
     fullName: detail.fullName,
     dateOfBirth: detail.dateOfBirth ? toIsoDateOnly(detail.dateOfBirth) : null,
-    panVerified: Boolean(detail.panVerified),
+    panVerified: detail.panVerified != null && detail.panVerified !== 0,
     panVerifiedAt: detail.panVerifiedAt?.toISOString() ?? null,
   });
 }
@@ -194,7 +194,7 @@ export class VerifyPanUseCase {
       detail = await this.prisma.client.leadDetail.update({
         where: { leadId: leadRow.id },
         data: {
-          panVerified: true,
+          panVerified: 1,
           panVerifiedAt: new Date(),
         },
         select: leadDetailSelect,
@@ -211,7 +211,7 @@ export class VerifyPanUseCase {
         panNumber: detail.panNumber,
         fullName: detail.fullName,
         dateOfBirth: detail.dateOfBirth ? toIsoDateOnly(detail.dateOfBirth) : null,
-        panVerified: Boolean(detail.panVerified),
+        panVerified: detail.panVerified != null && detail.panVerified !== 0,
         panVerifiedAt: detail.panVerifiedAt?.toISOString() ?? null,
       },
     };

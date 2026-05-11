@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import './load-env';
-import { ValidationPipe } from '@nestjs/common';
+import { type INestApplication, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
@@ -21,6 +21,28 @@ function parseCorsOrigins(): string[] | false {
 
 function isProductionNodeEnv(): boolean {
   return (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
+}
+
+/** `nest start --watch` can respawn before the old HTTP server releases the port (esp. in Docker). */
+async function listenWithBackoff(app: INestApplication, port: number, maxAttempts = 8): Promise<void> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await app.listen(port, '0.0.0.0');
+      return;
+    } catch (err) {
+      lastErr = err;
+      const code = err && typeof err === 'object' && 'code' in err ? String((err as NodeJS.ErrnoException).code) : '';
+      if (code !== 'EADDRINUSE' || attempt === maxAttempts) {
+        throw err;
+      }
+      const delayMs = Math.min(250 * 2 ** (attempt - 1), 4000);
+      // eslint-disable-next-line no-console
+      console.warn(`[nest] port ${port} busy (watch restart race?), retry ${attempt}/${maxAttempts} in ${delayMs}ms…`);
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  throw lastErr;
 }
 
 async function bootstrap() {
@@ -87,7 +109,7 @@ async function bootstrap() {
   await ensureApplicationTablesExist(prisma.client);
 
   const port = Number.parseInt(process.env.PORT ?? '4001', 10);
-  await app.listen(port, '0.0.0.0');
+  await listenWithBackoff(app, port);
   // eslint-disable-next-line no-console
   console.log(
     `[nest] listening on http://0.0.0.0:${port}` +

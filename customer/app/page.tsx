@@ -1,15 +1,14 @@
-import type { Metadata } from 'next';
-import { Suspense } from 'react';
-import { LandingNavbar } from '@/components/landing/LandingNavbar';
-import { HeroSection } from '@/components/landing/HeroSection';
-import { FeaturesSection } from '@/components/landing/FeaturesSection';
-import { LoanProducts } from '@/components/landing/LoanProducts';
-import { HomeCalculator } from '@/components/landing/HomeCalculator';
-import { StatsSection } from '@/components/landing/StatsSection';
-import { ProcessSteps } from '@/components/landing/ProcessSteps';
-import { TestimonialsSection } from '@/components/landing/TestimonialsSection';
-import { CTASection } from '@/components/landing/CTASection';
-import { LandingFooter } from '@/components/landing/LandingFooter';
+import type {Metadata} from 'next';
+import {Suspense} from 'react';
+import {LandingNavbar} from '@/components/landing/LandingNavbar';
+import {HeroSection} from '@/components/landing/HeroSection';
+import {FeaturesSection} from '@/components/landing/FeaturesSection';
+import {LoanProducts} from '@/components/landing/LoanProducts';
+import {StatsSection} from '@/components/landing/StatsSection';
+import {ProcessSteps} from '@/components/landing/ProcessSteps';
+import {TestimonialsSection} from '@/components/landing/TestimonialsSection';
+import {CTASection} from '@/components/landing/CTASection';
+import {LandingFooter} from '@/components/landing/LandingFooter';
 
 export const metadata: Metadata = {
   title: 'MoneyCash | Instant Loans up to ₹50,000 — Approved in 2 Minutes',
@@ -40,9 +39,6 @@ export default function CustomerLandingPage() {
 
           {/* Animated stats on dark background */}
           <StatsSection />
-
-          {/* Interactive EMI calculator */}
-          <HomeCalculator />
 
           {/* 3-step process — animated timeline */}
           <ProcessSteps />
