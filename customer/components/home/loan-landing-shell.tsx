@@ -64,7 +64,7 @@ export function LoanLandingShell({
         <div className="absolute -bottom-20 -left-16 w-80 h-80 bg-[#818cf8] rounded-full mix-blend-screen blur-[100px] opacity-25 animate-blob animation-delay-4000" />
 
         {/* Content wrapper — tighter spacing so the left rail fits common laptop heights without scrolling */}
-        <div className="relative z-10 flex min-h-0 flex-1 flex-col py-6 px-8 xl:px-10 gap-4 xl:gap-5">
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col py-4 px-8 xl:px-10 gap-3 xl:gap-3">
           {showSpeedometer ? (
             <>
               <div className="flex shrink-0 justify-center">
@@ -76,18 +76,18 @@ export function LoanLandingShell({
 
           {/* Headline */}
           <div className="text-center shrink-0">
-            <h1 className="text-2xl xl:text-[2.1rem] font-[900] text-white tracking-tight leading-[1.1] mb-2">
+            <h1 className="text-xl xl:text-[1.8rem] font-[900] text-white tracking-tight leading-[1.1] mb-1.5">
               {leftTitle || defaultTitle}
             </h1>
-            <p className="text-[0.98rem] text-slate-300 leading-snug max-w-sm mx-auto font-[500]">
+            <p className="text-[0.88rem] text-slate-300 leading-snug max-w-sm mx-auto font-[500]">
               {leftDescription || 'Experience a seamless digital journey. Get your loan approved in minutes without the hassle of paperwork.'}
             </p>
           </div>
 
           {/* Infographic OR feature list */}
           {leftInfographic ? (
-            <div className="flex min-h-0 flex-1 justify-center items-center py-2">
-              <div className="flex w-full max-w-[min(360px,94%)] items-center justify-center transition-transform duration-500 hover:scale-[1.015]">
+            <div className="flex min-h-0 flex-1 justify-center items-center py-1">
+              <div className="flex w-full max-w-[min(280px,90%)] items-center justify-center transition-transform duration-500 hover:scale-[1.015]">
                 {leftInfographic}
               </div>
             </div>
@@ -107,11 +107,11 @@ export function LoanLandingShell({
           )}
 
           {/* Stats bar */}
-          <div className="mt-auto shrink-0 border-t border-white/10 pt-4 flex justify-around">
+          <div className="mt-auto shrink-0 border-t border-white/10 pt-3 flex justify-around">
             {stats.map((stat) => (
               <div key={stat.label} className="text-center">
-                <div className="text-[1.75rem] font-[900] text-white leading-none tracking-tight mb-1">{stat.value}</div>
-                <div className="text-[0.68rem] text-[#1496f3] uppercase tracking-[0.15em] font-[800]">{stat.label}</div>
+                <div className="text-[1.4rem] font-[900] text-white leading-none tracking-tight mb-0.5">{stat.value}</div>
+                <div className="text-[0.62rem] text-[#1496f3] uppercase tracking-[0.15em] font-[800]">{stat.label}</div>
               </div>
             ))}
           </div>
@@ -119,8 +119,8 @@ export function LoanLandingShell({
       </div>
 
       {/* ── Right panel: journey form ── */}
-      <div className="w-full lg:w-7/12 flex flex-col justify-center p-6 sm:p-10 lg:p-14 bg-white relative">
-        <div className="w-full max-w-[480px] mx-auto h-full">
+      <div className="w-full flex-1 min-w-0 flex flex-col justify-start overflow-y-auto p-6 sm:p-10 lg:py-10 lg:px-14 bg-white relative">
+        <div className="w-full max-w-[480px] mx-auto">
           {/* Mobile-only header */}
           <div className="mb-8 lg:hidden text-center flex flex-col items-center">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-[0.7rem] font-[800] tracking-widest uppercase mb-4">

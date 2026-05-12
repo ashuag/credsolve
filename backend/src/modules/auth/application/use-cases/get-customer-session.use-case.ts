@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { Request } from 'express';
 import {
   formatLeadDetailForPortal,
@@ -18,6 +18,7 @@ export class GetCustomerSessionUseCase {
   ) {}
 
   async execute(req: Request): Promise<CustomerSessionResult> {
+    const logger = new Logger(GetCustomerSessionUseCase.name);
     const session = req.customerSession;
     if (!session) {
       return { authenticated: false };
@@ -29,6 +30,7 @@ export class GetCustomerSessionUseCase {
     }
 
     const leadRow = await this.leads.findActiveByCustomerId(customer.id);
+    logger .debug("leadRow", leadRow);
     if (!leadRow) {
       return {
         authenticated: true,

@@ -18,7 +18,7 @@ import {
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 
-type OnboardingStep = 'email' | 'email-otp' | 'details';
+type OnboardingStep = 'details' |'email' | 'email-otp';
 const DETAILS_TRANSITION_DELAY_MS = 650;
 
 export function OnboardingFlow() {
@@ -61,6 +61,8 @@ export function OnboardingFlow() {
 
     // If email is already verified, always enforce the details step —
     // even after hasResolved, so the Back button can't strand the user on the OTP screen.
+
+    console.log('isTransitioningToDetails', isTransitioningToDetails);
     if (emailVerified && !isTransitioningToDetails && step !== 'details') {
       if (!hasResolved) {
         setEmailMode(initialMode);

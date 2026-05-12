@@ -92,7 +92,7 @@ export function JourneySpeedometer() {
     <div className="flex flex-col items-center w-full gap-2">
       <svg
         viewBox="0 0 180 78"
-        className="w-[min(90vw,280px)] sm:w-[min(90vw,340px)] lg:w-[min(90vw,360px)] shrink-0"
+        className="w-[min(90vw,220px)] sm:w-[min(90vw,260px)] lg:w-[min(90vw,280px)] shrink-0"
         aria-hidden
       >
         <defs>
@@ -155,16 +155,16 @@ export function JourneySpeedometer() {
         <circle cx={cx} cy={cy} r="2.5" fill="#1e293b" />
       </svg>
 
-      <div className="flex flex-col items-center gap-0.5 -mt-1 text-center">
-        <span className="text-[1.35rem] sm:text-[1.5rem] font-black tabular-nums leading-none text-white">
+      <div className="flex flex-col items-center gap-0.5 -mt-2 text-center">
+        <span className="text-[1.1rem] sm:text-[1.25rem] font-black tabular-nums leading-none text-white">
           {progress}%
         </span>
-        <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.18em] text-sky-300/95 leading-none">
+        <span className="text-[0.58rem] font-extrabold uppercase tracking-[0.18em] text-sky-300/95 leading-none">
           {stepText}
         </span>
       </div>
 
-      <div className="flex items-start justify-center gap-3 sm:gap-4 w-full px-2 pt-1">
+      <div className="flex items-start justify-center gap-3 sm:gap-4 w-full px-2 pt-0.5">
         {JOURNEY_STEPS.map((step, i) => {
           const done = i < stepIndex;
           const active = i === stepIndex;
