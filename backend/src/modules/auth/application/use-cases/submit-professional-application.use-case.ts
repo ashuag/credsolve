@@ -9,6 +9,7 @@ import type { Request } from 'express';
 import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { OCCUPATION } from '../../../../common/constants/occupation.constants';
+import { parseOptionalInrAmount } from '../../../../common/utils/parse-inr-amount';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
@@ -23,17 +24,6 @@ const OCC_SLUG_TO_DB: Record<string, string> = {
   homemaker: OCCUPATION.HOMEMAKER,
   retired: OCCUPATION.RETIRED,
 };
-
-function parseOptionalInrAmount(raw: string | undefined): Prisma.Decimal | null {
-  if (raw === undefined || raw === null) {
-    return null;
-  }
-  const digits = raw.replace(/\D/g, '');
-  if (!digits) {
-    return null;
-  }
-  return new Prisma.Decimal(digits);
-}
 
 /** Demo CIBIL-style score when no bureau is integrated. */
 function randomDemoCibilScore(): number {
@@ -93,7 +83,20 @@ export class SubmitProfessionalApplicationUseCase {
     const annualTurnover = parseOptionalInrAmount(dto.annualTurnover);
     const annualProfit = parseOptionalInrAmount(dto.annualProfit);
 
-    const { preApprovedAmountInr } = this.checkLoanEligibility.execute();
+    const leadDetailIncomePatch: Prisma.LeadDetailUpdateInput = {
+      occupation: { connect: { id: occupation.id } },
+    };
+    if (dto.monthlyIncome !== undefined) {
+      leadDetailIncomePatch.netMonthlyIncome = netMonthlyIncome;
+    }
+    if (dto.annualTurnover !== undefined) {
+      leadDetailIncomePatch.annualTurnover = annualTurnover;
+    }
+    if (dto.annualProfit !== undefined) {
+      leadDetailIncomePatch.annualProfit = annualProfit;
+    }
+
+    const { preApprovedAmountInr } = this.checkLoanEligibility.computeForSeed(leadRow.uuid);
     const cibilScore = randomDemoCibilScore();
     const eligible = preApprovedAmountInr >= 5_000;
 
@@ -134,12 +137,7 @@ export class SubmitProfessionalApplicationUseCase {
 
       await tx.leadDetail.update({
         where: { leadId: leadRow.id },
-        data: {
-          occupationId: occupation.id,
-          netMonthlyIncome,
-          annualTurnover,
-          annualProfit,
-        },
+        data: leadDetailIncomePatch,
       });
 
       let application = await tx.application.findFirst({

@@ -1,18 +1,78 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { Request } from 'express';
-import { BreCheckService } from '../../../../common/bre/bre-check.service';
+import { PreBreCheckService } from '../../../../common/bre/pre-bre-check.service';
+import { BUREAU_FETCHED } from '../../../../common/constants/bureau-fetch.constants';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { PAN_VERIFIED } from '../../../../common/constants/pan-verification.constants';
 import { REJECTION_REASON } from '../../../../common/constants/rejection-reason.constants';
 import { isPanVerifiedFromDb } from '../../../../common/mappers/customer-portal-profile.mapper';
+import { GENDER_SLUG_TO_DB, OCCUPATION_SLUG_TO_DB } from '../../../../common/mappers/lead-detail-master-slugs';
+import { parseOptionalInrAmount } from '../../../../common/utils/parse-inr-amount';
 import { SmsService } from '../../../../common/sms/sms.service';
-import { PanVerificationService } from '../../../../common/vendor/pan-verification.service';
+import { CibilFetchService } from '../../../../common/vendor/cibil-fetch.service';
+import { PanVerificationService, type PanVerificationResult } from '../../../../common/vendor/pan-verification.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
 import type { VerifyPanDto } from '../dto/verify-pan.dto';
+
+const INDIAN_MOBILE = /^[6-9]\d{9}$/;
+
+/** `lead_detail` shape after upsert (BRE + response fields). */
+const leadDetailUpsertSelect = {
+  uuid: true,
+  fullName: true,
+  dateOfBirth: true,
+  pincode: true,
+  genderId: true,
+  occupationId: true,
+  city: { select: { id: true, name: true, stateId: true, state: { select: { code: true } } } },
+} as const;
+
+const leadPanSelect = {
+  panNumber: true,
+  panVerified: true,
+  panVerifiedAt: true,
+  leadStatusNote: true,
+  bureauFetched: true
+} as const;
+
+const cibilSoftPullLeadSelect = {
+  bureauFetched: true,
+  leadStatus: { select: { name: true } },
+  leadDetail: {
+    select: { cibilConsentAt: true, fullName: true },
+  },
+} as const;
+
+type LeadDetailBreRow = Prisma.LeadDetailGetPayload<{ select: typeof leadDetailUpsertSelect }>;
+
+type LeadPanVerificationRow = {
+  panNumber: string | null;
+  panVerified: number;
+  panVerifiedAt: Date | null;
+  leadStatusNote: string | null;
+  bureauFetched: number;
+};
+
+type CibilSoftPullLeadRow = {
+  bureauFetched: number;
+  leadStatus: { name: string } | null;
+  leadDetail: {
+    cibilConsentAt: Date | null;
+    fullName: string | null;
+  } | null;
+};
+
+const VERIFIED_WITHOUT_VENDOR_CALL = {
+  panVerifiedStatus: PAN_VERIFIED.VERIFIED,
+  nameMatch: true,
+  dobMatch: true,
+  panStatus: 'valid' as const,
+  category: 'Individual' as const,
+};
 
 function parseDobUtc(dob: string): Date {
   const [y, m, d] = dob.split('-').map((p) => Number.parseInt(p, 10));
@@ -25,16 +85,6 @@ function parseDobUtc(dob: string): Date {
 function toIsoDateOnly(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
-
-const leadDetailSelect = {
-  uuid: true,
-  panNumber: true,
-  fullName: true,
-  dateOfBirth: true,
-  panVerified: true,
-  panVerifiedAt: true,
-  panVerificationNote: true,
-} as const;
 
 export type VerifyPanResult = {
   success: true;
@@ -51,15 +101,13 @@ export type VerifyPanResult = {
     dateOfBirth: string | null;
     panVerified: boolean;
     panVerifiedAt: string | null;
-    panVerificationNote: string | null;
+    /** Mirrors `lead.lead_status_note` (PAN outcome or policy text). */
+    leadStatusNote: string | null;
   };
 };
 
 /**
- * Persists PAN + name + DOB on `lead_detail` and verifies the PAN against
- * NSDL via Tenacio (delegated to `PanVerificationService`).
- *
- * Status written to `lead_detail.pan_verified` (SmallInt):
+ * Status written to `lead.pan_verified` (SmallInt):
  *   0 = NOT_CHECKED — vendor call failed or was skipped; safe to retry.
  *   1 = VERIFIED    — panStatus=valid, nameMatch, dobMatch, category=Individual.
  *   2 = NOT_VERIFIED — vendor confirmed the PAN doesn't match.
@@ -69,7 +117,8 @@ export class VerifyPanUseCase {
   private readonly logger = new Logger(VerifyPanUseCase.name);
 
   constructor(
-    private readonly breCheck: BreCheckService,
+    private readonly preBreCheck: PreBreCheckService,
+    private readonly cibilFetch: CibilFetchService,
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
     private readonly prisma: PrismaService,
@@ -98,53 +147,50 @@ export class VerifyPanUseCase {
     }
 
     const panUpper = dto.panNumber.trim().toUpperCase();
-    const fullNameTrimmed = dto.fullName.trim();
-    const dateOfBirth = parseDobUtc(dto.dob);
 
-    const [detail, panVerificationEnabled, breSettings] = await Promise.all([
-      this.prisma.client.leadDetail.upsert({
-        where: { leadId: leadRow.id },
-        create: {
-          leadId: leadRow.id,
-          panNumber: panUpper,
-          fullName: fullNameTrimmed,
-          dateOfBirth,
-        },
-        update: {
-          panNumber: panUpper,
-          fullName: fullNameTrimmed,
-          dateOfBirth,
-        },
-        select: leadDetailSelect,
-      }),
-      this.settings.isPanVerificationEnabled(),
-      this.settings.loadBreSettings(),
+    const leadDetailPayload = await this.buildLeadInputRequest(dto);
+    const fullNameTrimmed = leadDetailPayload.fullName;
+
+    const [[detailRaw, leadPanRaw], [panVerificationEnabled, breSettings]] = await Promise.all([
+      Promise.all([
+        this.leads.upsertLeadDetail({
+          where: { leadId: leadRow.id },
+          create: { leadId: leadRow.id, ...leadDetailPayload },
+          update: leadDetailPayload,
+          select: leadDetailUpsertSelect,
+        }),
+        this.leads.updateLead({
+          where: { id: leadRow.id },
+          data: { panNumber: panUpper },
+          select: leadPanSelect,
+        }),
+      ]),
+      Promise.all([this.settings.isPanVerificationEnabled(), this.settings.loadBreSettings()]),
     ]);
 
-    // BRE: fetch location data for the lead and run eligibility checks.
-    const leadDetail = await this.prisma.client.leadDetail.findUnique({
-      where: { leadId: leadRow.id },
-      select: {
-        pincode: true,
-        city: { select: { name: true, state: { select: { code: true } } } },
-      },
-    });
+    const detail = detailRaw as unknown as LeadDetailBreRow;
+    const leadPan = leadPanRaw as LeadPanVerificationRow;
 
-    const breResult = this.breCheck.run(
+    const preBreResult = await this.preBreCheck.run(
       {
-        dateOfBirth,
-        pincode: leadDetail?.pincode ?? null,
-        cityName: leadDetail?.city?.name ?? null,
-        stateCode: leadDetail?.city?.state?.code ?? null,
+        dateOfBirth: detail.dateOfBirth,
+        genderId: detail.genderId,
+        occupationId: detail.occupationId,
+        genderDisplay: GENDER_SLUG_TO_DB[dto.gender] ?? dto.gender,
+        occupationDisplay: OCCUPATION_SLUG_TO_DB[dto.occupation] ?? dto.occupation,
+        pincode: detail.pincode,
+        cityId: detail.city?.id ?? null,
+        stateId: detail.city?.stateId ?? null,
+        cityName: detail.city?.name ?? null,
+        stateCode: detail.city?.state?.code ?? null,
       },
       breSettings,
     );
 
-    if (!breResult.passed) {
-      await this.rejectLead(leadRow.id, breResult.rejectReason ?? 'BRE check failed', breResult.rejectionReasonCode);
-      this.sms.sendThankYouSms(customer.mobileNumber).catch((err) => {
-        this.logger.error('Failed to send thank-you SMS', err instanceof Error ? err.stack : err);
-      });
+
+    if (!preBreResult.passed) {
+      await this.rejectLead(leadRow.id, preBreResult.rejectReason ?? 'BRE check failed', preBreResult.rejectionReasonCode);
+      this.fireThankYouSms(customer.mobileNumber);
       return {
         success: true,
         rejected: true,
@@ -153,31 +199,13 @@ export class VerifyPanUseCase {
     }
 
     if (!panVerificationEnabled) {
-      const note = 'PAN verification disabled in settings';
-      const updated = await this.updatePanStatus(leadRow.id, PAN_VERIFIED.API_DISABLED, note);
-      return this.buildResult(updated, {
+      const updatedLeadPan = await this.updatePanStatus(leadRow.id, PAN_VERIFIED.API_DISABLED, 'PAN verification disabled in settings');
+      return this.buildResult(detail, updatedLeadPan, {
         panVerifiedStatus: PAN_VERIFIED.API_DISABLED,
         nameMatch: false,
         dobMatch: false,
         panStatus: null,
         category: null,
-      });
-    }
-
-    // Skip the vendor call if this exact PAN is already verified.
-    // Type bridge: generated client may type panVerified as boolean until regenerated.
-    const alreadyVerified =
-      isPanVerifiedFromDb(detail.panVerified) &&
-      detail.panNumber === panUpper;
-
-    if (alreadyVerified) {
-      this.logger.debug('PAN already verified for this lead — skipping vendor call.');
-      return this.buildResult(detail, {
-        panVerifiedStatus: PAN_VERIFIED.VERIFIED,
-        nameMatch: true,
-        dobMatch: true,
-        panStatus: 'valid',
-        category: 'Individual',
       });
     }
 
@@ -192,21 +220,201 @@ export class VerifyPanUseCase {
       `PAN verification result: status=${verification.panVerifiedStatus}, panStatus=${verification.panStatus}, nameMatch=${verification.nameMatch}, dobMatch=${verification.dobMatch}`,
     );
 
-    // Persist any status except NOT_CHECKED (0). The default 0 means "never
-    // attempted" — we only overwrite it once we have an actual outcome.
-    let updatedDetail = detail;
-    if (verification.panVerifiedStatus !== PAN_VERIFIED.NOT_CHECKED) {
-      updatedDetail = await this.updatePanStatus(leadRow.id, verification.panVerifiedStatus, verification.note);
-    }
+    const leadPanState =
+      verification.panVerifiedStatus === PAN_VERIFIED.NOT_CHECKED
+        ? leadPan
+        : await this.updatePanStatus(leadRow.id, verification.panVerifiedStatus, verification.note);
 
     if (verification.panVerifiedStatus === PAN_VERIFIED.NOT_VERIFIED) {
-      await this.rejectLead(leadRow.id, 'PAN validation failed', REJECTION_REASON.PAN_VERIFICATION_FAILED);
-      this.sms.sendThankYouSms(customer.mobileNumber).catch((err) => {
-        this.logger.error('Failed to send thank-you SMS', err instanceof Error ? err.stack : err);
-      });
+      await this.rejectLead(
+        leadRow.id,
+        this.buildPanRejectLeadNote(dto, verification),
+        REJECTION_REASON.PAN_VERIFICATION_FAILED,
+      );
+      this.fireThankYouSms(customer.mobileNumber);
     }
 
-    return this.buildResult(updatedDetail, verification);
+    if (
+      (leadPan.panVerified === PAN_VERIFIED.VERIFIED || leadPan.panVerified === PAN_VERIFIED.API_DISABLED) &&
+      verification.panVerifiedStatus === PAN_VERIFIED.VERIFIED &&
+      leadPan.bureauFetched === BUREAU_FETCHED.NOT_FETCHED
+    ) {
+      this.enqueueCibilSoftPull(leadRow.id, customer.mobileNumber, panUpper, fullNameTrimmed);
+      return this.buildResult(detail, leadPanState, VERIFIED_WITHOUT_VENDOR_CALL);
+    }
+
+    return this.buildResult(detail, leadPanState, verification);
+  }
+
+  private async buildLeadInputRequest(
+    dto: VerifyPanDto,
+  ): Promise<{
+    fullName: string;
+    dateOfBirth: Date;
+    genderId: number;
+    occupationId: number;
+    netMonthlyIncome?: Prisma.Decimal | null;
+    annualTurnover?: Prisma.Decimal | null;
+    annualProfit?: Prisma.Decimal | null;
+  }> {
+    const { genderId, occupationId } = await this.resolveGenderOccupationIds(dto);
+    const { netMonthlyIncome, annualTurnover, annualProfit } = this.buildIncomeFields(dto);
+    return {
+      fullName: dto.fullName.trim(),
+      dateOfBirth: parseDobUtc(dto.dob),
+      genderId,
+      occupationId,
+      netMonthlyIncome,
+      annualTurnover,
+      annualProfit
+    };
+  }
+
+  private fireThankYouSms(mobileNumber: string): void {
+    this.sms.sendThankYouSms(mobileNumber).catch((err) => {
+      this.logger.error('Failed to send thank-you SMS', err instanceof Error ? err.stack : err);
+    });
+  }
+
+  private enqueueCibilSoftPull(leadId: bigint, customerMobile: string, panNumber: string, fullName: string): void {
+    void this.runCibilSoftPull(leadId, customerMobile, panNumber, fullName).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`CIBIL soft-pull unexpected error (leadId=${leadId}): ${message}`);
+    });
+  }
+
+  /**
+   * Tenacio CIBIL soft-pull after PAN is verified, when `BUREAU_FETCH_ENABLED`
+   * is on, the lead is not terminal-negative, and the customer has bureau
+   * consent on `lead_detail`. Runs asynchronously; failures are logged; outcome
+   * is written to `lead.bureau_fetched` / `bureau_fetched_at` / `bureau_fetched_note`.
+   */
+  private async runCibilSoftPull(leadId: bigint, customerMobile: string, panNumber: string, fullName: string) {
+    if (!(await this.settings.isBureauFetchEnabled())) {
+      this.logger.debug(`CIBIL soft-pull skipped (leadId=${leadId}): BUREAU_FETCH_ENABLED is off.`);
+      return;
+    }
+
+    const row = (await this.leads.findUniqueLead({
+      where: { id: leadId },
+      select: cibilSoftPullLeadSelect,
+    })) as CibilSoftPullLeadRow | null;
+
+    if (!row?.leadDetail) {
+      this.logger.debug(`CIBIL soft-pull skipped (leadId=${leadId}): no lead_detail.`);
+      return;
+    }
+    if (row.bureauFetched === BUREAU_FETCHED.SUCCESS) {
+      this.logger.debug(`CIBIL soft-pull skipped (leadId=${leadId}): bureau already fetched successfully.`);
+      return;
+    }
+
+    const statusName = row.leadStatus?.name;
+    if (statusName === LEAD_STATUS.REJECTED || statusName === LEAD_STATUS.BLACKLISTED) {
+      this.logger.debug(`CIBIL soft-pull skipped (leadId=${leadId}): lead status ${statusName}.`);
+      return;
+    }
+    if (!row.leadDetail.cibilConsentAt) {
+      this.logger.debug(`CIBIL soft-pull skipped (leadId=${leadId}): no CIBIL consent on file.`);
+      return;
+    }
+
+    const nameForVendor = (row.leadDetail.fullName ?? fullName).trim();
+    if (!nameForVendor || panNumber.length !== 10) {
+      this.logger.warn(`CIBIL soft-pull skipped (leadId=${leadId}): missing name or PAN.`);
+      return;
+    }
+
+    const mobile = customerMobile.trim();
+    if (!INDIAN_MOBILE.test(mobile)) {
+      this.logger.warn(`CIBIL soft-pull skipped (leadId=${leadId}): invalid mobile format.`);
+      return;
+    }
+
+    const out = await this.cibilFetch.fetchFromTenacio(
+      { input: { mobileNumber: mobile, name: nameForVendor, panNumber, consent: true } },
+      leadId,
+    );
+
+    if (!out.configured) {
+      this.logger.debug(`CIBIL soft-pull not configured (leadId=${leadId}): ${out.skipReason ?? ''}`);
+      return;
+    }
+
+    const now = new Date();
+    if (out.ok) {
+      await this.leads.updateLead({
+        where: { id: leadId },
+        data: {
+          bureauFetched: BUREAU_FETCHED.SUCCESS,
+          bureauFetchedAt: now,
+          bureauFetchedNote: null,
+        },
+      });
+      return;
+    }
+
+    const note = `http=${out.httpStatus ?? 'n/a'} err=${out.error?.message ?? 'vendor'}`.slice(0, 500);
+    await this.leads.updateLead({
+      where: { id: leadId },
+      data: {
+        bureauFetched: BUREAU_FETCHED.FAILED,
+        bureauFetchedAt: now,
+        bureauFetchedNote: note,
+      },
+    });
+    this.logger.warn(
+      `CIBIL soft-pull HTTP/vendor issue (leadId=${leadId}): http=${out.httpStatus ?? 'n/a'} transport=${out.error?.message ?? 'none'}`,
+    );
+  }
+
+  private async resolveGenderOccupationIds(
+    dto: VerifyPanDto,
+  ): Promise<{ genderId: number; occupationId: number }> {
+    const genderName = GENDER_SLUG_TO_DB[dto.gender];
+    const occupationName = OCCUPATION_SLUG_TO_DB[dto.occupation];
+    if (!genderName || !occupationName) {
+      throw new BadRequestException('Invalid gender or occupation.');
+    }
+    const [gender, occupation] = await Promise.all([
+      this.prisma.client.gender.findUnique({ where: { name: genderName }, select: { id: true } }),
+      this.prisma.client.occupation.findUnique({ where: { name: occupationName }, select: { id: true } }),
+    ]);
+    if (!gender || !occupation) {
+      throw new BadRequestException('Gender or occupation is not available in the system.');
+    }
+    return { genderId: gender.id, occupationId: occupation.id };
+  }
+
+  private buildIncomeFields(dto: VerifyPanDto): {
+    netMonthlyIncome?: Prisma.Decimal | null;
+    annualTurnover?: Prisma.Decimal | null;
+    annualProfit?: Prisma.Decimal | null;
+  } {
+    const fieldMap = {
+      monthlyIncome: 'netMonthlyIncome',
+      annualTurnover: 'annualTurnover',
+      annualProfit: 'annualProfit',
+    } as const;
+    
+    const incomeFields = Object.fromEntries(
+      Object.entries(fieldMap)
+        .filter(([dtoKey]) => dto[dtoKey as keyof typeof dto] !== undefined)
+        .map(([dtoKey, dbKey]) => [
+          dbKey,
+          parseOptionalInrAmount(dto[dtoKey as keyof typeof dto])
+        ])
+    );
+
+    return incomeFields;
+  }
+
+  private buildPanRejectLeadNote(dto: VerifyPanDto, verification: PanVerificationResult): string {
+    const occ = OCCUPATION_SLUG_TO_DB[dto.occupation] ?? dto.occupation;
+    const gen = GENDER_SLUG_TO_DB[dto.gender] ?? dto.gender;
+    const vendor = verification.note ? ` vendor=${verification.note.replace(/\s+/g, ' ').trim().slice(0, 80)}` : '';
+    const main = `PAN not verified: panStatus=${verification.panStatus ?? 'n/a'} nameMatch=${verification.nameMatch} dobMatch=${verification.dobMatch}${vendor}`;
+    return `${main} | occ=${occ} | gender=${gen}`.slice(0, 256);
   }
 
   private async rejectLead(leadId: bigint, note: string, rejectionReasonCode?: string | null) {
@@ -216,53 +424,63 @@ export class VerifyPanUseCase {
         select: { id: true },
       }),
       rejectionReasonCode
-        ? this.prisma.client.rejectionReason.findFirst({
+        ? (this.prisma.client as any).rejectionReason.findFirst({
             where: { name: rejectionReasonCode, isActive: true },
             select: { id: true },
           })
-        : null,
+        : Promise.resolve(null),
     ]);
     if (!rejected) {
       this.logger.warn('LeadStatus REJECTED not found in DB — skipping lead rejection.');
       return;
     }
-    await this.prisma.client.lead.update({
+    await this.leads.updateLead({
       where: { id: leadId },
       data: {
         leadStatusId: rejected.id,
-        leadStatusNote: note,
+        leadStatusNote: note.slice(0, 256),
         ...(reason ? { rejectionReasonId: reason.id } : {}),
-      } as unknown as Prisma.LeadUpdateInput,
+      },
     });
   }
 
-  /** Write pan_verified + pan_verified_at + pan_verification_note. */
   private updatePanStatus(leadId: bigint, status: number, note?: string | null) {
-    // Set panVerifiedAt for statuses where the vendor was actually contacted (1/2/3).
-    // Status 4 (API_DISABLED) never hits the vendor → no timestamp.
     const vendorWasContacted =
       status === PAN_VERIFIED.VERIFIED ||
       status === PAN_VERIFIED.NOT_VERIFIED ||
       status === PAN_VERIFIED.API_FAILURE;
 
-    return this.prisma.client.leadDetail.update({
-      where: { leadId },
+    return this.leads.updateLead({
+      where: { id: leadId },
       data: {
         panVerified: status,
         panVerifiedAt: vendorWasContacted ? new Date() : null,
-        panVerificationNote: note?.slice(0, 500) ?? null,
-      } as unknown as Prisma.LeadDetailUpdateInput,
-      select: leadDetailSelect,
-    });
+        ...(vendorWasContacted
+          ? {
+              leadStatusNote: note?.trim()
+                ? note.trim().slice(0, 256)
+                : null,
+            }
+          : {}),
+      },
+      select: leadPanSelect,
+    }) as Promise<LeadPanVerificationRow>;
   }
 
   private buildResult(
-    detail: { uuid: string; panNumber: string | null; fullName: string | null; dateOfBirth: Date | null; panVerified: number | boolean | null; panVerifiedAt: Date | null; panVerificationNote?: string | null },
-    verification: { panVerifiedStatus: number; nameMatch: boolean; dobMatch: boolean; panStatus: string | null; category: string | null },
+    detail: LeadDetailBreRow,
+    leadPan: LeadPanVerificationRow,
+    verification: {
+      panVerifiedStatus: number;
+      nameMatch: boolean;
+      dobMatch: boolean;
+      panStatus: string | null;
+      category: string | null;
+    },
   ): VerifyPanResult {
     return {
       success: true,
-      panVerified: isPanVerifiedFromDb(detail.panVerified),
+      panVerified: isPanVerifiedFromDb(leadPan.panVerified),
       panVerifiedStatus: verification.panVerifiedStatus,
       nameMatch: verification.nameMatch,
       dobMatch: verification.dobMatch,
@@ -270,12 +488,12 @@ export class VerifyPanUseCase {
       category: verification.category,
       leadDetail: {
         uuid: detail.uuid,
-        panNumber: detail.panNumber,
+        panNumber: leadPan.panNumber,
         fullName: detail.fullName,
         dateOfBirth: detail.dateOfBirth ? toIsoDateOnly(detail.dateOfBirth) : null,
-        panVerified: isPanVerifiedFromDb(detail.panVerified),
-        panVerifiedAt: detail.panVerifiedAt?.toISOString() ?? null,
-        panVerificationNote: detail.panVerificationNote ?? null,
+        panVerified: isPanVerifiedFromDb(leadPan.panVerified),
+        panVerifiedAt: leadPan.panVerifiedAt?.toISOString() ?? null,
+        leadStatusNote: leadPan.leadStatusNote ?? null,
       },
     };
   }

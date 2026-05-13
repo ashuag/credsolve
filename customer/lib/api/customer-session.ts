@@ -99,15 +99,26 @@ export function getCustomerJourneyResumePath(
   const journey = session.journey;
   if (!journey.detailsCompleted) return '/onboarding?mode=login';
   if (!journey.loanSelectionCompleted) return '/pre-approved-loan';
+  if (!session.lead.emailVerified) return '/onboarding?mode=login';
   if (!journey.kycCompleted) return '/kyc/upload-documents';
   if (!journey.bankDetailsCompleted) return '/bank-details';
   return '/thank-you';
 }
 
+/** Coalesce concurrent `/auth/me` calls (e.g. React Strict Mode double mount). */
+let sessionRequest: Promise<CustomerSessionResponse> | null = null;
+
 export async function fetchCustomerSession(): Promise<CustomerSessionResponse> {
-  const data = await apiGet<CustomerSessionResponse>('/auth/me', 'Unable to load session.');
-  if (!data) {
-    return { authenticated: false };
+  if (!sessionRequest) {
+    sessionRequest = (async (): Promise<CustomerSessionResponse> => {
+      const data = await apiGet<CustomerSessionResponse>('/auth/me', 'Unable to load session.');
+      if (!data) {
+        return { authenticated: false };
+      }
+      return data;
+    })().finally(() => {
+      sessionRequest = null;
+    });
   }
-  return data;
+  return sessionRequest as Promise<CustomerSessionResponse>;
 }

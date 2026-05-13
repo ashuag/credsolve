@@ -20,6 +20,8 @@ import { OtpRequestRepository } from '../../infrastructure/repositories/otp-requ
 import { OtpTypeRepository } from '../../infrastructure/repositories/otp-type.repository';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
 import { PrismaService } from '../../../../prisma/prisma.service';
+import { ApplicationRepository } from '../../infrastructure/repositories/application.repository';
+import { EmailVerificationType } from '@prisma/client';
 
 export type VerifyOtpSessionMeta = {
   ip?: string;
@@ -36,6 +38,7 @@ export class VerifyOtpUseCase {
     private readonly otpRequests: OtpRequestRepository,
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
+    private readonly applications: ApplicationRepository,
     private readonly leadStatuses: LeadStatusRepository,
     private readonly settingsRepository: SettingsRepository,
     private readonly customerSessions: CustomerSessionService
@@ -59,23 +62,18 @@ export class VerifyOtpUseCase {
       throw new InternalServerErrorException('OTP is not configured. Run database seeds.');
     }
 
-    this.logger.log('--------------1-------------');
-
     const request = await this.otpRequests.findPendingByUuidAndType(undefined, dto.requestId, otpType.id);
     if (!request) {
       throw new BadRequestException('Invalid or expired OTP request.');
     }
     this.assertOtpWindow(request, settings);
 
-    this.logger.log('--------------2-------------');
     const given = dto.otpCode.trim().padStart(settings.otpLength, '0');
     if (!safeEqualOtp(request.otpCode, given)) {
       await this.otpRequests.incrementAttempts(undefined, request.id);
       throw new BadRequestException('Incorrect OTP. Please try again.');
     }
 
-
-    this.logger.log('--------------3-------------');
     const verifiedAt = new Date();
 
     const [reapplyDays, blacklistThreshold, blacklistDurationDays] = await Promise.all([
@@ -184,7 +182,15 @@ export class VerifyOtpUseCase {
       if (!lead) {
         throw new BadRequestException('No active lead for this account. Complete mobile verification first.');
       }
-      await this.leads.updateEmailFromOtp(lead.id, request.value, tx);
+      await this.applications.updateEmailWithVerification(
+        {
+          leadId: lead.id,
+          customerId: customer.id,
+          email: request.value,
+          verificationType: EmailVerificationType.OTP,
+        },
+        tx,
+      );
       await this.leads.applyInProgressAfterEmailVerified(lead, tx);
     });
 

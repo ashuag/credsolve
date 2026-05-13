@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { Spinner } from '@/components/ui/spinner';
 import { OtpVerificationForm } from './otp-verification-form';
 
 export default function LoginPage() {
@@ -7,7 +8,7 @@ export default function LoginPage() {
       <Suspense
         fallback={
           <div className="flex min-h-[400px] items-center justify-center">
-            <div className="h-[40px] w-[40px] rounded-full border-4 border-[#1c347d1a] border-t-brand-blue animate-spin" />
+            <Spinner size={40} />
           </div>
         }
       >

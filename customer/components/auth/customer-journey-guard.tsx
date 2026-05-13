@@ -4,13 +4,14 @@ import { ReactNode, useEffect, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 
-type JourneyStage = 'details' | 'preApproved' | 'loanSelection' | 'kyc' | 'bankDetails' | 'done';
+type JourneyStage = 'details' | 'preApproved' | 'loanSelection' | 'email' | 'kyc' | 'bankDetails' | 'done';
 
 function stageFromSession(session: ReturnType<typeof useCustomerSession>['session']): JourneyStage {
   if (!session?.authenticated || !session.lead) return 'details';
   const j = session.journey;
   if (!j.detailsCompleted) return 'details';
   if (!j.loanSelectionCompleted) return 'preApproved';
+  if (!session.lead.emailVerified) return 'email';
   if (!j.kycCompleted) return 'kyc';
   if (!j.bankDetailsCompleted) return 'bankDetails';
   return 'done';
@@ -24,6 +25,8 @@ function defaultPathForStage(stage: JourneyStage): string {
       return '/pre-approved-loan';
     case 'loanSelection':
       return '/loan-selection';
+    case 'email':
+      return '/onboarding?mode=login';
     case 'kyc':
       return '/kyc/upload-documents';
     case 'bankDetails':
@@ -52,6 +55,8 @@ function isPathAllowedForStage(stage: JourneyStage, path: string): boolean {
       return path === '/pre-approved-loan' || path === '/loan-selection';
     case 'loanSelection':
       return path === '/loan-selection';
+    case 'email':
+      return path.startsWith('/onboarding');
     case 'kyc':
       // Skip DigiLocker option page; take users straight to upload-documents.
       return path === '/kyc/upload-documents';

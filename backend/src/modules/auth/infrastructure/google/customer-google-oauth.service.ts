@@ -9,6 +9,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { EmailVerificationType } from '@prisma/client';
 import { CustomerRepository } from '../repositories/customer.repository';
 import { LeadRepository } from '../repositories/lead.repository';
+import { ApplicationRepository } from '../repositories/application.repository';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import {
   buildGoogleAuthorizationUrl,
@@ -42,6 +43,7 @@ export class CustomerGoogleOauthService {
     private readonly config: ConfigService,
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
+    private readonly applications: ApplicationRepository,
     private readonly prisma: PrismaService
   ) {}
 
@@ -197,7 +199,15 @@ export class CustomerGoogleOauthService {
     }
 
     await this.prisma.client.$transaction(async (tx) => {
-      await this.leads.updateLeadEmailWithVerification(lead.id, email, EmailVerificationType.GOOGLE, tx);
+      await this.applications.updateEmailWithVerification(
+        {
+          leadId: lead.id,
+          customerId: lead.customerId,
+          email,
+          verificationType: EmailVerificationType.GOOGLE,
+        },
+        tx,
+      );
       await this.leads.applyInProgressAfterEmailVerified(lead, tx);
     });
 

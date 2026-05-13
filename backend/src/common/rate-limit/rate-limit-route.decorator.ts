@@ -6,6 +6,7 @@ export type RateLimitRouteId =
   | 'send-otp'
   | 'verify-otp'
   | 'verify-pan'
+  | 'fetch-cibil'
   | 'logout'
   | 'sync-lead-email'
   | 'save-lead-details'

@@ -1,5 +1,4 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import { EmailVerificationType } from '@prisma/client';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import type { DbClient } from './db.client';
@@ -12,9 +11,24 @@ export class LeadRepository {
     return tx ?? this.prisma.client;
   }
 
+  /** Prisma `lead_detail.upsert` — caller supplies full args (no business logic here). */
+  upsertLeadDetail(args: any, tx?: DbClient) {
+    return this.db(tx).leadDetail.upsert(args);
+  }
+
+  /** Prisma `lead.update` — caller supplies full args. */
+  updateLead(args: any, tx?: DbClient) {
+    return (this.db(tx) as any).lead.update(args);
+  }
+
+  /** Prisma `lead.findUnique` — caller supplies full args. */
+  findUniqueLead(args: any, tx?: DbClient) {
+    return (this.db(tx) as any).lead.findUnique(args);
+  }
+
   findActiveByCustomerId(customerId: bigint, tx?: DbClient) {
     return this.db(tx).lead.findFirst({
-      where: { customerId},
+      where: { customerId },
       orderBy: { createdAt: 'desc' },
       include: {
         leadStatus: { select: { name: true } },
@@ -48,16 +62,6 @@ export class LeadRepository {
             city: { select: { name: true, state: { select: { code: true } } } },
           },
         },
-      },
-    });
-  }
-
-  updateEmailFromOtp(leadId: bigint, email: string, tx?: DbClient) {
-    return this.db(tx).lead.update({
-      where: { id: leadId },
-      data: {
-        email,
-        emailVerificationType: EmailVerificationType.OTP,
       },
     });
   }
@@ -138,18 +142,4 @@ export class LeadRepository {
     });
   }
 
-  updateLeadEmailWithVerification(
-    leadId: bigint,
-    email: string,
-    verificationType: EmailVerificationType,
-    tx?: DbClient
-  ) {
-    return this.db(tx).lead.update({
-      where: { id: leadId },
-      data: {
-        email,
-        emailVerificationType: verificationType,
-      },
-    });
-  }
 }

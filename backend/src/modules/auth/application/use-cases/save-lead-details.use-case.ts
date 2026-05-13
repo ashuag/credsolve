@@ -4,40 +4,13 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import type { Request } from 'express';
-import { GENDER } from '../../../../common/constants/gender.constants';
-import { OCCUPATION } from '../../../../common/constants/occupation.constants';
+import { parseOptionalInrAmount } from '../../../../common/utils/parse-inr-amount';
+import { GENDER_SLUG_TO_DB, OCCUPATION_SLUG_TO_DB } from '../../../../common/mappers/lead-detail-master-slugs';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import type { SaveLeadDetailsDto } from '../dto/save-lead-details.dto';
-
-const GENDER_SLUG_TO_DB: Record<string, string> = {
-  male: GENDER.MALE,
-  female: GENDER.FEMALE,
-  others: GENDER.OTHERS,
-};
-
-const OCC_SLUG_TO_DB: Record<string, string> = {
-  salaried: OCCUPATION.SALARIED,
-  self_employed_professional: OCCUPATION.SELF_EMPLOYED_PROFESSIONAL,
-  self_employed_business: OCCUPATION.SELF_EMPLOYED_BUSINESS,
-  student: OCCUPATION.STUDENT,
-  homemaker: OCCUPATION.HOMEMAKER,
-  retired: OCCUPATION.RETIRED,
-};
-
-function parseOptionalInrAmount(raw: string | undefined): Prisma.Decimal | null {
-  if (raw === undefined || raw === null) {
-    return null;
-  }
-  const digits = raw.replace(/\D/g, '');
-  if (!digits) {
-    return null;
-  }
-  return new Prisma.Decimal(digits);
-}
 
 function parseDobUtc(dob: string): Date {
   const [y, m, d] = dob.split('-').map((p) => Number.parseInt(p, 10));
@@ -75,7 +48,7 @@ export class SaveLeadDetailsUseCase {
     }
 
     const genderName = GENDER_SLUG_TO_DB[dto.gender];
-    const occupationName = OCC_SLUG_TO_DB[dto.occupation];
+    const occupationName = OCCUPATION_SLUG_TO_DB[dto.occupation];
     if (!genderName || !occupationName) {
       throw new BadRequestException('Invalid gender or occupation.');
     }
@@ -108,10 +81,10 @@ export class SaveLeadDetailsUseCase {
     const annualProfit = parseOptionalInrAmount(dto.annualProfit);
 
     const consentAt = dto.creditConsentAccepted ? new Date() : null;
-    const panPatch =
+    const panUpper =
       dto.panNumber?.trim() != null && dto.panNumber.trim().length > 0
-        ? { panNumber: dto.panNumber.trim().toUpperCase() }
-        : {};
+        ? dto.panNumber.trim().toUpperCase()
+        : null;
 
     await this.prisma.client.leadDetail.upsert({
       where: { leadId: leadRow.id },
@@ -129,7 +102,6 @@ export class SaveLeadDetailsUseCase {
         annualTurnover,
         annualProfit,
         cibilConsentAt: consentAt,
-        ...panPatch,
       },
       update: {
         fullName: dto.fullName.trim(),
@@ -144,9 +116,15 @@ export class SaveLeadDetailsUseCase {
         annualTurnover,
         annualProfit,
         cibilConsentAt: consentAt,
-        ...panPatch,
       },
     });
+
+    if (panUpper) {
+      await this.prisma.client.lead.update({
+        where: { id: leadRow.id },
+        data: { panNumber: panUpper },
+      });
+    }
 
     return { success: true, leadUuid: leadRow.uuid };
   }

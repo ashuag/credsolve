@@ -8,6 +8,7 @@ import { RedisModule } from './common/redis/redis.module';
 import { SmsModule } from './common/sms/sms.module';
 import { VendorApiModule } from './common/vendor/vendor-api.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { BureauModule } from './modules/bureau/bureau.module';
 import { LosModule } from './modules/los/los.module';
 import { PrismaModule } from './prisma/prisma.module';
 
@@ -27,6 +28,7 @@ import { PrismaModule } from './prisma/prisma.module';
     SmsModule,
     VendorApiModule,
     AuthModule,
+    BureauModule,
     LosModule,
   ],
   controllers: [AppController],

@@ -84,6 +84,11 @@ export const SettingKey = {
         default: '30000',
         description: 'Maximum loan amount that can be offered',
     },
+    BUREAU_FETCH_ENABLED: {
+        key: 'BUREAU_FETCH_ENABLED',
+        default: '1',
+        description:  'Need to check Bureau data is fetched or not',
+    },
     PAN_VERIFICATION_ENABLED: {
         key: 'PAN_VERIFICATION_ENABLED',
         default: '1',
@@ -91,17 +96,17 @@ export const SettingKey = {
     },
     REAPPLY_AFTER_REJECTED: {
         key: 'REAPPLY_AFTER_REJECTED',
-        default: '30',
+        default: '90',
         description:  'Days after which lead can be re-applied after rejection',
     },
     BLACKLIST_REJECTION_THRESHOLD: {
         key: 'BLACKLIST_REJECTION_THRESHOLD',
-        default: '3',
+        default: '2',
         description:  'Max consecutive rejection count',
     },
     BLACKLIST_DURATION_DAYS: {
         key: 'BLACKLIST_DURATION_DAYS',
-        default: '30',
+        default: '90',
         description:  'Days after which lead can be re-applied after consecutive rejection',
     },
     BRE_MIN_AGE: {
@@ -114,19 +119,14 @@ export const SettingKey = {
         default: '57',
         description: 'Maximum borrower age (years)',
     },
-    BRE_NEGATIVE_PINCODES: {
-        key: 'BRE_NEGATIVE_PINCODES',
-        default: '',
-        description: 'Comma-separated list of blocked pincodes',
+    BRE_REJECTED_GENDERS: {
+        key: 'BRE_REJECTED_GENDERS',
+        default: '3',
+        description: 'Comma-separated list of blocked genders',
     },
-    BRE_NEGATIVE_CITIES: {
-        key: 'BRE_NEGATIVE_CITIES',
-        default: '',
-        description: 'Comma-separated list of blocked city names (case-insensitive)',
-    },
-    BRE_NEGATIVE_STATES: {
-        key: 'BRE_NEGATIVE_STATES',
-        default: '',
-        description: 'Comma-separated list of blocked state codes (case-insensitive)',
+    BRE_REJECTED_OCCUPATIONS: {
+        key: 'BRE_REJECTED_OCCUPATIONS',
+        default: '4,5,6',
+        description: 'Comma-separated list of blocked occupations',
     },
 } as const;

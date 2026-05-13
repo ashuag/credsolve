@@ -38,9 +38,8 @@ export interface AuthOtpSettings {
 export interface BreSettings {
   minAge: number;
   maxAge: number;
-  negativePincodes: string[];
-  negativeCities: string[];
-  negativeStates: string[];
+  rejectedGenderIds: number[];
+  rejectedOccupationIds: number[];
 }
 
 export interface LoanCalculationSettings {
@@ -68,6 +67,28 @@ function authOtpCacheTtlMs(): number {
 
 function settingRedisKey(settingKey: string): string {
   return `setting:${settingKey}`;
+}
+
+/**
+ * When an older compiled `setting.constants` is deployed with a newer
+ * `settings.repository`, `SettingKey.NEW_ENTRY` can be undefined and
+ * `undefined.key` crashes. Prefer live `SettingKey` when present.
+ */
+const BRE_SETTING_FALLBACK = {
+  BRE_MIN_AGE: { key: 'BRE_MIN_AGE', default: '21' },
+  BRE_MAX_AGE: { key: 'BRE_MAX_AGE', default: '57' },
+  BRE_REJECTED_GENDERS: { key: 'BRE_REJECTED_GENDERS', default: '3' },
+  BRE_REJECTED_OCCUPATIONS: { key: 'BRE_REJECTED_OCCUPATIONS', default: '4,5,6' },
+} as const;
+
+type BreSettingKeyId = keyof typeof BRE_SETTING_FALLBACK;
+
+function breSettingMeta(id: BreSettingKeyId): { key: string; default: string } {
+  const entry = SettingKey[id as keyof typeof SettingKey] as { key: string; default: string } | undefined;
+  if (entry && typeof entry.key === 'string' && typeof entry.default === 'string') {
+    return entry;
+  }
+  return BRE_SETTING_FALLBACK[id];
 }
 
 @Injectable()
@@ -118,6 +139,20 @@ export class SettingsRepository {
     */
 
     return enabled;
+  }
+
+  /**
+   * Whether to call the bureau (CIBIL) vendor after PAN is verified.
+   * DB `setting` row `BUREAU_FETCH_ENABLED` (default `1` = on).
+   */
+  async isBureauFetchEnabled(): Promise<boolean> {
+    const meta = SettingKey.BUREAU_FETCH_ENABLED;
+    const row = await this.prisma.client.setting.findFirst({
+      where: { key: meta.key, isActive: true },
+      select: { value: true },
+    });
+    const raw = row?.value?.trim() ?? meta.default;
+    return parseBool(raw, false);
   }
 
   async getReapplyAfterRejectedDays(): Promise<number> {
@@ -186,12 +221,12 @@ export class SettingsRepository {
   }
 
   async loadBreSettings(): Promise<BreSettings> {
+    const m = breSettingMeta;
     const breKeys = [
-      SettingKey.BRE_MIN_AGE.key,
-      SettingKey.BRE_MAX_AGE.key,
-      SettingKey.BRE_NEGATIVE_PINCODES.key,
-      SettingKey.BRE_NEGATIVE_CITIES.key,
-      SettingKey.BRE_NEGATIVE_STATES.key,
+      m('BRE_MIN_AGE').key,
+      m('BRE_MAX_AGE').key,
+      m('BRE_REJECTED_GENDERS').key,
+      m('BRE_REJECTED_OCCUPATIONS').key,
     ] as const;
 
     const rows = await this.prisma.client.setting.findMany({
@@ -201,15 +236,17 @@ export class SettingsRepository {
     const map = new Map(rows.map((r) => [r.key, r.value]));
     const pick = (key: string, def: string) => map.get(key)?.trim() || def;
 
-    const parseList = (raw: string): string[] =>
-      raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+    const parseIdList = (raw: string): number[] =>
+      raw
+        .split(',')
+        .map((s) => Number.parseInt(s.trim(), 10))
+        .filter((n) => Number.isFinite(n));
 
     return {
-      minAge: Math.max(1, parseInt(pick(SettingKey.BRE_MIN_AGE.key, SettingKey.BRE_MIN_AGE.default), 10) || 21),
-      maxAge: Math.max(1, parseInt(pick(SettingKey.BRE_MAX_AGE.key, SettingKey.BRE_MAX_AGE.default), 10) || 57),
-      negativePincodes: parseList(pick(SettingKey.BRE_NEGATIVE_PINCODES.key, SettingKey.BRE_NEGATIVE_PINCODES.default)),
-      negativeCities: parseList(pick(SettingKey.BRE_NEGATIVE_CITIES.key, SettingKey.BRE_NEGATIVE_CITIES.default)),
-      negativeStates: parseList(pick(SettingKey.BRE_NEGATIVE_STATES.key, SettingKey.BRE_NEGATIVE_STATES.default)),
+      minAge: Math.max(1, parseInt(pick(m('BRE_MIN_AGE').key, m('BRE_MIN_AGE').default), 10) || 21),
+      maxAge: Math.max(1, parseInt(pick(m('BRE_MAX_AGE').key, m('BRE_MAX_AGE').default), 10) || 57),
+      rejectedGenderIds: parseIdList(pick(m('BRE_REJECTED_GENDERS').key, m('BRE_REJECTED_GENDERS').default)),
+      rejectedOccupationIds: parseIdList(pick(m('BRE_REJECTED_OCCUPATIONS').key, m('BRE_REJECTED_OCCUPATIONS').default)),
     };
   }
 

@@ -43,6 +43,11 @@ export type VerifyLeadPanPayload = {
   panNumber: string;
   fullName: string;
   dob: string;
+  gender: CustomerGenderValue;
+  occupation: CustomerOccupationValue;
+  monthlyIncome?: string;
+  annualTurnover?: string;
+  annualProfit?: string;
 };
 
 export type VerifyLeadPanResponse = {
@@ -60,6 +65,8 @@ export type VerifyLeadPanResponse = {
     dateOfBirth: string | null;
     panVerified: boolean;
     panVerifiedAt: string | null;
+    /** Same as `lead.lead_status_note` after verify (PAN / policy). */
+    leadStatusNote?: string | null;
   };
 };
 

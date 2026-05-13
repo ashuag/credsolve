@@ -10,6 +10,7 @@ import { EmailVerificationType } from '@prisma/client';
 import { verifyGoogleIdTokenEmail } from '../../infrastructure/google/google-oauth-http.util';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
+import { ApplicationRepository } from '../../infrastructure/repositories/application.repository';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import type { SyncLeadEmailDto } from '../dto/sync-lead-email.dto';
 
@@ -19,6 +20,7 @@ export class SyncLeadEmailFromGoogleTokenUseCase {
     private readonly config: ConfigService,
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
+    private readonly applications: ApplicationRepository,
     private readonly prisma: PrismaService
   ) {}
 
@@ -55,7 +57,15 @@ export class SyncLeadEmailFromGoogleTokenUseCase {
     }
 
     await this.prisma.client.$transaction(async (tx) => {
-      await this.leads.updateLeadEmailWithVerification(lead.id, email, EmailVerificationType.GOOGLE, tx);
+      await this.applications.updateEmailWithVerification(
+        {
+          leadId: lead.id,
+          customerId: customer.id,
+          email,
+          verificationType: EmailVerificationType.GOOGLE,
+        },
+        tx,
+      );
       await this.leads.applyInProgressAfterEmailVerified(lead, tx);
     });
 

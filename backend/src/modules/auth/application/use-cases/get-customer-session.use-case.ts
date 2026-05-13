@@ -78,19 +78,28 @@ export class GetCustomerSessionUseCase {
       }
     }
 
-    const emailVerified = isLeadEmailVerifiedForPortal(
-      statusName,
-      leadRow.email,
-      leadRow.emailVerificationType
-    );
-
-    let profile = formatLeadDetailForPortal(leadRow.leadDetail);
-
     const application = await this.prisma.client.application.findFirst({
       where: { leadId: leadRow.id },
       orderBy: { createdAt: 'desc' },
-      select: { id: true },
+      select: { id: true, email: true, emailVerificationType: true },
     });
+
+    const emailVerified = isLeadEmailVerifiedForPortal(
+      statusName,
+      application?.email ?? null,
+      application?.emailVerificationType ?? null,
+    );
+
+    let profile = formatLeadDetailForPortal(
+      leadRow.leadDetail
+        ? {
+            ...leadRow.leadDetail,
+            panNumber: leadRow.panNumber ?? null,
+            panVerified: leadRow.panVerified,
+            panVerifiedAt: leadRow.panVerifiedAt,
+          }
+        : null,
+    );
 
     const [appDetails, disbursement, latestCustomerKyc] = await Promise.all([
       application
@@ -151,7 +160,7 @@ export class GetCustomerSessionUseCase {
       lead: {
         uuid: leadRow.uuid,
         status: statusName,
-        email: leadRow.email,
+        email: application?.email ?? null,
         emailVerified,
         rejectedUntil,
       },

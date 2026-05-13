@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { startTransition, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Spinner } from '@/components/ui/spinner';
 import { resolveCustomerFlowPath } from '@/lib/customer-flow';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 
@@ -68,7 +69,9 @@ export default function GoogleAuthCallbackPage() {
           <p className="mt-3 text-brand-muted leading-[1.6]">
             We are finishing your Google login and updating your MoneyCash application.
           </p>
-          <div className="mx-auto mt-6 h-[40px] w-[40px] rounded-full border-4 border-[#1c347d1a] border-t-brand-blue animate-spin" />
+          <div className="mx-auto mt-6 flex justify-center">
+            <Spinner size={40} />
+          </div>
         </div>
       </div>
     );

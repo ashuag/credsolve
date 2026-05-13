@@ -50,9 +50,7 @@ export default function MyAccountPage() {
               { label: 'Hub', value: 'Live' },
               { label: 'Help', value: '24/7' },
             ]}
-            mobileChip="Sign in"
-            mobileTitle="My account"
-            mobileSubtitle="Mobile OTP — then your dashboard."
+            mobileStepLabel="Sign in"
           />
         </main>
       </Suspense>

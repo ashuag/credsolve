@@ -179,6 +179,7 @@ export class AuthController {
     this.logger.log(
       `POST /api/auth/verify-pan ip=${readClientIp(req) ?? 'unknown'} leadUuid=${body.leadUuid ?? '(active lead)'} pan=******${panTail}`,
     );
+    
     return this.verifyPanFlow.execute(req, body);
   }
 }

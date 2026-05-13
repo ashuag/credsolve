@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+import { CibilFetchService } from './cibil-fetch.service';
 import { PanVerificationService } from './pan-verification.service';
 import { VendorApiService } from './vendor-api.service';
 
@@ -13,7 +14,7 @@ import { VendorApiService } from './vendor-api.service';
  */
 @Global()
 @Module({
-  providers: [VendorApiService, PanVerificationService],
-  exports: [VendorApiService, PanVerificationService],
+  providers: [VendorApiService, PanVerificationService, CibilFetchService],
+  exports: [VendorApiService, PanVerificationService, CibilFetchService],
 })
 export class VendorApiModule {}

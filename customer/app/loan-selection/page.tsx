@@ -168,7 +168,7 @@ export default function LoanSelectionPage() {
         loanPurpose: loanPurpose || undefined,
       });
       await refresh();
-      router.push('/kyc/upload-documents');
+      router.push('/onboarding?mode=login');
     } catch (e) {
       setSettingsError(e instanceof Error ? e.message : 'Unable to save loan selection.');
       setIsSaving(false);

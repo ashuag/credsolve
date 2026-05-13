@@ -56,7 +56,7 @@ type TenacioNsdlResponse = {
 
 export type PanVerificationResult = {
   /**
-   * SmallInt for `lead_detail.pan_verified`:
+   * SmallInt for `lead.pan_verified`:
    *   0 = NOT_CHECKED (transient failure, safe to retry)
    *   1 = VERIFIED
    *   2 = NOT_VERIFIED (definitive negative from vendor)
@@ -69,7 +69,7 @@ export type PanVerificationResult = {
   panStatus: string | null;
   category: string | null;
   vendorRequestId: string | null;
-  /** Human-readable summary for `lead_detail.pan_verification_note`. */
+  /** Human-readable summary stored on `lead.lead_status_note` after verification. */
   note: string | null;
 };
 

@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { BreCheckService } from './bre-check.service';
+import { PreBreCheckService } from './pre-bre-check.service';
 
 @Module({
-  providers: [BreCheckService],
-  exports: [BreCheckService],
+  providers: [PreBreCheckService],
+  exports: [PreBreCheckService],
 })
 export class BreModule {}

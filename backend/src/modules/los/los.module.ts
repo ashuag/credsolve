@@ -12,5 +12,6 @@ import { LosTeamService } from './los-team.service';
 @Module({
   controllers: [LosAuthController, LosDataController, LosMastersController, LosTeamController],
   providers: [LosAuthService, LosSessionService, LosAuthGuard, LosDataService, LosTeamService],
+  exports: [LosSessionService],
 })
 export class LosModule {}

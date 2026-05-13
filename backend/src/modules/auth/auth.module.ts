@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BreModule } from '../../common/bre/bre.module';
 import { EmailModule } from '../../common/email/email.module';
+import { VendorApiModule } from '../../common/vendor/vendor-api.module';
 import { RedisIpRateLimitGuard } from '../../common/rate-limit/redis-ip-rate-limit.guard';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { CheckLoanEligibilityUseCase } from './application/use-cases/check-loan-eligibility.use-case';
@@ -22,6 +23,7 @@ import { CustomerGoogleOauthService } from './infrastructure/google/customer-goo
 import { CustomerRepository } from './infrastructure/repositories/customer.repository';
 import { BankRepository } from './infrastructure/repositories/bank.repository';
 import { LeadRepository } from './infrastructure/repositories/lead.repository';
+import { ApplicationRepository } from './infrastructure/repositories/application.repository';
 import { LeadStatusRepository } from './infrastructure/repositories/lead-status.repository';
 import { OtpRequestRepository } from './infrastructure/repositories/otp-request.repository';
 import { OtpTypeRepository } from './infrastructure/repositories/otp-type.repository';
@@ -36,7 +38,7 @@ import { OptionalCustomerSessionGuard } from './presentation/guards/optional-cus
 import { RequiredCustomerSessionGuard } from './presentation/guards/required-customer-session.guard';
 
 @Module({
-  imports: [BreModule, EmailModule, PrismaModule],
+  imports: [BreModule, EmailModule, PrismaModule, VendorApiModule],
   controllers: [
     AuthController,
     ApplicationsController,
@@ -53,6 +55,7 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     CustomerRepository,
     BankRepository,
     LeadRepository,
+    ApplicationRepository,
     LeadStatusRepository,
     SettingsRepository,
     OptionalCustomerSessionGuard,
@@ -73,5 +76,6 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     GetCustomerLoansDashboardUseCase,
     LogoutUseCase,
   ],
+  exports: [CustomerSessionService],
 })
 export class AuthModule {}

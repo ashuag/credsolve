@@ -1,5 +1,5 @@
 /**
- * `lead_detail.pan_verified` SmallInt status codes.
+ * `lead.pan_verified` SmallInt status codes.
  *
  *   0 → NOT_CHECKED   — API not yet called, or network/timeout error.
  *                        Safe to retry later.

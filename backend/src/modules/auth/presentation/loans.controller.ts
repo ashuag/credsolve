@@ -1,5 +1,6 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Req, UseGuards } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { CheckLoanEligibilityUseCase } from '../application/use-cases/check-loan-eligibility.use-case';
 import { BankRepository } from '../infrastructure/repositories/bank.repository';
 import { SettingsRepository } from '../infrastructure/repositories/settings.repository';
@@ -17,7 +18,8 @@ export class LoansController {
 
   @Get('eligibility')
   @ApiOperation({
-    summary: 'Check loan pre-approval amount (demo: random ₹5k–₹50k for signed-in customers)',
+    summary:
+      'Pre-approved eligibility ceiling in INR (demo: deterministic ₹5k–₹50k from active lead until bureau/rules are wired)',
   })
   @ApiOkResponse({
     description: 'Pre-approved ceiling in INR',
@@ -28,8 +30,8 @@ export class LoansController {
       },
     },
   })
-  eligibility() {
-    return this.checkLoanEligibility.execute();
+  eligibility(@Req() req: Request) {
+    return this.checkLoanEligibility.executeForCustomerSession(req);
   }
 
   @Get('settings')

@@ -6,14 +6,18 @@
 // of 1:1 sub-aggregates (details, eligibility, agreement, disbursement).
 
 model Application {
-  id                  BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid                String    @unique @default(uuid()) @db.Char(36)
-  customerId          BigInt    @map("customer_id") @db.UnsignedBigInt
-  leadId              BigInt    @map("lead_id") @db.UnsignedBigInt
-  applicationStatusId Int       @map("application_status_id") @db.SmallInt
-  kycCompletedAt      DateTime? @map("kyc_completed_at")
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
+  id                    BigInt                    @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                  String                    @unique @default(uuid()) @db.Char(36)
+  customerId            BigInt                    @map("customer_id") @db.UnsignedBigInt
+  leadId                BigInt                    @map("lead_id") @db.UnsignedBigInt
+  email                 String?                   @map("email_id") @db.VarChar(150)
+  emailVerifiedAt       DateTime?                 @map("email_verified_at") @db.DateTime
+  emailVerificationType EmailVerificationType?    @map("email_verification_type")
+  applicationStatusId   Int                       @map("application_status_id") @db.SmallInt
+  preApprovedLoanAmount Decimal?                  @map("pre_approved_loan_amount") @db.Decimal(12, 2)
+  kycCompletedAt        DateTime?                 @map("kyc_completed_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt      @map("updated_at")
 
   customer          Customer                 @relation(fields: [customerId], references: [id])
   lead              Lead                     @relation(fields: [leadId], references: [id])

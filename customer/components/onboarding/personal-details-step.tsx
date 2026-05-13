@@ -50,7 +50,8 @@ function computeProfileCompletionRatio(fields: Fields, dobDisplay: string): numb
   checks.push(Boolean(fields.occupation));
   const occ = fields.occupation;
   if (occ && usesMonthlyIncomeMetric(occ)) {
-    checks.push(Boolean(fields.monthlyIncome && Number(fields.monthlyIncome) > 0));
+    const m = fields.monthlyIncome.trim();
+    checks.push(m !== '' && Number.isFinite(Number(m)) && Number(m) >= 0);
   }
   if (occ && usesAnnualFinancialMetric(occ)) {
     checks.push(Boolean(fields.annualTurnover && Number(fields.annualTurnover) > 0));
@@ -308,8 +309,11 @@ export function PersonalDetailsStep({
     }
     if (!fields.currentCity.trim()) next.currentCity = 'Please enter your current city.';
     if (!PINCODE_REGEX.test(fields.pincode)) next.pincode = 'Please enter a valid 6-digit pincode.';
-    if (usesMonthlyIncome && (!fields.monthlyIncome || Number(fields.monthlyIncome) <= 0)) {
-      next.monthlyIncome = 'Please enter your monthly income.';
+    if (usesMonthlyIncome) {
+      const raw = fields.monthlyIncome.trim();
+      if (!raw || !Number.isFinite(Number(raw)) || Number(raw) < 0) {
+        next.monthlyIncome = 'Please enter your monthly income (0 is allowed).';
+      }
     }
     if (isSelfEmployed) {
       if (!fields.annualTurnover || Number(fields.annualTurnover) <= 0) next.annualTurnover = 'Please enter your annual turnover.';
@@ -352,6 +356,12 @@ export function PersonalDetailsStep({
         panNumber: fields.panNumber.trim().toUpperCase(),
         fullName: fields.fullName.trim(),
         dob: fields.dob,
+        gender: fields.gender as CustomerGenderValue,
+        occupation: fields.occupation as CustomerOccupationValue,
+        ...(usesMonthlyIncome ? { monthlyIncome: fields.monthlyIncome.trim() } : {}),
+        ...(isSelfEmployed
+          ? { annualTurnover: fields.annualTurnover.trim(), annualProfit: fields.annualProfit.trim() }
+          : {}),
       });
       if (!result.success) {
         setSubmitError('Unable to verify your PAN right now. Please try again.');
@@ -396,9 +406,10 @@ export function PersonalDetailsStep({
         ...(fields.addressLine2.trim() ? { addressLine2: fields.addressLine2.trim() } : {}),
         currentCity: fields.currentCity.trim(),
         pincode: fields.pincode,
-        ...(fields.monthlyIncome ? { monthlyIncome: fields.monthlyIncome } : {}),
-        ...(fields.annualTurnover ? { annualTurnover: fields.annualTurnover } : {}),
-        ...(fields.annualProfit ? { annualProfit: fields.annualProfit } : {}),
+        ...(usesMonthlyIncome ? { monthlyIncome: fields.monthlyIncome.trim() } : {}),
+        ...(isSelfEmployed
+          ? { annualTurnover: fields.annualTurnover.trim(), annualProfit: fields.annualProfit.trim() }
+          : {}),
         creditConsentAccepted: fields.creditConsentAccepted,
       });
 
@@ -621,7 +632,15 @@ export function PersonalDetailsStep({
                   aria-busy={isVerifyingPan}
                   className="mc-btn-primary flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {isVerifyingPan ? 'Verifying PAN…' : 'Continue to address'}
+                  <span className="inline-flex items-center justify-center gap-[10px]">
+                    {isVerifyingPan ? (
+                      <span
+                        className="w-[18px] h-[18px] shrink-0 rounded-full border-2 border-[rgba(255,248,223,0.28)] border-t-[#fff8df] animate-spin-btn"
+                        aria-hidden
+                      />
+                    ) : null}
+                    <span>{isVerifyingPan ? 'Verifying PAN…' : 'Continue'}</span>
+                  </span>
                 </button>
               </div>
             </div>

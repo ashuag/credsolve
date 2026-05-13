@@ -21,6 +21,11 @@ export class LosDataService {
         leadStatus: { select: { name: true, displayName: true } },
         source: { select: { name: true, type: true } },
         leadUtms: { select: { utmSource: true, utmMedium: true, utmCampaign: true }, orderBy: { createdAt: 'desc' }, take: 1 },
+        applications: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { email: true },
+        },
       },
       take: 500,
     });
@@ -31,7 +36,7 @@ export class LosDataService {
         uuid: lead.uuid,
         customerUuid: lead.customer.uuid,
         mobileNumber: lead.customer.mobileNumber,
-        email: lead.email,
+        email: lead.applications[0]?.email ?? null,
         statusCode: lead.leadStatus.name,
         statusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
         sourceName: lead.source?.name ?? null,
@@ -50,7 +55,7 @@ export class LosDataService {
       orderBy: { createdAt: 'desc' },
       include: {
         customer: { select: { uuid: true, mobileNumber: true } },
-        lead: { select: { uuid: true, email: true, leadDetail: { select: { fullName: true } } } },
+        lead: { select: { uuid: true, leadDetail: { select: { fullName: true } } } },
         applicationStatus: { select: { name: true, displayName: true } },
         details: { select: { loanAmount: true } },
       },
@@ -62,7 +67,7 @@ export class LosDataService {
       customerUuid: application.customer.uuid,
       leadUuid: application.lead.uuid,
       mobileNumber: application.customer.mobileNumber,
-      email: application.lead.email,
+      email: application.email,
       fullName: application.lead.leadDetail?.fullName ?? null,
       loanAmount: application.details?.loanAmount?.toString() ?? null,
       statusCode: application.applicationStatus.name,
@@ -108,7 +113,7 @@ export class LosDataService {
       uuid: lead.uuid,
       customerUuid: lead.customer.uuid,
       mobileNumber: lead.customer.mobileNumber,
-      email: lead.email,
+      email: lead.applications[0]?.email ?? null,
       statusCode: lead.leadStatus.name,
       statusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
       sourceName: lead.source?.name ?? null,
@@ -127,7 +132,7 @@ export class LosDataService {
       profile: detail
         ? {
             fullName: detail.fullName,
-            panNumber: detail.panNumber,
+            panNumber: lead.panNumber,
             pincode: detail.pincode,
             addressLine1: detail.addressLine1,
             addressLine2: detail.addressLine2,

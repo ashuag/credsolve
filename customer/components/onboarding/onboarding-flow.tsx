@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Spinner } from '@/components/ui/spinner';
+import { FlowLoader } from '@/components/ui/flow-loader';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { SendEmailOtpResponse } from '@/lib/api/auth';
 import type { CustomerOnboardingMode } from '@/lib/customer-flow';
@@ -13,14 +13,14 @@ import { PersonalDetailsStep, type PersonalDetailsSection } from './personal-det
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 
-// Flow: mobile verified → details → email → email-otp → /pre-approved-loan
+// Flow: mobile verified → profile (/onboarding) → pre-approved + loan selection → email (/onboarding) → KYC
 type OnboardingStep = 'details' | 'email' | 'email-otp';
 
 /** Maps onboarding step to a mobile app-bar label. */
 const STEP_LABELS: Record<OnboardingStep, string> = {
-  details: 'Step 1 of 3',
-  email: 'Step 2 of 3',
-  'email-otp': 'Step 3 of 3',
+  details: 'Step 1 of 2',
+  email: 'Link email',
+  'email-otp': 'Verify email',
 };
 
 export function OnboardingFlow() {
@@ -51,10 +51,17 @@ export function OnboardingFlow() {
     const lead = session.lead;
     const storedEmail = lead?.email?.trim() ?? '';
     const emailVerified = lead?.emailVerified ?? false;
+    const { detailsCompleted, loanSelectionCompleted } = session.journey;
 
-    // Both details and email are done — move past onboarding
-    if (session.journey.detailsCompleted && emailVerified) {
+    // Profile + loan + email complete → continue journey (e.g. KYC).
+    if (detailsCompleted && loanSelectionCompleted && emailVerified) {
       router.replace(getCustomerJourneyResumePath(session));
+      return;
+    }
+
+    // Profile done but loan not chosen → offer / selection before email.
+    if (detailsCompleted && !loanSelectionCompleted) {
+      router.replace('/pre-approved-loan');
       return;
     }
 
@@ -64,8 +71,9 @@ export function OnboardingFlow() {
       setEmailMode(initialMode);
       setEmail(storedEmail);
 
-      if (session.journey.detailsCompleted) {
-        // Details are done but email is not verified — skip to email step
+      if (!detailsCompleted) {
+        setStep('details');
+      } else if (loanSelectionCompleted && !emailVerified) {
         setStep(storedEmail ? 'email-otp' : 'email');
       } else {
         setStep('details');
@@ -83,7 +91,7 @@ export function OnboardingFlow() {
 
   async function handleDetailsSaved() {
     await refresh();
-    setStep('email');
+    router.push('/pre-approved-loan');
   }
 
   function handleEmailNext(confirmedEmail: string, mode: EmailMode, otpRequest: SendEmailOtpResponse) {
@@ -95,35 +103,30 @@ export function OnboardingFlow() {
   }
 
   async function handleOtpVerified() {
-    await refresh();
-    router.push('/pre-approved-loan');
+    const next = await refresh();
+    router.replace(getCustomerJourneyResumePath(next));
   }
 
-  if (loading || !session || !hasResolved) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Spinner size={40} />
-      </div>
-    );
-  }
+  const sessionGateLoading =
+    loading ||
+    !session ||
+    !hasResolved ||
+    !session.authenticated ||
+    !session.lead;
 
-  if (!session.authenticated || !session.lead) {
+  if (sessionGateLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Spinner size={40} />
-      </div>
+      <FlowLoader
+        eyebrow="MoneyCash"
+        title="Loading your application"
+        description="We are checking your sign-in and opening the right step in your loan journey."
+        steps={['Verifying your session', 'Reading your loan status', 'Preparing the next step']}
+      />
     );
   }
 
   const portalSession = session;
   const activeLead = portalSession.lead;
-  if (!activeLead) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Spinner size={40} />
-      </div>
-    );
-  }
 
   let leftTitle, leftDescription, leftInfographic;
 
@@ -188,8 +191,18 @@ export function OnboardingFlow() {
 
   /** Back handler for mobile app bar — navigates within onboarding or exits */
   function handleMobileBack() {
-    if (step === 'email-otp') { setStep('email'); return; }
-    if (step === 'email') { setStep('details'); return; }
+    if (step === 'email-otp') {
+      setStep('email');
+      return;
+    }
+    if (step === 'email') {
+      if (portalSession.journey.loanSelectionCompleted) {
+        router.push('/loan-selection');
+      } else {
+        setStep('details');
+      }
+      return;
+    }
     router.push('/apply-for-loan');
   }
 
