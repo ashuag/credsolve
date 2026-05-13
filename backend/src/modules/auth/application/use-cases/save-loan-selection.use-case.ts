@@ -88,30 +88,46 @@ export class SaveLoanSelectionUseCase {
         });
       }
 
+      let reasonForLoanId: number | null | undefined;
+      if (dto.loanPurpose !== undefined) {
+        const trimmed = dto.loanPurpose.trim();
+        if (!trimmed) {
+          reasonForLoanId = null;
+        } else {
+          const row = await tx.reasonForLoan.findFirst({
+            where: { name: trimmed, isActive: true },
+            select: { id: true },
+          });
+          reasonForLoanId = row?.id ?? null;
+        }
+      }
+
+      const principal = new Prisma.Decimal(dto.loanAmount);
+      const detailsCore = {
+        loanAmount: principal,
+        loanTenure: tenureDays,
+        interestRate: new Prisma.Decimal(loanSettings.roiPerDayPercent),
+        interestAmount: new Prisma.Decimal(interestAmountNum),
+        processingFee: new Prisma.Decimal(loanSettings.processingFeePercent),
+        processingFeeAmount: new Prisma.Decimal(processingFeeAmountNum),
+        gstAmount: new Prisma.Decimal(gstAmountNum),
+        loanMaturityDate: tenureEndDate,
+        loanDisbursementDate: new Date(),
+      };
+
+      const reasonPatch =
+        reasonForLoanId === undefined ? {} : { reasonForLoanId };
+
       await tx.applicationDetails.upsert({
         where: { applicationId: application.id },
         create: {
           applicationId: application.id,
-          loanAmount: new Prisma.Decimal(dto.loanAmount),
-          loanTenure: tenureDays,
-          interestRate: new Prisma.Decimal(loanSettings.roiPerDayPercent),
-          interestAmount: new Prisma.Decimal(interestAmountNum),
-          processingFee: new Prisma.Decimal(loanSettings.processingFeePercent),
-          processingFeeAmount: new Prisma.Decimal(processingFeeAmountNum),
-          gstAmount: new Prisma.Decimal(gstAmountNum),
-          loanMaturityDate: tenureEndDate,
-          loanDisbursementDate: new Date(),
+          ...detailsCore,
+          ...reasonPatch,
         },
         update: {
-          loanAmount: new Prisma.Decimal(dto.loanAmount),
-          loanTenure: tenureDays,
-          interestRate: new Prisma.Decimal(loanSettings.roiPerDayPercent),
-          interestAmount: new Prisma.Decimal(interestAmountNum),
-          processingFee: new Prisma.Decimal(loanSettings.processingFeePercent),
-          processingFeeAmount: new Prisma.Decimal(processingFeeAmountNum),
-          gstAmount: new Prisma.Decimal(gstAmountNum),
-          loanMaturityDate: tenureEndDate,
-          loanDisbursementDate: new Date(),
+          ...detailsCore,
+          ...reasonPatch,
         },
       });
     });

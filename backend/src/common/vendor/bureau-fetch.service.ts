@@ -33,8 +33,8 @@ function maskMobile(mobile: string | undefined): string {
 }
 
 /**
- * Tenacio bureau pull (Experian/CIBIL workflow) using the same base URL, client-id, and
- * x-api-key as PAN NSDL. Path and `workflow-id` use `TENACIO_CIBIL_*` env vars (Tenacio naming).
+ * Tenacio bureau pull (Experian/CIBIL workflow) using env `VENDOR_HOST`, `TENACIO_CLIENT_ID` (sent as HTTP
+ * `client-id`), `TENACIO_API_KEY` (sent as HTTP `x-api-key`). Path and `workflow-id` use `TENACIO_CIBIL_*`.
  * Every live call is audited via {@link VendorApiService} → `vendor_api_log`.
  */
 @Injectable()

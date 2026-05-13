@@ -6,7 +6,7 @@ import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { LoanSummaryLeftRail } from '@/components/loan/loan-summary-left-rail';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
-import { initDigilockerSession } from '@/lib/api/digilocker';
+import { initDigilockerSession, persistDigilockerSessionTokenForCallback } from '@/lib/api/digilocker';
 import { getKycHubBackPath } from '@/lib/api/customer-session';
 import { AlertBanner } from '@/components/ui/alert-banner';
 
@@ -51,7 +51,10 @@ export function KycHubFlow() {
     setError('');
     setBusy(true);
     try {
-      const out = await initDigilockerSession();
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const out = await initDigilockerSession(
+        origin ? { redirectUrl: `${origin}/kyc/digilocker-callback` } : {},
+      );
       if (!out.configured) {
         setError(out.skipReason ?? 'DigiLocker is not configured on the server.');
         return;
@@ -65,12 +68,13 @@ export function KycHubFlow() {
         return;
       }
       await refresh();
-      const redirect = findRedirectUrl(out.vendor);
+      const redirect = out.digilockerLoginUrl ?? findRedirectUrl(out.vendor);
       if (redirect) {
+        persistDigilockerSessionTokenForCallback(out.sessionToken);
         window.location.assign(redirect);
         return;
       }
-      setError('DigiLocker started, but no redirect URL was returned. Check with support or use CKYC upload.');
+      setError('DigiLocker started, but no login URL was returned. Check with support or use CKYC upload.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to start DigiLocker.');
     } finally {

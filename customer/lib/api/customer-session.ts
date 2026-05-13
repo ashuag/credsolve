@@ -113,6 +113,19 @@ export function getCustomerJourneyResumePath(
   return '/thank-you';
 }
 
+/**
+ * After DigiLocker Aadhaar fetch, send the user to the next journey step without landing on bank details.
+ */
+export function getPostDigilockerAadhaarContinuePath(
+  session: Extract<CustomerSessionResponse, { authenticated: true }>
+): string {
+  const resume = getCustomerJourneyResumePath(session);
+  if (resume === '/bank-details') {
+    return '/loan-selection';
+  }
+  return resume;
+}
+
 /** Back navigation from the KYC hub (avoid `getCustomerJourneyResumePath` looping to `/kyc`). */
 export function getKycHubBackPath(session: Extract<CustomerSessionResponse, { authenticated: true }>): string {
   const j = session.journey;

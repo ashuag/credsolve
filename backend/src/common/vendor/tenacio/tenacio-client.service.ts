@@ -24,12 +24,12 @@ export class TenacioClientService {
     const apiKey = this.resolveApiKey();
     if (!baseUrl || !clientId || !apiKey) {
       const missing: string[] = [];
-      if (!baseUrl) missing.push('VENDOR_HOST or TENACIO_BASE_URL (no trailing slash issues — base must include …/services)');
-      if (!clientId) missing.push('TENACIO_CLIENT_ID or client-id');
-      if (!apiKey) missing.push('TENACIO_API_KEY or x-api-key');
+      if (!baseUrl) missing.push('VENDOR_HOST (Tenacio services base URL, typically ending with …/services)');
+      if (!clientId) missing.push('TENACIO_CLIENT_ID');
+      if (!apiKey) missing.push('TENACIO_API_KEY');
       throw new InternalServerErrorException(
         `Tenacio API is not configured. Missing in environment: ${missing.join('; ')}. ` +
-          'Put these in backend/.env (or inject into the API container). Optional: TENACIO_WORKFLOW_ID for workflow-id header.'
+          'Set these in backend/.env. Optional: TENACIO_WORKFLOW_ID or TENACIO_PAN_NSDL_WORKFLOW_ID for the workflow-id header.'
       );
     }
 
@@ -43,7 +43,7 @@ export class TenacioClientService {
       'x-api-key': apiKey,
     };
     const workflowId =
-      this.getEnv('TENACIO_WORKFLOW_ID') ?? this.getEnv('workflow-id') ?? this.getEnv('WORKFLOW_ID');
+      this.getEnv('TENACIO_PAN_NSDL_WORKFLOW_ID') ?? this.getEnv('TENACIO_WORKFLOW_ID');
     if (workflowId) {
       headers['workflow-id'] = workflowId.trim();
     }
@@ -70,25 +70,20 @@ export class TenacioClientService {
   }
 
   private resolveBaseUrl(): string {
-    return (
-      this.getEnv('VENDOR_HOST') ??
-      this.getEnv('TENACIO_BASE_URL') ??
-      this.getEnv('vendor_host') ??
-      ''
-    ).trim();
+    return (this.getEnv('VENDOR_HOST') ?? '').trim();
   }
 
   private resolveClientId(): string {
-    return (this.getEnv('TENACIO_CLIENT_ID') ?? this.getEnv('client-id') ?? '').trim();
+    return (this.getEnv('TENACIO_CLIENT_ID') ?? '').trim();
   }
 
   private resolveApiKey(): string {
-    return (this.getEnv('TENACIO_API_KEY') ?? this.getEnv('x-api-key') ?? '').trim();
+    return (this.getEnv('TENACIO_API_KEY') ?? '').trim();
   }
 
   /**
-   * Reads env vars. Prefer `process.env` first so hyphenated keys (`client-id`, `x-api-key`, `vendor_host`)
-   * work reliably when loaded via dotenv; Nest `ConfigService` can omit non-standard keys depending on setup.
+   * Reads env from `process.env` first, then Nest `ConfigService`, so values work when loaded via dotenv.
+   * Tenacio HTTP headers use `client-id` / `x-api-key`; read values only from env `TENACIO_CLIENT_ID`, `TENACIO_API_KEY`, and `VENDOR_HOST`.
    */
   private getEnv(key: string): string | undefined {
     const direct = process.env[key];

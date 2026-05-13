@@ -7,6 +7,7 @@ export type RateLimitRouteId =
   | 'verify-otp'
   | 'verify-pan'
   | 'digilocker-init'
+  | 'digilocker-aadhaar'
   | 'fetch-bureau'
   | 'logout'
   | 'sync-lead-email'

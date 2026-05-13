@@ -16,6 +16,9 @@ import { SaveLeadDetailsUseCase } from '../application/use-cases/save-lead-detai
 import { VerifyOtpUseCase } from '../application/use-cases/verify-otp.use-case';
 import { VerifyPanUseCase } from '../application/use-cases/verify-pan.use-case';
 import { InitDigilockerUseCase } from '../application/use-cases/init-digilocker.use-case';
+import { DownloadAadhaarDigilockerUseCase } from '../application/use-cases/download-aadhaar-digilocker.use-case';
+import { InitDigilockerDto } from '../application/dto/init-digilocker.dto';
+import { DownloadAadhaarDigilockerDto } from '../application/dto/download-aadhaar-digilocker.dto';
 import { CustomerGoogleOauthService } from '../infrastructure/google/customer-google-oauth.service';
 import { OptionalCustomerSessionGuard } from './guards/optional-customer-session.guard';
 import { RequiredCustomerSessionGuard } from './guards/required-customer-session.guard';
@@ -47,7 +50,8 @@ export class AuthController {
     private readonly customerGoogleOauth: CustomerGoogleOauthService,
     private readonly saveLeadDetailsFlow: SaveLeadDetailsUseCase,
     private readonly verifyPanFlow: VerifyPanUseCase,
-    private readonly initDigilockerFlow: InitDigilockerUseCase
+    private readonly initDigilockerFlow: InitDigilockerUseCase,
+    private readonly downloadAadhaarDigilockerFlow: DownloadAadhaarDigilockerUseCase
   ) {}
 
   @Post('send-otp')
@@ -192,8 +196,21 @@ export class AuthController {
   @ApiOperation({
     summary: 'Start Tenacio DigiLocker workflow (audited vendor call; requires mobile session cookie)',
   })
-  initDigilockerRoute(@Req() req: Request) {
+  initDigilockerRoute(@Req() req: Request, @Body() body: InitDigilockerDto) {
     this.logger.log(`POST /api/auth/digilocker/init ip=${readClientIp(req) ?? 'unknown'}`);
-    return this.initDigilockerFlow.execute(req);
+    return this.initDigilockerFlow.execute(req, body);
+  }
+
+  @Post('digilocker/download-aadhaar')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @RateLimitByRoute('digilocker-aadhaar')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Download Aadhaar XML/KYC data from Tenacio after DigiLocker (sessionToken from generate-URL response)',
+  })
+  downloadAadhaarDigilockerRoute(@Req() req: Request, @Body() body: DownloadAadhaarDigilockerDto) {
+    this.logger.log(`POST /api/auth/digilocker/download-aadhaar ip=${readClientIp(req) ?? 'unknown'}`);
+    return this.downloadAadhaarDigilockerFlow.execute(req, body);
   }
 }

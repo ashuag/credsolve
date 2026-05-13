@@ -47,6 +47,11 @@ function isPathAllowedForStage(stage: JourneyStage, path: string): boolean {
     return true;
   }
 
+  // DigiLocker OAuth return must stay on this route for every stage (otherwise guard sends users to bank).
+  if (path === '/kyc/digilocker-callback') {
+    return true;
+  }
+
   switch (stage) {
     case 'kyc':
       return path === '/kyc' || path.startsWith('/kyc/');

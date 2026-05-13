@@ -18,6 +18,7 @@ import { VerifyOtpUseCase } from './application/use-cases/verify-otp.use-case';
 import { PostBureauOfferService } from './application/services/post-bureau-offer.service';
 import { VerifyPanUseCase } from './application/use-cases/verify-pan.use-case';
 import { InitDigilockerUseCase } from './application/use-cases/init-digilocker.use-case';
+import { DownloadAadhaarDigilockerUseCase } from './application/use-cases/download-aadhaar-digilocker.use-case';
 import { SaveKycDocumentsUseCase } from './application/use-cases/save-kyc-documents.use-case';
 import { SaveBankDetailsUseCase } from './application/use-cases/save-bank-details.use-case';
 import { OtpCodeGenerator } from './infrastructure/crypto/otp-code.generator';
@@ -78,6 +79,7 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     VerifyOtpUseCase,
     VerifyPanUseCase,
     InitDigilockerUseCase,
+    DownloadAadhaarDigilockerUseCase,
     GetCustomerSessionUseCase,
     GetCustomerLoansDashboardUseCase,
     LogoutUseCase,

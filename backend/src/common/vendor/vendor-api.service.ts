@@ -105,7 +105,10 @@ export type VendorApiCallResult<TResponse> = {
  *   method: 'POST',
  *   baseUrl: process.env.VENDOR_HOST!,
  *   path: 'pan-name-dob',
- *   headers: { 'client-id': clientId, 'x-api-key': apiKey },
+ *   headers: {
+ *     'client-id': process.env.TENACIO_CLIENT_ID!,
+ *     'x-api-key': process.env.TENACIO_API_KEY!,
+ *   },
  *   body: { input: { panNumber, consent: true } },
  *   leadId: lead.id,
  * });
