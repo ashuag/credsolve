@@ -15,14 +15,17 @@ import { buildHrefWithSearch } from '@/lib/navigation';
 
 export function BrandHeader() {
   const searchParams = useSearchParams();
-  const { session } = useCustomerSession();
+  const { loading, session } = useCustomerSession();
 
   const applyHref = buildHrefWithSearch('/apply-for-loan', searchParams);
   const loginHref = buildHrefWithSearch('/my-account', searchParams, { mode: 'login' });
 
   const signedIn = isCustomerPortalSignedIn(session);
-  /** Guest chrome only once we know they are not signed in (avoid hiding account menu during `refresh()`). */
-  const showGuestNav = !signedIn && (session === null || session.authenticated === false);
+  /**
+   * Guest CTAs only after the first `/auth/me` completes. While `session === null` and loading,
+   * treating the user as a guest incorrectly showed "Log in" on KYC and other signed-in pages.
+   */
+  const showGuestNav = !loading && !signedIn && session?.authenticated === false;
   const showApplyForLoanNav = showGuestNav && !hasActiveLoanLead(session);
 
   const accountMenuTriggerLabel = useMemo(() => getCustomerAccountMenuTriggerLabel(session), [session]);
@@ -43,26 +46,36 @@ export function BrandHeader() {
         </Link>
 
         <nav className="flex shrink-0 items-center justify-end gap-2 sm:gap-4" aria-label="Primary">
-          {showApplyForLoanNav && (
-            <Link
-              href={applyHref}
-              className="inline-flex items-center justify-center min-h-[40px] sm:min-h-[42px] px-4 sm:px-6 py-2 sm:py-2.5 rounded-full border border-[rgba(18,36,79,0.15)] bg-white font-extrabold text-[0.85rem] sm:text-[0.96rem] text-brand-navy shadow-[0_8px_24px_rgba(23,44,113,0.12)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(23,44,113,0.2)]"
-            >
-              <span className="hidden sm:inline">Apply for a loan</span>
-              <span className="sm:hidden">Apply</span>
-            </Link>
-          )}
+          {loading ? (
+            <div
+              className="h-10 w-[min(200px,42vw)] rounded-full bg-slate-200/70 animate-pulse"
+              aria-busy="true"
+              aria-label="Loading account"
+            />
+          ) : (
+            <>
+              {showApplyForLoanNav && (
+                <Link
+                  href={applyHref}
+                  className="inline-flex items-center justify-center min-h-[40px] sm:min-h-[42px] px-4 sm:px-6 py-2 sm:py-2.5 rounded-full border border-[rgba(18,36,79,0.15)] bg-white font-extrabold text-[0.85rem] sm:text-[0.96rem] text-brand-navy shadow-[0_8px_24px_rgba(23,44,113,0.12)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(23,44,113,0.2)]"
+                >
+                  <span className="hidden sm:inline">Apply for a loan</span>
+                  <span className="sm:hidden">Apply</span>
+                </Link>
+              )}
 
-          {signedIn ? (
-            <CustomerAccountMenu triggerLabel={accountMenuTriggerLabel} />
-          ) : showGuestNav ? (
-            <Link
-              href={loginHref}
-              className="inline-flex items-center justify-center min-h-[40px] sm:min-h-[42px] px-6 sm:px-8 py-2 sm:py-2.5 rounded-full font-extrabold text-[0.9rem] sm:text-[0.96rem] text-[#fff8df] bg-[linear-gradient(135deg,#1c347d_0%,#12244f_100%)] shadow-[0_12px_28px_rgba(23,44,113,0.25)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(23,44,113,0.35)]"
-            >
-              Log in
-            </Link>
-          ) : null}
+              {signedIn ? (
+                <CustomerAccountMenu triggerLabel={accountMenuTriggerLabel} />
+              ) : showGuestNav ? (
+                <Link
+                  href={loginHref}
+                  className="inline-flex items-center justify-center min-h-[40px] sm:min-h-[42px] px-6 sm:px-8 py-2 sm:py-2.5 rounded-full font-extrabold text-[0.9rem] sm:text-[0.96rem] text-[#fff8df] bg-[linear-gradient(135deg,#1c347d_0%,#12244f_100%)] shadow-[0_12px_28px_rgba(23,44,113,0.25)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(23,44,113,0.35)]"
+                >
+                  Log in
+                </Link>
+              ) : null}
+            </>
+          )}
         </nav>
       </div>
     </header>

@@ -39,7 +39,13 @@ export function KycHubFlow() {
     journey?.setCompletion01(0.42);
   }, [journey]);
 
-  const loanSelection = session?.authenticated ? session.loanSelection : null;
+  const loanSelection =
+    session?.authenticated === true ? (session.loanSelection ?? null) : null;
+  const hasLoanSnapshot = Boolean(
+    loanSelection?.amountInr?.trim() ||
+      (loanSelection?.tenureDays != null && Number.isFinite(loanSelection.tenureDays)) ||
+      loanSelection?.maturityDate?.trim(),
+  );
 
   async function handleDigilocker() {
     setError('');
@@ -130,6 +136,10 @@ export function KycHubFlow() {
     </div>
   );
 
+  const leftDescription = hasLoanSnapshot
+    ? 'The amount and tenure you selected stay visible while you complete KYC.'
+    : 'KYC comes first. You will choose loan amount and tenure on the offer step after identity verification.';
+
   return (
     <LoanLandingShell
       showSpeedometer={false}
@@ -139,7 +149,7 @@ export function KycHubFlow() {
           Loan <span className="text-[#60a5fa]">details</span>
         </>
       }
-      leftDescription="The amount and tenure you selected stay visible while you complete KYC."
+      leftDescription={leftDescription}
       leftInfographic={<LoanSummaryLeftRail loanSelection={loanSelection} />}
       mobileStepLabel="KYC"
       mobileOnBack={handleBack}
