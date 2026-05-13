@@ -31,7 +31,7 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
             <BrandHeader />
           </Suspense>
         </div>
-        <div className="flex min-h-[calc(100vh-72px)] items-start justify-center lg:py-8">
+        <div className="flex w-full min-h-[calc(100vh-72px)] flex-col items-stretch justify-start lg:items-center lg:py-8">
           {children}
         </div>
       </>

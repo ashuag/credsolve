@@ -168,7 +168,7 @@ export function JourneySpeedometer() {
         </span>
       </div>
 
-      <div className="flex items-start justify-center gap-3 sm:gap-4 w-full px-2 pt-0.5">
+      <div className="flex max-w-full flex-wrap items-start justify-center gap-x-1.5 gap-y-2 px-1 pt-0.5 sm:gap-x-3 sm:px-2">
         {JOURNEY_STEPS.map((step, i) => {
           const done = i < stepIndex;
           const active = i === stepIndex;

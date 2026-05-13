@@ -68,7 +68,7 @@ export function LoanLandingShell({
   const featureList = leftFeatures ?? DEFAULT_FEATURES;
 
   return (
-    <>
+    <div className="flex w-full min-h-0 min-w-0 flex-col overflow-x-hidden">
       {/* ── Mobile app bar (hidden on lg+) ────────────────────────────────── */}
       <header className="lg:hidden sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-[0_1px_0_rgba(18,36,79,0.06)]">
         <div className="flex h-14 items-center justify-between px-4">
@@ -124,7 +124,7 @@ export function LoanLandingShell({
       {/* ── Main shell (desktop: card, mobile: full-screen) ───────────────── */}
       <div className={[
         // Mobile: full-screen white, no rounded card
-        'w-full flex flex-col bg-white',
+        'w-full flex flex-col bg-white lg:mx-auto',
         // Desktop: premium split-panel card
         'lg:max-w-[1240px] lg:flex-row lg:rounded-[2.5rem] lg:shadow-[0_24px_80px_rgba(23,44,113,0.12),0_8px_32px_rgba(23,44,113,0.06)] lg:overflow-hidden lg:border lg:border-slate-100 lg:relative lg:z-10 lg:animate-fade-in-up',
       ].join(' ')}>
@@ -140,17 +140,17 @@ export function LoanLandingShell({
           <div className="absolute top-1/2 right-0 w-80 h-80 bg-[#ffc519] rounded-full mix-blend-screen blur-[100px] opacity-15 animate-blob animation-delay-2000" />
           <div className="absolute -bottom-20 -left-16 w-80 h-80 bg-[#818cf8] rounded-full mix-blend-screen blur-[100px] opacity-25 animate-blob animation-delay-4000" />
 
-          {/* Content wrapper */}
-          <div className="relative z-10 flex min-h-0 flex-1 flex-col py-4 px-8 xl:px-10 gap-3 xl:gap-3">
-            {showSpeedometer ? (
-              <>
-                <div className="flex shrink-0 justify-center pt-1">
-                  <JourneySpeedometer />
-                </div>
-                <div className="w-full shrink-0 h-px bg-white/10" />
-              </>
-            ) : null}
+          {showSpeedometer ? (
+            <div className="relative z-20 flex shrink-0 flex-col items-center px-4 pt-4 pb-1">
+              <div className="flex w-full max-w-[min(100%,280px)] justify-center">
+                <JourneySpeedometer />
+              </div>
+              <div className="mt-3 h-px w-[calc(100%-2rem)] max-w-[280px] shrink-0 bg-white/10" />
+            </div>
+          ) : null}
 
+          {/* Content wrapper (headline + infographic + stats) — flex-1 so it fills remaining rail height */}
+          <div className="relative z-10 flex min-h-0 flex-1 flex-col px-8 pb-4 pt-2 xl:px-10 gap-3 xl:gap-3">
             {/* Headline */}
             <div className="text-center shrink-0">
               <h1 className="text-xl xl:text-[1.8rem] font-[900] text-white tracking-tight leading-[1.1] mb-1.5">
@@ -211,6 +211,6 @@ export function LoanLandingShell({
         </div>
 
       </div>
-    </>
+    </div>
   );
 }
