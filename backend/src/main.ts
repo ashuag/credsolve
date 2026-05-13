@@ -28,7 +28,8 @@ async function listenWithBackoff(app: INestApplication, port: number, maxAttempt
   let lastErr: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      await app.listen(port, '0.0.0.0');
+      const host = process.env.HOST || '127.0.0.1';
+      await app.listen(port, host);
       return;
     } catch (err) {
       lastErr = err;
