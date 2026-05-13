@@ -192,6 +192,9 @@ export function OnboardingFlow() {
     router.push('/apply-for-loan');
   }
 
+  /** Hide gauge only on email OTP (tight layout); show on profile + email entry. */
+  const shouldShowSpeedometer = step !== 'email-otp';
+
   const journeyPanel = (
     <div className="h-full">
       {step === 'details' && (
@@ -230,7 +233,7 @@ export function OnboardingFlow() {
 
   return (
     <LoanLandingShell
-      showSpeedometer={false}
+      showSpeedometer={shouldShowSpeedometer}
       journeyPanel={journeyPanel}
       leftTitle={leftTitle}
       leftDescription={leftDescription}

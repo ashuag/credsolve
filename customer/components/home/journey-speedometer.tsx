@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import { usePathname } from 'next/navigation';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
@@ -52,6 +53,7 @@ function getStepIndexFromPathname(pathname: string): number {
 }
 
 export function JourneySpeedometer() {
+  const gradientId = `mc-speedo-grad-${useId().replace(/:/g, '')}`;
   const pathname = usePathname() || '';
   const { session } = useCustomerSession();
   const journeyInline = useJourneyProgressOptional();
@@ -98,7 +100,7 @@ export function JourneySpeedometer() {
         aria-hidden
       >
         <defs>
-          <linearGradient id="speedoGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="#facc15" />
             <stop offset="100%" stopColor="#22c55e" />
           </linearGradient>
@@ -115,7 +117,7 @@ export function JourneySpeedometer() {
         <path
           d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
           fill="none"
-          stroke="url(#speedoGrad)"
+          stroke={`url(#${gradientId})`}
           strokeWidth="9"
           strokeLinecap="round"
           strokeDasharray={circumference}

@@ -114,6 +114,13 @@ export function LoanLandingShell({
         <MobileProgressBar />
       </header>
 
+      {/* Mobile / narrow: full gauge (desktop shows this in the dark left rail). */}
+      {showSpeedometer ? (
+        <div className="lg:hidden shrink-0 border-b border-white/10 bg-[#0a1628] py-3 flex justify-center">
+          <JourneySpeedometer />
+        </div>
+      ) : null}
+
       {/* ── Main shell (desktop: card, mobile: full-screen) ───────────────── */}
       <div className={[
         // Mobile: full-screen white, no rounded card
@@ -123,7 +130,7 @@ export function LoanLandingShell({
       ].join(' ')}>
 
         {/* ── Left panel (desktop only) ── */}
-        <div className="w-full lg:w-5/12 hidden lg:flex min-h-0 flex-col relative bg-[#0a1628] overflow-hidden">
+        <div className="w-full lg:w-5/12 hidden lg:flex min-h-0 flex-col relative bg-[#0a1628] overflow-x-hidden">
 
           {/* Background Mesh */}
           <div className="absolute inset-0 stats-mesh opacity-90 pointer-events-none" />
@@ -137,7 +144,7 @@ export function LoanLandingShell({
           <div className="relative z-10 flex min-h-0 flex-1 flex-col py-4 px-8 xl:px-10 gap-3 xl:gap-3">
             {showSpeedometer ? (
               <>
-                <div className="flex shrink-0 justify-center">
+                <div className="flex shrink-0 justify-center pt-1">
                   <JourneySpeedometer />
                 </div>
                 <div className="w-full shrink-0 h-px bg-white/10" />

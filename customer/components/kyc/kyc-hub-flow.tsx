@@ -146,7 +146,6 @@ export function KycHubFlow() {
 
   return (
     <LoanLandingShell
-      showSpeedometer={false}
       journeyPanel={journeyPanel}
       leftTitle={
         <>
