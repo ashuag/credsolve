@@ -105,10 +105,10 @@ export function getCustomerJourneyResumePath(
   }
 
   const journey = session.journey;
-  if (!journey.kycCompleted) return '/kyc';
   if (!journey.detailsCompleted) return '/onboarding?mode=login';
   if (!journey.loanSelectionCompleted) return '/pre-approved-loan';
   if (!session.lead.emailVerified) return '/onboarding?mode=login';
+  if (!journey.kycCompleted) return '/kyc';
   if (!journey.bankDetailsCompleted) return '/bank-details';
   return '/thank-you';
 }

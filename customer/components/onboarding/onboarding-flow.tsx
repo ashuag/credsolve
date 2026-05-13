@@ -14,7 +14,7 @@ import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { LoanSummaryLeftRail } from '@/components/loan/loan-summary-left-rail';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 
-// Flow: mobile verified → KYC → profile (/onboarding) → pre-approved + loan selection → email (/onboarding) → bank / thank-you
+// Flow: mobile verified → profile (/onboarding) → pre-approved + loan selection → email (/onboarding) → KYC → bank / thank-you
 type OnboardingStep = 'details' | 'email' | 'email-otp';
 
 /** Maps onboarding step to a mobile app-bar label. */
@@ -46,11 +46,6 @@ export function OnboardingFlow() {
 
     if (isLeadRejectedAndLocked(session.lead)) {
       router.replace('/thank-you-interest');
-      return;
-    }
-
-    if (!session.journey.kycCompleted) {
-      router.replace('/kyc');
       return;
     }
 
@@ -194,7 +189,7 @@ export function OnboardingFlow() {
       }
       return;
     }
-    router.push('/kyc');
+    router.push('/apply-for-loan');
   }
 
   const journeyPanel = (
@@ -206,7 +201,7 @@ export function OnboardingFlow() {
           initialProfile={portalSession.profile}
           activeSection={detailsSection}
           onSectionChange={setDetailsSection}
-          onBack={() => router.push('/kyc')}
+          onBack={() => router.push('/apply-for-loan')}
           noticeMessage={detailsNotice}
           onSaved={handleDetailsSaved}
         />

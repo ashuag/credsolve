@@ -9,10 +9,10 @@ type JourneyStage = 'details' | 'preApproved' | 'loanSelection' | 'email' | 'kyc
 function stageFromSession(session: ReturnType<typeof useCustomerSession>['session']): JourneyStage {
   if (!session?.authenticated || !session.lead) return 'details';
   const j = session.journey;
-  if (!j.kycCompleted) return 'kyc';
   if (!j.detailsCompleted) return 'details';
   if (!j.loanSelectionCompleted) return 'preApproved';
   if (!session.lead.emailVerified) return 'email';
+  if (!j.kycCompleted) return 'kyc';
   if (!j.bankDetailsCompleted) return 'bankDetails';
   return 'done';
 }

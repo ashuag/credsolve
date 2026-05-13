@@ -5,19 +5,21 @@ import { useJourneyProgressOptional } from '@/components/journey/journey-progres
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { isCustomerPortalSignedIn } from '@/lib/api/customer-session';
 
-const JOURNEY_STEPS = ['KYC', 'Profile', 'Apply', 'Bank', 'Done'] as const;
+const JOURNEY_STEPS = ['Profile', 'Apply', 'Email', 'KYC', 'Bank'] as const;
 
 /**
- * Milestones (each +20%): mobile OTP done → 20%, then KYC → profile → loan → bank → 100%.
+ * Milestones (each +20%): mobile OTP done → 20%, then profile → loan → email verify → KYC → bank → 100%.
  * Guest (not signed in) → 0% on the mobile / OTP screens.
  */
 function milestonesCompleted(session: ReturnType<typeof useCustomerSession>['session']): number {
   if (!session || session.authenticated !== true) return 0;
   const j = session.journey;
+  const emailVerified = session.lead?.emailVerified ?? false;
   let m = 1;
-  if (j.kycCompleted) m++;
   if (j.detailsCompleted) m++;
   if (j.loanSelectionCompleted) m++;
+  if (emailVerified) m++;
+  if (j.kycCompleted) m++;
   if (j.bankDetailsCompleted) m++;
   return Math.min(5, m);
 }
@@ -34,17 +36,17 @@ function stepIndexFromMilestones(m: number): number {
 
 /**
  * Order matters: first match wins. Labels always match `JOURNEY_STEPS[stepIndex]`.
- * Journey: KYC → entry / profile → loan offer & selection → bank → done.
+ * Journey: profile → loan offer & selection → email → KYC → bank.
  */
 function getStepIndexFromPathname(pathname: string): number {
   const p = pathname || '';
   if (p.includes('/thank-you-interest') || p.includes('/thank-you')) return 4;
-  if (p.includes('/bank-details')) return 3;
+  if (p.includes('/bank-details')) return 4;
+  if (p.includes('/kyc')) return 3;
   if (p.includes('/pre-approved-loan') || p.includes('/loan-selection') || p.includes('/loan-offer')) {
     return 2;
   }
   if (p.includes('/onboarding')) return 1;
-  if (p.includes('/kyc')) return 0;
   if (p.includes('/apply-for-loan')) return 0;
   return 0;
 }

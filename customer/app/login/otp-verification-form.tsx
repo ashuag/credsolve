@@ -7,7 +7,7 @@ import { AlertBanner } from '@/components/ui/alert-banner';
 import { FlowLoader } from '@/components/ui/flow-loader';
 import { OtpInputGrid } from '@/components/ui/otp-input-grid';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
-import { isLeadRejectedAndLocked } from '@/lib/api/customer-session';
+import { getCustomerJourneyResumePath, isLeadRejectedAndLocked } from '@/lib/api/customer-session';
 import { useCountdown } from '@/lib/hooks/use-countdown';
 import { useOtpInput } from '@/lib/hooks/use-otp-input';
 import { formatCustomerMobile, isValidCustomerMobile } from '@/lib/mobile';
@@ -107,7 +107,7 @@ export function OtpVerificationForm({
           router.push('/dashboard');
           return;
         }
-        router.push('/kyc');
+        router.push(getCustomerJourneyResumePath(updatedSession));
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to verify OTP right now.');
