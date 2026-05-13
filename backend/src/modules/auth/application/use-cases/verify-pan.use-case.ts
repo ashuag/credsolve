@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException, Unauthorize
 import type { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { PreBreCheckService } from '../../../../common/bre/pre-bre-check.service';
+import { PostBureauOfferService } from '../services/post-bureau-offer.service';
 import { BUREAU_FETCHED } from '../../../../common/constants/bureau-fetch.constants';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { PAN_VERIFIED } from '../../../../common/constants/pan-verification.constants';
@@ -10,9 +11,11 @@ import { isPanVerifiedFromDb } from '../../../../common/mappers/customer-portal-
 import { GENDER_SLUG_TO_DB, OCCUPATION_SLUG_TO_DB } from '../../../../common/mappers/lead-detail-master-slugs';
 import { parseOptionalInrAmount } from '../../../../common/utils/parse-inr-amount';
 import { SmsService } from '../../../../common/sms/sms.service';
-import { CibilFetchService } from '../../../../common/vendor/cibil-fetch.service';
+import { parseTenacioBureauVendorBody } from '../../../../common/vendor/tenacio-bureau-payload.mapper';
+import { BureauFetchService } from '../../../../common/vendor/bureau-fetch.service';
 import { PanVerificationService, type PanVerificationResult } from '../../../../common/vendor/pan-verification.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
+import { BureauReportRepository } from '../../infrastructure/repositories/bureau-report.repository';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
@@ -39,7 +42,9 @@ const leadPanSelect = {
   bureauFetched: true
 } as const;
 
-const cibilSoftPullLeadSelect = {
+const bureauSoftPullLeadSelect = {
+  uuid: true,
+  customerId: true,
   bureauFetched: true,
   leadStatus: { select: { name: true } },
   leadDetail: {
@@ -57,7 +62,9 @@ type LeadPanVerificationRow = {
   bureauFetched: number;
 };
 
-type CibilSoftPullLeadRow = {
+type BureauSoftPullLeadRow = {
+  uuid: string;
+  customerId: bigint;
   bureauFetched: number;
   leadStatus: { name: string } | null;
   leadDetail: {
@@ -66,12 +73,15 @@ type CibilSoftPullLeadRow = {
   } | null;
 };
 
-const VERIFIED_WITHOUT_VENDOR_CALL = {
+/** Same shape as a successful Tenacio response; used when we skip the vendor for an already-verified PAN. */
+const VERIFIED_VENDOR_SKIPPED: PanVerificationResult = {
   panVerifiedStatus: PAN_VERIFIED.VERIFIED,
   nameMatch: true,
   dobMatch: true,
-  panStatus: 'valid' as const,
-  category: 'Individual' as const,
+  panStatus: 'valid',
+  category: 'Individual',
+  vendorRequestId: null,
+  note: null,
 };
 
 function parseDobUtc(dob: string): Date {
@@ -118,7 +128,9 @@ export class VerifyPanUseCase {
 
   constructor(
     private readonly preBreCheck: PreBreCheckService,
-    private readonly cibilFetch: CibilFetchService,
+    private readonly postBureauOffer: PostBureauOfferService,
+    private readonly bureauReports: BureauReportRepository,
+    private readonly bureauFetch: BureauFetchService,
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
     private readonly prisma: PrismaService,
@@ -147,6 +159,11 @@ export class VerifyPanUseCase {
     }
 
     const panUpper = dto.panNumber.trim().toUpperCase();
+
+    const priorLeadPan = (await this.leads.findUniqueLead({
+      where: { id: leadRow.id },
+      select: { panNumber: true, panVerified: true },
+    })) as { panNumber: string | null; panVerified: number } | null;
 
     const leadDetailPayload = await this.buildLeadInputRequest(dto);
     const fullNameTrimmed = leadDetailPayload.fullName;
@@ -209,21 +226,37 @@ export class VerifyPanUseCase {
       });
     }
 
-    const verification = await this.panVerification.verify({
-      leadId: leadRow.id,
-      panNumber: panUpper,
-      fullName: fullNameTrimmed,
-      dobIso: dto.dob,
-    });
+    const priorPanNorm = (priorLeadPan?.panNumber ?? '').trim().toUpperCase();
+    const alreadyVerifiedSamePan =
+      priorLeadPan?.panVerified === PAN_VERIFIED.VERIFIED &&
+      priorPanNorm.length === 10 &&
+      priorPanNorm === panUpper;
 
-    this.logger.debug(
-      `PAN verification result: status=${verification.panVerifiedStatus}, panStatus=${verification.panStatus}, nameMatch=${verification.nameMatch}, dobMatch=${verification.dobMatch}`,
-    );
+    const verification: PanVerificationResult = alreadyVerifiedSamePan
+      ? VERIFIED_VENDOR_SKIPPED
+      : await this.panVerification.verify({
+          leadId: leadRow.id,
+          panNumber: panUpper,
+          fullName: fullNameTrimmed,
+          dobIso: dto.dob,
+        });
+
+    if (alreadyVerifiedSamePan) {
+      this.logger.debug(
+        `PAN vendor call skipped (leadId=${leadRow.id.toString()}): already VERIFIED in DB for this PAN.`,
+      );
+    } else {
+      this.logger.debug(
+        `PAN verification result: status=${verification.panVerifiedStatus}, panStatus=${verification.panStatus}, nameMatch=${verification.nameMatch}, dobMatch=${verification.dobMatch}`,
+      );
+    }
 
     const leadPanState =
-      verification.panVerifiedStatus === PAN_VERIFIED.NOT_CHECKED
+      alreadyVerifiedSamePan
         ? leadPan
-        : await this.updatePanStatus(leadRow.id, verification.panVerifiedStatus, verification.note);
+        : verification.panVerifiedStatus === PAN_VERIFIED.NOT_CHECKED
+          ? leadPan
+          : await this.updatePanStatus(leadRow.id, verification.panVerifiedStatus, verification.note);
 
     if (verification.panVerifiedStatus === PAN_VERIFIED.NOT_VERIFIED) {
       await this.rejectLead(
@@ -234,13 +267,19 @@ export class VerifyPanUseCase {
       this.fireThankYouSms(customer.mobileNumber);
     }
 
-    if (
-      (leadPan.panVerified === PAN_VERIFIED.VERIFIED || leadPan.panVerified === PAN_VERIFIED.API_DISABLED) &&
-      verification.panVerifiedStatus === PAN_VERIFIED.VERIFIED &&
-      leadPan.bureauFetched === BUREAU_FETCHED.NOT_FETCHED
-    ) {
-      this.enqueueCibilSoftPull(leadRow.id, customer.mobileNumber, panUpper, fullNameTrimmed);
-      return this.buildResult(detail, leadPanState, VERIFIED_WITHOUT_VENDOR_CALL);
+    if (verification.panVerifiedStatus === PAN_VERIFIED.VERIFIED) {
+      const bureauSnap = (await this.leads.findUniqueLead({
+        where: { id: leadRow.id },
+        select: { bureauFetched: true },
+      })) as { bureauFetched: number } | null;
+      const needBureau =
+        bureauSnap != null && Number(bureauSnap.bureauFetched) !== BUREAU_FETCHED.SUCCESS;
+      if (needBureau) {
+        this.logger.debug(
+          `Bureau soft-pull enqueued (leadId=${leadRow.id.toString()}) bureauFetched=${String(bureauSnap.bureauFetched)}`,
+        );
+        this.enqueueBureauSoftPull(leadRow.id, customer.mobileNumber, panUpper, fullNameTrimmed);
+      }
     }
 
     return this.buildResult(detail, leadPanState, verification);
@@ -253,6 +292,7 @@ export class VerifyPanUseCase {
     dateOfBirth: Date;
     genderId: number;
     occupationId: number;
+    cibilConsentAt: Date | null;
     netMonthlyIncome?: Prisma.Decimal | null;
     annualTurnover?: Prisma.Decimal | null;
     annualProfit?: Prisma.Decimal | null;
@@ -264,6 +304,7 @@ export class VerifyPanUseCase {
       dateOfBirth: parseDobUtc(dto.dob),
       genderId,
       occupationId,
+      cibilConsentAt: dto.creditConsentAccepted ? new Date() : null,
       netMonthlyIncome,
       annualTurnover,
       annualProfit
@@ -276,68 +317,68 @@ export class VerifyPanUseCase {
     });
   }
 
-  private enqueueCibilSoftPull(leadId: bigint, customerMobile: string, panNumber: string, fullName: string): void {
-    void this.runCibilSoftPull(leadId, customerMobile, panNumber, fullName).catch((err) => {
+  private enqueueBureauSoftPull(leadId: bigint, customerMobile: string, panNumber: string, fullName: string): void {
+    void this.runBureauSoftPull(leadId, customerMobile, panNumber, fullName).catch((err) => {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`CIBIL soft-pull unexpected error (leadId=${leadId}): ${message}`);
+      this.logger.warn(`Bureau soft-pull unexpected error (leadId=${leadId}): ${message}`);
     });
   }
 
   /**
-   * Tenacio CIBIL soft-pull after PAN is verified, when `BUREAU_FETCH_ENABLED`
+   * Tenacio bureau soft-pull after PAN is verified, when `BUREAU_FETCH_ENABLED`
    * is on, the lead is not terminal-negative, and the customer has bureau
    * consent on `lead_detail`. Runs asynchronously; failures are logged; outcome
    * is written to `lead.bureau_fetched` / `bureau_fetched_at` / `bureau_fetched_note`.
    */
-  private async runCibilSoftPull(leadId: bigint, customerMobile: string, panNumber: string, fullName: string) {
+  private async runBureauSoftPull(leadId: bigint, customerMobile: string, panNumber: string, fullName: string) {
     if (!(await this.settings.isBureauFetchEnabled())) {
-      this.logger.debug(`CIBIL soft-pull skipped (leadId=${leadId}): BUREAU_FETCH_ENABLED is off.`);
+      this.logger.debug(`Bureau soft-pull skipped (leadId=${leadId}): BUREAU_FETCH_ENABLED is off.`);
       return;
     }
 
     const row = (await this.leads.findUniqueLead({
       where: { id: leadId },
-      select: cibilSoftPullLeadSelect,
-    })) as CibilSoftPullLeadRow | null;
+      select: bureauSoftPullLeadSelect,
+    })) as BureauSoftPullLeadRow | null;
 
     if (!row?.leadDetail) {
-      this.logger.debug(`CIBIL soft-pull skipped (leadId=${leadId}): no lead_detail.`);
+      this.logger.debug(`Bureau soft-pull skipped (leadId=${leadId}): no lead_detail.`);
       return;
     }
     if (row.bureauFetched === BUREAU_FETCHED.SUCCESS) {
-      this.logger.debug(`CIBIL soft-pull skipped (leadId=${leadId}): bureau already fetched successfully.`);
+      this.logger.debug(`Bureau soft-pull skipped (leadId=${leadId}): bureau already fetched successfully.`);
       return;
     }
 
     const statusName = row.leadStatus?.name;
     if (statusName === LEAD_STATUS.REJECTED || statusName === LEAD_STATUS.BLACKLISTED) {
-      this.logger.debug(`CIBIL soft-pull skipped (leadId=${leadId}): lead status ${statusName}.`);
+      this.logger.debug(`Bureau soft-pull skipped (leadId=${leadId}): lead status ${statusName}.`);
       return;
     }
     if (!row.leadDetail.cibilConsentAt) {
-      this.logger.debug(`CIBIL soft-pull skipped (leadId=${leadId}): no CIBIL consent on file.`);
+      this.logger.debug(`Bureau soft-pull skipped (leadId=${leadId}): no bureau consent on file.`);
       return;
     }
 
     const nameForVendor = (row.leadDetail.fullName ?? fullName).trim();
     if (!nameForVendor || panNumber.length !== 10) {
-      this.logger.warn(`CIBIL soft-pull skipped (leadId=${leadId}): missing name or PAN.`);
+      this.logger.warn(`Bureau soft-pull skipped (leadId=${leadId}): missing name or PAN.`);
       return;
     }
 
     const mobile = customerMobile.trim();
     if (!INDIAN_MOBILE.test(mobile)) {
-      this.logger.warn(`CIBIL soft-pull skipped (leadId=${leadId}): invalid mobile format.`);
+      this.logger.warn(`Bureau soft-pull skipped (leadId=${leadId}): invalid mobile format.`);
       return;
     }
 
-    const out = await this.cibilFetch.fetchFromTenacio(
+    const out = await this.bureauFetch.fetchBureauFromTenacio(
       { input: { mobileNumber: mobile, name: nameForVendor, panNumber, consent: true } },
       leadId,
     );
 
     if (!out.configured) {
-      this.logger.debug(`CIBIL soft-pull not configured (leadId=${leadId}): ${out.skipReason ?? ''}`);
+      this.logger.debug(`Bureau soft-pull not configured (leadId=${leadId}): ${out.skipReason ?? ''}`);
       return;
     }
 
@@ -351,6 +392,32 @@ export class VerifyPanUseCase {
           bureauFetchedNote: null,
         },
       });
+      try {
+        const parsed = parseTenacioBureauVendorBody(out.vendorBody);
+        await this.bureauReports.createFromVendorSnapshot({
+          customerId: row.customerId,
+          leadId,
+          vendorBody: out.vendorBody,
+          parsed,
+          httpStatus: out.httpStatus,
+          dummyFetched: out.dummyPayload,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `BureauReport row not saved (leadId=${leadId.toString()}): ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+      try {
+        await this.postBureauOffer.runAfterSuccessfulBureauFetch({
+          leadId,
+          customerId: row.customerId,
+          leadUuid: row.uuid,
+        });
+      } catch (err) {
+        this.logger.error(
+          `Post-bureau offer persistence failed (leadId=${leadId.toString()}): ${err instanceof Error ? err.stack : String(err)}`,
+        );
+      }
       return;
     }
 
@@ -364,7 +431,7 @@ export class VerifyPanUseCase {
       },
     });
     this.logger.warn(
-      `CIBIL soft-pull HTTP/vendor issue (leadId=${leadId}): http=${out.httpStatus ?? 'n/a'} transport=${out.error?.message ?? 'none'}`,
+      `Bureau soft-pull HTTP/vendor issue (leadId=${leadId}): http=${out.httpStatus ?? 'n/a'} transport=${out.error?.message ?? 'none'}`,
     );
   }
 
@@ -396,14 +463,13 @@ export class VerifyPanUseCase {
       annualTurnover: 'annualTurnover',
       annualProfit: 'annualProfit',
     } as const;
-    
+
+    type IncomeFieldKey = keyof typeof fieldMap;
+
     const incomeFields = Object.fromEntries(
-      Object.entries(fieldMap)
-        .filter(([dtoKey]) => dto[dtoKey as keyof typeof dto] !== undefined)
-        .map(([dtoKey, dbKey]) => [
-          dbKey,
-          parseOptionalInrAmount(dto[dtoKey as keyof typeof dto])
-        ])
+      (Object.entries(fieldMap) as Array<[IncomeFieldKey, string]>)
+        .filter(([dtoKey]) => dto[dtoKey] !== undefined)
+        .map(([dtoKey, dbKey]) => [dbKey, parseOptionalInrAmount(dto[dtoKey])]),
     );
 
     return incomeFields;

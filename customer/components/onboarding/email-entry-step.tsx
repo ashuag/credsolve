@@ -100,7 +100,15 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', le
             id="email-heading"
             className="text-xl md:text-[1.8rem] font-extrabold text-brand-navy mb-3 tracking-tight leading-[1.1]"
           >
-            {isLogin ? 'Welcome ' : 'Verify Your '}<span className="text-brand-blue">{isLogin ? 'Back' : 'Email'}</span> ✨
+            {isLogin ? (
+              <>
+                Continue with <span className="text-brand-blue">email</span> ✨
+              </>
+            ) : (
+              <>
+                Verify Your <span className="text-brand-blue">Email</span> ✨
+              </>
+            )}
           </h2>
 
           <div className="flex items-start gap-3 p-3 mb-2 rounded-2xl bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border border-blue-100/60">

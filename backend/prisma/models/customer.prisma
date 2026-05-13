@@ -14,9 +14,10 @@ model Customer {
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  leads        Lead[]
-  applications Application[]
-  customerKycs CustomerKyc[]
+  leads         Lead[]
+  applications  Application[]
+  customerKycs  CustomerKyc[]
+  bureauReports BureauReport[]
 
   @@map("customer")
 }

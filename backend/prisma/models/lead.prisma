@@ -25,6 +25,7 @@ model Lead {
   leadUtms        LeadUtm[]
   applications    Application[]
   vendorApiLogs   VendorApiLog[]
+  bureauReports   BureauReport[]
 
   @@index([customerId, createdAt])
   @@index([leadStatusId])
@@ -72,8 +73,8 @@ model VendorApiLog {
   providerName    String           @map("provider_name") @db.VarChar(100)
   serviceName     String           @map("service_name") @db.VarChar(120)
   requestMethod   VendorHttpMethod @map("request_method")
-  /// Endpoint path (relative to the provider base URL), e.g. `pan-name-dob`.
-  requestPath     String?          @map("request_path") @db.VarChar(255)
+  /// Outbound request URL (scheme + host + path + query); `VendorApiService` caps length when persisting.
+  requestPath     String?          @map("request_path") @db.Text
   leadId          BigInt?          @map("lead_id") @db.UnsignedBigInt
   /// Outbound request headers (sensitive values redacted by VendorApiService).
   requestHeaders  Json?            @map("request_headers")

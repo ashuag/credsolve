@@ -25,8 +25,8 @@ const OCC_SLUG_TO_DB: Record<string, string> = {
   retired: OCCUPATION.RETIRED,
 };
 
-/** Demo CIBIL-style score when no bureau is integrated. */
-function randomDemoCibilScore(): number {
+/** Demo bureau-style score when no live bureau pull is used. */
+function randomDemoBureauScore(): number {
   return 650 + Math.floor(Math.random() * 151);
 }
 
@@ -97,7 +97,7 @@ export class SubmitProfessionalApplicationUseCase {
     }
 
     const { preApprovedAmountInr } = this.checkLoanEligibility.computeForSeed(leadRow.uuid);
-    const cibilScore = randomDemoCibilScore();
+    const cibilScore = randomDemoBureauScore();
     const eligible = preApprovedAmountInr >= 5_000;
 
     const [convertedStatus, appStatuses] = await Promise.all([

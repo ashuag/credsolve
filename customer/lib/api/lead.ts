@@ -45,6 +45,8 @@ export type VerifyLeadPanPayload = {
   dob: string;
   gender: CustomerGenderValue;
   occupation: CustomerOccupationValue;
+  /** Required; stored as `lead_detail.cibil_consent_at` for bureau soft-pull after PAN. */
+  creditConsentAccepted: boolean;
   monthlyIncome?: string;
   annualTurnover?: string;
   annualProfit?: string;

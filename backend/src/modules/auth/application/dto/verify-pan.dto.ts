@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
+import { Equals, IsBoolean, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
 
 const GENDERS = ['male', 'female', 'others'] as const;
 const OCCUPATIONS = [
@@ -39,6 +39,14 @@ export class VerifyPanDto {
   @ApiProperty({ enum: OCCUPATIONS, description: 'Persisted as occupation_id on lead_detail.' })
   @IsIn(OCCUPATIONS)
   occupation!: (typeof OCCUPATIONS)[number];
+
+  @ApiProperty({
+    description:
+      'User accepts credit bureau consent; persisted as `lead_detail.cibil_consent_at` (required for bureau soft-pull after PAN).',
+  })
+  @IsBoolean()
+  @Equals(true, { message: 'Credit consent must be accepted to continue.' })
+  creditConsentAccepted!: boolean;
 
   @ApiPropertyOptional({ description: 'Monthly income (digits); persisted on lead_detail when sent.' })
   @IsOptional()

@@ -35,16 +35,29 @@ const SENSITIVE_HEADER_NAMES: ReadonlySet<string> = new Set([
 /** Short snippet of the response body included in failure logs to aid debugging. */
 const FAILURE_LOG_BODY_SNIPPET_CHARS = 500;
 
+/** MySQL `TEXT` upper bound; caps `vendor_api_log.request_path` if URL is pathological. */
+const MAX_REQUEST_PATH_AUDIT_CHARS = 65_535;
+
 export type VendorApiCallOptions<TBody = unknown> = {
   /** Logical vendor name (audit), e.g. `'Tenacio'`. */
   providerName: string;
   /** Logical service identifier (audit), e.g. `'pan-name-dob'`. */
   serviceName: string;
   method: VendorHttpMethod;
-  /** Provider base URL, e.g. `https://testapi.tenacio.io/api/v1/services`. Trailing slash optional. */
-  baseUrl: string;
-  /** Endpoint path appended to `baseUrl`, e.g. `pan-name-dob`. Leading slash optional. */
-  path: string;
+  /**
+   * Provider base URL, e.g. `https://testapi.tenacio.io/api/v1/services`.
+   * Ignored when `absoluteUrl` is set.
+   */
+  baseUrl?: string;
+  /**
+   * Path appended to `baseUrl`, e.g. `pan-name-dob`. Ignored when `absoluteUrl` is set.
+   */
+  path?: string;
+  /**
+   * Full outbound URL (scheme + host + path + optional query). When set, `baseUrl` and `path` are not used.
+   * Use when the bureau endpoint does not compose cleanly from `VENDOR_HOST` + slug.
+   */
+  absoluteUrl?: string;
   /** Extra headers (auth, vendor-specific). `Content-Type: application/json` is set automatically when sending a body. */
   headers?: Record<string, string>;
   /** Request body. Serialised to JSON for non-GET/DELETE methods. */
@@ -86,7 +99,7 @@ export type VendorApiCallResult<TResponse> = {
  *
  * Example:
  * ```ts
- * const result = await this.vendorApi.request<{ matched: boolean }>({
+ * const result = await this.vendorApi.request({
  *   providerName: 'Tenacio',
  *   serviceName: 'pan-name-dob',
  *   method: 'POST',
@@ -95,8 +108,8 @@ export type VendorApiCallResult<TResponse> = {
  *   headers: { 'client-id': clientId, 'x-api-key': apiKey },
  *   body: { input: { panNumber, consent: true } },
  *   leadId: lead.id,
- *   redactRequest: (b) => ({ ...b, input: { ...b!.input, panNumber: '***MASKED***' } }),
  * });
+ * // Or pass `absoluteUrl` instead of `baseUrl` + `path` for a fixed bureau URL.
  * if (!result.ok) { ... }
  * ```
  */
@@ -110,7 +123,27 @@ export class VendorApiService {
     opts: VendorApiCallOptions<TBody>,
   ): Promise<VendorApiCallResult<TResponse>> {
     const requestedAt = new Date();
-    const url = joinBaseAndPath(opts.baseUrl, opts.path);
+    const abs = opts.absoluteUrl?.trim();
+    let url: string;
+    let pathForLog: string;
+
+    if (abs) {
+      url = abs;
+    } else {
+      const base = (opts.baseUrl ?? '').trim();
+      const path = opts.path ?? '';
+      if (!base) {
+        const err = new Error('VendorApiService.request: provide absoluteUrl or baseUrl');
+        this.logger.error(`${opts.providerName}/${opts.serviceName}: ${err.message}`);
+        return { ok: false, httpStatus: null, body: null, error: err };
+      }
+      url = joinBaseAndPath(base, path);
+    }
+
+    /** Full request URL for `vendor_api_log.request_path` (`TEXT` column). */
+    const requestPathForAudit = url.slice(0, MAX_REQUEST_PATH_AUDIT_CHARS);
+    pathForLog = requestPathForAudit;
+
     const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const sendBody = opts.method !== 'GET' && opts.method !== 'DELETE' && opts.body !== undefined;
 
@@ -147,7 +180,7 @@ export class VendorApiService {
     } catch (err) {
       error = err instanceof Error ? err : new Error(String(err));
       this.logger.warn(
-        `${opts.providerName}/${opts.serviceName} ${opts.method} ${opts.path} failed before response: ${error.message} headers=${JSON.stringify(redactedHeadersForAudit)}`,
+        `${opts.providerName}/${opts.serviceName} ${opts.method} ${pathForLog} failed before response: ${error.message} headers=${JSON.stringify(redactedHeadersForAudit)}`,
       );
     }
 
@@ -160,7 +193,7 @@ export class VendorApiService {
     if (!ok && httpStatus !== null) {
       const snippet = rawText ? rawText.slice(0, FAILURE_LOG_BODY_SNIPPET_CHARS) : '<empty>';
       this.logger.warn(
-        `${opts.providerName}/${opts.serviceName} ${opts.method} ${opts.path} HTTP ${httpStatus} headers=${JSON.stringify(redactedHeadersForAudit)} body=${snippet}`,
+        `${opts.providerName}/${opts.serviceName} ${opts.method} ${pathForLog} HTTP ${httpStatus} headers=${JSON.stringify(redactedHeadersForAudit)} body=${snippet} url=${url}`,
       );
     }
 
@@ -171,7 +204,7 @@ export class VendorApiService {
       providerName: opts.providerName,
       serviceName: opts.serviceName,
       requestMethod: opts.method,
-      requestPath: opts.path,
+      requestPath: requestPathForAudit,
       leadId: opts.leadId ?? null,
       requestHeaders: redactedHeadersForAudit,
       requestPayload: requestForAudit,
@@ -220,9 +253,6 @@ export class VendorApiService {
 
       await this.prisma.client.vendorApiLog.create({ data });
     } catch (err) {
-      // Audit logging is best-effort. The upstream caller already has the
-      // result; we don't want a transient DB blip to surface as a vendor
-      // call failure.
       const message = err instanceof Error ? err.message : String(err);
       this.logger.warn(`Failed to persist vendor_api_log row (${row.providerName}/${row.serviceName}): ${message}`);
     }

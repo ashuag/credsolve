@@ -57,6 +57,7 @@ function computeProfileCompletionRatio(fields: Fields, dobDisplay: string): numb
     checks.push(Boolean(fields.annualTurnover && Number(fields.annualTurnover) > 0));
     checks.push(Boolean(fields.annualProfit && Number(fields.annualProfit) > 0));
   }
+  checks.push(fields.creditConsentAccepted);
   return checks.length === 0 ? 0 : checks.filter(Boolean).length / checks.length;
 }
 
@@ -65,7 +66,6 @@ function computeFinancialCompletionRatio(fields: Fields): number {
     fields.addressLine1.trim().length >= 5,
     Boolean(fields.currentCity.trim()),
     PINCODE_REGEX.test(fields.pincode),
-    fields.creditConsentAccepted,
   ];
   let score = core.filter(Boolean).length / core.length;
   if (fields.addressLine2.trim()) {
@@ -87,6 +87,7 @@ const PROFILE_PAGE_FIELDS: Array<keyof Fields> = [
   'monthlyIncome',
   'annualTurnover',
   'annualProfit',
+  'creditConsentAccepted',
 ];
 
 type PersonalDetailsStepProps = {
@@ -343,6 +344,7 @@ export function PersonalDetailsStep({
       monthlyIncome: undefined,
       annualTurnover: undefined,
       annualProfit: undefined,
+      creditConsentAccepted: undefined,
     }));
     setSubmitError('');
 
@@ -358,6 +360,7 @@ export function PersonalDetailsStep({
         dob: fields.dob,
         gender: fields.gender as CustomerGenderValue,
         occupation: fields.occupation as CustomerOccupationValue,
+        creditConsentAccepted: fields.creditConsentAccepted,
         ...(usesMonthlyIncome ? { monthlyIncome: fields.monthlyIncome.trim() } : {}),
         ...(isSelfEmployed
           ? { annualTurnover: fields.annualTurnover.trim(), annualProfit: fields.annualProfit.trim() }
@@ -620,6 +623,25 @@ export function PersonalDetailsStep({
                 )}
               </div>
 
+              <div className="mt-4 md:mt-5 p-4 rounded-xl bg-slate-50 border border-slate-200 md:col-span-2">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    id="creditConsentAccepted"
+                    name="creditConsentAccepted"
+                    type="checkbox"
+                    checked={fields.creditConsentAccepted}
+                    onChange={setConsent}
+                    className="mt-1 h-5 w-5 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-[0.85rem] leading-relaxed text-slate-600">{CUSTOMER_CREDIT_CONSENT_TEXT}</span>
+                </label>
+                {errors.creditConsentAccepted && (
+                  <p id="creditConsentAccepted-error" className="mt-2 text-[#b2372d] text-sm font-medium">
+                    {errors.creditConsentAccepted}
+                  </p>
+                )}
+              </div>
+
               {/* Sticky CTA row — pins to bottom of scroll container on mobile */}
               <div className="sticky bottom-0 z-10 bg-white/95 backdrop-blur-sm mt-6 flex flex-col sm:flex-row gap-3 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] border-t border-slate-100 -mx-5 px-5 lg:mx-0 lg:px-0">
                 <button type="button" onClick={onBack} className="py-3 px-4 rounded-xl font-bold text-[0.95rem] text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors text-center border border-slate-200">
@@ -717,25 +739,6 @@ export function PersonalDetailsStep({
                     className={inputClass(Boolean(errors.pincode))}
                   />
                 </FieldGroup>
-              </div>
-
-              <div className="mt-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    id="creditConsentAccepted"
-                    name="creditConsentAccepted"
-                    type="checkbox"
-                    checked={fields.creditConsentAccepted}
-                    onChange={setConsent}
-                    className="mt-1 h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-[0.85rem] leading-relaxed text-slate-600">{CUSTOMER_CREDIT_CONSENT_TEXT}</span>
-                </label>
-                {errors.creditConsentAccepted && (
-                  <p id="creditConsentAccepted-error" className="mt-2 text-[#b2372d] text-sm font-medium">
-                    {errors.creditConsentAccepted}
-                  </p>
-                )}
               </div>
 
               {submitError && <AlertBanner variant="error">{submitError}</AlertBanner>}

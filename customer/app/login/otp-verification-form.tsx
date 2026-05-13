@@ -107,7 +107,7 @@ export function OtpVerificationForm({
           router.push('/dashboard');
           return;
         }
-        router.push('/onboarding?mode=register');
+        router.push('/kyc');
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to verify OTP right now.');
@@ -124,7 +124,7 @@ export function OtpVerificationForm({
             <div className="h-2 w-8 rounded-full bg-slate-100"></div>
             <div className="h-2 w-8 rounded-full bg-slate-100"></div>
           </div>
-          <span className="ml-3 text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Step 1 — Onboarding</span>
+          <span className="ml-3 text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Step 1 — Verification</span>
         </div>
 
         <h2 className="text-2xl md:text-[1.8rem] font-extrabold text-brand-navy mb-6 tracking-tight leading-[1.1] whitespace-nowrap">

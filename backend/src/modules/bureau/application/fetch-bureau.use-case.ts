@@ -1,25 +1,31 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { CibilFetchService } from '../../../common/vendor/cibil-fetch.service';
+import { BureauFetchService } from '../../../common/vendor/bureau-fetch.service';
+import { parseTenacioBureauVendorBody } from '../../../common/vendor/tenacio-bureau-payload.mapper';
 import { PrismaService } from '../../../prisma/prisma.service';
-import type { FetchCibilDto } from './dto/fetch-cibil.dto';
+import { BureauReportRepository } from '../../auth/infrastructure/repositories/bureau-report.repository';
+import type { FetchBureauDto } from './dto/fetch-bureau.dto';
 
 @Injectable()
-export class FetchCibilUseCase {
+export class FetchBureauUseCase {
+  private readonly logger = new Logger(FetchBureauUseCase.name);
+
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cibilFetch: CibilFetchService,
+    private readonly bureauFetch: BureauFetchService,
+    private readonly bureauReports: BureauReportRepository,
   ) {}
 
-  async execute(req: Request, dto: FetchCibilDto) {
+  async execute(req: Request, dto: FetchBureauDto) {
     const leadId = await this.resolveLeadIdForActor(req, dto.leadUuid);
 
-    const out = await this.cibilFetch.fetchFromTenacio(
+    const out = await this.bureauFetch.fetchBureauFromTenacio(
       {
         input: {
           mobileNumber: dto.input.mobileNumber,
@@ -42,6 +48,30 @@ export class FetchCibilUseCase {
       };
     }
 
+    if (out.ok && leadId != null) {
+      const lead = await this.prisma.client.lead.findUnique({
+        where: { id: leadId },
+        select: { customerId: true },
+      });
+      if (lead) {
+        try {
+          const parsed = parseTenacioBureauVendorBody(out.vendorBody);
+          await this.bureauReports.createFromVendorSnapshot({
+            customerId: lead.customerId,
+            leadId,
+            vendorBody: out.vendorBody,
+            parsed,
+            httpStatus: out.httpStatus,
+            dummyFetched: out.dummyPayload,
+          });
+        } catch (err) {
+          this.logger.warn(
+            `BureauReport not saved (leadId=${leadId.toString()}): ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
+    }
+
     return {
       success: out.ok,
       configured: true,
@@ -55,7 +85,7 @@ export class FetchCibilUseCase {
   private async resolveLeadIdForActor(req: Request, leadUuid: string | undefined): Promise<bigint | null> {
     if (req.losUser) {
       if (!leadUuid?.trim()) {
-        throw new BadRequestException('leadUuid is required for LOS CIBIL requests (vendor audit linkage).');
+        throw new BadRequestException('leadUuid is required for LOS bureau requests (vendor audit linkage).');
       }
       const lead = await this.prisma.client.lead.findUnique({
         where: { uuid: leadUuid.trim() },

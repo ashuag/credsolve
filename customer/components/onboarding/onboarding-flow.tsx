@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FlowLoader } from '@/components/ui/flow-loader';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
@@ -11,14 +11,15 @@ import { EmailEntryStep, type EmailMode } from './email-entry-step';
 import { EmailOtpStep } from './email-otp-step';
 import { PersonalDetailsStep, type PersonalDetailsSection } from './personal-details-step';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
+import { LoanSummaryLeftRail } from '@/components/loan/loan-summary-left-rail';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 
-// Flow: mobile verified → profile (/onboarding) → pre-approved + loan selection → email (/onboarding) → KYC
+// Flow: mobile verified → KYC → profile (/onboarding) → pre-approved + loan selection → email (/onboarding) → bank / thank-you
 type OnboardingStep = 'details' | 'email' | 'email-otp';
 
 /** Maps onboarding step to a mobile app-bar label. */
 const STEP_LABELS: Record<OnboardingStep, string> = {
-  details: 'Step 1 of 2',
+  details: 'Your profile',
   email: 'Link email',
   'email-otp': 'Verify email',
 };
@@ -48,12 +49,17 @@ export function OnboardingFlow() {
       return;
     }
 
+    if (!session.journey.kycCompleted) {
+      router.replace('/kyc');
+      return;
+    }
+
     const lead = session.lead;
     const storedEmail = lead?.email?.trim() ?? '';
     const emailVerified = lead?.emailVerified ?? false;
     const { detailsCompleted, loanSelectionCompleted } = session.journey;
 
-    // Profile + loan + email complete → continue journey (e.g. KYC).
+    // Profile + loan + email complete → continue journey (e.g. bank details).
     if (detailsCompleted && loanSelectionCompleted && emailVerified) {
       router.replace(getCustomerJourneyResumePath(session));
       return;
@@ -107,6 +113,43 @@ export function OnboardingFlow() {
     router.replace(getCustomerJourneyResumePath(next));
   }
 
+  const leftStats = useMemo(() => {
+    if (!session || session.authenticated !== true) {
+      return [
+        { label: 'Paperless', value: '100%' },
+        { label: 'Approval', value: 'Fast' },
+        { label: 'Fees', value: 'Clear' },
+      ];
+    }
+    const ls = session.loanSelection;
+    if (!ls?.amountInr?.trim() && (ls?.tenureDays == null || !Number.isFinite(ls.tenureDays))) {
+      return [
+        { label: 'Paperless', value: '100%' },
+        { label: 'Approval', value: 'Fast' },
+        { label: 'Fees', value: 'Clear' },
+      ];
+    }
+    const principal =
+      ls?.amountInr?.trim() && Number.isFinite(Number.parseFloat(ls.amountInr))
+        ? new Intl.NumberFormat('en-IN', {
+            style: 'currency',
+            currency: 'INR',
+            maximumFractionDigits: 0,
+          }).format(Number.parseFloat(ls.amountInr))
+        : '—';
+    const tenure =
+      ls?.tenureDays != null && Number.isFinite(ls.tenureDays)
+        ? ls.tenureDays % 30 === 0 && ls.tenureDays >= 30
+          ? `${ls.tenureDays / 30} mo`
+          : `${Math.round(ls.tenureDays)} d`
+        : '—';
+    return [
+      { label: 'Principal', value: principal },
+      { label: 'Tenure', value: tenure },
+      { label: 'Maturity', value: ls?.maturityDate?.trim() ? ls.maturityDate : '—' },
+    ];
+  }, [session]);
+
   const sessionGateLoading =
     loading ||
     !session ||
@@ -126,68 +169,16 @@ export function OnboardingFlow() {
   }
 
   const portalSession = session;
-  const activeLead = portalSession.lead;
+  const activeLead = portalSession.lead!;
 
-  let leftTitle, leftDescription, leftInfographic;
-
-  if (step === 'email') {
-    leftTitle = <>Secure <span className="text-[#60a5fa]">Access</span></>;
-    leftDescription = "Link your email address to secure your account and track your loan progress.";
-    leftInfographic = (
-      <svg viewBox="0 0 400 400" className="w-full h-full drop-shadow-xl" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="envGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#60a5fa" />
-            <stop offset="100%" stopColor="#1d4ed8" />
-          </linearGradient>
-        </defs>
-        <g transform="translate(100, 120)">
-          <rect x="0" y="0" width="200" height="140" rx="16" fill="url(#envGrad)" stroke="rgba(255,255,255,0.4)" strokeWidth="4" />
-          <path d="M0 20 L100 90 L200 20" stroke="rgba(255,255,255,0.8)" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="100" cy="90" r="30" fill="#facc15" />
-          <text x="100" y="98" fill="#854d0e" fontSize="24" fontWeight="bold" textAnchor="middle">@</text>
-        </g>
-      </svg>
-    );
-  } else if (step === 'email-otp') {
-    leftTitle = <>Verify <span className="text-[#60a5fa]">Email</span></>;
-    leftDescription = "Enter the secure code sent to your email to verify your identity.";
-    leftInfographic = (
-      <svg viewBox="0 0 400 400" className="w-full h-full drop-shadow-xl" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="shieldGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#10b981" />
-            <stop offset="100%" stopColor="#047857" />
-          </linearGradient>
-        </defs>
-        <g transform="translate(140, 100)">
-          <path d="M60 0 L120 20 L120 60 C120 100 80 140 60 160 C40 140 0 100 0 60 L0 20 Z" fill="url(#shieldGrad)" stroke="rgba(255,255,255,0.4)" strokeWidth="4" />
-          <path d="M30 70 L50 90 L90 40" stroke="#ffffff" strokeWidth="10" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </g>
-      </svg>
-    );
-  } else {
-    leftTitle = <>Final <span className="text-[#60a5fa]">Details</span></>;
-    leftDescription = "Complete your profile to unlock instant disbursal of your approved loan amount.";
-    leftInfographic = (
-      <svg viewBox="0 0 400 400" className="w-full h-full drop-shadow-xl" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="docGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#818cf8" />
-            <stop offset="100%" stopColor="#4338ca" />
-          </linearGradient>
-        </defs>
-        <g transform="translate(120, 80)">
-          <rect x="0" y="0" width="160" height="220" rx="12" fill="url(#docGrad)" stroke="rgba(255,255,255,0.4)" strokeWidth="4" />
-          <circle cx="80" cy="60" r="30" fill="rgba(255,255,255,0.2)" />
-          <rect x="40" y="120" width="80" height="12" rx="6" fill="rgba(255,255,255,0.8)" />
-          <rect x="40" y="150" width="50" height="12" rx="6" fill="rgba(255,255,255,0.4)" />
-          <circle cx="140" cy="200" r="24" fill="#10b981" />
-          <path d="M130 200 L138 208 L150 192" stroke="#ffffff" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </g>
-      </svg>
-    );
-  }
+  const leftTitle = (
+    <>
+      Loan <span className="text-[#60a5fa]">details</span>
+    </>
+  );
+  const leftDescription =
+    'Principal, tenure, and maturity from your application stay visible while you complete this step.';
+  const leftInfographic = <LoanSummaryLeftRail loanSelection={portalSession.loanSelection} />;
 
   /** Back handler for mobile app bar — navigates within onboarding or exits */
   function handleMobileBack() {
@@ -203,7 +194,7 @@ export function OnboardingFlow() {
       }
       return;
     }
-    router.push('/apply-for-loan');
+    router.push('/kyc');
   }
 
   const journeyPanel = (
@@ -215,7 +206,7 @@ export function OnboardingFlow() {
           initialProfile={portalSession.profile}
           activeSection={detailsSection}
           onSectionChange={setDetailsSection}
-          onBack={() => router.push('/apply-for-loan')}
+          onBack={() => router.push('/kyc')}
           noticeMessage={detailsNotice}
           onSaved={handleDetailsSaved}
         />
@@ -244,10 +235,12 @@ export function OnboardingFlow() {
 
   return (
     <LoanLandingShell
+      showSpeedometer={false}
       journeyPanel={journeyPanel}
       leftTitle={leftTitle}
       leftDescription={leftDescription}
       leftInfographic={leftInfographic}
+      leftStats={leftStats}
       mobileStepLabel={STEP_LABELS[step]}
       mobileOnBack={handleMobileBack}
     />

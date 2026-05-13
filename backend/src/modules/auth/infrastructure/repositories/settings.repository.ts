@@ -1,5 +1,9 @@
 import {Injectable, Logger} from '@nestjs/common';
 import {LOOKUP_CACHE_TTL_SECONDS} from '../../../../common/constants/app.constants';
+import {
+  readBureauFetchMode,
+  type BureauFetchMode,
+} from '../../../../common/constants/bureau-fetch-settings.util';
 import {SettingKey} from '../../../../common/constants/setting.constants';
 import {RedisService} from '../../../../common/redis/redis.service';
 import {PrismaService} from '../../../../prisma/prisma.service';
@@ -142,17 +146,17 @@ export class SettingsRepository {
   }
 
   /**
-   * Whether to call the bureau (CIBIL) vendor after PAN is verified.
-   * DB `setting` row `BUREAU_FETCH_ENABLED` (default `1` = on).
+   * Whether to run the bureau flow after PAN (`1` live, `2` mock). `0` = off.
+   * DB `setting` row `BUREAU_FETCH_ENABLED` (default `1`).
    */
   async isBureauFetchEnabled(): Promise<boolean> {
-    const meta = SettingKey.BUREAU_FETCH_ENABLED;
-    const row = await this.prisma.client.setting.findFirst({
-      where: { key: meta.key, isActive: true },
-      select: { value: true },
-    });
-    const raw = row?.value?.trim() ?? meta.default;
-    return parseBool(raw, false);
+    const mode = await readBureauFetchMode(this.prisma.client);
+    return mode === 1 || mode === 2;
+  }
+
+  /** `0` off, `1` live Tenacio, `2` mock (no HTTP). */
+  async getBureauFetchMode(): Promise<BureauFetchMode> {
+    return readBureauFetchMode(this.prisma.client);
   }
 
   async getReapplyAfterRejectedDays(): Promise<number> {

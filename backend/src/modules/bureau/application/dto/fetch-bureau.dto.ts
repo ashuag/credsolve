@@ -2,7 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { Equals, IsBoolean, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateNested } from 'class-validator';
 
-export class CibilTenacioInputDto {
+export class BureauTenacioInputDto {
   @ApiProperty({ example: '9876543210', description: 'Borrower mobile (10-digit Indian MSISDN).' })
   @IsString()
   @Matches(/^[6-9]\d{9}$/, { message: 'mobileNumber must be a 10-digit Indian mobile starting with 6–9.' })
@@ -25,11 +25,11 @@ export class CibilTenacioInputDto {
   consent!: boolean;
 }
 
-export class FetchCibilDto {
-  @ApiProperty({ type: CibilTenacioInputDto })
+export class FetchBureauDto {
+  @ApiProperty({ type: BureauTenacioInputDto })
   @ValidateNested()
-  @Type(() => CibilTenacioInputDto)
-  input!: CibilTenacioInputDto;
+  @Type(() => BureauTenacioInputDto)
+  input!: BureauTenacioInputDto;
 
   @ApiPropertyOptional({
     format: 'uuid',

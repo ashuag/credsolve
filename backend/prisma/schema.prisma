@@ -11,7 +11,7 @@
 //   models/geography.prisma     — State, City, NegativeState/City/Pincode
 //   models/otp.prisma           — OtpRequest
 //   models/customer.prisma      — Customer + KYC
-//   models/lead.prisma          — Lead + LeadDetail + UTMs + VendorApiLog
+//   models/lead.prisma          — Lead + LeadDetail + UTMs + VendorApiLog (+ BureauReport in bureau-report.prisma)
 //   models/application.prisma   — Application + sub-aggregates
 //   models/user.prisma          — LOS UserRole + User
 //

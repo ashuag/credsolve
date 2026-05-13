@@ -15,7 +15,9 @@ import { SaveLoanSelectionUseCase } from './application/use-cases/save-loan-sele
 import { SubmitProfessionalApplicationUseCase } from './application/use-cases/submit-professional-application.use-case';
 import { SyncLeadEmailFromGoogleTokenUseCase } from './application/use-cases/sync-lead-email-from-google-token.use-case';
 import { VerifyOtpUseCase } from './application/use-cases/verify-otp.use-case';
+import { PostBureauOfferService } from './application/services/post-bureau-offer.service';
 import { VerifyPanUseCase } from './application/use-cases/verify-pan.use-case';
+import { InitDigilockerUseCase } from './application/use-cases/init-digilocker.use-case';
 import { SaveKycDocumentsUseCase } from './application/use-cases/save-kyc-documents.use-case';
 import { SaveBankDetailsUseCase } from './application/use-cases/save-bank-details.use-case';
 import { OtpCodeGenerator } from './infrastructure/crypto/otp-code.generator';
@@ -24,6 +26,7 @@ import { CustomerRepository } from './infrastructure/repositories/customer.repos
 import { BankRepository } from './infrastructure/repositories/bank.repository';
 import { LeadRepository } from './infrastructure/repositories/lead.repository';
 import { ApplicationRepository } from './infrastructure/repositories/application.repository';
+import { BureauReportRepository } from './infrastructure/repositories/bureau-report.repository';
 import { LeadStatusRepository } from './infrastructure/repositories/lead-status.repository';
 import { OtpRequestRepository } from './infrastructure/repositories/otp-request.repository';
 import { OtpTypeRepository } from './infrastructure/repositories/otp-type.repository';
@@ -56,6 +59,7 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     BankRepository,
     LeadRepository,
     ApplicationRepository,
+    BureauReportRepository,
     LeadStatusRepository,
     SettingsRepository,
     OptionalCustomerSessionGuard,
@@ -65,6 +69,7 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     SaveLeadDetailsUseCase,
     GetCustomerLeadStatusUseCase,
     CheckLoanEligibilityUseCase,
+    PostBureauOfferService,
     SubmitProfessionalApplicationUseCase,
     SaveLoanSelectionUseCase,
     SaveKycDocumentsUseCase,
@@ -72,10 +77,11 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     SendOtpUseCase,
     VerifyOtpUseCase,
     VerifyPanUseCase,
+    InitDigilockerUseCase,
     GetCustomerSessionUseCase,
     GetCustomerLoansDashboardUseCase,
     LogoutUseCase,
   ],
-  exports: [CustomerSessionService],
+  exports: [CustomerSessionService, BureauReportRepository],
 })
 export class AuthModule {}

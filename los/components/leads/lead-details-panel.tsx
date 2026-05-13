@@ -365,7 +365,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
               { label: 'Net monthly income', value: formatInr(profile.netMonthlyIncome) },
               { label: 'Annual turnover', value: formatInr(profile.annualTurnover) },
               { label: 'Annual profit', value: formatInr(profile.annualProfit) },
-              { label: 'CIBIL consent at', value: formatDateTime(profile.cibilConsentAt ?? undefined) },
+              { label: 'Bureau consent at', value: formatDateTime(profile.cibilConsentAt ?? undefined) },
             ]}
           />
         ) : (

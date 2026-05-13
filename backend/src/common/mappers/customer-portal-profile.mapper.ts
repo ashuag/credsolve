@@ -63,6 +63,17 @@ export function mapOccupationDbNameToPortalSlug(name: string | null | undefined)
   return OCC_DB_TO_SLUG[name] ?? null;
 }
 
+/** True when `lead.pan_verified` / stored detail reflects a successful vendor verification. */
+export function isPanVerifiedFromDb(panVerified: boolean | number | null | undefined): boolean {
+  if (panVerified === true) {
+    return true;
+  }
+  if (typeof panVerified === 'number') {
+    return panVerified === PAN_VERIFIED.VERIFIED;
+  }
+  return false;
+}
+
 export function isLeadEmailVerifiedForPortal(leadStatusName: string, email: string | null, emailVerificationType: unknown): boolean {
   if (leadStatusName === LEAD_STATUS.IN_PROGRESS || leadStatusName === LEAD_STATUS.CONVERTED) {
     return true;

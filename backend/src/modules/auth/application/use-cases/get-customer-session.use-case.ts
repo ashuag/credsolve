@@ -44,6 +44,7 @@ export class GetCustomerSessionUseCase {
         kycCompleted: false,
         bankDetailsCompleted: false,
       },
+      loanSelection: null,
     };
 
     let leadRow = await this.leads.findActiveByCustomerId(customer.id);
@@ -105,7 +106,7 @@ export class GetCustomerSessionUseCase {
       application
         ? this.prisma.client.applicationDetails.findUnique({
             where: { applicationId: application.id },
-            select: { loanAmount: true, loanTenure: true },
+            select: { loanAmount: true, loanTenure: true, loanMaturityDate: true },
           })
         : Promise.resolve(null),
       application
@@ -153,6 +154,18 @@ export class GetCustomerSessionUseCase {
       disbursement?.accountNumber?.trim() && disbursement?.ifscCode?.trim() && disbursement?.bankName?.trim()
     );
 
+    const loanSelection =
+      appDetails &&
+      (appDetails.loanAmount != null || appDetails.loanTenure != null || appDetails.loanMaturityDate != null)
+        ? {
+            amountInr: appDetails.loanAmount != null ? appDetails.loanAmount.toString() : null,
+            tenureDays: appDetails.loanTenure ?? null,
+            maturityDate: appDetails.loanMaturityDate
+              ? appDetails.loanMaturityDate.toISOString().slice(0, 10)
+              : null,
+          }
+        : null;
+
     return {
       authenticated: true,
       customerId: customer.uuid,
@@ -171,6 +184,7 @@ export class GetCustomerSessionUseCase {
         kycCompleted,
         bankDetailsCompleted,
       },
+      loanSelection,
     };
   }
 }

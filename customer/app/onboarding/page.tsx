@@ -3,9 +3,9 @@ import { JourneyProgressProvider } from '@/components/journey/journey-progress-c
 import { OnboardingFlow } from '@/components/onboarding/onboarding-flow';
 
 export const metadata: Metadata = {
-  title: 'Complete Your Profile | MoneyCash',
+  title: 'Your loan application | MoneyCash',
   description:
-    'Provide your email address and personal details to complete your MoneyCash loan application.',
+    'Review your loan snapshot and complete profile and email steps to continue your MoneyCash application.',
 };
 
 export default function OnboardingPage() {

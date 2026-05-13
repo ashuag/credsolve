@@ -43,6 +43,14 @@ export type CustomerPortalJourneySnapshot = {
   bankDetailsCompleted: boolean;
 };
 
+export type CustomerLoanSelectionSnapshot = {
+  /** Selected principal in INR (decimal string). */
+  amountInr: string | null;
+  tenureDays: number | null;
+  /** ISO date-only for maturity when set. */
+  maturityDate: string | null;
+};
+
 export type CustomerSessionResult =
   | {
       authenticated: true;
@@ -51,5 +59,7 @@ export type CustomerSessionResult =
       lead: CustomerPortalLeadSnapshot | null;
       profile: CustomerPortalProfileSnapshot | null;
       journey: CustomerPortalJourneySnapshot;
+      /** Populated when the customer has saved loan amount / tenure on the application. */
+      loanSelection: CustomerLoanSelectionSnapshot | null;
     }
   | { authenticated: false };

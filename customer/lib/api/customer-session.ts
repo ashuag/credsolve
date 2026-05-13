@@ -35,6 +35,13 @@ export type CustomerPortalLead = {
   rejectedUntil: string | null;
 };
 
+/** Mirrors backend `CustomerLoanSelectionSnapshot` (`GET /auth/me`). */
+export type CustomerLoanSelectionSnapshot = {
+  amountInr: string | null;
+  tenureDays: number | null;
+  maturityDate: string | null;
+};
+
 export type CustomerSessionResponse =
   | {
       authenticated: true;
@@ -48,6 +55,7 @@ export type CustomerSessionResponse =
         kycCompleted: boolean;
         bankDetailsCompleted: boolean;
       };
+      loanSelection: CustomerLoanSelectionSnapshot | null;
     }
   | { authenticated: false };
 
@@ -97,12 +105,22 @@ export function getCustomerJourneyResumePath(
   }
 
   const journey = session.journey;
+  if (!journey.kycCompleted) return '/kyc';
   if (!journey.detailsCompleted) return '/onboarding?mode=login';
   if (!journey.loanSelectionCompleted) return '/pre-approved-loan';
   if (!session.lead.emailVerified) return '/onboarding?mode=login';
-  if (!journey.kycCompleted) return '/kyc/upload-documents';
   if (!journey.bankDetailsCompleted) return '/bank-details';
   return '/thank-you';
+}
+
+/** Back navigation from the KYC hub (avoid `getCustomerJourneyResumePath` looping to `/kyc`). */
+export function getKycHubBackPath(session: Extract<CustomerSessionResponse, { authenticated: true }>): string {
+  const j = session.journey;
+  const emailVerified = session.lead?.emailVerified ?? false;
+  if (!j.detailsCompleted) return '/apply-for-loan';
+  if (!j.loanSelectionCompleted) return '/pre-approved-loan';
+  if (!emailVerified) return '/onboarding?mode=login';
+  return '/loan-selection';
 }
 
 /** Coalesce concurrent `/auth/me` calls (e.g. React Strict Mode double mount). */

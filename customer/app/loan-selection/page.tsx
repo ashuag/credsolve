@@ -12,6 +12,7 @@ import {
   type LoanCalculationSettingsResponse,
 } from '@/lib/api/eligibility';
 import { saveLoanSelection } from '@/lib/api/lead';
+import { computeFixedRepaymentDate } from '@/lib/repayment-date';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { Spinner } from '@/components/ui/spinner';
 
@@ -25,28 +26,11 @@ const DEFAULT_LOAN_SETTINGS: LoanCalculationSettingsResponse = {
   processingFeeGstPercent: 18,
 };
 
-function addMonths(date: Date, months: number): Date {
-  const next = new Date(date);
-  next.setMonth(next.getMonth() + months);
-  return next;
-}
-
 function toDateInputValue(date: Date): string {
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const dd = String(date.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
-}
-
-function parseDateOnly(value: string): Date | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!m) return null;
-  const year = Number(m[1]);
-  const month = Number(m[2]);
-  const day = Number(m[3]);
-  const dt = new Date(year, month - 1, day);
-  if (Number.isNaN(dt.getTime())) return null;
-  return dt;
 }
 
 function diffDays(from: Date, to: Date): number {
@@ -107,22 +91,11 @@ export default function LoanSelectionPage() {
   );
 
   const today = useMemo(() => new Date(), []);
-  const minEndDate = useMemo(() => {
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow;
-  }, [today]);
-  const maxEndDate = useMemo(() => addMonths(today, 2), [today]);
+  const fixedRepaymentDate = useMemo(() => computeFixedRepaymentDate(today), [today]);
+  const selectedEndDate = useMemo(() => toDateInputValue(fixedRepaymentDate), [fixedRepaymentDate]);
 
   const [loanPurpose, setLoanPurpose] = useState('');
   const [selectedAmount, setSelectedAmount] = useState(Math.min(maxSelectableAmount, 25_000));
-  const defaultEndDate = useMemo(() => {
-    const bySetting = new Date(today);
-    bySetting.setDate(bySetting.getDate() + settings.loanTenureDays);
-    const capped = bySetting.getTime() > maxEndDate.getTime() ? maxEndDate : bySetting;
-    return toDateInputValue(capped);
-  }, [today, settings.loanTenureDays, maxEndDate]);
-  const [selectedEndDate, setSelectedEndDate] = useState(defaultEndDate);
 
   useEffect(() => {
     setSelectedAmount((prev) =>
@@ -130,14 +103,9 @@ export default function LoanSelectionPage() {
     );
   }, [maxSelectableAmount, settings.minLoanAmount]);
 
-  useEffect(() => {
-    setSelectedEndDate(defaultEndDate);
-  }, [defaultEndDate]);
-
   const tenureDays = useMemo(() => {
-    const end = parseDateOnly(selectedEndDate) ?? maxEndDate;
-    return diffDays(today, end);
-  }, [selectedEndDate, today, maxEndDate]);
+    return diffDays(today, fixedRepaymentDate);
+  }, [today, fixedRepaymentDate]);
 
   const calculations = useMemo(() => {
     const principal = selectedAmount;
@@ -230,7 +198,7 @@ export default function LoanSelectionPage() {
           Customize your loan.
         </h1>
         <p className="text-[0.95rem] text-slate-500 mb-8 leading-relaxed">
-          Adjust the amount and date to fit your needs. Your summary will update instantly on the left.
+          Adjust the loan amount to fit your needs. Repayment date follows our schedule (month-end rule). Your summary updates on the left.
         </p>
 
         <div className="grid gap-6">
@@ -263,11 +231,11 @@ export default function LoanSelectionPage() {
             <input
               id="loanEndDate"
               type="date"
-              min={toDateInputValue(minEndDate)}
-              max={toDateInputValue(maxEndDate)}
+              readOnly
+              aria-readonly="true"
               value={selectedEndDate}
-              onChange={(e) => setSelectedEndDate(e.target.value)}
-              className="w-full h-[54px] rounded-xl border border-slate-200 bg-white px-4 text-[1rem] font-bold text-brand-navy focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
+              title="Repayment date is set by policy: 1st–15th → end of this month; 16th onward → end of next month."
+              className="w-full h-[54px] rounded-xl border border-slate-200 bg-slate-50 px-4 text-[1rem] font-bold text-brand-navy outline-none cursor-default"
             />
             <div className="mt-3 flex justify-between items-center">
               <span className="text-[0.8rem] text-slate-500">Selected tenure:</span>

@@ -9,16 +9,18 @@ type JourneyStage = 'details' | 'preApproved' | 'loanSelection' | 'email' | 'kyc
 function stageFromSession(session: ReturnType<typeof useCustomerSession>['session']): JourneyStage {
   if (!session?.authenticated || !session.lead) return 'details';
   const j = session.journey;
+  if (!j.kycCompleted) return 'kyc';
   if (!j.detailsCompleted) return 'details';
   if (!j.loanSelectionCompleted) return 'preApproved';
   if (!session.lead.emailVerified) return 'email';
-  if (!j.kycCompleted) return 'kyc';
   if (!j.bankDetailsCompleted) return 'bankDetails';
   return 'done';
 }
 
 function defaultPathForStage(stage: JourneyStage): string {
   switch (stage) {
+    case 'kyc':
+      return '/kyc';
     case 'details':
       return '/onboarding?mode=login';
     case 'preApproved':
@@ -27,8 +29,6 @@ function defaultPathForStage(stage: JourneyStage): string {
       return '/loan-selection';
     case 'email':
       return '/onboarding?mode=login';
-    case 'kyc':
-      return '/kyc/upload-documents';
     case 'bankDetails':
       return '/bank-details';
     case 'done':
@@ -46,9 +46,10 @@ function isPathAllowedForStage(stage: JourneyStage, path: string): boolean {
   ) {
     return true;
   }
-  if (path.startsWith('/onboarding')) return true;
 
   switch (stage) {
+    case 'kyc':
+      return path === '/kyc' || path.startsWith('/kyc/');
     case 'details':
       return path.startsWith('/onboarding');
     case 'preApproved':
@@ -57,9 +58,6 @@ function isPathAllowedForStage(stage: JourneyStage, path: string): boolean {
       return path === '/loan-selection';
     case 'email':
       return path.startsWith('/onboarding');
-    case 'kyc':
-      // Skip DigiLocker option page; take users straight to upload-documents.
-      return path === '/kyc/upload-documents';
     case 'bankDetails':
       return path === '/bank-details';
     case 'done':
@@ -101,4 +99,3 @@ export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
 
   return <>{children}</>;
 }
-

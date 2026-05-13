@@ -4,12 +4,12 @@ import { RedisIpRateLimitGuard } from '../../common/rate-limit/redis-ip-rate-lim
 import { PrismaModule } from '../../prisma/prisma.module';
 import { AuthModule } from '../auth/auth.module';
 import { LosModule } from '../los/los.module';
-import { FetchCibilUseCase } from './application/fetch-cibil.use-case';
-import { TenacioCibilController } from './presentation/tenacio-cibil.controller';
+import { FetchBureauUseCase } from './application/fetch-bureau.use-case';
+import { TenacioBureauController } from './presentation/tenacio-bureau.controller';
 
 @Module({
   imports: [PrismaModule, LosModule, AuthModule],
-  controllers: [TenacioCibilController],
-  providers: [RedisIpRateLimitGuard, CustomerOrLosAuthGuard, FetchCibilUseCase],
+  controllers: [TenacioBureauController],
+  providers: [RedisIpRateLimitGuard, CustomerOrLosAuthGuard, FetchBureauUseCase],
 })
 export class BureauModule {}

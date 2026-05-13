@@ -33,7 +33,7 @@ export class ApplicationsController {
       'Save professional / income fields, run eligibility, store approved amount, set lead to CONVERTED',
   })
   @ApiOkResponse({
-    description: 'Eligibility outcome; approvedAmount/cibilScore when eligible',
+    description: 'Eligibility outcome; approvedAmount and bureau score (`cibilScore` in API) when eligible',
   })
   professionalDetailsRoute(@Req() req: Request, @Body() body: SaveProfessionalDetailsDto) {
     return this.submitProfessionalApplication.execute(req, body);

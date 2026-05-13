@@ -1,0 +1,11 @@
+/*
+  Warnings:
+
+  - You are about to alter the column `email_verified_at` on the `application` table. The data in that column could be lost. The data in that column will be cast from `DateTime(0)` to `DateTime`.
+
+*/
+-- AlterTable
+ALTER TABLE `application` MODIFY `email_verified_at` DATETIME NULL;
+
+-- AlterTable
+ALTER TABLE `vendor_api_log` MODIFY `request_path` TEXT NULL;

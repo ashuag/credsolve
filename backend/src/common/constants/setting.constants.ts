@@ -87,7 +87,8 @@ export const SettingKey = {
     BUREAU_FETCH_ENABLED: {
         key: 'BUREAU_FETCH_ENABLED',
         default: '1',
-        description:  'Need to check Bureau data is fetched or not',
+        description:
+            'Bureau after PAN: 0/false = off; 1/true = live Tenacio bureau; 2 = mock success (no HTTP, fixed payload)',
     },
     PAN_VERIFICATION_ENABLED: {
         key: 'PAN_VERIFICATION_ENABLED',
