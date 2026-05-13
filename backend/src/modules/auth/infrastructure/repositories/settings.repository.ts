@@ -35,6 +35,14 @@ export interface AuthOtpSettings {
   sessionRotateOnUse: boolean;
 }
 
+export interface BreSettings {
+  minAge: number;
+  maxAge: number;
+  negativePincodes: string[];
+  negativeCities: string[];
+  negativeStates: string[];
+}
+
 export interface LoanCalculationSettings {
   minLoanAmount: number;
   maxLoanAmount: number;
@@ -81,6 +89,7 @@ export class SettingsRepository {
     const meta = SettingKey.PAN_VERIFICATION_ENABLED;
     const redisKey = settingRedisKey(meta.key);
 
+    /*
     try {
       const cached = await this.redis.client.get(redisKey);
       if (cached !== null) {
@@ -90,6 +99,7 @@ export class SettingsRepository {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.warn(`Redis read failed for ${redisKey} (falling back to DB): ${msg}`);
     }
+    */
 
     const row = await this.prisma.client.setting.findFirst({
       where: { key: meta.key, isActive: true },
@@ -98,14 +108,46 @@ export class SettingsRepository {
     const raw = row?.value?.trim() ?? meta.default;
     const enabled = parseBool(raw, false);
 
+    /*
     try {
       await this.redis.client.set(redisKey, enabled ? '1' : '0', 'EX', LOOKUP_CACHE_TTL_SECONDS);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.warn(`Redis write failed for ${redisKey}: ${msg}`);
     }
+    */
 
     return enabled;
+  }
+
+  async getReapplyAfterRejectedDays(): Promise<number> {
+    const meta = SettingKey.REAPPLY_AFTER_REJECTED;
+    const row = await this.prisma.client.setting.findFirst({
+      where: { key: meta.key, isActive: true },
+      select: { value: true },
+    });
+    const raw = row?.value?.trim() ?? meta.default;
+    return Number.parseInt(raw, 10) || Number.parseInt(meta.default, 10);
+  }
+
+  async getBlacklistRejectionThreshold(): Promise<number> {
+    const meta = SettingKey.BLACKLIST_REJECTION_THRESHOLD;
+    const row = await this.prisma.client.setting.findFirst({
+      where: { key: meta.key, isActive: true },
+      select: { value: true },
+    });
+    const raw = row?.value?.trim() ?? meta.default;
+    return Number.parseInt(raw, 10) || Number.parseInt(meta.default, 10);
+  }
+
+  async getBlacklistDurationDays(): Promise<number> {
+    const meta = SettingKey.BLACKLIST_DURATION_DAYS;
+    const row = await this.prisma.client.setting.findFirst({
+      where: { key: meta.key, isActive: true },
+      select: { value: true },
+    });
+    const raw = row?.value?.trim() ?? meta.default;
+    return Number.parseInt(raw, 10) || Number.parseInt(meta.default, 10);
   }
 
   async loadAuthOtpSettings(): Promise<AuthOtpSettings> {
@@ -141,6 +183,34 @@ export class SettingsRepository {
   /** Test/admin hook: clear the in-process auth/OTP settings cache. */
   invalidateAuthOtpSettingsCache(): void {
     this.authOtpCache = null;
+  }
+
+  async loadBreSettings(): Promise<BreSettings> {
+    const breKeys = [
+      SettingKey.BRE_MIN_AGE.key,
+      SettingKey.BRE_MAX_AGE.key,
+      SettingKey.BRE_NEGATIVE_PINCODES.key,
+      SettingKey.BRE_NEGATIVE_CITIES.key,
+      SettingKey.BRE_NEGATIVE_STATES.key,
+    ] as const;
+
+    const rows = await this.prisma.client.setting.findMany({
+      where: { key: { in: [...breKeys] }, isActive: true },
+      select: { key: true, value: true },
+    });
+    const map = new Map(rows.map((r) => [r.key, r.value]));
+    const pick = (key: string, def: string) => map.get(key)?.trim() || def;
+
+    const parseList = (raw: string): string[] =>
+      raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+
+    return {
+      minAge: Math.max(1, parseInt(pick(SettingKey.BRE_MIN_AGE.key, SettingKey.BRE_MIN_AGE.default), 10) || 21),
+      maxAge: Math.max(1, parseInt(pick(SettingKey.BRE_MAX_AGE.key, SettingKey.BRE_MAX_AGE.default), 10) || 57),
+      negativePincodes: parseList(pick(SettingKey.BRE_NEGATIVE_PINCODES.key, SettingKey.BRE_NEGATIVE_PINCODES.default)),
+      negativeCities: parseList(pick(SettingKey.BRE_NEGATIVE_CITIES.key, SettingKey.BRE_NEGATIVE_CITIES.default)),
+      negativeStates: parseList(pick(SettingKey.BRE_NEGATIVE_STATES.key, SettingKey.BRE_NEGATIVE_STATES.default)),
+    };
   }
 
   async loadLoanCalculationSettings(): Promise<LoanCalculationSettings> {

@@ -47,8 +47,11 @@ export type VerifyLeadPanPayload = {
 
 export type VerifyLeadPanResponse = {
   success: boolean;
+  rejected?: boolean;
+  message?: string;
   matched: boolean;
   panVerified: boolean;
+  panVerifiedStatus?: number;
   vendorFullName: string | null;
   leadDetail?: {
     uuid: string;

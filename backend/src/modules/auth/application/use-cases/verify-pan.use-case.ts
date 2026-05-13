@@ -1,13 +1,18 @@
-import {BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException} from '@nestjs/common';
-import type {Prisma} from '@prisma/client';
-import type {Request} from 'express';
-import {isPanVerifiedFromDb} from '../../../../common/mappers/customer-portal-profile.mapper';
-import {PrismaService} from '../../../../prisma/prisma.service';
-import {VendorApiService} from '../../../../common/vendor/vendor-api.service';
-import {CustomerRepository} from '../../infrastructure/repositories/customer.repository';
-import {LeadRepository} from '../../infrastructure/repositories/lead.repository';
-import {SettingsRepository} from '../../infrastructure/repositories/settings.repository';
-import type {VerifyPanDto} from '../dto/verify-pan.dto';
+import { BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
+import type { Request } from 'express';
+import { BreCheckService } from '../../../../common/bre/bre-check.service';
+import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
+import { PAN_VERIFIED } from '../../../../common/constants/pan-verification.constants';
+import { REJECTION_REASON } from '../../../../common/constants/rejection-reason.constants';
+import { isPanVerifiedFromDb } from '../../../../common/mappers/customer-portal-profile.mapper';
+import { SmsService } from '../../../../common/sms/sms.service';
+import { PanVerificationService } from '../../../../common/vendor/pan-verification.service';
+import { PrismaService } from '../../../../prisma/prisma.service';
+import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
+import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
+import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
+import type { VerifyPanDto } from '../dto/verify-pan.dto';
 
 function parseDobUtc(dob: string): Date {
   const [y, m, d] = dob.split('-').map((p) => Number.parseInt(p, 10));
@@ -17,44 +22,8 @@ function parseDobUtc(dob: string): Date {
   return new Date(Date.UTC(y, m - 1, d));
 }
 
-/** Convert ISO `YYYY-MM-DD` to vendor's `DD-MM-YYYY` body format. */
-function formatDobDdMmYyyy(iso: string): string {
-  const [y, m, d] = iso.split('-');
-  if (!y || !m || !d) return iso;
-  return `${d}-${m}-${y}`;
-}
-
-function maskPanForAudit(pan: string | undefined): string {
-  if (!pan || pan.length < 4) return '*****';
-  return `******${pan.slice(-4)}`;
-}
-
-function maskDobForAudit(dob: string | undefined): string {
-  if (!dob || dob.length !== 10) return '****';
-  return `**-**-${dob.slice(-4)}`;
-}
-
 function toIsoDateOnly(d: Date): string {
   return d.toISOString().slice(0, 10);
-}
-
-/** Log line only — PAN masked; Nest `Logger.log` has no metadata object; put JSON in the message. */
-function formatLeadDetailSnapshotForLog(detail: {
-  uuid: string;
-  panNumber: string | null;
-  fullName: string | null;
-  dateOfBirth: Date | null;
-  panVerified: boolean | number | null;
-  panVerifiedAt: Date | null;
-}): string {
-  return JSON.stringify({
-    uuid: detail.uuid,
-    panNumber: maskPanForAudit(detail.panNumber ?? undefined),
-    fullName: detail.fullName,
-    dateOfBirth: detail.dateOfBirth ? toIsoDateOnly(detail.dateOfBirth) : null,
-    panVerified: isPanVerifiedFromDb(detail.panVerified),
-    panVerifiedAt: detail.panVerifiedAt?.toISOString() ?? null,
-  });
 }
 
 const leadDetailSelect = {
@@ -64,39 +33,17 @@ const leadDetailSelect = {
   dateOfBirth: true,
   panVerified: true,
   panVerifiedAt: true,
+  panVerificationNote: true,
 } as const;
-
-type panNsdlBody = {
-  input: {
-    panNumber: string;
-    name: string;
-    dob: string;
-    consent: boolean;
-  };
-};
-
-type panNsdlResponse = {
-  result?: {
-    matched?: boolean;
-    name?: string;
-    panNumber?: string;
-    [k: string]: unknown;
-  };
-  data?: {
-    matched?: boolean;
-    name?: string;
-    [k: string]: unknown;
-  };
-  status?: string;
-  [k: string]: unknown;
-};
 
 export type VerifyPanResult = {
   success: true;
-  matched: boolean;
   panVerified: boolean;
-  vendorFullName: string | null;
-  /** Persisted `lead_detail` after this request (PAN/name/DOB + optional NSDL flags). */
+  panVerifiedStatus: number;
+  nameMatch: boolean;
+  dobMatch: boolean;
+  panStatus: string | null;
+  category: string | null;
   leadDetail: {
     uuid: string;
     panNumber: string | null;
@@ -104,37 +51,34 @@ export type VerifyPanResult = {
     dateOfBirth: string | null;
     panVerified: boolean;
     panVerifiedAt: string | null;
+    panVerificationNote: string | null;
   };
 };
 
 /**
  * Persists PAN + name + DOB on `lead_detail` and verifies the PAN against
- * NSDL via Tenacio. Each vendor call is recorded in `vendor_api_log` by
- * `VendorApiService` (provider, service, path, method, payloads, status,
- * timings).
+ * NSDL via Tenacio (delegated to `PanVerificationService`).
  *
- * If `PAN_VERIFICATION_ENABLED` is off in `setting` (cached in Redis), the
- * NSDL call is skipped and `panVerified=false` is returned after persisting details.
- *
- * If the vendor call fails for any reason — missing creds, network error,
- * non-2xx — we still save the user-supplied details and return
- * `panVerified=false`. The user proceeds without being held up by vendor
- * outages; ops can audit the failed call from `vendor_api_log`.
+ * Status written to `lead_detail.pan_verified` (SmallInt):
+ *   0 = NOT_CHECKED — vendor call failed or was skipped; safe to retry.
+ *   1 = VERIFIED    — panStatus=valid, nameMatch, dobMatch, category=Individual.
+ *   2 = NOT_VERIFIED — vendor confirmed the PAN doesn't match.
  */
 @Injectable()
 export class VerifyPanUseCase {
   private readonly logger = new Logger(VerifyPanUseCase.name);
-  
+
   constructor(
+    private readonly breCheck: BreCheckService,
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
     private readonly prisma: PrismaService,
-    private readonly vendorApi: VendorApiService,
+    private readonly panVerification: PanVerificationService,
     private readonly settings: SettingsRepository,
+    private readonly sms: SmsService,
   ) {}
 
   async execute(req: Request, dto: VerifyPanDto): Promise<VerifyPanResult> {
-    this.logger.debug('Executing VerifyPanUseCase with DTO:', dto);
     const session = req.customerSession;
     if (!session) {
       throw new UnauthorizedException('Sign in with mobile OTP before continuing.');
@@ -153,59 +97,177 @@ export class VerifyPanUseCase {
       throw new NotFoundException('No matching active lead was found.');
     }
 
-    this.logger.log(
-      `verify-pan: resolved lead leadId=${leadRow.id.toString()} leadUuid=${leadRow.uuid} customerId=${customer.id.toString()}`,
-    );
-
     const panUpper = dto.panNumber.trim().toUpperCase();
     const fullNameTrimmed = dto.fullName.trim();
     const dateOfBirth = parseDobUtc(dto.dob);
 
-    // Save user-supplied details first so the work isn't lost on vendor flake.
-    let detail = await this.prisma.client.leadDetail.upsert({
-      where: { leadId: leadRow.id },
-      create: {
-        leadId: leadRow.id,
-        panNumber: panUpper,
-        fullName: fullNameTrimmed,
-        dateOfBirth,
-      },
-      update: {
-        panNumber: panUpper,
-        fullName: fullNameTrimmed,
-        dateOfBirth,
-      },
-      select: leadDetailSelect,
-    });
-
-    const panVerificationEnabled = await this.settings.isPanVerificationEnabled();
-    const verification = panVerificationEnabled
-      ? await this.callPanVerificationNsdl({
+    const [detail, panVerificationEnabled, breSettings] = await Promise.all([
+      this.prisma.client.leadDetail.upsert({
+        where: { leadId: leadRow.id },
+        create: {
           leadId: leadRow.id,
           panNumber: panUpper,
           fullName: fullNameTrimmed,
-          dobIso: dto.dob,
-        })
-      : { panVerified: false, matched: false, vendorFullName: null };
-
-    if (verification.panVerified) {
-      detail = await this.prisma.client.leadDetail.update({
-        where: { leadId: leadRow.id },
-        // `lead_detail.pan_verified` is BOOLEAN (migration 20260510120000). After
-        // `npx prisma generate`, `panVerified` is typed as boolean and this cast can be removed.
-        data: {
-          panVerified: true,
-          panVerifiedAt: new Date(),
-        } as unknown as Prisma.LeadDetailUpdateInput,
+          dateOfBirth,
+        },
+        update: {
+          panNumber: panUpper,
+          fullName: fullNameTrimmed,
+          dateOfBirth,
+        },
         select: leadDetailSelect,
+      }),
+      this.settings.isPanVerificationEnabled(),
+      this.settings.loadBreSettings(),
+    ]);
+
+    // BRE: fetch location data for the lead and run eligibility checks.
+    const leadDetail = await this.prisma.client.leadDetail.findUnique({
+      where: { leadId: leadRow.id },
+      select: {
+        pincode: true,
+        city: { select: { name: true, state: { select: { code: true } } } },
+      },
+    });
+
+    const breResult = this.breCheck.run(
+      {
+        dateOfBirth,
+        pincode: leadDetail?.pincode ?? null,
+        cityName: leadDetail?.city?.name ?? null,
+        stateCode: leadDetail?.city?.state?.code ?? null,
+      },
+      breSettings,
+    );
+
+    if (!breResult.passed) {
+      await this.rejectLead(leadRow.id, breResult.rejectReason ?? 'BRE check failed', breResult.rejectionReasonCode);
+      this.sms.sendThankYouSms(customer.mobileNumber).catch((err) => {
+        this.logger.error('Failed to send thank-you SMS', err instanceof Error ? err.stack : err);
+      });
+      return {
+        success: true,
+        rejected: true,
+        message: 'Thank you for your interest. Unfortunately, we are unable to proceed with your application at this time.',
+      } as any;
+    }
+
+    if (!panVerificationEnabled) {
+      const note = 'PAN verification disabled in settings';
+      const updated = await this.updatePanStatus(leadRow.id, PAN_VERIFIED.API_DISABLED, note);
+      return this.buildResult(updated, {
+        panVerifiedStatus: PAN_VERIFIED.API_DISABLED,
+        nameMatch: false,
+        dobMatch: false,
+        panStatus: null,
+        category: null,
       });
     }
 
+    // Skip the vendor call if this exact PAN is already verified.
+    // Type bridge: generated client may type panVerified as boolean until regenerated.
+    const alreadyVerified =
+      isPanVerifiedFromDb(detail.panVerified) &&
+      detail.panNumber === panUpper;
+
+    if (alreadyVerified) {
+      this.logger.debug('PAN already verified for this lead — skipping vendor call.');
+      return this.buildResult(detail, {
+        panVerifiedStatus: PAN_VERIFIED.VERIFIED,
+        nameMatch: true,
+        dobMatch: true,
+        panStatus: 'valid',
+        category: 'Individual',
+      });
+    }
+
+    const verification = await this.panVerification.verify({
+      leadId: leadRow.id,
+      panNumber: panUpper,
+      fullName: fullNameTrimmed,
+      dobIso: dto.dob,
+    });
+
+    this.logger.debug(
+      `PAN verification result: status=${verification.panVerifiedStatus}, panStatus=${verification.panStatus}, nameMatch=${verification.nameMatch}, dobMatch=${verification.dobMatch}`,
+    );
+
+    // Persist any status except NOT_CHECKED (0). The default 0 means "never
+    // attempted" — we only overwrite it once we have an actual outcome.
+    let updatedDetail = detail;
+    if (verification.panVerifiedStatus !== PAN_VERIFIED.NOT_CHECKED) {
+      updatedDetail = await this.updatePanStatus(leadRow.id, verification.panVerifiedStatus, verification.note);
+    }
+
+    if (verification.panVerifiedStatus === PAN_VERIFIED.NOT_VERIFIED) {
+      await this.rejectLead(leadRow.id, 'PAN validation failed', REJECTION_REASON.PAN_VERIFICATION_FAILED);
+      this.sms.sendThankYouSms(customer.mobileNumber).catch((err) => {
+        this.logger.error('Failed to send thank-you SMS', err instanceof Error ? err.stack : err);
+      });
+    }
+
+    return this.buildResult(updatedDetail, verification);
+  }
+
+  private async rejectLead(leadId: bigint, note: string, rejectionReasonCode?: string | null) {
+    const [rejected, reason] = await Promise.all([
+      this.prisma.client.leadStatus.findFirst({
+        where: { name: LEAD_STATUS.REJECTED, isActive: true },
+        select: { id: true },
+      }),
+      rejectionReasonCode
+        ? this.prisma.client.rejectionReason.findFirst({
+            where: { name: rejectionReasonCode, isActive: true },
+            select: { id: true },
+          })
+        : null,
+    ]);
+    if (!rejected) {
+      this.logger.warn('LeadStatus REJECTED not found in DB — skipping lead rejection.');
+      return;
+    }
+    await this.prisma.client.lead.update({
+      where: { id: leadId },
+      data: {
+        leadStatusId: rejected.id,
+        leadStatusNote: note,
+        ...(reason ? { rejectionReasonId: reason.id } : {}),
+      } as unknown as Prisma.LeadUpdateInput,
+    });
+  }
+
+  /** Write pan_verified + pan_verified_at + pan_verification_note. */
+  private updatePanStatus(leadId: bigint, status: number, note?: string | null) {
+    // Set panVerifiedAt for statuses where the vendor was actually contacted (1/2/3).
+    // Status 4 (API_DISABLED) never hits the vendor → no timestamp.
+    const vendorWasContacted =
+      status === PAN_VERIFIED.VERIFIED ||
+      status === PAN_VERIFIED.NOT_VERIFIED ||
+      status === PAN_VERIFIED.API_FAILURE;
+
+    return this.prisma.client.leadDetail.update({
+      where: { leadId },
+      data: {
+        panVerified: status,
+        panVerifiedAt: vendorWasContacted ? new Date() : null,
+        panVerificationNote: note?.slice(0, 500) ?? null,
+      } as unknown as Prisma.LeadDetailUpdateInput,
+      select: leadDetailSelect,
+    });
+  }
+
+  private buildResult(
+    detail: { uuid: string; panNumber: string | null; fullName: string | null; dateOfBirth: Date | null; panVerified: number | boolean | null; panVerifiedAt: Date | null; panVerificationNote?: string | null },
+    verification: { panVerifiedStatus: number; nameMatch: boolean; dobMatch: boolean; panStatus: string | null; category: string | null },
+  ): VerifyPanResult {
     return {
       success: true,
-      matched: verification.matched,
-      panVerified: verification.panVerified,
-      vendorFullName: verification.vendorFullName,
+      panVerified: isPanVerifiedFromDb(detail.panVerified),
+      panVerifiedStatus: verification.panVerifiedStatus,
+      nameMatch: verification.nameMatch,
+      dobMatch: verification.dobMatch,
+      panStatus: verification.panStatus,
+      category: verification.category,
       leadDetail: {
         uuid: detail.uuid,
         panNumber: detail.panNumber,
@@ -213,104 +275,8 @@ export class VerifyPanUseCase {
         dateOfBirth: detail.dateOfBirth ? toIsoDateOnly(detail.dateOfBirth) : null,
         panVerified: isPanVerifiedFromDb(detail.panVerified),
         panVerifiedAt: detail.panVerifiedAt?.toISOString() ?? null,
+        panVerificationNote: detail.panVerificationNote ?? null,
       },
     };
-  }
-
-  /**
-   * POST `${VENDOR_HOST}/pan-nsdl`. All four values come from the environment
-   * (see `backend/.env.example`):
-   *   - `VENDOR_HOST` base URL ending in `…/api/v1/services`
-   *   - `TENACIO_CLIENT_ID` `client-id` header
-   *   - `TENACIO_API_KEY` `x-api-key` header
-   *   - `TENACIO_PAN_NSDL_WORKFLOW_ID` `workflow-id` header (sandbox vs prod
-   *                                       differ — never hardcode)
-   *
-   * Returns a small projection rather than the raw response so the calling
-   * use-case isn't coupled to vendor schema drift.
-   */
-  private async callPanVerificationNsdl(args: {
-    leadId: bigint;
-    panNumber: string;
-    fullName: string;
-    dobIso: string;
-  }): Promise<{ panVerified: boolean; matched: boolean; vendorFullName: string | null }> {
-    // Contract: never throw. Vendor outages, missing env, schema drift, or
-    // unexpected bugs in this code path should degrade to "panVerified=false"
-    // so the user isn't blocked. Audit trail still lands in vendor_api_log.
-    const unverified = { panVerified: false, matched: false, vendorFullName: null };
-
-    try {
-      const baseUrl = (process.env.VENDOR_HOST ?? '').trim();
-      const clientId = (process.env.TENACIO_CLIENT_ID ?? '').trim();
-      const apiKey = (process.env.TENACIO_API_KEY ?? '').trim();
-      const workflowId = (process.env.TENACIO_PAN_NSDL_WORKFLOW_ID ?? '').trim();
-
-      if (!baseUrl || !clientId || !apiKey || !workflowId) {
-        this.logger.warn(
-          'Tenacio credentials missing — skipping PAN verification (set VENDOR_HOST/TENACIO_CLIENT_ID/TENACIO_API_KEY/TENACIO_PAN_NSDL_WORKFLOW_ID in backend/.env).',
-        );
-        return unverified;
-      }
-
-      const result = await this.vendorApi.request<panNsdlResponse, panNsdlBody>({
-        providerName: (process.env.TENACIO_PROVIDER ?? '').trim(),
-        serviceName: (process.env.TENACIO_PAN_NSDL_SERVICE ?? '').trim(),
-        method: 'POST',
-        baseUrl,
-        path: (process.env.TENACIO_PAN_NSDL_SERVICE ?? '').trim(),
-        headers: {
-          'client-id': clientId,
-          'x-api-key': apiKey,
-          'workflow-id': workflowId,
-        },
-        body: {
-          input: {
-            panNumber: args.panNumber,
-            name: args.fullName,
-            dob: formatDobDdMmYyyy(args.dobIso),
-            consent: true,
-          },
-        },
-        leadId: args.leadId,
-        // Mask PAN + DOB before they hit `vendor_api_log`. Adjust the policy
-        // here if your compliance posture allows full payload retention.
-        redactRequest: (body) => ({
-          ...body,
-          input: {
-            ...body?.input,
-            panNumber: maskPanForAudit(body?.input?.panNumber),
-            dob: maskDobForAudit(body?.input?.dob),
-          },
-        }),
-      });
-
-      if (!result.ok || !result.body) {
-        return unverified;
-      }
-
-      const payload = result.body.result ?? result.body.data ?? null;
-      const vendorFullName =
-        payload && typeof payload === 'object' && typeof payload.name === 'string' ? payload.name : null;
-      const matched =
-        payload && typeof payload === 'object' && payload.matched === true ? true : false;
-
-      // Treat any 2xx as "PAN exists in NSDL". Stricter callers can require
-      // `matched === true` before letting the user advance.
-      return {
-        panVerified: true,
-        matched,
-        vendorFullName,
-      };
-    } catch (err) {
-      // Defence in depth: VendorApiService already catches network/timeout
-      // errors, but a bug in redactRequest or a future code path could still
-      // throw here. We refuse to let the user's flow break over it.
-      const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(
-        `PAN verification skipped after unexpected error (leadId=${args.leadId.toString()}): ${message}`,
-      );
-      return unverified;
-    }
   }
 }

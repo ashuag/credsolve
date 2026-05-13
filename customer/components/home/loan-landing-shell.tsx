@@ -1,5 +1,10 @@
+'use client';
+
 import type { ReactNode } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
 import { JourneySpeedometer } from './journey-speedometer';
+import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 
 const DEFAULT_FEATURES = [
   { icon: 'M5 13l4 4L19 7', label: 'Zero paperwork — 100% digital' },
@@ -16,13 +21,27 @@ export type LoanLandingShellProps = {
   leftStats?: Array<{ label: string; value: string }>;
   /** When set, replaces the default marketing bullet list on the dark left rail. */
   leftFeatures?: Array<{ icon: string; label: string }>;
-  /** Overrides small-screen hero above the form (defaults match apply-for-loan). */
-  mobileChip?: string;
-  mobileTitle?: ReactNode;
-  mobileSubtitle?: string;
   /** Show journey progress dial on the dark left rail (apply-for-loan default). */
   showSpeedometer?: boolean;
+  /** Mobile app bar: label shown next to step number (e.g. "Step 1 of 3") */
+  mobileStepLabel?: string;
+  /** Mobile app bar: called when the back arrow is tapped. If omitted, back arrow is hidden. */
+  mobileOnBack?: () => void;
 };
+
+/* ── Mobile progress bar driven by journey context ──────────────────────── */
+function MobileProgressBar() {
+  const ctx = useJourneyProgressOptional();
+  const pct = Math.round((ctx?.completion01 ?? 0) * 100);
+  return (
+    <div className="h-[3px] w-full bg-slate-100 lg:hidden" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+      <div
+        className="h-full rounded-full bg-gradient-to-r from-[#1496f3] to-[#60c3ff] transition-[width] duration-500 ease-out"
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+}
 
 export function LoanLandingShell({
   journeyPanel,
@@ -31,10 +50,9 @@ export function LoanLandingShell({
   leftInfographic,
   leftStats,
   leftFeatures,
-  mobileChip = '100% Digital Process',
-  mobileTitle,
-  mobileSubtitle = 'Start your seamless digital journey.',
   showSpeedometer = true,
+  mobileStepLabel,
+  mobileOnBack,
 }: LoanLandingShellProps) {
   const defaultTitle = (
     <>Fast. Secure. <span className="text-transparent bg-clip-text bg-gradient-to-br from-[#1fa2ff] to-[#1496f3] drop-shadow-[0_0_12px_rgba(20,150,243,0.3)]">Instant.</span></>
@@ -50,95 +68,142 @@ export function LoanLandingShell({
   const featureList = leftFeatures ?? DEFAULT_FEATURES;
 
   return (
-    <div className="w-full max-w-[1240px] flex flex-col lg:flex-row bg-white rounded-[2.5rem] shadow-[0_24px_80px_rgba(23,44,113,0.12),0_8px_32px_rgba(23,44,113,0.06)] overflow-hidden border border-slate-100 relative z-10 animate-fade-in-up">
-      
-      {/* ── Left panel ── */}
-      <div className="w-full lg:w-5/12 hidden lg:flex min-h-0 flex-col relative bg-[#0a1628] overflow-hidden">
-        
-        {/* Background Mesh */}
-        <div className="absolute inset-0 stats-mesh opacity-90 pointer-events-none" />
-
-        {/* Ambient blobs */}
-        <div className="absolute -top-24 -left-24 w-96 h-96 bg-[#1496f3] rounded-full mix-blend-screen blur-[100px] opacity-30 animate-blob" />
-        <div className="absolute top-1/2 right-0 w-80 h-80 bg-[#ffc519] rounded-full mix-blend-screen blur-[100px] opacity-15 animate-blob animation-delay-2000" />
-        <div className="absolute -bottom-20 -left-16 w-80 h-80 bg-[#818cf8] rounded-full mix-blend-screen blur-[100px] opacity-25 animate-blob animation-delay-4000" />
-
-        {/* Content wrapper — tighter spacing so the left rail fits common laptop heights without scrolling */}
-        <div className="relative z-10 flex min-h-0 flex-1 flex-col py-4 px-8 xl:px-10 gap-3 xl:gap-3">
-          {showSpeedometer ? (
-            <>
-              <div className="flex shrink-0 justify-center">
-                <JourneySpeedometer />
-              </div>
-              <div className="w-full shrink-0 h-px bg-white/10" />
-            </>
-          ) : null}
-
-          {/* Headline */}
-          <div className="text-center shrink-0">
-            <h1 className="text-xl xl:text-[1.8rem] font-[900] text-white tracking-tight leading-[1.1] mb-1.5">
-              {leftTitle || defaultTitle}
-            </h1>
-            <p className="text-[0.88rem] text-slate-300 leading-snug max-w-sm mx-auto font-[500]">
-              {leftDescription || 'Experience a seamless digital journey. Get your loan approved in minutes without the hassle of paperwork.'}
-            </p>
-          </div>
-
-          {/* Infographic OR feature list */}
-          {leftInfographic ? (
-            <div className="flex min-h-0 flex-1 justify-center items-center py-1">
-              <div className="flex w-full max-w-[min(280px,90%)] items-center justify-center transition-transform duration-500 hover:scale-[1.015]">
-                {leftInfographic}
-              </div>
-            </div>
+    <>
+      {/* ── Mobile app bar (hidden on lg+) ────────────────────────────────── */}
+      <header className="lg:hidden sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-[0_1px_0_rgba(18,36,79,0.06)]">
+        <div className="flex h-14 items-center justify-between px-4">
+          {/* Back button */}
+          {mobileOnBack ? (
+            <button
+              type="button"
+              onClick={mobileOnBack}
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 transition-colors active:scale-95"
+              aria-label="Go back"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 12H5M12 5l-7 7 7 7" />
+              </svg>
+            </button>
           ) : (
-            <div className="flex flex-col gap-3 max-w-sm mx-auto w-full min-h-0 flex-1 justify-center">
-              {featureList.map((f, i) => (
-                <div key={f.label} className="flex items-center gap-3.5 group">
-                  <div className="shrink-0 flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-sm transition-all duration-300 group-hover:bg-[#1496f3]/20 group-hover:border-[#1496f3]/40 group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(20,150,243,0.3)]">
-                    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5 text-[#ffc519] transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d={f.icon} />
-                    </svg>
+            <Link href="/" className="flex h-9 w-9 items-center justify-center">
+              <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-500" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 12H5M12 5l-7 7 7 7" />
+              </svg>
+            </Link>
+          )}
+
+          {/* Logo centred */}
+          <Link href="/" className="absolute left-1/2 -translate-x-1/2">
+            <Image
+              src="/images/moneycash-logo.png"
+              alt="MoneyCash"
+              width={120}
+              height={40}
+              className="h-8 w-auto object-contain"
+              priority
+            />
+          </Link>
+
+          {/* Step label */}
+          <span className="text-[0.7rem] font-[800] uppercase tracking-[0.14em] text-[#1496f3]">
+            {mobileStepLabel ?? ''}
+          </span>
+        </div>
+
+        {/* Thin progress strip */}
+        <MobileProgressBar />
+      </header>
+
+      {/* ── Main shell (desktop: card, mobile: full-screen) ───────────────── */}
+      <div className={[
+        // Mobile: full-screen white, no rounded card
+        'w-full flex flex-col bg-white',
+        // Desktop: premium split-panel card
+        'lg:max-w-[1240px] lg:flex-row lg:rounded-[2.5rem] lg:shadow-[0_24px_80px_rgba(23,44,113,0.12),0_8px_32px_rgba(23,44,113,0.06)] lg:overflow-hidden lg:border lg:border-slate-100 lg:relative lg:z-10 lg:animate-fade-in-up',
+      ].join(' ')}>
+
+        {/* ── Left panel (desktop only) ── */}
+        <div className="w-full lg:w-5/12 hidden lg:flex min-h-0 flex-col relative bg-[#0a1628] overflow-hidden">
+
+          {/* Background Mesh */}
+          <div className="absolute inset-0 stats-mesh opacity-90 pointer-events-none" />
+
+          {/* Ambient blobs */}
+          <div className="absolute -top-24 -left-24 w-96 h-96 bg-[#1496f3] rounded-full mix-blend-screen blur-[100px] opacity-30 animate-blob" />
+          <div className="absolute top-1/2 right-0 w-80 h-80 bg-[#ffc519] rounded-full mix-blend-screen blur-[100px] opacity-15 animate-blob animation-delay-2000" />
+          <div className="absolute -bottom-20 -left-16 w-80 h-80 bg-[#818cf8] rounded-full mix-blend-screen blur-[100px] opacity-25 animate-blob animation-delay-4000" />
+
+          {/* Content wrapper */}
+          <div className="relative z-10 flex min-h-0 flex-1 flex-col py-4 px-8 xl:px-10 gap-3 xl:gap-3">
+            {showSpeedometer ? (
+              <>
+                <div className="flex shrink-0 justify-center">
+                  <JourneySpeedometer />
+                </div>
+                <div className="w-full shrink-0 h-px bg-white/10" />
+              </>
+            ) : null}
+
+            {/* Headline */}
+            <div className="text-center shrink-0">
+              <h1 className="text-xl xl:text-[1.8rem] font-[900] text-white tracking-tight leading-[1.1] mb-1.5">
+                {leftTitle || defaultTitle}
+              </h1>
+              <p className="text-[0.88rem] text-slate-300 leading-snug max-w-sm mx-auto font-[500]">
+                {leftDescription || 'Experience a seamless digital journey. Get your loan approved in minutes without the hassle of paperwork.'}
+              </p>
+            </div>
+
+            {/* Infographic OR feature list */}
+            {leftInfographic ? (
+              <div className="flex min-h-0 flex-1 justify-center items-center py-1">
+                <div className="flex w-full max-w-[min(280px,90%)] items-center justify-center transition-transform duration-500 hover:scale-[1.015]">
+                  {leftInfographic}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 max-w-sm mx-auto w-full min-h-0 flex-1 justify-center">
+                {featureList.map((f) => (
+                  <div key={f.label} className="flex items-center gap-3.5 group">
+                    <div className="shrink-0 flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-sm transition-all duration-300 group-hover:bg-[#1496f3]/20 group-hover:border-[#1496f3]/40 group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(20,150,243,0.3)]">
+                      <svg viewBox="0 0 24 24" className="h-4.5 w-4.5 text-[#ffc519] transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d={f.icon} />
+                      </svg>
+                    </div>
+                    <span className="text-[0.95rem] text-slate-200 font-[600] leading-snug transition-colors duration-300 group-hover:text-white">{f.label}</span>
                   </div>
-                  <span className="text-[0.95rem] text-slate-200 font-[600] leading-snug transition-colors duration-300 group-hover:text-white">{f.label}</span>
+                ))}
+              </div>
+            )}
+
+            {/* Stats bar */}
+            <div className="mt-auto shrink-0 border-t border-white/10 pt-3 flex justify-around">
+              {stats.map((stat) => (
+                <div key={stat.label} className="text-center">
+                  <div className="text-[1.4rem] font-[900] text-white leading-none tracking-tight mb-0.5">{stat.value}</div>
+                  <div className="text-[0.62rem] text-[#1496f3] uppercase tracking-[0.15em] font-[800]">{stat.label}</div>
                 </div>
               ))}
             </div>
-          )}
-
-          {/* Stats bar */}
-          <div className="mt-auto shrink-0 border-t border-white/10 pt-3 flex justify-around">
-            {stats.map((stat) => (
-              <div key={stat.label} className="text-center">
-                <div className="text-[1.4rem] font-[900] text-white leading-none tracking-tight mb-0.5">{stat.value}</div>
-                <div className="text-[0.62rem] text-[#1496f3] uppercase tracking-[0.15em] font-[800]">{stat.label}</div>
-              </div>
-            ))}
           </div>
         </div>
-      </div>
 
-      {/* ── Right panel: journey form ── */}
-      <div className="w-full flex-1 min-w-0 flex flex-col justify-start overflow-y-auto p-6 sm:p-10 lg:py-10 lg:px-14 bg-white relative">
-        <div className="w-full max-w-[480px] mx-auto">
-          {/* Mobile-only header */}
-          <div className="mb-8 lg:hidden text-center flex flex-col items-center">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-[0.7rem] font-[800] tracking-widest uppercase mb-4">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-              </span>
-              {mobileChip}
-            </div>
-            <h1 className="text-[2rem] font-[900] text-brand-navy mb-2 tracking-tight leading-tight">
-              {mobileTitle ?? 'Instant Loan'}
-            </h1>
-            <p className="text-brand-muted font-[500] text-[1.05rem]">{mobileSubtitle}</p>
+        {/* ── Right panel: journey form ── */}
+        {/* Mobile: flex-1, overflow-y-auto, flush padding, pb safe-area */}
+        {/* Desktop: overflow-y-auto with generous padding + centred max-width */}
+        <div className={[
+          'flex-1 min-w-0 flex flex-col bg-white',
+          // Mobile
+          'overflow-y-auto px-5 pt-6 pb-[max(24px,env(safe-area-inset-bottom))]',
+          // Desktop override
+          'lg:justify-start lg:overflow-y-auto lg:p-10 lg:py-10 lg:px-14',
+        ].join(' ')}>
+          <div className="w-full lg:max-w-[480px] lg:mx-auto">
+            {journeyPanel}
           </div>
-          {journeyPanel}
         </div>
-      </div>
 
-    </div>
+      </div>
+    </>
   );
 }

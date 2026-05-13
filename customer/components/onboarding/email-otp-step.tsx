@@ -113,8 +113,8 @@ export function EmailOtpStep({
         await refreshCustomerSession();
         startTransition(() => router.push('/account'));
       } else {
+        // Parent handles navigation — keep FlowLoader visible until unmount
         await onVerified();
-        setIsVerifying(false);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to verify OTP right now.');
@@ -124,22 +124,13 @@ export function EmailOtpStep({
 
   return (
     <>
-      <section className="h-full flex flex-col justify-center" aria-labelledby="email-otp-heading">
-        <div className={cn(compact ? 'mb-4' : 'mb-8')}>
-          <div className={cn('flex items-center gap-2', compact ? 'mb-4' : 'mb-8')}>
-            <div className="flex gap-1.5">
-              <div className="h-2 w-8 rounded-full bg-blue-600"></div>
-              <div className="h-2 w-8 rounded-full bg-slate-100"></div>
-              <div className="h-2 w-8 rounded-full bg-slate-100"></div>
-            </div>
-            <span className="ml-3 text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Step 1 — Onboarding</span>
-          </div>
-
+      <section className="h-full flex flex-col" aria-labelledby="email-otp-heading">
+        <div className={cn(compact ? 'mb-3' : 'mb-4')}>
           <h2
             id="email-otp-heading"
             className={cn(
-              'text-2xl md:text-[1.8rem] font-extrabold text-brand-navy tracking-tight leading-[1.1] whitespace-nowrap',
-              compact ? 'mb-4' : 'mb-6',
+              'text-xl md:text-[1.8rem] font-extrabold text-brand-navy tracking-tight leading-[1.1]',
+              compact ? 'mb-3' : 'mb-4',
             )}
           >
             {isLogin ? 'Verify to ' : 'Verify your '}<span className="text-brand-blue">{isLogin ? 'log in' : 'email'}</span> ✨
@@ -147,16 +138,16 @@ export function EmailOtpStep({
 
           <div
             className={cn(
-              'flex items-start gap-4 mb-2 rounded-2xl bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border border-blue-100/60 shadow-sm',
-              compact ? 'p-3' : 'p-4',
+              'flex items-start gap-3 mb-2 rounded-2xl bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border border-blue-100/60',
+              compact ? 'p-3' : 'p-3',
             )}
           >
-            <div className="p-2 bg-white rounded-xl shadow-sm text-blue-600 shrink-0">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="p-1.5 bg-white rounded-xl shadow-sm text-blue-600 shrink-0">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             </div>
-            <p className="text-[0.95rem] text-slate-600 leading-relaxed m-0 pt-0.5">
+            <p className="text-[0.88rem] text-slate-600 leading-relaxed m-0 pt-0.5">
               We sent a secure code to <strong className="text-slate-900 font-bold tracking-wider">{otpRequest?.maskedEmail ?? email}</strong>. Enter it below.
             </p>
           </div>
@@ -182,17 +173,19 @@ export function EmailOtpStep({
           {error && <AlertBanner variant="error">{error}</AlertBanner>}
           {status && <AlertBanner variant="success">{status}</AlertBanner>}
 
-          <button type="submit" className="mc-btn-primary w-full mt-2" disabled={isVerifying}>
-            <span className="inline-flex items-center justify-center gap-[10px]">
-              {isVerifying && (
-                <span
-                  className="w-[18px] h-[18px] rounded-full border-2 border-[rgba(255,248,223,0.28)] border-t-[#fff8df] animate-spin-btn"
-                  aria-hidden
-                />
-              )}
-              <span>{isVerifying ? 'Verifying securely...' : isLogin ? 'Login' : 'Verify & Continue'}</span>
-            </span>
-          </button>
+          <div className="sticky bottom-0 z-10 bg-white/95 backdrop-blur-sm mt-4 pb-[max(12px,env(safe-area-inset-bottom))] -mx-5 px-5 pt-3 border-t border-slate-100 lg:mx-0 lg:px-0">
+            <button type="submit" className="mc-btn-primary w-full" disabled={isVerifying}>
+              <span className="inline-flex items-center justify-center gap-[10px]">
+                {isVerifying && (
+                  <span
+                    className="w-[18px] h-[18px] rounded-full border-2 border-[rgba(255,248,223,0.28)] border-t-[#fff8df] animate-spin-btn"
+                    aria-hidden
+                  />
+                )}
+                <span>{isVerifying ? 'Verifying securely...' : isLogin ? 'Login' : 'Verify & Continue'}</span>
+              </span>
+            </button>
+          </div>
         </form>
 
         <div

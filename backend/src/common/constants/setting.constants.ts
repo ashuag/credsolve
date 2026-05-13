@@ -86,7 +86,47 @@ export const SettingKey = {
     },
     PAN_VERIFICATION_ENABLED: {
         key: 'PAN_VERIFICATION_ENABLED',
-        default: '0',
+        default: '1',
         description:  'Need to check Pan is verified or not',
+    },
+    REAPPLY_AFTER_REJECTED: {
+        key: 'REAPPLY_AFTER_REJECTED',
+        default: '30',
+        description:  'Days after which lead can be re-applied after rejection',
+    },
+    BLACKLIST_REJECTION_THRESHOLD: {
+        key: 'BLACKLIST_REJECTION_THRESHOLD',
+        default: '3',
+        description:  'Max consecutive rejection count',
+    },
+    BLACKLIST_DURATION_DAYS: {
+        key: 'BLACKLIST_DURATION_DAYS',
+        default: '30',
+        description:  'Days after which lead can be re-applied after consecutive rejection',
+    },
+    BRE_MIN_AGE: {
+        key: 'BRE_MIN_AGE',
+        default: '21',
+        description: 'Minimum borrower age (years)',
+    },
+    BRE_MAX_AGE: {
+        key: 'BRE_MAX_AGE',
+        default: '57',
+        description: 'Maximum borrower age (years)',
+    },
+    BRE_NEGATIVE_PINCODES: {
+        key: 'BRE_NEGATIVE_PINCODES',
+        default: '',
+        description: 'Comma-separated list of blocked pincodes',
+    },
+    BRE_NEGATIVE_CITIES: {
+        key: 'BRE_NEGATIVE_CITIES',
+        default: '',
+        description: 'Comma-separated list of blocked city names (case-insensitive)',
+    },
+    BRE_NEGATIVE_STATES: {
+        key: 'BRE_NEGATIVE_STATES',
+        default: '',
+        description: 'Comma-separated list of blocked state codes (case-insensitive)',
     },
 } as const;

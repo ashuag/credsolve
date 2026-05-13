@@ -5,23 +5,27 @@ model Lead {
   email                 String?                @db.VarChar(100)
   emailVerificationType EmailVerificationType? @map("email_verification_type")
   leadStatusId          Int                    @default(1) @map("lead_status_id") @db.SmallInt
+  rejectionReasonId     Int?                   @map("rejection_reason_id") @db.SmallInt
   sourceId              Int?                   @map("source_id")
   isActive              Boolean                @default(true) @map("is_active")
   expiresAt             DateTime?              @map("expires_at")
   createdAt             DateTime               @default(now()) @map("created_at")
   updatedAt             DateTime               @updatedAt @map("updated_at")
 
-  customer      Customer       @relation(fields: [customerId], references: [id])
-  leadStatus    LeadStatus     @relation(fields: [leadStatusId], references: [id])
-  source        LeadSource?    @relation(fields: [sourceId], references: [id])
-  leadDetail    LeadDetail?
-  leadUtms      LeadUtm[]
-  applications  Application[]
-  vendorApiLogs VendorApiLog[]
+  customer        Customer         @relation(fields: [customerId], references: [id])
+  leadStatus      LeadStatus       @relation(fields: [leadStatusId], references: [id])
+  leadStatusNote  String?          @map("lead_status_note") @db.VarChar(256)
+  rejectionReason RejectionReason? @relation(fields: [rejectionReasonId], references: [id])
+  source          LeadSource?      @relation(fields: [sourceId], references: [id])
+  leadDetail      LeadDetail?
+  leadUtms        LeadUtm[]
+  applications    Application[]
+  vendorApiLogs   VendorApiLog[]
 
   @@index([customerId, createdAt])
   @@index([email])
   @@index([leadStatusId])
+  @@index([rejectionReasonId])
   @@index([sourceId])
   @@index([expiresAt])
   @@index([createdAt])
@@ -36,8 +40,9 @@ model LeadDetail {
   dateOfBirth      DateTime? @map("date_of_birth") @db.Date
   genderId         Int?      @map("gender_id") @db.SmallInt
   panNumber        String?   @map("pan_number") @db.Char(10)
-  panVerified      Boolean   @default(false) @map("pan_verified")
-  panVerifiedAt    DateTime? @map("pan_verified_at")
+  panVerified          Int       @default(0) @map("pan_verified") @db.SmallInt
+  panVerifiedAt        DateTime? @map("pan_verified_at")
+  panVerificationNote  String?   @map("pan_verification_note") @db.VarChar(500)
   cityId           Int?      @map("city_id")
   pincode          String?   @db.Char(6)
   addressLine1     String?   @map("address_line_1") @db.TinyText

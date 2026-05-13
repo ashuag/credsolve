@@ -1,6 +1,7 @@
 'use client';
 
 import {type ChangeEvent, useEffect, useRef, useState} from 'react';
+import {createPortal} from 'react-dom';
 import {cn} from '@/lib/cn';
 import {
   defaultDobMonth,
@@ -57,9 +58,6 @@ type DatePickerFieldProps = {
 
 /* ── Component ───────────────────────────────────────────────────────────── */
 
-const FIELD_CLASS =
-  'relative overflow-hidden grid gap-2 p-3 rounded-[20px] border border-[rgba(18,36,79,0.08)] bg-white shadow-[0_12px_24px_rgba(23,44,113,0.05)] transition-all duration-[220ms] focus-within:-translate-y-0.5 focus-within:border-[rgba(20,150,243,0.2)] focus-within:shadow-[0_22px_40px_rgba(23,44,113,0.1),0_0_0_6px_rgba(20,150,243,0.07)]';
-
 const LABEL_CLASS =
   'text-[0.84rem] font-extrabold text-brand-navy transition-colors duration-[180ms] group-focus-within:text-brand-blue';
 
@@ -90,7 +88,17 @@ export function DatePickerField({
     return defaultDobMonth();
   });
 
+  // Portal popover position state
+  const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
+  const [mounted, setMounted] = useState(false);
+
   const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const inputWrapRef = useRef<HTMLDivElement | null>(null);
+
+  // Mark as client-mounted so the portal can be created
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Sync visible month when value is parsed externally (e.g. restored from store)
   useEffect(() => {
@@ -99,10 +107,54 @@ export function DatePickerField({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
+  // Compute popover position relative to the input when opening
+  useEffect(() => {
+    if (!isOpen || !inputWrapRef.current) return;
+
+    function computePosition() {
+      if (!inputWrapRef.current) return;
+      const rect = inputWrapRef.current.getBoundingClientRect();
+      const popoverWidth = Math.min(360, window.innerWidth - 24);
+      // Default: below the input, aligned to left edge
+      let left = rect.left + window.scrollX;
+      const top = rect.bottom + window.scrollY + 10;
+
+      // Clamp so it doesn't overflow the right edge of the viewport
+      if (left + popoverWidth > window.innerWidth - 12) {
+        left = window.innerWidth - popoverWidth - 12;
+      }
+      if (left < 12) left = 12;
+
+      setPopoverStyle({
+        position: 'absolute',
+        top,
+        left,
+        width: popoverWidth,
+        zIndex: 9999,
+      });
+    }
+
+    computePosition();
+
+    // Recompute on resize/scroll
+    window.addEventListener('resize', computePosition);
+    window.addEventListener('scroll', computePosition, true);
+    return () => {
+      window.removeEventListener('resize', computePosition);
+      window.removeEventListener('scroll', computePosition, true);
+    };
+  }, [isOpen]);
+
   // Close on outside click or Escape
   useEffect(() => {
     function onPointerDown(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+      // Close if click is outside both the wrapper and the portal popover
+      const target = e.target as Node;
+      const insideWrapper = wrapperRef.current?.contains(target);
+      const insidePortal = document
+        .getElementById('mc-datepicker-portal')
+        ?.contains(target);
+      if (!insideWrapper && !insidePortal) {
         setIsOpen(false);
       }
     }
@@ -144,11 +196,131 @@ export function DatePickerField({
   );
   const calendarDays = getCalendarDays(visibleMonth);
 
+  /* ── Calendar popover markup (rendered in portal) ───────────────────────── */
+  const calendarPopover = (
+    <div id="mc-datepicker-portal" style={popoverStyle}>
+      <div className="relative overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.82)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(240,247,255,0.92))] p-[18px] shadow-[0_28px_58px_rgba(23,44,113,0.18)] backdrop-blur-[18px] animate-calendar-in sm:p-[22px]">
+        <div className="relative grid gap-5">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="grid gap-2">
+              <span className="block text-[0.72rem] font-extrabold uppercase tracking-[0.18em] text-brand-blue">
+                {label}
+              </span>
+              <strong className="block text-[1.12rem] tracking-[-0.04em] text-brand-navy">
+                {selectedDate ? formatDateDisplay(selectedDate) : 'Select a date'}
+              </strong>
+            </div>
+            {selectedDate && (
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-full border border-[rgba(255,255,255,0.86)] bg-[rgba(255,255,255,0.72)] px-3.5 py-2 text-[0.78rem] font-extrabold text-brand-navy shadow-[0_10px_18px_rgba(23,44,113,0.08)] transition-all duration-[180ms] hover:-translate-y-px hover:text-brand-blue"
+                onClick={() => onChange('')}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* Month / Year selects */}
+          <div className="grid grid-cols-[minmax(0,1fr)_110px] gap-2.5 sm:grid-cols-[minmax(0,1fr)_120px]">
+            <div className="relative min-w-0">
+              <select
+                className="h-11 w-full appearance-none rounded-[16px] border border-[rgba(255,255,255,0.86)] bg-[rgba(255,255,255,0.8)] px-3 pr-8 text-[0.9rem] font-extrabold text-brand-navy shadow-[inset_0_1px_0_rgba(255,255,255,0.74),0_10px_18px_rgba(23,44,113,0.06)] outline-none sm:px-4 sm:pr-10 sm:text-[0.92rem]"
+                value={visibleMonth.getMonth()}
+                onChange={(e) =>
+                  setVisibleMonth(new Date(visibleMonth.getFullYear(), Number(e.target.value), 1))
+                }
+              >
+                {MONTH_LABELS.map((m, i) => (
+                  <option key={m} value={i}>{m}</option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[rgba(20,150,243,0.84)]">
+                <span className="rotate-90"><ChevronDownIcon /></span>
+              </span>
+            </div>
+            <div className="relative min-w-0">
+              <select
+                className="h-11 w-full appearance-none rounded-[16px] border border-[rgba(255,255,255,0.86)] bg-[rgba(255,255,255,0.8)] px-3 pr-8 text-[0.9rem] font-extrabold text-brand-navy shadow-[inset_0_1px_0_rgba(255,255,255,0.74),0_10px_18px_rgba(23,44,113,0.06)] outline-none sm:px-4 sm:pr-10 sm:text-[0.92rem]"
+                value={visibleMonth.getFullYear()}
+                onChange={(e) =>
+                  setVisibleMonth(new Date(Number(e.target.value), visibleMonth.getMonth(), 1))
+                }
+              >
+                {yearOptions.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[rgba(20,150,243,0.84)]">
+                <span className="rotate-90"><ChevronDownIcon /></span>
+              </span>
+            </div>
+          </div>
+
+          {/* Calendar grid */}
+          <div className="grid gap-3 rounded-[24px] border border-[rgba(255,255,255,0.72)] bg-[rgba(247,250,255,0.56)] p-3">
+            {/* Weekday headers */}
+            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(7, minmax(0,1fr))' }}>
+              {WEEKDAY_LABELS.map((wd) => (
+                <span
+                  key={wd}
+                  className="inline-flex min-h-[30px] items-center justify-center rounded-full border border-[rgba(255,255,255,0.8)] bg-[rgba(255,255,255,0.72)] text-center text-[0.66rem] font-extrabold uppercase tracking-[0.14em] text-[rgba(23,44,113,0.62)]"
+                >
+                  {wd}
+                </span>
+              ))}
+            </div>
+
+            {/* Day cells */}
+            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(7, minmax(0,1fr))' }}>
+              {calendarDays.map(({ date, isCurrentMonth }) => {
+                const isSelected =
+                  selectedDate !== null &&
+                  date.getFullYear() === selectedDate.getFullYear() &&
+                  date.getMonth() === selectedDate.getMonth() &&
+                  date.getDate() === selectedDate.getDate();
+                const isToday =
+                  date.getFullYear() === today.getFullYear() &&
+                  date.getMonth() === today.getMonth() &&
+                  date.getDate() === today.getDate();
+                const isDisabled = date > effectiveMax;
+
+                return (
+                  <button
+                    key={`${date.toISOString()}-${isCurrentMonth}`}
+                    type="button"
+                    disabled={isDisabled}
+                    className={cn(
+                      'relative inline-flex aspect-square w-full items-center justify-center overflow-hidden rounded-[16px] border text-[0.92rem] font-extrabold transition-all duration-[180ms]',
+                      isSelected
+                        ? 'border-[rgba(15,60,150,0.08)] bg-[linear-gradient(135deg,#1496f3,#172c71)] text-white shadow-[0_16px_28px_rgba(23,44,113,0.24)]'
+                        : isToday
+                        ? 'border-[rgba(255,197,25,0.44)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,246,215,0.94))] text-brand-navy'
+                        : isDisabled
+                        ? 'border-[rgba(18,36,79,0.05)] bg-[rgba(244,248,255,0.62)] text-[rgba(94,103,130,0.38)] cursor-not-allowed'
+                        : !isCurrentMonth
+                        ? 'border-[rgba(18,36,79,0.05)] bg-[rgba(244,248,255,0.62)] text-[rgba(94,103,130,0.5)]'
+                        : 'border-[rgba(255,255,255,0.84)] bg-[rgba(255,255,255,0.88)] text-brand-navy hover:-translate-y-px',
+                    )}
+                    onClick={() => selectDate(date)}
+                  >
+                    {date.getDate()}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div ref={wrapperRef} className={cn('relative overflow-visible', isOpen && 'z-[18]', className)}>
+    <div ref={wrapperRef} className={cn('relative', className)}>
 
         {showInputLabel ? <span className={LABEL_CLASS}>{label}</span> : null}
-        <div className="relative">
+        <div className="relative" ref={inputWrapRef}>
           <input
             className={cn(INPUT_CLASS, 'pr-[56px]')}
             id={id}
@@ -177,124 +349,8 @@ export function DatePickerField({
           {hint ?? (selectedDate ? `Selected: ${formatDateDisplay(selectedDate)}` : 'Use the calendar or type DD/MM/YYYY.')}
         </span>
 
-      {isOpen && (
-        <div className="absolute top-[calc(100%+12px)] left-0 z-[14] w-[min(360px,calc(100vw-24px))] max-w-[calc(100vw-24px)]">
-          <div className="relative overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.82)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(240,247,255,0.92))] p-[18px] shadow-[0_28px_58px_rgba(23,44,113,0.18)] backdrop-blur-[18px] animate-calendar-in sm:p-[22px]">
-            <div className="relative grid gap-5">
-              {/* Header */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="grid gap-2">
-                  <span className="block text-[0.72rem] font-extrabold uppercase tracking-[0.18em] text-brand-blue">
-                    {label}
-                  </span>
-                  <strong className="block text-[1.12rem] tracking-[-0.04em] text-brand-navy">
-                    {selectedDate ? formatDateDisplay(selectedDate) : 'Select a date'}
-                  </strong>
-                </div>
-                {selectedDate && (
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center rounded-full border border-[rgba(255,255,255,0.86)] bg-[rgba(255,255,255,0.72)] px-3.5 py-2 text-[0.78rem] font-extrabold text-brand-navy shadow-[0_10px_18px_rgba(23,44,113,0.08)] transition-all duration-[180ms] hover:-translate-y-px hover:text-brand-blue"
-                    onClick={() => onChange('')}
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-
-              {/* Month / Year selects */}
-              <div className="grid grid-cols-[minmax(0,1fr)_110px] gap-2.5 sm:grid-cols-[minmax(0,1fr)_120px]">
-                <div className="relative min-w-0">
-                  <select
-                    className="h-11 w-full appearance-none rounded-[16px] border border-[rgba(255,255,255,0.86)] bg-[rgba(255,255,255,0.8)] px-3 pr-8 text-[0.9rem] font-extrabold text-brand-navy shadow-[inset_0_1px_0_rgba(255,255,255,0.74),0_10px_18px_rgba(23,44,113,0.06)] outline-none sm:px-4 sm:pr-10 sm:text-[0.92rem]"
-                    value={visibleMonth.getMonth()}
-                    onChange={(e) =>
-                      setVisibleMonth(new Date(visibleMonth.getFullYear(), Number(e.target.value), 1))
-                    }
-                  >
-                    {MONTH_LABELS.map((m, i) => (
-                      <option key={m} value={i}>{m}</option>
-                    ))}
-                  </select>
-                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[rgba(20,150,243,0.84)]">
-                    <span className="rotate-90"><ChevronDownIcon /></span>
-                  </span>
-                </div>
-                <div className="relative min-w-0">
-                  <select
-                    className="h-11 w-full appearance-none rounded-[16px] border border-[rgba(255,255,255,0.86)] bg-[rgba(255,255,255,0.8)] px-3 pr-8 text-[0.9rem] font-extrabold text-brand-navy shadow-[inset_0_1px_0_rgba(255,255,255,0.74),0_10px_18px_rgba(23,44,113,0.06)] outline-none sm:px-4 sm:pr-10 sm:text-[0.92rem]"
-                    value={visibleMonth.getFullYear()}
-                    onChange={(e) =>
-                      setVisibleMonth(new Date(Number(e.target.value), visibleMonth.getMonth(), 1))
-                    }
-                  >
-                    {yearOptions.map((y) => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
-                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[rgba(20,150,243,0.84)]">
-                    <span className="rotate-90"><ChevronDownIcon /></span>
-                  </span>
-                </div>
-              </div>
-
-              {/* Calendar grid */}
-              <div className="grid gap-3 rounded-[24px] border border-[rgba(255,255,255,0.72)] bg-[rgba(247,250,255,0.56)] p-3">
-                {/* Weekday headers */}
-                <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(7, minmax(0,1fr))' }}>
-                  {WEEKDAY_LABELS.map((wd) => (
-                    <span
-                      key={wd}
-                      className="inline-flex min-h-[30px] items-center justify-center rounded-full border border-[rgba(255,255,255,0.8)] bg-[rgba(255,255,255,0.72)] text-center text-[0.66rem] font-extrabold uppercase tracking-[0.14em] text-[rgba(23,44,113,0.62)]"
-                    >
-                      {wd}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Day cells */}
-                <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(7, minmax(0,1fr))' }}>
-                  {calendarDays.map(({ date, isCurrentMonth }) => {
-                    const isSelected =
-                      selectedDate !== null &&
-                      date.getFullYear() === selectedDate.getFullYear() &&
-                      date.getMonth() === selectedDate.getMonth() &&
-                      date.getDate() === selectedDate.getDate();
-                    const isToday =
-                      date.getFullYear() === today.getFullYear() &&
-                      date.getMonth() === today.getMonth() &&
-                      date.getDate() === today.getDate();
-                    const isDisabled = date > effectiveMax;
-
-                    return (
-                      <button
-                        key={`${date.toISOString()}-${isCurrentMonth}`}
-                        type="button"
-                        disabled={isDisabled}
-                        className={cn(
-                          'relative inline-flex aspect-square w-full items-center justify-center overflow-hidden rounded-[16px] border text-[0.92rem] font-extrabold transition-all duration-[180ms]',
-                          isSelected
-                            ? 'border-[rgba(15,60,150,0.08)] bg-[linear-gradient(135deg,#1496f3,#172c71)] text-white shadow-[0_16px_28px_rgba(23,44,113,0.24)]'
-                            : isToday
-                            ? 'border-[rgba(255,197,25,0.44)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,246,215,0.94))] text-brand-navy'
-                            : isDisabled
-                            ? 'border-[rgba(18,36,79,0.05)] bg-[rgba(244,248,255,0.62)] text-[rgba(94,103,130,0.38)] cursor-not-allowed'
-                            : !isCurrentMonth
-                            ? 'border-[rgba(18,36,79,0.05)] bg-[rgba(244,248,255,0.62)] text-[rgba(94,103,130,0.5)]'
-                            : 'border-[rgba(255,255,255,0.84)] bg-[rgba(255,255,255,0.88)] text-brand-navy hover:-translate-y-px',
-                        )}
-                        onClick={() => selectDate(date)}
-                      >
-                        {date.getDate()}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Render the popover in a portal so it escapes all parent overflow/z-index constraints */}
+      {isOpen && mounted && createPortal(calendarPopover, document.body)}
     </div>
   );
 }

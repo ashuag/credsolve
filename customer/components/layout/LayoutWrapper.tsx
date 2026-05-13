@@ -10,9 +10,32 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
   const isLandingPage = pathname === '/';
   const isApplyPage = pathname === '/apply-for-loan';
   const isAccountLoginPage = pathname === '/my-account';
+  const isOnboardingPage = pathname === '/onboarding';
 
   if (isLandingPage || isApplyPage || isAccountLoginPage) {
     return <>{children}</>;
+  }
+
+  if (isOnboardingPage) {
+    return (
+      <>
+        <div className="hidden lg:block">
+          <Suspense
+            fallback={
+              <header
+                className="sticky top-0 z-20 min-h-[72px] border-b border-b-[rgba(18,36,79,0.09)] bg-[rgba(255,253,248,0.95)] backdrop-blur-[24px] shadow-[0_4px_32px_rgba(23,44,113,0.08)]"
+                aria-hidden
+              />
+            }
+          >
+            <BrandHeader />
+          </Suspense>
+        </div>
+        <div className="flex min-h-[calc(100vh-72px)] items-start justify-center lg:py-8">
+          {children}
+        </div>
+      </>
+    );
   }
 
   return (

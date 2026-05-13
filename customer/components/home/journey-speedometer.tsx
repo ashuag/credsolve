@@ -38,7 +38,7 @@ function stepIndexFromMilestones(m: number): number {
  */
 function getStepIndexFromPathname(pathname: string): number {
   const p = pathname || '';
-  if (p.includes('/thank-you')) return 4;
+  if (p.includes('/thank-you-interest') || p.includes('/thank-you')) return 4;
   if (p.includes('/bank-details')) return 3;
   if (p.includes('/kyc')) return 2;
   if (
@@ -64,7 +64,10 @@ export function JourneySpeedometer() {
   let progress = progressPercentFromMilestones(m);
   let stepIndex = m > 0 ? stepIndexFromMilestones(m) : pathStep;
 
-  if (!isCustomerPortalSignedIn(session)) {
+  if (pathname.includes('/thank-you-interest') || pathname.includes('/thank-you')) {
+    progress = 100;
+    stepIndex = 4;
+  } else if (!isCustomerPortalSignedIn(session)) {
     progress = 0;
     stepIndex = pathStep;
   } else {

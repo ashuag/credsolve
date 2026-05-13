@@ -3,6 +3,8 @@ export type CustomerPortalLeadSnapshot = {
   status: string;
   email: string | null;
   emailVerified: boolean;
+  /** ISO date-time until which the customer cannot reapply after rejection. `null` when not rejected. */
+  rejectedUntil: string | null;
 };
 
 export type CustomerPortalProfileSnapshot = {

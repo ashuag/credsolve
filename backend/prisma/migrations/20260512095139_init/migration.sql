@@ -261,6 +261,7 @@ CREATE TABLE `lead` (
     `expires_at` DATETIME(3) NULL,
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updated_at` DATETIME(3) NOT NULL,
+    `lead_status_note` VARCHAR(256) NULL,
 
     UNIQUE INDEX `lead_uuid_key`(`uuid`),
     INDEX `lead_customer_id_created_at_idx`(`customer_id`, `created_at`),
@@ -281,8 +282,9 @@ CREATE TABLE `lead_detail` (
     `date_of_birth` DATE NULL,
     `gender_id` SMALLINT NULL,
     `pan_number` CHAR(10) NULL,
-    `pan_verified` BOOLEAN NOT NULL DEFAULT false,
+    `pan_verified` SMALLINT NOT NULL DEFAULT 0,
     `pan_verified_at` DATETIME(3) NULL,
+    `pan_verification_note` VARCHAR(500) NULL,
     `city_id` INTEGER NULL,
     `pincode` CHAR(6) NULL,
     `address_line_1` TINYTEXT NULL,

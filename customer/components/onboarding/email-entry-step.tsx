@@ -94,31 +94,22 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', le
 
   return (
     <>
-      <section className="h-full flex flex-col justify-center" aria-labelledby="email-heading">
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-8">
-            <div className="flex gap-1.5">
-              <div className="h-2 w-8 rounded-full bg-blue-600"></div>
-              <div className="h-2 w-8 rounded-full bg-slate-100"></div>
-              <div className="h-2 w-8 rounded-full bg-slate-100"></div>
-            </div>
-            <span className="ml-3 text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Step 1 — Onboarding</span>
-          </div>
-
+      <section className="h-full flex flex-col" aria-labelledby="email-heading">
+        <div className="mb-4">
           <h2
             id="email-heading"
-            className="text-2xl md:text-[1.8rem] font-extrabold text-brand-navy mb-6 tracking-tight leading-[1.1] whitespace-nowrap"
+            className="text-xl md:text-[1.8rem] font-extrabold text-brand-navy mb-3 tracking-tight leading-[1.1]"
           >
             {isLogin ? 'Welcome ' : 'Verify Your '}<span className="text-brand-blue">{isLogin ? 'Back' : 'Email'}</span> ✨
           </h2>
 
-          <div className="flex items-start gap-4 p-4 mb-2 rounded-2xl bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border border-blue-100/60 shadow-sm">
-            <div className="p-2 bg-white rounded-xl shadow-sm text-blue-600 shrink-0">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="flex items-start gap-3 p-3 mb-2 rounded-2xl bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border border-blue-100/60">
+            <div className="p-1.5 bg-white rounded-xl shadow-sm text-blue-600 shrink-0">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
               </svg>
             </div>
-            <p className="text-[0.95rem] text-slate-600 leading-relaxed m-0 pt-0.5">
+            <p className="text-[0.88rem] text-slate-600 leading-relaxed m-0 pt-0.5">
               {isLogin
                 ? 'Choose Google login or enter your email ID manually to continue.'
                 : 'Choose an option below to securely link your email address.'}
@@ -251,7 +242,8 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', le
                 : 'Your email is only used for loan-related communications.')}
             </p>
 
-            <button type="submit" className="mc-btn-primary w-full mt-1" disabled={isSending}>
+          <div className="sticky bottom-0 z-10 bg-white/95 backdrop-blur-sm mt-4 pb-[max(12px,env(safe-area-inset-bottom))] -mx-5 px-5 pt-3 border-t border-slate-100 lg:mx-0 lg:px-0">
+            <button type="submit" className="mc-btn-primary w-full" disabled={isSending}>
               <span className="inline-flex items-center justify-center gap-[10px]">
                 {isSending ? (
                   <span
@@ -262,6 +254,7 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', le
                 <span>{isSending ? 'Sending OTP...' : isLogin ? 'Send login OTP' : 'Send verification OTP'}</span>
               </span>
             </button>
+          </div>
           </form>
         ) : null}
       </section>

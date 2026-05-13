@@ -24,21 +24,3 @@ function BureauBadge({
     </div>
   );
 }
-
-export function CreditBureauPoweredBy() {
-  return (
-    <div className="grid gap-3 rounded-[22px] border border-[rgba(18,36,79,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(244,249,255,0.94))] px-4 py-4 shadow-[0_14px_28px_rgba(23,44,113,0.08)]">
-      <div>
-        <span className="block text-[0.74rem] font-extrabold uppercase tracking-[0.14em] text-brand-blue">
-          Powered by
-        </span>
-        <strong className="mt-1 block text-[1rem] text-brand-navy">TU CIBIL and Equifax</strong>
-      </div>
-
-      <div className="flex flex-wrap gap-3 max-sm:flex-col">
-        <BureauBadge name="CIBIL" accentColor="#1496f3" textColor="#12244f" />
-        <BureauBadge name="Equifax" accentColor="#7dc142" textColor="#12244f" />
-      </div>
-    </div>
-  );
-}

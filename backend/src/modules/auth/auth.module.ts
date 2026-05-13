@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BreModule } from '../../common/bre/bre.module';
 import { EmailModule } from '../../common/email/email.module';
 import { RedisIpRateLimitGuard } from '../../common/rate-limit/redis-ip-rate-limit.guard';
 import { PrismaModule } from '../../prisma/prisma.module';
@@ -35,7 +36,7 @@ import { OptionalCustomerSessionGuard } from './presentation/guards/optional-cus
 import { RequiredCustomerSessionGuard } from './presentation/guards/required-customer-session.guard';
 
 @Module({
-  imports: [EmailModule, PrismaModule],
+  imports: [BreModule, EmailModule, PrismaModule],
   controllers: [
     AuthController,
     ApplicationsController,

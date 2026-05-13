@@ -14,7 +14,7 @@ export class LeadRepository {
 
   findActiveByCustomerId(customerId: bigint, tx?: DbClient) {
     return this.db(tx).lead.findFirst({
-      where: { customerId, isActive: true },
+      where: { customerId},
       orderBy: { createdAt: 'desc' },
       include: {
         leadStatus: { select: { name: true } },
@@ -82,6 +82,44 @@ export class LeadRepository {
     return this.db(tx).lead.update({
       where: { id: lead.id },
       data: { leadStatusId: inProgress.id },
+    });
+  }
+
+  /**
+   * Count REJECTED or BLACKLISTED leads (active or not) for this customer
+   * whose updatedAt falls within the given lookback window.
+   */
+  countRecentRejections(customerId: bigint, sinceDate: Date, tx?: DbClient) {
+    return this.db(tx).lead.count({
+      where: {
+        customerId,
+        leadStatus: { name: { in: [LEAD_STATUS.REJECTED, LEAD_STATUS.BLACKLISTED] } },
+        updatedAt: { gte: sinceDate },
+      },
+    });
+  }
+
+  async shouldBlackListCustomer(
+    customerId: bigint,
+    blacklistRejectionThreshold: number,
+    tx?: DbClient,
+  ): Promise<boolean> {
+    const recentLeads = await this.db(tx).lead.findMany({
+      where: { customerId },
+      orderBy: { createdAt: 'desc' },
+      take: blacklistRejectionThreshold,
+      include: { leadStatus: { select: { name: true } } },
+    });
+
+    if (recentLeads.length < blacklistRejectionThreshold) return false;
+
+    return recentLeads.every(l => l.leadStatus.name === LEAD_STATUS.REJECTED);
+  }
+
+  deactivate(leadId: bigint, tx?: DbClient) {
+    return this.db(tx).lead.update({
+      where: { id: leadId },
+      data: { isActive: false },
     });
   }
 

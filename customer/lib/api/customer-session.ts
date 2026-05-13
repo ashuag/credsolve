@@ -31,6 +31,8 @@ export type CustomerPortalLead = {
   status: string;
   email: string | null;
   emailVerified: boolean;
+  /** ISO date-time until which the customer cannot reapply after rejection. `null` when not rejected. */
+  rejectedUntil: string | null;
 };
 
 export type CustomerSessionResponse =
@@ -75,11 +77,23 @@ export function hasActiveLoanLead(session: CustomerSessionResponse | null | unde
 /**
  * Returns the most relevant page to continue a signed-in customer's in-progress journey.
  */
+/** Returns `true` when the lead is REJECTED or BLACKLISTED and the reapply window hasn't elapsed yet. */
+export function isLeadRejectedAndLocked(lead: CustomerPortalLead | null | undefined): boolean {
+  if (!lead) return false;
+  if (lead.status !== 'REJECTED' && lead.status !== 'BLACKLISTED') return false;
+  if (!lead.rejectedUntil) return false;
+  return new Date(lead.rejectedUntil).getTime() > Date.now();
+}
+
 export function getCustomerJourneyResumePath(
   session: CustomerSessionResponse | null | undefined
 ): string {
   if (!session?.authenticated || !session.lead) {
     return '/my-account?mode=login';
+  }
+
+  if (isLeadRejectedAndLocked(session.lead)) {
+    return '/thank-you-interest';
   }
 
   const journey = session.journey;

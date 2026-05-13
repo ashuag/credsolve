@@ -96,6 +96,15 @@ model LeadStatus {
   @@map("lead_status")
 }
 
+model RejectionReason {
+  id       Int     @id @default(autoincrement()) @db.SmallInt
+  name     String  @unique @db.VarChar(50)
+  isActive Boolean @default(true) @map("is_active")
+  leads    Lead[]
+
+  @@map("rejection_reason")
+}
+
 model ApplicationStatus {
   id           Int           @id @default(autoincrement()) @db.SmallInt
   name         String        @unique @db.VarChar(20)

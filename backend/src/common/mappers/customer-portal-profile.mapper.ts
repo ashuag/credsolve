@@ -1,6 +1,7 @@
 import { GENDER } from '../constants/gender.constants';
 import { LEAD_STATUS } from '../constants/lead.constants';
 import { OCCUPATION } from '../constants/occupation.constants';
+import { PAN_VERIFIED } from '../constants/pan-verification.constants';
 
 /** FE `CustomerGenderValue` slugs (customer app). */
 export type CustomerPortalGenderSlug = 'male' | 'female' | 'others';
@@ -72,7 +73,7 @@ export function isLeadEmailVerifiedForPortal(leadStatusName: string, email: stri
 export function isPanVerifiedFromDb(value: boolean | number | null | undefined): boolean {
   if (value == null) return false;
   if (typeof value === 'boolean') return value;
-  return value !== 0;
+  return value === PAN_VERIFIED.VERIFIED;
 }
 
 export function formatLeadDetailForPortal(detail: {

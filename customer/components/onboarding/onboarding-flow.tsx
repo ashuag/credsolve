@@ -1,94 +1,90 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Spinner } from '@/components/ui/spinner';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { SendEmailOtpResponse } from '@/lib/api/auth';
 import type { CustomerOnboardingMode } from '@/lib/customer-flow';
-import { getCustomerJourneyResumePath } from '@/lib/api/customer-session';
+import { getCustomerJourneyResumePath, isLeadRejectedAndLocked } from '@/lib/api/customer-session';
 import { EmailEntryStep, type EmailMode } from './email-entry-step';
 import { EmailOtpStep } from './email-otp-step';
 import { PersonalDetailsStep, type PersonalDetailsSection } from './personal-details-step';
-import {
-  EmailAside,
-  EmailOtpAside,
-  PersonalDetailsAside,
-} from '@/components/onboarding/onboarding-asides';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 
-type OnboardingStep = 'details' |'email' | 'email-otp';
-const DETAILS_TRANSITION_DELAY_MS = 650;
+// Flow: mobile verified → details → email → email-otp → /pre-approved-loan
+type OnboardingStep = 'details' | 'email' | 'email-otp';
+
+/** Maps onboarding step to a mobile app-bar label. */
+const STEP_LABELS: Record<OnboardingStep, string> = {
+  details: 'Step 1 of 3',
+  email: 'Step 2 of 3',
+  'email-otp': 'Step 3 of 3',
+};
 
 export function OnboardingFlow() {
   const router = useRouter();
   const journeyProgress = useJourneyProgressOptional();
   const { loading, session, refresh } = useCustomerSession();
-  const syncedProfileRef = useRef(false);
   const [hasResolved, setHasResolved] = useState(false);
-  const [step, setStep] = useState<OnboardingStep>('email');
+  const [step, setStep] = useState<OnboardingStep>('details');
   const [email, setEmail] = useState('');
   const [emailMode, setEmailMode] = useState<EmailMode>('register');
   const [emailOtpRequest, setEmailOtpRequest] = useState<SendEmailOtpResponse | null>(null);
   const [detailsSection, setDetailsSection] = useState<PersonalDetailsSection>('profile');
   const [detailsNotice, setDetailsNotice] = useState<string | null>(null);
-  const [isTransitioningToDetails, setIsTransitioningToDetails] = useState(false);
 
   useEffect(() => {
-    if (loading || !session) {
-      return;
-    }
-
-    // We rely on CustomerSessionProvider's initial load. No need to double fetch.
+    if (loading || !session) return;
 
     if (!session.authenticated || !session.mobileNumber?.trim() || !session.lead) {
       router.replace('/apply-for-loan');
       return;
     }
 
-    if (session.journey.detailsCompleted) {
-      router.replace(getCustomerJourneyResumePath(session));
+    if (isLeadRejectedAndLocked(session.lead)) {
+      router.replace('/thank-you-interest');
       return;
     }
-
-    const requestedMode = new URLSearchParams(window.location.search).get('mode');
-    const initialMode: CustomerOnboardingMode = requestedMode === 'login' ? 'login' : 'register';
 
     const lead = session.lead;
     const storedEmail = lead?.email?.trim() ?? '';
     const emailVerified = lead?.emailVerified ?? false;
 
-    // If email is already verified, always enforce the details step —
-    // even after hasResolved, so the Back button can't strand the user on the OTP screen.
-
-    console.log('isTransitioningToDetails', isTransitioningToDetails);
-    if (emailVerified && !isTransitioningToDetails && step !== 'details') {
-      if (!hasResolved) {
-        setEmailMode(initialMode);
-        setEmail(storedEmail);
-        setHasResolved(true);
-      }
-      setDetailsSection('profile');
-      setStep('details');
-      setDetailsNotice(null);
+    // Both details and email are done — move past onboarding
+    if (session.journey.detailsCompleted && emailVerified) {
+      router.replace(getCustomerJourneyResumePath(session));
       return;
     }
 
     if (!hasResolved) {
+      const requestedMode = new URLSearchParams(window.location.search).get('mode');
+      const initialMode: CustomerOnboardingMode = requestedMode === 'login' ? 'login' : 'register';
       setEmailMode(initialMode);
       setEmail(storedEmail);
-      setStep(storedEmail ? 'email-otp' : 'email');
+
+      if (session.journey.detailsCompleted) {
+        // Details are done but email is not verified — skip to email step
+        setStep(storedEmail ? 'email-otp' : 'email');
+      } else {
+        setStep('details');
+      }
       setHasResolved(true);
     }
-  }, [isTransitioningToDetails, loading, session, router, step]);
+  }, [loading, session, router, hasResolved]);
 
   useEffect(() => {
     if (!journeyProgress) return;
-    if (step === 'email') journeyProgress.setCompletion01(0.07);
-    else if (step === 'email-otp') journeyProgress.setCompletion01(0.16);
-    else if (step === 'details') journeyProgress.setCompletion01(0.2);
+    if (step === 'details') journeyProgress.setCompletion01(0.1);
+    else if (step === 'email') journeyProgress.setCompletion01(0.55);
+    else if (step === 'email-otp') journeyProgress.setCompletion01(0.65);
   }, [step, journeyProgress]);
+
+  async function handleDetailsSaved() {
+    await refresh();
+    setStep('email');
+  }
 
   function handleEmailNext(confirmedEmail: string, mode: EmailMode, otpRequest: SendEmailOtpResponse) {
     setEmail(confirmedEmail);
@@ -99,17 +95,8 @@ export function OnboardingFlow() {
   }
 
   async function handleOtpVerified() {
-    setIsTransitioningToDetails(true);
-
-    try {
-      await refresh();
-      await new Promise((resolve) => setTimeout(resolve, DETAILS_TRANSITION_DELAY_MS));
-      setDetailsSection('profile');
-      setStep('details');
-      setDetailsNotice(null);
-    } finally {
-      setIsTransitioningToDetails(false);
-    }
+    await refresh();
+    router.push('/pre-approved-loan');
   }
 
   if (loading || !session || !hasResolved) {
@@ -139,7 +126,7 @@ export function OnboardingFlow() {
   }
 
   let leftTitle, leftDescription, leftInfographic;
-  
+
   if (step === 'email') {
     leftTitle = <>Secure <span className="text-[#60a5fa]">Access</span></>;
     leftDescription = "Link your email address to secure your account and track your loan progress.";
@@ -199,8 +186,27 @@ export function OnboardingFlow() {
     );
   }
 
+  /** Back handler for mobile app bar — navigates within onboarding or exits */
+  function handleMobileBack() {
+    if (step === 'email-otp') { setStep('email'); return; }
+    if (step === 'email') { setStep('details'); return; }
+    router.push('/apply-for-loan');
+  }
+
   const journeyPanel = (
     <div className="h-full">
+      {step === 'details' && (
+        <PersonalDetailsStep
+          email={email}
+          leadUuid={activeLead.uuid}
+          initialProfile={portalSession.profile}
+          activeSection={detailsSection}
+          onSectionChange={setDetailsSection}
+          onBack={() => router.push('/apply-for-loan')}
+          noticeMessage={detailsNotice}
+          onSaved={handleDetailsSaved}
+        />
+      )}
       {step === 'email' && (
         <EmailEntryStep
           initialEmail={email}
@@ -220,20 +226,6 @@ export function OnboardingFlow() {
           compact={true}
         />
       )}
-      {step === 'details' && (
-        <PersonalDetailsStep
-          email={email}
-          leadUuid={activeLead.uuid}
-          initialProfile={portalSession.profile}
-          activeSection={detailsSection}
-          onSectionChange={setDetailsSection}
-          onBack={() => setStep('email')}
-          noticeMessage={detailsNotice}
-          onSaved={async () => {
-            await refresh();
-          }}
-        />
-      )}
     </div>
   );
 
@@ -243,6 +235,8 @@ export function OnboardingFlow() {
       leftTitle={leftTitle}
       leftDescription={leftDescription}
       leftInfographic={leftInfographic}
+      mobileStepLabel={STEP_LABELS[step]}
+      mobileOnBack={handleMobileBack}
     />
   );
 }

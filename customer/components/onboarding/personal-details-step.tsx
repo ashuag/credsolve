@@ -1,8 +1,7 @@
 'use client';
 
-import {type ChangeEvent, type ReactNode, startTransition, type SubmitEvent, useEffect, useState,} from 'react';
+import {type ChangeEvent, type ReactNode, type SubmitEvent, useEffect, useState,} from 'react';
 import {useRouter} from 'next/navigation';
-import {CreditBureauPoweredBy} from '@/components/account/credit-bureau-powered-by';
 import {AlertBanner} from '@/components/ui/alert-banner';
 import {DatePickerField} from '@/components/ui/date-picker-field';
 import {FlowLoader} from '@/components/ui/flow-loader';
@@ -358,6 +357,10 @@ export function PersonalDetailsStep({
         setSubmitError('Unable to verify your PAN right now. Please try again.');
         return;
       }
+      if (result.rejected || result.panVerifiedStatus === 2) {
+        router.push('/thank-you-interest');
+        return;
+      }
       onSectionChange('financial');
     } catch (err) {
       setSubmitError(
@@ -406,8 +409,6 @@ export function PersonalDetailsStep({
       }
 
       await onSaved();
-
-      startTransition(() => router.push('/pre-approved-loan'));
     } catch (err) {
       setIsNavigating(false);
       setSubmitError(err instanceof Error ? err.message : 'Unable to save your details right now. Please try again.');
@@ -416,31 +417,22 @@ export function PersonalDetailsStep({
 
   return (
     <>
-      <section className="h-full flex flex-col justify-center py-4" aria-labelledby="details-heading">
+      <section className="h-full flex flex-col" aria-labelledby="details-heading">
         <div className="mb-4">
-          <div className="flex items-center gap-2 mb-5">
-            <div className="flex gap-1.5">
-              <div className="h-2 w-8 rounded-full bg-blue-600"></div>
-              <div className="h-2 w-8 rounded-full bg-blue-600"></div>
-              <div className="h-2 w-8 rounded-full bg-slate-100"></div>
-            </div>
-            <span className="ml-3 text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Step 2 — Profile</span>
-          </div>
-
           <h2
             id="details-heading"
-            className="text-2xl md:text-[1.8rem] font-extrabold text-brand-navy mb-6 tracking-tight leading-[1.1] whitespace-nowrap"
+            className="text-xl md:text-[1.8rem] font-extrabold text-brand-navy mb-3 tracking-tight leading-[1.1]"
           >
             Complete Your <span className="text-brand-blue">Profile</span> ✨
           </h2>
 
-          <div className="flex items-start gap-4 p-4 mb-0 rounded-2xl bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border border-blue-100/60 shadow-sm">
-            <div className="p-2 bg-white rounded-xl shadow-sm text-blue-600 shrink-0">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="flex items-start gap-3 p-3 mb-0 rounded-2xl bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border border-blue-100/60">
+            <div className="p-1.5 bg-white rounded-xl shadow-sm text-blue-600 shrink-0">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             </div>
-            <p className="text-[0.95rem] text-slate-600 leading-relaxed m-0 pt-0.5">
+            <p className="text-[0.88rem] text-slate-600 leading-relaxed m-0 pt-0.5">
               Please provide your personal and financial details to complete your loan profile.
             </p>
           </div>
@@ -617,7 +609,8 @@ export function PersonalDetailsStep({
                 )}
               </div>
 
-              <div className="mt-6 flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-100">
+              {/* Sticky CTA row — pins to bottom of scroll container on mobile */}
+              <div className="sticky bottom-0 z-10 bg-white/95 backdrop-blur-sm mt-6 flex flex-col sm:flex-row gap-3 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] border-t border-slate-100 -mx-5 px-5 lg:mx-0 lg:px-0">
                 <button type="button" onClick={onBack} className="py-3 px-4 rounded-xl font-bold text-[0.95rem] text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors text-center border border-slate-200">
                   ← Back
                 </button>
@@ -724,14 +717,12 @@ export function PersonalDetailsStep({
                     {errors.creditConsentAccepted}
                   </p>
                 )}
-                <div className="mt-4 pt-4 border-t border-slate-200">
-                  <CreditBureauPoweredBy />
-                </div>
               </div>
 
               {submitError && <AlertBanner variant="error">{submitError}</AlertBanner>}
 
-              <div className="mt-6 flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-100">
+              {/* Sticky CTA row */}
+              <div className="sticky bottom-0 z-10 bg-white/95 backdrop-blur-sm mt-6 flex flex-col sm:flex-row gap-3 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] border-t border-slate-100 -mx-5 px-5 lg:mx-0 lg:px-0">
                 <button
                   type="button"
                   onClick={() => onSectionChange('profile')}

@@ -15,7 +15,7 @@ export class CustomerRepository {
       where: { mobileNumber: mobile },
       create: { mobileNumber: mobile },
       update: {},
-      select: { id: true, uuid: true, mobileNumber: true },
+      select: { id: true, uuid: true, mobileNumber: true, isBlacklisted: true },
     });
   }
 

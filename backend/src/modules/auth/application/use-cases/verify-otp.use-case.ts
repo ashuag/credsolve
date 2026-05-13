@@ -2,8 +2,10 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import type { VerifyOtpDto } from '../dto/verify-otp.dto';
 import type { VerifyOtpResult } from '../contracts/verify-otp-result.contract';
 import type { CustomerSessionPayload } from '../contracts/customer-session-payload.contract';
@@ -26,6 +28,8 @@ export type VerifyOtpSessionMeta = {
 
 @Injectable()
 export class VerifyOtpUseCase {
+  private readonly logger = new Logger(VerifyOtpUseCase.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly otpTypes: OtpTypeRepository,
@@ -55,33 +59,47 @@ export class VerifyOtpUseCase {
       throw new InternalServerErrorException('OTP is not configured. Run database seeds.');
     }
 
+    this.logger.log('--------------1-------------');
+
     const request = await this.otpRequests.findPendingByUuidAndType(undefined, dto.requestId, otpType.id);
     if (!request) {
       throw new BadRequestException('Invalid or expired OTP request.');
     }
     this.assertOtpWindow(request, settings);
 
+    this.logger.log('--------------2-------------');
     const given = dto.otpCode.trim().padStart(settings.otpLength, '0');
     if (!safeEqualOtp(request.otpCode, given)) {
       await this.otpRequests.incrementAttempts(undefined, request.id);
       throw new BadRequestException('Incorrect OTP. Please try again.');
     }
 
+
+    this.logger.log('--------------3-------------');
     const verifiedAt = new Date();
+
+    const [reapplyDays, blacklistThreshold, blacklistDurationDays] = await Promise.all([
+      this.settingsRepository.getReapplyAfterRejectedDays(),
+      this.settingsRepository.getBlacklistRejectionThreshold(),
+      this.settingsRepository.getBlacklistDurationDays(),
+    ]);
 
     const { customer, lead } = await this.prisma.client.$transaction(async (tx) => {
       await this.otpRequests.markVerified(tx, request.id, verifiedAt);
       const cust = await this.customers.upsertByMobile(tx, request.value);
+      
       const newStatus = await this.leadStatuses.findActiveByName(tx, LEAD_STATUS.NEW);
       if (!newStatus) {
         throw new InternalServerErrorException('Lead status NEW is missing. Run database seeds.');
       }
       const leadExpireAt = new Date();
+      this.logger.log('leadExpireAt', leadExpireAt);
       leadExpireAt.setUTCDate(leadExpireAt.getUTCDate() + settings.leadExpireDays);
 
-      let activeLead = await this.leads.findActiveByCustomerId(cust.id, tx);
-      if (!activeLead) {
-        activeLead = await this.leads.createForCustomer(
+      let recentLead = await this.leads.findActiveByCustomerId(cust.id, tx);
+
+      if (!recentLead) {
+        recentLead = await this.leads.createForCustomer(
           {
             customerId: cust.id,
             leadStatusId: newStatus.id,
@@ -90,8 +108,21 @@ export class VerifyOtpUseCase {
           tx
         );
       }
-      return { customer: cust, lead: activeLead };
+
+      const autoRejectResult = await this.checkAutoRejectOrBlacklist(
+        cust.id, recentLead, tx,
+        { reapplyDays, blacklistThreshold, blacklistDurationDays },
+      );
+      if (autoRejectResult) {
+        recentLead = autoRejectResult;
+      }
+
+      return { customer: cust, lead: recentLead };
     });
+
+    if (!lead) {
+      throw new InternalServerErrorException('Failed to resolve lead for customer.');
+    }
 
     const created = await this.customerSessions.createSession({
       customerUuid: customer.uuid,
@@ -163,6 +194,71 @@ export class VerifyOtpUseCase {
       verified: true,
       verifiedAt: verifiedAt.toISOString(),
     };
+  }
+
+  /** Old REJECTED / BLACKLISTED / CONVERTED leads should be deactivated to make room for a new one. */
+  private shouldDeactivate(lead: { leadStatus: { name: string } }): boolean {
+    const s = lead.leadStatus.name;
+    return s === LEAD_STATUS.REJECTED || s === LEAD_STATUS.BLACKLISTED || s === LEAD_STATUS.CONVERTED;
+  }
+
+  /**
+   * After creating a fresh NEW lead, inspect the customer's rejection history:
+   *  If the last consecutive rejected leads >= threshold → blacklist.
+   *  Returns the updated lead row if it was blacklisted, or null if clean.
+   */
+  private async checkAutoRejectOrBlacklist(
+    customerId: bigint,
+    lead: { id: bigint; leadStatus: { name: string } },
+    tx: Parameters<Parameters<PrismaService['client']['$transaction']>[0]>[0],
+    cfg: { reapplyDays: number; blacklistThreshold: number; blacklistDurationDays: number },
+  ) {
+    if (lead.leadStatus.name !== LEAD_STATUS.NEW) return null;
+
+    const shouldBlacklist = await this.leads.shouldBlackListCustomer(
+      customerId, cfg.blacklistThreshold, tx as any,
+    );
+    if (!shouldBlacklist) return null;
+
+    this.logger.warn(
+      `Customer ${customerId}: ${cfg.blacklistThreshold} consecutive rejections — blacklisting.`,
+    );
+    return this.autoRejectLead(
+      lead.id,
+      LEAD_STATUS.BLACKLISTED,
+      `Blacklisted: ${cfg.blacklistThreshold} consecutive rejections`,
+      tx as any,
+    );
+  }
+
+  private async autoRejectLead(
+    leadId: bigint,
+    statusName: string,
+    note: string,
+    tx: any,
+  ) {
+    const statusRow = await this.leadStatuses.findActiveByName(tx, statusName);
+    if (!statusRow) {
+      this.logger.error(`LeadStatus ${statusName} not found — skipping auto-reject.`);
+      return null;
+    }
+    return tx.lead.update({
+      where: { id: leadId },
+      data: {
+        leadStatusId: statusRow.id,
+        leadStatusNote: note,
+      } as unknown as Prisma.LeadUpdateInput,
+      include: {
+        leadStatus: { select: { name: true } },
+        leadDetail: {
+          include: {
+            gender: { select: { name: true } },
+            occupation: { select: { name: true } },
+            city: { select: { name: true, state: { select: { code: true } } } },
+          },
+        },
+      },
+    });
   }
 
   private assertOtpWindow(

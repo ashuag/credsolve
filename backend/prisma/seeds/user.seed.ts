@@ -15,7 +15,7 @@ export async function seedUser(prisma: Prisma.TransactionClient) {
   const users: SeedUser[] = [
     {
       fullName: 'MoneyCash Admin',
-      email: 'admin@moneycash.test',
+      email: 'admin@moneycash.in',
       password: hashedPassword,
       roleId: 1,
     },
