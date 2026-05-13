@@ -11,24 +11,52 @@ import { AppModule } from './app.module';
 import { ensureApplicationTablesExist } from './prisma/ensure-application-schema';
 import { PrismaService } from './prisma/prisma.service';
 
+function isProductionNodeEnv(): boolean {
+  return (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
+}
+
+/** Browser `Origin` has no trailing slash; normalize so env can use either form. */
 function parseCorsOrigins(): string[] | false {
   const raw = process.env.CORS_ORIGINS?.trim();
   if (!raw) {
     return false;
   }
-  return raw.split(',').map((s) => s.trim()).filter(Boolean);
+  return raw
+    .split(',')
+    .map((s) => s.trim().replace(/\/+$/, ''))
+    .filter(Boolean);
 }
 
-function isProductionNodeEnv(): boolean {
-  return (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
+const DEV_CORS_FALLBACK = [
+  'http://localhost:3010',
+  'http://localhost:3011',
+  'http://localhost:4001',
+  'http://127.0.0.1:3010',
+  'http://127.0.0.1:3011',
+  'http://127.0.0.1:4001',
+] as const;
+
+function resolveCorsOrigins(): string[] {
+  const parsed = parseCorsOrigins();
+  if (parsed !== false && parsed.length > 0) {
+    return parsed;
+  }
+  if (!isProductionNodeEnv()) {
+    return [...DEV_CORS_FALLBACK];
+  }
+  return [];
 }
 
 /** `nest start --watch` can respawn before the old HTTP server releases the port (esp. in Docker). */
-async function listenWithBackoff(app: INestApplication, port: number, maxAttempts = 8): Promise<void> {
+async function listenWithBackoff(
+  app: INestApplication,
+  port: number,
+  host: string,
+  maxAttempts = 8
+): Promise<void> {
   let lastErr: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const host = process.env.HOST || '127.0.0.1';
       await app.listen(port, host);
       return;
     } catch (err) {
@@ -89,9 +117,29 @@ async function bootstrap() {
     })
   );
 
-  const origins = parseCorsOrigins();
-  if (origins !== false && origins.length > 0) {
-    app.enableCors({ origin: origins, credentials: true });
+  const origins = resolveCorsOrigins();
+  if (isProductionNodeEnv() && origins.length === 0) {
+    // eslint-disable-next-line no-console
+    console.error(
+      '[nest] CORS_ORIGINS is missing or empty in production. Browser calls from your web app will fail CORS. ' +
+        'Set a comma-separated list of exact origins (no path), e.g. CORS_ORIGINS=https://www.moneycash.in,https://moneycash.in'
+    );
+  }
+  if (origins.length > 0) {
+    app.enableCors({
+      origin: (requestOrigin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+        if (!requestOrigin) {
+          callback(null, true);
+          return;
+        }
+        if (origins.includes(requestOrigin)) {
+          callback(null, true);
+          return;
+        }
+        callback(null, false);
+      },
+      credentials: true,
+    });
   }
 
   const swaggerConfig = new DocumentBuilder()
@@ -110,10 +158,11 @@ async function bootstrap() {
   await ensureApplicationTablesExist(prisma.client);
 
   const port = Number.parseInt(process.env.PORT ?? '4001', 10);
-  await listenWithBackoff(app, port);
+  const listenHost = (process.env.HOST ?? '127.0.0.1').trim() || '127.0.0.1';
+  await listenWithBackoff(app, port, listenHost);
   // eslint-disable-next-line no-console
   console.log(
-    `[nest] listening on http://0.0.0.0:${port}` +
+    `[nest] listening on http://${listenHost}:${port}` +
       (openApiEnabled ? ' (OpenAPI: /docs)' : ' (OpenAPI disabled in production; set ENABLE_OPENAPI_DOCS=true to enable)')
   );
 }
