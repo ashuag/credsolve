@@ -31,9 +31,26 @@ export function getApiUrl() {
     return ensureNestGlobalPrefix(apiUrl);
   }
 
-  if (!process.env.NEXT_PUBLIC_API_URL) {
+  const rawPublic = (process.env.NEXT_PUBLIC_API_URL ?? '').trim();
+  if (!rawPublic) {
     throw new Error('Missing NEXT_PUBLIC_API_URL in customer environment.');
   }
 
-  return ensureNestGlobalPrefix(process.env.NEXT_PUBLIC_API_URL);
+  /**
+   * `NEXT_PUBLIC_*` is inlined when the client bundle is built. Mis-set or stale values often use
+   * `http(s)://localhost:4001/...`, which breaks in Firefox (NS_ERROR_NET_RESET when HTTPS is used
+   * against a plain HTTP Nest dev server) and triggers CORS. Next rewrites same-origin `/api/*`.
+   */
+  if (/^https?:\/\/(?:127\.0\.0\.1|localhost):4001\b/i.test(rawPublic)) {
+    if (process.env.NODE_ENV === 'development') {
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[MoneyCash] NEXT_PUBLIC_API_URL points at port 4001 in the browser; using same-origin `/api` instead. ' +
+          'Set NEXT_PUBLIC_API_URL=/api in customer/.env, restart `next dev`, and run `rm -rf .next` if requests still hit :4001.'
+      );
+    }
+    return '/api';
+  }
+
+  return ensureNestGlobalPrefix(rawPublic);
 }

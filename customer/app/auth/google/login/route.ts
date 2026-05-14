@@ -8,26 +8,32 @@ function nestApiBase(raw: string | undefined): string | null {
   return noSlash.endsWith('/api') ? noSlash : `${noSlash}/api`;
 }
 
-function buildGoogleErrorUrl(request: NextRequest, reason: string, httpStatus?: number): string {
-  const incoming = new URL(request.url);
-  const next = new URL('/auth/google/error', incoming.origin);
-  next.searchParams.set('reason', reason);
+/**
+ * Same-site error redirect as a path + query only (no origin).
+ * An absolute URL built from `request.nextUrl.origin` or `Host` is often wrong behind reverse
+ * proxies (`localhost:3011`, internal service names). Browsers resolve `Location: /path?…`
+ * against the URL the user actually opened (e.g. https://www.moneycash.in/...).
+ */
+function buildGoogleErrorLocation(request: NextRequest, reason: string, httpStatus?: number): string {
+  const next = new URLSearchParams();
+  next.set('reason', reason);
 
   if (httpStatus !== undefined && Number.isFinite(httpStatus)) {
-    next.searchParams.set('status', String(httpStatus));
+    next.set('status', String(httpStatus));
   }
 
-  const mode = incoming.searchParams.get('mode');
+  const q = request.nextUrl.searchParams;
+  const mode = q.get('mode');
   if (mode === 'login' || mode === 'register') {
-    next.searchParams.set('mode', mode);
+    next.set('mode', mode);
   }
 
-  const leadId = incoming.searchParams.get('leadId')?.trim();
+  const leadId = q.get('leadId')?.trim();
   if (leadId) {
-    next.searchParams.set('leadId', leadId);
+    next.set('leadId', leadId);
   }
 
-  return next.toString();
+  return `/auth/google/error?${next.toString()}`;
 }
 
 /**
@@ -37,10 +43,10 @@ function buildGoogleErrorUrl(request: NextRequest, reason: string, httpStatus?: 
 export async function GET(request: NextRequest) {
   const apiBase = nestApiBase(process.env.API_SERVER_URL);
   if (!apiBase) {
-    return NextResponse.redirect(buildGoogleErrorUrl(request, 'Customer server is missing API configuration.', 500));
+    return NextResponse.redirect(buildGoogleErrorLocation(request, 'Customer server is missing API configuration.', 500));
   }
 
-  const incoming = new URL(request.url);
+  const incoming = request.nextUrl;
   const upstream = `${apiBase}/auth/google/login${incoming.search}`;
 
   const upstreamRes = await fetch(upstream, {
@@ -72,5 +78,5 @@ export async function GET(request: NextRequest) {
     // keep fallback message
   }
 
-  return NextResponse.redirect(buildGoogleErrorUrl(request, message, httpStatus));
+  return NextResponse.redirect(buildGoogleErrorLocation(request, message, httpStatus));
 }

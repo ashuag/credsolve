@@ -30,10 +30,23 @@ function parseCorsOrigins(): string[] | false {
 const DEV_CORS_FALLBACK = [
   'http://localhost:3010',
   'http://localhost:3011',
+  'http://localhost:3020',
+  'http://localhost:3021',
   'http://localhost:4001',
   'http://127.0.0.1:3010',
   'http://127.0.0.1:3011',
+  'http://127.0.0.1:3020',
+  'http://127.0.0.1:3021',
   'http://127.0.0.1:4001',
+  // `next dev --experimental-https` (or similar) — must match browser Origin exactly
+  'https://localhost:3010',
+  'https://localhost:3011',
+  'https://localhost:3020',
+  'https://localhost:3021',
+  'https://127.0.0.1:3010',
+  'https://127.0.0.1:3011',
+  'https://127.0.0.1:3020',
+  'https://127.0.0.1:3021',
 ] as const;
 
 function resolveCorsOrigins(): string[] {
