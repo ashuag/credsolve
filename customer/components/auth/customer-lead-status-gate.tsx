@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Spinner } from '@/components/ui/spinner';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
-import { resolveCustomerFlowPath } from '@/lib/customer-flow';
+import { getCustomerJourneyResumePath } from '@/lib/api/customer-session';
 
 type CustomerLeadStatusGateProps = {
   allowedStatuses: readonly string[];
@@ -36,7 +36,12 @@ export function CustomerLeadStatusGate({
       return;
     }
 
-    router.replace(resolveCustomerFlowPath(status));
+    if (session.lead) {
+      router.replace(getCustomerJourneyResumePath(session));
+      return;
+    }
+
+    router.replace('/my-account?mode=login');
   }, [loading, session, allowedStatuses, router]);
 
   if (loading || !session) {

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { startTransition, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Spinner } from '@/components/ui/spinner';
-import { resolveCustomerFlowPath } from '@/lib/customer-flow';
+import { getCustomerPostAuthResumePath } from '@/lib/api/customer-session';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 
 export default function GoogleAuthCallbackPage() {
@@ -36,11 +36,9 @@ export default function GoogleAuthCallbackPage() {
 
       try {
         const nextSession = await refresh();
-        const leadStatus =
-          nextSession.authenticated && nextSession.lead ? nextSession.lead.status : null;
 
         startTransition(() => {
-          router.replace(resolveCustomerFlowPath(leadStatus, emailMode));
+          router.replace(getCustomerPostAuthResumePath(nextSession, emailMode));
         });
       } catch (callbackPayloadError) {
         if (isActive) {

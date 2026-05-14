@@ -1,3 +1,4 @@
+import { CUSTOMER_LEAD_STATUS } from '../lead-status';
 import { apiGet } from './client';
 
 /** Mirrors backend `CustomerSessionResult` (`GET /auth/me`). */
@@ -114,6 +115,29 @@ export function getCustomerJourneyResumePath(
   if (!journey.kycCompleted) return '/kyc';
   if (!journey.bankDetailsCompleted) return '/bank-details';
   return '/thank-you';
+}
+
+/**
+ * After Google OAuth or email verification, continue the loan journey (including `/kyc` / DigiLocker).
+ * Avoids legacy `/account` routing for `IN_PROGRESS` leads.
+ */
+export function getCustomerPostAuthResumePath(
+  session: CustomerSessionResponse,
+  onboardingMode: 'register' | 'login' = 'login'
+): string {
+  if (!session.authenticated) {
+    return '/my-account?mode=login';
+  }
+  if (session.lead && isLeadRejectedAndLocked(session.lead)) {
+    return '/thank-you-interest';
+  }
+  if (session.lead?.status === CUSTOMER_LEAD_STATUS.NEW) {
+    return `/onboarding?mode=${onboardingMode}`;
+  }
+  if (session.lead) {
+    return getCustomerJourneyResumePath(session);
+  }
+  return '/my-account?mode=login';
 }
 
 /**

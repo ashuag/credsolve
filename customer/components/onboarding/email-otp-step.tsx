@@ -8,6 +8,7 @@ import { FlowLoader } from '@/components/ui/flow-loader';
 import { OtpInputGrid } from '@/components/ui/otp-input-grid';
 import { useCountdown } from '@/lib/hooks/use-countdown';
 import { useOtpInput } from '@/lib/hooks/use-otp-input';
+import { getCustomerPostAuthResumePath } from '@/lib/api/customer-session';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { cn } from '@/lib/cn';
 import type { EmailMode } from './email-entry-step';
@@ -110,8 +111,8 @@ export function EmailOtpStep({
       await verifyEmailOtp(otpRequest.requestId, otp.joined);
 
       if (isLogin) {
-        await refreshCustomerSession();
-        startTransition(() => router.push('/account'));
+        const updated = await refreshCustomerSession();
+        startTransition(() => router.push(getCustomerPostAuthResumePath(updated, 'login')));
       } else {
         // Parent handles navigation — keep FlowLoader visible until unmount
         await onVerified();
