@@ -141,7 +141,7 @@ export class PanVerificationService {
         body: {
           input: {
             panNumber: input.panNumber,
-            name: input.fullName,
+            name: input.fullName.trim().toUpperCase(),
             dob: formatDobDdMmYyyy(input.dobIso),
             consent: true,
           },

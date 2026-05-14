@@ -9,6 +9,12 @@ import { LosDataService } from './los-data.service';
 export class LosDataController {
   constructor(private readonly losData: LosDataService) {}
 
+  @Get('dashboard/crm')
+  @ApiOperation({ summary: 'LOS CRM dashboard aggregates (live counts from the book)' })
+  dashboardCrm() {
+    return this.losData.getDashboardCrm();
+  }
+
   @Get('leads/new')
   @ApiOperation({ summary: 'List latest leads for LOS lead management' })
   leads() {
@@ -19,6 +25,12 @@ export class LosDataController {
   @ApiOperation({ summary: 'List latest applications for LOS application management' })
   applications() {
     return this.losData.listApplications();
+  }
+
+  @Get('applications/:applicationUuid')
+  @ApiOperation({ summary: 'Get application details by application uuid' })
+  applicationByUuid(@Param('applicationUuid') applicationUuid: string) {
+    return this.losData.getApplicationDetails(applicationUuid);
   }
 
   @Get('leads/:leadUuid')

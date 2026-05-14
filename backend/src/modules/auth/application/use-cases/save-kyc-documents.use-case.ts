@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
 import type { UploadedFileLike } from '../../../../common/types/uploaded-file';
+import { assertApplicationKycNotCompleted } from '../../../../common/kyc/application-kyc-guard.util';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 
@@ -52,6 +53,21 @@ export class SaveKycDocumentsUseCase {
     for (const spec of DOC_SPECS) {
       assertUpload(byField.get(spec.field), spec.displayName);
     }
+
+    const leadForKyc = await this.prisma.client.lead.findFirst({
+      where: { customerId: customer.id, isActive: true },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    if (!leadForKyc) {
+      throw new NotFoundException('No active lead found.');
+    }
+    const applicationForKyc = await this.prisma.client.application.findFirst({
+      where: { leadId: leadForKyc.id, customerId: customer.id },
+      orderBy: { createdAt: 'desc' },
+      select: { kycStatus: true },
+    });
+    assertApplicationKycNotCompleted(applicationForKyc?.kycStatus);
 
     await this.prisma.client.$transaction(async (tx) => {
       let customerKyc = await tx.customerKyc.findFirst({
@@ -123,15 +139,6 @@ export class SaveKycDocumentsUseCase {
           };
         }),
       });
-
-      const lead = await tx.lead.findFirst({
-        where: { customerId: customer.id, isActive: true },
-        orderBy: { createdAt: 'desc' },
-        select: { id: true },
-      });
-      if (!lead) {
-        throw new NotFoundException('No active lead found.');
-      }
     });
 
     return { success: true };

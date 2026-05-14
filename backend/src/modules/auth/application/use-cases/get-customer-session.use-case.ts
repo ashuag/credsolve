@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Request } from 'express';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
+import { APPLICATION_KYC_STATUS } from '../../../../common/constants/application.constants';
 import {
   formatLeadDetailForPortal,
   isLeadEmailVerifiedForPortal,
@@ -9,6 +10,8 @@ import type { CustomerSessionResult } from '../contracts/customer-session-result
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
+import { isKycLivenessCheckPaused } from '../../../../common/kyc/kyc-liveness-env.util';
+import { fetchLatestApplicationKycSnapshot } from '../../../../prisma/application-kyc-snapshot.query';
 import { PrismaService } from '../../../../prisma/prisma.service';
 
 @Injectable()
@@ -45,6 +48,7 @@ export class GetCustomerSessionUseCase {
         bankDetailsCompleted: false,
       },
       loanSelection: null,
+      kycFaceProgress: null,
     };
 
     let leadRow = await this.leads.findActiveByCustomerId(customer.id);
@@ -79,10 +83,8 @@ export class GetCustomerSessionUseCase {
       }
     }
 
-    const application = await this.prisma.client.application.findFirst({
-      where: { leadId: leadRow.id },
-      orderBy: { createdAt: 'desc' },
-      select: { id: true, email: true, emailVerificationType: true },
+    const application = await fetchLatestApplicationKycSnapshot(this.prisma.client, {
+      leadId: leadRow.id,
     });
 
     const emailVerified = isLeadEmailVerifiedForPortal(
@@ -145,13 +147,26 @@ export class GetCustomerSessionUseCase {
           where: { customerKycId: latestCustomerKyc.id },
         })
       : 0;
+    const livenessPaused = isKycLivenessCheckPaused();
+    const hasSavedSelfie = Boolean(application?.selfieRelativePath?.trim());
+    const hasDigilockerForm = application?.digilockerAadhaarFormJson != null;
+    /** Liveness can be paused by env, but DigiLocker + a stored selfie are always required for this path. */
+    const faceStepCompleteForJourney = Boolean(
+      application &&
+        hasDigilockerForm &&
+        hasSavedSelfie &&
+        (application.livenessPassed === true || livenessPaused),
+    );
+
     const kycCompleted = Boolean(
-      latestCustomerKyc &&
-        (latestCustomerKyc.kycVerifiedAt != null || kycDocsCount >= 3)
+      application?.kycStatus === APPLICATION_KYC_STATUS.COMPLETED ||
+        (latestCustomerKyc &&
+          (latestCustomerKyc.kycVerifiedAt != null || kycDocsCount >= 3)) ||
+        faceStepCompleteForJourney,
     );
 
     const bankDetailsCompleted = Boolean(
-      disbursement?.accountNumber?.trim() && disbursement?.ifscCode?.trim() && disbursement?.bankName?.trim()
+      disbursement?.accountNumber?.trim() && disbursement?.ifscCode?.trim(),
     );
 
     const loanSelection =
@@ -163,6 +178,22 @@ export class GetCustomerSessionUseCase {
             maturityDate: appDetails.loanMaturityDate
               ? appDetails.loanMaturityDate.toISOString().slice(0, 10)
               : null,
+          }
+        : null;
+
+    const kycFaceProgress =
+      application != null
+        ? {
+            applicationKycStatus: application.kycStatus,
+            digilockerAadhaarCaptured: application.digilockerAadhaarFormJson != null,
+            selfieCaptured: Boolean(application.selfieRelativePath?.trim()),
+            livenessPassed: application.livenessPassed === true,
+            livenessRequired: !livenessPaused,
+            digilockerAadhaarForm: application.digilockerAadhaarFormJson ?? null,
+            digilockerAadhaarPhotoUrl: application.aadhaarPhotoRelativePath?.trim()
+              ? '/auth/kyc/digilocker-aadhaar-photo'
+              : null,
+            kycSelfiePhotoUrl: application.selfieRelativePath?.trim() ? '/auth/kyc/selfie-photo' : null,
           }
         : null;
 
@@ -185,6 +216,7 @@ export class GetCustomerSessionUseCase {
         bankDetailsCompleted,
       },
       loanSelection,
+      kycFaceProgress,
     };
   }
 }

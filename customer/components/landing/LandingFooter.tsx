@@ -92,7 +92,7 @@ export function LandingFooter() {
                 </div>
               </a>
 
-              <a href="mailto:care@moneycash.in" className="group flex items-center gap-3">
+              <a href="mailto:contact@moneycash.in" className="group flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/6 transition-colors group-hover:bg-[#1496f3]/20">
                   <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#1496f3]" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
@@ -101,7 +101,7 @@ export function LandingFooter() {
                 </div>
                 <div>
                   <div className="text-[0.58rem] font-[800] uppercase tracking-[0.14em] text-white/25">Email</div>
-                  <div className="text-sm font-[800] text-white">care@moneycash.in</div>
+                  <div className="text-sm font-[800] text-white">contact@moneycash.in</div>
                 </div>
               </a>
             </div>

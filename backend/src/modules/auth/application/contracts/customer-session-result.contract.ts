@@ -43,6 +43,25 @@ export type CustomerPortalJourneySnapshot = {
   bankDetailsCompleted: boolean;
 };
 
+/** DigiLocker Aadhaar + selfie + Tenacio liveness progress for the active application. */
+export type CustomerKycFaceProgressSnapshot = {
+  /** `application.kyc_status` (0–3); `1` = completed. */
+  applicationKycStatus: number;
+  digilockerAadhaarCaptured: boolean;
+  selfieCaptured: boolean;
+  livenessPassed: boolean;
+  /**
+   * When `false`, the journey does not require `POST .../kyc/liveness` (Tenacio paused via env).
+   * Omitted only in older clients; server always sends a boolean.
+   */
+  livenessRequired: boolean;
+  digilockerAadhaarForm: unknown | null;
+  /** Path fragment for `GET {API}/auth/kyc/digilocker-aadhaar-photo` (cookie auth). */
+  digilockerAadhaarPhotoUrl: string | null;
+  /** Path fragment for `GET {API}/auth/kyc/selfie-photo` when a selfie file exists. */
+  kycSelfiePhotoUrl: string | null;
+};
+
 export type CustomerLoanSelectionSnapshot = {
   /** Selected principal in INR (decimal string). */
   amountInr: string | null;
@@ -61,5 +80,7 @@ export type CustomerSessionResult =
       journey: CustomerPortalJourneySnapshot;
       /** Populated when the customer has saved loan amount / tenure on the application. */
       loanSelection: CustomerLoanSelectionSnapshot | null;
+      /** Active application DigiLocker / selfie / liveness state; `null` without an application row. */
+      kycFaceProgress: CustomerKycFaceProgressSnapshot | null;
     }
   | { authenticated: false };

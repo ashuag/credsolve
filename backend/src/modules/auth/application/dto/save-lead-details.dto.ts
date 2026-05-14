@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, Min } from 'class-validator';
 
 const GENDERS = ['male', 'female', 'others'] as const;
 const OCCUPATIONS = [
@@ -54,6 +55,20 @@ export class SaveLeadDetailsDto {
   @MinLength(1)
   @MaxLength(200)
   currentCity!: string;
+
+  @ApiPropertyOptional({
+    description:
+      'When set, must match an active `city.id` from `GET /lookup/cities` (preferred over parsing `currentCity`).',
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === '' || value === undefined || value === null) return undefined;
+    const n = typeof value === 'number' ? value : Number.parseInt(String(value), 10);
+    return Number.isFinite(n) ? n : undefined;
+  })
+  @IsInt()
+  @Min(1)
+  currentCityId?: number;
 
   @ApiProperty()
   @IsString()

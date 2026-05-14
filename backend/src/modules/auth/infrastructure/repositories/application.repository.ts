@@ -1,5 +1,5 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import type { EmailVerificationType } from '@prisma/client';
+import type { EmailVerificationType, Prisma } from '@prisma/client';
 import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import type { DbClient } from './db.client';
@@ -62,6 +62,52 @@ export class ApplicationRepository {
         email: params.email,
         emailVerificationType: params.verificationType,
         emailVerifiedAt: verifiedAt,
+      },
+    });
+  }
+
+  async updateDigilockerAadhaarArtifacts(
+    params: {
+      applicationId: bigint;
+      digilockerAadhaarFormJson: Prisma.InputJsonValue;
+      aadhaarPhotoRelativePath: string | null;
+    },
+    tx?: DbClient,
+  ) {
+    return this.db(tx).application.update({
+      where: { id: params.applicationId },
+      data: {
+        digilockerAadhaarFormJson: params.digilockerAadhaarFormJson,
+        aadhaarPhotoRelativePath: params.aadhaarPhotoRelativePath,
+      },
+    });
+  }
+
+  async updateSelfiePath(
+    params: { applicationId: bigint; selfieRelativePath: string },
+    tx?: DbClient,
+  ) {
+    return this.db(tx).application.update({
+      where: { id: params.applicationId },
+      data: { selfieRelativePath: params.selfieRelativePath },
+    });
+  }
+
+  async updateLivenessResult(
+    params: {
+      applicationId: bigint;
+      livenessVendorJson: Prisma.InputJsonValue;
+      passed: boolean;
+      checkedAt: Date;
+    },
+    tx?: DbClient,
+  ) {
+    return this.db(tx).application.update({
+      where: { id: params.applicationId },
+      data: {
+        livenessVendorJson: params.livenessVendorJson,
+        livenessPassed: params.passed,
+        livenessCheckedAt: params.checkedAt,
       },
     });
   }

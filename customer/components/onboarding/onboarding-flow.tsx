@@ -7,6 +7,7 @@ import { useCustomerSession } from '@/components/providers/customer-session-prov
 import { SendEmailOtpResponse } from '@/lib/api/auth';
 import type { CustomerOnboardingMode } from '@/lib/customer-flow';
 import { getCustomerJourneyResumePath, isLeadRejectedAndLocked, CUSTOMER_EMAIL_VERIFY_PATH } from '@/lib/api/customer-session';
+import { formatIsoDateDdMmYyyy } from '@/lib/format-date';
 import { EmailEntryStep, type EmailMode } from './email-entry-step';
 import { EmailOtpStep } from './email-otp-step';
 import { PersonalDetailsStep, type PersonalDetailsSection } from './personal-details-step';
@@ -169,7 +170,10 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
     return [
       { label: 'Principal', value: principal },
       { label: 'Tenure', value: tenure },
-      { label: 'Maturity', value: ls?.maturityDate?.trim() ? ls.maturityDate : '—' },
+      {
+        label: 'Maturity',
+        value: ls?.maturityDate?.trim() ? formatIsoDateDdMmYyyy(ls.maturityDate) : '—',
+      },
     ];
   }, [session]);
 

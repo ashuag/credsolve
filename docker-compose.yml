@@ -39,7 +39,7 @@ services:
     command:
       - sh
       - -c
-      - npm run prisma:migrate:deploy && npm run dev
+      - npm run prisma:generate && npm run prisma:migrate:deploy && npm run dev
 
   los:
     <<: *node-defaults

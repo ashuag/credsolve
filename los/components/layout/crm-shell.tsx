@@ -117,6 +117,7 @@ function isNavActive(pathname: string, item: NavItem) {
 function breadcrumbLabel(pathname: string): string {
   if (BREADCRUMBS[pathname]) return BREADCRUMBS[pathname];
   if (/^\/leads\/[^/]+$/.test(pathname)) return 'Lead detail';
+  if (/^\/applications\/[^/]+$/.test(pathname)) return 'Application detail';
   const seg = pathname.replace(/^\//, '').split('/')[0];
   return seg ? seg.charAt(0).toUpperCase() + seg.slice(1) : 'Home';
 }

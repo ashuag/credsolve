@@ -12,18 +12,14 @@ export class SaveBankDetailsDto {
   @Matches(/^[A-Z]{4}0[A-Z0-9]{6}$/i)
   ifscCode!: string;
 
-  @ApiProperty({ description: 'Bank name as per account' })
-  @IsString()
-  @MinLength(2)
-  @MaxLength(100)
-  @Matches(/^[A-Za-z0-9][A-Za-z0-9 &.'(),/-]{1,99}$/)
-  bankName!: string;
-
-  @ApiPropertyOptional({ description: 'Account holder name (optional for now)' })
+  @ApiPropertyOptional({
+    description: 'Bank name as per master list; omit when customer only provides IFSC + account number.',
+  })
   @IsOptional()
   @IsString()
   @MinLength(2)
   @MaxLength(100)
-  accountHolderName?: string;
+  @Matches(/^[A-Za-z0-9][A-Za-z0-9 &.'(),/-]{1,99}$/)
+  bankName?: string;
 }
 

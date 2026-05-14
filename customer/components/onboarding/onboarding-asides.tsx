@@ -57,7 +57,7 @@ export function EmailOtpAside({ mode }: { mode: EmailMode }) {
           <span className="block text-brand-muted leading-[1.6]">
             {isLogin
               ? 'We create a protected session upon successful OTP verification.'
-              : 'Full name, gender, date of birth, occupation, income, address, city, and residential pincode.'}
+              : 'Full name as per PAN card, gender, date of birth, occupation, income, address, city, and residential pincode.'}
           </span>
         </div>
         <div className="mc-inner-card bg-gradient-to-br from-[rgba(255,244,204,0.94)] to-[rgba(255,255,255,0.92)]">

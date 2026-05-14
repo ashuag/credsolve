@@ -2,6 +2,8 @@ import { apiGet } from './client';
 
 export type LoanEligibilityResponse = {
   preApprovedAmountInr: number;
+  minLoanAmountInr: number;
+  maxLoanAmountInr: number;
 };
 
 export type LoanCalculationSettingsResponse = {
@@ -37,7 +39,12 @@ export async function fetchLoanEligibility(): Promise<LoanEligibilityResponse> {
         '/loans/eligibility',
         'Unable to check loan eligibility.'
       );
-      if (!data || typeof data.preApprovedAmountInr !== 'number') {
+      if (
+        !data ||
+        typeof data.preApprovedAmountInr !== 'number' ||
+        typeof data.minLoanAmountInr !== 'number' ||
+        typeof data.maxLoanAmountInr !== 'number'
+      ) {
         throw new Error('Invalid eligibility response.');
       }
 

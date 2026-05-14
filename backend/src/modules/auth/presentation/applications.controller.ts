@@ -1,14 +1,20 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Req, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
-import { AnyFilesInterceptor } from '@nestjs/platform-express';
+import { Body, Controller, HttpCode, HttpStatus, Post, Req, UploadedFile, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { AnyFilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import type { UploadedFileLike } from '../../../common/types/uploaded-file';
 import { RateLimitByRoute } from '../../../common/rate-limit/rate-limit-route.decorator';
 import { RedisIpRateLimitGuard } from '../../../common/rate-limit/redis-ip-rate-limit.guard';
+import { LookupIfscDto } from '../application/dto/lookup-ifsc.dto';
+import { SubmitVerifiedBankDto } from '../application/dto/submit-verified-bank.dto';
 import { SaveBankDetailsDto } from '../application/dto/save-bank-details.dto';
 import { SaveLoanSelectionDto } from '../application/dto/save-loan-selection.dto';
+import { LookupIfscUseCase } from '../application/use-cases/lookup-ifsc.use-case';
+import { SubmitVerifiedBankUseCase } from '../application/use-cases/submit-verified-bank.use-case';
 import { SaveBankDetailsUseCase } from '../application/use-cases/save-bank-details.use-case';
 import { SaveKycDocumentsUseCase } from '../application/use-cases/save-kyc-documents.use-case';
+import { SaveKycSelfieUseCase } from '../application/use-cases/save-kyc-selfie.use-case';
+import { RunKycLivenessUseCase } from '../application/use-cases/run-kyc-liveness.use-case';
 import { SaveLoanSelectionUseCase } from '../application/use-cases/save-loan-selection.use-case';
 import { SaveProfessionalDetailsDto } from '../application/dto/save-professional-details.dto';
 import { SubmitProfessionalApplicationUseCase } from '../application/use-cases/submit-professional-application.use-case';
@@ -22,7 +28,11 @@ export class ApplicationsController {
     private readonly submitProfessionalApplication: SubmitProfessionalApplicationUseCase,
     private readonly saveLoanSelection: SaveLoanSelectionUseCase,
     private readonly saveKycDocuments: SaveKycDocumentsUseCase,
-    private readonly saveBankDetails: SaveBankDetailsUseCase
+    private readonly saveKycSelfie: SaveKycSelfieUseCase,
+    private readonly runKycLiveness: RunKycLivenessUseCase,
+    private readonly saveBankDetails: SaveBankDetailsUseCase,
+    private readonly lookupIfsc: LookupIfscUseCase,
+    private readonly submitVerifiedBank: SubmitVerifiedBankUseCase
   ) {}
 
   @Post('professional-details')
@@ -63,6 +73,52 @@ export class ApplicationsController {
     @UploadedFiles() files: Array<UploadedFileLike>
   ) {
     return this.saveKycDocuments.execute(req, files ?? []);
+  }
+
+  @Post('kyc/selfie')
+  @RateLimitByRoute('kyc-selfie')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    FileInterceptor('selfie', {
+      limits: { fileSize: 6 * 1024 * 1024 },
+    }),
+  )
+  @ApiOperation({ summary: 'Store customer selfie JPEG for the active application (webcam / camera)' })
+  @ApiOkResponse({ description: 'Selfie stored under customer UUID / selfie / application UUID' })
+  kycSelfieRoute(@Req() req: Request, @UploadedFile() selfie: UploadedFileLike | undefined) {
+    return this.saveKycSelfie.execute(req, selfie);
+  }
+
+  @Post('kyc/liveness')
+  @RateLimitByRoute('kyc-liveness')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Run Tenacio liveness on the stored selfie (TENACIO_LIVENESS_SERVICE + workflow id). No-op vendor call when KYC_LIVENESS_PAUSED is set.',
+  })
+  @ApiOkResponse({ description: 'Vendor outcome; updates application when HTTP call completes' })
+  kycLivenessRoute(@Req() req: Request) {
+    return this.runKycLiveness.execute(req);
+  }
+
+  @Post('bank/ifsc-lookup')
+  @RateLimitByRoute('bank-ifsc-lookup')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resolve IFSC via Tenacio (input.ifscNumber + consent); returns data for customer review' })
+  @ApiOkResponse({ description: 'Vendor envelope + parsed `details` when present' })
+  lookupIfscRoute(@Req() req: Request, @Body() body: LookupIfscDto) {
+    return this.lookupIfsc.execute(req, body);
+  }
+
+  @Post('bank/submit-verified')
+  @RateLimitByRoute('bank-submit-verified')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Penny-drop verify account + IFSC (Tenacio), then save disbursement and set application to IN_REVIEW',
+  })
+  @ApiOkResponse({ description: 'success + pennyDropOk + applicationStatus when saved' })
+  submitVerifiedBankRoute(@Req() req: Request, @Body() body: SubmitVerifiedBankDto) {
+    return this.submitVerifiedBank.execute(req, body);
   }
 
   @Post('bank-details')

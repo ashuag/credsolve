@@ -6,6 +6,7 @@ import {
   fetchCustomerGenderLookupValues,
   fetchCustomerOccupationLookupValues
 } from './api/lookup';
+import type { CustomerCityLookupOption } from './customer-city-lookup';
 import {
   CUSTOMER_GENDER_OPTIONS,
   CUSTOMER_OCCUPATION_OPTIONS,
@@ -17,14 +18,14 @@ import {
 } from './customer-details';
 
 type CustomerDetailLookupState = {
-  cityOptions: string[];
+  cityOptions: CustomerCityLookupOption[];
   genderOptions: Array<CustomerLookupOption<CustomerGenderValue>>;
   occupationOptions: Array<CustomerLookupOption<CustomerOccupationValue>>;
   isLoading: boolean;
 };
 
 type LookupCache = {
-  cityOptions: string[];
+  cityOptions: CustomerCityLookupOption[];
   genderOptions: Array<CustomerLookupOption<CustomerGenderValue>>;
   occupationOptions: Array<CustomerLookupOption<CustomerOccupationValue>>;
 };
@@ -52,7 +53,7 @@ export function useCustomerDetailLookups(
   options: UseCustomerDetailLookupsOptions = {}
 ): CustomerDetailLookupState {
   const { enableApiFetch = true } = options;
-  const [cityOptions, setCityOptions] = useState<string[]>([]);
+  const [cityOptions, setCityOptions] = useState<CustomerCityLookupOption[]>([]);
   const [genderOptions, setGenderOptions] = useState<Array<CustomerLookupOption<CustomerGenderValue>>>([]);
   const [occupationOptions, setOccupationOptions] = useState<Array<CustomerLookupOption<CustomerOccupationValue>>>([]);
   const [isLoading, setIsLoading] = useState(enableApiFetch);
@@ -93,13 +94,16 @@ export function useCustomerDetailLookups(
           return;
         }
 
-        const nextCityOptions = Array.from(
-          new Set(
-            cityValues
-              .map((value) => value.name.trim())
-              .filter((value) => value.length > 0)
-          )
-        );
+        const seen = new Set<number>();
+        const nextCityOptions: CustomerCityLookupOption[] = [];
+        for (const value of cityValues) {
+          const label = value.name.trim();
+          if (!label || !Number.isFinite(value.id)) continue;
+          if (seen.has(value.id)) continue;
+          seen.add(value.id);
+          nextCityOptions.push({ id: value.id, label });
+        }
+        nextCityOptions.sort((a, b) => a.label.localeCompare(b.label));
 
         const nextGenderOptions = dedupeOptions(
           genderValues

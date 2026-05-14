@@ -4,29 +4,33 @@
 
 export function PrivacyDocument() {
   return (
-    <article className="privacy-doc space-y-8 text-[0.9375rem] leading-relaxed text-slate-700 [&_h2]:scroll-mt-24 [&_h3]:scroll-mt-24">
-      <header className="space-y-4 border-b border-slate-200 pb-8">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-blue">Legal</p>
-        <h1 className="text-2xl font-black tracking-tight text-brand-navy md:text-3xl">Privacy Policy</h1>
-        <p className="text-sm font-semibold text-slate-600">MoneyCash</p>
-        <div className="rounded-xl border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm text-slate-800">
-          <p className="font-bold text-brand-navy">Official MoneyCash privacy policy</p>
-          <p className="mt-1 leading-snug">
-            This is the authoritative Privacy Policy for MoneyCash. It is published in full as the original, operative policy governing
-            how we collect, use, and protect information on the MoneyCash website and app—not a shortened or alternate version.
-          </p>
+    <article className="legal-doc flex flex-col gap-8 text-[0.9375rem] leading-[1.72] text-slate-600 sm:gap-10 [&_h2]:scroll-mt-28 [&_h3]:scroll-mt-24">
+      <header className="relative overflow-hidden rounded-2xl border border-[rgba(20,150,243,0.14)] bg-gradient-to-br from-[rgba(20,150,243,0.08)] via-white to-[rgba(255,197,25,0.07)] p-6 shadow-[0_8px_32px_rgba(23,44,113,0.06)] sm:rounded-3xl sm:p-8">
+        <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-brand-blue/15 blur-2xl" aria-hidden />
+        <div className="pointer-events-none absolute -bottom-10 left-1/4 h-28 w-28 rounded-full bg-brand-gold/20 blur-2xl" aria-hidden />
+        <div className="relative space-y-4">
+          <div className="mc-chip">Legal</div>
+          <h1 className="text-[1.65rem] font-black tracking-[-0.03em] text-brand-navy sm:text-3xl md:text-[2.1rem]">Privacy Policy</h1>
+          <p className="text-sm font-bold uppercase tracking-[0.18em] text-brand-muted">MoneyCash</p>
+          <div className="rounded-2xl border border-amber-200/70 bg-gradient-to-r from-amber-50/95 to-[rgba(255,250,235,0.95)] p-4 text-sm text-slate-800 shadow-sm sm:p-5">
+            <p className="font-black text-brand-navy">Official MoneyCash privacy policy</p>
+            <p className="mt-2 leading-relaxed text-slate-700">
+              This is the authoritative Privacy Policy for MoneyCash. It is published in full as the original, operative policy governing
+              how we collect, use, and protect information on the MoneyCash website and app—not a shortened or alternate version.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200/90 bg-slate-50/90 p-4 text-sm text-slate-700 shadow-sm sm:p-5">
+            <p className="font-black text-brand-navy">Registered office</p>
+            <p className="mt-2 leading-relaxed text-slate-600">
+              Add the official registered office address as shown on MoneyCash letterhead (same as corporate filings).
+            </p>
+          </div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Official document (reference)</p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
-          <p className="font-bold text-brand-navy">Registered office</p>
-          <p className="mt-1 text-slate-600">
-            Add the official registered office address as shown on MoneyCash letterhead (same as corporate filings).
-          </p>
-        </div>
-        <p className="text-sm italic text-slate-500">Official document (reference)</p>
       </header>
 
       <section className="space-y-4" id="pp-1">
-        <h2 className="text-lg font-black text-brand-navy">1. General</h2>
+        <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">1. General</h2>
         <p>
           This privacy policy (&quot;Privacy Policy&quot;) addresses the privacy rights relating to the assembling, use and protection of
           the information provided by the end user of app/web (as defined below) to MoneyCash (&quot;MoneyCash&quot;, &quot;we&quot;, &quot;us&quot;,
@@ -52,7 +56,7 @@ export function PrivacyDocument() {
       </section>
 
       <section className="space-y-4" id="pp-2">
-        <h2 className="text-lg font-black text-brand-navy">2. Information Collected</h2>
+        <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">2. Information Collected</h2>
         <p>
           <strong>2.1.</strong> As for creation of an account and to use the services provided by MoneyCash, users shall be
           required to register themselves on MoneyCash App/web, and as for registration, MoneyCash may require users to
@@ -146,15 +150,15 @@ export function PrivacyDocument() {
       <PrivacyGrievances />
       <PrivacyGoverningLaw />
 
-      <footer className="space-y-6 border-t border-slate-200 pt-8">
-        <p className="text-center text-[0.8rem] font-black uppercase leading-snug tracking-wide text-brand-navy">
+      <footer className="mt-2 space-y-6 border-t border-[rgba(18,36,79,0.08)] pt-10">
+        <p className="rounded-xl border border-slate-200/80 bg-slate-50/80 p-4 text-center text-[0.72rem] font-black uppercase leading-relaxed tracking-wide text-brand-navy sm:p-5 sm:text-[0.75rem]">
           NOTWITHSTANDING ANYTHING SPECIFIED IN THIS PRIVACY POLICY, ALL PERMISSIONS GRANTED HEREIN, USE OF DATA / INFORMATION SHARED
           WITH MONEYCASH SHALL BE SUBJECT TO APPLICABLE LAWS AND REGULATIONS INCLUDING RULES/GUIDELINES FRAMED BY SECTOR SPECIFIC
           REGULATORS SUCH AS RBI, UIDAI etc..
         </p>
-        <div className="text-center">
-          <p className="text-lg font-black text-brand-navy">MoneyCash</p>
-          <p className="mt-2 text-sm text-slate-600">
+        <div className="rounded-2xl border border-[rgba(20,150,243,0.12)] bg-gradient-to-br from-white to-[rgba(244,249,255,0.9)] p-6 text-center shadow-sm">
+          <p className="text-xl font-black text-brand-navy">MoneyCash</p>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-brand-muted">
             Your trusted partner for personal loan requirements. Making financial dreams come true with quick approvals.
           </p>
         </div>
@@ -167,7 +171,7 @@ function PrivacyUseAndCookies() {
   return (
     <>
       <section className="space-y-4" id="pp-3">
-        <h2 className="text-lg font-black text-brand-navy">3. Use of the Information</h2>
+        <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">3. Use of the Information</h2>
         <p>
           <strong>3.1.</strong> The information collected from user shall be used for the following purposes only:
         </p>
@@ -219,7 +223,7 @@ function PrivacyUseAndCookies() {
           <li>as otherwise provided in this Privacy Policy and in compliance with the applicable laws.</li>
         </ul>
 
-        <h3 className="text-base font-bold text-brand-navy">3.2 Cookies</h3>
+        <h3 className="mt-4 text-[0.95rem] font-bold text-brand-navy">3.2 Cookies</h3>
         <p>
           <strong>3.2.1</strong> A &quot;cookie&quot; is a small piece of information stored by MoneyCash&apos;s server on MoneyCash&apos;s
           browser so it can be later read back from that browser. Cookies are useful for enabling the browser to remember information
@@ -261,7 +265,7 @@ function PrivacyUseAndCookies() {
 function PrivacyRetention() {
   return (
     <section className="space-y-4" id="pp-4">
-      <h2 className="text-lg font-black text-brand-navy">4. Retention of Data</h2>
+      <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">4. Retention of Data</h2>
       <p>
         <strong>4.1.</strong> After termination of user account, MoneyCash shall destroy the data collected from user, except the
         records and the data pertaining to the transactions undertaken using MoneyCash&apos;s services on the App/web, and where
@@ -296,7 +300,7 @@ function PrivacyRetention() {
 function PrivacyDisclosure() {
   return (
     <section className="space-y-4" id="pp-5">
-      <h2 className="text-lg font-black text-brand-navy">5. Disclosure of Information</h2>
+      <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">5. Disclosure of Information</h2>
       <p>
         <strong>5.1.</strong> MoneyCash shall not be liable for disclosure of the Personal Information when done in accordance
         with this Privacy Policy or after otherwise obtaining users&apos; prior permission in this regard.
@@ -345,7 +349,7 @@ function PrivacyDisclosure() {
 function PrivacySecurity() {
   return (
     <section className="space-y-4" id="pp-6">
-      <h2 className="text-lg font-black text-brand-navy">6. Security</h2>
+      <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">6. Security</h2>
       <p>
         <strong>6.1.</strong> MoneyCash strives to ensure the security, integrity and privacy of users&apos; Personal Information from
         unauthorized access or unauthorized alteration, disclosure or destruction. MoneyCash adopt adequate measures to prevent
@@ -376,7 +380,7 @@ function PrivacySecurity() {
 function PrivacyLinks() {
   return (
     <section className="space-y-4" id="pp-7">
-      <h2 className="text-lg font-black text-brand-navy">7. Link to Other App/webs</h2>
+      <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">7. Link to Other App/webs</h2>
       <p>
         <strong>7.1.</strong> MoneyCash App/web may provide links to other apps/webs. These links are provided for user convenience
         only and the provision of these links does not mean that the other app/web s are related to or associated with MoneyCash.
@@ -400,7 +404,7 @@ function PrivacyLinks() {
 function PrivacyPermissions() {
   return (
     <section className="space-y-4" id="pp-8">
-      <h2 className="text-lg font-black text-brand-navy">8. Permissions</h2>
+      <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">8. Permissions</h2>
       <p>
         One time access/ permissions are being sought by the service provider/digital platform/APP, from the consumer at the event of
         downloading the application, registration or requesting for loan.
@@ -428,7 +432,7 @@ function PrivacyPermissions() {
 function PrivacyDiscretion() {
   return (
     <section className="space-y-3" id="pp-9">
-      <h2 className="text-lg font-black text-brand-navy">9. User Discretion</h2>
+      <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">9. User Discretion</h2>
       <p>
         User can always choose not to provide information, which is not mandatory in nature but in case the information required is
         mandatory and user does not wish to provide the requisite information, then user will not be able to access the app/web or the
@@ -443,7 +447,7 @@ function PrivacyDiscretion() {
 function PrivacyCommunications() {
   return (
     <section className="space-y-4" id="pp-10">
-      <h2 className="text-lg font-black text-brand-navy">10. Communications</h2>
+      <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">10. Communications</h2>
       <p>
         <strong>10.1</strong> MoneyCash may contact users via the App/web, e-mail address and phone number as provided by user.
         Users may also receive system-generated transactional e-mails such as confirmations, notification of receipt of payments,
@@ -460,7 +464,7 @@ function PrivacyCommunications() {
 function PrivacyRevision() {
   return (
     <section className="space-y-4" id="pp-11">
-      <h2 className="text-lg font-black text-brand-navy">11. Revision of the Privacy Policy</h2>
+      <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">11. Revision of the Privacy Policy</h2>
       <p>
         <strong>11.1.</strong> This Privacy Policy is subject to change at any time without prior notice to users, and MoneyCash
         does not bear any responsibility for notifying user on the same. Any changes will be effective upon posting of the revisions on
@@ -479,7 +483,7 @@ function PrivacyRevision() {
 function PrivacyGrievances() {
   return (
     <section className="space-y-4" id="pp-13">
-      <h2 className="text-lg font-black text-brand-navy">13. Grievances</h2>
+      <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">13. Grievances</h2>
       <p>
         MoneyCash shall address users&apos; grievances with respect to processing of information provided in relation to this Privacy
         Policy in a time bound manner. For this purpose, MoneyCash hereby designate a grievance officer to redress to any of
@@ -509,7 +513,7 @@ function PrivacyGrievances() {
 function PrivacyGoverningLaw() {
   return (
     <section className="space-y-3" id="pp-14">
-      <h2 className="text-lg font-black text-brand-navy">14. Governing law and dispute resolution</h2>
+      <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">14. Governing law and dispute resolution</h2>
       <p>
         This Privacy Policy shall be governed by and construed in accordance with the laws of India. All disputes in relation to the
         Privacy Policy will be adjudicated exclusively before a competent court in Delhi, India only.

@@ -22,7 +22,9 @@ export class VerifyPanDto {
   @Matches(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i, { message: 'Invalid PAN format.' })
   panNumber!: string;
 
-  @ApiProperty({ description: 'Full name as entered by the user (matched against vendor response).' })
+  @ApiProperty({
+    description: 'Full name as per PAN card, as entered by the user (matched against vendor response).',
+  })
   @IsString()
   @MinLength(2)
   @MaxLength(100)

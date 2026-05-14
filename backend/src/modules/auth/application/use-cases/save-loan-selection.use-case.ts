@@ -5,6 +5,7 @@ import { CustomerRepository } from '../../infrastructure/repositories/customer.r
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
+import { CheckLoanEligibilityUseCase } from './check-loan-eligibility.use-case';
 import type { SaveLoanSelectionDto } from '../dto/save-loan-selection.dto';
 
 function parseDateOnlyUtc(raw: string): Date {
@@ -29,7 +30,8 @@ export class SaveLoanSelectionUseCase {
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
     private readonly prisma: PrismaService,
-    private readonly settings: SettingsRepository
+    private readonly settings: SettingsRepository,
+    private readonly checkLoanEligibility: CheckLoanEligibilityUseCase,
   ) {}
 
   async execute(req: Request, dto: SaveLoanSelectionDto): Promise<{ success: true }> {
@@ -49,9 +51,11 @@ export class SaveLoanSelectionUseCase {
     }
 
     const loanSettings = await this.settings.loadLoanCalculationSettings();
-    if (dto.loanAmount < loanSettings.minLoanAmount || dto.loanAmount > loanSettings.maxLoanAmount) {
+    const { preApprovedAmountInr } = await this.checkLoanEligibility.computeForSeed(lead.uuid);
+    const maxSelectable = Math.min(loanSettings.maxLoanAmount, preApprovedAmountInr);
+    if (dto.loanAmount < loanSettings.minLoanAmount || dto.loanAmount > maxSelectable) {
       throw new BadRequestException(
-        `Loan amount must be between ${loanSettings.minLoanAmount} and ${loanSettings.maxLoanAmount}.`
+        `Loan amount must be between ${loanSettings.minLoanAmount} and ${maxSelectable} INR (minimum loan and your pre-approved limit).`,
       );
     }
 

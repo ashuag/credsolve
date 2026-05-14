@@ -5,6 +5,7 @@ export const OCCUPATION = {
     STUDENT: 'Students',
     HOMEMAKER: 'Homemaker',
     RETIRED: 'Retired',
+    UNEMPLOYED: 'Unemployed',
 } as const;
 
 export type Occupation = typeof OCCUPATION[keyof typeof OCCUPATION];

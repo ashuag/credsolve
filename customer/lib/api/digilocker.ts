@@ -56,7 +56,31 @@ export type DownloadAadhaarDigilockerResponse = {
   ok: boolean;
   httpStatus: number | null;
   vendor: unknown;
+  businessSuccess?: boolean;
+  persisted?: boolean;
 };
+
+function isRec(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+/** Best-effort message from Tenacio-style `vendor` bodies on download failures. */
+export function pickDigilockerDownloadErrorMessage(vendor: unknown): string | undefined {
+  if (!isRec(vendor)) return undefined;
+  const err = vendor.error;
+  if (typeof err === 'string') {
+    const m = err.trim();
+    if (m) return m;
+  }
+  if (isRec(err)) {
+    for (const key of ['message', 'description', 'detail'] as const) {
+      const val = err[key];
+      if (typeof val === 'string' && val.trim()) return val.trim();
+    }
+  }
+  if (typeof vendor.message === 'string' && vendor.message.trim()) return vendor.message.trim();
+  return undefined;
+}
 
 export async function initDigilockerSession(
   payload: InitDigilockerPayload = {},

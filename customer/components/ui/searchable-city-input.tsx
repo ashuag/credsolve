@@ -1,11 +1,20 @@
 'use client';
 
+import type { CustomerCityLookupOption } from '@/lib/customer-city-lookup';
+import { useState, useRef, useEffect } from 'react';
+
+export type CityInputChange = {
+  label: string;
+  /** Set when the user picks a row from the lookup list; cleared when they type freely. */
+  cityId: number | null;
+};
+
 type SearchableCityInputProps = {
   id: string;
   name: string;
   value: string;
-  options: string[];
-  onChange: (value: string) => void;
+  options: CustomerCityLookupOption[];
+  onChange: (next: CityInputChange) => void;
   className: string;
   placeholder: string;
   isLoading?: boolean;
@@ -14,8 +23,6 @@ type SearchableCityInputProps = {
   ariaInvalid?: boolean;
   ariaDescribedBy?: string;
 };
-
-import { useState, useRef, useEffect } from 'react';
 
 export function SearchableCityInput({
   id,
@@ -35,16 +42,13 @@ export function SearchableCityInput({
   const [searchTerm, setSearchTerm] = useState(value || '');
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Sync internal search term with external value
   useEffect(() => {
     setSearchTerm(value || '');
   }, [value]);
 
   const filteredOptions = (options || [])
-    .filter((opt) => 
-      opt.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .slice(0, 100); // Limit to 100 for performance
+    .filter((opt) => opt.label.toLowerCase().includes(searchTerm.toLowerCase()))
+    .slice(0, 100);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -56,16 +60,16 @@ export function SearchableCityInput({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSelect = (city: string) => {
-    setSearchTerm(city);
-    onChange(city);
+  const handleSelect = (city: CustomerCityLookupOption) => {
+    setSearchTerm(city.label);
+    onChange({ label: city.label, cityId: city.id });
     setIsOpen(false);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setSearchTerm(val);
-    onChange(val);
+    onChange({ label: val, cityId: null });
     if (!isOpen) setIsOpen(true);
   };
 
@@ -97,7 +101,7 @@ export function SearchableCityInput({
         <div className="absolute z-[100] mt-1 w-full max-h-[240px] overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-[0_12px_30px_rgba(0,0,0,0.1)] py-1 custom-scrollbar">
           {filteredOptions.map((option) => (
             <button
-              key={option}
+              key={`${option.id}-${option.label}`}
               type="button"
               onClick={() => handleSelect(option)}
               className="w-full text-left px-4 py-2.5 text-[0.9rem] text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center gap-2"
@@ -106,7 +110,7 @@ export function SearchableCityInput({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              {option}
+              {option.label}
             </button>
           ))}
         </div>

@@ -17,10 +17,9 @@ import { computeFixedRepaymentDate } from '@/lib/repayment-date';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { Spinner } from '@/components/ui/spinner';
 
-const MIN_LOAN_AMOUNT = 5_000;
 const DEFAULT_LOAN_SETTINGS: LoanCalculationSettingsResponse = {
-  minLoanAmount: 5000,
-  maxLoanAmount: 50000,
+  minLoanAmount: 2000,
+  maxLoanAmount: 30000,
   loanTenureDays: 30,
   roiPerDayPercent: 1,
   processingFeePercent: 2,
@@ -86,9 +85,13 @@ export default function LoanSelectionPage() {
     };
   }, [router]);
 
-  const maxSelectableAmount = Math.max(
-    settings.minLoanAmount,
-    Math.min(eligibleAmount ?? settings.maxLoanAmount, settings.maxLoanAmount)
+  /** Slider: product floor … up to pre-approved eligible amount (never above product `maxLoanAmount`). */
+  const sliderMin = settings.minLoanAmount;
+  const sliderMax = Math.max(
+    sliderMin,
+    eligibleAmount != null
+      ? Math.min(eligibleAmount, settings.maxLoanAmount)
+      : settings.maxLoanAmount,
   );
 
   const today = useMemo(() => new Date(), []);
@@ -96,13 +99,11 @@ export default function LoanSelectionPage() {
   const selectedEndDate = useMemo(() => toDateInputValue(fixedRepaymentDate), [fixedRepaymentDate]);
 
   const [loanPurpose, setLoanPurpose] = useState('');
-  const [selectedAmount, setSelectedAmount] = useState(Math.min(maxSelectableAmount, 25_000));
+  const [selectedAmount, setSelectedAmount] = useState(DEFAULT_LOAN_SETTINGS.minLoanAmount);
 
   useEffect(() => {
-    setSelectedAmount((prev) =>
-      Math.min(maxSelectableAmount, Math.max(settings.minLoanAmount, prev))
-    );
-  }, [maxSelectableAmount, settings.minLoanAmount]);
+    setSelectedAmount((prev) => Math.min(sliderMax, Math.max(sliderMin, prev)));
+  }, [sliderMax, sliderMin]);
 
   const tenureDays = useMemo(() => {
     return diffDays(today, fixedRepaymentDate);
@@ -199,7 +200,8 @@ export default function LoanSelectionPage() {
           Customize your loan.
         </h1>
         <p className="text-[0.95rem] text-slate-500 mb-8 leading-relaxed">
-          Adjust the loan amount to fit your needs. Repayment date follows our schedule (month-end rule). Your summary updates on the left.
+          Choose an amount between your minimum loan and your pre-approved limit. Repayment date follows our schedule
+          (month-end rule). Your summary updates on the left.
         </p>
 
         <div className="grid gap-6">
@@ -210,16 +212,16 @@ export default function LoanSelectionPage() {
             </div>
             <input
               type="range"
-              min={settings.minLoanAmount}
-              max={maxSelectableAmount}
+              min={sliderMin}
+              max={sliderMax}
               step={500}
               value={selectedAmount}
               onChange={(e) => setSelectedAmount(Number(e.target.value))}
               className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand-blue"
             />
             <div className="flex justify-between mt-2 text-[0.65rem] font-bold text-slate-400">
-              <span>{formatInr(settings.minLoanAmount)}</span>
-              <span>{formatInr(maxSelectableAmount)}</span>
+              <span>{formatInr(sliderMin)}</span>
+              <span>{formatInr(sliderMax)}</span>
             </div>
           </div>
 

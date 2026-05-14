@@ -6,8 +6,10 @@ import {
   extractDigilockerSessionToken,
 } from '../../../../common/vendor/digilocker-response.util';
 import { DigilockerVendorService } from '../../../../common/vendor/digilocker-vendor.service';
+import { assertApplicationKycNotCompleted } from '../../../../common/kyc/application-kyc-guard.util';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
+import { ApplicationRepository } from '../../infrastructure/repositories/application.repository';
 import type { InitDigilockerDto } from '../dto/init-digilocker.dto';
 
 export type InitDigilockerResult = {
@@ -27,6 +29,7 @@ export class InitDigilockerUseCase {
   constructor(
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
+    private readonly applications: ApplicationRepository,
     private readonly digilocker: DigilockerVendorService,
   ) {}
 
@@ -45,6 +48,12 @@ export class InitDigilockerUseCase {
     if (!lead) {
       throw new BadRequestException('No active loan application was found for your account.');
     }
+
+    const application = await this.applications.ensureDraftApplicationForLead({
+      leadId: lead.id,
+      customerId: customer.id,
+    });
+    assertApplicationKycNotCompleted(application.kycStatus);
 
     const redirectUrl = resolveDigilockerRedirectUrl(dto.redirectUrl);
 

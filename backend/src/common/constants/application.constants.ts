@@ -7,3 +7,11 @@ export const APPLICATION_STATUS = {
 } as const;
 
 export type ApplicationStatus = (typeof APPLICATION_STATUS)[keyof typeof APPLICATION_STATUS];
+
+/** `application.kyc_status` (SmallInt). */
+export const APPLICATION_KYC_STATUS = {
+  NOT_DONE: 0,
+  COMPLETED: 1,
+  FAILED: 2,
+  TECHNICAL_ISSUE: 3,
+} as const;

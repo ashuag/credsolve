@@ -43,6 +43,19 @@ export type CustomerLoanSelectionSnapshot = {
   maturityDate: string | null;
 };
 
+export type CustomerKycFaceProgress = {
+  applicationKycStatus: number;
+  digilockerAadhaarCaptured: boolean;
+  selfieCaptured: boolean;
+  livenessPassed: boolean;
+  /** When `false`, face step does not require calling the liveness API (server pause). */
+  livenessRequired?: boolean;
+  digilockerAadhaarForm: unknown | null;
+  digilockerAadhaarPhotoUrl: string | null;
+  /** Cookie-auth `GET …/auth/kyc/selfie-photo` when a selfie exists. */
+  kycSelfiePhotoUrl?: string | null;
+};
+
 export type CustomerSessionResponse =
   | {
       authenticated: true;
@@ -57,6 +70,7 @@ export type CustomerSessionResponse =
         bankDetailsCompleted: boolean;
       };
       loanSelection: CustomerLoanSelectionSnapshot | null;
+      kycFaceProgress: CustomerKycFaceProgress | null;
     }
   | { authenticated: false };
 
@@ -112,6 +126,18 @@ export function getCustomerJourneyResumePath(
   if (!journey.detailsCompleted) return '/onboarding?mode=login';
   if (!journey.loanSelectionCompleted) return '/pre-approved-loan';
   if (!session.lead.emailVerified) return CUSTOMER_EMAIL_VERIFY_PATH;
+
+  const kyc = session.kycFaceProgress;
+  const livenessNeeded = kyc?.livenessRequired !== false;
+  if (
+    !journey.kycCompleted &&
+    kyc?.applicationKycStatus !== 1 &&
+    kyc?.digilockerAadhaarCaptured &&
+    (!kyc.selfieCaptured || (livenessNeeded && !kyc.livenessPassed))
+  ) {
+    return '/kyc/selfie';
+  }
+
   if (!journey.kycCompleted) return '/kyc';
   if (!journey.bankDetailsCompleted) return '/bank-details';
   return '/thank-you';
@@ -146,6 +172,15 @@ export function getCustomerPostAuthResumePath(
 export function getPostDigilockerAadhaarContinuePath(
   session: Extract<CustomerSessionResponse, { authenticated: true }>
 ): string {
+  const kyc = session.kycFaceProgress;
+  const livenessNeeded = kyc?.livenessRequired !== false;
+  if (
+    kyc?.applicationKycStatus !== 1 &&
+    kyc?.digilockerAadhaarCaptured &&
+    (!kyc.selfieCaptured || (livenessNeeded && !kyc.livenessPassed))
+  ) {
+    return '/kyc/selfie';
+  }
   const resume = getCustomerJourneyResumePath(session);
   if (resume === '/bank-details') {
     return '/loan-selection';

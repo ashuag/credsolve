@@ -27,6 +27,13 @@ function formatDateTime(iso: string | null | undefined) {
   });
 }
 
+function formatDateOnly(iso: string | null | undefined) {
+  if (!iso) return '—';
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 function formatInr(value: string | null | undefined): string {
   if (value == null || value === '') return '—';
   const n = Number(value);
@@ -297,6 +304,39 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
                 Source: <span className="ml-1 text-brand-text">{sourceSummary(lead)}</span>
               </span>
             </div>
+            {(lead.rejectionReason ||
+              lead.leadStatusNote ||
+              lead.bureauFetchedNote ||
+              lead.statusCode.toUpperCase() === 'REJECTED') ? (
+              <dl className="m-0 mt-4 grid gap-3 rounded-[12px] border border-[rgba(23,44,113,0.1)] bg-[rgba(248,250,255,0.85)] px-4 py-3 text-[0.84rem] leading-relaxed">
+                {(lead.rejectionReason || lead.statusCode.toUpperCase() === 'REJECTED') && (
+                  <div>
+                    <dt className="m-0 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
+                      Rejection reason
+                    </dt>
+                    <dd className="m-0 mt-1 font-semibold text-brand-text">
+                      {lead.rejectionReason ? lead.rejectionReason.label : '—'}
+                    </dd>
+                  </div>
+                )}
+                {lead.leadStatusNote ? (
+                  <div>
+                    <dt className="m-0 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
+                      Notes
+                    </dt>
+                    <dd className="m-0 mt-1 whitespace-pre-wrap break-words text-brand-text">{lead.leadStatusNote}</dd>
+                  </div>
+                ) : null}
+                {lead.bureauFetchedNote ? (
+                  <div>
+                    <dt className="m-0 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
+                      Bureau / vendor note
+                    </dt>
+                    <dd className="m-0 mt-1 whitespace-pre-wrap break-words text-brand-text">{lead.bureauFetchedNote}</dd>
+                  </div>
+                ) : null}
+              </dl>
+            ) : null}
           </div>
           <div className="grid w-full max-w-sm gap-2 rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.72)] p-4 text-[0.82rem] lg:justify-self-end">
             <div className="flex justify-between gap-3 border-b border-[rgba(23,44,113,0.06)] pb-2">
@@ -310,6 +350,28 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
           </div>
         </div>
       </header>
+
+      <div
+        className={
+          lead.applications.length === 0
+            ? 'rounded-[14px] border border-[rgba(100,116,139,0.25)] bg-[rgba(100,116,139,0.07)] px-4 py-3 text-[0.84rem] leading-relaxed text-brand-navy'
+            : 'rounded-[14px] border border-[rgba(20,150,243,0.22)] bg-[rgba(20,150,243,0.06)] px-4 py-3 text-[0.84rem] leading-relaxed text-brand-navy'
+        }
+      >
+        {lead.applications.length === 0 ? (
+          <>
+            <strong className="font-extrabold">Lead-only workspace.</strong>{' '}
+            No loan application has been created yet, so product, eligibility, and agreement data will appear once the
+            customer starts an application. Everything below reflects intake and onboarding captured on the lead.
+          </>
+        ) : (
+          <>
+            <strong className="font-extrabold">Application created.</strong>{' '}
+            Borrower intake below stays on the lead for context; open each application card for loan terms, bureau
+            outcome, KYC flags, agreement, and disbursement.
+          </>
+        )}
+      </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <SectionCard
@@ -350,7 +412,8 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
         {profile ? (
           <DetailGrid
             rows={[
-              { label: 'Full name', value: profile.fullName ?? '—' },
+              { label: 'Full name as per PAN card', value: profile.fullName ?? '—' },
+              { label: 'Date of birth', value: formatDateOnly(profile.dateOfBirth ?? undefined) },
               { label: 'PAN', value: profile.panNumber ?? '—' },
               { label: 'Gender', value: profile.gender ?? '—' },
               { label: 'Occupation', value: profile.occupation ?? '—' },
@@ -376,7 +439,11 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
       <SectionCard
         eyebrow="Applications"
         title="Linked loan applications"
-        description="Each row is an application spawned from this lead. Status reflects the origination workflow stage."
+        description={
+          lead.applications.length === 0
+            ? 'When the customer starts an application, open it from here or from the Applications queue.'
+            : 'Loan structure and downstream checks live on each application page — use Open application for the full workspace.'
+        }
       >
         {lead.applications.length === 0 ? (
           <div className="rounded-[14px] border border-dashed border-[rgba(23,44,113,0.16)] bg-[rgba(248,250,255,0.5)] px-4 py-8 text-center">
@@ -411,8 +478,14 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
                       <dd className="m-0">{formatDateTime(application.createdAt)}</dd>
                     </div>
                   </dl>
-                  <div className="mt-3 flex justify-end border-t border-[rgba(23,44,113,0.04)] pt-3">
+                  <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-[rgba(23,44,113,0.04)] pt-3">
                     <CopyIdButton value={application.uuid} label="Application UUID" />
+                    <Link
+                      href={`/applications/${application.uuid}`}
+                      className="inline-flex min-h-[36px] items-center justify-center rounded-full bg-brand-navy px-4 text-[0.78rem] font-extrabold text-white no-underline shadow-sm transition-opacity hover:opacity-95"
+                    >
+                      Open application
+                    </Link>
                   </div>
                 </article>
               </li>

@@ -34,6 +34,8 @@ type Fields = {
   addressLine1: string;
   addressLine2: string;
   currentCity: string;
+  /** Populated when the user picks a row from `/lookup/cities` (preferred for save). */
+  currentCityId: number | null;
   pincode: string;
   monthlyIncome: string;
   annualTurnover: string;
@@ -133,6 +135,7 @@ export function PersonalDetailsStep({
     addressLine1: '',
     addressLine2: '',
     currentCity: '',
+    currentCityId: null,
     pincode: '',
     monthlyIncome: '',
     annualTurnover: '',
@@ -200,6 +203,7 @@ export function PersonalDetailsStep({
       addressLine1: p.addressLine1 ?? prev.addressLine1,
       addressLine2: p.addressLine2 ?? prev.addressLine2,
       currentCity: p.currentCity ?? prev.currentCity,
+      currentCityId: null,
       pincode: p.pincode ?? prev.pincode,
       monthlyIncome: p.monthlyIncome ?? prev.monthlyIncome,
       annualTurnover: p.annualTurnover ?? prev.annualTurnover,
@@ -289,7 +293,7 @@ export function PersonalDetailsStep({
     const next: FieldError = {};
 
     if (!fields.fullName.trim() || fields.fullName.trim().length < 2) {
-      next.fullName = 'Please enter your full name.';
+      next.fullName = 'Please enter your full name as per your PAN card.';
     }
     if (!dobDisplay.trim()) {
       next.dob = 'Please enter your date of birth.';
@@ -408,6 +412,7 @@ export function PersonalDetailsStep({
         addressLine1: fields.addressLine1.trim(),
         ...(fields.addressLine2.trim() ? { addressLine2: fields.addressLine2.trim() } : {}),
         currentCity: fields.currentCity.trim(),
+        ...(fields.currentCityId != null ? { currentCityId: fields.currentCityId } : {}),
         pincode: fields.pincode,
         ...(usesMonthlyIncome ? { monthlyIncome: fields.monthlyIncome.trim() } : {}),
         ...(isSelfEmployed
@@ -468,7 +473,7 @@ export function PersonalDetailsStep({
             <div className="w-full">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
                 <div className="md:col-span-2">
-                  <FieldGroup label="Full name" htmlFor="fullName" error={errors.fullName}>
+                  <FieldGroup labelSentenceCase label="Full name as per PAN card" htmlFor="fullName" error={errors.fullName}>
                     <input
                       id="fullName"
                       name="fullName"
@@ -710,8 +715,12 @@ export function PersonalDetailsStep({
                     name="currentCity"
                     value={fields.currentCity}
                     options={cityOptions}
-                    onChange={(value) => {
-                      setFields((prev) => ({ ...prev, currentCity: value }));
+                    onChange={(next) => {
+                      setFields((prev) => ({
+                        ...prev,
+                        currentCity: next.label,
+                        currentCityId: next.cityId,
+                      }));
                       if (errors.currentCity) setErrors((prev) => ({ ...prev, currentCity: undefined }));
                     }}
                     className={inputClass(Boolean(errors.currentCity))}
@@ -790,12 +799,21 @@ type FieldGroupProps = {
   htmlFor: string;
   error?: string;
   children: ReactNode;
+  /** Long labels read better without `uppercase` (e.g. legal wording). */
+  labelSentenceCase?: boolean;
 };
 
-function FieldGroup({ label, htmlFor, error, children }: FieldGroupProps) {
+function FieldGroup({ label, htmlFor, error, children, labelSentenceCase }: FieldGroupProps) {
   return (
     <div className="flex flex-col gap-1.5 w-full">
-      <label htmlFor={htmlFor} className="text-[0.75rem] font-bold text-slate-500 uppercase tracking-wider pl-1">
+      <label
+        htmlFor={htmlFor}
+        className={
+          labelSentenceCase
+            ? 'text-[0.75rem] font-bold text-slate-600 tracking-normal pl-1 leading-snug'
+            : 'text-[0.75rem] font-bold text-slate-500 uppercase tracking-wider pl-1'
+        }
+      >
         {label}
       </label>
       {children}

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { BreModule } from '../../common/bre/bre.module';
 import { EmailModule } from '../../common/email/email.module';
 import { VendorApiModule } from '../../common/vendor/vendor-api.module';
+import { KycFilesService } from '../../common/kyc/kyc-files.service';
 import { RedisIpRateLimitGuard } from '../../common/rate-limit/redis-ip-rate-limit.guard';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { CheckLoanEligibilityUseCase } from './application/use-cases/check-loan-eligibility.use-case';
@@ -19,8 +20,14 @@ import { PostBureauOfferService } from './application/services/post-bureau-offer
 import { VerifyPanUseCase } from './application/use-cases/verify-pan.use-case';
 import { InitDigilockerUseCase } from './application/use-cases/init-digilocker.use-case';
 import { DownloadAadhaarDigilockerUseCase } from './application/use-cases/download-aadhaar-digilocker.use-case';
+import { RunKycLivenessUseCase } from './application/use-cases/run-kyc-liveness.use-case';
+import { SaveKycSelfieUseCase } from './application/use-cases/save-kyc-selfie.use-case';
+import { ServeDigilockerAadhaarPhotoUseCase } from './application/use-cases/serve-digilocker-aadhaar-photo.use-case';
+import { ServeKycSelfiePhotoUseCase } from './application/use-cases/serve-kyc-selfie-photo.use-case';
 import { SaveKycDocumentsUseCase } from './application/use-cases/save-kyc-documents.use-case';
 import { SaveBankDetailsUseCase } from './application/use-cases/save-bank-details.use-case';
+import { LookupIfscUseCase } from './application/use-cases/lookup-ifsc.use-case';
+import { SubmitVerifiedBankUseCase } from './application/use-cases/submit-verified-bank.use-case';
 import { OtpCodeGenerator } from './infrastructure/crypto/otp-code.generator';
 import { CustomerGoogleOauthService } from './infrastructure/google/customer-google-oauth.service';
 import { CustomerRepository } from './infrastructure/repositories/customer.repository';
@@ -75,11 +82,18 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     SaveLoanSelectionUseCase,
     SaveKycDocumentsUseCase,
     SaveBankDetailsUseCase,
+    LookupIfscUseCase,
+    SubmitVerifiedBankUseCase,
     SendOtpUseCase,
     VerifyOtpUseCase,
     VerifyPanUseCase,
     InitDigilockerUseCase,
     DownloadAadhaarDigilockerUseCase,
+    KycFilesService,
+    SaveKycSelfieUseCase,
+    RunKycLivenessUseCase,
+    ServeDigilockerAadhaarPhotoUseCase,
+    ServeKycSelfiePhotoUseCase,
     GetCustomerSessionUseCase,
     GetCustomerLoansDashboardUseCase,
     LogoutUseCase,

@@ -2,13 +2,14 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
-
-const MIN_INR = 5_000;
-const MAX_INR = 50_000;
+import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
 
 export type LoanEligibilityResult = {
-  /** Pre-approved offer ceiling in whole INR (deterministic from seed until real rules exist). */
+  /** Pre-approved offer ceiling in whole INR (deterministic from seed; clamped to settings min/max). */
   preApprovedAmountInr: number;
+  /** Bounds from `MIN_LOAN_AMOUNT` / `MAX_LOAN_AMOUNT` settings (same as `GET /loans/settings`). */
+  minLoanAmountInr: number;
+  maxLoanAmountInr: number;
 };
 
 function hashStringToUint32(s: string): number {
@@ -22,22 +23,27 @@ function hashStringToUint32(s: string): number {
 
 /**
  * Demo pre-approval: maps a stable seed (e.g. lead UUID) to an amount in
- * [MIN_INR, MAX_INR]. Same seed always yields the same ceiling so
- * `GET /loans/eligibility` matches amounts computed during application submit.
- * Replace with bureau / rules engine when ready.
+ * [`MIN_LOAN_AMOUNT`, `MAX_LOAN_AMOUNT`] from settings. Same seed always yields
+ * the same ceiling so `GET /loans/eligibility` matches amounts computed during
+ * application submit. Replace with bureau / rules engine when ready.
  */
 @Injectable()
 export class CheckLoanEligibilityUseCase {
   constructor(
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
+    private readonly settings: SettingsRepository,
   ) {}
 
   /** Use when the active lead UUID is already known (e.g. professional submit). */
-  computeForSeed(seed: string): LoanEligibilityResult {
-    const span = MAX_INR - MIN_INR + 1;
-    const preApprovedAmountInr = MIN_INR + (hashStringToUint32(seed) % span);
-    return { preApprovedAmountInr };
+  async computeForSeed(seed: string): Promise<LoanEligibilityResult> {
+    const { minLoanAmount, maxLoanAmount } = await this.settings.loadLoanCalculationSettings();
+    const minInr = Math.max(1, Math.floor(minLoanAmount));
+    const maxInr = Math.max(minInr, Math.floor(maxLoanAmount));
+    const span = maxInr - minInr + 1;
+    const raw = minInr + (hashStringToUint32(seed) % span);
+    const preApprovedAmountInr = Math.min(maxInr, Math.max(minInr, raw));
+    return { preApprovedAmountInr, minLoanAmountInr: minInr, maxLoanAmountInr: maxInr };
   }
 
   /**
@@ -57,6 +63,6 @@ export class CheckLoanEligibilityUseCase {
 
     const lead = await this.leads.findActiveSummaryForCustomer(customer.id);
     const seed = lead?.uuid ?? `customer:${customer.id.toString()}`;
-    return this.computeForSeed(seed);
+    return await this.computeForSeed(seed);
   }
 }

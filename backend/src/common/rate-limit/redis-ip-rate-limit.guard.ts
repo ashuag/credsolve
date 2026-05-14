@@ -33,6 +33,10 @@ const DEFAULTS: Record<RateLimitRouteId, { max: number; windowSec: number }> = {
   'loan-selection': { max: 30, windowSec: 3600 },
   'kyc-documents': { max: 20, windowSec: 3600 },
   'bank-details': { max: 20, windowSec: 3600 },
+  'bank-ifsc-lookup': { max: 40, windowSec: 3600 },
+  'bank-submit-verified': { max: 15, windowSec: 3600 },
+  'kyc-selfie': { max: 30, windowSec: 3600 },
+  'kyc-liveness': { max: 25, windowSec: 3600 },
 };
 
 @Injectable()

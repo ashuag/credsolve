@@ -235,7 +235,12 @@ export function ApplicationsPanel() {
                   >
                     <td className="px-4 py-2.5">
                       <div className="min-w-[220px]">
-                        <strong className="block text-brand-text text-[0.84rem] break-all">{application.uuid}</strong>
+                        <Link
+                          href={`/applications/${application.uuid}`}
+                          className="block text-brand-blue no-underline hover:underline"
+                        >
+                          <strong className="block text-brand-text text-[0.84rem] break-all">{application.uuid}</strong>
+                        </Link>
                         <span className="block text-brand-muted text-[0.75rem] break-all">
                           {application.leadUuid ? (
                             <>

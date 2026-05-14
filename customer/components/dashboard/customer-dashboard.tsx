@@ -18,6 +18,7 @@ import {
   type CustomerSessionResponse,
 } from '@/lib/api/customer-session';
 import { cn } from '@/lib/cn';
+import { formatIsoDateDdMmYyyy } from '@/lib/format-date';
 
 type JourneyStepState = 'done' | 'current' | 'todo';
 
@@ -71,18 +72,6 @@ function buildJourneySteps(
     completed,
     total,
   };
-}
-
-function formatIsoDate(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const [y, m, d] = iso.split('-').map((v) => Number.parseInt(v, 10));
-  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return iso;
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
 }
 
 function statusBadgeClass(status: string): string {
@@ -314,7 +303,7 @@ function LoanSummaryCard({ loan, emphasize }: { loan: CustomerLoanCard; emphasiz
         </div>
         <div>
           <dt className="text-[0.7rem] font-bold uppercase tracking-wider text-slate-400">Maturity</dt>
-          <dd className="font-bold text-brand-navy">{formatIsoDate(loan.maturityDate)}</dd>
+          <dd className="font-bold text-brand-navy">{formatIsoDateDdMmYyyy(loan.maturityDate)}</dd>
         </div>
         {loan.disbursedAt && (
           <div className="sm:col-span-2">
@@ -550,7 +539,7 @@ export function CustomerDashboard() {
                 >
                   <div>
                     <p className="font-bold text-brand-navy">{line.label}</p>
-                    <p className="text-sm text-brand-muted">Due {formatIsoDate(line.dueDate)}</p>
+                    <p className="text-sm text-brand-muted">Due {formatIsoDateDdMmYyyy(line.dueDate)}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
                     <span className="text-xl font-extrabold text-brand-navy">{formatInr(line.amount)}</span>

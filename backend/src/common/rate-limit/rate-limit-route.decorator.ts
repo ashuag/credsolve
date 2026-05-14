@@ -15,7 +15,11 @@ export type RateLimitRouteId =
   | 'professional-details'
   | 'loan-selection'
   | 'kyc-documents'
-  | 'bank-details';
+  | 'bank-details'
+  | 'bank-ifsc-lookup'
+  | 'bank-submit-verified'
+  | 'kyc-selfie'
+  | 'kyc-liveness';
 
 /** Marks a handler for Redis fixed-window rate limiting by client IP (see RedisIpRateLimitGuard). */
 export const RateLimitByRoute = (id: RateLimitRouteId) => SetMetadata(RATE_LIMIT_ROUTE_KEY, id);

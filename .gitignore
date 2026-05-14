@@ -44,3 +44,7 @@ Thumbs.db
 ## Generated code
 /backend/src/generated/prisma/
 los/public/image
+
+## Local KYC file store (DigiLocker photo, selfie under storage/customer/…)
+backend/storage/customer/
+backend/storage/kyc-files/

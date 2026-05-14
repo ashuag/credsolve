@@ -30,6 +30,8 @@ export type SaveLeadDetailsPayload = {
   addressLine1: string;
   addressLine2?: string;
   currentCity: string;
+  /** When set, backend resolves city by id (from `GET /lookup/cities`). */
+  currentCityId?: number;
   pincode: string;
   monthlyIncome?: string;
   annualTurnover?: string;
@@ -183,9 +185,54 @@ export type SaveKycDocumentsPayload = {
 export type SaveBankDetailsPayload = {
   accountNumber: string;
   ifscCode: string;
-  bankName: string;
-  accountHolderName?: string;
+  bankName?: string;
+  verifiedBankName?: string;
 };
+
+export type IfscLookupResponse = {
+  configured: boolean;
+  skipReason?: string;
+  ok: boolean;
+  httpStatus: number | null;
+  details: Record<string, unknown> | null;
+  vendor: unknown | null;
+};
+
+export async function lookupBankIfsc(ifscNumber: string): Promise<IfscLookupResponse | null> {
+  return apiPost<IfscLookupResponse>(
+    '/applications/bank/ifsc-lookup',
+    { ifscNumber: ifscNumber.trim().toUpperCase() },
+    'Unable to look up IFSC.',
+    { timeoutMs: 30_000 },
+  );
+}
+
+export type SubmitVerifiedBankResponse = {
+  success: boolean;
+  pennyDropOk: boolean;
+  applicationStatus: string | null;
+  message?: string;
+  vendor?: unknown;
+};
+
+export async function submitVerifiedBankDetails(payload: {
+  accountNumber: string;
+  ifscCode: string;
+  verifiedBankName?: string;
+}): Promise<SubmitVerifiedBankResponse | null> {
+  return apiPost<SubmitVerifiedBankResponse>(
+    '/applications/bank/submit-verified',
+    {
+      accountNumber: payload.accountNumber.replace(/\D/g, ''),
+      ifscCode: payload.ifscCode.trim().toUpperCase(),
+      ...(payload.verifiedBankName?.trim()
+        ? { verifiedBankName: payload.verifiedBankName.trim() }
+        : {}),
+    },
+    'Unable to verify bank account.',
+    { timeoutMs: 60_000 },
+  );
+}
 
 export type LoanBanksResponse = {
   banks: string[];

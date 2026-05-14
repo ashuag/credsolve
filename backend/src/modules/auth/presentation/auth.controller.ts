@@ -17,6 +17,8 @@ import { VerifyOtpUseCase } from '../application/use-cases/verify-otp.use-case';
 import { VerifyPanUseCase } from '../application/use-cases/verify-pan.use-case';
 import { InitDigilockerUseCase } from '../application/use-cases/init-digilocker.use-case';
 import { DownloadAadhaarDigilockerUseCase } from '../application/use-cases/download-aadhaar-digilocker.use-case';
+import { ServeDigilockerAadhaarPhotoUseCase } from '../application/use-cases/serve-digilocker-aadhaar-photo.use-case';
+import { ServeKycSelfiePhotoUseCase } from '../application/use-cases/serve-kyc-selfie-photo.use-case';
 import { InitDigilockerDto } from '../application/dto/init-digilocker.dto';
 import { DownloadAadhaarDigilockerDto } from '../application/dto/download-aadhaar-digilocker.dto';
 import { buildCustomerAuthCookieOptions } from '../infrastructure/session/customer-auth-cookie.util';
@@ -48,7 +50,9 @@ export class AuthController {
     private readonly saveLeadDetailsFlow: SaveLeadDetailsUseCase,
     private readonly verifyPanFlow: VerifyPanUseCase,
     private readonly initDigilockerFlow: InitDigilockerUseCase,
-    private readonly downloadAadhaarDigilockerFlow: DownloadAadhaarDigilockerUseCase
+    private readonly downloadAadhaarDigilockerFlow: DownloadAadhaarDigilockerUseCase,
+    private readonly serveDigilockerAadhaarPhotoFlow: ServeDigilockerAadhaarPhotoUseCase,
+    private readonly serveKycSelfiePhotoFlow: ServeKycSelfiePhotoUseCase
   ) {}
 
   @Post('send-otp')
@@ -105,6 +109,24 @@ export class AuthController {
   @ApiOperation({ summary: 'Return the current customer session if the auth cookie is valid' })
   me(@Req() req: Request) {
     return this.customerSession.execute(req);
+  }
+
+  @Get('kyc/digilocker-aadhaar-photo')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @ApiOperation({
+    summary: 'Stream Aadhaar photo saved after DigiLocker download (requires session cookie)',
+  })
+  async digilockerAadhaarPhoto(@Req() req: Request, @Res() res: Response): Promise<void> {
+    await this.serveDigilockerAadhaarPhotoFlow.execute(req, res);
+  }
+
+  @Get('kyc/selfie-photo')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @ApiOperation({
+    summary: 'Stream the selfie JPEG saved for the active application (requires session cookie)',
+  })
+  async kycSelfiePhoto(@Req() req: Request, @Res() res: Response): Promise<void> {
+    await this.serveKycSelfiePhotoFlow.execute(req, res);
   }
 
   @Get('my-loans')

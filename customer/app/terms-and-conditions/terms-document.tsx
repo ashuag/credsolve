@@ -4,30 +4,36 @@
 
 export function TermsDocument() {
   return (
-    <article className="terms-doc space-y-8 text-[0.9375rem] leading-relaxed text-slate-700 [&_h2]:scroll-mt-24 [&_h3]:scroll-mt-24">
-      <header className="space-y-4 border-b border-slate-200 pb-8">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-blue">Legal</p>
-        <h1 className="text-2xl font-black tracking-tight text-brand-navy md:text-3xl">Terms &amp; Conditions</h1>
-        <p className="text-sm font-semibold text-slate-600">MoneyCash</p>
-        <div className="rounded-xl border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm text-slate-800">
-          <p className="font-bold text-brand-navy">Official MoneyCash terms</p>
-          <p className="mt-1 leading-snug">
-            This is the authoritative Terms &amp; Conditions for the MoneyCash digital lending journey (website and mobile app). The
-            clauses below are published in full as the operative, original MoneyCash user agreement—not an abbreviated or substitute
-            summary.
-          </p>
+    <article className="legal-doc flex flex-col gap-8 text-[0.9375rem] leading-[1.72] text-slate-600 sm:gap-10 [&_h2]:scroll-mt-28 [&_h3]:scroll-mt-24">
+      <header className="relative overflow-hidden rounded-2xl border border-[rgba(20,150,243,0.14)] bg-gradient-to-br from-[rgba(20,150,243,0.08)] via-white to-[rgba(255,197,25,0.07)] p-6 shadow-[0_8px_32px_rgba(23,44,113,0.06)] sm:rounded-3xl sm:p-8">
+        <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-brand-blue/15 blur-2xl" aria-hidden />
+        <div className="pointer-events-none absolute -bottom-10 left-1/4 h-28 w-28 rounded-full bg-brand-gold/20 blur-2xl" aria-hidden />
+        <div className="relative space-y-4">
+          <div className="mc-chip">Legal</div>
+          <h1 className="text-[1.65rem] font-black tracking-[-0.03em] text-brand-navy sm:text-3xl md:text-[2.1rem]">
+            Terms &amp; Conditions
+          </h1>
+          <p className="text-sm font-bold uppercase tracking-[0.18em] text-brand-muted">MoneyCash</p>
+          <div className="rounded-2xl border border-amber-200/70 bg-gradient-to-r from-amber-50/95 to-[rgba(255,250,235,0.95)] p-4 text-sm text-slate-800 shadow-sm sm:p-5">
+            <p className="font-black text-brand-navy">Official MoneyCash terms</p>
+            <p className="mt-2 leading-relaxed text-slate-700">
+              This is the authoritative Terms &amp; Conditions for the MoneyCash digital lending journey (website and mobile app). The
+              clauses below are published in full as the operative, original MoneyCash user agreement—not an abbreviated or substitute
+              summary.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200/90 bg-slate-50/90 p-4 text-sm text-slate-700 shadow-sm sm:p-5">
+            <p className="font-black text-brand-navy">Registered office</p>
+            <p className="mt-2 leading-relaxed text-slate-600">
+              Add the official registered office address as shown on MoneyCash letterhead (same as corporate filings).
+            </p>
+          </div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Official document (reference)</p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
-          <p className="font-bold text-brand-navy">Registered office</p>
-          <p className="mt-1 text-slate-600">
-            Add the official registered office address as shown on MoneyCash letterhead (same as corporate filings).
-          </p>
-        </div>
-        <p className="text-sm italic text-slate-500">Official document (reference)</p>
       </header>
 
       <section className="space-y-3" id="section-1">
-        <h2 className="text-lg font-black text-brand-navy">1. GENERAL</h2>
+        <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">1. GENERAL</h2>
         <p>
           This Agreement is a contract between you and MoneyCash (&quot;MoneyCash&quot;, &quot;we&quot;, &quot;us&quot;, &quot;our&quot;) and applies to your use of the
           MoneyCash platform and related offerings (the &quot;Services&quot;). By registering for the Services, you must read, agree with
@@ -44,7 +50,7 @@ export function TermsDocument() {
       </section>
 
       <section className="space-y-3" id="section-2">
-        <h2 className="text-lg font-black text-brand-navy">2. ELIGIBILITY</h2>
+        <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">2. ELIGIBILITY</h2>
         <p>
           Use of the App is available only to persons who can form legally binding contracts under Indian Contract Act, 1872.
           Persons who are &quot;incompetent to contract&quot; within the meaning of the Indian Contract Act, 1872 including minors,
@@ -57,7 +63,7 @@ export function TermsDocument() {
       </section>
 
       <section className="space-y-3" id="section-3">
-        <h2 className="text-lg font-black text-brand-navy">3. PRIVACY</h2>
+        <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">3. PRIVACY</h2>
         <p>
           Any personal information submitted in connection with your use of the Offerings or the app is subject to Our Privacy
           Policy.
@@ -65,7 +71,7 @@ export function TermsDocument() {
       </section>
 
       <section className="space-y-3" id="section-4">
-        <h2 className="text-lg font-black text-brand-navy">4. REGISTRATION</h2>
+        <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">4. REGISTRATION</h2>
         <p>
           To use MoneyCash and access certain portions of the App, you will need to register and obtain an account, username and password.
           When you register, the information you provide to us during the registration process will help us in offering content,
@@ -85,7 +91,7 @@ export function TermsDocument() {
       </section>
 
       <section className="space-y-3" id="section-5">
-        <h2 className="text-lg font-black text-brand-navy">5. COMMUNICATIONS</h2>
+        <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">5. COMMUNICATIONS</h2>
         <p>
           When You use the App or send emails or other data, information or communication to us, You agree and understand that You
           are communicating with Us through electronic records and You consent to receive communications via electronic records from
@@ -95,7 +101,7 @@ export function TermsDocument() {
       </section>
 
       <section className="space-y-4" id="section-6">
-        <h2 className="text-lg font-black text-brand-navy">6. TRANSACTION AND COMMUNICATION PLATFORM</h2>
+        <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">6. TRANSACTION AND COMMUNICATION PLATFORM</h2>
         <p>
           <strong>a.</strong> The App is a platform that Users utilize to meet and interact with one another or with third party
           Vendor(s) for their transactions including services of granting, sanctioning, lending of short-term loans, through our NBFC
@@ -193,7 +199,7 @@ export function TermsDocument() {
       </section>
 
       <section className="space-y-4" id="section-7">
-        <h2 className="text-lg font-black text-brand-navy">7. INDEMNITY AND DISCLAIMER OF WARRANTY</h2>
+        <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">7. INDEMNITY AND DISCLAIMER OF WARRANTY</h2>
         <p>
           <strong>a.</strong> You shall indemnify and hold harmless MoneyCash its owner, licensee, affiliates, subsidiaries, group
           companies (as applicable) and their respective officers, directors, agents, and employees, from any claim or demand, or
@@ -227,7 +233,7 @@ export function TermsDocument() {
       </section>
 
       <section className="space-y-3" id="section-8">
-        <h2 className="text-lg font-black text-brand-navy">8. INTELLECTUAL PROPERTY RIGHTS</h2>
+        <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">8. INTELLECTUAL PROPERTY RIGHTS</h2>
         <p>
           <strong>a.</strong> This platform is controlled and operated by MoneyCash and all material on this site, including images,
           illustrations, audio clips, and video clips, are protected by copyrights, trademarks, and other intellectual property
@@ -247,7 +253,7 @@ export function TermsDocument() {
       </section>
 
       <section className="space-y-3" id="section-9">
-        <h2 className="text-lg font-black text-brand-navy">9. INTELLECTUAL PROPERTY AND TRADEMARK INFRINGEMENT COMPLAINTS</h2>
+        <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">9. INTELLECTUAL PROPERTY AND TRADEMARK INFRINGEMENT COMPLAINTS</h2>
         <p>
           MoneyCash respects the intellectual property of others. In case You feel that Your Trademark or Intellectual Property Rights have
           been infringed, You can write to us at{' '}
@@ -259,7 +265,7 @@ export function TermsDocument() {
       </section>
 
       <section className="space-y-3" id="section-10">
-        <h2 className="text-lg font-black text-brand-navy">10. DESCRIPTION</h2>
+        <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">10. DESCRIPTION</h2>
         <p>
           MoneyCash does not warrant that Product and / or Services description or other content of this App is accurate, complete,
           reliable, current, or error-free and assumes no liability in this regard.
@@ -267,7 +273,7 @@ export function TermsDocument() {
       </section>
 
       <section className="space-y-4" id="section-11">
-        <h2 className="text-lg font-black text-brand-navy">11. LIMITATION OF LIABILITY</h2>
+        <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">11. LIMITATION OF LIABILITY</h2>
         <p>
           <strong>a.</strong> In No Event Shall MoneyCash Be Liable For Any Special, Incidental, Indirect Or Consequential Damages Of Any
           Kind In Connection With These Terms Of Use, Even If User Has Been Informed In Advance Of The Possibility Of Such Damages.
@@ -293,7 +299,7 @@ export function TermsDocument() {
       </section>
 
       <section className="space-y-3" id="section-13">
-        <h2 className="text-lg font-black text-brand-navy">13. LINKS TO OTHER SITES</h2>
+        <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">13. LINKS TO OTHER SITES</h2>
         <p>
           Our App links to other websites that may collect personally identifiable information about you. MoneyCash is not responsible for
           the privacy practices or the content of those linked websites.
@@ -301,7 +307,7 @@ export function TermsDocument() {
       </section>
 
       <section className="space-y-3" id="section-14">
-        <h2 className="text-lg font-black text-brand-navy">14. APPLICABLE LAW AND JURISDICTION</h2>
+        <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">14. APPLICABLE LAW AND JURISDICTION</h2>
         <p>
           These Terms of Use shall be governed by and interpreted and construed in accordance with the laws of India. The place of
           jurisdiction shall be exclusively in Delhi.
@@ -310,8 +316,9 @@ export function TermsDocument() {
 
       <TermsPlatformUse />
 
-      <footer className="border-t border-slate-200 pt-8 text-center text-sm font-semibold text-slate-600">
-        MoneyCash
+      <footer className="mt-2 border-t border-[rgba(18,36,79,0.08)] pt-10 text-center">
+        <p className="text-sm font-bold uppercase tracking-[0.12em] text-brand-muted">MoneyCash</p>
+        <p className="mt-2 text-xs text-slate-400">Terms of use apply to all services on this platform.</p>
       </footer>
     </article>
   );
@@ -321,7 +328,7 @@ export function TermsDocument() {
 function TermsPlatformUse() {
   return (
     <section className="space-y-4" id="section-15">
-      <h2 className="text-lg font-black text-brand-navy">15. PLATFORM USE</h2>
+      <h2 className="text-base font-black tracking-tight text-brand-navy sm:text-lg">15. PLATFORM USE</h2>
       <p>
         You agree, undertake and confirm that your use of platform shall be strictly governed by the following binding principles:
       </p>

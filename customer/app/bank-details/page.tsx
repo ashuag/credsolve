@@ -1,127 +1,186 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
-import { getLoanBanks, saveBankDetails } from '@/lib/api/lead';
-import { sendCustomerOtp, verifyCustomerOtp } from '@/lib/api/auth';
+import { lookupBankIfsc, submitVerifiedBankDetails } from '@/lib/api/lead';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
-import { cn } from '@/lib/cn';
+
+const IFSC_RE = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+
+const DETAIL_LABELS: Record<string, string> = {
+  bankName: 'Bank name',
+  ifsc: 'IFSC',
+  branch: 'Branch',
+  address: 'Address',
+  city: 'City',
+  district: 'District',
+  state: 'State',
+  centre: 'Centre',
+  micr: 'MICR',
+  contact: 'Contact',
+  bankCode: 'Bank code',
+  iso3166: 'Region',
+  rtgsAvailable: 'RTGS',
+  neftAvailable: 'NEFT',
+  impsAvailable: 'IMPS',
+  upiAvailable: 'UPI',
+  swift: 'SWIFT',
+};
+
+function formatCell(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+  const s = String(v).trim();
+  return s.length ? s : null;
+}
+
+function IfscDetailPanel({ details }: { details: Record<string, unknown> }) {
+  const rows: Array<{ key: string; label: string; value: string }> = [];
+  const orderedKeys = [
+    ...Object.keys(DETAIL_LABELS),
+    ...Object.keys(details).filter((k) => !DETAIL_LABELS[k] && k !== 'vendorResponse'),
+  ];
+  const seen = new Set<string>();
+  for (const k of orderedKeys) {
+    if (seen.has(k)) continue;
+    const val = formatCell(details[k]);
+    if (!val) continue;
+    seen.add(k);
+    const label =
+      DETAIL_LABELS[k] ?? k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
+    rows.push({ key: k, label, value: val });
+  }
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-4">
+      <p className="m-0 mb-3 text-[0.7rem] font-black text-slate-500 uppercase tracking-wider">IFSC details</p>
+      <dl className="grid gap-2 text-sm max-h-[280px] overflow-y-auto pr-1">
+        {rows.slice(0, 18).map((row) => (
+          <div key={row.key} className="grid grid-cols-[minmax(0,0.42fr)_1fr] gap-2">
+            <dt className="text-brand-muted font-medium">{row.label}</dt>
+            <dd className="m-0 text-brand-navy font-semibold break-words">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
 
 export default function BankDetailsPage() {
   const router = useRouter();
-  const { session } = useCustomerSession();
-  
-  const [accountHolderName, setAccountHolderName] = useState('');
-  const [bankName, setBankName] = useState('');
-  const [banks, setBanks] = useState<string[]>([]);
-  const [isLoadingBanks, setIsLoadingBanks] = useState(true);
+  const { session, refresh } = useCustomerSession();
+
   const [accountNumber, setAccountNumber] = useState('');
   const [ifscCode, setIfscCode] = useState('');
-  
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [ifscLookup, setIfscLookup] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
+  const [ifscDetails, setIfscDetails] = useState<Record<string, unknown> | null>(null);
+  const [ifscLookupNote, setIfscLookupNote] = useState('');
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  // OTP State
-  const [showOtpStep, setShowOtpStep] = useState(false);
-  const [otpValue, setOtpValue] = useState('');
-  const [otpRequestId, setOtpRequestId] = useState('');
-  const [otpExpiresAt, setOtpExpiresAt] = useState<number | null>(null);
-  const expiryTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const accountHolderDisplay =
+    session?.authenticated === true ? (session.profile?.fullName?.trim() ?? '') : '';
 
   useEffect(() => {
-    let mounted = true;
-    getLoanBanks()
-      .then((items) => {
-        if (!mounted) return;
-        setBanks(items);
-      })
-      .catch((e) => {
-        if (!mounted) return;
-        setError(e instanceof Error ? e.message : 'Unable to load banks right now.');
-      })
-      .finally(() => {
-        if (!mounted) return;
-        setIsLoadingBanks(false);
-      });
+    const ifsc = ifscCode.trim().toUpperCase();
+    if (!IFSC_RE.test(ifsc)) {
+      setIfscLookup('idle');
+      setIfscDetails(null);
+      setIfscLookupNote('');
+      return;
+    }
+
+    let cancelled = false;
+    setIfscLookup('loading');
+    setIfscLookupNote('');
+    const handle = setTimeout(() => {
+      void (async () => {
+        try {
+          const out = await lookupBankIfsc(ifsc);
+          if (cancelled) return;
+          if (!out) {
+            setIfscLookup('error');
+            setIfscDetails(null);
+            setIfscLookupNote('No response from IFSC lookup.');
+            return;
+          }
+          if (!out.configured) {
+            setIfscLookup('error');
+            setIfscDetails(null);
+            setIfscLookupNote(out.skipReason ?? 'IFSC lookup is not configured.');
+            return;
+          }
+          if (!out.ok || !out.details || Object.keys(out.details).length === 0) {
+            setIfscLookup('error');
+            setIfscDetails(null);
+            setIfscLookupNote('Could not resolve this IFSC. Check the code and try again.');
+            return;
+          }
+          setIfscDetails(out.details);
+          setIfscLookup('ok');
+        } catch (e) {
+          if (cancelled) return;
+          setIfscLookup('error');
+          setIfscDetails(null);
+          setIfscLookupNote(e instanceof Error ? e.message : 'IFSC lookup failed.');
+        }
+      })();
+    }, 480);
 
     return () => {
-      mounted = false;
-      if (expiryTimerRef.current) clearTimeout(expiryTimerRef.current);
+      cancelled = true;
+      clearTimeout(handle);
     };
-  }, []);
+  }, [ifscCode]);
 
-  const handleInitialSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const canSubmit =
+    accountHolderDisplay.length >= 2 &&
+    /^\d{9,18}$/.test(accountNumber.replace(/\D/g, '')) &&
+    IFSC_RE.test(ifscCode.trim().toUpperCase()) &&
+    ifscLookup === 'ok' &&
+    ifscDetails !== null;
+
+  function openConfirm() {
     setError('');
-
-    if (!bankName) {
-      setError('Please select your bank.');
+    if (!canSubmit) {
+      setError('Enter a valid account number and IFSC, wait for branch details to load, and ensure your name is on file.');
       return;
     }
-    if (!/^\d{9,18}$/.test(accountNumber.replace(/\D/g, ''))) {
-      setError('Please enter a valid bank account number.');
-      return;
-    }
-    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifscCode.trim().toUpperCase())) {
-      setError('Please enter a valid IFSC code.');
-      return;
-    }
+    setConfirmOpen(true);
+  }
 
-    if (!session?.authenticated) return;
-
-    setIsSubmitting(true);
-    try {
-      const res = await sendCustomerOtp(session.mobileNumber);
-      setOtpRequestId(res.requestId);
-      const expires = new Date(res.expiresAt).getTime();
-      setOtpExpiresAt(expires);
-      setShowOtpStep(true);
-
-      // Handle expiry redirect
-      const timeout = expires - Date.now();
-      if (expiryTimerRef.current) clearTimeout(expiryTimerRef.current);
-      expiryTimerRef.current = setTimeout(() => {
-        router.push('/apply-for-loan');
-      }, timeout);
-
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to send OTP. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleVerifyAndComplete = async () => {
-    if (!otpValue || otpValue.length < 4) {
-      setError('Please enter a valid OTP.');
-      return;
-    }
-
-    setIsSubmitting(true);
+  async function confirmAndVerify() {
+    setBusy(true);
     setError('');
-
     try {
-      const verifyRes = await verifyCustomerOtp(otpRequestId, otpValue);
-      if (!verifyRes.verified) {
-        throw new Error('Invalid OTP code.');
-      }
-
-      await saveBankDetails({
+      const bankName =
+        ifscDetails && typeof ifscDetails.bankName === 'string' ? ifscDetails.bankName.trim() : undefined;
+      const res = await submitVerifiedBankDetails({
         accountNumber: accountNumber.replace(/\D/g, ''),
         ifscCode: ifscCode.trim().toUpperCase(),
-        bankName: bankName.trim(),
-        accountHolderName: accountHolderName.trim() || undefined,
+        verifiedBankName: bankName,
       });
-      
-      if (expiryTimerRef.current) clearTimeout(expiryTimerRef.current);
+      if (!res) {
+        setError('Empty response from bank verification.');
+        return;
+      }
+      if (!res.success || !res.pennyDropOk) {
+        setError(res.message ?? 'Bank verification did not succeed. Please check your details.');
+        return;
+      }
+      setConfirmOpen(false);
+      await refresh();
       router.replace('/thank-you');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Verification failed.');
-      setIsSubmitting(false);
+    } finally {
+      setBusy(false);
     }
-  };
+  }
 
   const journeyPanel = (
     <div className="h-full flex flex-col justify-center">
@@ -135,152 +194,151 @@ export default function BankDetailsPage() {
           <span className="ml-3 text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Step 6 — Disbursement</span>
         </div>
 
-        {!showOtpStep ? (
-          <>
-            <h1 className="text-2xl md:text-[2.2rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">
-              Receive Money.
-            </h1>
-            <p className="text-[0.95rem] text-slate-500 mb-8 leading-relaxed">
-              Provide your bank details where you want the loan amount to be credited. Money is usually disbursed within 15 minutes of approval.
+        <h1 className="text-2xl md:text-[2.2rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">
+          Receive Money.
+        </h1>
+        <p className="text-[0.95rem] text-slate-500 mb-8 leading-relaxed">
+          Enter your IFSC — we fetch branch details for you to review. When you submit, we verify your account (penny
+          drop) and mark your application for review.
+        </p>
+
+        <div className="grid gap-4">
+          <div>
+            <label className="block text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">
+              Account holder name
+            </label>
+            <input
+              className="w-full h-[52px] rounded-xl border border-slate-200 bg-slate-50 px-4 text-[0.95rem] font-bold text-brand-navy outline-none cursor-default"
+              type="text"
+              readOnly
+              aria-readonly="true"
+              value={accountHolderDisplay}
+              placeholder="From your application — complete personal details if empty"
+            />
+            <p className="mt-1.5 ml-1 text-[0.75rem] text-slate-500 leading-snug">
+              Used for penny-drop verification; must match your bank records.
             </p>
+          </div>
 
-            <form onSubmit={handleInitialSubmit} className="grid gap-4" noValidate>
-              <div>
-                <label className="block text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">Account Holder Name</label>
-                <input
-                  className="w-full h-[52px] rounded-xl border border-slate-200 bg-white px-4 text-[0.95rem] font-bold text-brand-navy focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
-                  type="text"
-                  placeholder="As per bank records"
-                  value={accountHolderName}
-                  onChange={(e) => setAccountHolderName(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="block text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">Bank Name</label>
-                <div className="relative">
-                  <select
-                    className="w-full h-[52px] rounded-xl border border-slate-200 bg-white px-4 text-[0.95rem] font-bold text-brand-navy focus:ring-2 focus:ring-brand-blue/20 outline-none appearance-none transition-all"
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                    disabled={isLoadingBanks}
-                  >
-                    <option value="">{isLoadingBanks ? 'Loading banks...' : 'Select your bank'}</option>
-                    {banks.map((name) => (
-                      <option key={name} value={name}>{name}</option>
-                    ))}
-                  </select>
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">Account Number</label>
-                  <input
-                    className="w-full h-[52px] rounded-xl border border-slate-200 bg-white px-4 text-[0.95rem] font-bold text-brand-navy focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
-                    type="text"
-                    placeholder="9-18 digit number"
-                    value={accountNumber}
-                    onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 18))}
-                    inputMode="numeric"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">IFSC Code</label>
-                  <input
-                    className="w-full h-[52px] rounded-xl border border-slate-200 bg-white px-4 text-[0.95rem] font-bold text-brand-navy focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all uppercase"
-                    type="text"
-                    placeholder="ABCD0123456"
-                    value={ifscCode}
-                    onChange={(e) => setIfscCode(e.target.value.toUpperCase())}
-                  />
-                </div>
-              </div>
-
-              {error ? (
-                <div className="p-3 rounded-lg bg-red-50 border border-red-100 flex items-center gap-2 text-red-600 text-[0.85rem] font-bold">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {error}
-                </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">
+                Account number
+              </label>
+              <input
+                className="w-full h-[52px] rounded-xl border border-slate-200 bg-white px-4 text-[0.95rem] font-bold text-brand-navy focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
+                type="text"
+                placeholder="9-18 digit number"
+                value={accountNumber}
+                onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 18))}
+                inputMode="numeric"
+              />
+            </div>
+            <div>
+              <label className="block text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">
+                IFSC code
+              </label>
+              <input
+                className="w-full h-[52px] rounded-xl border border-slate-200 bg-white px-4 text-[0.95rem] font-bold text-brand-navy focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all uppercase"
+                type="text"
+                placeholder="ABCD0123456"
+                value={ifscCode}
+                onChange={(e) => setIfscCode(e.target.value.toUpperCase())}
+              />
+              {ifscLookup === 'loading' ? (
+                <p className="mt-1.5 ml-1 text-[0.75rem] text-slate-500">Looking up IFSC…</p>
               ) : null}
-
-              <div className="mt-6 flex flex-col sm:flex-row gap-3">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="mc-btn-primary flex-1 py-4 text-[1rem]"
-                >
-                  {isSubmitting ? 'Processing...' : 'Submit & Disburse'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => router.push('/kyc/upload-documents')}
-                  className="py-4 px-6 rounded-xl font-bold text-[1rem] text-slate-600 bg-white hover:bg-slate-50 transition-colors text-center border border-slate-200"
-                >
-                  Back
-                </button>
-              </div>
-            </form>
-          </>
-        ) : (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h1 className="text-2xl md:text-[2.2rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">
-              Verify Security Code.
-            </h1>
-            <p className="text-[0.95rem] text-slate-500 mb-8 leading-relaxed">
-              We've sent a 6-digit security code to{' '}
-              <span className="font-bold text-brand-navy">
-                {session?.authenticated ? session.mobileNumber : 'your registered mobile'}
-              </span>
-              . Please enter it to authorize the disbursement.
-            </p>
-
-            <div className="grid gap-4">
-              <div>
-                <label className="block text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">OTP Code</label>
-                <input
-                  className="w-full h-[60px] rounded-2xl border border-slate-200 bg-white px-4 text-center text-2xl font-black tracking-[0.5em] text-brand-navy focus:ring-4 focus:ring-brand-blue/10 outline-none transition-all placeholder:text-slate-200"
-                  type="text"
-                  placeholder="000000"
-                  value={otpValue}
-                  onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  autoFocus
-                />
-              </div>
-
-              {error ? (
-                <div className="p-3 rounded-lg bg-red-50 border border-red-100 flex items-center gap-2 text-red-600 text-[0.85rem] font-bold">
-                  {error}
-                </div>
+              {ifscLookup === 'error' && ifscLookupNote ? (
+                <p className="mt-1.5 ml-1 text-[0.75rem] text-red-600 font-semibold">{ifscLookupNote}</p>
               ) : null}
-
-              <div className="mt-6 flex flex-col gap-3">
-                <button
-                  onClick={handleVerifyAndComplete}
-                  disabled={isSubmitting}
-                  className="mc-btn-primary py-4 text-[1rem]"
-                >
-                  {isSubmitting ? 'Verifying...' : 'Verify & Confirm Payout'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowOtpStep(false)}
-                  className="text-center py-2 text-[0.9rem] font-bold text-slate-400 hover:text-slate-600 transition-colors"
-                >
-                  Change Bank Details
-                </button>
-              </div>
             </div>
           </div>
-        )}
+
+          {ifscLookup === 'ok' && ifscDetails ? <IfscDetailPanel details={ifscDetails} /> : null}
+
+          {error ? (
+            <div className="p-3 rounded-lg bg-red-50 border border-red-100 flex items-center gap-2 text-red-600 text-[0.85rem] font-bold">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="mt-2 flex flex-col sm:flex-row gap-3">
+            <button
+              type="button"
+              disabled={busy || !canSubmit}
+              onClick={() => openConfirm()}
+              className="mc-btn-primary flex-1 py-4 text-[1rem] disabled:opacity-50"
+            >
+              Submit details
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push('/kyc/upload-documents')}
+              className="py-4 px-6 rounded-xl font-bold text-[1rem] text-slate-600 bg-white hover:bg-slate-50 transition-colors text-center border border-slate-200"
+            >
+              Back
+            </button>
+          </div>
+        </div>
       </div>
+
+      {confirmOpen ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bank-confirm-title"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl border border-slate-200 grid gap-4">
+            <h2 id="bank-confirm-title" className="m-0 text-lg font-black text-brand-navy">
+              Confirm details
+            </h2>
+            <p className="m-0 text-sm text-slate-600 leading-relaxed">
+              Please confirm the bank account and IFSC details below are correct. We will run a one-paise verification
+              with your bank using the account holder name on file.
+            </p>
+            <ul className="m-0 pl-4 text-sm text-brand-navy space-y-1.5 list-disc">
+              <li>
+                <span className="font-semibold">Account holder:</span> {accountHolderDisplay || '—'}
+              </li>
+              <li>
+                <span className="font-semibold">Account number:</span> {accountNumber.replace(/\D/g, '') || '—'}
+              </li>
+              <li>
+                <span className="font-semibold">IFSC:</span> {ifscCode.trim().toUpperCase() || '—'}
+              </li>
+              {ifscDetails && formatCell(ifscDetails.bankName) ? (
+                <li>
+                  <span className="font-semibold">Bank:</span> {String(ifscDetails.bankName)}
+                </li>
+              ) : null}
+              {ifscDetails && formatCell(ifscDetails.branch) ? (
+                <li>
+                  <span className="font-semibold">Branch:</span> {String(ifscDetails.branch)}
+                </li>
+              ) : null}
+            </ul>
+            <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
+              <button
+                type="button"
+                className="py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200"
+                disabled={busy}
+                onClick={() => setConfirmOpen(false)}
+              >
+                No, go back
+              </button>
+              <button
+                type="button"
+                className="mc-btn-primary flex-1 py-3"
+                disabled={busy}
+                onClick={() => void confirmAndVerify()}
+              >
+                {busy ? 'Verifying…' : 'Yes, verify & submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 
@@ -290,7 +348,7 @@ export default function BankDetailsPage() {
         <LoanLandingShell
           journeyPanel={journeyPanel}
           leftTitle={<>Instant <span className="text-[#60a5fa]">Disbursement</span></>}
-          leftDescription={showOtpStep ? "Final step! Verify your identity to receive your funds immediately." : "Direct transfer to your bank account within minutes of approval. 24/7 processing."}
+          leftDescription="We verify your account securely before crediting your loan. Review IFSC details, then confirm to submit your application for review."
           leftInfographic={
             <svg viewBox="0 0 400 400" className="w-full h-full drop-shadow-2xl" fill="none" xmlns="http://www.w3.org/2000/svg">
               <defs>
@@ -307,7 +365,9 @@ export default function BankDetailsPage() {
                 <rect x="90" y="70" width="20" height="30" fill="rgba(255,255,255,0.2)" />
                 <rect x="140" y="70" width="20" height="30" fill="rgba(255,255,255,0.2)" />
                 <circle cx="220" cy="40" r="30" fill="url(#moneyGrad)" className="animate-bounce" />
-                <text x="220" y="50" textAnchor="middle" fill="white" fontSize="30" fontWeight="bold">₹</text>
+                <text x="220" y="50" textAnchor="middle" fill="white" fontSize="30" fontWeight="bold">
+                  ₹
+                </text>
                 <path d="M180 40 Q250 40 250 100" stroke="#facc15" strokeWidth="6" strokeDasharray="10,5" fill="none" />
                 <path d="M245 95 L250 105 L255 95" fill="#facc15" />
               </g>
@@ -318,6 +378,3 @@ export default function BankDetailsPage() {
     </CustomerJourneyGuard>
   );
 }
-
-
-

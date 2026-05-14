@@ -1,6 +1,7 @@
 'use client';
 
 import type { CustomerLoanSelectionSnapshot } from '@/lib/api/customer-session';
+import { formatIsoDateDdMmYyyy } from '@/lib/format-date';
 
 function formatInr(amountInr: string | null): string {
   if (!amountInr?.trim()) return '—';
@@ -45,7 +46,7 @@ export function LoanSummaryLeftRail({ loanSelection }: { loanSelection: Customer
     { label: 'Tenure', value: formatTenure(loanSelection!.tenureDays) },
     {
       label: 'Maturity',
-      value: loanSelection!.maturityDate ? loanSelection!.maturityDate : '—',
+      value: formatIsoDateDdMmYyyy(loanSelection!.maturityDate),
     },
   ];
 

@@ -23,7 +23,7 @@ type LoginResponse = {
 export function LoginForm() {
   const router = useRouter();
   const { startNavigation } = useNavigationProgress();
-  const [email, setEmail] = useState('admin@moneycash.test');
+  const [email, setEmail] = useState('admin@moneycash.in');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

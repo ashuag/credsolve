@@ -1,5 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { APPLICATION_STATUS } from '../../common/constants/application.constants';
+import { LEAD_STATUS } from '../../common/constants/lead.constants';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { UpdateBankMasterDto } from './dto/update-bank-master.dto';
 import type { UpdateEligibilityCriterionDto } from './dto/update-eligibility-criterion.dto';
@@ -8,7 +10,82 @@ function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
 }
 
-@Injectable()
+function applicationKycStatusLabel(code: number): string {
+  switch (code) {
+    case 0:
+      return 'Not done';
+    case 1:
+      return 'Completed';
+    case 2:
+      return 'Failed';
+    case 3:
+      return 'Technical issue';
+    default:
+      return `Unknown (${code})`;
+  }
+}
+
+const DASHBOARD_DAILY_TREND_DAYS = 14;
+
+/** UTC calendar day key `YYYY-MM-DD` from a SQL `DATE` / `Date` / ISO string. */
+function dashboardRowDayKey(d: Date | string): string {
+  if (typeof d === 'string') {
+    return d.length >= 10 ? d.slice(0, 10) : d;
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+/** Last `DASHBOARD_DAILY_TREND_DAYS` UTC dates oldest → newest. */
+function lastUtcDayKeys(count: number): string[] {
+  const keys: string[] = [];
+  const now = new Date();
+  for (let i = count - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
+    keys.push(d.toISOString().slice(0, 10));
+  }
+  return keys;
+}
+
+type LosDashboardDailyPoint = {
+  date: string;
+  newLeads: number;
+  newApplications: number;
+  disbursedCount: number;
+  disbursedAmountInr: string | null;
+};
+
+function mergeLosDashboardDailySeries(
+  keys: string[],
+  leadRows: Array<{ d: Date | string; c: bigint }>,
+  appRows: Array<{ d: Date | string; c: bigint }>,
+  disbRows: Array<{ d: Date | string; c: bigint; amt: unknown }>,
+): LosDashboardDailyPoint[] {
+  const leadMap = new Map<string, number>();
+  const appMap = new Map<string, number>();
+  const disbMap = new Map<string, { count: number; amount: string | null }>();
+  for (const r of leadRows) {
+    leadMap.set(dashboardRowDayKey(r.d), Number(r.c));
+  }
+  for (const r of appRows) {
+    appMap.set(dashboardRowDayKey(r.d), Number(r.c));
+  }
+  for (const r of disbRows) {
+    const k = dashboardRowDayKey(r.d);
+    const raw = r.amt;
+    const amount = raw === null || raw === undefined ? null : String(raw);
+    disbMap.set(k, { count: Number(r.c), amount });
+  }
+  return keys.map((date) => {
+    const dis = disbMap.get(date);
+    return {
+      date,
+      newLeads: leadMap.get(date) ?? 0,
+      newApplications: appMap.get(date) ?? 0,
+      disbursedCount: dis?.count ?? 0,
+      disbursedAmountInr: dis?.amount ?? null,
+    };
+  });
+}
 export class LosDataService {
   constructor(private readonly prisma: PrismaService) {}
 
@@ -92,6 +169,7 @@ export class LosDataService {
           },
         },
         leadUtms: { orderBy: { createdAt: 'desc' }, take: 1 },
+        rejectionReason: { select: { name: true } },
         applications: {
           include: {
             applicationStatus: { select: { name: true, displayName: true } },
@@ -108,6 +186,8 @@ export class LosDataService {
 
     const latestUtm = lead.leadUtms[0];
     const detail = lead.leadDetail;
+    const noteTrimmed = lead.leadStatusNote?.trim() ?? null;
+    const bureauNoteTrimmed = lead.bureauFetchedNote?.trim() ?? null;
 
     return {
       uuid: lead.uuid,
@@ -116,6 +196,14 @@ export class LosDataService {
       email: lead.applications[0]?.email ?? null,
       statusCode: lead.leadStatus.name,
       statusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
+      leadStatusNote: noteTrimmed,
+      bureauFetchedNote: bureauNoteTrimmed,
+      rejectionReason: lead.rejectionReason
+        ? {
+            code: lead.rejectionReason.name,
+            label: lead.rejectionReason.name.replace(/_/g, ' '),
+          }
+        : null,
       sourceName: lead.source?.name ?? null,
       sourceType: lead.source?.type ?? null,
       utm: latestUtm
@@ -132,6 +220,7 @@ export class LosDataService {
       profile: detail
         ? {
             fullName: detail.fullName,
+            dateOfBirth: detail.dateOfBirth ? detail.dateOfBirth.toISOString().slice(0, 10) : null,
             panNumber: lead.panNumber,
             pincode: detail.pincode,
             addressLine1: detail.addressLine1,
@@ -156,6 +245,127 @@ export class LosDataService {
         createdAt: application.createdAt.toISOString(),
         updatedAt: application.updatedAt.toISOString(),
       })),
+    };
+  }
+
+  async getApplicationDetails(applicationUuid: string) {
+    const application = await this.prisma.client.application.findUnique({
+      where: { uuid: applicationUuid },
+      include: {
+        customer: { select: { uuid: true, mobileNumber: true } },
+        lead: {
+          include: {
+            leadStatus: { select: { name: true, displayName: true } },
+            leadDetail: {
+              include: {
+                city: { select: { name: true, state: { select: { name: true, code: true } } } },
+                gender: { select: { name: true } },
+                occupation: { select: { name: true } },
+              },
+            },
+          },
+        },
+        applicationStatus: { select: { name: true, displayName: true } },
+        details: {
+          include: {
+            reasonForLoan: { select: { name: true } },
+          },
+        },
+        eligibility: true,
+        agreement: true,
+        disbursement: true,
+      },
+    });
+
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+
+    const lead = application.lead;
+    const detail = lead.leadDetail;
+
+    return {
+      uuid: application.uuid,
+      customerUuid: application.customer.uuid,
+      leadUuid: lead.uuid,
+      mobileNumber: application.customer.mobileNumber,
+      email: application.email,
+      emailVerifiedAt: application.emailVerifiedAt?.toISOString() ?? null,
+      statusCode: application.applicationStatus.name,
+      statusLabel: displayName(application.applicationStatus.name, application.applicationStatus.displayName),
+      kycStatus: application.kycStatus,
+      kycStatusLabel: applicationKycStatusLabel(application.kycStatus),
+      kycCompletedAt: application.kycCompletedAt?.toISOString() ?? null,
+      livenessPassed: application.livenessPassed,
+      livenessCheckedAt: application.livenessCheckedAt?.toISOString() ?? null,
+      preApprovedLoanAmount: application.preApprovedLoanAmount?.toString() ?? null,
+      createdAt: application.createdAt.toISOString(),
+      updatedAt: application.updatedAt.toISOString(),
+      lead: {
+        uuid: lead.uuid,
+        statusCode: lead.leadStatus.name,
+        statusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
+        panNumber: lead.panNumber,
+        profile: detail
+          ? {
+              fullName: detail.fullName,
+              dateOfBirth: detail.dateOfBirth ? detail.dateOfBirth.toISOString().slice(0, 10) : null,
+              panNumber: lead.panNumber,
+              pincode: detail.pincode,
+              addressLine1: detail.addressLine1,
+              addressLine2: detail.addressLine2,
+              city: detail.city?.name ?? null,
+              state: detail.city?.state?.name ?? null,
+              stateCode: detail.city?.state?.code ?? null,
+              gender: detail.gender?.name ?? null,
+              occupation: detail.occupation?.name ?? null,
+              netMonthlyIncome: detail.netMonthlyIncome?.toString() ?? null,
+              annualTurnover: detail.annualTurnover?.toString() ?? null,
+              annualProfit: detail.annualProfit?.toString() ?? null,
+              cibilConsentAt: detail.cibilConsentAt?.toISOString() ?? null,
+            }
+          : null,
+      },
+      details: application.details
+        ? {
+            reasonForLoan: application.details.reasonForLoan?.name ?? null,
+            loanAmount: application.details.loanAmount?.toString() ?? null,
+            loanTenure: application.details.loanTenure,
+            interestRate: application.details.interestRate?.toString() ?? null,
+            interestAmount: application.details.interestAmount?.toString() ?? null,
+            processingFee: application.details.processingFee?.toString() ?? null,
+            processingFeeAmount: application.details.processingFeeAmount?.toString() ?? null,
+            gstAmount: application.details.gstAmount?.toString() ?? null,
+            loanDisbursementDate: application.details.loanDisbursementDate?.toISOString().slice(0, 10) ?? null,
+            loanMaturityDate: application.details.loanMaturityDate?.toISOString().slice(0, 10) ?? null,
+          }
+        : null,
+      eligibility: application.eligibility
+        ? {
+            isEligible: application.eligibility.isEligible,
+            approvedAmount: application.eligibility.approvedAmount?.toString() ?? null,
+            cibilScore: application.eligibility.cibilScore,
+            ineligibleReason: application.eligibility.ineligibleReason,
+            checkedAt: application.eligibility.checkedAt.toISOString(),
+          }
+        : null,
+      agreement: application.agreement
+        ? {
+            documentName: application.agreement.documentName,
+            signedAt: application.agreement.signedAt?.toISOString() ?? null,
+            ipAddress: application.agreement.ipAddress,
+          }
+        : null,
+      disbursement: application.disbursement
+        ? {
+            amount: application.disbursement.amount?.toString() ?? null,
+            accountNumber: application.disbursement.accountNumber,
+            ifscCode: application.disbursement.ifscCode,
+            bankName: application.disbursement.bankName,
+            utr: application.disbursement.utr,
+            disbursedAt: application.disbursement.disbursedAt?.toISOString() ?? null,
+          }
+        : null,
     };
   }
 
@@ -350,6 +560,219 @@ export class LosDataService {
       value: row.value,
       description: row.description,
       isActive: row.isActive,
+    };
+  }
+
+  /** Aggregated LOS CRM dashboard (counts + small activity feed). */
+  async getDashboardCrm() {
+    const prisma = this.prisma.client;
+    const startOfDay = new Date();
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(startOfDay);
+    endOfDay.setUTCDate(endOfDay.getUTCDate() + 1);
+
+    const seriesSince = new Date(startOfDay);
+    seriesSince.setUTCDate(seriesSince.getUTCDate() - (DASHBOARD_DAILY_TREND_DAYS - 1));
+
+    const [
+      activeAgentsToday,
+      customerCount,
+      leadGroups,
+      applicationGroups,
+      newApplicationsToday,
+      newLeadsToday,
+      disbursedTodayAgg,
+      sanctionedPipelineAgg,
+      avgLoanAgg,
+      kycPendingInFlow,
+      livenessPending,
+      recentApplications,
+      leadStatuses,
+      applicationStatuses,
+      leadDailyRows,
+      appDailyRows,
+      disbDailyRows,
+    ] = await Promise.all([
+      prisma.user.count({
+        where: {
+          isActive: true,
+          password: { not: null },
+          lastLoginAt: { gte: startOfDay, lt: endOfDay },
+        },
+      }),
+      prisma.customer.count(),
+      prisma.lead.groupBy({
+        by: ['leadStatusId'],
+        where: { isActive: true },
+        _count: { _all: true },
+      }),
+      prisma.application.groupBy({
+        by: ['applicationStatusId'],
+        _count: { _all: true },
+      }),
+      prisma.application.count({
+        where: { createdAt: { gte: startOfDay, lt: endOfDay } },
+      }),
+      prisma.lead.count({
+        where: { isActive: true, createdAt: { gte: startOfDay, lt: endOfDay } },
+      }),
+      prisma.applicationDisbursement.aggregate({
+        where: { disbursedAt: { gte: startOfDay, lt: endOfDay } },
+        _sum: { amount: true },
+      }),
+      prisma.applicationEligibility.aggregate({
+        where: {
+          application: {
+            applicationStatus: { name: APPLICATION_STATUS.APPROVED },
+          },
+        },
+        _sum: { approvedAmount: true },
+      }),
+      prisma.applicationDetails.aggregate({
+        where: { loanAmount: { not: null } },
+        _avg: { loanAmount: true },
+      }),
+      prisma.application.count({
+        where: {
+          kycStatus: 0,
+          applicationStatus: { name: { in: [APPLICATION_STATUS.DRAFT, APPLICATION_STATUS.IN_REVIEW] } },
+        },
+      }),
+      prisma.application.count({
+        where: {
+          kycStatus: 1,
+          livenessPassed: false,
+          applicationStatus: { name: { in: [APPLICATION_STATUS.DRAFT, APPLICATION_STATUS.IN_REVIEW] } },
+        },
+      }),
+      prisma.application.findMany({
+        take: 8,
+        orderBy: { updatedAt: 'desc' },
+        select: {
+          uuid: true,
+          updatedAt: true,
+          kycStatus: true,
+          livenessPassed: true,
+          applicationStatus: { select: { name: true, displayName: true } },
+          lead: { select: { leadDetail: { select: { fullName: true } } } },
+          customer: { select: { mobileNumber: true } },
+        },
+      }),
+      prisma.leadStatus.findMany({ select: { id: true, name: true, displayName: true } }),
+      prisma.applicationStatus.findMany({ select: { id: true, name: true, displayName: true } }),
+      prisma.$queryRaw<Array<{ d: Date; c: bigint }>>`
+        SELECT DATE(created_at) AS d, COUNT(*) AS c
+        FROM lead
+        WHERE created_at >= ${seriesSince}
+        GROUP BY DATE(created_at)
+        ORDER BY d ASC
+      `,
+      prisma.$queryRaw<Array<{ d: Date; c: bigint }>>`
+        SELECT DATE(created_at) AS d, COUNT(*) AS c
+        FROM application
+        WHERE created_at >= ${seriesSince}
+        GROUP BY DATE(created_at)
+        ORDER BY d ASC
+      `,
+      prisma.$queryRaw<Array<{ d: Date; c: bigint; amt: unknown }>>`
+        SELECT DATE(disbursed_at) AS d, COUNT(*) AS c, COALESCE(SUM(amount), 0) AS amt
+        FROM application_disbursement
+        WHERE disbursed_at >= ${seriesSince}
+        GROUP BY DATE(disbursed_at)
+        ORDER BY d ASC
+      `,
+    ]);
+
+    const leadStatusById = new Map(leadStatuses.map((s) => [s.id, s]));
+    const applicationStatusById = new Map(applicationStatuses.map((s) => [s.id, s]));
+
+    const leadsByStatus = leadGroups.map((g) => {
+      const s = leadStatusById.get(g.leadStatusId);
+      return {
+        code: s?.name ?? String(g.leadStatusId),
+        label: displayName(s?.name ?? 'UNKNOWN', s?.displayName ?? null),
+        count: g._count._all,
+      };
+    });
+
+    const applicationsByStatus = applicationGroups.map((g) => {
+      const s = applicationStatusById.get(g.applicationStatusId);
+      return {
+        code: s?.name ?? String(g.applicationStatusId),
+        label: displayName(s?.name ?? 'UNKNOWN', s?.displayName ?? null),
+        count: g._count._all,
+      };
+    });
+
+    const countByLeadCode = (codes: readonly string[]) =>
+      leadsByStatus.filter((row) => codes.includes(row.code)).reduce((a, b) => a + b.count, 0);
+
+    const countByAppCode = (codes: readonly string[]) =>
+      applicationsByStatus.filter((row) => codes.includes(row.code)).reduce((a, b) => a + b.count, 0);
+
+    const freshLeads = countByLeadCode([LEAD_STATUS.NEW, LEAD_STATUS.IN_PROGRESS]);
+    const applicationInProgress = countByAppCode([APPLICATION_STATUS.DRAFT, APPLICATION_STATUS.IN_REVIEW]);
+    const approvedCount = countByAppCode([APPLICATION_STATUS.APPROVED]);
+    const disbursedCount = countByAppCode([APPLICATION_STATUS.DISBURSED]);
+    const rejectedAppCount = countByAppCode([APPLICATION_STATUS.REJECTED]);
+    const decided = approvedCount + rejectedAppCount;
+    const approvalRatePercent = decided > 0 ? Math.round((approvedCount / decided) * 100) : null;
+
+    const recentActivity = recentApplications.map((app) => {
+      const name = app.lead.leadDetail?.fullName?.trim() || 'Borrower';
+      const mobile = app.customer.mobileNumber;
+      const tail = mobile.length >= 4 ? mobile.slice(-4) : mobile;
+      const statusLabel = displayName(app.applicationStatus.name, app.applicationStatus.displayName);
+      const title =
+        app.applicationStatus.name === APPLICATION_STATUS.DISBURSED
+          ? 'Disbursement recorded'
+          : app.applicationStatus.name === APPLICATION_STATUS.APPROVED
+            ? 'Loan sanctioned'
+            : app.kycStatus === 1
+              ? 'KYC cleared'
+              : app.applicationStatus.name === APPLICATION_STATUS.IN_REVIEW
+                ? 'Credit review queue'
+                : 'Application updated';
+
+      return {
+        id: app.uuid,
+        title,
+        actor: `${name} · …${tail} — now ${statusLabel}.`,
+        timeIso: app.updatedAt.toISOString(),
+      };
+    });
+
+    const dayKeys = lastUtcDayKeys(DASHBOARD_DAILY_TREND_DAYS);
+    const dailySeries = mergeLosDashboardDailySeries(dayKeys, leadDailyRows, appDailyRows, disbDailyRows);
+
+    return {
+      generatedAt: new Date().toISOString(),
+      activeAgentsToday,
+      customers: customerCount,
+      newLeadsToday,
+      newApplicationsToday,
+      dailySeries,
+      leadsByStatus,
+      applicationsByStatus,
+      pipeline: {
+        freshLeads,
+        applicationInProgress,
+        kycPendingInReview: kycPendingInFlow,
+        livenessPending,
+        approvedCount,
+        disbursedCount,
+      },
+      amounts: {
+        sanctionedOpenPipelineInr: sanctionedPipelineAgg._sum.approvedAmount?.toString() ?? null,
+        disbursedTodayInr: disbursedTodayAgg._sum.amount?.toString() ?? null,
+        avgRequestedLoanInr: avgLoanAgg._avg.loanAmount?.toString() ?? null,
+      },
+      credit: {
+        approvalRatePercent,
+        approvedTotal: approvedCount,
+        rejectedTotal: rejectedAppCount,
+      },
+      recentActivity,
     };
   }
 }

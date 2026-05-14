@@ -96,9 +96,9 @@ export class SubmitProfessionalApplicationUseCase {
       leadDetailIncomePatch.annualProfit = annualProfit;
     }
 
-    const { preApprovedAmountInr } = this.checkLoanEligibility.computeForSeed(leadRow.uuid);
+    const { preApprovedAmountInr, minLoanAmountInr } = await this.checkLoanEligibility.computeForSeed(leadRow.uuid);
     const cibilScore = randomDemoBureauScore();
-    const eligible = preApprovedAmountInr >= 5_000;
+    const eligible = preApprovedAmountInr >= minLoanAmountInr;
 
     const [convertedStatus, appStatuses] = await Promise.all([
       this.prisma.client.leadStatus.findFirst({

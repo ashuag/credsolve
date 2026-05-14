@@ -37,6 +37,12 @@ export type LosLeadDetails = {
   email: string | null;
   statusCode: string;
   statusLabel: string;
+  /** LOS / ops note on the lead row (`lead.lead_status_note`). */
+  leadStatusNote: string | null;
+  /** Vendor/bureau diagnostic text (`lead.bureau_fetched_note`). */
+  bureauFetchedNote: string | null;
+  /** Master rejection reason when `rejection_reason_id` is set. */
+  rejectionReason: { code: string; label: string } | null;
   sourceName: string | null;
   sourceType: string | null;
   utm: {
@@ -50,6 +56,7 @@ export type LosLeadDetails = {
   updatedAt: string;
   profile: {
     fullName: string | null;
+    dateOfBirth: string | null;
     panNumber: string | null;
     pincode: string | null;
     addressLine1: string | null;
@@ -75,6 +82,64 @@ export type LosLeadDetails = {
   }>;
 };
 
+export type LosApplicationDetails = {
+  uuid: string;
+  customerUuid: string;
+  leadUuid: string;
+  mobileNumber: string;
+  email: string | null;
+  emailVerifiedAt: string | null;
+  statusCode: string;
+  statusLabel: string;
+  kycStatus: number;
+  kycStatusLabel: string;
+  kycCompletedAt: string | null;
+  livenessPassed: boolean;
+  livenessCheckedAt: string | null;
+  preApprovedLoanAmount: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lead: {
+    uuid: string;
+    statusCode: string;
+    statusLabel: string;
+    panNumber: string | null;
+    profile: LosLeadDetails['profile'];
+  };
+  details: {
+    reasonForLoan: string | null;
+    loanAmount: string | null;
+    loanTenure: number | null;
+    interestRate: string | null;
+    interestAmount: string | null;
+    processingFee: string | null;
+    processingFeeAmount: string | null;
+    gstAmount: string | null;
+    loanDisbursementDate: string | null;
+    loanMaturityDate: string | null;
+  } | null;
+  eligibility: {
+    isEligible: boolean;
+    approvedAmount: string | null;
+    cibilScore: number | null;
+    ineligibleReason: string | null;
+    checkedAt: string;
+  } | null;
+  agreement: {
+    documentName: string | null;
+    signedAt: string | null;
+    ipAddress: string | null;
+  } | null;
+  disbursement: {
+    amount: string | null;
+    accountNumber: string | null;
+    ifscCode: string | null;
+    bankName: string | null;
+    utr: string | null;
+    disbursedAt: string | null;
+  } | null;
+};
+
 export async function getNewLeads(token: string): Promise<LosLead[]> {
   return cachedAuthorizedLosGet<LosLead[]>(token, '/leads/new', 'Failed to fetch new leads');
 }
@@ -88,5 +153,13 @@ export async function getLeadDetails(token: string, leadUuid: string): Promise<L
     token,
     `/leads/${encodeURIComponent(leadUuid)}`,
     'Failed to fetch lead details',
+  );
+}
+
+export async function getApplicationDetails(token: string, applicationUuid: string): Promise<LosApplicationDetails> {
+  return cachedAuthorizedLosGet<LosApplicationDetails>(
+    token,
+    `/applications/${encodeURIComponent(applicationUuid)}`,
+    'Failed to fetch application details',
   );
 }

@@ -19,14 +19,16 @@ export class LoansController {
   @Get('eligibility')
   @ApiOperation({
     summary:
-      'Pre-approved eligibility ceiling in INR (demo: deterministic ₹5k–₹50k from active lead until bureau/rules are wired)',
+      'Pre-approved eligibility ceiling in INR (demo: deterministic amount from active lead seed, clamped to MIN_LOAN_AMOUNT / MAX_LOAN_AMOUNT settings)',
   })
   @ApiOkResponse({
-    description: 'Pre-approved ceiling in INR',
+    description: 'Pre-approved ceiling and the min/max bounds used for clamping',
     schema: {
       type: 'object',
       properties: {
         preApprovedAmountInr: { type: 'number', example: 25000 },
+        minLoanAmountInr: { type: 'number', example: 2000 },
+        maxLoanAmountInr: { type: 'number', example: 30000 },
       },
     },
   })

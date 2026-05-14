@@ -35,7 +35,7 @@ export class PostBureauOfferService {
       return;
     }
 
-    const { preApprovedAmountInr } = this.checkLoanEligibility.computeForSeed(params.leadUuid);
+    const { preApprovedAmountInr } = await this.checkLoanEligibility.computeForSeed(params.leadUuid);
     const approved = new Prisma.Decimal(preApprovedAmountInr);
     const cibilScore = await this.bureauReports.findLatestBureauScoreForLead(params.leadId);
 

@@ -17,10 +17,12 @@ export class SaveBankDetailsUseCase {
   ) {}
 
   async execute(req: Request, dto: SaveBankDetailsDto): Promise<{ success: true }> {
-    const normalizedBankName = dto.bankName.trim();
-    const validBank = await this.banks.isActiveBankName(normalizedBankName);
-    if (!validBank) {
-      throw new BadRequestException('Please select a valid bank from the list.');
+    const normalizedBankName = dto.bankName?.trim() ?? '';
+    if (normalizedBankName) {
+      const validBank = await this.banks.isActiveBankName(normalizedBankName);
+      if (!validBank) {
+        throw new BadRequestException('Please select a valid bank from the list.');
+      }
     }
 
     const session = req.customerSession;
@@ -73,7 +75,7 @@ export class SaveBankDetailsUseCase {
       // `bank_name` is written via raw SQL so the DB stays compatible even when the column was added after the initial migration.
       await tx.$executeRaw`
         UPDATE application_disbursement
-        SET bank_name = ${normalizedBankName}
+        SET bank_name = ${normalizedBankName.length > 0 ? normalizedBankName : null}
         WHERE application_id = ${application.id}
       `;
     });

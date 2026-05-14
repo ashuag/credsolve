@@ -15,7 +15,17 @@ model Application {
   emailVerificationType EmailVerificationType?    @map("email_verification_type")
   applicationStatusId   Int                       @map("application_status_id") @db.SmallInt
   preApprovedLoanAmount Decimal?                  @map("pre_approved_loan_amount") @db.Decimal(12, 2)
+  kycStatus             Int                       @map("kyc_status") @db.SmallInt @default(0) // 0: Not Done, 1: Completed, 2: failed, 3: technical issue
   kycCompletedAt        DateTime?                 @map("kyc_completed_at")
+  /// DigiLocker Aadhaar download payload for forms (large `photo` replaced by stored-file reference).
+  digilockerAadhaarFormJson Json?                 @map("digilocker_aadhaar_form_json")
+  /// Relative under `KYC_FILES_ROOT`: `customer/{customer_uuid}/photos/aadhaar/{application_uuid}.{jpg|png}`.
+  aadhaarPhotoRelativePath  String?               @map("aadhaar_photo_relative_path") @db.VarChar(512)
+  /// `customer/{customer_uuid}/photos/selfie/{application_uuid}.jpg`
+  selfieRelativePath    String?                   @map("selfie_relative_path") @db.VarChar(512)
+  livenessVendorJson    Json?                     @map("liveness_vendor_json")
+  livenessCheckedAt     DateTime?                 @map("liveness_checked_at")
+  livenessPassed        Boolean                   @default(false) @map("liveness_passed")
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt             DateTime  @updatedAt      @map("updated_at")
 

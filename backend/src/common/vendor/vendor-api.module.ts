@@ -1,6 +1,8 @@
 import { Global, Module } from '@nestjs/common';
 import { BureauFetchService } from './bureau-fetch.service';
+import { BankTenacioVendorService } from './bank-tenacio-vendor.service';
 import { DigilockerVendorService } from './digilocker-vendor.service';
+import { LivenessVendorService } from './liveness-vendor.service';
 import { PanVerificationService } from './pan-verification.service';
 import { VendorApiService } from './vendor-api.service';
 
@@ -15,7 +17,7 @@ import { VendorApiService } from './vendor-api.service';
  */
 @Global()
 @Module({
-  providers: [VendorApiService, PanVerificationService, BureauFetchService, DigilockerVendorService],
-  exports: [VendorApiService, PanVerificationService, BureauFetchService, DigilockerVendorService],
+  providers: [VendorApiService, PanVerificationService, BureauFetchService, DigilockerVendorService, LivenessVendorService, BankTenacioVendorService],
+  exports: [VendorApiService, PanVerificationService, BureauFetchService, DigilockerVendorService, LivenessVendorService, BankTenacioVendorService],
 })
 export class VendorApiModule {}
