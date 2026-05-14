@@ -24,6 +24,9 @@ services:
     <<: *node-defaults
     tty: true
     env_file: ./backend/.env
+    # Nest must listen on all interfaces so other containers (customer, los) can reach `backend:4001`.
+    environment:
+      HOST: "0.0.0.0"
     ports:
       - "4001:4001"
     working_dir: /workspace/backend
@@ -41,6 +44,10 @@ services:
   los:
     <<: *node-defaults
     env_file: ./los/.env
+    environment:
+      API_SERVER_URL: http://backend:4001/api/los
+    depends_on:
+      - backend
     ports:
       - "3020:3010"
     working_dir: /workspace/los
@@ -52,6 +59,11 @@ services:
   customer:
     <<: *node-defaults
     env_file: ./customer/.env
+    # Inside the container, localhost is not the API — Next rewrites must target the `backend` service.
+    environment:
+      API_SERVER_URL: http://backend:4001/api
+    depends_on:
+      - backend
     ports:
       - "3021:3011"
     working_dir: /workspace/customer

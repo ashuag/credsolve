@@ -78,7 +78,15 @@ export class SendOtpUseCase {
         try {
           await this.emailService.sendOtpEmail(canonical, otpCode, expiresAt);
         } catch (error) {
+          const endpoint = this.emailService.smtpEndpointLabel();
           this.logger.error(`Failed to send OTP email to ${masked}`, error instanceof Error ? error.stack : error);
+          if (endpoint) {
+            this.logger.error(
+              `[SendOtpUseCase] SMTP ${endpoint} unreachable from this host (timeout/refused). ` +
+                'Check: (1) outbound port from this VPS, (2) mail server firewall allows this server public IP, ' +
+                '(3) set SMTP_FAMILY=4 if IPv6 to the mail host hangs, (4) try port 587+STARTTLS if 465 is blocked.',
+            );
+          }
           await this.otpRequests.deleteById(undefined, row.id);
           throw new InternalServerErrorException('Could not send verification email. Please try again.');
         }

@@ -22,7 +22,8 @@ export function buildGoogleAuthorizationUrl(params: {
   u.searchParams.set('scope', params.scope);
   u.searchParams.set('state', params.state);
   u.searchParams.set('access_type', 'offline');
-  u.searchParams.set('prompt', 'consent');
+  /** Prefer account picker over forced re-consent (avoids noisy Gmail re-prompts when scope is already granted). */
+  u.searchParams.set('prompt', 'select_account');
   u.searchParams.set('include_granted_scopes', 'true');
   return u.toString();
 }

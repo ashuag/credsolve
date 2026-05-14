@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Suspense, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { CUSTOMER_EMAIL_VERIFY_PATH } from '@/lib/api/customer-session';
 
 function GoogleAuthErrorContent() {
   const params = useSearchParams();
@@ -28,7 +29,7 @@ function GoogleAuthErrorContent() {
     return `/auth/google/login?${q.toString()}`;
   }, [leadId, mode]);
 
-  const backHref = mode === 'login' ? '/onboarding?mode=login' : '/onboarding';
+  const backHref = mode === 'login' ? CUSTOMER_EMAIL_VERIFY_PATH : '/email-verify';
 
   return (
     <div className="flex min-h-[520px] items-center justify-center px-4 py-8">

@@ -2,6 +2,8 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  Logger,
+  OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
@@ -38,7 +40,9 @@ function base64UrlDecodeJson<T>(raw: string): T | null {
 }
 
 @Injectable()
-export class CustomerGoogleOauthService {
+export class CustomerGoogleOauthService implements OnModuleInit {
+  private readonly logger = new Logger(CustomerGoogleOauthService.name);
+
   constructor(
     private readonly config: ConfigService,
     private readonly customers: CustomerRepository,
@@ -46,6 +50,32 @@ export class CustomerGoogleOauthService {
     private readonly applications: ApplicationRepository,
     private readonly prisma: PrismaService
   ) {}
+
+  onModuleInit(): void {
+    if ((process.env.NODE_ENV ?? '').toLowerCase() !== 'production') {
+      return;
+    }
+    const pairs: [string, string][] = [
+      ['GOOGLE_CALLBACK_URL', this.config.get<string>('GOOGLE_CALLBACK_URL')?.trim() ?? ''],
+      ['GOOGLE_FRONTEND_CALLBACK_URL', this.config.get<string>('GOOGLE_FRONTEND_CALLBACK_URL')?.trim() ?? ''],
+    ];
+    for (const [name, url] of pairs) {
+      if (!url) {
+        continue;
+      }
+      if (!/^https:\/\//i.test(url)) {
+        this.logger.warn(
+          `${name} should use https:// in production (Google OAuth and browsers expect TLS). Current value starts incorrectly.`
+        );
+      }
+    }
+    const cb = pairs[0][1];
+    if (cb && !cb.includes('/auth/google/callback')) {
+      this.logger.warn(
+        'GOOGLE_CALLBACK_URL should end with /auth/google/callback (with /api prefix if Nest uses global prefix /api). Must match an Authorized redirect URI in Google Cloud exactly.'
+      );
+    }
+  }
 
   private stateSecret(): string {
     const s = this.config.get<string>('GOOGLE_STATE_SECRET')?.trim();

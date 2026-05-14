@@ -57,6 +57,14 @@ export class EmailService {
     return this.transporter !== null;
   }
 
+  /** For error logs only (no credentials). */
+  smtpEndpointLabel(): string | null {
+    const host = this.config.get<string>('SMTP_HOST')?.trim();
+    if (!host) return null;
+    const port = Number.parseInt(this.config.get<string>('SMTP_PORT') ?? '587', 10) || 587;
+    return `${host}:${port}`;
+  }
+
   private formatFrom(): string {
     const name = this.config.get<string>('MAIL_FROM_NAME')?.trim() || 'MoneyCash';
     const addr =

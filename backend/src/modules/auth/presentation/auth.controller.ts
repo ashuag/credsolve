@@ -19,6 +19,7 @@ import { InitDigilockerUseCase } from '../application/use-cases/init-digilocker.
 import { DownloadAadhaarDigilockerUseCase } from '../application/use-cases/download-aadhaar-digilocker.use-case';
 import { InitDigilockerDto } from '../application/dto/init-digilocker.dto';
 import { DownloadAadhaarDigilockerDto } from '../application/dto/download-aadhaar-digilocker.dto';
+import { buildCustomerAuthCookieOptions } from '../infrastructure/session/customer-auth-cookie.util';
 import { CustomerGoogleOauthService } from '../infrastructure/google/customer-google-oauth.service';
 import { OptionalCustomerSessionGuard } from './guards/optional-customer-session.guard';
 import { RequiredCustomerSessionGuard } from './guards/required-customer-session.guard';
@@ -29,10 +30,6 @@ function readClientIp(req: Request): string | undefined {
     return xf.split(',')[0]?.trim();
   }
   return req.ip;
-}
-
-function isProduction(): boolean {
-  return (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
 }
 
 @ApiTags('auth')
@@ -89,13 +86,7 @@ export class AuthController {
     });
     const { sessionCookie, ...rest } = out;
     if (sessionCookie) {
-      res.cookie(sessionCookie.name, sessionCookie.sessionId, {
-        httpOnly: true,
-        secure: isProduction(),
-        sameSite: 'lax',
-        path: '/',
-        maxAge: sessionCookie.maxAgeMs,
-      });
+      res.cookie(sessionCookie.name, sessionCookie.sessionId, buildCustomerAuthCookieOptions(sessionCookie.maxAgeMs));
     }
     const bodyJson: VerifyOtpSuccessResponseDto = {
       success: rest.success,

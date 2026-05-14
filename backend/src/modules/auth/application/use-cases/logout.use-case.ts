@@ -1,11 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { CustomerSessionService } from '../../infrastructure/session/customer-session.service';
+import { buildCustomerAuthCookieClearOptions } from '../../infrastructure/session/customer-auth-cookie.util';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
-
-function isProduction(): boolean {
-  return (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
-}
 
 @Injectable()
 export class LogoutUseCase {
@@ -18,8 +15,7 @@ export class LogoutUseCase {
     const settings = await this.settingsRepository.loadAuthOtpSettings();
     const sid = req.cookies?.[settings.authCookieName] as string | undefined;
     await this.customerSessions.revokeSession(sid);
-    const secure = isProduction();
-    res.clearCookie(settings.authCookieName, { httpOnly: true, secure, sameSite: 'lax', path: '/' });
+    res.clearCookie(settings.authCookieName, buildCustomerAuthCookieClearOptions());
     return { success: true };
   }
 }

@@ -4,6 +4,7 @@ import type { Request, Response } from 'express';
 import { RedisService } from '../../../../common/redis/redis.service';
 import type { CustomerSessionPayload } from '../../application/contracts/customer-session-payload.contract';
 import { SettingsRepository } from '../repositories/settings.repository';
+import { buildCustomerAuthCookieOptions } from './customer-auth-cookie.util';
 
 const KEY_PREFIX = 'mc:cs:';
 
@@ -16,20 +17,6 @@ interface StoredCustomerSession {
   createdUa?: string;
   lastIp?: string;
   lastUa?: string;
-}
-
-function isProduction(): boolean {
-  return (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
-}
-
-function buildCookieOptions(maxAgeMs: number) {
-  return {
-    httpOnly: true,
-    secure: isProduction(),
-    sameSite: 'lax' as const,
-    path: '/',
-    maxAge: maxAgeMs,
-  };
 }
 
 @Injectable()
@@ -141,7 +128,7 @@ export class CustomerSessionService {
         pipeline.set(this.storageKey(newSid), serialized, 'PX', ttl);
         pipeline.del(this.storageKey(sid));
         await pipeline.exec();
-        res.cookie(settings.authCookieName, newSid, buildCookieOptions(ttl));
+        res.cookie(settings.authCookieName, newSid, buildCustomerAuthCookieOptions(ttl));
       } else if (settings.sessionSliding) {
         await this.redisService.client.set(this.storageKey(sid), serialized, 'PX', ttl);
       } else {

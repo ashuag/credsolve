@@ -139,7 +139,14 @@ export async function GET(request: NextRequest) {
   if (upstreamRes.status >= 300 && upstreamRes.status < 400) {
     const location = upstreamRes.headers.get('location');
     if (location) {
-      return NextResponse.redirect(location, upstreamRes.status);
+      let target = location.trim();
+      try {
+        // Reject relative URLs — Next.js `redirect()` requires an absolute URL.
+        new URL(target);
+      } catch {
+        target = new URL(target.startsWith('/') ? target : `/${target}`, resolvePublicOrigin(request)).toString();
+      }
+      return NextResponse.redirect(target, upstreamRes.status);
     }
   }
 
