@@ -94,7 +94,7 @@ export class ApplicationsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Run Tenacio liveness on the stored selfie (TENACIO_LIVENESS_SERVICE + workflow id). No-op vendor call when KYC_LIVENESS_PAUSED is set.',
+      'Run Tenacio liveness on the stored selfie when outbound is enabled (VENDOR_HOST + TENACIO_LIVENESS_SERVICE or TENACIO_LIVENESS_URL). No vendor HTTP call when KYC_LIVENESS_PAUSED, TENACIO_LIVENESS_DISABLED, or the POST target is not configured.',
   })
   @ApiOkResponse({ description: 'Vendor outcome; updates application when HTTP call completes' })
   kycLivenessRoute(@Req() req: Request) {

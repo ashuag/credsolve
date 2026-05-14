@@ -10,7 +10,7 @@ import type { CustomerSessionResult } from '../contracts/customer-session-result
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
-import { isKycLivenessCheckPaused } from '../../../../common/kyc/kyc-liveness-env.util';
+import { isKycLivenessOutboundSkipped } from '../../../../common/kyc/kyc-liveness-env.util';
 import { fetchLatestApplicationKycSnapshot } from '../../../../prisma/application-kyc-snapshot.query';
 import { PrismaService } from '../../../../prisma/prisma.service';
 
@@ -147,15 +147,15 @@ export class GetCustomerSessionUseCase {
           where: { customerKycId: latestCustomerKyc.id },
         })
       : 0;
-    const livenessPaused = isKycLivenessCheckPaused();
+    const livenessOutboundSkipped = isKycLivenessOutboundSkipped();
     const hasSavedSelfie = Boolean(application?.selfieRelativePath?.trim());
     const hasDigilockerForm = application?.digilockerAadhaarFormJson != null;
-    /** Liveness can be paused by env, but DigiLocker + a stored selfie are always required for this path. */
+    /** Outbound Tenacio liveness can be skipped by env; DigiLocker + a stored selfie are always required for this path. */
     const faceStepCompleteForJourney = Boolean(
       application &&
         hasDigilockerForm &&
         hasSavedSelfie &&
-        (application.livenessPassed === true || livenessPaused),
+        (application.livenessPassed === true || livenessOutboundSkipped),
     );
 
     const kycCompleted = Boolean(
@@ -188,7 +188,7 @@ export class GetCustomerSessionUseCase {
             digilockerAadhaarCaptured: application.digilockerAadhaarFormJson != null,
             selfieCaptured: Boolean(application.selfieRelativePath?.trim()),
             livenessPassed: application.livenessPassed === true,
-            livenessRequired: !livenessPaused,
+            livenessRequired: !livenessOutboundSkipped,
             digilockerAadhaarForm: application.digilockerAadhaarFormJson ?? null,
             digilockerAadhaarPhotoUrl: application.aadhaarPhotoRelativePath?.trim()
               ? '/auth/kyc/digilocker-aadhaar-photo'

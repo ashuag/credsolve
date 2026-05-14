@@ -12,7 +12,10 @@ import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { ApplicationRepository } from '../../infrastructure/repositories/application.repository';
-import { isKycLivenessCheckPaused } from '../../../../common/kyc/kyc-liveness-env.util';
+import {
+  isKycLivenessCheckPaused,
+  isKycLivenessOutboundSkipped,
+} from '../../../../common/kyc/kyc-liveness-env.util';
 import { fetchLatestApplicationKycSnapshot } from '../../../../prisma/application-kyc-snapshot.query';
 import { PrismaService } from '../../../../prisma/prisma.service';
 
@@ -79,14 +82,17 @@ export class RunKycLivenessUseCase {
       throw new BadRequestException('Upload a selfie before running liveness.');
     }
 
-    if (isKycLivenessCheckPaused()) {
+    if (isKycLivenessOutboundSkipped()) {
+      const paused = isKycLivenessCheckPaused();
       return {
         configured: true,
         ok: false,
         httpStatus: null,
-        vendor: { paused: true },
+        vendor: paused ? { paused: true } : { outboundSkipped: true },
         livenessPassed: false,
-        vendorErrorMessage: 'Liveness checks are temporarily paused. Your saved selfie is still on file.',
+        vendorErrorMessage: paused
+          ? 'Liveness checks are temporarily paused. Your saved selfie is still on file.'
+          : 'Partner liveness verification is turned off. Your saved selfie is still on file.',
       };
     }
 

@@ -51,7 +51,8 @@ export type CustomerKycFaceProgressSnapshot = {
   selfieCaptured: boolean;
   livenessPassed: boolean;
   /**
-   * When `false`, the journey does not require `POST .../kyc/liveness` (Tenacio paused via env).
+   * When `false`, the journey does not require `POST .../kyc/liveness` (outbound Tenacio liveness skipped:
+   * `KYC_LIVENESS_PAUSED`, `TENACIO_LIVENESS_DISABLED`, or no configured liveness POST URL / service).
    * Omitted only in older clients; server always sends a boolean.
    */
   livenessRequired: boolean;
