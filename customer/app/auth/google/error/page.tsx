@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Suspense, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { buildGoogleOAuthStartHref } from '@/lib/api-url';
 import { CUSTOMER_EMAIL_VERIFY_PATH } from '@/lib/api/customer-session';
 
 function GoogleAuthErrorContent() {
@@ -26,7 +27,7 @@ function GoogleAuthErrorContent() {
     if (leadId) {
       q.set('leadId', leadId);
     }
-    return `/auth/google/login?${q.toString()}`;
+    return buildGoogleOAuthStartHref(q.toString());
   }, [leadId, mode]);
 
   const backHref = mode === 'login' ? CUSTOMER_EMAIL_VERIFY_PATH : '/email-verify';

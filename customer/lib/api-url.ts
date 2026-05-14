@@ -54,3 +54,26 @@ export function getApiUrl() {
 
   return ensureNestGlobalPrefix(rawPublic);
 }
+
+/**
+ * Full-page URL to start Google OAuth (Nest `GET .../auth/google/login`).
+ * When `NEXT_PUBLIC_API_URL` is absolute (e.g. `https://api.moneycash.in/api`), the browser must open
+ * that host so the HttpOnly session cookie set by `api` is sent. Using only `/auth/google/login` on
+ * `www` forwards cookies sent to `www`, which breaks split-host setups without `Domain=` cookies.
+ */
+export function buildGoogleOAuthStartHref(queryString: string): string {
+  const raw = (process.env.NEXT_PUBLIC_API_URL ?? '').trim();
+  const suffix = queryString.length > 0 ? `?${queryString}` : '';
+
+  if (!raw || raw.startsWith('/')) {
+    return `/auth/google/login${suffix}`;
+  }
+
+  const apiBase = ensureNestGlobalPrefix(raw);
+  if (!/^https?:\/\//i.test(apiBase)) {
+    return `/auth/google/login${suffix}`;
+  }
+
+  const noTrailing = apiBase.replace(/\/$/, '');
+  return `${noTrailing}/auth/google/login${suffix}`;
+}

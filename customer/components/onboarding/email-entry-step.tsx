@@ -2,37 +2,9 @@
 
 import { useEffect, useRef, useState, type SubmitEvent } from 'react';
 import { SendEmailOtpResponse, sendEmailOtp } from '@/lib/api/auth';
+import { buildGoogleOAuthStartHref } from '@/lib/api-url';
 import { AlertBanner } from '@/components/ui/alert-banner';
 import { isValidEmail } from '@/lib/validators';
-
-const GOOGLE_LOGIN_URL = process.env.NEXT_PUBLIC_GOOGLE_LOGIN_URL?.trim() || '/auth/google/login';
-
-/** Avoid `http://…` from env on HTTPS pages (Firefox: Mixed Block) and keep OAuth start on the site origin so the session cookie matches `NEXT_PUBLIC_API_URL=/api`. */
-function googleLoginAssignHref(query: string): string {
-  const raw = GOOGLE_LOGIN_URL.trim() || '/auth/google/login';
-  if (typeof window === 'undefined') {
-    const sep = raw.includes('?') ? '&' : '?';
-    return `${raw}${sep}${query}`;
-  }
-  try {
-    const resolved = new URL(raw, window.location.origin);
-    if (window.location.protocol === 'https:' && resolved.protocol === 'http:') {
-      const path = `${resolved.pathname.replace(/\/$/, '') || '/auth/google/login'}${resolved.search}`;
-      const base = path.split('?')[0] || '/auth/google/login';
-      const sep = base.includes('?') ? '&' : '?';
-      return `${base}${sep}${query}`;
-    }
-    if (resolved.origin === window.location.origin) {
-      const base = `${resolved.pathname}${resolved.search}`;
-      const sep = base.includes('?') ? '&' : '?';
-      return `${base}${sep}${query}`;
-    }
-  } catch {
-    // fall through
-  }
-  const sep = raw.includes('?') ? '&' : '?';
-  return `${raw}${sep}${query}`;
-}
 
 export type EmailMode = 'register' | 'login';
 type LoginOption = 'manual' | null;
@@ -84,7 +56,7 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', le
       searchParams.set('leadId', leadUuid.trim());
     }
 
-    window.location.assign(googleLoginAssignHref(searchParams.toString()));
+    window.location.assign(buildGoogleOAuthStartHref(searchParams.toString()));
   }
 
   function handleManualLogin() {
