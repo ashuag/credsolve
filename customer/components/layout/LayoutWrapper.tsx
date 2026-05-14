@@ -10,13 +10,13 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
   const isLandingPage = pathname === '/';
   const isApplyPage = pathname === '/apply-for-loan';
   const isAccountLoginPage = pathname === '/my-account';
-  const isOnboardingPage = pathname === '/onboarding';
+  const isOnboardingLayout = pathname === '/onboarding' || pathname === '/email-verify';
 
   if (isLandingPage || isApplyPage || isAccountLoginPage) {
     return <>{children}</>;
   }
 
-  if (isOnboardingPage) {
+  if (isOnboardingLayout) {
     return (
       <>
         <div className="hidden lg:block">

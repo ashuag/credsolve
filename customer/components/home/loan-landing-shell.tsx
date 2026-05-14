@@ -130,7 +130,8 @@ export function LoanLandingShell({
       ].join(' ')}>
 
         {/* ── Left panel (desktop only) ── */}
-        <div className="w-full lg:w-5/12 hidden lg:flex min-h-0 flex-col relative bg-[#0a1628] overflow-x-hidden">
+        {/* `overflow-x-hidden` alone makes `overflow-y` compute to `auto` (CSS overflow pairing), which shows a vertical scrollbar on this rail when content is a few px taller than the column. */}
+        <div className="w-full lg:w-5/12 hidden lg:flex min-h-0 flex-col relative bg-[#0a1628] overflow-hidden">
 
           {/* Background Mesh */}
           <div className="absolute inset-0 stats-mesh opacity-90 pointer-events-none" />

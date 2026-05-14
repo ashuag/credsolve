@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { ApiRequestError } from '@/lib/api/client';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
+import { CUSTOMER_EMAIL_VERIFY_PATH } from '@/lib/api/customer-session';
 import {
   fetchLoanCalculationSettings,
   fetchLoanEligibility,
@@ -136,7 +137,7 @@ export default function LoanSelectionPage() {
         loanPurpose: loanPurpose || undefined,
       });
       await refresh();
-      router.push('/onboarding?mode=login');
+      router.push(CUSTOMER_EMAIL_VERIFY_PATH);
     } catch (e) {
       setSettingsError(e instanceof Error ? e.message : 'Unable to save loan selection.');
       setIsSaving(false);

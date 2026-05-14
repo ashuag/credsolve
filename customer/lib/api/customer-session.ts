@@ -59,6 +59,9 @@ export type CustomerSessionResponse =
     }
   | { authenticated: false };
 
+/** Profile + loan done; customer should verify email (OTP). Replaces `/onboarding?mode=login` for this stage only. */
+export const CUSTOMER_EMAIL_VERIFY_PATH = '/email-verify?mode=login';
+
 /** Same rule as the header: verified mobile session with an active cookie. */
 export function isCustomerPortalSignedIn(
   session: CustomerSessionResponse | null | undefined
@@ -107,7 +110,7 @@ export function getCustomerJourneyResumePath(
   const journey = session.journey;
   if (!journey.detailsCompleted) return '/onboarding?mode=login';
   if (!journey.loanSelectionCompleted) return '/pre-approved-loan';
-  if (!session.lead.emailVerified) return '/onboarding?mode=login';
+  if (!session.lead.emailVerified) return CUSTOMER_EMAIL_VERIFY_PATH;
   if (!journey.kycCompleted) return '/kyc';
   if (!journey.bankDetailsCompleted) return '/bank-details';
   return '/thank-you';
@@ -132,7 +135,7 @@ export function getKycHubBackPath(session: Extract<CustomerSessionResponse, { au
   const emailVerified = session.lead?.emailVerified ?? false;
   if (!j.detailsCompleted) return '/apply-for-loan';
   if (!j.loanSelectionCompleted) return '/pre-approved-loan';
-  if (!emailVerified) return '/onboarding?mode=login';
+  if (!emailVerified) return CUSTOMER_EMAIL_VERIFY_PATH;
   return '/loan-selection';
 }
 

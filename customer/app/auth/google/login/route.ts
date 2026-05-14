@@ -8,32 +8,110 @@ function nestApiBase(raw: string | undefined): string | null {
   return noSlash.endsWith('/api') ? noSlash : `${noSlash}/api`;
 }
 
+function trimTrailingSlashes(s: string | undefined): string | undefined {
+  const t = s?.trim();
+  if (!t) return undefined;
+  return t.replace(/\/+$/, '');
+}
+
+function withHttpScheme(origin: string): string {
+  const t = origin.trim();
+  if (/^https?:\/\//i.test(t)) return t;
+  return `https://${t}`;
+}
+
+function loopbackHostname(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  return h === 'localhost' || h === '127.0.0.1' || h === '::1' || h.startsWith('127.');
+}
+
+function hostOnlyLoopback(hostHeader: string): boolean {
+  const hostname = hostHeader.split(':')[0]?.trim() ?? hostHeader;
+  return loopbackHostname(hostname);
+}
+
+/** First segment of RFC 7239 Forwarded header. */
+function parseForwardedHostProto(header: string | null): { host: string; proto?: string } | null {
+  if (!header) return null;
+  const first = header.split(',')[0]?.trim();
+  if (!first) return null;
+  let host: string | undefined;
+  let proto: string | undefined;
+  for (const part of first.split(';')) {
+    const eq = part.indexOf('=');
+    if (eq < 0) continue;
+    const key = part.slice(0, eq).trim().toLowerCase();
+    let val = part.slice(eq + 1).trim().replace(/^"+|"+$/g, '');
+    if (key === 'host') host = val;
+    if (key === 'proto') proto = val;
+  }
+  if (!host) return null;
+  return { host, proto };
+}
+
 /**
- * Same-site error redirect as a path + query only (no origin).
- * An absolute URL built from `request.nextUrl.origin` or `Host` is often wrong behind reverse
- * proxies (`localhost:3011`, internal service names). Browsers resolve `Location: /path?…`
- * against the URL the user actually opened (e.g. https://www.moneycash.in/...).
+ * Public origin for absolute redirects. Next.js requires absolute URLs for `NextResponse.redirect`
+ * (see https://nextjs.org/docs/messages/middleware-relative-urls). Prefer env / proxy headers so
+ * `request.nextUrl.origin` is not `http://localhost:3011` behind misconfigured proxies.
  */
-function buildGoogleErrorLocation(request: NextRequest, reason: string, httpStatus?: number): string {
-  const next = new URLSearchParams();
-  next.set('reason', reason);
+function resolvePublicOrigin(request: NextRequest): string {
+  const fromEnv =
+    trimTrailingSlashes(process.env.NEXT_PUBLIC_CUSTOMER_PUBLIC_URL) ||
+    trimTrailingSlashes(process.env.CUSTOMER_PUBLIC_URL);
+  if (fromEnv) {
+    return withHttpScheme(fromEnv);
+  }
+
+  const xfProtoRaw = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  const xfProto = xfProtoRaw === 'http' || xfProtoRaw === 'https' ? xfProtoRaw : undefined;
+
+  const xfHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+  if (xfHost && !hostOnlyLoopback(xfHost)) {
+    const proto = xfProto ?? 'https';
+    return `${proto}://${xfHost}`;
+  }
+
+  const fwd = parseForwardedHostProto(request.headers.get('forwarded'));
+  if (fwd && !hostOnlyLoopback(fwd.host)) {
+    const p =
+      fwd.proto === 'http' || fwd.proto === 'https'
+        ? fwd.proto
+        : xfProto ?? 'https';
+    return `${p}://${fwd.host}`;
+  }
+
+  const rawHost = request.headers.get('host')?.split(',')[0]?.trim();
+  if (rawHost && !hostOnlyLoopback(rawHost)) {
+    const fromUrl = request.nextUrl.protocol.replace(':', '');
+    const proto =
+      xfProto ?? (fromUrl === 'http' || fromUrl === 'https' ? fromUrl : 'https');
+    return `${proto}://${rawHost}`;
+  }
+
+  return request.nextUrl.origin;
+}
+
+function buildGoogleErrorUrl(request: NextRequest, reason: string, httpStatus?: number): string {
+  const origin = resolvePublicOrigin(request);
+  const next = new URL('/auth/google/error', origin.endsWith('/') ? origin.slice(0, -1) : origin);
+  next.searchParams.set('reason', reason);
 
   if (httpStatus !== undefined && Number.isFinite(httpStatus)) {
-    next.set('status', String(httpStatus));
+    next.searchParams.set('status', String(httpStatus));
   }
 
   const q = request.nextUrl.searchParams;
   const mode = q.get('mode');
   if (mode === 'login' || mode === 'register') {
-    next.set('mode', mode);
+    next.searchParams.set('mode', mode);
   }
 
   const leadId = q.get('leadId')?.trim();
   if (leadId) {
-    next.set('leadId', leadId);
+    next.searchParams.set('leadId', leadId);
   }
 
-  return `/auth/google/error?${next.toString()}`;
+  return next.toString();
 }
 
 /**
@@ -43,7 +121,7 @@ function buildGoogleErrorLocation(request: NextRequest, reason: string, httpStat
 export async function GET(request: NextRequest) {
   const apiBase = nestApiBase(process.env.API_SERVER_URL);
   if (!apiBase) {
-    return NextResponse.redirect(buildGoogleErrorLocation(request, 'Customer server is missing API configuration.', 500));
+    return NextResponse.redirect(buildGoogleErrorUrl(request, 'Customer server is missing API configuration.', 500));
   }
 
   const incoming = request.nextUrl;
@@ -78,5 +156,5 @@ export async function GET(request: NextRequest) {
     // keep fallback message
   }
 
-  return NextResponse.redirect(buildGoogleErrorLocation(request, message, httpStatus));
+  return NextResponse.redirect(buildGoogleErrorUrl(request, message, httpStatus));
 }

@@ -6,7 +6,7 @@ import { FlowLoader } from '@/components/ui/flow-loader';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { SendEmailOtpResponse } from '@/lib/api/auth';
 import type { CustomerOnboardingMode } from '@/lib/customer-flow';
-import { getCustomerJourneyResumePath, isLeadRejectedAndLocked } from '@/lib/api/customer-session';
+import { getCustomerJourneyResumePath, isLeadRejectedAndLocked, CUSTOMER_EMAIL_VERIFY_PATH } from '@/lib/api/customer-session';
 import { EmailEntryStep, type EmailMode } from './email-entry-step';
 import { EmailOtpStep } from './email-otp-step';
 import { PersonalDetailsStep, type PersonalDetailsSection } from './personal-details-step';
@@ -14,8 +14,15 @@ import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { LoanSummaryLeftRail } from '@/components/loan/loan-summary-left-rail';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 
-// Flow: mobile verified → profile (/onboarding) → pre-approved + loan selection → email (/onboarding) → KYC → bank / thank-you
+// Flow: mobile verified → profile (/onboarding) → pre-approved + loan selection → email (/email-verify) → KYC → bank / thank-you
 type OnboardingStep = 'details' | 'email' | 'email-otp';
+
+export type OnboardingFlowVariant = 'full' | 'email-only';
+
+type OnboardingFlowProps = {
+  /** `email-only`: `/email-verify` — email + OTP only; sends users away if profile/loan not done. */
+  variant?: OnboardingFlowVariant;
+};
 
 /** Maps onboarding step to a mobile app-bar label. */
 const STEP_LABELS: Record<OnboardingStep, string> = {
@@ -24,7 +31,7 @@ const STEP_LABELS: Record<OnboardingStep, string> = {
   'email-otp': 'Verify email',
 };
 
-export function OnboardingFlow() {
+export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
   const router = useRouter();
   const journeyProgress = useJourneyProgressOptional();
   const { loading, session, refresh } = useCustomerSession();
@@ -60,6 +67,26 @@ export function OnboardingFlow() {
       return;
     }
 
+    if (variant === 'email-only') {
+      if (!detailsCompleted) {
+        router.replace('/onboarding?mode=login');
+        return;
+      }
+      if (!loanSelectionCompleted) {
+        router.replace('/pre-approved-loan');
+        return;
+      }
+      if (!hasResolved) {
+        const requestedMode = new URLSearchParams(window.location.search).get('mode');
+        const initialMode: CustomerOnboardingMode = requestedMode === 'login' ? 'login' : 'register';
+        setEmailMode(initialMode);
+        setEmail(storedEmail);
+        setStep(storedEmail ? 'email-otp' : 'email');
+        setHasResolved(true);
+      }
+      return;
+    }
+
     // Profile done but loan not chosen → offer / selection before email.
     if (detailsCompleted && !loanSelectionCompleted) {
       router.replace('/pre-approved-loan');
@@ -75,13 +102,14 @@ export function OnboardingFlow() {
       if (!detailsCompleted) {
         setStep('details');
       } else if (loanSelectionCompleted && !emailVerified) {
-        setStep(storedEmail ? 'email-otp' : 'email');
+        router.replace(requestedMode === 'login' ? CUSTOMER_EMAIL_VERIFY_PATH : '/email-verify');
+        return;
       } else {
         setStep('details');
       }
       setHasResolved(true);
     }
-  }, [loading, session, router, hasResolved]);
+  }, [loading, session, router, hasResolved, variant]);
 
   useEffect(() => {
     if (!journeyProgress) return;
@@ -184,6 +212,8 @@ export function OnboardingFlow() {
     if (step === 'email') {
       if (portalSession.journey.loanSelectionCompleted) {
         router.push('/loan-selection');
+      } else if (variant === 'email-only') {
+        router.push('/pre-approved-loan');
       } else {
         setStep('details');
       }

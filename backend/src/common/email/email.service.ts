@@ -33,12 +33,24 @@ export class EmailService {
     const user = this.config.get<string>('SMTP_USER')?.trim();
     const pass = this.config.get<string>('SMTP_PASS') ?? '';
 
+    const connectionTimeoutMs = parsePositiveInt(this.config.get<string>('SMTP_CONNECTION_TIMEOUT_MS'), 120_000);
+    const socketTimeoutMs = parsePositiveInt(this.config.get<string>('SMTP_SOCKET_TIMEOUT_MS'), 120_000);
+    const family = parseSocketFamily(this.config.get<string>('SMTP_FAMILY'));
+
     this.transporter = nodemailer.createTransport({
       host,
       port,
       secure,
+      connectionTimeout: connectionTimeoutMs,
+      socketTimeout: socketTimeoutMs,
+      ...(family !== undefined ? { family } : {}),
       ...(user ? { auth: { user, pass } } : {}),
     });
+
+    this.logger.log(
+      `SMTP transport: ${host}:${port} secure=${secure} connectionTimeoutMs=${connectionTimeoutMs}` +
+        `${family !== undefined ? ` family=${family}` : ''}`,
+    );
   }
 
   isConfigured(): boolean {
@@ -103,4 +115,17 @@ function escapeHtml(s: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function parsePositiveInt(raw: string | undefined, fallback: number): number {
+  const n = Number.parseInt(raw ?? '', 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+/** Prefer IPv4 on some cloud hosts where IPv6 to the MX hangs until TCP timeout. */
+function parseSocketFamily(raw: string | undefined): number | undefined {
+  const t = raw?.trim().toLowerCase();
+  if (t === '4' || t === 'ipv4') return 4;
+  if (t === '6' || t === 'ipv6') return 6;
+  return undefined;
 }

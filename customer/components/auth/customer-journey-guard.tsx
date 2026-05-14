@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
+import { CUSTOMER_EMAIL_VERIFY_PATH } from '@/lib/api/customer-session';
 
 type JourneyStage = 'details' | 'preApproved' | 'loanSelection' | 'email' | 'kyc' | 'bankDetails' | 'done';
 
@@ -28,7 +29,7 @@ function defaultPathForStage(stage: JourneyStage): string {
     case 'loanSelection':
       return '/loan-selection';
     case 'email':
-      return '/onboarding?mode=login';
+      return CUSTOMER_EMAIL_VERIFY_PATH;
     case 'bankDetails':
       return '/bank-details';
     case 'done':
@@ -62,7 +63,7 @@ function isPathAllowedForStage(stage: JourneyStage, path: string): boolean {
     case 'loanSelection':
       return path === '/loan-selection';
     case 'email':
-      return path.startsWith('/onboarding');
+      return path.startsWith('/email-verify') || path.startsWith('/onboarding');
     case 'bankDetails':
       return path === '/bank-details';
     case 'done':

@@ -47,6 +47,7 @@ function getStepIndexFromPathname(pathname: string): number {
   if (p.includes('/pre-approved-loan') || p.includes('/loan-selection') || p.includes('/loan-offer')) {
     return 2;
   }
+  if (p.includes('/email-verify')) return 2;
   if (p.includes('/onboarding')) return 1;
   if (p.includes('/apply-for-loan')) return 0;
   return 0;
@@ -77,7 +78,7 @@ export function JourneySpeedometer() {
       stepIndex = pathStep;
     }
     /** Onboarding form: smooth 20%→39% while completing profile after mobile verify (milestone 1). */
-    if (pathname.includes('/onboarding') && journeyInline && m === 1) {
+    if ((pathname.includes('/onboarding') || pathname.includes('/email-verify')) && journeyInline && m === 1) {
       progress = Math.round(20 + journeyInline.completion01 * 19);
     }
   }
