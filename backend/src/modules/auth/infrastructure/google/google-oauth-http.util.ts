@@ -44,14 +44,24 @@ export async function exchangeGoogleAuthorizationCode(
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
   });
-  if (!res.ok) {
-    throw new Error(`google_token_http_${res.status}`);
+  const rawText = await res.text();
+  let parsed: { access_token?: string; error?: string; error_description?: string } = {};
+  try {
+    parsed = JSON.parse(rawText) as typeof parsed;
+  } catch {
+    // non-JSON body
   }
-  const data = (await res.json()) as { access_token?: string };
-  if (!data.access_token) {
+
+  if (!res.ok) {
+    const detail = [parsed.error, parsed.error_description].filter(Boolean).join(' — ');
+    throw new Error(
+      detail ? `google_token_http_${res.status}:${detail}` : `google_token_http_${res.status}:${rawText.slice(0, 200)}`
+    );
+  }
+  if (!parsed.access_token) {
     throw new Error('google_token_no_access_token');
   }
-  return { access_token: data.access_token };
+  return { access_token: parsed.access_token };
 }
 
 /**

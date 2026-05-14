@@ -209,7 +209,21 @@ export class CustomerGoogleOauthService implements OnModuleInit {
     try {
       const tokens = await exchangeGoogleAuthorizationCode(cfg, code.trim());
       accessToken = tokens.access_token;
-    } catch {
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      this.logger.error(
+        `Google OAuth token exchange failed. Check GOOGLE_CALLBACK_URL matches the authorized redirect URI used in the auth request, and GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET match this OAuth client. redirect_uri_sent=${cfg.redirectUri} detail=${detail}`,
+      );
+      if (detail.includes('invalid_grant')) {
+        return fail(
+          'Google could not validate the login (invalid_grant). Usually the redirect URI in Nest does not exactly match Google Cloud, the code was reused, or the client secret is wrong.'
+        );
+      }
+      if (detail.includes('redirect_uri') || detail.includes('Redirect URI')) {
+        return fail(
+          'Google rejected the redirect URI for token exchange. Set GOOGLE_CALLBACK_URL on the API to exactly match an Authorized redirect URI in Google Cloud.'
+        );
+      }
       return fail('Could not exchange Google authorization code.');
     }
 

@@ -73,8 +73,12 @@ export class SendOtpUseCase {
       utmContent: dto.utmContent ?? null,
     });
 
+    const emailOtpInlineOnly = (process.env.EMAIL_OTP_INLINE_ONLY ?? '').trim().toLowerCase() === 'true';
+
     if (dto.type === OTP_TYPE.EMAIL) {
-      if (this.emailService.isConfigured()) {
+      if (emailOtpInlineOnly) {
+        this.logger.log(`[otp] EMAIL_OTP_INLINE_ONLY: skipping SMTP; returning debugOtp in API for ${masked} request=${row.uuid}`);
+      } else if (this.emailService.isConfigured()) {
         try {
           await this.emailService.sendOtpEmail(canonical, otpCode, expiresAt);
         } catch (error) {
@@ -105,13 +109,16 @@ export class SendOtpUseCase {
 
     const resendAvailableAt = new Date(now + settings.otpResendCooldownSeconds * 1000);
 
+    const includeDebugOtpMobile = isDev && process.env.INCLUDE_DEBUG_OTP !== 'false';
+    const includeDebugOtpEmail = dto.type === OTP_TYPE.EMAIL && (emailOtpInlineOnly || includeDebugOtpMobile);
+
     return {
       requestId: row.uuid,
       maskedValue: masked,
       resendAfterSeconds: settings.otpResendCooldownSeconds,
       resendAvailableAt: resendAvailableAt.toISOString(),
       expiresAt: expiresAt.toISOString(),
-      ...(isDev && process.env.INCLUDE_DEBUG_OTP !== 'false' ? { debugOtp: otpCode } : {}),
+      ...((dto.type === OTP_TYPE.MOBILE ? includeDebugOtpMobile : includeDebugOtpEmail) ? { debugOtp: otpCode } : {}),
     };
   }
 

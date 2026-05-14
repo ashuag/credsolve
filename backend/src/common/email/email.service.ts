@@ -33,8 +33,8 @@ export class EmailService {
     const user = this.config.get<string>('SMTP_USER')?.trim();
     const pass = this.config.get<string>('SMTP_PASS') ?? '';
 
-    const connectionTimeoutMs = parsePositiveInt(this.config.get<string>('SMTP_CONNECTION_TIMEOUT_MS'), 120_000);
-    const socketTimeoutMs = parsePositiveInt(this.config.get<string>('SMTP_SOCKET_TIMEOUT_MS'), 120_000);
+    const connectionTimeoutMs = parsePositiveInt(this.config.get<string>('SMTP_CONNECTION_TIMEOUT_MS'), 25_000);
+    const socketTimeoutMs = parsePositiveInt(this.config.get<string>('SMTP_SOCKET_TIMEOUT_MS'), 60_000);
     const family = parseSocketFamily(this.config.get<string>('SMTP_FAMILY'));
 
     this.transporter = nodemailer.createTransport({

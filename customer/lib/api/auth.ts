@@ -63,11 +63,18 @@ export type VerifyEmailOtpResponse = {
 };
 
 async function sendOtpRequest(payload: SendOtpRequestPayload): Promise<SendUnifiedOtpResponse> {
+  const sendOtpMs = readSendOtpPostTimeoutMs();
   return (await apiPost<SendUnifiedOtpResponse>(
     `${AUTH}/send-otp`,
     payload,
-    'Unable to send OTP right now. Please try again.'
+    'Unable to send OTP right now. Please try again.',
+    { timeoutMs: sendOtpMs }
   )) as SendUnifiedOtpResponse;
+}
+
+function readSendOtpPostTimeoutMs(): number {
+  const parsed = Number.parseInt(process.env.NEXT_PUBLIC_API_SEND_OTP_TIMEOUT_MS ?? '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 60_000;
 }
 
 async function verifyOtpRequest<T>(payload: {

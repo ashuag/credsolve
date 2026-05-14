@@ -196,9 +196,10 @@ export async function apiPost<T>(
   path: string,
   body: unknown,
   fallbackMessage: string,
-  init?: Omit<RequestInit, 'method' | 'body'>
+  init?: Omit<RequestInit, 'method' | 'body'> & { timeoutMs?: number }
 ): Promise<T | null> {
-  const headers = new Headers(init?.headers);
+  const { timeoutMs: initTimeoutMs, ...fetchInit } = init ?? {};
+  const headers = new Headers(fetchInit.headers);
 
   if (!headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
@@ -207,13 +208,13 @@ export async function apiPost<T>(
   return requestJson<T>(
     path,
     {
-      ...init,
+      ...fetchInit,
       method: 'POST',
       headers,
       body: JSON.stringify(body),
     },
     fallbackMessage,
-    { timeoutMs: POST_TIMEOUT_MS, retryOnTransient: false }
+    { timeoutMs: initTimeoutMs ?? POST_TIMEOUT_MS, retryOnTransient: false }
   );
 }
 
@@ -221,16 +222,18 @@ export async function apiPostFormData<T>(
   path: string,
   formData: FormData,
   fallbackMessage: string,
-  init?: Omit<RequestInit, 'method' | 'body'>
+  init?: Omit<RequestInit, 'method' | 'body'> & { timeoutMs?: number }
 ): Promise<T | null> {
+  const { timeoutMs: initTimeoutMs, ...fetchInit } = init ?? {};
+
   return requestJson<T>(
     path,
     {
-      ...init,
+      ...fetchInit,
       method: 'POST',
       body: formData,
     },
     fallbackMessage,
-    { timeoutMs: POST_TIMEOUT_MS, retryOnTransient: false }
+    { timeoutMs: initTimeoutMs ?? POST_TIMEOUT_MS, retryOnTransient: false }
   );
 }

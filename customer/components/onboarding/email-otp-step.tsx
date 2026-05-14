@@ -84,7 +84,7 @@ export function EmailOtpStep({
       const next = await sendEmailOtp(email);
       onOtpRequestChange(next);
       otp.clear();
-      setStatus('A fresh OTP has been sent to your email.');
+      setStatus(next.debugOtp ? 'A fresh verification code is shown below.' : 'A fresh OTP has been sent to your email.');
       otp.inputRefs.current[0]?.focus();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to resend OTP.');
@@ -148,7 +148,15 @@ export function EmailOtpStep({
               </svg>
             </div>
             <p className="text-[0.88rem] text-slate-600 leading-relaxed m-0 pt-0.5">
-              We sent a secure code to <strong className="text-slate-900 font-bold tracking-wider">{otpRequest?.maskedEmail ?? email}</strong>. Enter it below.
+              {otpRequest?.debugOtp ? (
+                <>
+                  Your verification code is shown below for <strong className="text-slate-900 font-bold tracking-wider">{otpRequest.maskedEmail ?? email}</strong>.
+                </>
+              ) : (
+                <>
+                  We sent a secure code to <strong className="text-slate-900 font-bold tracking-wider">{otpRequest?.maskedEmail ?? email}</strong>. Enter it below.
+                </>
+              )}
             </p>
           </div>
         </div>
