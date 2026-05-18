@@ -158,7 +158,7 @@ export function OtpVerificationForm({
 
         {otpRequest?.debugOtp && (
           <AlertBanner variant="warn">
-            Demo OTP: <strong>{otpRequest.debugOtp}</strong>
+            Verification code: <strong>{otpRequest.debugOtp}</strong>
           </AlertBanner>
         )}
         {error && <AlertBanner variant="error">{error}</AlertBanner>}

@@ -74,6 +74,7 @@ export class SendOtpUseCase {
     });
 
     const emailOtpInlineOnly = (process.env.EMAIL_OTP_INLINE_ONLY ?? '').trim().toLowerCase() === 'true';
+    const includeDebugOtpEmailFlag = (process.env.INCLUDE_DEBUG_OTP_EMAIL ?? '').trim().toLowerCase() === 'true';
 
     if (dto.type === OTP_TYPE.EMAIL) {
       if (emailOtpInlineOnly) {
@@ -96,7 +97,7 @@ export class SendOtpUseCase {
         }
       } else {
         this.logger.warn(
-          `[otp] SMTP not configured; email not sent. to=${masked} request=${row.uuid} (use dev logs / LOG_OTP_TO_CONSOLE for code)`,
+          `[otp] SMTP not configured; email not sent. to=${masked} request=${row.uuid} — response includes debugOtp for manual entry (set SMTP or EMAIL_OTP_INLINE_ONLY as needed).`,
         );
       }
     }
@@ -110,7 +111,13 @@ export class SendOtpUseCase {
     const resendAvailableAt = new Date(now + settings.otpResendCooldownSeconds * 1000);
 
     const includeDebugOtpMobile = isDev && process.env.INCLUDE_DEBUG_OTP !== 'false';
-    const includeDebugOtpEmail = dto.type === OTP_TYPE.EMAIL && (emailOtpInlineOnly || includeDebugOtpMobile);
+    /** Same UX as mobile `debugOtp`: show code in the app when email is not (or must not be) delivered out-of-band. */
+    const includeDebugOtpEmail =
+      dto.type === OTP_TYPE.EMAIL &&
+      (emailOtpInlineOnly ||
+        includeDebugOtpMobile ||
+        includeDebugOtpEmailFlag ||
+        !this.emailService.isConfigured());
 
     return {
       requestId: row.uuid,

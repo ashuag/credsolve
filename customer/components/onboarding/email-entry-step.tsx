@@ -244,7 +244,7 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', le
               className={`text-[0.9rem] leading-[1.55] ${emailError ? 'text-[#b2372d]' : 'text-brand-muted'}`}
             >
               {emailError || (isLogin
-                ? "We'll send a 6-digit OTP to this email to authenticate you."
+                ? 'We will show a 6-digit verification code on the next screen (and send it by email when SMTP is configured).'
                 : 'Your email is only used for loan-related communications.')}
             </p>
 

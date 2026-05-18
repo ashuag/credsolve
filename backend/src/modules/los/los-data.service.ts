@@ -86,6 +86,8 @@ function mergeLosDashboardDailySeries(
     };
   });
 }
+
+@Injectable()
 export class LosDataService {
   constructor(private readonly prisma: PrismaService) {}
 
