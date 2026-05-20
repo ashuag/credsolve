@@ -76,11 +76,10 @@ export class VerifyOtpUseCase {
 
     const verifiedAt = new Date();
 
-    const [reapplyDays, blacklistThreshold, blacklistDurationDays] = await Promise.all([
-      this.settingsRepository.getReapplyAfterRejectedDays(),
-      this.settingsRepository.getBlacklistRejectionThreshold(),
-      this.settingsRepository.getBlacklistDurationDays(),
-    ]);
+    const leadPolicy = await this.settingsRepository.loadCustomerLeadPolicySettings();
+    const reapplyDays = leadPolicy.reapplyAfterRejectedDays;
+    const blacklistThreshold = leadPolicy.blacklistRejectionThreshold;
+    const blacklistDurationDays = leadPolicy.blacklistDurationDays;
 
     const { customer, lead } = await this.prisma.client.$transaction(async (tx) => {
       await this.otpRequests.markVerified(tx, request.id, verifiedAt);

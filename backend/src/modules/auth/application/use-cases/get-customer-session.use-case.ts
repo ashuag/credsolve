@@ -69,9 +69,11 @@ export class GetCustomerSessionUseCase {
     // REJECTED or BLACKLISTED → compute rejectedUntil based on the applicable cooldown.
     let rejectedUntil: string | null = null;
     if (statusName === LEAD_STATUS.REJECTED || statusName === LEAD_STATUS.BLACKLISTED) {
-      const cooldownDays = statusName === LEAD_STATUS.BLACKLISTED
-        ? await this.settings.getBlacklistDurationDays()
-        : await this.settings.getReapplyAfterRejectedDays();
+      const leadPolicy = await this.settings.loadCustomerLeadPolicySettings();
+      const cooldownDays =
+        statusName === LEAD_STATUS.BLACKLISTED
+          ? leadPolicy.blacklistDurationDays
+          : leadPolicy.reapplyAfterRejectedDays;
       const cooldownMs = cooldownDays * 24 * 60 * 60 * 1000;
       const canReapplyAt = new Date(leadRow.updatedAt.getTime() + cooldownMs);
 
@@ -104,25 +106,34 @@ export class GetCustomerSessionUseCase {
         : null,
     );
 
-    const [appDetails, disbursement, latestCustomerKyc] = await Promise.all([
+    const [applicationExtras, latestCustomerKyc] = await Promise.all([
       application
-        ? this.prisma.client.applicationDetails.findUnique({
-            where: { applicationId: application.id },
-            select: { loanAmount: true, loanTenure: true, loanMaturityDate: true },
-          })
-        : Promise.resolve(null),
-      application
-        ? this.prisma.client.applicationDisbursement.findUnique({
-            where: { applicationId: application.id },
-            select: { accountNumber: true, ifscCode: true, bankName: true },
+        ? this.prisma.client.application.findUnique({
+            where: { id: application.id },
+            select: {
+              details: {
+                select: { loanAmount: true, loanTenure: true, loanMaturityDate: true },
+              },
+              disbursement: {
+                select: { accountNumber: true, ifscCode: true, bankName: true },
+              },
+            },
           })
         : Promise.resolve(null),
       this.prisma.client.customerKyc.findFirst({
         where: { customerId: customer.id },
         orderBy: { createdAt: 'desc' },
-        select: { id: true, kycVerifiedAt: true, fullName: true },
+        select: {
+          id: true,
+          kycVerifiedAt: true,
+          fullName: true,
+          _count: { select: { customerKycDocuments: true } },
+        },
       }),
     ]);
+
+    const appDetails = applicationExtras?.details ?? null;
+    const disbursement = applicationExtras?.disbursement ?? null;
 
     const kycDisplayName = latestCustomerKyc?.fullName?.trim();
     if (profile && kycDisplayName && !profile.fullName?.trim()) {
@@ -142,11 +153,7 @@ export class GetCustomerSessionUseCase {
 
     const loanSelectionCompleted = Boolean(appDetails?.loanAmount != null && appDetails?.loanTenure != null);
 
-    const kycDocsCount = latestCustomerKyc
-      ? await this.prisma.client.customerKycDocument.count({
-          where: { customerKycId: latestCustomerKyc.id },
-        })
-      : 0;
+    const kycDocsCount = latestCustomerKyc?._count.customerKycDocuments ?? 0;
     const livenessOutboundSkipped = isKycLivenessOutboundSkipped();
     const hasSavedSelfie = Boolean(application?.selfieRelativePath?.trim());
     const hasDigilockerForm = application?.digilockerAadhaarFormJson != null;

@@ -3,7 +3,7 @@ import { CrmShell } from '@/components/layout/crm-shell';
 
 export default function ApplicationsPage() {
   return (
-    <CrmShell title="Application Management">
+    <CrmShell title="Application Management" showPageHead={false}>
       <ApplicationsPanel />
     </CrmShell>
   );

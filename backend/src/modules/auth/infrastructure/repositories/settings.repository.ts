@@ -55,6 +55,12 @@ export interface LoanCalculationSettings {
   processingFeeGstPercent: number;
 }
 
+export interface CustomerLeadPolicySettings {
+  reapplyAfterRejectedDays: number;
+  blacklistRejectionThreshold: number;
+  blacklistDurationDays: number;
+}
+
 /**
  * In-process TTL for cached auth/OTP settings. Override via env when running
  * pods that should pick up admin setting changes faster (e.g. set to 5_000 in
@@ -100,6 +106,8 @@ export class SettingsRepository {
   private readonly logger = new Logger(SettingsRepository.name);
   private authOtpCache: { value: AuthOtpSettings; expiresAt: number } | null = null;
   private authOtpInflight: Promise<AuthOtpSettings> | null = null;
+  private leadPolicyCache: { value: CustomerLeadPolicySettings; expiresAt: number } | null = null;
+  private leadPolicyInflight: Promise<CustomerLeadPolicySettings> | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -159,34 +167,67 @@ export class SettingsRepository {
     return readBureauFetchMode(this.prisma.client);
   }
 
+  async loadCustomerLeadPolicySettings(): Promise<CustomerLeadPolicySettings> {
+    const ttl = authOtpCacheTtlMs();
+    const now = Date.now();
+
+    if (ttl > 0 && this.leadPolicyCache && this.leadPolicyCache.expiresAt > now) {
+      return this.leadPolicyCache.value;
+    }
+
+    if (this.leadPolicyInflight) {
+      return this.leadPolicyInflight;
+    }
+
+    this.leadPolicyInflight = this.fetchCustomerLeadPolicySettings()
+      .then((value) => {
+        if (ttl > 0) {
+          this.leadPolicyCache = { value, expiresAt: Date.now() + ttl };
+        } else {
+          this.leadPolicyCache = null;
+        }
+        return value;
+      })
+      .finally(() => {
+        this.leadPolicyInflight = null;
+      });
+
+    return this.leadPolicyInflight;
+  }
+
   async getReapplyAfterRejectedDays(): Promise<number> {
-    const meta = SettingKey.REAPPLY_AFTER_REJECTED;
-    const row = await this.prisma.client.setting.findFirst({
-      where: { key: meta.key, isActive: true },
-      select: { value: true },
-    });
-    const raw = row?.value?.trim() ?? meta.default;
-    return Number.parseInt(raw, 10) || Number.parseInt(meta.default, 10);
+    return (await this.loadCustomerLeadPolicySettings()).reapplyAfterRejectedDays;
   }
 
   async getBlacklistRejectionThreshold(): Promise<number> {
-    const meta = SettingKey.BLACKLIST_REJECTION_THRESHOLD;
-    const row = await this.prisma.client.setting.findFirst({
-      where: { key: meta.key, isActive: true },
-      select: { value: true },
-    });
-    const raw = row?.value?.trim() ?? meta.default;
-    return Number.parseInt(raw, 10) || Number.parseInt(meta.default, 10);
+    return (await this.loadCustomerLeadPolicySettings()).blacklistRejectionThreshold;
   }
 
   async getBlacklistDurationDays(): Promise<number> {
-    const meta = SettingKey.BLACKLIST_DURATION_DAYS;
-    const row = await this.prisma.client.setting.findFirst({
-      where: { key: meta.key, isActive: true },
-      select: { value: true },
+    return (await this.loadCustomerLeadPolicySettings()).blacklistDurationDays;
+  }
+
+  private async fetchCustomerLeadPolicySettings(): Promise<CustomerLeadPolicySettings> {
+    const metas = [
+      SettingKey.REAPPLY_AFTER_REJECTED,
+      SettingKey.BLACKLIST_REJECTION_THRESHOLD,
+      SettingKey.BLACKLIST_DURATION_DAYS,
+    ] as const;
+    const rows = await this.prisma.client.setting.findMany({
+      where: { key: { in: metas.map((m) => m.key) }, isActive: true },
+      select: { key: true, value: true },
     });
-    const raw = row?.value?.trim() ?? meta.default;
-    return Number.parseInt(raw, 10) || Number.parseInt(meta.default, 10);
+    const map = new Map(rows.map((r) => [r.key, r.value]));
+    const pickInt = (meta: { key: string; default: string }) => {
+      const raw = map.get(meta.key)?.trim() ?? meta.default;
+      return Number.parseInt(raw, 10) || Number.parseInt(meta.default, 10);
+    };
+
+    return {
+      reapplyAfterRejectedDays: pickInt(SettingKey.REAPPLY_AFTER_REJECTED),
+      blacklistRejectionThreshold: pickInt(SettingKey.BLACKLIST_REJECTION_THRESHOLD),
+      blacklistDurationDays: pickInt(SettingKey.BLACKLIST_DURATION_DAYS),
+    };
   }
 
   async loadAuthOtpSettings(): Promise<AuthOtpSettings> {
@@ -222,6 +263,7 @@ export class SettingsRepository {
   /** Test/admin hook: clear the in-process auth/OTP settings cache. */
   invalidateAuthOtpSettingsCache(): void {
     this.authOtpCache = null;
+    this.leadPolicyCache = null;
   }
 
   async loadBreSettings(): Promise<BreSettings> {

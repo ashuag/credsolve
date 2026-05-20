@@ -23,7 +23,6 @@ const NAV_LINKS = [
 
 const ANNOUNCEMENTS = [
   '⚡  Instant Digital Loans up to ₹50,000',
-  '🏛️  RBI Registered Lending Partner',
   '🔒  100% Secure • Paperless • Quick Approval',
   '✅  Approval in 2 Minutes — No Branch Visit',
 ];

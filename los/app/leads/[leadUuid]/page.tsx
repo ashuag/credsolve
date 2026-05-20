@@ -9,10 +9,7 @@ export default async function LeadDetailsPage({
   const { leadUuid } = await params;
 
   return (
-    <CrmShell
-      title="Lead workspace"
-      subtitle="Review intake, borrower profile, attribution, and linked applications in one LOS view."
-    >
+    <CrmShell showPageHead={false}>
       <LeadDetailsPanel leadUuid={leadUuid} />
     </CrmShell>
   );

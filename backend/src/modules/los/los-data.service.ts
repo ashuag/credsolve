@@ -2,12 +2,56 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { Prisma } from '@prisma/client';
 import { APPLICATION_STATUS } from '../../common/constants/application.constants';
 import { LEAD_STATUS } from '../../common/constants/lead.constants';
+import { PAN_VERIFIED } from '../../common/constants/pan-verification.constants';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { UpdateBankMasterDto } from './dto/update-bank-master.dto';
 import type { UpdateEligibilityCriterionDto } from './dto/update-eligibility-criterion.dto';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
+}
+
+function panVerifiedStatusLabel(code: number): string {
+  switch (code) {
+    case PAN_VERIFIED.NOT_CHECKED:
+      return 'Not checked';
+    case PAN_VERIFIED.VERIFIED:
+      return 'Verified';
+    case PAN_VERIFIED.NOT_VERIFIED:
+      return 'Not verified';
+    case PAN_VERIFIED.API_FAILURE:
+      return 'API failure';
+    case PAN_VERIFIED.API_DISABLED:
+      return 'Disabled';
+    default:
+      return `Unknown (${code})`;
+  }
+}
+
+function sumDecimalAmounts(parts: Array<Prisma.Decimal | null | undefined>): string | null {
+  let total = 0;
+  let any = false;
+  for (const part of parts) {
+    if (part == null) continue;
+    any = true;
+    total += part.toNumber();
+  }
+  if (!any) return null;
+  return total.toFixed(2);
+}
+
+function maskBankDetails(bankName: string | null | undefined, accountNumber: string | null | undefined, ifscCode: string | null | undefined): string | null {
+  const bank = bankName?.trim();
+  const tail = accountNumber?.replace(/\D/g, '').slice(-4);
+  const ifsc = ifscCode?.trim().toUpperCase();
+  if (bank && tail && ifsc) return `${bank} ••••${tail} (${ifsc})`;
+  if (bank && tail) return `${bank} ••••${tail}`;
+  if (bank && ifsc) return `${bank} (${ifsc})`;
+  if (bank) return bank;
+  if (tail && ifsc) return `••••${tail} (${ifsc})`;
+  if (tail) return `Account ••••${tail}`;
+  if (ifsc) return ifsc;
+  return null;
 }
 
 function applicationKycStatusLabel(code: number): string {
@@ -44,6 +88,56 @@ function lastUtcDayKeys(count: number): string[] {
     keys.push(d.toISOString().slice(0, 10));
   }
   return keys;
+}
+
+/** Inclusive UTC start and exclusive end for a `YYYY-MM-DD` day key. */
+function utcDayBounds(dayKey: string): { gte: Date; lt: Date } {
+  const gte = new Date(`${dayKey}T00:00:00.000Z`);
+  const lt = new Date(gte.getTime() + 86_400_000);
+  return { gte, lt };
+}
+
+/** Count timestamps into fixed UTC day keys (ignores dates outside `dayKeys`). */
+function countByUtcDayKeys(dayKeys: string[], dates: Date[]): Map<string, number> {
+  const keySet = new Set(dayKeys);
+  const counts = new Map<string, number>();
+  for (const key of dayKeys) {
+    counts.set(key, 0);
+  }
+  for (const dt of dates) {
+    const k = dashboardRowDayKey(dt);
+    if (!keySet.has(k)) {
+      continue;
+    }
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function sumDisbursementsByUtcDayKeys(
+  dayKeys: string[],
+  rows: Array<{ disbursedAt: Date | null; amount: Prisma.Decimal | null }>,
+): Map<string, { count: number; amount: Prisma.Decimal }> {
+  const keySet = new Set(dayKeys);
+  const agg = new Map<string, { count: number; amount: Prisma.Decimal }>();
+  for (const key of dayKeys) {
+    agg.set(key, { count: 0, amount: new Prisma.Decimal(0) });
+  }
+  for (const row of rows) {
+    if (!row.disbursedAt) {
+      continue;
+    }
+    const k = dashboardRowDayKey(row.disbursedAt);
+    if (!keySet.has(k)) {
+      continue;
+    }
+    const cur = agg.get(k)!;
+    cur.count += 1;
+    if (row.amount != null) {
+      cur.amount = cur.amount.add(row.amount);
+    }
+  }
+  return agg;
 }
 
 type LosDashboardDailyPoint = {
@@ -98,12 +192,28 @@ export class LosDataService {
       include: {
         customer: { select: { uuid: true, mobileNumber: true } },
         leadStatus: { select: { name: true, displayName: true } },
+        rejectionReason: { select: { name: true } },
         source: { select: { name: true, type: true } },
+        leadDetail: {
+          select: {
+            fullName: true,
+            occupation: { select: { name: true } },
+            city: { select: { name: true, state: { select: { code: true } } } },
+          },
+        },
         leadUtms: { select: { utmSource: true, utmMedium: true, utmCampaign: true }, orderBy: { createdAt: 'desc' }, take: 1 },
+        bureauReports: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { cibilScore: true },
+        },
         applications: {
           orderBy: { createdAt: 'desc' },
           take: 1,
-          select: { email: true },
+          select: {
+            email: true,
+            eligibility: { select: { cibilScore: true } },
+          },
         },
       },
       take: 500,
@@ -111,11 +221,33 @@ export class LosDataService {
 
     return leads.map((lead) => {
       const latestUtm = lead.leadUtms[0];
+      const detail = lead.leadDetail;
+      const cityName = detail?.city?.name ?? null;
+      const stateCode = detail?.city?.state?.code ?? null;
+      const city =
+        cityName != null ? (stateCode ? `${cityName}, ${stateCode}` : cityName) : null;
+      const cibilScore =
+        lead.bureauReports[0]?.cibilScore ?? lead.applications[0]?.eligibility?.cibilScore ?? null;
+
       return {
         uuid: lead.uuid,
         customerUuid: lead.customer.uuid,
+        fullName: detail?.fullName?.trim() || null,
+        panNumber: lead.panNumber?.trim().toUpperCase() || null,
         mobileNumber: lead.customer.mobileNumber,
         email: lead.applications[0]?.email ?? null,
+        occupation: detail?.occupation?.name ?? null,
+        city,
+        cibilScore,
+        panVerified: lead.panVerified,
+        panVerifiedLabel: panVerifiedStatusLabel(lead.panVerified),
+        rejectionReason: lead.rejectionReason
+          ? {
+              code: lead.rejectionReason.name,
+              label: lead.rejectionReason.name.replace(/_/g, ' '),
+            }
+          : null,
+        leadStatusNote: lead.leadStatusNote?.trim() || null,
         statusCode: lead.leadStatus.name,
         statusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
         sourceName: lead.source?.name ?? null,
@@ -136,24 +268,63 @@ export class LosDataService {
         customer: { select: { uuid: true, mobileNumber: true } },
         lead: { select: { uuid: true, leadDetail: { select: { fullName: true } } } },
         applicationStatus: { select: { name: true, displayName: true } },
-        details: { select: { loanAmount: true } },
+        details: {
+          select: {
+            loanAmount: true,
+            interestAmount: true,
+            processingFee: true,
+            processingFeeAmount: true,
+            gstAmount: true,
+            loanMaturityDate: true,
+          },
+        },
+        eligibility: { select: { cibilScore: true, approvedAmount: true } },
+        disbursement: { select: { bankName: true, accountNumber: true, ifscCode: true } },
       },
       take: 500,
     });
 
-    return applications.map((application) => ({
-      uuid: application.uuid,
-      customerUuid: application.customer.uuid,
-      leadUuid: application.lead.uuid,
-      mobileNumber: application.customer.mobileNumber,
-      email: application.email,
-      fullName: application.lead.leadDetail?.fullName ?? null,
-      loanAmount: application.details?.loanAmount?.toString() ?? null,
-      statusCode: application.applicationStatus.name,
-      statusLabel: displayName(application.applicationStatus.name, application.applicationStatus.displayName),
-      createdAt: application.createdAt.toISOString(),
-      updatedAt: application.updatedAt.toISOString(),
-    }));
+    return applications.map((application) => {
+      const details = application.details;
+      const repaymentAmount = details
+        ? sumDecimalAmounts([
+            details.loanAmount,
+            details.interestAmount,
+            details.processingFeeAmount,
+            details.gstAmount,
+          ])
+        : null;
+      const eligibleLoanAmount =
+        application.eligibility?.approvedAmount?.toString()
+        ?? application.preApprovedLoanAmount?.toString()
+        ?? null;
+
+      return {
+        uuid: application.uuid,
+        customerUuid: application.customer.uuid,
+        leadUuid: application.lead.uuid,
+        mobileNumber: application.customer.mobileNumber,
+        email: application.email,
+        fullName: application.lead.leadDetail?.fullName ?? null,
+        cibilScore: application.eligibility?.cibilScore ?? null,
+        eligibleLoanAmount,
+        selectedLoanAmount: details?.loanAmount?.toString() ?? null,
+        repayDate: details?.loanMaturityDate?.toISOString().slice(0, 10) ?? null,
+        repaymentAmount,
+        emi: repaymentAmount,
+        processingFeePercent: details?.processingFee?.toString() ?? null,
+        processingFeeAmount: details?.processingFeeAmount?.toString() ?? null,
+        bankDetails: maskBankDetails(
+          application.disbursement?.bankName,
+          application.disbursement?.accountNumber,
+          application.disbursement?.ifscCode,
+        ),
+        statusCode: application.applicationStatus.name,
+        statusLabel: displayName(application.applicationStatus.name, application.applicationStatus.displayName),
+        createdAt: application.createdAt.toISOString(),
+        updatedAt: application.updatedAt.toISOString(),
+      };
+    });
   }
 
   async getLeadDetails(leadUuid: string) {
@@ -372,7 +543,7 @@ export class LosDataService {
   }
 
   async getMasters() {
-    const [leadStatuses, applicationStatuses, leadSources, states, cities, occupations, reasonsForLoan, genders, banks] = await Promise.all([
+    const [leadStatuses, applicationStatuses, leadSources, states, cities, occupations, reasonsForLoan, genders, banks, rejectionReasons] = await Promise.all([
       this.prisma.client.leadStatus.findMany({ orderBy: { id: 'asc' } }),
       this.prisma.client.applicationStatus.findMany({ orderBy: { id: 'asc' } }),
       this.prisma.client.leadSource.findMany({ orderBy: { name: 'asc' } }),
@@ -382,6 +553,7 @@ export class LosDataService {
       this.prisma.client.reasonForLoan.findMany({ orderBy: { name: 'asc' } }),
       this.prisma.client.gender.findMany({ orderBy: { name: 'asc' } }),
       this.prisma.client.bank.findMany({ orderBy: { name: 'asc' } }),
+      this.prisma.client.rejectionReason.findMany({ orderBy: { name: 'asc' } }),
     ]);
 
     return {
@@ -436,6 +608,11 @@ export class LosDataService {
         isActive: item.isActive,
       })),
       banks: banks.map((item) => ({
+        id: item.id,
+        name: item.name,
+        isActive: item.isActive,
+      })),
+      rejectionReasons: rejectionReasons.map((item) => ({
         id: item.id,
         name: item.name,
         isActive: item.isActive,
@@ -565,6 +742,62 @@ export class LosDataService {
     };
   }
 
+  private async fetchDashboardDailyTrends(
+    dayKeys: string[],
+  ): Promise<{
+    leadRows: Array<{ d: Date; c: bigint }>;
+    appRows: Array<{ d: Date; c: bigint }>;
+    disbRows: Array<{ d: Date; c: bigint; amt: unknown }>;
+  }> {
+    if (dayKeys.length === 0) {
+      return { leadRows: [], appRows: [], disbRows: [] };
+    }
+
+    const prisma = this.prisma.client;
+    const { gte: seriesSince } = utcDayBounds(dayKeys[0]!);
+    const { lt: seriesUntil } = utcDayBounds(dayKeys[dayKeys.length - 1]!);
+
+    const [leads, applications, disbursements] = await Promise.all([
+      prisma.lead.findMany({
+        where: { createdAt: { gte: seriesSince, lt: seriesUntil } },
+        select: { createdAt: true },
+      }),
+      prisma.application.findMany({
+        where: { createdAt: { gte: seriesSince, lt: seriesUntil } },
+        select: { createdAt: true },
+      }),
+      prisma.applicationDisbursement.findMany({
+        where: { disbursedAt: { gte: seriesSince, lt: seriesUntil } },
+        select: { disbursedAt: true, amount: true },
+      }),
+    ]);
+
+    const leadCounts = countByUtcDayKeys(
+      dayKeys,
+      leads.map((row) => row.createdAt),
+    );
+    const appCounts = countByUtcDayKeys(
+      dayKeys,
+      applications.map((row) => row.createdAt),
+    );
+    const disbAgg = sumDisbursementsByUtcDayKeys(dayKeys, disbursements);
+
+    return {
+      leadRows: dayKeys.map((key) => ({
+        d: utcDayBounds(key).gte,
+        c: BigInt(leadCounts.get(key) ?? 0),
+      })),
+      appRows: dayKeys.map((key) => ({
+        d: utcDayBounds(key).gte,
+        c: BigInt(appCounts.get(key) ?? 0),
+      })),
+      disbRows: dayKeys.map((key) => {
+        const v = disbAgg.get(key)!;
+        return { d: utcDayBounds(key).gte, c: BigInt(v.count), amt: v.amount };
+      }),
+    };
+  }
+
   /** Aggregated LOS CRM dashboard (counts + small activity feed). */
   async getDashboardCrm() {
     const prisma = this.prisma.client;
@@ -573,8 +806,7 @@ export class LosDataService {
     const endOfDay = new Date(startOfDay);
     endOfDay.setUTCDate(endOfDay.getUTCDate() + 1);
 
-    const seriesSince = new Date(startOfDay);
-    seriesSince.setUTCDate(seriesSince.getUTCDate() - (DASHBOARD_DAILY_TREND_DAYS - 1));
+    const dayKeys = lastUtcDayKeys(DASHBOARD_DAILY_TREND_DAYS);
 
     const [
       activeAgentsToday,
@@ -591,9 +823,7 @@ export class LosDataService {
       recentApplications,
       leadStatuses,
       applicationStatuses,
-      leadDailyRows,
-      appDailyRows,
-      disbDailyRows,
+      dailyTrends,
     ] = await Promise.all([
       prisma.user.count({
         where: {
@@ -662,28 +892,10 @@ export class LosDataService {
       }),
       prisma.leadStatus.findMany({ select: { id: true, name: true, displayName: true } }),
       prisma.applicationStatus.findMany({ select: { id: true, name: true, displayName: true } }),
-      prisma.$queryRaw<Array<{ d: Date; c: bigint }>>`
-        SELECT DATE(created_at) AS d, COUNT(*) AS c
-        FROM lead
-        WHERE created_at >= ${seriesSince}
-        GROUP BY DATE(created_at)
-        ORDER BY d ASC
-      `,
-      prisma.$queryRaw<Array<{ d: Date; c: bigint }>>`
-        SELECT DATE(created_at) AS d, COUNT(*) AS c
-        FROM application
-        WHERE created_at >= ${seriesSince}
-        GROUP BY DATE(created_at)
-        ORDER BY d ASC
-      `,
-      prisma.$queryRaw<Array<{ d: Date; c: bigint; amt: unknown }>>`
-        SELECT DATE(disbursed_at) AS d, COUNT(*) AS c, COALESCE(SUM(amount), 0) AS amt
-        FROM application_disbursement
-        WHERE disbursed_at >= ${seriesSince}
-        GROUP BY DATE(disbursed_at)
-        ORDER BY d ASC
-      `,
+      this.fetchDashboardDailyTrends(dayKeys),
     ]);
+
+    const { leadRows: leadDailyRows, appRows: appDailyRows, disbRows: disbDailyRows } = dailyTrends;
 
     const leadStatusById = new Map(leadStatuses.map((s) => [s.id, s]));
     const applicationStatusById = new Map(applicationStatuses.map((s) => [s.id, s]));
@@ -744,7 +956,6 @@ export class LosDataService {
       };
     });
 
-    const dayKeys = lastUtcDayKeys(DASHBOARD_DAILY_TREND_DAYS);
     const dailySeries = mergeLosDashboardDailySeries(dayKeys, leadDailyRows, appDailyRows, disbDailyRows);
 
     return {

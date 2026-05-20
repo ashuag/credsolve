@@ -52,6 +52,7 @@ export type LosMastersPayload = {
   reasonsForLoan: LosNamedMaster[];
   genders: LosNamedMaster[];
   banks: LosNamedMaster[];
+  rejectionReasons: LosNamedMaster[];
 };
 
 export type LosEligibilityCriterion = {
