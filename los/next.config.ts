@@ -1,5 +1,8 @@
 import type { NextConfig } from 'next';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+const configDir = path.dirname(fileURLToPath(import.meta.url));
 const distDir = process.env.NEXT_DIST_DIR?.trim();
 const isProductionRuntime = (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
 
@@ -33,6 +36,7 @@ const nextConfig: NextConfig = {
   },
   allowedDevOrigins,
   ...(distDir ? { distDir } : {}),
+  outputFileTracingRoot: configDir,
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },

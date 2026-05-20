@@ -23,10 +23,20 @@ export function getLosServerApiBase(): string {
   return normalizeLosApiBase(u);
 }
 
+function ensureHttpsForSecurePage(base: string): string {
+  if (typeof window === 'undefined') {
+    return base;
+  }
+  if (window.location.protocol === 'https:' && base.startsWith('http://')) {
+    return `https://${base.slice('http://'.length)}`;
+  }
+  return base;
+}
+
 export function getLosClientApiBase(): string {
   const u = process.env.NEXT_PUBLIC_API_URL;
   if (!u?.trim()) {
     throw new Error('Missing NEXT_PUBLIC_API_URL.');
   }
-  return normalizeLosApiBase(u);
+  return ensureHttpsForSecurePage(normalizeLosApiBase(u));
 }
