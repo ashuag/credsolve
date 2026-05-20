@@ -43,19 +43,20 @@ type Tab = {
   exact?: boolean;
 };
 
-function isActive(pathname: string, tab: Tab, accountHref: string) {
-  if (tab.exact) return pathname === tab.href;
+function isActive(pathname: string | null, tab: Tab, accountHref: string) {
+  const path = pathname ?? '';
+  if (tab.exact) return path === tab.href;
   if (tab.href === '__account__') {
     return (
-      pathname === accountHref ||
-      pathname === '/dashboard' ||
-      pathname === '/my-account' ||
-      pathname === '/apply-for-loan' ||
-      pathname === '/login' ||
-      pathname.startsWith('/account')
+      path === accountHref ||
+      path === '/dashboard' ||
+      path === '/my-account' ||
+      path === '/apply-for-loan' ||
+      path === '/login' ||
+      path.startsWith('/account')
     );
   }
-  return pathname.startsWith(tab.href);
+  return path.startsWith(tab.href);
 }
 
 export function MobileTabBar() {

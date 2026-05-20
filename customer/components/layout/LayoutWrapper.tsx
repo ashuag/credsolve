@@ -6,7 +6,7 @@ import { BrandHeader } from '@/components/layout/brand-header';
 import { MobileTabBar } from '@/components/layout/mobile-tab-bar';
 
 export function LayoutWrapper({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '';
   const isLandingPage = pathname === '/';
   const isApplyPage = pathname === '/apply-for-loan';
   const isAccountLoginPage = pathname === '/my-account';
