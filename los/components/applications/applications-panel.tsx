@@ -240,54 +240,10 @@ export function ApplicationsPanel() {
     });
   };
 
-  const draftApplications = applications.filter((application) => application.statusCode === 'DRAFT').length;
-  const inReviewApplications = applications.filter((application) => application.statusCode === 'IN_REVIEW').length;
-  const approvedApplications = applications.filter((application) => (
-    application.statusCode === 'APPROVED' || application.statusCode === 'DISBURSED'
-  )).length;
   const applicationsWithAmount = applications.filter((application) => application.selectedLoanAmount !== null).length;
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-2 mb-3 sm:grid-cols-4">
-        <article
-          className="rounded-[8px] border border-[rgba(23,44,113,0.1)] px-4 py-3"
-          style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.97), rgba(240,246,255,0.94))' }}
-        >
-          <span className="block text-[0.78rem] text-brand-muted">Total applications</span>
-          <strong className="block mt-0.5 text-[1.6rem] font-extrabold tracking-[-0.03em] leading-none">
-            {loading ? '—' : applications.length}
-          </strong>
-        </article>
-        <article
-          className="rounded-[8px] border border-[rgba(23,44,113,0.1)] px-4 py-3"
-          style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.97), rgba(240,246,255,0.94))' }}
-        >
-          <span className="block text-[0.78rem] text-brand-muted">Draft</span>
-          <strong className="block mt-0.5 text-[1.6rem] font-extrabold tracking-[-0.03em] leading-none">
-            {loading ? '—' : draftApplications}
-          </strong>
-        </article>
-        <article
-          className="rounded-[8px] border border-[rgba(23,44,113,0.1)] px-4 py-3"
-          style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.97), rgba(240,246,255,0.94))' }}
-        >
-          <span className="block text-[0.78rem] text-brand-muted">In review</span>
-          <strong className="block mt-0.5 text-[1.6rem] font-extrabold tracking-[-0.03em] leading-none">
-            {loading ? '—' : inReviewApplications}
-          </strong>
-        </article>
-        <article
-          className="rounded-[8px] border border-[rgba(23,44,113,0.1)] px-4 py-3"
-          style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.97), rgba(240,246,255,0.94))' }}
-        >
-          <span className="block text-[0.78rem] text-brand-muted">Approved / Disbursed</span>
-          <strong className="block mt-0.5 text-[1.6rem] font-extrabold tracking-[-0.03em] leading-none">
-            {loading ? '—' : approvedApplications}
-          </strong>
-        </article>
-      </div>
-
       <div
         className="rounded-[10px] border border-[rgba(23,44,113,0.1)] overflow-hidden"
         style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.97), rgba(240,246,255,0.94))' }}

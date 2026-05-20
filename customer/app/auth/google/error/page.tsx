@@ -8,19 +8,21 @@ import { CUSTOMER_EMAIL_VERIFY_PATH } from '@/lib/api/customer-session';
 
 function GoogleAuthErrorContent() {
   const params = useSearchParams();
+  const statusRaw = params?.get('status') ?? '';
+  const reasonRaw = params?.get('reason')?.trim() ?? '';
+  const modeParam = params?.get('mode');
+  const leadId = params?.get('leadId')?.trim() ?? undefined;
 
-  const httpStatus = Number.parseInt(params.get('status') ?? '', 10);
+  const httpStatus = Number.parseInt(statusRaw, 10);
   const isUnauthorized = httpStatus === 401;
 
-  const reason = useMemo(() => {
-    const raw = params.get('reason')?.trim();
-    return raw && raw.length > 0
-      ? raw
-      : 'Google sign-in could not be started. Please sign in with mobile OTP and try again.';
-  }, [params]);
+  const reason = useMemo(() => (
+    reasonRaw.length > 0
+      ? reasonRaw
+      : 'Google sign-in could not be started. Please sign in with mobile OTP and try again.'
+  ), [reasonRaw]);
 
-  const mode = params.get('mode') === 'login' ? 'login' : 'register';
-  const leadId = params.get('leadId')?.trim();
+  const mode = modeParam === 'login' ? 'login' : 'register';
 
   const retryHref = useMemo(() => {
     const q = new URLSearchParams({ mode });
