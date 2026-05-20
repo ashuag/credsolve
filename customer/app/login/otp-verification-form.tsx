@@ -43,7 +43,7 @@ export function OtpVerificationForm({
 
   const currentMobile = otpRequest?.mobileNumber ? String(otpRequest.mobileNumber) : '';
   const displayMobile = otpRequest?.maskedMobile ?? formatCustomerMobile(currentMobile);
-  const mode = searchParams.get('mode');
+  const mode = searchParams?.get('mode') ?? null;
 
   useEffect(() => {
     setOtpRequest(initialOtpRequest);

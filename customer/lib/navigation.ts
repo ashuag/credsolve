@@ -3,7 +3,7 @@ type SearchLike = { toString(): string };
 
 export function buildHrefWithSearch(
   pathname: string,
-  currentSearchParams?: SearchLike,
+  currentSearchParams?: SearchLike | null,
   extraParams?: Record<string, QueryValue | null | undefined>
 ) {
   const nextSearchParams = new URLSearchParams(currentSearchParams?.toString() ?? '');
