@@ -8,7 +8,7 @@ import {
   isTenacioVendorBusinessSuccess,
   pickTenacioVendorErrorMessage,
 } from '../../../../common/kyc/aadhaar-vendor-parse.util';
-import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
+import { buildKycLivenessSelfiePublicUrl } from '../../../../common/kyc/kyc-liveness-selfie-url.util';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { ApplicationRepository } from '../../infrastructure/repositories/application.repository';
@@ -39,7 +39,6 @@ export class RunKycLivenessUseCase {
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
     private readonly applications: ApplicationRepository,
-    private readonly kycFiles: KycFilesService,
     private readonly liveness: LivenessVendorService,
     private readonly prisma: PrismaService,
   ) {}
@@ -88,24 +87,33 @@ export class RunKycLivenessUseCase {
     }
 
     if (isKycLivenessOutboundSkipped()) {
-      const paused = isKycLivenessCheckPaused();
       return {
         configured: true,
-        ok: false,
+        ok: true,
         httpStatus: null,
-        vendor: paused ? { paused: true } : { outboundSkipped: true },
-        livenessPassed: false,
-        vendorErrorMessage: paused
-          ? 'Liveness checks are temporarily paused. Your saved selfie is still on file.'
-          : 'Partner liveness verification is turned off. Your saved selfie is still on file.',
+        vendor: isKycLivenessCheckPaused() ? { paused: true } : { outboundSkipped: true },
+        livenessPassed: true,
       };
     }
 
-    const buf = await this.kycFiles.readBytes(application.selfieRelativePath.trim());
-    const imageB64 = buf.toString('base64');
+    const selfieUrlResult = buildKycLivenessSelfiePublicUrl({
+      applicationUuid: application.uuid,
+      selfieRelativePath: application.selfieRelativePath.trim(),
+    });
+    if (!selfieUrlResult.ok) {
+      return {
+        configured: false,
+        skipReason: selfieUrlResult.error,
+        ok: false,
+        httpStatus: null,
+        vendor: null,
+        livenessPassed: false,
+        vendorErrorMessage: selfieUrlResult.error,
+      };
+    }
 
     const out = await this.liveness.postLivenessCheck(
-      { input: { consent: true, image: imageB64 } },
+      { input: { consent: true, url: selfieUrlResult.url } },
       lead.id,
     );
 

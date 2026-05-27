@@ -11,6 +11,11 @@ import { fetchCustomerReferenceRelationLookupValues } from '@/lib/api/lookup';
 import { CUSTOMER_EMAIL_VERIFY_PATH } from '@/lib/api/customer-session';
 import { saveLeadReferences } from '@/lib/api/lead';
 import { cn } from '@/lib/cn';
+import {
+  isValidPersonName,
+  PERSON_NAME_VALIDATION_MESSAGE,
+  sanitizePersonNameInput,
+} from '@/lib/validators';
 
 const INDIAN_MOBILE_RE = /^[6-9]\d{9}$/;
 
@@ -62,9 +67,10 @@ export default function ReferencesPage() {
   }, []);
 
   function updateRef(index: 0 | 1, field: keyof ReferenceForm, value: string) {
+    const nextValue = field === 'fullName' ? sanitizePersonNameInput(value) : value;
     setRefs((current) => {
       const next: [ReferenceForm, ReferenceForm] = [...current] as [ReferenceForm, ReferenceForm];
-      next[index] = { ...next[index], [field]: value };
+      next[index] = { ...next[index], [field]: nextValue };
       return next;
     });
     setErrors((current) => {
@@ -82,8 +88,9 @@ export default function ReferencesPage() {
     const customerMobile = session?.authenticated ? session.mobileNumber.trim() : '';
 
     refs.forEach((ref, index) => {
-      if (ref.fullName.trim().length < 2) {
-        nextErrors[index]!.fullName = 'Enter the reference name.';
+      if (!isValidPersonName(ref.fullName)) {
+        nextErrors[index]!.fullName =
+          ref.fullName.trim().length === 0 ? 'Enter the reference name.' : PERSON_NAME_VALIDATION_MESSAGE;
       }
       const mobile = ref.mobileNumber.replace(/\D/g, '').slice(0, 10);
       if (!INDIAN_MOBILE_RE.test(mobile)) {

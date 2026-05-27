@@ -1,12 +1,45 @@
-import { apiPost } from './client';
+import { apiGet, apiPost } from './client';
 
-/** Same-tab DigiLocker flow: callback URL does not include `sessionToken`; store before redirect. */
+/** Same-tab DigiLocker flow: callback URL may not include `sessionToken`; store before redirect. */
 export const DIGILOCKER_SESSION_TOKEN_STORAGE_KEY = 'moneycash:digilocker:sessionToken';
+
+function isRec(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+/** Mirror backend Tenacio parsing — token may be nested under `data`. */
+export function extractDigilockerSessionTokenFromVendor(vendor: unknown, depth = 0): string | null {
+  if (depth > 8 || vendor == null || !isRec(vendor)) return null;
+  for (const key of ['sessionToken', 'session_token', 'sessionId', 'session_id'] as const) {
+    const v = vendor[key];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  for (const value of Object.values(vendor)) {
+    const found = extractDigilockerSessionTokenFromVendor(value, depth + 1);
+    if (found) return found;
+  }
+  return null;
+}
+
+export function extractDigilockerSessionTokenFromUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    for (const key of ['sessionToken', 'session_token', 'token', 'sessionId', 'session_id']) {
+      const v = u.searchParams.get(key);
+      if (v?.trim()) return v.trim();
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
 
 export function persistDigilockerSessionTokenForCallback(token: string | null | undefined): void {
   if (typeof window === 'undefined' || !token?.trim()) return;
+  const value = token.trim();
   try {
-    sessionStorage.setItem(DIGILOCKER_SESSION_TOKEN_STORAGE_KEY, token.trim());
+    sessionStorage.setItem(DIGILOCKER_SESSION_TOKEN_STORAGE_KEY, value);
+    localStorage.setItem(DIGILOCKER_SESSION_TOKEN_STORAGE_KEY, value);
   } catch {
     /* storage disabled / quota */
   }
@@ -15,7 +48,11 @@ export function persistDigilockerSessionTokenForCallback(token: string | null | 
 export function readDigilockerSessionTokenFromStorage(): string {
   if (typeof window === 'undefined') return '';
   try {
-    return (sessionStorage.getItem(DIGILOCKER_SESSION_TOKEN_STORAGE_KEY) ?? '').trim();
+    return (
+      sessionStorage.getItem(DIGILOCKER_SESSION_TOKEN_STORAGE_KEY) ??
+      localStorage.getItem(DIGILOCKER_SESSION_TOKEN_STORAGE_KEY) ??
+      ''
+    ).trim();
   } catch {
     return '';
   }
@@ -25,9 +62,22 @@ export function clearDigilockerSessionTokenFromStorage(): void {
   if (typeof window === 'undefined') return;
   try {
     sessionStorage.removeItem(DIGILOCKER_SESSION_TOKEN_STORAGE_KEY);
+    localStorage.removeItem(DIGILOCKER_SESSION_TOKEN_STORAGE_KEY);
   } catch {
     /* ignore */
   }
+}
+
+export type PendingDigilockerSessionResponse = {
+  sessionToken: string | null;
+};
+
+export async function fetchPendingDigilockerSession(): Promise<PendingDigilockerSessionResponse> {
+  const res = await apiGet<PendingDigilockerSessionResponse>(
+    '/auth/digilocker/pending-session',
+    'Unable to recover DigiLocker session.',
+  );
+  return res ?? { sessionToken: null };
 }
 
 export type InitDigilockerPayload = {
@@ -59,10 +109,6 @@ export type DownloadAadhaarDigilockerResponse = {
   businessSuccess?: boolean;
   persisted?: boolean;
 };
-
-function isRec(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === 'object' && !Array.isArray(v);
-}
 
 /** Best-effort message from Tenacio-style `vendor` bodies on download failures. */
 export function pickDigilockerDownloadErrorMessage(vendor: unknown): string | undefined {

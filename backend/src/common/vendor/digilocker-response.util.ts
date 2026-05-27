@@ -12,17 +12,21 @@ function pickString(obj: Record<string, unknown>, keys: string[]): string | null
   return null;
 }
 
-/** Walk shallow + one level under `data` for common Tenacio shapes. */
-export function extractDigilockerSessionToken(vendor: unknown): string | null {
+function findSessionTokenDeep(vendor: unknown, depth = 0): string | null {
+  if (depth > 8 || vendor == null) return null;
   if (!isRecord(vendor)) return null;
-  const direct = pickString(vendor, ['sessionToken', 'session_token']);
+  const direct = pickString(vendor, ['sessionToken', 'session_token', 'sessionId', 'session_id']);
   if (direct) return direct;
-  const data = vendor.data;
-  if (isRecord(data)) {
-    const inner = pickString(data, ['sessionToken', 'session_token']);
-    if (inner) return inner;
+  for (const value of Object.values(vendor)) {
+    const found = findSessionTokenDeep(value, depth + 1);
+    if (found) return found;
   }
   return null;
+}
+
+/** Walk nested Tenacio envelopes for `sessionToken` / `session_token`. */
+export function extractDigilockerSessionToken(vendor: unknown): string | null {
+  return findSessionTokenDeep(vendor);
 }
 
 export function extractDigilockerLoginUrl(vendor: unknown): string | null {

@@ -38,6 +38,7 @@ export default function KycSelfiePage() {
   const streamRef = useRef<MediaStream | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [busyLabel, setBusyLabel] = useState('');
   const [cameraReady, setCameraReady] = useState(false);
   /** Open webcam only while capturing; not after a saved selfie (avoids permission prompts on refresh / return visits). */
   const [retakeSelfie, setRetakeSelfie] = useState(false);
@@ -109,29 +110,37 @@ export default function KycSelfiePage() {
     };
   }, [needsWebcamStream, stopCamera]);
 
-  async function afterStep() {
+  async function continueToNextStep() {
     const next = await refresh();
-    if (next.authenticated && next.journey.kycCompleted) {
-      router.replace(getCustomerJourneyResumePath(next));
-    }
+    if (!next.authenticated) return;
+    router.replace(getCustomerJourneyResumePath(next));
   }
 
-  async function handleContinueAfterSelfie() {
-    setError('');
-    setBusy(true);
-    try {
-      const next = await refresh();
-      if (!next.authenticated) return;
-      if (!next.kycFaceProgress?.selfieCaptured) {
-        setError('Capture and save a selfie before continuing.');
-        return;
-      }
-      router.replace(getCustomerJourneyResumePath(next));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not continue.');
-    } finally {
-      setBusy(false);
+  useEffect(() => {
+    if (loading || busy || session?.authenticated !== true || retakeSelfie) return;
+    const progress = session.kycFaceProgress;
+    if (!progress?.selfieCaptured) return;
+    if (progress.livenessRequired === false || progress.livenessPassed) {
+      void continueToNextStep();
     }
+  }, [loading, busy, session, retakeSelfie]);
+
+  async function runLivenessCheck(): Promise<boolean> {
+    const out = await postKycLiveness();
+    if (!out) {
+      setError('Empty response from liveness.');
+      return false;
+    }
+    if (!out.configured) {
+      setError(out.skipReason ?? 'Liveness is not configured on the server.');
+      return false;
+    }
+    if (!out.livenessPassed) {
+      setError(pickLivenessFailureUserMessage(out));
+      await refresh();
+      return false;
+    }
+    return true;
   }
 
   async function handleCapture() {
@@ -157,6 +166,7 @@ export default function KycSelfiePage() {
     }
     ctx.drawImage(video, 0, 0, w, h);
     setBusy(true);
+    setBusyLabel('Saving selfie…');
     try {
       const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
       const file = dataUrlToFile(dataUrl, 'selfie.jpg');
@@ -167,37 +177,42 @@ export default function KycSelfiePage() {
       }
       setRetakeSelfie(false);
       stopCamera();
-      await afterStep();
+
+      const refreshed = await refresh();
+      if (!refreshed.authenticated) return;
+
+      const livenessRequired = refreshed.kycFaceProgress?.livenessRequired !== false;
+      if (!livenessRequired) {
+        await continueToNextStep();
+        return;
+      }
+
+      setBusyLabel('Running face liveness check…');
+      const passed = await runLivenessCheck();
+      if (!passed) return;
+
+      await continueToNextStep();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Selfie upload failed.');
     } finally {
       setBusy(false);
+      setBusyLabel('');
     }
   }
 
   async function handleLiveness() {
     setError('');
     setBusy(true);
+    setBusyLabel('Running face liveness check…');
     try {
-      const out = await postKycLiveness();
-      if (!out) {
-        setError('Empty response from liveness.');
-        return;
-      }
-      if (!out.configured) {
-        setError(out.skipReason ?? 'Liveness is not configured on the server.');
-        return;
-      }
-      if (!out.livenessPassed) {
-        setError(pickLivenessFailureUserMessage(out));
-        await refresh();
-        return;
-      }
-      await afterStep();
+      const passed = await runLivenessCheck();
+      if (!passed) return;
+      await continueToNextStep();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Liveness request failed.');
     } finally {
       setBusy(false);
+      setBusyLabel('');
     }
   }
 
@@ -275,8 +290,15 @@ export default function KycSelfiePage() {
 
           {needsWebcamStream ? (
             <button type="button" disabled={busy || !cameraReady} onClick={() => void handleCapture()} className="mc-btn-primary">
-              Capture from webcam
+              {busy ? busyLabel || 'Please wait…' : 'Capture from webcam'}
             </button>
+          ) : null}
+
+          {busy && busyLabel && !needsWebcamStream ? (
+            <div className="flex items-center justify-center gap-3 rounded-2xl border border-[rgba(18,36,79,0.1)] bg-white/80 p-4">
+              <Spinner size={28} />
+              <p className="m-0 text-sm font-semibold text-brand-navy">{busyLabel}</p>
+            </div>
           ) : null}
 
           {selfieAlreadySaved && !retakeSelfie ? (
@@ -303,36 +325,15 @@ export default function KycSelfiePage() {
             </button>
           ) : null}
 
-          {kyc?.selfieCaptured ? (
+          {kyc?.selfieCaptured && kyc.livenessRequired !== false && !kyc.livenessPassed ? (
             <div className="grid gap-2">
-              {kyc.livenessRequired === false ? (
-                <>
-                  <p className="m-0 text-sm text-brand-muted">
-                    Liveness checks are paused. A saved selfie is still required — yours is on file below. Continue when
-                    you are ready.
-                  </p>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void handleContinueAfterSelfie()}
-                    className="mc-btn-primary"
-                  >
-                    Continue
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p className="m-0 text-sm text-brand-muted">Selfie saved. Run liveness check to continue.</p>
-                  <button type="button" disabled={busy} onClick={() => void handleLiveness()} className="mc-btn-primary">
-                    Run liveness check
-                  </button>
-                </>
-              )}
+              <p className="m-0 text-sm text-brand-muted">
+                Selfie saved. Face liveness did not pass or was not completed — try again to continue.
+              </p>
+              <button type="button" disabled={busy} onClick={() => void handleLiveness()} className="mc-btn-primary">
+                {busy ? busyLabel || 'Please wait…' : 'Retry liveness check'}
+              </button>
             </div>
-          ) : null}
-
-          {kyc?.livenessPassed ? (
-            <p className="m-0 text-sm font-semibold text-emerald-700">Liveness passed. You can continue your application.</p>
           ) : null}
         </div>
       </JourneyProgressProvider>

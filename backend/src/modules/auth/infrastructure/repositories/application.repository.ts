@@ -1,5 +1,5 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import type { EmailVerificationType, Prisma } from '@prisma/client';
+import { Prisma, type EmailVerificationType } from '@prisma/client';
 import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import type { DbClient } from './db.client';
@@ -21,7 +21,7 @@ export class ApplicationRepository {
     tx?: DbClient,
   ) {
     const existing = await this.db(tx).application.findFirst({
-      where: { leadId: params.leadId },
+      where: { leadId: params.leadId, customerId: params.customerId },
       orderBy: { createdAt: 'desc' },
     });
     if (existing) return existing;
@@ -89,7 +89,12 @@ export class ApplicationRepository {
   ) {
     return this.db(tx).application.update({
       where: { id: params.applicationId },
-      data: { selfieRelativePath: params.selfieRelativePath },
+      data: {
+        selfieRelativePath: params.selfieRelativePath,
+        livenessPassed: false,
+        livenessCheckedAt: null,
+        livenessVendorJson: Prisma.JsonNull,
+      },
     });
   }
 

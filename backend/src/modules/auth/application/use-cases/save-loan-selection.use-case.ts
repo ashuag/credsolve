@@ -71,7 +71,7 @@ export class SaveLoanSelectionUseCase {
 
     await this.prisma.client.$transaction(async (tx) => {
       let application = await tx.application.findFirst({
-        where: { leadId: lead.id },
+        where: { leadId: lead.id, customerId: customer.id },
         orderBy: { createdAt: 'desc' },
       });
 
@@ -145,6 +145,7 @@ export class SaveLoanSelectionUseCase {
       await tx.application.update({
         where: { id: application.id },
         data: {
+          email: null,
           emailVerifiedAt: null,
           emailVerificationType: null,
           loanDocumentsAcceptedAt: null,

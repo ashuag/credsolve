@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Request } from 'express';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
-import { APPLICATION_KYC_STATUS } from '../../../../common/constants/application.constants';
+import {
+  APPLICATION_KYC_STATUS,
+  APPLICATION_STATUS,
+} from '../../../../common/constants/application.constants';
 import {
   formatLeadDetailForPortal,
   isLeadEmailVerifiedForPortal,
@@ -64,10 +67,20 @@ export class GetCustomerSessionUseCase {
 
     const statusName = leadRow.leadStatus.name;
 
-    // CONVERTED lead (previous loan fully disbursed) → deactivate so a new journey can start.
+    // CONVERTED after a completed disbursement → deactivate so a new journey can start.
+    // Mid-journey CONVERTED (post-BRE / professional handoff) keeps the active lead + application.
     if (statusName === LEAD_STATUS.CONVERTED) {
-      await this.leads.deactivate(leadRow.id);
-      return noLeadResult;
+      const disbursedApp = await this.prisma.client.application.findFirst({
+        where: {
+          leadId: leadRow.id,
+          applicationStatus: { name: APPLICATION_STATUS.DISBURSED, isActive: true },
+        },
+        select: { id: true },
+      });
+      if (disbursedApp) {
+        await this.leads.deactivate(leadRow.id);
+        return noLeadResult;
+      }
     }
 
     // REJECTED or BLACKLISTED → compute rejectedUntil based on the applicable cooldown.

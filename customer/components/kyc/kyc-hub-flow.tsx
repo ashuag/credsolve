@@ -6,7 +6,12 @@ import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { LoanSummaryLeftRail } from '@/components/loan/loan-summary-left-rail';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
-import { initDigilockerSession, persistDigilockerSessionTokenForCallback } from '@/lib/api/digilocker';
+import {
+  extractDigilockerSessionTokenFromUrl,
+  extractDigilockerSessionTokenFromVendor,
+  initDigilockerSession,
+  persistDigilockerSessionTokenForCallback,
+} from '@/lib/api/digilocker';
 import { getKycHubBackPath } from '@/lib/api/customer-session';
 import { isLoanDocumentsJourneyComplete } from '@/lib/loan-documents-journey';
 import { AlertBanner } from '@/components/ui/alert-banner';
@@ -77,7 +82,17 @@ export function KycHubFlow() {
       await refresh();
       const redirect = out.digilockerLoginUrl ?? findRedirectUrl(out.vendor);
       if (redirect) {
-        persistDigilockerSessionTokenForCallback(out.sessionToken);
+        const sessionToken =
+          out.sessionToken ??
+          extractDigilockerSessionTokenFromVendor(out.vendor) ??
+          extractDigilockerSessionTokenFromUrl(redirect);
+        persistDigilockerSessionTokenForCallback(sessionToken);
+        if (!sessionToken) {
+          setError(
+            'DigiLocker started, but no session token was returned. Check Tenacio configuration or try again.',
+          );
+          return;
+        }
         window.location.assign(redirect);
         return;
       }

@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { VendorApiService } from './vendor-api.service';
 
-/** Tenacio POST body for `/services/liveness` style workflows. */
+/** Tenacio POST body for `/services/liveness` — selfie fetched from `input.url`. */
 export type TenacioLivenessBody = {
   input: {
     consent: boolean;
-    /** Base64 or data-URL image from the customer selfie. */
-    image: string;
+    /** Public HTTPS URL where the stored selfie JPEG/PNG can be downloaded. */
+    url: string;
   };
 };
 
@@ -22,19 +22,10 @@ type UrlResolved = { absoluteUrl: string } | { baseUrl: string; path: string };
 
 type PickUrlOutcome = VendorCallResult | { resolved: UrlResolved };
 
-/** Tenacio often validates `input.image` as a data-URL, not raw base64. */
-function normalizeLivenessImagePayload(image: string): string {
-  const trimmed = image.trim().replace(/\s/g, '');
-  if (/^data:image\//i.test(trimmed)) {
-    return trimmed;
-  }
-  return `data:image/jpeg;base64,${trimmed}`;
-}
-
 /**
  * Face liveness via Tenacio.
  *
- * - `TENACIO_LIVENESS_SERVICE` — path under `VENDOR_HOST` (e.g. `liveness` or `services/liveness`)
+ * - `TENACIO_LIVENESS_SERVICE` — path under `VENDOR_HOST` (e.g. `liveness`)
  * - `TENACIO_LIVENESS_URL` — optional full POST URL
  * - `TENACIO_LIVENESS_WORKFLOW_ID` — `workflow-id` header
  */
@@ -55,6 +46,11 @@ export class LivenessVendorService {
     const workflowId = (process.env.TENACIO_LIVENESS_WORKFLOW_ID ?? '').trim();
     if (!workflowId) {
       return this.fail('Set TENACIO_LIVENESS_WORKFLOW_ID for liveness checks.');
+    }
+
+    const selfieUrl = body.input.url.trim();
+    if (!/^https?:\/\//i.test(selfieUrl)) {
+      return this.fail('Liveness selfie URL must be an absolute http(s) URL.');
     }
 
     const fullUrl = (process.env.TENACIO_LIVENESS_URL ?? '').trim();
@@ -85,19 +81,19 @@ export class LivenessVendorService {
       body: {
         input: {
           consent: body.input.consent,
-          image: normalizeLivenessImagePayload(body.input.image),
+          url: selfieUrl,
         },
       },
       leadId,
       redactRequest: (b) => {
         const input = b?.input as Record<string, unknown> | undefined;
-        const img = input?.image;
-        if (typeof img !== 'string') return b;
+        const url = input?.url;
+        if (typeof url !== 'string') return b;
         return {
           ...b,
           input: {
             ...input,
-            image: `[REDACTED:${img.length} chars]`,
+            url: `[REDACTED:${url.length} chars]`,
           },
         };
       },

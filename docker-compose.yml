@@ -27,7 +27,6 @@ services:
     # Nest must listen on all interfaces so other containers (customer, los) can reach `backend:4001`.
     environment:
       HOST: "0.0.0.0"
-      LIBREOFFICE_BIN: "soffice"
     ports:
       - "4001:4001"
     working_dir: /workspace/backend
@@ -40,7 +39,7 @@ services:
     command:
       - sh
       - -c
-      - apt-get update -y && apt-get install -y --no-install-recommends unzip zip libreoffice-writer fonts-dejavu-core fonts-liberation default-jre-headless openssl && npm run prisma:generate && npm run prisma:migrate:deploy && npm run dev
+      - apt-get update -y && apt-get install -y --no-install-recommends openssl && npm run prisma:generate && npm run prisma:migrate:deploy && npm run dev
 
   los:
     <<: *node-defaults

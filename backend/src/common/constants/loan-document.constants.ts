@@ -5,9 +5,16 @@ export const LOAN_DOCUMENT_TYPE = {
 
 export type LoanDocumentType = (typeof LOAN_DOCUMENT_TYPE)[keyof typeof LOAN_DOCUMENT_TYPE];
 
-export const LOAN_DOCUMENT_TEMPLATE_FILES: Record<LoanDocumentType, string> = {
+/** Source Word files (dev-only; used by `npm run loan-docs:build-templates`). */
+export const LOAN_DOCUMENT_TEMPLATE_DOCX_FILES: Record<LoanDocumentType, string> = {
   [LOAN_DOCUMENT_TYPE.KEY_FACT]: 'key-fact-statement.docx',
   [LOAN_DOCUMENT_TYPE.LOAN_AGREEMENT]: 'loan-agreement.docx',
+};
+
+/** Pre-built PDF shells filled at runtime via pdf-lib (see `*.fields.json`). */
+export const LOAN_DOCUMENT_TEMPLATE_PDF_FILES: Record<LoanDocumentType, string> = {
+  [LOAN_DOCUMENT_TYPE.KEY_FACT]: 'key-fact-statement.template.pdf',
+  [LOAN_DOCUMENT_TYPE.LOAN_AGREEMENT]: 'loan-agreement.template.pdf',
 };
 
 export const LOAN_DOCUMENT_PDF_FILES: Record<LoanDocumentType, string> = {

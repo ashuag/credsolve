@@ -7,6 +7,11 @@ export type LoanDocumentMergeInput = {
   currentCity: string | null;
   pincode: string | null;
   loanAmountInr: string | number | null;
+  loanPurpose: string | null;
+  interestRatePerDayPercent: string | number | null;
+  interestAmountInr: string | number | null;
+  processingFeeAmountInr: string | number | null;
+  gstAmountInr: string | number | null;
   loanTenureDays: number | null;
   loanMaturityDate: Date | string | null;
   asOf?: Date;

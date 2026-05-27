@@ -65,6 +65,14 @@ export class PostBureauOfferService {
     const approved = new Prisma.Decimal(preApprovedAmountInr);
     const cibilScore = postBre.cibilScore;
 
+    const convertedLeadStatus = await this.prisma.client.leadStatus.findFirst({
+      where: { name: LEAD_STATUS.CONVERTED, isActive: true },
+      select: { id: true },
+    });
+    if (!convertedLeadStatus) {
+      this.logger.warn('LeadStatus CONVERTED not found — application will be created but lead stays unchanged.');
+    }
+
     await this.prisma.client.$transaction(async (tx) => {
       const application = await this.applications.ensureDraftApplicationForLead(
         { leadId: params.leadId, customerId: params.customerId },
@@ -92,7 +100,18 @@ export class PostBureauOfferService {
           checkedAt: new Date(),
         },
       });
+
+      if (convertedLeadStatus) {
+        await tx.lead.update({
+          where: { id: params.leadId },
+          data: { leadStatusId: convertedLeadStatus.id },
+        });
+      }
     });
+
+    this.logger.log(
+      `Post-BRE passed (leadId=${params.leadId.toString()}): draft application ensured, lead set to CONVERTED.`,
+    );
 
     return { ok: true };
   }

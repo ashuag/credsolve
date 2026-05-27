@@ -94,7 +94,7 @@ export class ApplicationsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Run Tenacio liveness on the stored selfie when outbound is enabled (VENDOR_HOST + TENACIO_LIVENESS_SERVICE or TENACIO_LIVENESS_URL). No vendor HTTP call when KYC_LIVENESS_PAUSED, TENACIO_LIVENESS_DISABLED, or the POST target is not configured.',
+      'Run Tenacio liveness on the stored selfie URL (`input.url`) when outbound is enabled (VENDOR_HOST + TENACIO_LIVENESS_SERVICE or TENACIO_LIVENESS_URL). Selfie URL is public storage or a short-lived signed GET /api/vendor/kyc/liveness-selfie. No vendor HTTP when KYC_LIVENESS_PAUSED, TENACIO_LIVENESS_DISABLED, or POST target is not configured.',
   })
   @ApiOkResponse({ description: 'Vendor outcome; updates application when HTTP call completes' })
   kycLivenessRoute(@Req() req: Request) {

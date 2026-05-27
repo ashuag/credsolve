@@ -5,6 +5,7 @@ import {
   extractDigilockerLoginUrl,
   extractDigilockerSessionToken,
 } from '../../../../common/vendor/digilocker-response.util';
+import { DigilockerSessionStore } from '../../../../common/kyc/digilocker-session.store';
 import { DigilockerVendorService } from '../../../../common/vendor/digilocker-vendor.service';
 import { assertApplicationKycNotCompleted } from '../../../../common/kyc/application-kyc-guard.util';
 import { assertActiveApplicationLoanDocumentsAccepted } from '../../../../common/loan-documents/application-loan-documents-guard.util';
@@ -33,6 +34,7 @@ export class InitDigilockerUseCase {
     private readonly leads: LeadRepository,
     private readonly applications: ApplicationRepository,
     private readonly digilocker: DigilockerVendorService,
+    private readonly digilockerSession: DigilockerSessionStore,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -70,6 +72,10 @@ export class InitDigilockerUseCase {
     );
 
     const vendor = out.vendorBody ?? null;
+    const sessionToken = extractDigilockerSessionToken(vendor);
+    if (out.ok && sessionToken) {
+      await this.digilockerSession.save(application.uuid, sessionToken);
+    }
     return {
       configured: out.configured,
       skipReason: out.skipReason,
@@ -77,7 +83,7 @@ export class InitDigilockerUseCase {
       httpStatus: out.httpStatus,
       vendor,
       digilockerLoginUrl: extractDigilockerLoginUrl(vendor),
-      sessionToken: extractDigilockerSessionToken(vendor),
+      sessionToken,
     };
   }
 }

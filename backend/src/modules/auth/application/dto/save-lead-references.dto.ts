@@ -15,6 +15,10 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
+import {
+  PERSON_NAME_PATTERN,
+  PERSON_NAME_VALIDATION_MESSAGE,
+} from '../../../../common/utils/person-name.util';
 
 const INDIAN_MOBILE = /^[6-9]\d{9}$/;
 
@@ -23,6 +27,7 @@ export class LeadReferenceInputDto {
   @IsString()
   @MinLength(2)
   @MaxLength(100)
+  @Matches(PERSON_NAME_PATTERN, { message: PERSON_NAME_VALIDATION_MESSAGE })
   fullName!: string;
 
   @ApiProperty({ example: '9876543210' })

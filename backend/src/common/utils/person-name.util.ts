@@ -7,3 +7,9 @@ export function normalizeComparablePersonName(raw: string): string {
     .trim()
     .toUpperCase();
 }
+
+/** Letters (any script), spaces, and periods only; no digits or other symbols. */
+export const PERSON_NAME_PATTERN = /^[\p{L}]+(?:[ .][\p{L}]+)*$/u;
+
+export const PERSON_NAME_VALIDATION_MESSAGE =
+  'Name may only contain letters, spaces, and periods.';

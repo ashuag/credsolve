@@ -1,5 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  PERSON_NAME_PATTERN,
+  PERSON_NAME_VALIDATION_MESSAGE,
+} from '../../../../common/utils/person-name.util';
 
 const GENDERS = ['male', 'female', 'others'] as const;
 const OCCUPATIONS = [
@@ -21,6 +25,7 @@ export class SaveLeadProfileDto {
   @IsString()
   @MinLength(2)
   @MaxLength(100)
+  @Matches(PERSON_NAME_PATTERN, { message: PERSON_NAME_VALIDATION_MESSAGE })
   fullName!: string;
 
   @ApiProperty({ description: 'Date of birth as YYYY-MM-DD' })

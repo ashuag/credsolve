@@ -43,6 +43,8 @@ export class LoanDocumentApplicationService {
             interestRate: true,
             interestAmount: true,
             processingFeeAmount: true,
+            gstAmount: true,
+            reasonForLoan: { select: { name: true } },
           },
         },
       },
@@ -85,10 +87,16 @@ export class LoanDocumentApplicationService {
         loanAmount: { toString(): string } | null;
         loanTenure: number | null;
         loanMaturityDate: Date | null;
+        interestRate: { toString(): string } | null;
+        interestAmount: { toString(): string } | null;
+        processingFeeAmount: { toString(): string } | null;
+        gstAmount: { toString(): string } | null;
+        reasonForLoan: { name: string } | null;
       } | null;
     };
   }): LoanDocumentMergeInput {
     const detail = params.lead?.leadDetail;
+    const appDetails = params.application.details;
     return {
       fullName: detail?.fullName ?? null,
       mobileNumber: params.customer.mobileNumber,
@@ -97,9 +105,14 @@ export class LoanDocumentApplicationService {
       addressLine2: detail?.addressLine2 ?? null,
       currentCity: detail?.city?.name ?? null,
       pincode: detail?.pincode ?? null,
-      loanAmountInr: params.application.details?.loanAmount?.toString() ?? null,
-      loanTenureDays: params.application.details?.loanTenure ?? null,
-      loanMaturityDate: params.application.details?.loanMaturityDate ?? null,
+      loanAmountInr: appDetails?.loanAmount?.toString() ?? null,
+      loanPurpose: appDetails?.reasonForLoan?.name ?? null,
+      interestRatePerDayPercent: appDetails?.interestRate?.toString() ?? null,
+      interestAmountInr: appDetails?.interestAmount?.toString() ?? null,
+      processingFeeAmountInr: appDetails?.processingFeeAmount?.toString() ?? null,
+      gstAmountInr: appDetails?.gstAmount?.toString() ?? null,
+      loanTenureDays: appDetails?.loanTenure ?? null,
+      loanMaturityDate: appDetails?.loanMaturityDate ?? null,
     };
   }
 

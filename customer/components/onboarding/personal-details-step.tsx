@@ -19,7 +19,7 @@ import {
 } from '@/lib/customer-details';
 import {formatDateDisplay, formatDateIso, getAge, parseDobDisplay, parseIsoDate,} from '@/lib/date-utils';
 import {useCustomerDetailLookups} from '@/lib/use-customer-detail-lookups';
-import {isValidPan, PINCODE_REGEX} from '@/lib/validators';
+import {isValidPan, isValidPersonName, PERSON_NAME_VALIDATION_MESSAGE, PINCODE_REGEX, sanitizePersonNameInput} from '@/lib/validators';
 import {useJourneyProgressOptional} from '@/components/journey/journey-progress-context';
 
 const SECTION_CLASS =
@@ -46,7 +46,7 @@ type Fields = {
 
 function computeProfileCompletionRatio(fields: Fields, dobDisplay: string): number {
   const checks: boolean[] = [];
-  checks.push(fields.fullName.trim().length >= 2);
+  checks.push(isValidPersonName(fields.fullName));
   checks.push(Boolean(fields.gender));
   checks.push(Boolean(dobDisplay.trim() && fields.dob));
   checks.push(isValidPan(fields.panNumber.trim()));
@@ -248,6 +248,9 @@ export function PersonalDetailsStep({
       if (key === 'pincode') {
         value = value.replace(/\D/g, '').slice(0, 6);
       }
+      if (key === 'fullName') {
+        value = sanitizePersonNameInput(value);
+      }
 
       setFields((prev) => {
         const next = { ...prev, [key]: value } as Fields;
@@ -293,8 +296,11 @@ export function PersonalDetailsStep({
     const today = new Date();
     const next: FieldError = {};
 
-    if (!fields.fullName.trim() || fields.fullName.trim().length < 2) {
-      next.fullName = 'Please enter your full name as per your PAN card.';
+    if (!isValidPersonName(fields.fullName)) {
+      next.fullName =
+        fields.fullName.trim().length === 0
+          ? 'Please enter your full name as per your PAN card.'
+          : PERSON_NAME_VALIDATION_MESSAGE;
     }
     if (!dobDisplay.trim()) {
       next.dob = 'Please enter your date of birth.';

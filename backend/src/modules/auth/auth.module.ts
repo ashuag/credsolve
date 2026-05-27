@@ -5,6 +5,7 @@ import { EmailModule } from '../../common/email/email.module';
 import { VendorApiModule } from '../../common/vendor/vendor-api.module';
 import { LoanDocumentsModule } from '../../common/loan-documents/loan-documents.module';
 import { KycFilesService } from '../../common/kyc/kyc-files.service';
+import { DigilockerSessionStore } from '../../common/kyc/digilocker-session.store';
 import { RedisIpRateLimitGuard } from '../../common/rate-limit/redis-ip-rate-limit.guard';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { CheckLoanEligibilityUseCase } from './application/use-cases/check-loan-eligibility.use-case';
@@ -24,10 +25,12 @@ import { PostBureauOfferService } from './application/services/post-bureau-offer
 import { VerifyPanUseCase } from './application/use-cases/verify-pan.use-case';
 import { InitDigilockerUseCase } from './application/use-cases/init-digilocker.use-case';
 import { DownloadAadhaarDigilockerUseCase } from './application/use-cases/download-aadhaar-digilocker.use-case';
+import { GetPendingDigilockerSessionUseCase } from './application/use-cases/get-pending-digilocker-session.use-case';
 import { RunKycLivenessUseCase } from './application/use-cases/run-kyc-liveness.use-case';
 import { SaveKycSelfieUseCase } from './application/use-cases/save-kyc-selfie.use-case';
 import { ServeDigilockerAadhaarPhotoUseCase } from './application/use-cases/serve-digilocker-aadhaar-photo.use-case';
 import { ServeKycSelfiePhotoUseCase } from './application/use-cases/serve-kyc-selfie-photo.use-case';
+import { ServeKycLivenessSelfieVendorUseCase } from './application/use-cases/serve-kyc-liveness-selfie-vendor.use-case';
 import { GetLoanDocumentsUseCase } from './application/use-cases/get-loan-documents.use-case';
 import { ServeLoanDocumentPdfUseCase } from './application/use-cases/serve-loan-document-pdf.use-case';
 import { SendLoanDocumentsOtpUseCase } from './application/use-cases/send-loan-documents-otp.use-case';
@@ -52,6 +55,7 @@ import { CustomerSessionService } from './infrastructure/session/customer-sessio
 import { AuthController } from './presentation/auth.controller';
 import { CustomerLeadsController } from './presentation/customer-leads.controller';
 import { ApplicationsController } from './presentation/applications.controller';
+import { VendorKycController } from './presentation/vendor-kyc.controller';
 import { LoansController } from './presentation/loans.controller';
 import { LookupController } from './presentation/lookup.controller';
 import { OptionalCustomerSessionGuard } from './presentation/guards/optional-customer-session.guard';
@@ -62,6 +66,7 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
   controllers: [
     AuthController,
     ApplicationsController,
+    VendorKycController,
     CustomerLeadsController,
     LoansController,
     LookupController,
@@ -100,11 +105,14 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     VerifyPanUseCase,
     InitDigilockerUseCase,
     DownloadAadhaarDigilockerUseCase,
+    GetPendingDigilockerSessionUseCase,
     KycFilesService,
+    DigilockerSessionStore,
     SaveKycSelfieUseCase,
     RunKycLivenessUseCase,
     ServeDigilockerAadhaarPhotoUseCase,
     ServeKycSelfiePhotoUseCase,
+    ServeKycLivenessSelfieVendorUseCase,
     LoanDocumentApplicationService,
     GetLoanDocumentsUseCase,
     ServeLoanDocumentPdfUseCase,

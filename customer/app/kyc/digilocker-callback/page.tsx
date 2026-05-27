@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { JourneyProgressProvider } from '@/components/journey/journey-progress-context';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
@@ -11,14 +11,16 @@ import { Spinner } from '@/components/ui/spinner';
 import {
   clearDigilockerSessionTokenFromStorage,
   downloadDigilockerAadhaar,
+  fetchPendingDigilockerSession,
   persistDigilockerSessionTokenForCallback,
   pickDigilockerDownloadErrorMessage,
   readDigilockerSessionTokenFromStorage,
+  type DownloadAadhaarDigilockerResponse,
 } from '@/lib/api/digilocker';
 import { getPostDigilockerAadhaarContinuePath } from '@/lib/api/customer-session';
 
-/** Avoid duplicate POST /download-aadhaar when layout + search updates retrigger effects (e.g. React Strict Mode). */
-const digilockerAadhaarDownloadStarted = new Set<string>();
+/** Share one in-flight download per token (React Strict Mode runs effects twice). */
+const digilockerAadhaarDownloadByToken = new Map<string, Promise<DownloadAadhaarDigilockerResponse>>();
 
 function describeContinueStep(href: string): string {
   if (href.startsWith('/kyc/selfie')) {
@@ -36,73 +38,110 @@ function describeContinueStep(href: string): string {
   return 'Continue your application.';
 }
 
+function readTokenFromSearchParams(params: URLSearchParams): string {
+  return (
+    params.get('sessionToken') ??
+    params.get('session_token') ??
+    params.get('token') ??
+    params.get('sessionId') ??
+    params.get('session_id') ??
+    ''
+  ).trim();
+}
+
 function DigilockerCallbackContent() {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { refresh } = useCustomerSession();
   const [status, setStatus] = useState<'working' | 'done' | 'error'>('working');
   const [message, setMessage] = useState('Fetching your Aadhaar from DigiLocker…');
   const [error, setError] = useState('');
   const [continueHref, setContinueHref] = useState('/kyc');
-  const resolvedTokenRef = useRef<string | null>(null);
 
-  /**
-   * Persist session token from the callback query (if any), resolve the token for download,
-   * then strip query params from the address bar before paint (name/DOB/etc. from DigiLocker).
-   */
-  useLayoutEffect(() => {
-    if (typeof window === 'undefined' || !pathname) return;
-
-    const rawSearch = window.location.search;
-    let token = readDigilockerSessionTokenFromStorage().trim();
-
-    if (rawSearch) {
-      const params = new URLSearchParams(rawSearch);
-      const fromQuery = (
-        params.get('sessionToken') ??
-        params.get('session_token') ??
-        params.get('token') ??
-        ''
-      ).trim();
-      if (fromQuery) {
-        persistDigilockerSessionTokenForCallback(fromQuery);
-        token = fromQuery;
-      }
-      window.history.replaceState(null, '', pathname);
-      void router.replace(pathname, { scroll: false });
+  const resolveSessionToken = useCallback(async (): Promise<string> => {
+    const fromQuery = readTokenFromSearchParams(searchParams);
+    if (fromQuery) {
+      persistDigilockerSessionTokenForCallback(fromQuery);
+      return fromQuery;
     }
 
-    resolvedTokenRef.current = token.trim() || readDigilockerSessionTokenFromStorage().trim();
-  }, [pathname, router]);
+    const stored = readDigilockerSessionTokenFromStorage();
+    if (stored) return stored;
+
+    try {
+      const pending = await fetchPendingDigilockerSession();
+      const fromServer = pending.sessionToken?.trim() ?? '';
+      if (fromServer) {
+        persistDigilockerSessionTokenForCallback(fromServer);
+        return fromServer;
+      }
+    } catch {
+      /* fall through to empty */
+    }
+
+    return '';
+  }, [searchParams]);
 
   useEffect(() => {
-    const token = (resolvedTokenRef.current ?? readDigilockerSessionTokenFromStorage()).trim();
-    if (!token) {
-      setStatus('error');
-      setError(
-        'Missing session token. Open DigiLocker from this app (KYC) so the session is saved, then try again.',
-      );
-      return;
+    if (searchParams.toString()) {
+      const cleanPath = pathname ?? '/kyc/digilocker-callback';
+      window.history.replaceState(null, '', cleanPath);
+      void router.replace(cleanPath, { scroll: false });
     }
+  }, [pathname, router, searchParams]);
 
-    if (digilockerAadhaarDownloadStarted.has(token)) {
-      return;
-    }
-    digilockerAadhaarDownloadStarted.add(token);
-
+  useEffect(() => {
     let cancelled = false;
+
     (async () => {
+      const session = await refresh();
+      if (cancelled) return;
+
+      if (
+        session.authenticated === true &&
+        session.kycFaceProgress?.digilockerAadhaarCaptured
+      ) {
+        clearDigilockerSessionTokenFromStorage();
+        const href =
+          session.lead != null
+            ? getPostDigilockerAadhaarContinuePath(session)
+            : '/apply-for-loan';
+        setContinueHref(href);
+        setStatus('done');
+        setMessage('Aadhaar details were saved. Continue to the next step.');
+        return;
+      }
+
+      const token = (await resolveSessionToken()).trim();
+      if (cancelled) return;
+
+      if (!token) {
+        setStatus('error');
+        setError(
+          'Missing session token. Open DigiLocker from this app (KYC → Login with DigiLocker) so the session is saved, then try again.',
+        );
+        return;
+      }
+
+      let downloadPromise = digilockerAadhaarDownloadByToken.get(token);
+      if (!downloadPromise) {
+        downloadPromise = downloadDigilockerAadhaar({ sessionToken: token, consent: true });
+        digilockerAadhaarDownloadByToken.set(token, downloadPromise);
+        void downloadPromise.finally(() => {
+          digilockerAadhaarDownloadByToken.delete(token);
+        });
+      }
+
       try {
-        const out = await downloadDigilockerAadhaar({ sessionToken: token.trim(), consent: true });
+        const out = await downloadPromise;
         if (cancelled) return;
         if (!out.configured) {
-          digilockerAadhaarDownloadStarted.delete(token);
           setStatus('error');
           setError(out.skipReason ?? 'Aadhaar download is not configured on the server.');
           return;
         }
         if (!out.ok) {
-          digilockerAadhaarDownloadStarted.delete(token);
           setStatus('error');
           const vendorMsg = pickDigilockerDownloadErrorMessage(out.vendor);
           setError(vendorMsg ?? `Aadhaar download failed (HTTP ${out.httpStatus ?? 'n/a'}).`);
@@ -110,6 +149,7 @@ function DigilockerCallbackContent() {
         }
         clearDigilockerSessionTokenFromStorage();
         const next = await refresh();
+        if (cancelled) return;
         const href =
           next.authenticated === true && next.lead
             ? getPostDigilockerAadhaarContinuePath(next)
@@ -118,7 +158,6 @@ function DigilockerCallbackContent() {
         setStatus('done');
         setMessage('Aadhaar details were saved. Continue to the next step.');
       } catch (e) {
-        digilockerAadhaarDownloadStarted.delete(token);
         if (!cancelled) {
           setStatus('error');
           setError(e instanceof Error ? e.message : 'Something went wrong.');
@@ -129,7 +168,7 @@ function DigilockerCallbackContent() {
     return () => {
       cancelled = true;
     };
-  }, [refresh]);
+  }, [refresh, resolveSessionToken]);
 
   return (
     <JourneyProgressProvider>
@@ -137,9 +176,6 @@ function DigilockerCallbackContent() {
         <header>
           <p className="m-0 text-[0.7rem] font-[800] uppercase tracking-[0.14em] text-[#1496f3]">KYC</p>
           <h1 className="mt-2 text-brand-navy text-2xl font-[900] tracking-tight">DigiLocker</h1>
-          <p className="m-0 text-brand-muted text-[0.95rem] leading-relaxed">
-            We finish the DigiLocker hand-off here and store your Aadhaar data for this application.
-          </p>
         </header>
 
         {error ? (

@@ -21,6 +21,7 @@ import { VerifyOtpUseCase } from '../application/use-cases/verify-otp.use-case';
 import { VerifyPanUseCase } from '../application/use-cases/verify-pan.use-case';
 import { InitDigilockerUseCase } from '../application/use-cases/init-digilocker.use-case';
 import { DownloadAadhaarDigilockerUseCase } from '../application/use-cases/download-aadhaar-digilocker.use-case';
+import { GetPendingDigilockerSessionUseCase } from '../application/use-cases/get-pending-digilocker-session.use-case';
 import { ServeDigilockerAadhaarPhotoUseCase } from '../application/use-cases/serve-digilocker-aadhaar-photo.use-case';
 import { ServeKycSelfiePhotoUseCase } from '../application/use-cases/serve-kyc-selfie-photo.use-case';
 import { GetLoanDocumentsUseCase } from '../application/use-cases/get-loan-documents.use-case';
@@ -62,6 +63,7 @@ export class AuthController {
     private readonly verifyPanFlow: VerifyPanUseCase,
     private readonly initDigilockerFlow: InitDigilockerUseCase,
     private readonly downloadAadhaarDigilockerFlow: DownloadAadhaarDigilockerUseCase,
+    private readonly getPendingDigilockerSessionFlow: GetPendingDigilockerSessionUseCase,
     private readonly serveDigilockerAadhaarPhotoFlow: ServeDigilockerAadhaarPhotoUseCase,
     private readonly serveKycSelfiePhotoFlow: ServeKycSelfiePhotoUseCase,
     private readonly getLoanDocumentsFlow: GetLoanDocumentsUseCase,
@@ -288,6 +290,17 @@ export class AuthController {
   initDigilockerRoute(@Req() req: Request, @Body() body: InitDigilockerDto) {
     this.logger.log(`POST /api/auth/digilocker/init ip=${readClientIp(req) ?? 'unknown'}`);
     return this.initDigilockerFlow.execute(req, body);
+  }
+
+  @Get('digilocker/pending-session')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @RateLimitByRoute('digilocker-aadhaar')
+  @ApiOperation({
+    summary:
+      'Recover DigiLocker sessionToken saved at init (for /kyc/digilocker-callback when browser storage is empty)',
+  })
+  getPendingDigilockerSessionRoute(@Req() req: Request) {
+    return this.getPendingDigilockerSessionFlow.execute(req);
   }
 
   @Post('digilocker/download-aadhaar')

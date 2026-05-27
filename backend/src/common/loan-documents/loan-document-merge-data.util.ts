@@ -15,6 +15,12 @@ const MONTH_NAMES = [
   'December',
 ] as const;
 
+function toNumber(value: string | number | null | undefined): number | null {
+  if (value == null) return null;
+  const n = typeof value === 'number' ? value : Number.parseFloat(String(value));
+  return Number.isFinite(n) ? n : null;
+}
+
 function formatInr(amount: number | null | undefined): string {
   if (amount == null || !Number.isFinite(amount)) return '';
   return new Intl.NumberFormat('en-IN', {
@@ -22,6 +28,13 @@ function formatInr(amount: number | null | undefined): string {
     currency: 'INR',
     maximumFractionDigits: 0,
   }).format(amount);
+}
+
+function formatInterestRatePerDay(rate: number | null): string {
+  if (rate == null || !Number.isFinite(rate)) return '';
+  const trimmed = Number(rate.toFixed(4));
+  const display = Number.isInteger(trimmed) ? String(trimmed) : String(trimmed);
+  return `${display}% per day (fixed)`;
 }
 
 function formatDateDdMmYyyy(d: Date): string {
@@ -39,7 +52,16 @@ export function buildLoanDocumentReplacements(input: LoanDocumentMergeInput): Re
     .filter(Boolean);
   const address = addressParts.join(', ');
 
-  const loanAmount = input.loanAmountInr != null ? Number(input.loanAmountInr) : null;
+  const loanAmount = toNumber(input.loanAmountInr);
+  const processingFeeAmount = toNumber(input.processingFeeAmountInr);
+  const gstAmount = toNumber(input.gstAmountInr);
+  const interestAmount = toNumber(input.interestAmountInr);
+  const interestRate = toNumber(input.interestRatePerDayPercent);
+  const netDisbursed =
+    loanAmount != null
+      ? loanAmount - (processingFeeAmount ?? 0) - (gstAmount ?? 0)
+      : null;
+  const borrowerName = input.fullName?.trim() ?? '';
   const tenure = input.loanTenureDays != null ? String(input.loanTenureDays) : '';
   const maturity =
     input.loanMaturityDate != null
@@ -49,7 +71,15 @@ export function buildLoanDocumentReplacements(input: LoanDocumentMergeInput): Re
       : '';
 
   return {
-    NAME: input.fullName?.trim() ?? '',
+    NAME: borrowerName,
+    BORROWER_NAME: borrowerName,
+    PURPOSE_OF_LOAN: input.loanPurpose?.trim() ?? '',
+    SANCTIONED_AMOUNT: loanAmount != null ? formatInr(loanAmount) : '',
+    DISBURSED_AMOUNT: netDisbursed != null ? formatInr(netDisbursed) : '',
+    LOAN_AMOUNT: loanAmount != null ? formatInr(loanAmount) : '',
+    INTEREST_RATE: formatInterestRatePerDay(interestRate),
+    INTEREST_AMOUNT: interestAmount != null ? formatInr(interestAmount) : '',
+    PROCESSING_FEE: processingFeeAmount != null ? formatInr(processingFeeAmount) : '',
     AMOUNT: loanAmount != null ? formatInr(loanAmount) : '',
     'ADDRESS OF THE BORROWER': address,
     ADDRESS: address,

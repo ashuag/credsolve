@@ -11,6 +11,7 @@ import type { PrismaClient } from '@prisma/client';
  */
 export type ApplicationKycSnapshotRow = {
   id: bigint;
+  uuid: string;
   email: string | null;
   emailVerificationType: string | null;
   kycStatus: number;
@@ -32,6 +33,7 @@ export async function fetchLatestApplicationKycSnapshot(
       ? await client.$queryRaw<ApplicationKycSnapshotRow[]>`
           SELECT
             a.id AS id,
+            a.uuid AS uuid,
             a.email_id AS email,
             a.email_verification_type AS emailVerificationType,
             a.kyc_status AS kycStatus,
@@ -48,6 +50,7 @@ export async function fetchLatestApplicationKycSnapshot(
       : await client.$queryRaw<ApplicationKycSnapshotRow[]>`
           SELECT
             a.id AS id,
+            a.uuid AS uuid,
             a.email_id AS email,
             a.email_verification_type AS emailVerificationType,
             a.kyc_status AS kycStatus,

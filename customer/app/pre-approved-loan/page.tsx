@@ -221,17 +221,9 @@ export default function PreApprovedLoanPage() {
             Great news! You have been pre-approved for the amount shown above. Complete your account selection to move ahead to disbursement.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Link href="/loan-selection" className="mc-btn-primary flex-1 text-center py-4 text-[1rem]">
-              Continue to Selection
-            </Link>
-            <Link
-              href="/"
-              className="py-4 px-6 rounded-xl font-bold text-[1rem] text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors text-center border border-slate-200"
-            >
-              Back to Home
-            </Link>
-          </div>
+          <Link href="/loan-selection" className="mc-btn-primary block w-full text-center py-4 text-[1rem]">
+            Continue to Selection
+          </Link>
 
           <div className="mt-10 flex flex-nowrap justify-between items-center gap-2 py-1 w-full border-t border-slate-100 pt-6">
             {BENEFIT_TAGS.map((tag) => (

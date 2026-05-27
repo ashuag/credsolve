@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { Request } from 'express';
+import { DigilockerSessionStore } from '../../../../common/kyc/digilocker-session.store';
 import { DigilockerVendorService } from '../../../../common/vendor/digilocker-vendor.service';
 import {
   buildDigilockerAadhaarFormJson,
@@ -37,6 +38,7 @@ export class DownloadAadhaarDigilockerUseCase {
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
     private readonly digilocker: DigilockerVendorService,
+    private readonly digilockerSession: DigilockerSessionStore,
     private readonly applications: ApplicationRepository,
     private readonly kycFiles: KycFilesService,
     private readonly prisma: PrismaService,
@@ -68,9 +70,19 @@ export class DownloadAadhaarDigilockerUseCase {
     });
     assertApplicationKycNotCompleted(applicationRow.kycStatus);
 
+    let sessionToken = dto.sessionToken?.trim() ?? '';
+    if (!sessionToken) {
+      sessionToken = (await this.digilockerSession.read(applicationRow.uuid)) ?? '';
+    }
+    if (!sessionToken) {
+      throw new BadRequestException(
+        'Missing DigiLocker session token. Start DigiLocker again from KYC (Login with DigiLocker), then return to this page.',
+      );
+    }
+
     const consent = dto.consent !== false;
     const out = await this.digilocker.postAadhaarDownload(
-      { input: { sessionToken: dto.sessionToken.trim(), consent } },
+      { input: { sessionToken, consent } },
       lead.id,
     );
 
@@ -130,6 +142,7 @@ export class DownloadAadhaarDigilockerUseCase {
         aadhaarPhotoRelativePath: photoRel,
       });
       persisted = true;
+      await this.digilockerSession.clear(application.uuid);
     } catch (err) {
       this.logger.error(
         `Failed to persist DigiLocker Aadhaar artifacts: ${err instanceof Error ? err.message : String(err)}`,

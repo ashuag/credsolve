@@ -1,0 +1,77 @@
+{
+  "pageHeight": 842,
+  "fields": [
+    {
+      "key": "NAME",
+      "page": 0,
+      "x": 113.65,
+      "y": 275.18,
+      "width": 80,
+      "height": 22.3,
+      "fontSize": 10
+    },
+    {
+      "key": "AMOUNT",
+      "page": 0,
+      "x": 315.15,
+      "y": 342.25,
+      "width": 80,
+      "height": 19.72,
+      "fontSize": 10
+    },
+    {
+      "key": "NAME",
+      "page": 0,
+      "x": 106.33,
+      "y": 161.68,
+      "width": 80,
+      "height": 22.3,
+      "fontSize": 10
+    },
+    {
+      "key": "Month",
+      "page": 0,
+      "x": 433.7,
+      "y": 176.43,
+      "width": 80,
+      "height": 22.3,
+      "fontSize": 10
+    },
+    {
+      "key": "Date",
+      "page": 0,
+      "x": 478.15,
+      "y": 176.43,
+      "width": 80,
+      "height": 22.3,
+      "fontSize": 10
+    },
+    {
+      "key": "Year",
+      "page": 0,
+      "x": 515.7,
+      "y": 176.43,
+      "width": 80,
+      "height": 22.3,
+      "fontSize": 10
+    },
+    {
+      "key": "NAME",
+      "page": 0,
+      "x": 87.1,
+      "y": 277.6,
+      "width": 80,
+      "height": 19.72,
+      "fontSize": 10
+    },
+    {
+      "key": "ADDRESS",
+      "page": 0,
+      "x": 87.1,
+      "y": 290.15,
+      "width": 220,
+      "height": 19.72,
+      "fontSize": 10
+    }
+  ]
+}

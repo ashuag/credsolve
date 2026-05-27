@@ -16,6 +16,8 @@
     "prisma:migrate:deploy": "node scripts/run-prisma-cli.cjs migrate deploy --config prisma.config.ts",
     "prisma:migrate:dev": "node scripts/run-prisma-cli.cjs migrate dev --config prisma.config.ts",
     "prisma:seed": "node scripts/run-prisma-cli.cjs db seed --config prisma.config.ts",
+    "loan-docs:build-templates": "node scripts/build-loan-document-pdf-templates.mjs",
+    "loan-docs:generate-field-maps": "node scripts/generate-loan-document-field-maps.mjs",
     "nest": "nest"
   },
   "dependencies": {
@@ -35,6 +37,7 @@
     "helmet": "^8.1.0",
     "ioredis": "^5.10.1",
     "nodemailer": "6.10.1",
+    "pdf-lib": "^1.17.1",
     "prisma": "^7.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
