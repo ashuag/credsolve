@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import './load-env';
 import { type INestApplication, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { type NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
@@ -87,8 +88,18 @@ async function listenWithBackoff(
   throw lastErr;
 }
 
+function httpJsonBodyLimit(): string {
+  const raw = process.env.HTTP_JSON_BODY_LIMIT?.trim();
+  return raw || '15mb';
+}
+
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const bodyLimit = httpJsonBodyLimit();
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bodyParser: false,
+  });
+  app.useBodyParser('json', { limit: bodyLimit });
+  app.useBodyParser('urlencoded', { limit: bodyLimit, extended: true });
   app.enableShutdownHooks();
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.set('trust proxy', 1);

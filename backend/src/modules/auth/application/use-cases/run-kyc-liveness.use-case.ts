@@ -8,7 +8,8 @@ import {
   isTenacioVendorBusinessSuccess,
   pickTenacioVendorErrorMessage,
 } from '../../../../common/kyc/aadhaar-vendor-parse.util';
-import { buildKycLivenessSelfiePublicUrl } from '../../../../common/kyc/kyc-liveness-selfie-url.util';
+import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
+import { resolveKycLivenessSelfiePublicUrl } from '../../../../common/kyc/kyc-liveness-selfie-url.util';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { ApplicationRepository } from '../../infrastructure/repositories/application.repository';
@@ -40,6 +41,7 @@ export class RunKycLivenessUseCase {
     private readonly leads: LeadRepository,
     private readonly applications: ApplicationRepository,
     private readonly liveness: LivenessVendorService,
+    private readonly kycFiles: KycFilesService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -96,7 +98,7 @@ export class RunKycLivenessUseCase {
       };
     }
 
-    const selfieUrlResult = buildKycLivenessSelfiePublicUrl({
+    const selfieUrlResult = await resolveKycLivenessSelfiePublicUrl(this.kycFiles, {
       applicationUuid: application.uuid,
       selfieRelativePath: application.selfieRelativePath.trim(),
     });

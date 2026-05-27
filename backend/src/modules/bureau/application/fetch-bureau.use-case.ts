@@ -9,6 +9,7 @@ import type { Request } from 'express';
 import { BureauFetchService } from '../../../common/vendor/bureau-fetch.service';
 import { parseTenacioBureauVendorBody } from '../../../common/vendor/tenacio-bureau-payload.mapper';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { BureauReportPdfService } from '../../../common/cibil/bureau-report-pdf.service';
 import { BureauReportRepository } from '../../auth/infrastructure/repositories/bureau-report.repository';
 import type { FetchBureauDto } from './dto/fetch-bureau.dto';
 
@@ -20,6 +21,7 @@ export class FetchBureauUseCase {
     private readonly prisma: PrismaService,
     private readonly bureauFetch: BureauFetchService,
     private readonly bureauReports: BureauReportRepository,
+    private readonly bureauReportPdf: BureauReportPdfService,
   ) {}
 
   async execute(req: Request, dto: FetchBureauDto) {
@@ -51,18 +53,24 @@ export class FetchBureauUseCase {
     if (out.ok && leadId != null) {
       const lead = await this.prisma.client.lead.findUnique({
         where: { id: leadId },
-        select: { customerId: true },
+        select: { customerId: true, customer: { select: { uuid: true } } },
       });
       if (lead) {
         try {
           const parsed = parseTenacioBureauVendorBody(out.vendorBody);
-          await this.bureauReports.createFromVendorSnapshot({
+          const created = await this.bureauReports.createFromVendorSnapshot({
             customerId: lead.customerId,
             leadId,
             vendorBody: out.vendorBody,
             parsed,
             httpStatus: out.httpStatus,
             dummyFetched: out.dummyPayload,
+          });
+          await this.bureauReportPdf.generateAndAttachForReport({
+            bureauReportId: created.id,
+            customerUuid: lead.customer.uuid,
+            bureauReportUuid: created.uuid,
+            vendorBody: out.vendorBody,
           });
         } catch (err) {
           this.logger.warn(

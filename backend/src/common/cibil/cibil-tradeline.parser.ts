@@ -164,16 +164,168 @@ export function extractTradelinesFromBureauVendorBody(body: unknown): ParsedCibi
   return parsed;
 }
 
+const ACCOUNT_TYPE_LABELS: Record<string, string> = {
+  '00': 'Other',
+  '05': 'Personal loan',
+  '06': 'Consumer loan',
+  '08': 'Education loan',
+  '09': 'Loan to professional',
+  '10': 'Credit card',
+  '12': 'Overdraft',
+  '16': 'Fleet card',
+  '36': 'Kisan credit card',
+  '37': 'Loan on credit card',
+  '38': 'PMJDY overdraft',
+  '39': 'Mudra loan',
+  '45': 'P2P personal loan',
+  '61': 'Business loan – unsecured',
+  '99': 'Current unsecured',
+};
+
+function accountTypeLabel(symbol: string | null): string {
+  if (!symbol) return 'Account';
+  return ACCOUNT_TYPE_LABELS[symbol] ?? `Type ${symbol}`;
+}
+
+/** Human-readable CIBIL account type (TUEF Appendix A) for LOS diagnostics. */
+export function cibilAccountTypeDisplayLabel(symbol: string | null): string {
+  return accountTypeLabel(symbol);
+}
+
+function parseTradelineDate(raw: unknown): Date | null {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+
+  const isoLike = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoLike) {
+    const d = new Date(`${isoLike[1]}-${isoLike[2]}-${isoLike[3]}T00:00:00.000Z`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  const compact = s.match(/^(\d{4})(\d{2})(\d{2})/);
+  if (compact) {
+    const d = new Date(`${compact[1]}-${compact[2]}-${compact[3]}T00:00:00.000Z`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function formatTradelineDateDisplay(raw: unknown): string | null {
+  const d = parseTradelineDate(raw);
+  if (!d) return null;
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${d.getUTCFullYear()}`;
+}
+
+export type OpenUnsecuredTradelineRow = {
+  creditorName: string;
+  accountNumber: string;
+  accountTypeSymbol: string | null;
+  accountTypeLabel: string;
+  dateOpened: string | null;
+  dateClosed: string | null;
+  exposureInr: number;
+  /** True when this line's exposure equals the max used for tier lookup. */
+  drivesTier: boolean;
+};
+
+export type OpenUnsecuredExposureBreakdown = {
+  lines: OpenUnsecuredTradelineRow[];
+  /** Sum of exposure across all open unsecured tradelines. */
+  totalOpenUnsecuredExposureInr: number;
+  /** Largest single open unsecured exposure (tier lookup input). */
+  maxOpenUnsecuredExposureInr: number;
+};
+
+/**
+ * Lists each open unsecured tradeline with exposure, plus total (sum) and max (tier driver).
+ */
+export function computeOpenUnsecuredExposureBreakdown(body: unknown): OpenUnsecuredExposureBreakdown {
+  const root = asRecord(body);
+  if (!root) {
+    return { lines: [], totalOpenUnsecuredExposureInr: 0, maxOpenUnsecuredExposureInr: 0 };
+  }
+
+  const data = asRecord(root.data);
+  const cibilData = data ? asRecord(data.cibilData) : null;
+  const gcr = cibilData ? asRecord(cibilData.GetCustomerAssetsResponse) : null;
+  const success = gcr ? asRecord(gcr.GetCustomerAssetsSuccess) : null;
+  if (!success) {
+    return { lines: [], totalOpenUnsecuredExposureInr: 0, maxOpenUnsecuredExposureInr: 0 };
+  }
+
+  let asset = success.Asset;
+  if (Array.isArray(asset)) asset = asset[0];
+  const assetRec = asRecord(asset);
+  const tlr = assetRec ? asRecord(assetRec.TrueLinkCreditReport) : null;
+  if (!tlr) {
+    return { lines: [], totalOpenUnsecuredExposureInr: 0, maxOpenUnsecuredExposureInr: 0 };
+  }
+
+  const rows: OpenUnsecuredTradelineRow[] = [];
+
+  for (const partition of asArray(tlr.TradeLinePartition)) {
+    const partitionRec = asRecord(partition);
+    if (!partitionRec) continue;
+    const partitionSymbol = normalizeCibilAccountTypeSymbol(
+      partitionRec.accountTypeSymbol != null
+        ? String(partitionRec.accountTypeSymbol)
+        : undefined,
+    );
+
+    for (const rawLine of asArray(partitionRec.Tradeline)) {
+      const lineRec = asRecord(rawLine);
+      if (!lineRec) continue;
+
+      const parsed = parseCibilTradeline(rawLine, partitionSymbol);
+      if (!parsed || !parsed.isUnsecured || !parsed.isOpen) continue;
+
+      const accountNumber = String(lineRec.accountNumber ?? '').trim() || '-';
+      const dateOpened = formatTradelineDateDisplay(lineRec.dateOpened ?? lineRec.DateOpened);
+      const dateClosed = formatTradelineDateDisplay(lineRec.dateClosed ?? lineRec.DateClosed);
+      rows.push({
+        creditorName: String(lineRec.creditorName ?? 'Lender').trim() || 'Lender',
+        accountNumber,
+        accountTypeSymbol: parsed.accountTypeSymbol,
+        accountTypeLabel: accountTypeLabel(parsed.accountTypeSymbol),
+        dateOpened,
+        dateClosed,
+        exposureInr: parsed.exposureInr,
+        drivesTier: false,
+      });
+    }
+  }
+
+  rows.sort((a, b) => b.exposureInr - a.exposureInr);
+
+  let max = 0;
+  let total = 0;
+  for (const row of rows) {
+    total += row.exposureInr;
+    if (row.exposureInr > max) max = row.exposureInr;
+  }
+
+  if (max > 0) {
+    for (const row of rows) {
+      if (row.exposureInr === max) row.drivesTier = true;
+    }
+  }
+
+  return {
+    lines: rows,
+    totalOpenUnsecuredExposureInr: total,
+    maxOpenUnsecuredExposureInr: max,
+  };
+}
+
 /**
  * Maximum exposure (INR) across open, unsecured tradelines.
  * Used to select a row from `credit_limit_tier` (`min_unsecured_loan` … `max_unsecured_loan`).
  */
 export function computeMaxOpenUnsecuredExposureInr(body: unknown): number {
-  const lines = extractTradelinesFromBureauVendorBody(body);
-  let max = 0;
-  for (const line of lines) {
-    if (!line.isUnsecured || !line.isOpen) continue;
-    if (line.exposureInr > max) max = line.exposureInr;
-  }
-  return max;
+  return computeOpenUnsecuredExposureBreakdown(body).maxOpenUnsecuredExposureInr;
 }

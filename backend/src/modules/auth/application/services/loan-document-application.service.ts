@@ -130,11 +130,8 @@ export class LoanDocumentApplicationService {
       this.kycFiles.loanDocumentPdfRelativePath(customerUuid, applicationUuid, pdfName);
 
     if (existingRelativePath?.trim()) {
-      try {
-        await this.kycFiles.readBytes(rel);
+      if (await this.kycFiles.exists(rel)) {
         return rel;
-      } catch {
-        // regenerate below
       }
     }
 

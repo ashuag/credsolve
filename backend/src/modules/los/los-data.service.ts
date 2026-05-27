@@ -3,6 +3,7 @@ import { LeadSourceType, Prisma } from '@prisma/client';
 import { APPLICATION_STATUS } from '../../common/constants/application.constants';
 import { LEAD_STATUS } from '../../common/constants/lead.constants';
 import { PAN_VERIFIED } from '../../common/constants/pan-verification.constants';
+import { BureauReportPdfService } from '../../common/cibil/bureau-report-pdf.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CreateNegativeCityDto } from './dto/create-negative-city.dto';
 import type { CreateNegativePincodeDto } from './dto/create-negative-pincode.dto';
@@ -215,7 +216,10 @@ function mergeLosDashboardDailySeries(
 
 @Injectable()
 export class LosDataService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly bureauReportPdf: BureauReportPdfService,
+  ) {}
 
   async listLeads() {
     const leads = await this.prisma.client.lead.findMany({
@@ -489,6 +493,26 @@ export class LosDataService {
     const lead = application.lead;
     const detail = lead.leadDetail;
 
+    const bureauReportRow = await this.prisma.client.bureauReport.findFirst({
+      where: { leadId: application.leadId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        uuid: true,
+        cibilScore: true,
+        htmlUrl: true,
+        createdAt: true,
+      },
+    });
+
+    let bureauReportPdfUrl: string | null = null;
+    if (bureauReportRow) {
+      const pdfResult = await this.bureauReportPdf.ensurePdfForLead({
+        leadId: application.leadId,
+        customerUuid: application.customer.uuid,
+      });
+      bureauReportPdfUrl = pdfResult?.publicUrl ?? null;
+    }
+
     return {
       uuid: application.uuid,
       customerUuid: application.customer.uuid,
@@ -554,6 +578,15 @@ export class LosDataService {
             checkedAt: application.eligibility.checkedAt.toISOString(),
           }
         : null,
+      bureauReport: bureauReportRow
+        ? {
+            uuid: bureauReportRow.uuid,
+            cibilScore: bureauReportRow.cibilScore,
+            htmlUrl: bureauReportRow.htmlUrl,
+            reportPdfUrl: bureauReportPdfUrl,
+            fetchedAt: bureauReportRow.createdAt.toISOString(),
+          }
+        : null,
       agreement: application.agreement
         ? {
             documentName: application.agreement.documentName,
@@ -571,6 +604,54 @@ export class LosDataService {
             disbursedAt: application.disbursement.disbursedAt?.toISOString() ?? null,
           }
         : null,
+    };
+  }
+
+  async getApplicationCibilReport(applicationUuid: string) {
+    const application = await this.prisma.client.application.findUnique({
+      where: { uuid: applicationUuid },
+      select: {
+        leadId: true,
+        customer: { select: { uuid: true } },
+      },
+    });
+
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+
+    const bureauReportRow = await this.prisma.client.bureauReport.findFirst({
+      where: { leadId: application.leadId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        uuid: true,
+        htmlUrl: true,
+        rawPayload: true,
+        createdAt: true,
+      },
+    });
+
+    if (!bureauReportRow) {
+      throw new NotFoundException('No bureau report found for this application');
+    }
+
+    if (bureauReportRow.rawPayload == null) {
+      throw new NotFoundException('Bureau report has no stored JSON payload');
+    }
+
+    const pdfResult = await this.bureauReportPdf.ensurePdfForLead({
+      leadId: application.leadId,
+      customerUuid: application.customer.uuid,
+    });
+
+    const report = await this.bureauReportPdf.buildReportViewData(bureauReportRow.rawPayload);
+
+    return {
+      bureauReportUuid: bureauReportRow.uuid,
+      fetchedAt: bureauReportRow.createdAt.toISOString(),
+      reportPdfUrl: pdfResult?.publicUrl ?? null,
+      htmlUrl: bureauReportRow.htmlUrl,
+      report,
     };
   }
 

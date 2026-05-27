@@ -6,6 +6,7 @@ import {
   LOAN_DOCUMENT_TEMPLATE_PDF_FILES,
   type LoanDocumentType,
 } from '../constants/loan-document.constants';
+import { pdfSafeText } from '../pdf/pdf-safe-text.util';
 import { buildLoanDocumentReplacements } from './loan-document-merge-data.util';
 import type { LoanDocumentFieldOverlayMap } from './loan-document-field-overlay.types';
 import type { LoanDocumentMergeInput } from './loan-document.types';
@@ -106,13 +107,4 @@ export class LoanDocumentPdfGeneratorService {
     const est = Math.min(360, Math.max(minByKey, value.length * 5.5));
     return Math.max(field.width, est);
   }
-}
-
-/** Standard PDF fonts (Helvetica) are WinAnsi — replace ₹ and other unsupported glyphs. */
-function pdfSafeText(value: string): string {
-  return value
-    .replace(/\u20b9\s?/g, 'Rs. ')
-    .replace(/[\u2018\u2019]/g, "'")
-    .replace(/[\u201c\u201d]/g, '"')
-    .replace(/[\u2013\u2014]/g, '-');
 }

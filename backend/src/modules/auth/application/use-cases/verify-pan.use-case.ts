@@ -16,6 +16,7 @@ import { parseTenacioBureauVendorBody } from '../../../../common/vendor/tenacio-
 import { BureauFetchService } from '../../../../common/vendor/bureau-fetch.service';
 import { PanVerificationService, type PanVerificationResult } from '../../../../common/vendor/pan-verification.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
+import { BureauReportPdfService } from '../../../../common/cibil/bureau-report-pdf.service';
 import { BureauReportRepository } from '../../infrastructure/repositories/bureau-report.repository';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
@@ -53,6 +54,7 @@ const bureauSoftPullLeadSelect = {
   uuid: true,
   customerId: true,
   bureauFetched: true,
+  customer: { select: { uuid: true } },
   leadStatus: { select: { name: true } },
   leadDetail: {
     select: { cibilConsentAt: true, fullName: true },
@@ -70,6 +72,7 @@ type LeadPanVerificationRow = {
 };
 
 type BureauSoftPullLeadRow = {
+  customer?: { uuid: string };
   uuid: string;
   customerId: bigint;
   bureauFetched: number;
@@ -143,6 +146,7 @@ export class VerifyPanUseCase {
     private readonly preBreCheck: PreBreCheckService,
     private readonly postBureauOffer: PostBureauOfferService,
     private readonly bureauReports: BureauReportRepository,
+    private readonly bureauReportPdf: BureauReportPdfService,
     private readonly bureauFetch: BureauFetchService,
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
@@ -488,7 +492,7 @@ export class VerifyPanUseCase {
       });
       try {
         const parsed = parseTenacioBureauVendorBody(out.vendorBody);
-        await this.bureauReports.createFromVendorSnapshot({
+        const created = await this.bureauReports.createFromVendorSnapshot({
           customerId: row.customerId,
           leadId,
           vendorBody: out.vendorBody,
@@ -496,6 +500,15 @@ export class VerifyPanUseCase {
           httpStatus: out.httpStatus,
           dummyFetched: out.dummyPayload,
         });
+        const customerUuid = row.customer?.uuid;
+        if (customerUuid) {
+          await this.bureauReportPdf.generateAndAttachForReport({
+            bureauReportId: created.id,
+            customerUuid,
+            bureauReportUuid: created.uuid,
+            vendorBody: out.vendorBody,
+          });
+        }
       } catch (err) {
         this.logger.warn(
           `BureauReport row not saved (leadId=${leadId.toString()}): ${err instanceof Error ? err.message : String(err)}`,

@@ -33,6 +33,14 @@ export class LosDataController {
     return this.losData.getApplicationDetails(applicationUuid);
   }
 
+  @Get('applications/:applicationUuid/cibil-report')
+  @ApiOperation({
+    summary: 'Structured CIBIL report view for an application (from latest bureau pull)',
+  })
+  applicationCibilReport(@Param('applicationUuid') applicationUuid: string) {
+    return this.losData.getApplicationCibilReport(applicationUuid);
+  }
+
   @Get('leads/:leadUuid')
   @ApiOperation({ summary: 'Get lead details by lead uuid' })
   leadByUuid(@Param('leadUuid') leadUuid: string) {

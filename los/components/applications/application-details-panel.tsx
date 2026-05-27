@@ -1,9 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import { ApplicationCibilReportTab } from '@/components/applications/application-cibil-report-tab';
+import { cx } from '@/components/eligibility/eligibility-ui';
 import { getApplicationDetails, type LosApplicationDetails } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
+
+type ApplicationDetailsTab = 'overview' | 'cibil';
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -148,6 +152,7 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
   const [row, setRow] = useState<LosApplicationDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ApplicationDetailsTab>('overview');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -287,6 +292,51 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
         </div>
       </header>
 
+      <nav
+        className="los-card flex flex-wrap gap-1 p-1.5"
+        aria-label="Application workspace sections"
+      >
+        {(
+          [
+            { id: 'overview' as const, label: 'Overview' },
+            { id: 'cibil' as const, label: 'CIBIL report' },
+          ] satisfies Array<{ id: ApplicationDetailsTab; label: string }>
+        ).map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={cx(
+              'min-h-[40px] flex-1 rounded-[10px] px-4 text-[0.84rem] font-extrabold transition-colors sm:flex-none',
+              activeTab === tab.id
+                ? 'bg-brand-navy text-white shadow-sm'
+                : 'text-brand-navy hover:bg-[rgba(23,44,113,0.06)]',
+            )}
+            aria-current={activeTab === tab.id ? 'page' : undefined}
+          >
+            {tab.label}
+            {tab.id === 'cibil' && row.bureauReport?.cibilScore != null ? (
+              <span
+                className={cx(
+                  'ml-1.5 inline-flex rounded-full px-1.5 py-0.5 text-[0.62rem] font-bold',
+                  activeTab === tab.id
+                    ? 'bg-[rgba(255,255,255,0.2)]'
+                    : 'bg-[rgba(20,150,243,0.12)] text-brand-blue',
+                )}
+              >
+                {row.bureauReport.cibilScore}
+              </span>
+            ) : null}
+          </button>
+        ))}
+      </nav>
+
+      {activeTab === 'cibil' ? (
+        <ApplicationCibilReportTab applicationUuid={applicationUuid} />
+      ) : null}
+
+      {activeTab === 'overview' ? (
+      <div className="grid gap-5">
       <div className="grid gap-5 lg:grid-cols-2">
         <SectionCard
           eyebrow="Identifiers"
@@ -408,6 +458,20 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
                 { label: 'CIBIL score', value: row.eligibility.cibilScore != null ? String(row.eligibility.cibilScore) : '—' },
                 { label: 'Ineligible reason', value: row.eligibility.ineligibleReason ?? '—' },
                 { label: 'Checked at', value: formatDateTime(row.eligibility.checkedAt) },
+                {
+                  label: 'Full bureau view',
+                  value: row.bureauReport ? (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('cibil')}
+                      className="border-0 bg-transparent p-0 font-bold text-brand-blue underline"
+                    >
+                      Open CIBIL report tab
+                    </button>
+                  ) : (
+                    'No bureau pull on file'
+                  ),
+                },
               ]}
             />
           ) : (
@@ -454,6 +518,8 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
           <p className="m-0 text-[0.9rem] text-brand-muted">No disbursement record yet.</p>
         )}
       </SectionCard>
+      </div>
+      ) : null}
     </div>
   );
 }

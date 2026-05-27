@@ -13,6 +13,7 @@ import {
   useState,
 } from 'react';
 import { ELIGIBILITY_SECTION_DEFINITIONS } from '@/components/eligibility/eligibility-definitions';
+import { DEVELOPER_TOOL_LINKS } from '@/components/developer/developer-tools-nav';
 import { useNavigationProgress } from '@/components/ui/navigation-progress-provider';
 import { LogoutButton } from '@/components/ui/logout-button';
 import { updateLosPassword } from '@/lib/api';
@@ -25,18 +26,22 @@ type SessionUser = {
 
 type SidebarMode = 'expanded' | 'icons' | 'hidden';
 type ThemeMode = 'light' | 'dark';
-type NavIcon = 'dashboard' | 'leads' | 'applications' | 'agents' | 'roles' | 'masters' | 'eligibility' | 'partners';
+type NavIcon =
+  | 'dashboard'
+  | 'leads'
+  | 'applications'
+  | 'agents'
+  | 'roles'
+  | 'masters'
+  | 'eligibility'
+  | 'developer'
+  | 'partners';
 type NavChildItem = { href: string; label: string };
 type NavItem = { href: string; label: string; icon: NavIcon; badge?: number; children?: NavChildItem[] };
 type NotificationItem = { title: string; detail: string; time: string; tone: 'lead' | 'disbursal' | 'payment' | 'risk' };
 
 const SIDEBAR_MODE_KEY = 'moneycash_los_sidebar_mode';
 const LEGACY_SIDEBAR_COLLAPSED_KEY = 'moneycash_los_sidebar_collapsed';
-
-const eligibilityNavChildren: NavChildItem[] = ELIGIBILITY_SECTION_DEFINITIONS.map((item) => ({
-  href: item.href,
-  label: item.label,
-}));
 
 const navGroups: { section: string; color: string; items: NavItem[] }[] = [
   {
@@ -70,8 +75,23 @@ const navGroups: { section: string; color: string; items: NavItem[] }[] = [
         icon: 'masters',
         children: [{ href: '/masters/source-utm', label: 'Source & UTM' }],
       },
-      { href: '/eligibility-criteria', label: 'Business Rule Engine', icon: 'eligibility'},
+      { href: '/eligibility-criteria', label: 'Business Rule Engine', icon: 'eligibility' },
       { href: '/eligibility-criteria/serviceability-lists', label: 'Serviceability Lists', icon: 'eligibility' },
+    ],
+  },
+  {
+    section: 'Developer Tools',
+    color: '#8b5cf6',
+    items: [
+      {
+        href: '/developer-tools',
+        label: 'Developer Tools',
+        icon: 'developer',
+        children: DEVELOPER_TOOL_LINKS.map((item) => ({
+          href: item.href,
+          label: item.label,
+        })),
+      },
     ],
   },
 ];
@@ -88,6 +108,7 @@ const GROUP_ACCENT: Record<string, { dot: string; bg: string; border: string; te
   'Loan Pipeline': { dot: 'bg-indigo-500',  bg: 'rgba(99,102,241,0.07)', border: 'rgba(99,102,241,0.18)', text: '#6366f1' },
   'Team':          { dot: 'bg-teal-600',    bg: 'rgba(13,148,136,0.07)', border: 'rgba(13,148,136,0.18)', text: '#0d9488' },
   'Configuration': { dot: 'bg-amber-400',  bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)',  text: '#d97706' },
+  'Developer Tools': { dot: 'bg-violet-500', bg: 'rgba(139,92,246,0.08)', border: 'rgba(139,92,246,0.2)', text: '#7c3aed' },
 };
 
 const toneColors: Record<NotificationItem['tone'], string> = {
@@ -108,6 +129,11 @@ const BREADCRUMBS: Record<string, string> = {
   '/masters/source-utm': 'Source & UTM',
   '/eligibility-criteria': 'Eligibility Criteria',
   '/eligibility-criteria/serviceability-lists': 'Serviceability Lists',
+  '/developer-tools': 'Developer Tools',
+  '/developer-tools/pre-bre-check': 'Pre BRE Check',
+  '/developer-tools/pre-approved-offer': 'Pre-approved Offer',
+  '/developer-tools/post-bureau-check': 'Post BRE Inspector',
+  '/developer-tools/cibil-report-download': 'CIBIL Report Download',
   ...Object.fromEntries(ELIGIBILITY_SECTION_DEFINITIONS.map((item) => [item.href, item.label])),
 };
 
@@ -119,6 +145,19 @@ function persistSidebarMode(mode: SidebarMode) {
 }
 
 function isNavActive(pathname: string, item: NavItem) {
+  if (item.children?.length) {
+    if (pathname === item.href) return true;
+    return item.children.some(
+      (child) => pathname === child.href || pathname.startsWith(`${child.href}/`),
+    );
+  }
+  // Overview hub only — sub-routes have their own sidebar links.
+  if (item.href === '/eligibility-criteria') {
+    return pathname === item.href;
+  }
+  if (item.href === '/developer-tools') {
+    return pathname === item.href || pathname.startsWith('/developer-tools/');
+  }
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
@@ -212,6 +251,14 @@ function IcMasters(p: SvgProps) {
 function IcEligibility(p: SvgProps) {
   return <Icon {...p}><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></Icon>;
 }
+function IcDeveloper(p: SvgProps) {
+  return (
+    <Icon {...p}>
+      <polyline points="16 18 22 12 16 6" />
+      <polyline points="8 6 2 12 8 18" />
+    </Icon>
+  );
+}
 function IcPartners(p: SvgProps) {
   return <Icon {...p}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></Icon>;
 }
@@ -226,6 +273,7 @@ function NavIconSvg({ name, size = 18 }: { name: NavIcon; size?: number }) {
     case 'roles':        return <IcRoles {...p} />;
     case 'masters':      return <IcMasters {...p} />;
     case 'eligibility':  return <IcEligibility {...p} />;
+    case 'developer':    return <IcDeveloper {...p} />;
     case 'partners':     return <IcPartners {...p} />;
   }
 }

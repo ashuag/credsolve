@@ -4,7 +4,6 @@ import { CibilModule } from '../../common/cibil/cibil.module';
 import { EmailModule } from '../../common/email/email.module';
 import { VendorApiModule } from '../../common/vendor/vendor-api.module';
 import { LoanDocumentsModule } from '../../common/loan-documents/loan-documents.module';
-import { KycFilesService } from '../../common/kyc/kyc-files.service';
 import { DigilockerSessionStore } from '../../common/kyc/digilocker-session.store';
 import { RedisIpRateLimitGuard } from '../../common/rate-limit/redis-ip-rate-limit.guard';
 import { PrismaModule } from '../../prisma/prisma.module';
@@ -106,7 +105,6 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     InitDigilockerUseCase,
     DownloadAadhaarDigilockerUseCase,
     GetPendingDigilockerSessionUseCase,
-    KycFilesService,
     DigilockerSessionStore,
     SaveKycSelfieUseCase,
     RunKycLivenessUseCase,

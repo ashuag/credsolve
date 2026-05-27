@@ -4,6 +4,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { StorageModule } from './common/storage/storage.module';
 import { RedisModule } from './common/redis/redis.module';
 import { SmsModule } from './common/sms/sms.module';
 import { VendorApiModule } from './common/vendor/vendor-api.module';
@@ -24,6 +25,7 @@ import { PrismaModule } from './prisma/prisma.module';
       ].filter((p) => existsSync(p)),
     }),
     PrismaModule,
+    StorageModule,
     RedisModule,
     SmsModule,
     VendorApiModule,

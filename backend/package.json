@@ -18,11 +18,11 @@
     "prisma:seed": "node scripts/run-prisma-cli.cjs db seed --config prisma.config.ts",
     "loan-docs:build-templates": "node scripts/build-loan-document-pdf-templates.mjs",
     "loan-docs:generate-field-maps": "node scripts/generate-loan-document-field-maps.mjs",
+    "storage:migrate-to-spaces": "node scripts/migrate-local-storage-to-spaces.mjs",
+    "storage:migrate-to-spaces:dry-run": "node scripts/migrate-local-storage-to-spaces.mjs --dry-run",
     "nest": "nest"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.800.0",
-    "@aws-sdk/s3-request-presigner": "^3.800.0",
     "@nestjs/common": "^11.1.11",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.11",

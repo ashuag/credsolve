@@ -13,3 +13,5 @@ export * from './leads';
 export * from './invitations';
 export * from './masters';
 export * from './negative-lists';
+export * from './bre';
+export * from './cibil-report';

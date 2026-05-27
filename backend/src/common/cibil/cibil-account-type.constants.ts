@@ -1,6 +1,7 @@
 /**
- * CIBIL / TransUnion account type symbols (Appendix A) classified as unsecured
- * for max open unsecured exposure used in credit-limit tier lookup.
+ * CIBIL / TransUnion account type symbols (Appendix A / TUEF Guide) classified as
+ * unsecured for max open unsecured exposure (Appendix E). MFI types 40–43 are secured
+ * per Appendix E and are handled under post-BRE `no_active_mfi`, not here.
  */
 export const CIBIL_UNSECURED_ACCOUNT_TYPE_SYMBOLS = new Set([
   '00', // Other

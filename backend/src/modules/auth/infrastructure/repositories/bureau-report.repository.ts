@@ -35,9 +35,33 @@ export class BureauReportRepository {
     };
 
     const client = this.prisma.client as unknown as {
-      bureauReport: { create: (args: { data: typeof data }) => Promise<{ id: bigint }> };
+      bureauReport: {
+        create: (args: {
+          data: typeof data;
+        }) => Promise<{ id: bigint; uuid: string }>;
+      };
     };
     return client.bureauReport.create({ data });
+  }
+
+  async findLatestForLead(leadId: bigint): Promise<{
+    id: bigint;
+    uuid: string;
+    cibilScore: number | null;
+    htmlUrl: string | null;
+    createdAt: Date;
+  } | null> {
+    return this.prisma.client.bureauReport.findFirst({
+      where: { leadId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        uuid: true,
+        cibilScore: true,
+        htmlUrl: true,
+        createdAt: true,
+      },
+    });
   }
 
   async findLatestRawPayloadForLead(leadId: bigint): Promise<unknown | null> {

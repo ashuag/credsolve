@@ -150,7 +150,7 @@ export class AuthController {
   @UseGuards(RequiredCustomerSessionGuard)
   @RateLimitByRoute('loan-documents')
   @ApiOperation({
-    summary: 'List pre-KYC loan PDFs (generates personalized copies under storage/customer when missing)',
+    summary: 'List pre-KYC loan PDFs (generates personalized copies in Spaces or storage/customer when missing)',
   })
   loanDocumentsRoute(@Req() req: Request) {
     return this.getLoanDocumentsFlow.execute(req);

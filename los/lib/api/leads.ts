@@ -142,6 +142,13 @@ export type LosApplicationDetails = {
     ineligibleReason: string | null;
     checkedAt: string;
   } | null;
+  bureauReport: {
+    uuid: string;
+    cibilScore: number | null;
+    htmlUrl: string | null;
+    reportPdfUrl: string | null;
+    fetchedAt: string;
+  } | null;
   agreement: {
     documentName: string | null;
     signedAt: string | null;

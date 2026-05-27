@@ -19,14 +19,14 @@ model Application {
   kycCompletedAt        DateTime?                 @map("kyc_completed_at")
   /// DigiLocker Aadhaar download payload for forms (large `photo` replaced by stored-file reference).
   digilockerAadhaarFormJson Json?                 @map("digilocker_aadhaar_form_json")
-  /// Relative under `KYC_FILES_ROOT`: `customer/{customer_uuid}/photos/aadhaar/{application_uuid}.{jpg|png}`.
+  /// Object key (DigitalOcean Spaces or local `storage/`): `customer/{customer_uuid}/photos/aadhaar/{application_uuid}.{jpg|png}`.
   aadhaarPhotoRelativePath  String?               @map("aadhaar_photo_relative_path") @db.VarChar(512)
   /// `customer/{customer_uuid}/photos/selfie/{application_uuid}.jpg`
   selfieRelativePath    String?                   @map("selfie_relative_path") @db.VarChar(512)
   livenessVendorJson    Json?                     @map("liveness_vendor_json")
   livenessCheckedAt     DateTime?                 @map("liveness_checked_at")
   livenessPassed        Boolean                   @default(false) @map("liveness_passed")
-  /// Relative under `KYC_FILES_ROOT`: `customer/{uuid}/loan-documents/{app_uuid}/key-fact-statement.pdf`
+  /// Object key: `customer/{uuid}/loan-documents/{app_uuid}/key-fact-statement.pdf` (and loan-agreement.pdf)
   keyFactPdfRelativePath     String?              @map("key_fact_pdf_relative_path") @db.VarChar(512)
   /// `customer/{uuid}/loan-documents/{app_uuid}/loan-agreement.pdf`
   loanAgreementPdfRelativePath String?            @map("loan_agreement_pdf_relative_path") @db.VarChar(512)

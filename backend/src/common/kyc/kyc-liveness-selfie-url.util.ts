@@ -1,3 +1,4 @@
+import type { KycFilesService } from './kyc-files.service';
 import { createKycLivenessSelfieAccessToken } from './kyc-liveness-selfie-token.util';
 
 export type KycLivenessSelfieUrlResult =
@@ -59,12 +60,16 @@ function signedVendorSelfieUrl(
  * Priority:
  * 1. `KYC_LIVENESS_SELFIE_PUBLIC_BASE_URL` + relative selfie path (if public)
  * 2. `STORAGE_BASE_URL` + relative path (if public)
- * 3. `BACKEND_PUBLIC_BASE_URL` + signed `GET /api/vendor/kyc/liveness-selfie?token=…`
+ * 3. DigitalOcean Spaces presigned URL (when `SPACES_*` is configured)
+ * 4. `BACKEND_PUBLIC_BASE_URL` + signed `GET /api/vendor/kyc/liveness-selfie?token=…`
  */
-export function buildKycLivenessSelfiePublicUrl(params: {
-  applicationUuid: string;
-  selfieRelativePath: string;
-}): KycLivenessSelfieUrlResult {
+export async function resolveKycLivenessSelfiePublicUrl(
+  kycFiles: KycFilesService,
+  params: {
+    applicationUuid: string;
+    selfieRelativePath: string;
+  },
+): Promise<KycLivenessSelfieUrlResult> {
   const rel = params.selfieRelativePath.trim().replace(/^\/+/, '');
   if (!rel) {
     return { ok: false, error: 'Selfie path is missing.' };
@@ -79,6 +84,16 @@ export function buildKycLivenessSelfiePublicUrl(params: {
     }
   }
 
+  try {
+    const spacesUrl = await kycFiles.resolvePublicReadUrl(rel);
+    if (spacesUrl && isPubliclyReachableHttpUrl(spacesUrl)) {
+      return { ok: true, url: spacesUrl };
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message };
+  }
+
   const backendBase = trimBase(process.env.BACKEND_PUBLIC_BASE_URL ?? '');
   if (backendBase) {
     return signedVendorSelfieUrl(backendBase, params.applicationUuid);
@@ -88,6 +103,7 @@ export function buildKycLivenessSelfiePublicUrl(params: {
     ok: false,
     error:
       'Set BACKEND_PUBLIC_BASE_URL to your public API origin (e.g. https://api.moneycash.in) so Tenacio can download the selfie. ' +
-      'Optional: KYC_LIVENESS_SELFIE_PUBLIC_BASE_URL for a CDN/object-store base.',
+      'Or configure DigitalOcean Spaces (SPACES_*) / STORAGE_BASE_URL for a public or presigned object URL.',
   };
 }
+

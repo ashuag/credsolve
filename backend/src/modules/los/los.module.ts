@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { BreModule } from '../../common/bre/bre.module';
+import { CibilModule } from '../../common/cibil/cibil.module';
 import { LosAuthController } from './auth/los-auth.controller';
 import { LosAuthService } from './auth/los-auth.service';
 import { LosAuthGuard } from './auth/los-auth.guard';
@@ -7,11 +9,20 @@ import { LosDataController } from './los-data.controller';
 import { LosDataService } from './los-data.service';
 import { LosMastersController } from './los-masters.controller';
 import { LosNegativeListsController } from './los-negative-lists.controller';
+import { LosBreController } from './los-bre.controller';
 import { LosTeamController } from './los-team.controller';
 import { LosTeamService } from './los-team.service';
 
 @Module({
-  controllers: [LosAuthController, LosDataController, LosMastersController, LosNegativeListsController, LosTeamController],
+  imports: [BreModule, CibilModule],
+  controllers: [
+    LosAuthController,
+    LosDataController,
+    LosMastersController,
+    LosNegativeListsController,
+    LosTeamController,
+    LosBreController,
+  ],
   providers: [LosAuthService, LosSessionService, LosAuthGuard, LosDataService, LosTeamService],
   exports: [LosSessionService],
 })
