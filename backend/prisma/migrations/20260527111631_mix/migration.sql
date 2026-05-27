@@ -5,4 +5,5 @@
 
 */
 -- AlterTable
-ALTER TABLE `application` MODIFY `email_verified_at` DATETIME NULL;
+ALTER TABLE `application` MODIFY `email_verified_at` DATETIME NULL,
+    MODIFY `loan_documents_accepted_at` DATETIME(3) NULL;

@@ -116,7 +116,10 @@ export class PanVerificationService {
       const clientId = (process.env.TENACIO_CLIENT_ID ?? '').trim();
       const apiKey = (process.env.TENACIO_API_KEY ?? '').trim();
       const workflowId = (process.env.TENACIO_PAN_NSDL_WORKFLOW_ID ?? '').trim();
-
+      const logger = new Logger(PanVerificationService.name);
+      logger.warn(clientId);
+      logger.warn(apiKey);
+      logger.warn(workflowId)
       if (!baseUrl || !clientId || !apiKey || !workflowId) {
         this.logger.warn(
           'Tenacio credentials missing — skipping PAN verification. Set VENDOR_HOST, TENACIO_CLIENT_ID, TENACIO_API_KEY, TENACIO_PAN_NSDL_WORKFLOW_ID.',
