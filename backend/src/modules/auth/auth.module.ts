@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { BreModule } from '../../common/bre/bre.module';
+import { CibilModule } from '../../common/cibil/cibil.module';
 import { EmailModule } from '../../common/email/email.module';
 import { VendorApiModule } from '../../common/vendor/vendor-api.module';
+import { LoanDocumentsModule } from '../../common/loan-documents/loan-documents.module';
 import { KycFilesService } from '../../common/kyc/kyc-files.service';
 import { RedisIpRateLimitGuard } from '../../common/rate-limit/redis-ip-rate-limit.guard';
 import { PrismaModule } from '../../prisma/prisma.module';
@@ -12,6 +14,8 @@ import { GetCustomerLoansDashboardUseCase } from './application/use-cases/get-cu
 import { LogoutUseCase } from './application/use-cases/logout.use-case';
 import { SendOtpUseCase } from './application/use-cases/send-otp.use-case';
 import { SaveLeadDetailsUseCase } from './application/use-cases/save-lead-details.use-case';
+import { SaveLeadProfileUseCase } from './application/use-cases/save-lead-profile.use-case';
+import { SaveLeadReferencesUseCase } from './application/use-cases/save-lead-references.use-case';
 import { SaveLoanSelectionUseCase } from './application/use-cases/save-loan-selection.use-case';
 import { SubmitProfessionalApplicationUseCase } from './application/use-cases/submit-professional-application.use-case';
 import { SyncLeadEmailFromGoogleTokenUseCase } from './application/use-cases/sync-lead-email-from-google-token.use-case';
@@ -24,6 +28,11 @@ import { RunKycLivenessUseCase } from './application/use-cases/run-kyc-liveness.
 import { SaveKycSelfieUseCase } from './application/use-cases/save-kyc-selfie.use-case';
 import { ServeDigilockerAadhaarPhotoUseCase } from './application/use-cases/serve-digilocker-aadhaar-photo.use-case';
 import { ServeKycSelfiePhotoUseCase } from './application/use-cases/serve-kyc-selfie-photo.use-case';
+import { GetLoanDocumentsUseCase } from './application/use-cases/get-loan-documents.use-case';
+import { ServeLoanDocumentPdfUseCase } from './application/use-cases/serve-loan-document-pdf.use-case';
+import { SendLoanDocumentsOtpUseCase } from './application/use-cases/send-loan-documents-otp.use-case';
+import { AcceptLoanDocumentsUseCase } from './application/use-cases/accept-loan-documents.use-case';
+import { LoanDocumentApplicationService } from './application/services/loan-document-application.service';
 import { SaveKycDocumentsUseCase } from './application/use-cases/save-kyc-documents.use-case';
 import { SaveBankDetailsUseCase } from './application/use-cases/save-bank-details.use-case';
 import { LookupIfscUseCase } from './application/use-cases/lookup-ifsc.use-case';
@@ -49,7 +58,7 @@ import { OptionalCustomerSessionGuard } from './presentation/guards/optional-cus
 import { RequiredCustomerSessionGuard } from './presentation/guards/required-customer-session.guard';
 
 @Module({
-  imports: [BreModule, EmailModule, PrismaModule, VendorApiModule],
+  imports: [BreModule, CibilModule, EmailModule, LoanDocumentsModule, PrismaModule, VendorApiModule],
   controllers: [
     AuthController,
     ApplicationsController,
@@ -75,6 +84,8 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     CustomerGoogleOauthService,
     SyncLeadEmailFromGoogleTokenUseCase,
     SaveLeadDetailsUseCase,
+    SaveLeadProfileUseCase,
+    SaveLeadReferencesUseCase,
     GetCustomerLeadStatusUseCase,
     CheckLoanEligibilityUseCase,
     PostBureauOfferService,
@@ -94,6 +105,11 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     RunKycLivenessUseCase,
     ServeDigilockerAadhaarPhotoUseCase,
     ServeKycSelfiePhotoUseCase,
+    LoanDocumentApplicationService,
+    GetLoanDocumentsUseCase,
+    ServeLoanDocumentPdfUseCase,
+    SendLoanDocumentsOtpUseCase,
+    AcceptLoanDocumentsUseCase,
     GetCustomerSessionUseCase,
     GetCustomerLoansDashboardUseCase,
     LogoutUseCase,

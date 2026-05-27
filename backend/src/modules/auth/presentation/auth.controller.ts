@@ -1,24 +1,33 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Logger, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Logger, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { RateLimitByRoute } from '../../../common/rate-limit/rate-limit-route.decorator';
 import { RedisIpRateLimitGuard } from '../../../common/rate-limit/redis-ip-rate-limit.guard';
 import { SaveLeadDetailsDto } from '../application/dto/save-lead-details.dto';
+import { SaveLeadProfileDto } from '../application/dto/save-lead-profile.dto';
 import { SendOtpDto } from '../application/dto/send-otp.dto';
 import { VerifyOtpSuccessResponseDto } from '../application/dto/verify-otp-response.dto';
 import { VerifyOtpDto } from '../application/dto/verify-otp.dto';
+import { SaveLeadReferencesDto } from '../application/dto/save-lead-references.dto';
 import { VerifyPanDto } from '../application/dto/verify-pan.dto';
 import { GetCustomerSessionUseCase } from '../application/use-cases/get-customer-session.use-case';
 import { GetCustomerLoansDashboardUseCase } from '../application/use-cases/get-customer-loans-dashboard.use-case';
 import { LogoutUseCase } from '../application/use-cases/logout.use-case';
 import { SendOtpUseCase } from '../application/use-cases/send-otp.use-case';
 import { SaveLeadDetailsUseCase } from '../application/use-cases/save-lead-details.use-case';
+import { SaveLeadProfileUseCase } from '../application/use-cases/save-lead-profile.use-case';
+import { SaveLeadReferencesUseCase } from '../application/use-cases/save-lead-references.use-case';
 import { VerifyOtpUseCase } from '../application/use-cases/verify-otp.use-case';
 import { VerifyPanUseCase } from '../application/use-cases/verify-pan.use-case';
 import { InitDigilockerUseCase } from '../application/use-cases/init-digilocker.use-case';
 import { DownloadAadhaarDigilockerUseCase } from '../application/use-cases/download-aadhaar-digilocker.use-case';
 import { ServeDigilockerAadhaarPhotoUseCase } from '../application/use-cases/serve-digilocker-aadhaar-photo.use-case';
 import { ServeKycSelfiePhotoUseCase } from '../application/use-cases/serve-kyc-selfie-photo.use-case';
+import { GetLoanDocumentsUseCase } from '../application/use-cases/get-loan-documents.use-case';
+import { ServeLoanDocumentPdfUseCase } from '../application/use-cases/serve-loan-document-pdf.use-case';
+import { SendLoanDocumentsOtpUseCase } from '../application/use-cases/send-loan-documents-otp.use-case';
+import { AcceptLoanDocumentsUseCase } from '../application/use-cases/accept-loan-documents.use-case';
+import { AcceptLoanDocumentsDto } from '../application/dto/accept-loan-documents.dto';
 import { InitDigilockerDto } from '../application/dto/init-digilocker.dto';
 import { DownloadAadhaarDigilockerDto } from '../application/dto/download-aadhaar-digilocker.dto';
 import { buildCustomerAuthCookieOptions } from '../infrastructure/session/customer-auth-cookie.util';
@@ -48,11 +57,17 @@ export class AuthController {
     private readonly logoutFlow: LogoutUseCase,
     private readonly customerGoogleOauth: CustomerGoogleOauthService,
     private readonly saveLeadDetailsFlow: SaveLeadDetailsUseCase,
+    private readonly saveLeadProfileFlow: SaveLeadProfileUseCase,
+    private readonly saveLeadReferencesFlow: SaveLeadReferencesUseCase,
     private readonly verifyPanFlow: VerifyPanUseCase,
     private readonly initDigilockerFlow: InitDigilockerUseCase,
     private readonly downloadAadhaarDigilockerFlow: DownloadAadhaarDigilockerUseCase,
     private readonly serveDigilockerAadhaarPhotoFlow: ServeDigilockerAadhaarPhotoUseCase,
-    private readonly serveKycSelfiePhotoFlow: ServeKycSelfiePhotoUseCase
+    private readonly serveKycSelfiePhotoFlow: ServeKycSelfiePhotoUseCase,
+    private readonly getLoanDocumentsFlow: GetLoanDocumentsUseCase,
+    private readonly serveLoanDocumentPdfFlow: ServeLoanDocumentPdfUseCase,
+    private readonly sendLoanDocumentsOtpFlow: SendLoanDocumentsOtpUseCase,
+    private readonly acceptLoanDocumentsFlow: AcceptLoanDocumentsUseCase,
   ) {}
 
   @Post('send-otp')
@@ -129,6 +144,48 @@ export class AuthController {
     await this.serveKycSelfiePhotoFlow.execute(req, res);
   }
 
+  @Get('loan-documents')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @RateLimitByRoute('loan-documents')
+  @ApiOperation({
+    summary: 'List pre-KYC loan PDFs (generates personalized copies under storage/customer when missing)',
+  })
+  loanDocumentsRoute(@Req() req: Request) {
+    return this.getLoanDocumentsFlow.execute(req);
+  }
+
+  @Get('loan-documents/:docType/pdf')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @RateLimitByRoute('loan-documents')
+  @ApiOperation({
+    summary: 'Stream Key Fact Statement or Loan Agreement PDF (requires session cookie)',
+  })
+  async loanDocumentPdfRoute(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Param('docType') docType: string,
+  ): Promise<void> {
+    await this.serveLoanDocumentPdfFlow.execute(req, res, docType);
+  }
+
+  @Post('loan-documents/send-otp')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @RateLimitByRoute('loan-documents-otp')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Send mobile OTP to accept loan documents after review' })
+  sendLoanDocumentsOtpRoute(@Req() req: Request) {
+    return this.sendLoanDocumentsOtpFlow.execute(req);
+  }
+
+  @Post('loan-documents/accept')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @RateLimitByRoute('loan-documents-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify mobile OTP and record loan document acceptance' })
+  acceptLoanDocumentsRoute(@Req() req: Request, @Body() body: AcceptLoanDocumentsDto) {
+    return this.acceptLoanDocumentsFlow.execute(req, body);
+  }
+
   @Get('my-loans')
   @UseGuards(RequiredCustomerSessionGuard)
   @ApiOperation({
@@ -185,12 +242,22 @@ export class AuthController {
     return this.saveLeadDetailsFlow.execute(req, body);
   }
 
+  @Post('lead-profile')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @RateLimitByRoute('save-lead-details')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Save basic profile fields before the address step (no PAN/CIBIL yet)' })
+  saveLeadProfileRoute(@Req() req: Request, @Body() body: SaveLeadProfileDto) {
+    return this.saveLeadProfileFlow.execute(req, body);
+  }
+
   @Post('verify-pan')
   @UseGuards(RequiredCustomerSessionGuard)
   @RateLimitByRoute('verify-pan')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Verify PAN via Tenacio (pan-name-dob), compare name with profile, audit vendor log',
+    summary:
+      'Save full profile, run pre-BRE, then PAN-NSDL and bureau soft-pull when checks pass',
   })
   verifyPanRoute(@Req() req: Request, @Body() body: VerifyPanDto) {
     const pan = body.panNumber?.trim().toUpperCase() ?? '';
@@ -200,6 +267,15 @@ export class AuthController {
     );
     
     return this.verifyPanFlow.execute(req, body);
+  }
+
+  @Post('lead-references')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @RateLimitByRoute('save-lead-references')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Save two personal references before bank details' })
+  saveLeadReferencesRoute(@Req() req: Request, @Body() body: SaveLeadReferencesDto) {
+    return this.saveLeadReferencesFlow.execute(req, body);
   }
 
   @Post('digilocker/init')

@@ -3,6 +3,8 @@ import type { Request } from 'express';
 import type { UploadedFileLike } from '../../../../common/types/uploaded-file';
 import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
 import { assertApplicationKycNotCompleted } from '../../../../common/kyc/application-kyc-guard.util';
+import { assertActiveApplicationLoanDocumentsAccepted } from '../../../../common/loan-documents/application-loan-documents-guard.util';
+import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { ApplicationRepository } from '../../infrastructure/repositories/application.repository';
@@ -16,6 +18,7 @@ export class SaveKycSelfieUseCase {
     private readonly leads: LeadRepository,
     private readonly applications: ApplicationRepository,
     private readonly kycFiles: KycFilesService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async execute(req: Request, file: UploadedFileLike | undefined): Promise<{ success: true; selfieRelativePath: string }> {
@@ -42,6 +45,10 @@ export class SaveKycSelfieUseCase {
     if (!lead) {
       throw new BadRequestException('No active loan application was found for your account.');
     }
+    await assertActiveApplicationLoanDocumentsAccepted(this.prisma.client, {
+      leadId: lead.id,
+      customerId: customer.id,
+    });
 
     const application = await this.applications.ensureDraftApplicationForLead({
       leadId: lead.id,

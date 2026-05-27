@@ -47,6 +47,12 @@ export type VerifyLeadPanPayload = {
   dob: string;
   gender: CustomerGenderValue;
   occupation: CustomerOccupationValue;
+  /** Optional when address was just saved via `saveLeadDetails`. */
+  addressLine1?: string;
+  addressLine2?: string;
+  currentCity?: string;
+  currentCityId?: number;
+  pincode?: string;
   /** Required; stored as `lead_detail.cibil_consent_at` for bureau soft-pull after PAN. */
   creditConsentAccepted: boolean;
   monthlyIncome?: string;
@@ -121,6 +127,27 @@ export async function syncLeadEmail(payload: SyncLeadEmailPayload): Promise<Sync
   );
 }
 
+export type SaveLeadProfilePayload = {
+  leadUuid?: string;
+  fullName: string;
+  dob: string;
+  gender: CustomerGenderValue;
+  occupation: CustomerOccupationValue;
+  panNumber: string;
+  creditConsentAccepted: boolean;
+  monthlyIncome?: string;
+  annualTurnover?: string;
+  annualProfit?: string;
+};
+
+export async function saveLeadProfile(payload: SaveLeadProfilePayload): Promise<SaveLeadDetailsResponse> {
+  return (await apiPost<SaveLeadDetailsResponse>(
+    '/leads/profile',
+    payload,
+    'Unable to save your profile right now. Please try again.',
+  )) ?? { success: true };
+}
+
 export async function saveLeadDetails(payload: SaveLeadDetailsPayload): Promise<SaveLeadDetailsResponse> {
   /** Prefer `/auth/lead-details`: same Nest handler as `/leads/details`, works if only `/api/auth/*` is proxied. */
   return (await apiPost<SaveLeadDetailsResponse>(
@@ -130,7 +157,7 @@ export async function saveLeadDetails(payload: SaveLeadDetailsPayload): Promise<
   )) ?? { success: true };
 }
 
-/** Tenacio `pan-name-dob` — runs before the address step; sets `pan_verified` when name matches. */
+/** Saves full profile, runs pre-BRE, then PAN-NSDL and bureau soft-pull when checks pass. */
 export async function verifyLeadPan(payload: VerifyLeadPanPayload): Promise<VerifyLeadPanResponse> {
   return (
     (await apiPost<VerifyLeadPanResponse>(
@@ -279,6 +306,25 @@ export async function saveKycDocuments(payload: SaveKycDocumentsPayload): Promis
       'Unable to save KYC documents right now. Please try again.'
     )) ?? { success: true }
   );
+}
+
+export type LeadReferenceInput = {
+  fullName: string;
+  mobileNumber: string;
+  relationId: number;
+};
+
+export type SaveLeadReferencesPayload = {
+  leadUuid?: string;
+  references: [LeadReferenceInput, LeadReferenceInput];
+};
+
+export async function saveLeadReferences(payload: SaveLeadReferencesPayload): Promise<{ success: boolean; leadUuid?: string }> {
+  return (await apiPost<{ success: boolean; leadUuid?: string }>(
+    '/auth/lead-references',
+    payload,
+    'Unable to save your references right now. Please try again.',
+  )) ?? { success: true };
 }
 
 export async function saveBankDetails(payload: SaveBankDetailsPayload): Promise<{ success: boolean }> {

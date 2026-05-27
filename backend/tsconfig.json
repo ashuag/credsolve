@@ -21,6 +21,6 @@
     "watchFile": "dynamicprioritypolling",
     "watchDirectory": "dynamicprioritypolling"
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts", "prisma/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.json", "prisma/**/*.ts"],
   "exclude": ["node_modules", "dist", "build", "src/generated/**/*"]
 }

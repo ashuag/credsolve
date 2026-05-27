@@ -1,11 +1,14 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
+import { computeMaxOpenUnsecuredExposureInr } from '../../../../common/cibil/cibil-tradeline.parser';
+import { CreditLimitTierResolverService } from '../../../../common/cibil/credit-limit-tier-resolver.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
+import { BureauReportRepository } from '../../infrastructure/repositories/bureau-report.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
 
 export type LoanEligibilityResult = {
-  /** Pre-approved offer ceiling in whole INR (deterministic from seed; clamped to settings min/max). */
+  /** Pre-approved offer ceiling in whole INR (from bureau tier or seed fallback). */
   preApprovedAmountInr: number;
   /** Bounds from `MIN_LOAN_AMOUNT` / `MAX_LOAN_AMOUNT` settings (same as `GET /loans/settings`). */
   minLoanAmountInr: number;
@@ -21,34 +24,45 @@ function hashStringToUint32(s: string): number {
   return h >>> 0;
 }
 
-/**
- * Demo pre-approval: maps a stable seed (e.g. lead UUID) to an amount in
- * [`MIN_LOAN_AMOUNT`, `MAX_LOAN_AMOUNT`] from settings. Same seed always yields
- * the same ceiling so `GET /loans/eligibility` matches amounts computed during
- * application submit. Replace with bureau / rules engine when ready.
- */
 @Injectable()
 export class CheckLoanEligibilityUseCase {
   constructor(
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
     private readonly settings: SettingsRepository,
+    private readonly bureauReports: BureauReportRepository,
+    private readonly creditLimitTiers: CreditLimitTierResolverService,
   ) {}
 
-  /** Use when the active lead UUID is already known (e.g. professional submit). */
+  /**
+   * Pre-approved ceiling from the latest bureau pull: max open unsecured tradeline exposure
+   * → `credit_limit_tier.max_bullet_loan`, clamped to product min/max loan settings.
+   */
+  async computeForLead(leadId: bigint): Promise<LoanEligibilityResult> {
+    const bounds = await this.loadLoanBounds();
+    const rawPayload = await this.bureauReports.findLatestRawPayloadForLead(leadId);
+    if (rawPayload != null) {
+      const maxExposure = computeMaxOpenUnsecuredExposureInr(rawPayload);
+      const tier = await this.creditLimitTiers.resolveMaxBulletLoan(maxExposure);
+      if (tier) {
+        return {
+          preApprovedAmountInr: this.clampToBounds(tier.maxBulletLoan, bounds),
+          minLoanAmountInr: bounds.minInr,
+          maxLoanAmountInr: bounds.maxInr,
+        };
+      }
+    }
+    return this.computeFromSeedFallback(leadId.toString(), bounds);
+  }
+
+  /** @deprecated Prefer {@link computeForLead} when a lead id is known. */
   async computeForSeed(seed: string): Promise<LoanEligibilityResult> {
-    const { minLoanAmount, maxLoanAmount } = await this.settings.loadLoanCalculationSettings();
-    const minInr = Math.max(1, Math.floor(minLoanAmount));
-    const maxInr = Math.max(minInr, Math.floor(maxLoanAmount));
-    const span = maxInr - minInr + 1;
-    const raw = minInr + (hashStringToUint32(seed) % span);
-    const preApprovedAmountInr = Math.min(maxInr, Math.max(minInr, raw));
-    return { preApprovedAmountInr, minLoanAmountInr: minInr, maxLoanAmountInr: maxInr };
+    const bounds = await this.loadLoanBounds();
+    return this.computeFromSeedFallback(seed, bounds);
   }
 
   /**
-   * Resolves the signed-in customer’s active lead and derives the same
-   * pre-approved ceiling the UI uses on `/pre-approved-loan`.
+   * Resolves the signed-in customer’s active lead and derives the pre-approved ceiling.
    */
   async executeForCustomerSession(req: Request): Promise<LoanEligibilityResult> {
     const session = req.customerSession;
@@ -62,7 +76,38 @@ export class CheckLoanEligibilityUseCase {
     }
 
     const lead = await this.leads.findActiveSummaryForCustomer(customer.id);
-    const seed = lead?.uuid ?? `customer:${customer.id.toString()}`;
-    return await this.computeForSeed(seed);
+    if (lead) {
+      return this.computeForLead(lead.id);
+    }
+
+    const seed = `customer:${customer.id.toString()}`;
+    const bounds = await this.loadLoanBounds();
+    return this.computeFromSeedFallback(seed, bounds);
+  }
+
+  private async loadLoanBounds(): Promise<{ minInr: number; maxInr: number }> {
+    const { minLoanAmount, maxLoanAmount } = await this.settings.loadLoanCalculationSettings();
+    const minInr = Math.max(1, Math.floor(minLoanAmount));
+    const maxInr = Math.max(minInr, Math.floor(maxLoanAmount));
+    return { minInr, maxInr };
+  }
+
+  private clampToBounds(amountInr: number, bounds: { minInr: number; maxInr: number }): number {
+    const n = Math.floor(amountInr);
+    return Math.min(bounds.maxInr, Math.max(bounds.minInr, n));
+  }
+
+  /** Deterministic demo fallback when bureau/tier data is unavailable (e.g. before bureau pull). */
+  private computeFromSeedFallback(
+    seed: string,
+    bounds: { minInr: number; maxInr: number },
+  ): LoanEligibilityResult {
+    const span = bounds.maxInr - bounds.minInr + 1;
+    const raw = bounds.minInr + (hashStringToUint32(seed || 'default') % span);
+    return {
+      preApprovedAmountInr: this.clampToBounds(raw, bounds),
+      minLoanAmountInr: bounds.minInr,
+      maxLoanAmountInr: bounds.maxInr,
+    };
   }
 }

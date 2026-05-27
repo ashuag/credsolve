@@ -64,8 +64,14 @@ const navGroups: { section: string; color: string; items: NavItem[] }[] = [
     section: 'Configuration',
     color: '#f59e0b',
     items: [
-      { href: '/masters', label: 'Masters', icon: 'masters' },
+      {
+        href: '/masters',
+        label: 'Masters',
+        icon: 'masters',
+        children: [{ href: '/masters/source-utm', label: 'Source & UTM' }],
+      },
       { href: '/eligibility-criteria', label: 'Business Rule Engine', icon: 'eligibility'},
+      { href: '/eligibility-criteria/serviceability-lists', label: 'Serviceability Lists', icon: 'eligibility' },
     ],
   },
 ];
@@ -99,7 +105,9 @@ const BREADCRUMBS: Record<string, string> = {
   '/agents': 'Agent Management',
   '/roles': 'Role Management',
   '/masters': 'Masters',
+  '/masters/source-utm': 'Source & UTM',
   '/eligibility-criteria': 'Eligibility Criteria',
+  '/eligibility-criteria/serviceability-lists': 'Serviceability Lists',
   ...Object.fromEntries(ELIGIBILITY_SECTION_DEFINITIONS.map((item) => [item.href, item.label])),
 };
 

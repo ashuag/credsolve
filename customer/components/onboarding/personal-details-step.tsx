@@ -2,12 +2,13 @@
 
 import {type ChangeEvent, type ReactNode, type SubmitEvent, useEffect, useState,} from 'react';
 import {useRouter} from 'next/navigation';
+import {SessionRequiredAlert} from '@/components/auth/session-required-alert';
 import {AlertBanner} from '@/components/ui/alert-banner';
 import {DatePickerField} from '@/components/ui/date-picker-field';
 import {FlowLoader} from '@/components/ui/flow-loader';
 import {SearchableCityInput} from '@/components/ui/searchable-city-input';
 import type {CustomerPortalProfile} from '@/lib/api/customer-session';
-import {saveLeadDetails, verifyLeadPan} from '@/lib/api/lead';
+import {saveLeadDetails, saveLeadProfile, verifyLeadPan} from '@/lib/api/lead';
 import {cn} from '@/lib/cn';
 import {
   CUSTOMER_CREDIT_CONSENT_TEXT,
@@ -145,8 +146,8 @@ export function PersonalDetailsStep({
   // Display value DD/MM/YYYY; fields.dob holds YYYY-MM-DD
   const [dobDisplay, setDobDisplay] = useState('');
   const [errors, setErrors] = useState<FieldError>({});
-  const [isNavigating, setIsNavigating] = useState(false);
-  const [isVerifyingPan, setIsVerifyingPan] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const { cityOptions, genderOptions, occupationOptions, isLoading: isLoadingLookups } = useCustomerDetailLookups();
 
@@ -330,7 +331,7 @@ export function PersonalDetailsStep({
   }
 
   async function handleContinueToFinancial() {
-    if (isVerifyingPan) return;
+    if (isSavingProfile) return;
 
     const validation = validate();
     const sectionErrors = pickErrors(validation, PROFILE_PAGE_FIELDS);
@@ -351,40 +352,27 @@ export function PersonalDetailsStep({
       creditConsentAccepted: undefined,
     }));
     setSubmitError('');
+    setIsSavingProfile(true);
 
-    // Persist PAN/name/DOB and run vendor PAN-NSDL verification. The backend
-    // saves the user-supplied details first, so even if the vendor flakes
-    // we don't lose what the user typed.
-    setIsVerifyingPan(true);
     try {
-      const result = await verifyLeadPan({
-        ...(leadUuid ? { leadUuid } : {}),
-        panNumber: fields.panNumber.trim().toUpperCase(),
+      await saveLeadProfile({
+        leadUuid,
         fullName: fields.fullName.trim(),
         dob: fields.dob,
         gender: fields.gender as CustomerGenderValue,
         occupation: fields.occupation as CustomerOccupationValue,
+        panNumber: fields.panNumber.trim().toUpperCase(),
         creditConsentAccepted: fields.creditConsentAccepted,
         ...(usesMonthlyIncome ? { monthlyIncome: fields.monthlyIncome.trim() } : {}),
         ...(isSelfEmployed
           ? { annualTurnover: fields.annualTurnover.trim(), annualProfit: fields.annualProfit.trim() }
           : {}),
       });
-      if (!result.success) {
-        setSubmitError('Unable to verify your PAN right now. Please try again.');
-        return;
-      }
-      if (result.rejected || result.panVerifiedStatus === 2) {
-        router.push('/thank-you-interest');
-        return;
-      }
       onSectionChange('financial');
     } catch (err) {
-      setSubmitError(
-        err instanceof Error ? err.message : 'Unable to verify your PAN right now. Please try again.'
-      );
+      setSubmitError(err instanceof Error ? err.message : 'Unable to save your profile right now. Please try again.');
     } finally {
-      setIsVerifyingPan(false);
+      setIsSavingProfile(false);
     }
   }
 
@@ -399,7 +387,7 @@ export function PersonalDetailsStep({
     }
 
     setSubmitError('');
-    setIsNavigating(true);
+    setIsSubmittingProfile(true);
 
     try {
       await saveLeadDetails({
@@ -414,12 +402,35 @@ export function PersonalDetailsStep({
         currentCity: fields.currentCity.trim(),
         ...(fields.currentCityId != null ? { currentCityId: fields.currentCityId } : {}),
         pincode: fields.pincode,
+        creditConsentAccepted: fields.creditConsentAccepted,
         ...(usesMonthlyIncome ? { monthlyIncome: fields.monthlyIncome.trim() } : {}),
         ...(isSelfEmployed
           ? { annualTurnover: fields.annualTurnover.trim(), annualProfit: fields.annualProfit.trim() }
           : {}),
-        creditConsentAccepted: fields.creditConsentAccepted,
       });
+
+      const result = await verifyLeadPan({
+        ...(leadUuid ? { leadUuid } : {}),
+        panNumber: fields.panNumber.trim().toUpperCase(),
+        fullName: fields.fullName.trim(),
+        dob: fields.dob,
+        gender: fields.gender as CustomerGenderValue,
+        occupation: fields.occupation as CustomerOccupationValue,
+        creditConsentAccepted: fields.creditConsentAccepted,
+        ...(usesMonthlyIncome ? { monthlyIncome: fields.monthlyIncome.trim() } : {}),
+        ...(isSelfEmployed
+          ? { annualTurnover: fields.annualTurnover.trim(), annualProfit: fields.annualProfit.trim() }
+          : {}),
+      });
+
+      if (!result.success) {
+        setSubmitError('Unable to complete your profile right now. Please try again.');
+        return;
+      }
+      if (result.rejected || result.panVerifiedStatus === 2) {
+        router.push('/thank-you-interest');
+        return;
+      }
 
       try {
         window.localStorage.removeItem(draftStorageKey);
@@ -429,8 +440,9 @@ export function PersonalDetailsStep({
 
       await onSaved();
     } catch (err) {
-      setIsNavigating(false);
-      setSubmitError(err instanceof Error ? err.message : 'Unable to save your details right now. Please try again.');
+      setSubmitError(err instanceof Error ? err.message : 'Unable to complete your profile right now. Please try again.');
+    } finally {
+      setIsSubmittingProfile(false);
     }
   }
 
@@ -464,7 +476,7 @@ export function PersonalDetailsStep({
         )}
         {submitError && activeSection === 'profile' && (
           <div className="mb-4">
-            <AlertBanner variant="error">{submitError}</AlertBanner>
+            <SessionRequiredAlert message={submitError} />
           </div>
         )}
 
@@ -654,19 +666,19 @@ export function PersonalDetailsStep({
                 </button>
                 <button
                   type="button"
-                  onClick={handleContinueToFinancial}
-                  disabled={isVerifyingPan}
-                  aria-busy={isVerifyingPan}
+                  onClick={() => void handleContinueToFinancial()}
+                  disabled={isSavingProfile}
+                  aria-busy={isSavingProfile}
                   className="mc-btn-primary flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <span className="inline-flex items-center justify-center gap-[10px]">
-                    {isVerifyingPan ? (
+                    {isSavingProfile ? (
                       <span
                         className="w-[18px] h-[18px] shrink-0 rounded-full border-2 border-[rgba(255,248,223,0.28)] border-t-[#fff8df] animate-spin-btn"
                         aria-hidden
                       />
                     ) : null}
-                    <span>{isVerifyingPan ? 'Verifying PAN…' : 'Continue'}</span>
+                    <span>{isSavingProfile ? 'Saving…' : 'Continue'}</span>
                   </span>
                 </button>
               </div>
@@ -750,7 +762,7 @@ export function PersonalDetailsStep({
                 </FieldGroup>
               </div>
 
-              {submitError && <AlertBanner variant="error">{submitError}</AlertBanner>}
+              {submitError && <SessionRequiredAlert message={submitError} />}
 
               {/* Sticky CTA row */}
               <div className="sticky bottom-0 z-10 bg-white/95 backdrop-blur-sm mt-6 flex flex-col sm:flex-row gap-3 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] border-t border-slate-100 -mx-5 px-5 lg:mx-0 lg:px-0">
@@ -761,8 +773,8 @@ export function PersonalDetailsStep({
                 >
                   ← Back
                 </button>
-                <button type="submit" className="mc-btn-primary flex-1" disabled={isNavigating}>
-                  {isNavigating ? 'Submitting...' : 'Complete application'}
+                <button type="submit" className="mc-btn-primary flex-1" disabled={isSubmittingProfile}>
+                  {isSubmittingProfile ? 'Submitting...' : 'Complete application'}
                 </button>
               </div>
             </div>
@@ -770,12 +782,16 @@ export function PersonalDetailsStep({
         </form>
       </section>
 
-      {isNavigating && (
+      {isSubmittingProfile && (
         <FlowLoader
           eyebrow="Almost there"
-          title="Saving your details"
-          description="We are securely saving your information and preparing your MoneyCash account."
-          steps={['Validating details', 'Running consent checks', 'Opening your account']}
+          title="Checking your eligibility"
+          description="We save your address, run pre-checks, verify PAN, fetch CIBIL when needed, then calculate your eligible loan amount."
+          steps={[
+            'Saving your address',
+            'Pre-eligibility checks',
+            'PAN verification and bureau',
+          ]}
         />
       )}
     </>

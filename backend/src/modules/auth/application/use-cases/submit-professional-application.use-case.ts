@@ -96,7 +96,7 @@ export class SubmitProfessionalApplicationUseCase {
       leadDetailIncomePatch.annualProfit = annualProfit;
     }
 
-    const { preApprovedAmountInr, minLoanAmountInr } = await this.checkLoanEligibility.computeForSeed(leadRow.uuid);
+    const { preApprovedAmountInr, minLoanAmountInr } = await this.checkLoanEligibility.computeForLead(leadRow.id);
     const cibilScore = randomDemoBureauScore();
     const eligible = preApprovedAmountInr >= minLoanAmountInr;
 

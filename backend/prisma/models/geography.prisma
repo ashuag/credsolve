@@ -35,40 +35,56 @@ model City {
 
 /// Serviceability: blocklisted 6-digit Indian pincodes (no FK — pincodes may exist outside `city` master).
 model NegativePincode {
-  id        Int      @id @default(autoincrement())
-  pincode   String   @unique @db.Char(6)
-  reason    String?  @db.VarChar(500)
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id              Int       @id @default(autoincrement())
+  pincode         String    @unique @db.Char(6)
+  reason          String?   @db.VarChar(500)
+  isActive        Boolean   @default(true) @map("is_active")
+  addedByUserId   BigInt?   @map("added_by_user_id") @db.UnsignedBigInt
+  removedByUserId BigInt?   @map("removed_by_user_id") @db.UnsignedBigInt
+  removedAt       DateTime? @map("removed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  addedBy   User? @relation("NegativePincodeAddedBy", fields: [addedByUserId], references: [id])
+  removedBy User? @relation("NegativePincodeRemovedBy", fields: [removedByUserId], references: [id])
 
   @@map("negative_pincode")
 }
 
 /// Serviceability: entire `state` blocked for origination.
 model NegativeState {
-  id        Int      @id @default(autoincrement())
-  stateId   Int      @unique @map("state_id")
-  reason    String?  @db.VarChar(500)
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id              Int       @id @default(autoincrement())
+  stateId         Int       @unique @map("state_id")
+  reason          String?   @db.VarChar(500)
+  isActive        Boolean   @default(true) @map("is_active")
+  addedByUserId   BigInt?   @map("added_by_user_id") @db.UnsignedBigInt
+  removedByUserId BigInt?   @map("removed_by_user_id") @db.UnsignedBigInt
+  removedAt       DateTime? @map("removed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  state State @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  state     State @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  addedBy   User? @relation("NegativeStateAddedBy", fields: [addedByUserId], references: [id])
+  removedBy User? @relation("NegativeStateRemovedBy", fields: [removedByUserId], references: [id])
 
   @@map("negative_state")
 }
 
 /// Serviceability: single `city` blocked for origination.
 model NegativeCity {
-  id        Int      @id @default(autoincrement())
-  cityId    Int      @unique @map("city_id")
-  reason    String?  @db.VarChar(500)
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id              Int       @id @default(autoincrement())
+  cityId          Int       @unique @map("city_id")
+  reason          String?   @db.VarChar(500)
+  isActive        Boolean   @default(true) @map("is_active")
+  addedByUserId   BigInt?   @map("added_by_user_id") @db.UnsignedBigInt
+  removedByUserId BigInt?   @map("removed_by_user_id") @db.UnsignedBigInt
+  removedAt       DateTime? @map("removed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  city City @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  city      City  @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  addedBy   User? @relation("NegativeCityAddedBy", fields: [addedByUserId], references: [id])
+  removedBy User? @relation("NegativeCityRemovedBy", fields: [removedByUserId], references: [id])
 
   @@map("negative_city")
 }

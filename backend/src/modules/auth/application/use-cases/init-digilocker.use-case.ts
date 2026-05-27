@@ -7,6 +7,8 @@ import {
 } from '../../../../common/vendor/digilocker-response.util';
 import { DigilockerVendorService } from '../../../../common/vendor/digilocker-vendor.service';
 import { assertApplicationKycNotCompleted } from '../../../../common/kyc/application-kyc-guard.util';
+import { assertActiveApplicationLoanDocumentsAccepted } from '../../../../common/loan-documents/application-loan-documents-guard.util';
+import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { ApplicationRepository } from '../../infrastructure/repositories/application.repository';
@@ -31,6 +33,7 @@ export class InitDigilockerUseCase {
     private readonly leads: LeadRepository,
     private readonly applications: ApplicationRepository,
     private readonly digilocker: DigilockerVendorService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async execute(req: Request, dto: InitDigilockerDto): Promise<InitDigilockerResult> {
@@ -54,6 +57,10 @@ export class InitDigilockerUseCase {
       customerId: customer.id,
     });
     assertApplicationKycNotCompleted(application.kycStatus);
+    await assertActiveApplicationLoanDocumentsAccepted(this.prisma.client, {
+      leadId: lead.id,
+      customerId: customer.id,
+    });
 
     const redirectUrl = resolveDigilockerRedirectUrl(dto.redirectUrl);
 

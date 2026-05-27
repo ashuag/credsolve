@@ -5,7 +5,9 @@ import { APPLICATION_KYC_STATUS } from '../../../../common/constants/application
 import {
   formatLeadDetailForPortal,
   isLeadEmailVerifiedForPortal,
+  isPanVerifiedFromDb,
 } from '../../../../common/mappers/customer-portal-profile.mapper';
+import { PAN_VERIFIED } from '../../../../common/constants/pan-verification.constants';
 import type { CustomerSessionResult } from '../contracts/customer-session-result.contract';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
@@ -44,7 +46,9 @@ export class GetCustomerSessionUseCase {
       journey: {
         detailsCompleted: false,
         loanSelectionCompleted: false,
+        loanDocumentsCompleted: false,
         kycCompleted: false,
+        referencesCompleted: false,
         bankDetailsCompleted: false,
       },
       loanSelection: null,
@@ -106,7 +110,7 @@ export class GetCustomerSessionUseCase {
         : null,
     );
 
-    const [applicationExtras, latestCustomerKyc] = await Promise.all([
+    const [applicationExtras, latestCustomerKyc, leadReferenceCount] = await Promise.all([
       application
         ? this.prisma.client.application.findUnique({
             where: { id: application.id },
@@ -130,6 +134,13 @@ export class GetCustomerSessionUseCase {
           _count: { select: { customerKycDocuments: true } },
         },
       }),
+      this.prisma.client.leadReference.count({
+        where: {
+          leadId: leadRow.id,
+          fullName: { not: '' },
+          mobileNumber: { not: '' },
+        },
+      }),
     ]);
 
     const appDetails = applicationExtras?.details ?? null;
@@ -140,7 +151,7 @@ export class GetCustomerSessionUseCase {
       profile = { ...profile, fullName: kycDisplayName };
     }
 
-    const detailsCompleted = Boolean(
+    const profileFieldsComplete = Boolean(
       profile?.fullName?.trim() &&
         profile?.dob?.trim() &&
         profile?.gender &&
@@ -148,10 +159,15 @@ export class GetCustomerSessionUseCase {
         profile?.addressLine1?.trim() &&
         profile?.currentCity?.trim() &&
         profile?.pincode?.trim() &&
-        profile?.creditConsentAccepted
+        profile?.creditConsentAccepted,
     );
+    const panChecksComplete =
+      isPanVerifiedFromDb(leadRow.panVerified) || leadRow.panVerified === PAN_VERIFIED.API_DISABLED;
+    const detailsCompleted = profileFieldsComplete && panChecksComplete;
 
     const loanSelectionCompleted = Boolean(appDetails?.loanAmount != null && appDetails?.loanTenure != null);
+
+    const loanDocumentsCompleted = Boolean(application?.loanDocumentsAcceptedAt);
 
     const kycDocsCount = latestCustomerKyc?._count.customerKycDocuments ?? 0;
     const livenessOutboundSkipped = isKycLivenessOutboundSkipped();
@@ -171,6 +187,8 @@ export class GetCustomerSessionUseCase {
           (latestCustomerKyc.kycVerifiedAt != null || kycDocsCount >= 3)) ||
         faceStepCompleteForJourney,
     );
+
+    const referencesCompleted = leadReferenceCount >= 2;
 
     const bankDetailsCompleted = Boolean(
       disbursement?.accountNumber?.trim() && disbursement?.ifscCode?.trim(),
@@ -219,7 +237,9 @@ export class GetCustomerSessionUseCase {
       journey: {
         detailsCompleted,
         loanSelectionCompleted,
+        loanDocumentsCompleted,
         kycCompleted,
+        referencesCompleted,
         bankDetailsCompleted,
       },
       loanSelection,

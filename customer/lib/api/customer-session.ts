@@ -1,3 +1,4 @@
+import { isLoanDocumentsJourneyComplete } from '../loan-documents-journey';
 import { CUSTOMER_LEAD_STATUS } from '../lead-status';
 import { apiGet } from './client';
 
@@ -66,7 +67,9 @@ export type CustomerSessionResponse =
       journey: {
         detailsCompleted: boolean;
         loanSelectionCompleted: boolean;
+        loanDocumentsCompleted: boolean;
         kycCompleted: boolean;
+        referencesCompleted: boolean;
         bankDetailsCompleted: boolean;
       };
       loanSelection: CustomerLoanSelectionSnapshot | null;
@@ -125,7 +128,9 @@ export function getCustomerJourneyResumePath(
   const journey = session.journey;
   if (!journey.detailsCompleted) return '/onboarding?mode=login';
   if (!journey.loanSelectionCompleted) return '/pre-approved-loan';
+  if (!journey.referencesCompleted) return '/references';
   if (!session.lead.emailVerified) return CUSTOMER_EMAIL_VERIFY_PATH;
+  if (!isLoanDocumentsJourneyComplete(session)) return '/loan-documents';
 
   const kyc = session.kycFaceProgress;
   const livenessNeeded = kyc?.livenessRequired !== false;
@@ -183,7 +188,7 @@ export function getPostDigilockerAadhaarContinuePath(
   }
   const resume = getCustomerJourneyResumePath(session);
   if (resume === '/bank-details') {
-    return '/loan-selection';
+    return '/kyc';
   }
   return resume;
 }
@@ -194,8 +199,10 @@ export function getKycHubBackPath(session: Extract<CustomerSessionResponse, { au
   const emailVerified = session.lead?.emailVerified ?? false;
   if (!j.detailsCompleted) return '/apply-for-loan';
   if (!j.loanSelectionCompleted) return '/pre-approved-loan';
+  if (!j.referencesCompleted) return '/references';
   if (!emailVerified) return CUSTOMER_EMAIL_VERIFY_PATH;
-  return '/loan-selection';
+  if (!isLoanDocumentsJourneyComplete(session)) return '/loan-documents';
+  return CUSTOMER_EMAIL_VERIFY_PATH;
 }
 
 /** Coalesce concurrent `/auth/me` calls (e.g. React Strict Mode double mount). */

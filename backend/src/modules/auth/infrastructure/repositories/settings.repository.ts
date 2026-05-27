@@ -46,6 +46,11 @@ export interface BreSettings {
   rejectedOccupationIds: number[];
 }
 
+export interface CibilEligibilityThresholds {
+  cibilMinNew: number;
+  cibilMinExisting: number;
+}
+
 export interface LoanCalculationSettings {
   minLoanAmount: number;
   maxLoanAmount: number;
@@ -264,6 +269,25 @@ export class SettingsRepository {
   invalidateAuthOtpSettingsCache(): void {
     this.authOtpCache = null;
     this.leadPolicyCache = null;
+  }
+
+  /** Min CIBIL thresholds from `eligibility_criteria` (`cibil_min_new`, `cibil_min_existing`). */
+  async loadCibilEligibilityThresholds(): Promise<CibilEligibilityThresholds> {
+    const keys = ['cibil_min_new', 'cibil_min_existing'] as const;
+    const rows = await this.prisma.client.eligibilityCriteria.findMany({
+      where: { key: { in: [...keys] }, isActive: true },
+      select: { key: true, value: true },
+    });
+    const map = new Map(rows.map((r) => [r.key, r.value]));
+    const pick = (key: (typeof keys)[number], fallback: number) => {
+      const raw = map.get(key)?.trim();
+      const n = raw ? Number.parseInt(raw, 10) : NaN;
+      return Number.isFinite(n) ? n : fallback;
+    };
+    return {
+      cibilMinNew: pick('cibil_min_new', 700),
+      cibilMinExisting: pick('cibil_min_existing', 650),
+    };
   }
 
   async loadBreSettings(): Promise<BreSettings> {

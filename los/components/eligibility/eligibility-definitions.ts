@@ -12,4 +12,11 @@ export const ELIGIBILITY_SECTION_DEFINITIONS = [
       'Manage profile-level eligibility rules and thresholds (credit, age, bureau windows, negative state/pincode/city lists, and more), plus whether each rule is enforced.',
     href: '/eligibility-criteria/profile-eligibility-check',
   },
+  {
+    slug: 'serviceability-lists',
+    label: 'Serviceability Negative Lists',
+    description:
+      'Add or soft-remove negative pincodes, cities, and states with added/removed timestamps and operator audit.',
+    href: '/eligibility-criteria/serviceability-lists',
+  },
 ] as const;

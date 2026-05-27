@@ -4,15 +4,26 @@ import { ReactNode, useEffect, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { CUSTOMER_EMAIL_VERIFY_PATH } from '@/lib/api/customer-session';
+import { isLoanDocumentsJourneyComplete } from '@/lib/loan-documents-journey';
 
-type JourneyStage = 'details' | 'preApproved' | 'loanSelection' | 'email' | 'kyc' | 'bankDetails' | 'done';
+type JourneyStage =
+  | 'details'
+  | 'preApproved'
+  | 'references'
+  | 'email'
+  | 'loanDocuments'
+  | 'kyc'
+  | 'bankDetails'
+  | 'done';
 
 function stageFromSession(session: ReturnType<typeof useCustomerSession>['session']): JourneyStage {
   if (!session?.authenticated || !session.lead) return 'details';
   const j = session.journey;
   if (!j.detailsCompleted) return 'details';
   if (!j.loanSelectionCompleted) return 'preApproved';
+  if (!j.referencesCompleted) return 'references';
   if (!session.lead.emailVerified) return 'email';
+  if (!isLoanDocumentsJourneyComplete(session)) return 'loanDocuments';
   if (!j.kycCompleted) return 'kyc';
   if (!j.bankDetailsCompleted) return 'bankDetails';
   return 'done';
@@ -26,10 +37,12 @@ function defaultPathForStage(stage: JourneyStage): string {
       return '/onboarding?mode=login';
     case 'preApproved':
       return '/pre-approved-loan';
-    case 'loanSelection':
-      return '/loan-selection';
     case 'email':
       return CUSTOMER_EMAIL_VERIFY_PATH;
+    case 'loanDocuments':
+      return '/loan-documents';
+    case 'references':
+      return '/references';
     case 'bankDetails':
       return '/bank-details';
     case 'done':
@@ -60,10 +73,12 @@ function isPathAllowedForStage(stage: JourneyStage, path: string): boolean {
       return path.startsWith('/onboarding');
     case 'preApproved':
       return path === '/pre-approved-loan' || path === '/loan-selection';
-    case 'loanSelection':
-      return path === '/loan-selection';
     case 'email':
       return path.startsWith('/email-verify') || path.startsWith('/onboarding');
+    case 'loanDocuments':
+      return path === '/loan-documents';
+    case 'references':
+      return path === '/references' || path === '/loan-selection';
     case 'bankDetails':
       return path === '/bank-details';
     case 'done':

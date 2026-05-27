@@ -16,6 +16,10 @@ import path from 'node:path';
  *           {application_uuid}.{jpg|png}
  *         selfie/
  *           {application_uuid}.jpg
+ *       loan-documents/
+ *         {application_uuid}/
+ *           key-fact-statement.pdf
+ *           loan-agreement.pdf
  * ```
  */
 @Injectable()
@@ -51,5 +55,13 @@ export class KycFilesService {
 
   selfieRelativePath(customerUuid: string, applicationUuid: string): string {
     return `customer/${customerUuid}/photos/selfie/${applicationUuid}.jpg`;
+  }
+
+  loanDocumentPdfRelativePath(
+    customerUuid: string,
+    applicationUuid: string,
+    fileName: 'key-fact-statement.pdf' | 'loan-agreement.pdf',
+  ): string {
+    return `customer/${customerUuid}/loan-documents/${applicationUuid}/${fileName}`;
   }
 }

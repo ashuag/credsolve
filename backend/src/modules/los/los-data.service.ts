@@ -1,11 +1,43 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { LeadSourceType, Prisma } from '@prisma/client';
 import { APPLICATION_STATUS } from '../../common/constants/application.constants';
 import { LEAD_STATUS } from '../../common/constants/lead.constants';
 import { PAN_VERIFIED } from '../../common/constants/pan-verification.constants';
 import { PrismaService } from '../../prisma/prisma.service';
+import type { CreateNegativeCityDto } from './dto/create-negative-city.dto';
+import type { CreateNegativePincodeDto } from './dto/create-negative-pincode.dto';
+import type { CreateNegativeStateDto } from './dto/create-negative-state.dto';
+import type { UpdateLeadSourceMasterDto } from './dto/update-lead-source-master.dto';
+import type { UpdateUtmCampaignDto } from './dto/update-utm-campaign.dto';
+import type { UpdateUtmMediumDto } from './dto/update-utm-medium.dto';
+import type { UpdateUtmSourceDto } from './dto/update-utm-source.dto';
 import type { UpdateBankMasterDto } from './dto/update-bank-master.dto';
 import type { UpdateEligibilityCriterionDto } from './dto/update-eligibility-criterion.dto';
+
+type LosAuditUser = { id: string; fullName: string; email: string } | null;
+
+const negativeListUserSelect = {
+  id: true,
+  fullName: true,
+  email: true,
+} as const;
+
+const negativePincodeInclude = {
+  addedBy: { select: negativeListUserSelect },
+  removedBy: { select: negativeListUserSelect },
+} as const;
+
+const negativeCityInclude = {
+  city: { include: { state: true } },
+  addedBy: { select: negativeListUserSelect },
+  removedBy: { select: negativeListUserSelect },
+} as const;
+
+const negativeStateInclude = {
+  state: true,
+  addedBy: { select: negativeListUserSelect },
+  removedBy: { select: negativeListUserSelect },
+} as const;
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -543,7 +575,26 @@ export class LosDataService {
   }
 
   async getMasters() {
-    const [leadStatuses, applicationStatuses, leadSources, states, cities, occupations, reasonsForLoan, genders, banks, rejectionReasons] = await Promise.all([
+    const utmQuery = {
+      include: { leadSource: { select: { name: true } } },
+      orderBy: [{ leadSource: { name: 'asc' as const } }, { name: 'asc' as const }],
+    };
+
+    const [
+      leadStatuses,
+      applicationStatuses,
+      leadSources,
+      states,
+      cities,
+      occupations,
+      reasonsForLoan,
+      genders,
+      banks,
+      rejectionReasons,
+      utmSources,
+      utmMediums,
+      utmCampaigns,
+    ] = await Promise.all([
       this.prisma.client.leadStatus.findMany({ orderBy: { id: 'asc' } }),
       this.prisma.client.applicationStatus.findMany({ orderBy: { id: 'asc' } }),
       this.prisma.client.leadSource.findMany({ orderBy: { name: 'asc' } }),
@@ -554,6 +605,9 @@ export class LosDataService {
       this.prisma.client.gender.findMany({ orderBy: { name: 'asc' } }),
       this.prisma.client.bank.findMany({ orderBy: { name: 'asc' } }),
       this.prisma.client.rejectionReason.findMany({ orderBy: { name: 'asc' } }),
+      this.prisma.client.utmSource.findMany(utmQuery),
+      this.prisma.client.utmMedium.findMany(utmQuery),
+      this.prisma.client.utmCampaign.findMany(utmQuery),
     ]);
 
     return {
@@ -617,11 +671,44 @@ export class LosDataService {
         name: item.name,
         isActive: item.isActive,
       })),
+      utmSources: utmSources.map((item) => this.mapUtmTag(item)),
+      utmMediums: utmMediums.map((item) => this.mapUtmTag(item)),
+      utmCampaigns: utmCampaigns.map((item) => this.mapUtmTag(item)),
     };
   }
 
   private mapBank(item: { id: number; name: string; isActive: boolean }) {
     return { id: item.id, name: item.name, isActive: item.isActive };
+  }
+
+  private mapLeadSource(item: { id: number; name: string; type: string; isActive: boolean }) {
+    return { id: item.id, name: item.name, type: item.type, isActive: item.isActive };
+  }
+
+  private mapUtmTag(item: {
+    id: number;
+    leadSourceId: number;
+    name: string;
+    isActive: boolean;
+    leadSource: { name: string };
+  }) {
+    return {
+      id: item.id,
+      leadSourceId: item.leadSourceId,
+      leadSourceName: item.leadSource.name,
+      name: item.name,
+      isActive: item.isActive,
+    };
+  }
+
+  private async assertLeadSourceExists(leadSourceId: number) {
+    const row = await this.prisma.client.leadSource.findUnique({
+      where: { id: leadSourceId },
+      select: { id: true },
+    });
+    if (!row) {
+      throw new NotFoundException('Lead source not found');
+    }
   }
 
   async createBank(name: string) {
@@ -684,6 +771,167 @@ export class LosDataService {
 
     await this.prisma.client.bank.delete({ where: { id } });
     return { ok: true as const };
+  }
+
+  async createLeadSource(input: { name: string; type: LeadSourceType }) {
+    try {
+      const row = await this.prisma.client.leadSource.create({
+        data: { name: input.name, type: input.type, isActive: true },
+      });
+      return this.mapLeadSource(row);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('A lead source with this name already exists.');
+      }
+      throw error;
+    }
+  }
+
+  async updateLeadSource(id: number, dto: UpdateLeadSourceMasterDto) {
+    const hasName = dto.name !== undefined;
+    const hasType = dto.type !== undefined;
+    const hasActive = dto.isActive !== undefined;
+    if (!hasName && !hasType && !hasActive) {
+      throw new BadRequestException('Provide name, type, and/or isActive to update.');
+    }
+
+    const existing = await this.prisma.client.leadSource.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('Lead source not found');
+    }
+
+    const data: { name?: string; type?: LeadSourceType; isActive?: boolean } = {};
+    if (hasName) {
+      const trimmed = dto.name!.trim();
+      if (!trimmed) {
+        throw new BadRequestException('Lead source name cannot be empty.');
+      }
+      data.name = trimmed;
+    }
+    if (hasType) {
+      data.type = dto.type;
+    }
+    if (hasActive) {
+      data.isActive = dto.isActive;
+    }
+
+    try {
+      const row = await this.prisma.client.leadSource.update({
+        where: { id },
+        data,
+      });
+      return this.mapLeadSource(row);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('A lead source with this name already exists.');
+      }
+      throw error;
+    }
+  }
+
+  async createUtmSource(input: { leadSourceId: number; name: string }) {
+    await this.assertLeadSourceExists(input.leadSourceId);
+    try {
+      const row = await this.prisma.client.utmSource.create({
+        data: { leadSourceId: input.leadSourceId, name: input.name, isActive: true },
+        include: { leadSource: { select: { name: true } } },
+      });
+      return this.mapUtmTag(row);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('This UTM source already exists for the selected lead source.');
+      }
+      throw error;
+    }
+  }
+
+  async updateUtmSource(id: number, dto: UpdateUtmSourceDto) {
+    return this.updateUtmTagRow('utmSource', id, dto, 'UTM source');
+  }
+
+  async createUtmMedium(input: { leadSourceId: number; name: string }) {
+    await this.assertLeadSourceExists(input.leadSourceId);
+    try {
+      const row = await this.prisma.client.utmMedium.create({
+        data: { leadSourceId: input.leadSourceId, name: input.name, isActive: true },
+        include: { leadSource: { select: { name: true } } },
+      });
+      return this.mapUtmTag(row);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('This UTM medium already exists for the selected lead source.');
+      }
+      throw error;
+    }
+  }
+
+  async updateUtmMedium(id: number, dto: UpdateUtmMediumDto) {
+    return this.updateUtmTagRow('utmMedium', id, dto, 'UTM medium');
+  }
+
+  async createUtmCampaign(input: { leadSourceId: number; name: string }) {
+    await this.assertLeadSourceExists(input.leadSourceId);
+    try {
+      const row = await this.prisma.client.utmCampaign.create({
+        data: { leadSourceId: input.leadSourceId, name: input.name, isActive: true },
+        include: { leadSource: { select: { name: true } } },
+      });
+      return this.mapUtmTag(row);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('This UTM campaign already exists for the selected lead source.');
+      }
+      throw error;
+    }
+  }
+
+  async updateUtmCampaign(id: number, dto: UpdateUtmCampaignDto) {
+    return this.updateUtmTagRow('utmCampaign', id, dto, 'UTM campaign');
+  }
+
+  private async updateUtmTagRow(
+    model: 'utmSource' | 'utmMedium' | 'utmCampaign',
+    id: number,
+    dto: { name?: string; isActive?: boolean },
+    label: string,
+  ) {
+    const hasName = dto.name !== undefined;
+    const hasActive = dto.isActive !== undefined;
+    if (!hasName && !hasActive) {
+      throw new BadRequestException('Provide name and/or isActive to update.');
+    }
+
+    const client = this.prisma.client as any;
+    const existing = await client[model].findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException(`${label} not found`);
+    }
+
+    const data: { name?: string; isActive?: boolean } = {};
+    if (hasName) {
+      const trimmed = dto.name!.trim();
+      if (!trimmed) {
+        throw new BadRequestException(`${label} name cannot be empty.`);
+      }
+      data.name = trimmed;
+    }
+    if (hasActive) {
+      data.isActive = dto.isActive;
+    }
+
+    try {
+      const row = await client[model].update({
+        where: { id },
+        data,
+        include: { leadSource: { select: { name: true } } },
+      });
+      return this.mapUtmTag(row);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException(`This ${label.toLowerCase()} already exists for the selected lead source.`);
+      }
+      throw error;
+    }
   }
 
   async getEligibilityCriteriaForLos() {
@@ -987,5 +1235,305 @@ export class LosDataService {
       },
       recentActivity,
     };
+  }
+
+  private mapAuditUser(
+    user: { id: bigint; fullName: string; email: string } | null | undefined,
+  ): LosAuditUser {
+    if (!user) return null;
+    return {
+      id: user.id.toString(),
+      fullName: user.fullName,
+      email: user.email,
+    };
+  }
+
+  private mapNegativePincode(row: {
+    id: number;
+    pincode: string;
+    reason: string | null;
+    isActive: boolean;
+    createdAt: Date;
+    removedAt: Date | null;
+    addedBy: { id: bigint; fullName: string; email: string } | null;
+    removedBy: { id: bigint; fullName: string; email: string } | null;
+  }) {
+    return {
+      id: row.id,
+      pincode: row.pincode,
+      reason: row.reason,
+      isActive: row.isActive,
+      addedAt: row.createdAt.toISOString(),
+      removedAt: row.removedAt?.toISOString() ?? null,
+      addedBy: this.mapAuditUser(row.addedBy),
+      removedBy: this.mapAuditUser(row.removedBy),
+    };
+  }
+
+  private mapNegativeCity(row: {
+    id: number;
+    cityId: number;
+    reason: string | null;
+    isActive: boolean;
+    createdAt: Date;
+    removedAt: Date | null;
+    city: { name: string; state: { name: string; code: string } };
+    addedBy: { id: bigint; fullName: string; email: string } | null;
+    removedBy: { id: bigint; fullName: string; email: string } | null;
+  }) {
+    return {
+      id: row.id,
+      cityId: row.cityId,
+      cityName: row.city.name,
+      stateName: row.city.state.name,
+      stateCode: row.city.state.code,
+      reason: row.reason,
+      isActive: row.isActive,
+      addedAt: row.createdAt.toISOString(),
+      removedAt: row.removedAt?.toISOString() ?? null,
+      addedBy: this.mapAuditUser(row.addedBy),
+      removedBy: this.mapAuditUser(row.removedBy),
+    };
+  }
+
+  private mapNegativeState(row: {
+    id: number;
+    stateId: number;
+    reason: string | null;
+    isActive: boolean;
+    createdAt: Date;
+    removedAt: Date | null;
+    state: { name: string; code: string };
+    addedBy: { id: bigint; fullName: string; email: string } | null;
+    removedBy: { id: bigint; fullName: string; email: string } | null;
+  }) {
+    return {
+      id: row.id,
+      stateId: row.stateId,
+      stateName: row.state.name,
+      stateCode: row.state.code,
+      reason: row.reason,
+      isActive: row.isActive,
+      addedAt: row.createdAt.toISOString(),
+      removedAt: row.removedAt?.toISOString() ?? null,
+      addedBy: this.mapAuditUser(row.addedBy),
+      removedBy: this.mapAuditUser(row.removedBy),
+    };
+  }
+
+  private parseLosUserId(userId: string): bigint {
+    try {
+      return BigInt(userId);
+    } catch {
+      throw new BadRequestException('Invalid LOS user session.');
+    }
+  }
+
+  async getNegativeListsForLos() {
+    const [pincodes, cities, states] = await Promise.all([
+      this.prisma.client.negativePincode.findMany({
+        include: negativePincodeInclude,
+        orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
+      }),
+      this.prisma.client.negativeCity.findMany({
+        include: negativeCityInclude,
+        orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
+      }),
+      this.prisma.client.negativeState.findMany({
+        include: negativeStateInclude,
+        orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
+      }),
+    ]);
+
+    return {
+      pincodes: pincodes.map((row) => this.mapNegativePincode(row)),
+      cities: cities.map((row) => this.mapNegativeCity(row)),
+      states: states.map((row) => this.mapNegativeState(row)),
+    };
+  }
+
+  async addNegativePincode(userId: string, dto: CreateNegativePincodeDto) {
+    const pincode = dto.pincode.trim();
+    const addedByUserId = this.parseLosUserId(userId);
+    const reason = dto.reason?.trim() || null;
+
+    const existing = await this.prisma.client.negativePincode.findUnique({
+      where: { pincode },
+      include: negativePincodeInclude,
+    });
+
+    if (existing) {
+      if (existing.isActive) {
+        throw new ConflictException('This pincode is already on the negative list.');
+      }
+
+      const row = await this.prisma.client.negativePincode.update({
+        where: { id: existing.id },
+        data: {
+          isActive: true,
+          reason,
+          addedByUserId,
+          removedByUserId: null,
+          removedAt: null,
+          createdAt: new Date(),
+        },
+        include: negativePincodeInclude,
+      });
+      return this.mapNegativePincode(row);
+    }
+
+    const row = await this.prisma.client.negativePincode.create({
+      data: { pincode, reason, isActive: true, addedByUserId },
+      include: negativePincodeInclude,
+    });
+    return this.mapNegativePincode(row);
+  }
+
+  async removeNegativePincode(userId: string, id: number) {
+    const removedByUserId = this.parseLosUserId(userId);
+    const existing = await this.prisma.client.negativePincode.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('Negative pincode entry not found.');
+    }
+    if (!existing.isActive) {
+      throw new BadRequestException('This pincode is already removed from the negative list.');
+    }
+
+    const row = await this.prisma.client.negativePincode.update({
+      where: { id },
+      data: {
+        isActive: false,
+        removedByUserId,
+        removedAt: new Date(),
+      },
+      include: negativePincodeInclude,
+    });
+    return this.mapNegativePincode(row);
+  }
+
+  async addNegativeCity(userId: string, dto: CreateNegativeCityDto) {
+    const addedByUserId = this.parseLosUserId(userId);
+    const reason = dto.reason?.trim() || null;
+
+    const city = await this.prisma.client.city.findUnique({ where: { id: dto.cityId } });
+    if (!city) {
+      throw new NotFoundException('City not found.');
+    }
+
+    const existing = await this.prisma.client.negativeCity.findUnique({
+      where: { cityId: dto.cityId },
+      include: negativeCityInclude,
+    });
+
+    if (existing) {
+      if (existing.isActive) {
+        throw new ConflictException('This city is already on the negative list.');
+      }
+
+      const row = await this.prisma.client.negativeCity.update({
+        where: { id: existing.id },
+        data: {
+          isActive: true,
+          reason,
+          addedByUserId,
+          removedByUserId: null,
+          removedAt: null,
+          createdAt: new Date(),
+        },
+        include: negativeCityInclude,
+      });
+      return this.mapNegativeCity(row);
+    }
+
+    const row = await this.prisma.client.negativeCity.create({
+      data: { cityId: dto.cityId, reason, isActive: true, addedByUserId },
+      include: negativeCityInclude,
+    });
+    return this.mapNegativeCity(row);
+  }
+
+  async removeNegativeCity(userId: string, id: number) {
+    const removedByUserId = this.parseLosUserId(userId);
+    const existing = await this.prisma.client.negativeCity.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('Negative city entry not found.');
+    }
+    if (!existing.isActive) {
+      throw new BadRequestException('This city is already removed from the negative list.');
+    }
+
+    const row = await this.prisma.client.negativeCity.update({
+      where: { id },
+      data: {
+        isActive: false,
+        removedByUserId,
+        removedAt: new Date(),
+      },
+      include: negativeCityInclude,
+    });
+    return this.mapNegativeCity(row);
+  }
+
+  async addNegativeState(userId: string, dto: CreateNegativeStateDto) {
+    const addedByUserId = this.parseLosUserId(userId);
+    const reason = dto.reason?.trim() || null;
+
+    const state = await this.prisma.client.state.findUnique({ where: { id: dto.stateId } });
+    if (!state) {
+      throw new NotFoundException('State not found.');
+    }
+
+    const existing = await this.prisma.client.negativeState.findUnique({
+      where: { stateId: dto.stateId },
+      include: negativeStateInclude,
+    });
+
+    if (existing) {
+      if (existing.isActive) {
+        throw new ConflictException('This state is already on the negative list.');
+      }
+
+      const row = await this.prisma.client.negativeState.update({
+        where: { id: existing.id },
+        data: {
+          isActive: true,
+          reason,
+          addedByUserId,
+          removedByUserId: null,
+          removedAt: null,
+          createdAt: new Date(),
+        },
+        include: negativeStateInclude,
+      });
+      return this.mapNegativeState(row);
+    }
+
+    const row = await this.prisma.client.negativeState.create({
+      data: { stateId: dto.stateId, reason, isActive: true, addedByUserId },
+      include: negativeStateInclude,
+    });
+    return this.mapNegativeState(row);
+  }
+
+  async removeNegativeState(userId: string, id: number) {
+    const removedByUserId = this.parseLosUserId(userId);
+    const existing = await this.prisma.client.negativeState.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('Negative state entry not found.');
+    }
+    if (!existing.isActive) {
+      throw new BadRequestException('This state is already removed from the negative list.');
+    }
+
+    const row = await this.prisma.client.negativeState.update({
+      where: { id },
+      data: {
+        isActive: false,
+        removedByUserId,
+        removedAt: new Date(),
+      },
+      include: negativeStateInclude,
+    });
+    return this.mapNegativeState(row);
   }
 }

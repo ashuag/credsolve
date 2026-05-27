@@ -4,9 +4,11 @@ import type { Request } from 'express';
 import { RateLimitByRoute } from '../../../common/rate-limit/rate-limit-route.decorator';
 import { RedisIpRateLimitGuard } from '../../../common/rate-limit/redis-ip-rate-limit.guard';
 import { SaveLeadDetailsDto } from '../application/dto/save-lead-details.dto';
+import { SaveLeadProfileDto } from '../application/dto/save-lead-profile.dto';
 import { SyncLeadEmailDto } from '../application/dto/sync-lead-email.dto';
 import { GetCustomerLeadStatusUseCase } from '../application/use-cases/get-customer-lead-status.use-case';
 import { SaveLeadDetailsUseCase } from '../application/use-cases/save-lead-details.use-case';
+import { SaveLeadProfileUseCase } from '../application/use-cases/save-lead-profile.use-case';
 import { SyncLeadEmailFromGoogleTokenUseCase } from '../application/use-cases/sync-lead-email-from-google-token.use-case';
 import { RequiredCustomerSessionGuard } from './guards/required-customer-session.guard';
 
@@ -17,6 +19,7 @@ export class CustomerLeadsController {
   constructor(
     private readonly syncLeadEmailFromGoogle: SyncLeadEmailFromGoogleTokenUseCase,
     private readonly saveLeadDetailsFlow: SaveLeadDetailsUseCase,
+    private readonly saveLeadProfileFlow: SaveLeadProfileUseCase,
     private readonly getCustomerLeadStatusFlow: GetCustomerLeadStatusUseCase
   ) {}
 
@@ -36,6 +39,15 @@ export class CustomerLeadsController {
   @ApiOkResponse({ description: 'Lead identifiers when an active lead exists' })
   leadStatusRoute(@Req() req: Request) {
     return this.getCustomerLeadStatusFlow.execute(req);
+  }
+
+  @Post('profile')
+  @RateLimitByRoute('save-lead-details')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Save basic profile before address step (name, PAN, occupation, consent)' })
+  @ApiOkResponse({ description: 'Profile saved' })
+  saveLeadProfileRoute(@Req() req: Request, @Body() body: SaveLeadProfileDto) {
+    return this.saveLeadProfileFlow.execute(req, body);
   }
 
   @Post('details')

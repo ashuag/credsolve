@@ -51,7 +51,7 @@ export class SaveLoanSelectionUseCase {
     }
 
     const loanSettings = await this.settings.loadLoanCalculationSettings();
-    const { preApprovedAmountInr } = await this.checkLoanEligibility.computeForSeed(lead.uuid);
+    const { preApprovedAmountInr } = await this.checkLoanEligibility.computeForLead(lead.id);
     const maxSelectable = Math.min(loanSettings.maxLoanAmount, preApprovedAmountInr);
     if (dto.loanAmount < loanSettings.minLoanAmount || dto.loanAmount > maxSelectable) {
       throw new BadRequestException(
@@ -133,6 +133,40 @@ export class SaveLoanSelectionUseCase {
           ...detailsCore,
           ...reasonPatch,
         },
+      });
+
+      // Loan selection is the upstream checkpoint for the rest of the journey.
+      // If the customer revisits and changes selection, force downstream steps
+      // (references, email, sanction-letter OTP, KYC/bank) to be completed again.
+      await tx.leadReference.deleteMany({
+        where: { leadId: lead.id },
+      });
+
+      await tx.application.update({
+        where: { id: application.id },
+        data: {
+          emailVerifiedAt: null,
+          emailVerificationType: null,
+          loanDocumentsAcceptedAt: null,
+          keyFactPdfRelativePath: null,
+          loanAgreementPdfRelativePath: null,
+          digilockerAadhaarFormJson: Prisma.JsonNull,
+          aadhaarPhotoRelativePath: null,
+          selfieRelativePath: null,
+          livenessVendorJson: Prisma.JsonNull,
+          livenessCheckedAt: null,
+          livenessPassed: false,
+          kycStatus: 0,
+          kycCompletedAt: null,
+        },
+      });
+
+      await tx.applicationAgreement.deleteMany({
+        where: { applicationId: application.id },
+      });
+
+      await tx.applicationDisbursement.deleteMany({
+        where: { applicationId: application.id },
       });
     });
 

@@ -40,6 +40,24 @@ export class BureauReportRepository {
     return client.bureauReport.create({ data });
   }
 
+  async findLatestRawPayloadForLead(leadId: bigint): Promise<unknown | null> {
+    const client = this.prisma.client as unknown as {
+      bureauReport: {
+        findFirst: (args: {
+          where: { leadId: bigint };
+          orderBy: { createdAt: 'desc' };
+          select: { rawPayload: true };
+        }) => Promise<{ rawPayload: unknown } | null>;
+      };
+    };
+    const row = await client.bureauReport.findFirst({
+      where: { leadId },
+      orderBy: { createdAt: 'desc' },
+      select: { rawPayload: true },
+    });
+    return row?.rawPayload ?? null;
+  }
+
   async findLatestBureauScoreForLead(leadId: bigint): Promise<number | null> {
     const client = this.prisma.client as unknown as {
       bureauReport: {

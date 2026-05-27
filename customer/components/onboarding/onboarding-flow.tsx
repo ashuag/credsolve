@@ -15,7 +15,7 @@ import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { LoanSummaryLeftRail } from '@/components/loan/loan-summary-left-rail';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 
-// Flow: mobile verified → profile (/onboarding) → pre-approved + loan selection → email (/email-verify) → KYC → bank / thank-you
+// Flow: mobile → profile → pre-BRE/PAN/CIBIL → pre-approved → loan selection → references → email → loan docs + OTP → KYC → bank
 type OnboardingStep = 'details' | 'email' | 'email-otp';
 
 export type OnboardingFlowVariant = 'full' | 'email-only';
@@ -77,6 +77,10 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
         router.replace('/pre-approved-loan');
         return;
       }
+      if (!session.journey.referencesCompleted) {
+        router.replace('/references');
+        return;
+      }
       if (!hasResolved) {
         const requestedMode = new URLSearchParams(window.location.search).get('mode');
         const initialMode: CustomerOnboardingMode = requestedMode === 'login' ? 'login' : 'register';
@@ -102,6 +106,9 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
 
       if (!detailsCompleted) {
         setStep('details');
+      } else if (loanSelectionCompleted && !session.journey.referencesCompleted) {
+        router.replace('/references');
+        return;
       } else if (loanSelectionCompleted && !emailVerified) {
         router.replace(requestedMode === 'login' ? CUSTOMER_EMAIL_VERIFY_PATH : '/email-verify');
         return;

@@ -7,7 +7,9 @@ type LookupValueResponse = {
   }>;
 };
 
-async function fetchLookupValues(endpoint: 'gender' | 'occupations' | 'cities'): Promise<LookupValueResponse['values']> {
+async function fetchLookupValues(
+  endpoint: 'gender' | 'occupations' | 'cities' | 'reference-relations',
+): Promise<LookupValueResponse['values']> {
   try {
     const data = await apiGet<LookupValueResponse>(
       `/lookup/${endpoint}`,
@@ -33,4 +35,8 @@ export async function fetchCustomerOccupationLookupValues() {
 
 export async function fetchCustomerCityLookupValues() {
   return fetchLookupValues('cities');
+}
+
+export async function fetchCustomerReferenceRelationLookupValues() {
+  return fetchLookupValues('reference-relations');
 }

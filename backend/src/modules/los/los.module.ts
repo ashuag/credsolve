@@ -6,11 +6,12 @@ import { LosSessionService } from './auth/los-session.service';
 import { LosDataController } from './los-data.controller';
 import { LosDataService } from './los-data.service';
 import { LosMastersController } from './los-masters.controller';
+import { LosNegativeListsController } from './los-negative-lists.controller';
 import { LosTeamController } from './los-team.controller';
 import { LosTeamService } from './los-team.service';
 
 @Module({
-  controllers: [LosAuthController, LosDataController, LosMastersController, LosTeamController],
+  controllers: [LosAuthController, LosDataController, LosMastersController, LosNegativeListsController, LosTeamController],
   providers: [LosAuthService, LosSessionService, LosAuthGuard, LosDataService, LosTeamService],
   exports: [LosSessionService],
 })

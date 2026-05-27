@@ -16,6 +16,7 @@ import {
   isKycLivenessCheckPaused,
   isKycLivenessOutboundSkipped,
 } from '../../../../common/kyc/kyc-liveness-env.util';
+import { assertActiveApplicationLoanDocumentsAccepted } from '../../../../common/loan-documents/application-loan-documents-guard.util';
 import { fetchLatestApplicationKycSnapshot } from '../../../../prisma/application-kyc-snapshot.query';
 import { PrismaService } from '../../../../prisma/prisma.service';
 
@@ -57,6 +58,10 @@ export class RunKycLivenessUseCase {
     if (!lead) {
       throw new BadRequestException('No active loan application was found for your account.');
     }
+    await assertActiveApplicationLoanDocumentsAccepted(this.prisma.client, {
+      leadId: lead.id,
+      customerId: customer.id,
+    });
 
     const application = await fetchLatestApplicationKycSnapshot(this.prisma.client, {
       leadId: lead.id,

@@ -10,6 +10,7 @@ import { REJECTION_REASON } from '../../../../common/constants/rejection-reason.
 import { isPanVerifiedFromDb } from '../../../../common/mappers/customer-portal-profile.mapper';
 import { GENDER_SLUG_TO_DB, OCCUPATION_SLUG_TO_DB } from '../../../../common/mappers/lead-detail-master-slugs';
 import { parseOptionalInrAmount } from '../../../../common/utils/parse-inr-amount';
+import { resolveLeadCityId } from '../../../../common/utils/resolve-lead-city-id.util';
 import { SmsService } from '../../../../common/sms/sms.service';
 import { parseTenacioBureauVendorBody } from '../../../../common/vendor/tenacio-bureau-payload.mapper';
 import { BureauFetchService } from '../../../../common/vendor/bureau-fetch.service';
@@ -22,6 +23,12 @@ import { SettingsRepository } from '../../infrastructure/repositories/settings.r
 import type { VerifyPanDto } from '../dto/verify-pan.dto';
 
 const INDIAN_MOBILE = /^[6-9]\d{9}$/;
+
+const BUREAU_THANK_YOU_MESSAGE =
+  'Thank you for your interest. Unfortunately, we are unable to proceed with your application at this time.';
+
+/** Outcome of an attempted Tenacio bureau soft-pull (customer journey). */
+type BureauSoftPullOutcome = 'skipped' | 'success' | 'failed' | 'post_bre_failed';
 
 /** `lead_detail` shape after upsert (BRE + response fields). */
 const leadDetailUpsertSelect = {
@@ -96,25 +103,31 @@ function toIsoDateOnly(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-export type VerifyPanResult = {
-  success: true;
-  panVerified: boolean;
-  panVerifiedStatus: number;
-  nameMatch: boolean;
-  dobMatch: boolean;
-  panStatus: string | null;
-  category: string | null;
-  leadDetail: {
-    uuid: string;
-    panNumber: string | null;
-    fullName: string | null;
-    dateOfBirth: string | null;
-    panVerified: boolean;
-    panVerifiedAt: string | null;
-    /** Mirrors `lead.lead_status_note` (PAN outcome or policy text). */
-    leadStatusNote: string | null;
-  };
-};
+export type VerifyPanResult =
+  | {
+      success: true;
+      rejected: true;
+      message: string;
+    }
+  | {
+      success: true;
+      panVerified: boolean;
+      panVerifiedStatus: number;
+      nameMatch: boolean;
+      dobMatch: boolean;
+      panStatus: string | null;
+      category: string | null;
+      leadDetail: {
+        uuid: string;
+        panNumber: string | null;
+        fullName: string | null;
+        dateOfBirth: string | null;
+        panVerified: boolean;
+        panVerifiedAt: string | null;
+        /** Mirrors `lead.lead_status_note` (PAN outcome or policy text). */
+        leadStatusNote: string | null;
+      };
+    };
 
 /**
  * Status written to `lead.pan_verified` (SmallInt):
@@ -165,7 +178,7 @@ export class VerifyPanUseCase {
       select: { panNumber: true, panVerified: true },
     })) as { panNumber: string | null; panVerified: number } | null;
 
-    const leadDetailPayload = await this.buildLeadInputRequest(dto);
+    const leadDetailPayload = await this.buildLeadInputRequest(leadRow.id, dto);
     const fullNameTrimmed = leadDetailPayload.fullName;
 
     const [[detailRaw, leadPanRaw], [panVerificationEnabled, breSettings]] = await Promise.all([
@@ -211,8 +224,8 @@ export class VerifyPanUseCase {
       return {
         success: true,
         rejected: true,
-        message: 'Thank you for your interest. Unfortunately, we are unable to proceed with your application at this time.',
-      } as any;
+        message: BUREAU_THANK_YOU_MESSAGE,
+      };
     }
 
     if (!panVerificationEnabled) {
@@ -276,9 +289,35 @@ export class VerifyPanUseCase {
         bureauSnap != null && Number(bureauSnap.bureauFetched) !== BUREAU_FETCHED.SUCCESS;
       if (needBureau) {
         this.logger.debug(
-          `Bureau soft-pull enqueued (leadId=${leadRow.id.toString()}) bureauFetched=${String(bureauSnap.bureauFetched)}`,
+          `Bureau soft-pull starting (leadId=${leadRow.id.toString()}) bureauFetched=${String(bureauSnap.bureauFetched)}`,
         );
-        this.enqueueBureauSoftPull(leadRow.id, customer.mobileNumber, panUpper, fullNameTrimmed);
+        const bureauOutcome = await this.runBureauSoftPull(
+          leadRow.id,
+          customer.mobileNumber,
+          panUpper,
+          fullNameTrimmed,
+        );
+        if (bureauOutcome === 'failed') {
+          await this.rejectLead(
+            leadRow.id,
+            'Bureau soft-pull failed: credit bureau returned a non-200 response.',
+            REJECTION_REASON.REJECTED_BY_CLIENTS,
+          );
+          this.fireThankYouSms(customer.mobileNumber);
+          return {
+            success: true,
+            rejected: true,
+            message: BUREAU_THANK_YOU_MESSAGE,
+          };
+        }
+        if (bureauOutcome === 'post_bre_failed') {
+          this.fireThankYouSms(customer.mobileNumber);
+          return {
+            success: true,
+            rejected: true,
+            message: BUREAU_THANK_YOU_MESSAGE,
+          };
+        }
       }
     }
 
@@ -286,12 +325,17 @@ export class VerifyPanUseCase {
   }
 
   private async buildLeadInputRequest(
+    leadId: bigint,
     dto: VerifyPanDto,
   ): Promise<{
     fullName: string;
     dateOfBirth: Date;
     genderId: number;
     occupationId: number;
+    cityId: number;
+    pincode: string;
+    addressLine1: string;
+    addressLine2: string | null;
     cibilConsentAt: Date | null;
     netMonthlyIncome?: Prisma.Decimal | null;
     annualTurnover?: Prisma.Decimal | null;
@@ -299,15 +343,66 @@ export class VerifyPanUseCase {
   }> {
     const { genderId, occupationId } = await this.resolveGenderOccupationIds(dto);
     const { netMonthlyIncome, annualTurnover, annualProfit } = this.buildIncomeFields(dto);
+
+    const hasAddressInRequest = Boolean(dto.addressLine1?.trim() && dto.pincode?.trim() && dto.currentCity?.trim());
+
+    if (hasAddressInRequest) {
+      const cityId = await resolveLeadCityId(this.prisma.client, {
+        currentCityId: dto.currentCityId ?? null,
+        currentCity: dto.currentCity!.trim(),
+      });
+      if (cityId == null) {
+        throw new BadRequestException(
+          'Could not resolve your city. Pick a city from the suggestions list and try again.',
+        );
+      }
+
+      return {
+        fullName: dto.fullName.trim(),
+        dateOfBirth: parseDobUtc(dto.dob),
+        genderId,
+        occupationId,
+        cityId,
+        pincode: dto.pincode!.trim(),
+        addressLine1: dto.addressLine1!.trim(),
+        addressLine2: dto.addressLine2?.trim() || null,
+        cibilConsentAt: dto.creditConsentAccepted ? new Date() : null,
+        netMonthlyIncome,
+        annualTurnover,
+        annualProfit,
+      };
+    }
+
+    const existing = await this.prisma.client.leadDetail.findUnique({
+      where: { leadId },
+      select: {
+        cityId: true,
+        pincode: true,
+        addressLine1: true,
+        addressLine2: true,
+        cibilConsentAt: true,
+      },
+    });
+
+    if (!existing?.pincode?.trim() || !existing.cityId || !existing.addressLine1?.trim()) {
+      throw new BadRequestException(
+        'Save your address details before we run eligibility and PAN verification.',
+      );
+    }
+
     return {
       fullName: dto.fullName.trim(),
       dateOfBirth: parseDobUtc(dto.dob),
       genderId,
       occupationId,
-      cibilConsentAt: dto.creditConsentAccepted ? new Date() : null,
+      cityId: existing.cityId,
+      pincode: existing.pincode.trim(),
+      addressLine1: existing.addressLine1.trim(),
+      addressLine2: existing.addressLine2?.trim() || null,
+      cibilConsentAt: dto.creditConsentAccepted ? new Date() : existing.cibilConsentAt,
       netMonthlyIncome,
       annualTurnover,
-      annualProfit
+      annualProfit,
     };
   }
 
@@ -317,23 +412,22 @@ export class VerifyPanUseCase {
     });
   }
 
-  private enqueueBureauSoftPull(leadId: bigint, customerMobile: string, panNumber: string, fullName: string): void {
-    void this.runBureauSoftPull(leadId, customerMobile, panNumber, fullName).catch((err) => {
-      const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Bureau soft-pull unexpected error (leadId=${leadId}): ${message}`);
-    });
-  }
-
   /**
    * Tenacio bureau soft-pull after PAN is verified, when `BUREAU_FETCH_ENABLED`
    * is on, the lead is not terminal-negative, and the customer has bureau
-   * consent on `lead_detail`. Runs asynchronously; failures are logged; outcome
-   * is written to `lead.bureau_fetched` / `bureau_fetched_at` / `bureau_fetched_note`.
+   * consent on `lead_detail`. Outcome is written to `lead.bureau_fetched` /
+   * `bureau_fetched_at` / `bureau_fetched_note`. Returns `failed` when the vendor
+   * HTTP status is not 200 (caller shows thank-you and rejects the lead).
    */
-  private async runBureauSoftPull(leadId: bigint, customerMobile: string, panNumber: string, fullName: string) {
+  private async runBureauSoftPull(
+    leadId: bigint,
+    customerMobile: string,
+    panNumber: string,
+    fullName: string,
+  ): Promise<BureauSoftPullOutcome> {
     if (!(await this.settings.isBureauFetchEnabled())) {
       this.logger.debug(`Bureau soft-pull skipped (leadId=${leadId}): BUREAU_FETCH_ENABLED is off.`);
-      return;
+      return 'skipped';
     }
 
     const row = (await this.leads.findUniqueLead({
@@ -343,33 +437,33 @@ export class VerifyPanUseCase {
 
     if (!row?.leadDetail) {
       this.logger.debug(`Bureau soft-pull skipped (leadId=${leadId}): no lead_detail.`);
-      return;
+      return 'skipped';
     }
     if (row.bureauFetched === BUREAU_FETCHED.SUCCESS) {
       this.logger.debug(`Bureau soft-pull skipped (leadId=${leadId}): bureau already fetched successfully.`);
-      return;
+      return 'skipped';
     }
 
     const statusName = row.leadStatus?.name;
     if (statusName === LEAD_STATUS.REJECTED || statusName === LEAD_STATUS.BLACKLISTED) {
       this.logger.debug(`Bureau soft-pull skipped (leadId=${leadId}): lead status ${statusName}.`);
-      return;
+      return 'skipped';
     }
     if (!row.leadDetail.cibilConsentAt) {
       this.logger.debug(`Bureau soft-pull skipped (leadId=${leadId}): no bureau consent on file.`);
-      return;
+      return 'skipped';
     }
 
     const nameForVendor = (row.leadDetail.fullName ?? fullName).trim();
     if (!nameForVendor || panNumber.length !== 10) {
       this.logger.warn(`Bureau soft-pull skipped (leadId=${leadId}): missing name or PAN.`);
-      return;
+      return 'skipped';
     }
 
     const mobile = customerMobile.trim();
     if (!INDIAN_MOBILE.test(mobile)) {
       this.logger.warn(`Bureau soft-pull skipped (leadId=${leadId}): invalid mobile format.`);
-      return;
+      return 'skipped';
     }
 
     const out = await this.bureauFetch.fetchBureauFromTenacio(
@@ -379,11 +473,11 @@ export class VerifyPanUseCase {
 
     if (!out.configured) {
       this.logger.debug(`Bureau soft-pull not configured (leadId=${leadId}): ${out.skipReason ?? ''}`);
-      return;
+      return 'skipped';
     }
 
     const now = new Date();
-    if (out.ok) {
+    if (out.httpStatus === 200) {
       await this.leads.updateLead({
         where: { id: leadId },
         data: {
@@ -408,17 +502,20 @@ export class VerifyPanUseCase {
         );
       }
       try {
-        await this.postBureauOffer.runAfterSuccessfulBureauFetch({
+        const offerResult = await this.postBureauOffer.runAfterSuccessfulBureauFetch({
           leadId,
           customerId: row.customerId,
           leadUuid: row.uuid,
         });
+        if (!offerResult.ok) {
+          return 'post_bre_failed';
+        }
       } catch (err) {
         this.logger.error(
           `Post-bureau offer persistence failed (leadId=${leadId.toString()}): ${err instanceof Error ? err.stack : String(err)}`,
         );
       }
-      return;
+      return 'success';
     }
 
     const note = `http=${out.httpStatus ?? 'n/a'} err=${out.error?.message ?? 'vendor'}`.slice(0, 500);
@@ -433,6 +530,7 @@ export class VerifyPanUseCase {
     this.logger.warn(
       `Bureau soft-pull HTTP/vendor issue (leadId=${leadId}): http=${out.httpStatus ?? 'n/a'} transport=${out.error?.message ?? 'none'}`,
     );
+    return 'failed';
   }
 
   private async resolveGenderOccupationIds(

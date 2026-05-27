@@ -64,6 +64,18 @@ export class LookupController {
     return { values };
   }
 
+  @Get('reference-relations')
+  @ApiOperation({ summary: 'Active reference relation options for customer forms' })
+  @ApiOkResponse({ description: 'Lookup rows' })
+  async referenceRelations() {
+    const values = await this.prisma.client.referenceRelation.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true },
+      orderBy: { id: 'asc' },
+    });
+    return { values };
+  }
+
   @Get('cities')
   @ApiOperation({
     summary:

@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Equals, IsBoolean, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { Equals, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, MaxLength, MinLength, Min } from 'class-validator';
 
 const GENDERS = ['male', 'female', 'others'] as const;
 const OCCUPATIONS = [
@@ -70,4 +71,45 @@ export class VerifyPanDto {
   @MaxLength(20)
   @Matches(/^\d*$/)
   annualProfit?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Optional when address was saved via POST /auth/lead-details immediately before this call.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(5)
+  @MaxLength(500)
+  addressLine1?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  addressLine2?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(200)
+  currentCity?: string;
+
+  @ApiPropertyOptional({ description: 'Preferred when the user picked a row from GET /lookup/cities.' })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === '' || value === undefined || value === null) return undefined;
+    const n = typeof value === 'number' ? value : Number.parseInt(String(value), 10);
+    return Number.isFinite(n) ? n : undefined;
+  })
+  @IsInt()
+  @Min(1)
+  currentCityId?: number;
+
+  @ApiPropertyOptional({ example: '400001' })
+  @IsOptional()
+  @IsString()
+  @Length(6, 6)
+  @Matches(/^\d{6}$/)
+  pincode?: string;
 }

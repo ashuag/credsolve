@@ -26,6 +26,11 @@ model Application {
   livenessVendorJson    Json?                     @map("liveness_vendor_json")
   livenessCheckedAt     DateTime?                 @map("liveness_checked_at")
   livenessPassed        Boolean                   @default(false) @map("liveness_passed")
+  /// Relative under `KYC_FILES_ROOT`: `customer/{uuid}/loan-documents/{app_uuid}/key-fact-statement.pdf`
+  keyFactPdfRelativePath     String?              @map("key_fact_pdf_relative_path") @db.VarChar(512)
+  /// `customer/{uuid}/loan-documents/{app_uuid}/loan-agreement.pdf`
+  loanAgreementPdfRelativePath String?            @map("loan_agreement_pdf_relative_path") @db.VarChar(512)
+  loanDocumentsAcceptedAt    DateTime?           @map("loan_documents_accepted_at")
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt             DateTime  @updatedAt      @map("updated_at")
 

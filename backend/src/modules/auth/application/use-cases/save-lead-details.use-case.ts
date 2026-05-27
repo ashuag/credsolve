@@ -8,6 +8,7 @@ import type { Request } from 'express';
 import { parseOptionalInrAmount } from '../../../../common/utils/parse-inr-amount';
 import { GENDER_SLUG_TO_DB, OCCUPATION_SLUG_TO_DB } from '../../../../common/mappers/lead-detail-master-slugs';
 import { PrismaService } from '../../../../prisma/prisma.service';
+import { resolveLeadCityId } from '../../../../common/utils/resolve-lead-city-id.util';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import type { SaveLeadDetailsDto } from '../dto/save-lead-details.dto';
@@ -68,21 +69,10 @@ export class SaveLeadDetailsUseCase {
       throw new BadRequestException('Gender or occupation is not available in the system.');
     }
 
-    let cityId: number | null = null;
-    if (dto.currentCityId != null) {
-      const byId = await this.prisma.client.city.findFirst({
-        where: { id: dto.currentCityId, isActive: true },
-        select: { id: true },
-      });
-      if (!byId) {
-        throw new BadRequestException(
-          'That city selection is no longer valid. Open the city list and pick your city again.',
-        );
-      }
-      cityId = byId.id;
-    } else {
-      cityId = await this.resolveCityId(dto.currentCity.trim());
-    }
+    const cityId = await resolveLeadCityId(this.prisma.client, {
+      currentCityId: dto.currentCityId ?? null,
+      currentCity: dto.currentCity,
+    });
     if (cityId == null) {
       throw new BadRequestException(
         'Could not resolve your city. Pick a city from the suggestions list and try again.',
@@ -141,58 +131,5 @@ export class SaveLeadDetailsUseCase {
     }
 
     return { success: true, leadUuid: leadRow.uuid };
-  }
-
-  private async resolveCityId(raw: string): Promise<number | null> {
-    const normalized = raw.replace(/\s+/g, ' ').trim();
-    const parts = normalized
-      .split(',')
-      .map((p) => p.trim())
-      .filter(Boolean);
-    if (parts.length >= 2) {
-      const cityName = parts[0]!;
-      const stateSegment = parts[parts.length - 1]!.trim();
-      const stateCode = stateSegment.length <= 3 ? stateSegment.toUpperCase() : null;
-
-      if (stateCode) {
-        const row = await this.prisma.client.city.findFirst({
-          where: {
-            name: cityName,
-            isActive: true,
-            state: { code: stateCode },
-          },
-          select: { id: true },
-        });
-        if (row) {
-          return row.id;
-        }
-      }
-
-      const state = await this.prisma.client.state.findFirst({
-        where: {
-          isActive: true,
-          OR: [
-            ...(stateCode ? [{ code: stateCode }] : []),
-            { name: stateSegment },
-          ],
-        },
-        select: { id: true },
-      });
-      if (state) {
-        const row = await this.prisma.client.city.findFirst({
-          where: { name: cityName, isActive: true, stateId: state.id },
-          select: { id: true },
-        });
-        if (row) {
-          return row.id;
-        }
-      }
-    }
-
-    const single = await this.prisma.client.city.findFirst({
-      where: { name: normalized, isActive: true },
-      select: { id: true },
-    });
-    return single?.id ?? null;
   }
 }

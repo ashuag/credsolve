@@ -29,6 +29,7 @@ const DEFAULTS: Record<RateLimitRouteId, { max: number; windowSec: number }> = {
   logout: { max: 60, windowSec: 3600 },
   'sync-lead-email': { max: 30, windowSec: 3600 },
   'save-lead-details': { max: 40, windowSec: 3600 },
+  'save-lead-references': { max: 40, windowSec: 3600 },
   'professional-details': { max: 30, windowSec: 3600 },
   'loan-selection': { max: 30, windowSec: 3600 },
   'kyc-documents': { max: 20, windowSec: 3600 },
@@ -37,6 +38,8 @@ const DEFAULTS: Record<RateLimitRouteId, { max: number; windowSec: number }> = {
   'bank-submit-verified': { max: 15, windowSec: 3600 },
   'kyc-selfie': { max: 30, windowSec: 3600 },
   'kyc-liveness': { max: 25, windowSec: 3600 },
+  'loan-documents': { max: 60, windowSec: 3600 },
+  'loan-documents-otp': { max: 20, windowSec: 3600 },
 };
 
 @Injectable()

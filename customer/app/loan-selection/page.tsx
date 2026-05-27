@@ -2,11 +2,10 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { ApiRequestError } from '@/lib/api/client';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
-import { CUSTOMER_EMAIL_VERIFY_PATH } from '@/lib/api/customer-session';
 import {
   fetchLoanCalculationSettings,
   fetchLoanEligibility,
@@ -46,6 +45,18 @@ function formatInr(amount: number): string {
     currency: 'INR',
     maximumFractionDigits: 0,
   }).format(amount);
+}
+
+const LOAN_AMOUNT_STEP = 500;
+
+function snapLoanAmount(value: number, min: number, max: number, step = LOAN_AMOUNT_STEP): number {
+  const snapped = Math.round(value / step) * step;
+  return Math.min(max, Math.max(min, snapped));
+}
+
+/** Default slider position: midpoint of min/max, aligned to step. */
+function defaultLoanAmount(min: number, max: number): number {
+  return snapLoanAmount((min + max) / 2, min, max);
 }
 
 export default function LoanSelectionPage() {
@@ -100,10 +111,19 @@ export default function LoanSelectionPage() {
 
   const [loanPurpose, setLoanPurpose] = useState('');
   const [selectedAmount, setSelectedAmount] = useState(DEFAULT_LOAN_SETTINGS.minLoanAmount);
+  const hasInitializedAmount = useRef(false);
 
   useEffect(() => {
-    setSelectedAmount((prev) => Math.min(sliderMax, Math.max(sliderMin, prev)));
-  }, [sliderMax, sliderMin]);
+    if (loadingSettings) return;
+
+    if (!hasInitializedAmount.current) {
+      setSelectedAmount(defaultLoanAmount(sliderMin, sliderMax));
+      hasInitializedAmount.current = true;
+      return;
+    }
+
+    setSelectedAmount((prev) => snapLoanAmount(prev, sliderMin, sliderMax));
+  }, [sliderMax, sliderMin, loadingSettings]);
 
   const tenureDays = useMemo(() => {
     return diffDays(today, fixedRepaymentDate);
@@ -138,7 +158,7 @@ export default function LoanSelectionPage() {
         loanPurpose: loanPurpose || undefined,
       });
       await refresh();
-      router.push(CUSTOMER_EMAIL_VERIFY_PATH);
+      router.push('/references');
     } catch (e) {
       setSettingsError(e instanceof Error ? e.message : 'Unable to save loan selection.');
       setIsSaving(false);
@@ -214,7 +234,7 @@ export default function LoanSelectionPage() {
               type="range"
               min={sliderMin}
               max={sliderMax}
-              step={500}
+              step={LOAN_AMOUNT_STEP}
               value={selectedAmount}
               onChange={(e) => setSelectedAmount(Number(e.target.value))}
               className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand-blue"

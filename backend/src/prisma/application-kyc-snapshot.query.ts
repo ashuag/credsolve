@@ -18,6 +18,7 @@ export type ApplicationKycSnapshotRow = {
   aadhaarPhotoRelativePath: string | null;
   selfieRelativePath: string | null;
   livenessPassed: boolean;
+  loanDocumentsAcceptedAt: Date | null;
 };
 
 export async function fetchLatestApplicationKycSnapshot(
@@ -37,7 +38,8 @@ export async function fetchLatestApplicationKycSnapshot(
             a.digilocker_aadhaar_form_json AS digilockerAadhaarFormJson,
             a.aadhaar_photo_relative_path AS aadhaarPhotoRelativePath,
             a.selfie_relative_path AS selfieRelativePath,
-            a.liveness_passed AS livenessPassed
+            a.liveness_passed AS livenessPassed,
+            a.loan_documents_accepted_at AS loanDocumentsAcceptedAt
           FROM application a
           WHERE a.lead_id = ${leadId} AND a.customer_id = ${customerId}
           ORDER BY a.created_at DESC
@@ -52,7 +54,8 @@ export async function fetchLatestApplicationKycSnapshot(
             a.digilocker_aadhaar_form_json AS digilockerAadhaarFormJson,
             a.aadhaar_photo_relative_path AS aadhaarPhotoRelativePath,
             a.selfie_relative_path AS selfieRelativePath,
-            a.liveness_passed AS livenessPassed
+            a.liveness_passed AS livenessPassed,
+            a.loan_documents_accepted_at AS loanDocumentsAcceptedAt
           FROM application a
           WHERE a.lead_id = ${leadId}
           ORDER BY a.created_at DESC

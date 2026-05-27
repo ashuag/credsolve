@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException, UnauthorizedExcepti
 import type { Request } from 'express';
 import type { UploadedFileLike } from '../../../../common/types/uploaded-file';
 import { assertApplicationKycNotCompleted } from '../../../../common/kyc/application-kyc-guard.util';
+import { assertActiveApplicationLoanDocumentsAccepted } from '../../../../common/loan-documents/application-loan-documents-guard.util';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 
@@ -62,6 +63,10 @@ export class SaveKycDocumentsUseCase {
     if (!leadForKyc) {
       throw new NotFoundException('No active lead found.');
     }
+    await assertActiveApplicationLoanDocumentsAccepted(this.prisma.client, {
+      leadId: leadForKyc.id,
+      customerId: customer.id,
+    });
     const applicationForKyc = await this.prisma.client.application.findFirst({
       where: { leadId: leadForKyc.id, customerId: customer.id },
       orderBy: { createdAt: 'desc' },

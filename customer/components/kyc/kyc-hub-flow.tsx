@@ -8,6 +8,7 @@ import { useCustomerSession } from '@/components/providers/customer-session-prov
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 import { initDigilockerSession, persistDigilockerSessionTokenForCallback } from '@/lib/api/digilocker';
 import { getKycHubBackPath } from '@/lib/api/customer-session';
+import { isLoanDocumentsJourneyComplete } from '@/lib/loan-documents-journey';
 import { AlertBanner } from '@/components/ui/alert-banner';
 
 function findRedirectUrl(vendor: unknown, depth = 0): string | null {
@@ -38,6 +39,12 @@ export function KycHubFlow() {
   useEffect(() => {
     journey?.setCompletion01(0.42);
   }, [journey]);
+
+  useEffect(() => {
+    if (session?.authenticated === true && session.lead && !isLoanDocumentsJourneyComplete(session)) {
+      router.replace('/loan-documents');
+    }
+  }, [router, session]);
 
   const loanSelection =
     session?.authenticated === true ? (session.loanSelection ?? null) : null;
