@@ -2,11 +2,19 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { OTP_TYPE } from '../../../../common/constants/otp.constants';
+import {
+  LOAN_DOCUMENT_PDF_FILES,
+  LOAN_DOCUMENT_TYPE,
+} from '../../../../common/constants/loan-document.constants';
+import { EmailService } from '../../../../common/email/email.service';
+import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
 import { isLeadEmailVerifiedForPortal } from '../../../../common/mappers/customer-portal-profile.mapper';
+import { maskEmail } from '../../infrastructure/utils/email.util';
 import { safeEqualOtp } from '../../infrastructure/crypto/otp-compare.util';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
@@ -27,11 +35,15 @@ function readClientIp(req: Request): string | undefined {
 
 @Injectable()
 export class AcceptLoanDocumentsUseCase {
+  private readonly logger = new Logger(AcceptLoanDocumentsUseCase.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
     private readonly loanDocs: LoanDocumentApplicationService,
+    private readonly kycFiles: KycFilesService,
+    private readonly emailService: EmailService,
     private readonly otpTypes: OtpTypeRepository,
     private readonly otpRequests: OtpRequestRepository,
     private readonly settingsRepository: SettingsRepository,
@@ -122,6 +134,62 @@ export class AcceptLoanDocumentsUseCase {
       return updated.loanDocumentsAcceptedAt!;
     });
 
+    await this.sendAcceptedDocumentsEmail(ctx, customer.uuid);
+
     return { success: true, acceptedAt: acceptedAt.toISOString() };
+  }
+
+  private async sendAcceptedDocumentsEmail(
+    ctx: Awaited<ReturnType<LoanDocumentApplicationService['loadApplicationContext']>>,
+    customerUuid: string,
+  ): Promise<void> {
+    const email = ctx.application.email?.trim();
+    if (!email) {
+      this.logger.warn(`Loan documents accepted for application ${ctx.application.uuid} but no email is stored.`);
+      return;
+    }
+
+    if (!this.emailService.isConfigured()) {
+      this.logger.warn(
+        `[loan-docs] SMTP not configured; skipping email with PDF attachments to ${maskEmail(email)}.`,
+      );
+      return;
+    }
+
+    const merge = this.loanDocs.buildMergeInput({
+      customer: ctx.customer,
+      lead: ctx.lead,
+      application: ctx.application,
+    });
+
+    const docTypes = [LOAN_DOCUMENT_TYPE.KEY_FACT, LOAN_DOCUMENT_TYPE.LOAN_AGREEMENT] as const;
+    const attachments = [];
+
+    try {
+      for (const docType of docTypes) {
+        const existing = this.loanDocs.relativePathForType(docType, ctx.application);
+        const relativePath = await this.loanDocs.ensurePdf(
+          docType,
+          customerUuid,
+          ctx.application.uuid,
+          ctx.application.id,
+          merge,
+          existing,
+        );
+        const content = await this.kycFiles.readBytes(relativePath);
+        attachments.push({
+          filename: LOAN_DOCUMENT_PDF_FILES[docType],
+          content,
+        });
+      }
+
+      await this.emailService.sendLoanDocumentsEmail(email, attachments);
+      this.logger.log(`Loan document PDFs emailed to ${maskEmail(email)} for application ${ctx.application.uuid}.`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to email loan documents to ${maskEmail(email)} for application ${ctx.application.uuid}`,
+        error instanceof Error ? error.stack : error,
+      );
+    }
   }
 }

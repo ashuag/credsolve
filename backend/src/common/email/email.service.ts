@@ -3,11 +3,18 @@ import { ConfigService } from '@nestjs/config';
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 
+export type EmailAttachment = {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+};
+
 export type SendEmailOptions = {
   to: string;
   subject: string;
   text: string;
   html?: string;
+  attachments?: EmailAttachment[];
 };
 
 /**
@@ -92,6 +99,15 @@ export class EmailService {
       subject: options.subject,
       text: options.text,
       html: options.html ?? options.text,
+      ...(options.attachments?.length
+        ? {
+            attachments: options.attachments.map((attachment) => ({
+              filename: attachment.filename,
+              content: attachment.content,
+              contentType: attachment.contentType ?? 'application/pdf',
+            })),
+          }
+        : {}),
     });
   }
 
@@ -114,6 +130,31 @@ export class EmailService {
     `.trim();
 
     await this.sendEmail({ to, subject, text, html });
+  }
+
+  /**
+   * Sends accepted loan documents (Key Fact Statement + Loan Agreement) after OTP acceptance.
+   */
+  async sendLoanDocumentsEmail(to: string, attachments: EmailAttachment[]): Promise<void> {
+    const subject = 'Your MoneyCash loan documents';
+    const text = [
+      'Thank you for accepting your loan documents.',
+      '',
+      'Attached are your Sanction letter cum Key Fact Statement and Loan Agreement for your records.',
+      '',
+      'You can continue your application in the MoneyCash portal to complete KYC and bank verification.',
+      '',
+      'If you did not accept these documents, please contact support.',
+    ].join('\n');
+
+    const html = `
+      <p>Thank you for accepting your loan documents.</p>
+      <p>Attached are your <strong>Sanction letter cum Key Fact Statement</strong> and <strong>Loan Agreement</strong> for your records.</p>
+      <p style="color:#555;font-size:0.9em;">You can continue your application in the MoneyCash portal to complete KYC and bank verification.</p>
+      <p style="color:#555;font-size:0.85em;">If you did not accept these documents, please contact support.</p>
+    `.trim();
+
+    await this.sendEmail({ to, subject, text, html, attachments });
   }
 }
 

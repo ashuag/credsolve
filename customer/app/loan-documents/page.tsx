@@ -135,6 +135,7 @@ export default function LoanDocumentsPage() {
           <h1 className="text-2xl font-black text-brand-navy">Confirm with OTP</h1>
           <p className="text-slate-500 text-sm">
             Enter the code sent to your registered mobile number to accept the Key Fact Statement and Loan Agreement.
+            We will email both documents to your registered email address after verification.
           </p>
           {otpStatus ? <p className="text-sm text-emerald-700 font-medium">{otpStatus}</p> : null}
           {otpError ? <AlertBanner variant="error">{otpError}</AlertBanner> : null}
@@ -179,7 +180,7 @@ export default function LoanDocumentsPage() {
           <h1 className="text-2xl font-black text-brand-navy mb-2">Sanction letter &amp; agreement</h1>
           <p className="text-sm text-slate-500 mb-6">
             Read the sanction letter (Key Fact Statement) and loan agreement. After both are accepted, we will send an
-            OTP to your mobile to confirm.
+            OTP to your mobile to confirm. Once verified, both documents will be emailed to your registered email address.
           </p>
           {error ? <AlertBanner variant="error">{error}</AlertBanner> : null}
           <LoanDocumentScrollPanel
