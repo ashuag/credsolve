@@ -85,7 +85,7 @@ function DigilockerCallbackContent() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (searchParams.toString()) {
+    if (searchParams?.toString()) {
       const cleanPath = pathname ?? '/kyc/digilocker-callback';
       window.history.replaceState(null, '', cleanPath);
       void router.replace(cleanPath, { scroll: false });
