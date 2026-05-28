@@ -1,11 +1,16 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
 import { computeMaxOpenUnsecuredExposureInr } from '../../../../common/cibil/cibil-tradeline.parser';
 import { CreditLimitTierResolverService } from '../../../../common/cibil/credit-limit-tier-resolver.service';
+import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
+import { isCibilNewToCreditScore } from '../../../../common/vendor/tenacio-bureau-payload.mapper';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { BureauReportRepository } from '../../infrastructure/repositories/bureau-report.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
+
+const LOAN_OFFER_UNAVAILABLE_MESSAGE =
+  'We are unable to offer a loan based on your current credit profile.';
 
 export type LoanEligibilityResult = {
   /** Pre-approved offer ceiling in whole INR (from bureau tier or seed fallback). */
@@ -39,6 +44,8 @@ export class CheckLoanEligibilityUseCase {
    * → `credit_limit_tier.max_bullet_loan`, clamped to product min/max loan settings.
    */
   async computeForLead(leadId: bigint): Promise<LoanEligibilityResult> {
+    await this.assertLeadEligibleForOffer(leadId);
+
     const bounds = await this.loadLoanBounds();
     const rawPayload = await this.bureauReports.findLatestRawPayloadForLead(leadId);
     if (rawPayload != null) {
@@ -95,6 +102,43 @@ export class CheckLoanEligibilityUseCase {
   private clampToBounds(amountInr: number, bounds: { minInr: number; maxInr: number }): number {
     const n = Math.floor(amountInr);
     return Math.min(bounds.maxInr, Math.max(bounds.minInr, n));
+  }
+
+  /** Blocks pre-approved amounts for rejected leads, failed post-BRE, and new-to-credit bureau scores. */
+  private async assertLeadEligibleForOffer(leadId: bigint): Promise<void> {
+    const row = (await this.leads.findUniqueLead({
+      where: { id: leadId },
+      select: {
+        leadStatus: { select: { name: true } },
+        applications: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { eligibility: { select: { isEligible: true } } },
+        },
+      },
+    })) as {
+      leadStatus: { name: string } | null;
+      applications: Array<{ eligibility: { isEligible: boolean } | null }>;
+    } | null;
+
+    if (!row) {
+      throw new ForbiddenException(LOAN_OFFER_UNAVAILABLE_MESSAGE);
+    }
+
+    const statusName = row.leadStatus?.name;
+    if (statusName === LEAD_STATUS.REJECTED || statusName === LEAD_STATUS.BLACKLISTED) {
+      throw new ForbiddenException(LOAN_OFFER_UNAVAILABLE_MESSAGE);
+    }
+
+    const eligibility = row.applications[0]?.eligibility;
+    if (eligibility?.isEligible === false) {
+      throw new ForbiddenException(LOAN_OFFER_UNAVAILABLE_MESSAGE);
+    }
+
+    const cibilScore = await this.bureauReports.findLatestBureauScoreForLead(leadId);
+    if (isCibilNewToCreditScore(cibilScore)) {
+      throw new ForbiddenException(LOAN_OFFER_UNAVAILABLE_MESSAGE);
+    }
   }
 
   /** Deterministic demo fallback when bureau/tier data is unavailable (e.g. before bureau pull). */

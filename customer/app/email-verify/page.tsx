@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { JourneyProgressProvider } from '@/components/journey/journey-progress-context';
 import { OnboardingFlow } from '@/components/onboarding/onboarding-flow';
 
@@ -9,8 +10,10 @@ export const metadata: Metadata = {
 
 export default function EmailVerifyPage() {
   return (
-    <JourneyProgressProvider>
-      <OnboardingFlow variant="email-only" />
-    </JourneyProgressProvider>
+    <CustomerJourneyGuard>
+      <JourneyProgressProvider>
+        <OnboardingFlow variant="email-only" />
+      </JourneyProgressProvider>
+    </CustomerJourneyGuard>
   );
 }

@@ -322,6 +322,20 @@ export class VerifyPanUseCase {
             message: BUREAU_THANK_YOU_MESSAGE,
           };
         }
+      } else if (bureauSnap != null && Number(bureauSnap.bureauFetched) === BUREAU_FETCHED.SUCCESS) {
+        const postBreRejected = await this.applyPostBureauOffer({
+          leadId: leadRow.id,
+          customerId: customer.id,
+          leadUuid: leadRow.uuid,
+        });
+        if (postBreRejected) {
+          this.fireThankYouSms(customer.mobileNumber);
+          return {
+            success: true,
+            rejected: true,
+            message: BUREAU_THANK_YOU_MESSAGE,
+          };
+        }
       }
     }
 
@@ -592,6 +606,23 @@ export class VerifyPanUseCase {
     const vendor = verification.note ? ` vendor=${verification.note.replace(/\s+/g, ' ').trim().slice(0, 80)}` : '';
     const main = `PAN not verified: panStatus=${verification.panStatus ?? 'n/a'} nameMatch=${verification.nameMatch} dobMatch=${verification.dobMatch}${vendor}`;
     return `${main} | occ=${occ} | gender=${gen}`.slice(0, 256);
+  }
+
+  /** Returns `true` when post-BRE rejects the lead (e.g. new-to-credit). */
+  private async applyPostBureauOffer(params: {
+    leadId: bigint;
+    customerId: bigint;
+    leadUuid: string;
+  }): Promise<boolean> {
+    try {
+      const offerResult = await this.postBureauOffer.runAfterSuccessfulBureauFetch(params);
+      return !offerResult.ok;
+    } catch (err) {
+      this.logger.error(
+        `Post-bureau offer persistence failed (leadId=${params.leadId.toString()}): ${err instanceof Error ? err.stack : String(err)}`,
+      );
+      return false;
+    }
   }
 
   private async rejectLead(leadId: bigint, note: string, rejectionReasonCode?: string | null) {

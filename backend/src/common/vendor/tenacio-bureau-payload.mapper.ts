@@ -19,6 +19,11 @@ function parseScoreFromRiskScore(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** CIBIL reports -1 or 0 when the borrower has no usable credit history (NTC). */
+export function isCibilNewToCreditScore(score: number | null): boolean {
+  return score === -1 || score === 0;
+}
+
 /** Walk `GetCustomerAssetsSuccess.Asset` (object or first element of array). */
 function readAssetTrueLink(asset: unknown): Record<string, unknown> | null {
   const a = asRecord(asset);

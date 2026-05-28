@@ -86,6 +86,10 @@ export default function LoanSelectionPage() {
           router.replace('/apply-for-loan');
           return;
         }
+        if (e instanceof ApiRequestError && e.statusCode === 403) {
+          router.replace('/thank-you-interest');
+          return;
+        }
         setSettingsError(e instanceof Error ? e.message : 'Unable to load loan settings.');
       } finally {
         if (!cancelled) setLoadingSettings(false);

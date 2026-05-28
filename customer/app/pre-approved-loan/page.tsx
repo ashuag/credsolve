@@ -4,9 +4,11 @@ import Link from 'next/link';
 import {useRouter} from 'next/navigation';
 import {useEffect, useState} from 'react';
 import {CustomerJourneyGuard} from '@/components/auth/customer-journey-guard';
+import {useCustomerSession} from '@/components/providers/customer-session-provider';
 import {Spinner} from '@/components/ui/spinner';
 import {fetchLoanEligibility} from '@/lib/api/eligibility';
 import {ApiRequestError} from '@/lib/api/client';
+import {isLeadRejectedAndLocked} from '@/lib/api/customer-session';
 import {LoanLandingShell} from '@/components/home/loan-landing-shell';
 
 const SUMMARY_ITEMS = [
@@ -158,10 +160,28 @@ function ErrorState({ error }: { error: string }) {
 
 export default function PreApprovedLoanPage() {
   const router = useRouter();
+  const { loading: sessionLoading, session } = useCustomerSession();
   const [amountInr, setAmountInr] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (sessionLoading) return;
+
+    if (!session?.authenticated || !session.lead) {
+      router.replace('/apply-for-loan');
+      return;
+    }
+
+    if (isLeadRejectedAndLocked(session.lead)) {
+      router.replace('/thank-you-interest');
+      return;
+    }
+  }, [sessionLoading, session, router]);
+
+  useEffect(() => {
+    if (sessionLoading || !session?.authenticated || !session.lead) return;
+    if (isLeadRejectedAndLocked(session.lead)) return;
+
     let cancelled = false;
 
     (async () => {
@@ -180,6 +200,11 @@ export default function PreApprovedLoanPage() {
           return;
         }
 
+        if (e instanceof ApiRequestError && e.statusCode === 403) {
+          router.replace('/thank-you-interest');
+          return;
+        }
+
         setError(e instanceof Error ? e.message : 'Something went wrong.');
       }
     })();
@@ -187,7 +212,7 @@ export default function PreApprovedLoanPage() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [sessionLoading, session, router]);
 
   let content;
 

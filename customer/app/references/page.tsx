@@ -8,7 +8,6 @@ import { FlowLoader } from '@/components/ui/flow-loader';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { fetchCustomerReferenceRelationLookupValues } from '@/lib/api/lookup';
-import { CUSTOMER_EMAIL_VERIFY_PATH } from '@/lib/api/customer-session';
 import { saveLeadReferences } from '@/lib/api/lead';
 import { cn } from '@/lib/cn';
 import {
@@ -139,8 +138,10 @@ export default function ReferencesPage() {
           },
         ],
       });
-      if (refresh) await refresh();
-      router.push(CUSTOMER_EMAIL_VERIFY_PATH);
+      if (refresh) {
+        await refresh();
+      }
+      router.push('/email-verify');
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : 'Unable to save references. Please try again.');
     } finally {
@@ -155,7 +156,7 @@ export default function ReferencesPage() {
           Personal <span className="text-brand-blue">References</span>
         </h2>
         <p className="m-0 text-[0.88rem] text-slate-600 leading-relaxed">
-          Add two people we can contact. This step comes before email verification.
+          Add two people we can contact. Next you will verify your email, then review and accept the loan agreement.
         </p>
       </div>
 
@@ -249,7 +250,7 @@ export default function ReferencesPage() {
             Almost <span className="text-[#60a5fa]">there</span>
           </>
         }
-        leftDescription="Two references help us complete verification before email and your sanction letter."
+        leftDescription="Two references, then email verification, then your sanction letter and loan agreement."
         mobileStepLabel="References"
         mobileOnBack={() => router.push('/loan-selection')}
       />

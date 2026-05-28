@@ -16,7 +16,7 @@ import {
   type LoanDocumentItem,
   type SendLoanDocumentsOtpResponse,
 } from '@/lib/api/loan-documents';
-import { CUSTOMER_EMAIL_VERIFY_PATH, getCustomerJourneyResumePath } from '@/lib/api/customer-session';
+import { CUSTOMER_EMAIL_JOURNEY_PATH, getCustomerJourneyResumePath } from '@/lib/api/customer-session';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { useCountdown } from '@/lib/hooks/use-countdown';
 import { useOtpInput } from '@/lib/hooks/use-otp-input';
@@ -247,7 +247,7 @@ export default function LoanDocumentsPage() {
         leftDescription="Review your sanction letter and loan agreement before identity verification (KYC)."
         leftInfographic={<LoanSummaryLeftRail loanSelection={loanSelection} />}
         mobileStepLabel="Sanction letter"
-        mobileOnBack={() => router.push(CUSTOMER_EMAIL_VERIFY_PATH)}
+        mobileOnBack={() => router.push(CUSTOMER_EMAIL_JOURNEY_PATH)}
       />
     </CustomerJourneyGuard>
   );

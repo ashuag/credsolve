@@ -11,8 +11,11 @@ import {
   isPanVerifiedFromDb,
 } from '../../../../common/mappers/customer-portal-profile.mapper';
 import { PAN_VERIFIED } from '../../../../common/constants/pan-verification.constants';
+import { isCibilNewToCreditScore } from '../../../../common/vendor/tenacio-bureau-payload.mapper';
 import type { CustomerSessionResult } from '../contracts/customer-session-result.contract';
+import { PostBureauOfferService } from '../services/post-bureau-offer.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
+import { BureauReportRepository } from '../../infrastructure/repositories/bureau-report.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
 import { isKycLivenessOutboundSkipped } from '../../../../common/kyc/kyc-liveness-env.util';
@@ -26,6 +29,8 @@ export class GetCustomerSessionUseCase {
     private readonly leads: LeadRepository,
     private readonly prisma: PrismaService,
     private readonly settings: SettingsRepository,
+    private readonly bureauReports: BureauReportRepository,
+    private readonly postBureauOffer: PostBureauOfferService,
   ) {}
 
   async execute(req: Request): Promise<CustomerSessionResult> {
@@ -65,7 +70,12 @@ export class GetCustomerSessionUseCase {
       return noLeadResult;
     }
 
-    const statusName = leadRow.leadStatus.name;
+    leadRow = await this.syncOfferEligibilityForLead(leadRow, customer.id);
+    if (!leadRow) {
+      return noLeadResult;
+    }
+
+    let statusName = leadRow.leadStatus.name;
 
     // CONVERTED after a completed disbursement → deactivate so a new journey can start.
     // Mid-journey CONVERTED (post-BRE / professional handoff) keeps the active lead + application.
@@ -258,5 +268,35 @@ export class GetCustomerSessionUseCase {
       loanSelection,
       kycFaceProgress,
     };
+  }
+
+  /**
+   * When bureau score is new-to-credit (0 / -1) but post-BRE rejection was missed,
+   * apply it now so the portal session and journey routing stay consistent.
+   */
+  private async syncOfferEligibilityForLead(
+    leadRow: NonNullable<Awaited<ReturnType<LeadRepository['findActiveByCustomerId']>>>,
+    customerId: bigint,
+  ) {
+    const statusName = leadRow.leadStatus.name;
+    if (statusName === LEAD_STATUS.REJECTED || statusName === LEAD_STATUS.BLACKLISTED) {
+      return leadRow;
+    }
+
+    const cibilScore = await this.bureauReports.findLatestBureauScoreForLead(leadRow.id);
+    if (!isCibilNewToCreditScore(cibilScore)) {
+      return leadRow;
+    }
+
+    const offerResult = await this.postBureauOffer.runAfterSuccessfulBureauFetch({
+      leadId: leadRow.id,
+      customerId,
+      leadUuid: leadRow.uuid,
+    });
+    if (offerResult.ok) {
+      return leadRow;
+    }
+
+    return this.leads.findActiveByCustomerId(customerId);
   }
 }

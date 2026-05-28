@@ -22,7 +22,10 @@ import {
   type PostBreEnquiryInspectionRow,
   type PostBreTradelineInspectionRow,
 } from '../cibil/cibil-bureau-rules.parser';
-import { parseTenacioBureauVendorBody } from '../vendor/tenacio-bureau-payload.mapper';
+import {
+  isCibilNewToCreditScore,
+  parseTenacioBureauVendorBody,
+} from '../vendor/tenacio-bureau-payload.mapper';
 import { PrismaService } from '../../prisma/prisma.service';
 import { loadLoanAmountBounds } from './bre-settings.loader';
 import {
@@ -222,19 +225,19 @@ export class PostBreCheckService {
             ],
     });
 
-    if (cibilScore === -1) {
+    if (isCibilNewToCreditScore(cibilScore)) {
       push({
         id: 'new_to_credit',
         label: 'New to credit (NTC)',
         passed: false,
         rejectionReasonCode: REJECTION_REASON.NEW_TO_CREDIT,
-        detail: 'Bureau score is -1 (new to credit).',
+        detail: `Bureau score is ${cibilScore} (new to credit).`,
         meta: { cibilScore },
         findings: [
           {
             title: 'NTC score',
-            detail: 'CIBIL reports -1 when the borrower has no usable credit history.',
-            data: { cibilScore: -1 },
+            detail: 'CIBIL reports -1 or 0 when the borrower has no usable credit history.',
+            data: { cibilScore },
           },
         ],
       });
@@ -244,12 +247,12 @@ export class PostBreCheckService {
         label: 'New to credit (NTC)',
         passed: true,
         rejectionReasonCode: null,
-        detail: 'Score is not -1.',
+        detail: 'Score is not 0 or -1.',
         meta: { cibilScore },
       });
     }
 
-    if (cibilScore !== null && cibilScore !== -1) {
+    if (cibilScore !== null && !isCibilNewToCreditScore(cibilScore)) {
       const minScore = input.isExistingCustomer ? thresholds.cibilMinExisting : thresholds.cibilMinNew;
       const customerLabel = input.isExistingCustomer ? 'existing' : 'new';
       const scorePassed = cibilScore >= minScore;
@@ -459,10 +462,10 @@ export class PostBreCheckService {
       return { passed: true, rejectReason: null, rejectionReasonCode: null, cibilScore: null };
     }
 
-    if (cibilScore === -1) {
+    if (isCibilNewToCreditScore(cibilScore)) {
       return {
         passed: false,
-        rejectReason: 'New to credit: bureau score is -1 (NTC).',
+        rejectReason: `New to credit: bureau score is ${cibilScore} (NTC).`,
         rejectionReasonCode: REJECTION_REASON.NEW_TO_CREDIT,
         cibilScore,
       };

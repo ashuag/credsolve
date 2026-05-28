@@ -3,7 +3,8 @@
 import { ReactNode, useEffect, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
-import { CUSTOMER_EMAIL_VERIFY_PATH } from '@/lib/api/customer-session';
+import { isLeadRejectedAndLocked } from '@/lib/api/customer-session';
+import { CUSTOMER_EMAIL_JOURNEY_PATH, CUSTOMER_EMAIL_VERIFY_PATH } from '@/lib/api/customer-session';
 import { isLoanDocumentsJourneyComplete } from '@/lib/loan-documents-journey';
 
 type JourneyStage =
@@ -38,7 +39,7 @@ function defaultPathForStage(stage: JourneyStage): string {
     case 'preApproved':
       return '/pre-approved-loan';
     case 'email':
-      return CUSTOMER_EMAIL_VERIFY_PATH;
+      return CUSTOMER_EMAIL_JOURNEY_PATH;
     case 'loanDocuments':
       return '/loan-documents';
     case 'references':
@@ -56,6 +57,7 @@ function isPathAllowedForStage(stage: JourneyStage, path: string): boolean {
     path === '/login' ||
     path === '/' ||
     path === '/thank-you' ||
+    path === '/thank-you-interest' ||
     path === '/dashboard'
   ) {
     return true;
@@ -109,6 +111,13 @@ export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
     if (!session.lead) {
       if (pathname !== '/thank-you') {
         router.replace('/apply-for-loan');
+      }
+      return;
+    }
+
+    if (isLeadRejectedAndLocked(session.lead)) {
+      if (pathname !== '/thank-you-interest') {
+        router.replace('/thank-you-interest');
       }
       return;
     }

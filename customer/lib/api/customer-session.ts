@@ -77,8 +77,30 @@ export type CustomerSessionResponse =
     }
   | { authenticated: false };
 
-/** Profile + loan done; customer should verify email (OTP). Replaces `/onboarding?mode=login` for this stage only. */
+/** Email entry + OTP during the loan journey (after references). */
+export const CUSTOMER_EMAIL_JOURNEY_PATH = '/email-verify';
+
+/** Returning-user login via email (`?mode=login`). */
 export const CUSTOMER_EMAIL_VERIFY_PATH = '/email-verify?mode=login';
+
+/**
+ * Next route after successful email OTP in an active loan application.
+ * Order: references → email → email OTP → loan agreement → KYC → bank.
+ */
+export function getPostEmailVerificationPath(
+  session: CustomerSessionResponse | null | undefined,
+): string {
+  if (!session?.authenticated || !session.lead) {
+    return '/apply-for-loan';
+  }
+  if (!session.lead.emailVerified) {
+    return CUSTOMER_EMAIL_JOURNEY_PATH;
+  }
+  if (!isLoanDocumentsJourneyComplete(session)) {
+    return '/loan-documents';
+  }
+  return getCustomerJourneyResumePath(session);
+}
 
 /** Same rule as the header: verified mobile session with an active cookie. */
 export function isCustomerPortalSignedIn(
@@ -129,7 +151,7 @@ export function getCustomerJourneyResumePath(
   if (!journey.detailsCompleted) return '/onboarding?mode=login';
   if (!journey.loanSelectionCompleted) return '/pre-approved-loan';
   if (!journey.referencesCompleted) return '/references';
-  if (!session.lead.emailVerified) return CUSTOMER_EMAIL_VERIFY_PATH;
+  if (!session.lead.emailVerified) return CUSTOMER_EMAIL_JOURNEY_PATH;
   if (!isLoanDocumentsJourneyComplete(session)) return '/loan-documents';
 
   const kyc = session.kycFaceProgress;
@@ -200,15 +222,25 @@ export function getKycHubBackPath(session: Extract<CustomerSessionResponse, { au
   if (!j.detailsCompleted) return '/apply-for-loan';
   if (!j.loanSelectionCompleted) return '/pre-approved-loan';
   if (!j.referencesCompleted) return '/references';
-  if (!emailVerified) return CUSTOMER_EMAIL_VERIFY_PATH;
+  if (!emailVerified) return CUSTOMER_EMAIL_JOURNEY_PATH;
   if (!isLoanDocumentsJourneyComplete(session)) return '/loan-documents';
-  return CUSTOMER_EMAIL_VERIFY_PATH;
+  return CUSTOMER_EMAIL_JOURNEY_PATH;
 }
 
 /** Coalesce concurrent `/auth/me` calls (e.g. React Strict Mode double mount). */
 let sessionRequest: Promise<CustomerSessionResponse> | null = null;
 
-export async function fetchCustomerSession(): Promise<CustomerSessionResponse> {
+export type FetchCustomerSessionOptions = {
+  /** When true, always hits `/auth/me` (e.g. after saving references before email verify). */
+  force?: boolean;
+};
+
+export async function fetchCustomerSession(
+  options?: FetchCustomerSessionOptions,
+): Promise<CustomerSessionResponse> {
+  if (options?.force) {
+    sessionRequest = null;
+  }
   if (!sessionRequest) {
     sessionRequest = (async (): Promise<CustomerSessionResponse> => {
       const data = await apiGet<CustomerSessionResponse>('/auth/me', 'Unable to load session.');

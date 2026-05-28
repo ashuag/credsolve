@@ -32,7 +32,7 @@ export function CustomerSessionProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async (): Promise<CustomerSessionResponse> => {
     setLoading(true);
     try {
-      const next = await fetchCustomerSession();
+      const next = await fetchCustomerSession({ force: true });
       setSession(next);
       return next;
     } catch {

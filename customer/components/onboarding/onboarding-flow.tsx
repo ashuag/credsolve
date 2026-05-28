@@ -6,7 +6,13 @@ import { FlowLoader } from '@/components/ui/flow-loader';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { SendEmailOtpResponse } from '@/lib/api/auth';
 import type { CustomerOnboardingMode } from '@/lib/customer-flow';
-import { getCustomerJourneyResumePath, isLeadRejectedAndLocked, CUSTOMER_EMAIL_VERIFY_PATH } from '@/lib/api/customer-session';
+import {
+  getCustomerJourneyResumePath,
+  getPostEmailVerificationPath,
+  isLeadRejectedAndLocked,
+  CUSTOMER_EMAIL_JOURNEY_PATH,
+  CUSTOMER_EMAIL_VERIFY_PATH,
+} from '@/lib/api/customer-session';
 import { formatIsoDateDdMmYyyy } from '@/lib/format-date';
 import { EmailEntryStep, type EmailMode } from './email-entry-step';
 import { EmailOtpStep } from './email-otp-step';
@@ -43,6 +49,8 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
   const [emailOtpRequest, setEmailOtpRequest] = useState<SendEmailOtpResponse | null>(null);
   const [detailsSection, setDetailsSection] = useState<PersonalDetailsSection>('profile');
   const [detailsNotice, setDetailsNotice] = useState<string | null>(null);
+  /** One forced session reload when `/email-verify` still sees references incomplete (stale `/auth/me`). */
+  const [referencesRecheckDone, setReferencesRecheckDone] = useState(false);
 
   useEffect(() => {
     if (loading || !session) return;
@@ -78,6 +86,11 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
         return;
       }
       if (!session.journey.referencesCompleted) {
+        if (!referencesRecheckDone) {
+          setReferencesRecheckDone(true);
+          void refresh();
+          return;
+        }
         router.replace('/references');
         return;
       }
@@ -86,7 +99,9 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
         const initialMode: CustomerOnboardingMode = requestedMode === 'login' ? 'login' : 'register';
         setEmailMode(initialMode);
         setEmail(storedEmail);
-        setStep(storedEmail ? 'email-otp' : 'email');
+        // Always show email entry first in email-only flow:
+        // references -> email screen -> email OTP -> sanction letter.
+        setStep('email');
         setHasResolved(true);
       }
       return;
@@ -110,14 +125,16 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
         router.replace('/references');
         return;
       } else if (loanSelectionCompleted && !emailVerified) {
-        router.replace(requestedMode === 'login' ? CUSTOMER_EMAIL_VERIFY_PATH : '/email-verify');
+        router.replace(
+          requestedMode === 'login' ? CUSTOMER_EMAIL_VERIFY_PATH : CUSTOMER_EMAIL_JOURNEY_PATH,
+        );
         return;
       } else {
         setStep('details');
       }
       setHasResolved(true);
     }
-  }, [loading, session, router, hasResolved, variant]);
+  }, [loading, session, router, hasResolved, variant, referencesRecheckDone, refresh]);
 
   useEffect(() => {
     if (!journeyProgress) return;
@@ -141,7 +158,7 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
 
   async function handleOtpVerified() {
     const next = await refresh();
-    router.replace(getCustomerJourneyResumePath(next));
+    router.replace(getPostEmailVerificationPath(next));
   }
 
   const leftStats = useMemo(() => {
@@ -221,10 +238,10 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
       return;
     }
     if (step === 'email') {
-      if (portalSession.journey.loanSelectionCompleted) {
+      if (variant === 'email-only') {
+        router.push('/references');
+      } else if (portalSession.journey.loanSelectionCompleted) {
         router.push('/loan-selection');
-      } else if (variant === 'email-only') {
-        router.push('/pre-approved-loan');
       } else {
         setStep('details');
       }
