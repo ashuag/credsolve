@@ -69,6 +69,7 @@ export class SpacesObjectStorageService {
   }
 
   publicObjectUrl(relativePath: string): string | null {
+    if (!spacesUsesPublicRead()) return null;
     const base = this.publicBaseUrl();
     if (!base) return null;
     const rel = normalizeObjectKey(relativePath);
