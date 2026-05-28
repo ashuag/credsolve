@@ -12,6 +12,7 @@ import { OCCUPATION } from '../../../../common/constants/occupation.constants';
 import { parseOptionalInrAmount } from '../../../../common/utils/parse-inr-amount';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
+import { BureauReportRepository } from '../../infrastructure/repositories/bureau-report.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { CheckLoanEligibilityUseCase } from './check-loan-eligibility.use-case';
 import type { SaveProfessionalDetailsDto } from '../dto/save-professional-details.dto';
@@ -24,11 +25,6 @@ const OCC_SLUG_TO_DB: Record<string, string> = {
   homemaker: OCCUPATION.HOMEMAKER,
   retired: OCCUPATION.RETIRED,
 };
-
-/** Demo bureau-style score when no live bureau pull is used. */
-function randomDemoBureauScore(): number {
-  return 650 + Math.floor(Math.random() * 151);
-}
 
 export type SubmitProfessionalApplicationResult = {
   success: true;
@@ -44,6 +40,7 @@ export class SubmitProfessionalApplicationUseCase {
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
     private readonly prisma: PrismaService,
+    private readonly bureauReports: BureauReportRepository,
     private readonly checkLoanEligibility: CheckLoanEligibilityUseCase
   ) {}
 
@@ -97,7 +94,7 @@ export class SubmitProfessionalApplicationUseCase {
     }
 
     const { preApprovedAmountInr, minLoanAmountInr } = await this.checkLoanEligibility.computeForLead(leadRow.id);
-    const cibilScore = randomDemoBureauScore();
+    const cibilScore = await this.bureauReports.findLatestBureauScoreForLead(leadRow.id);
     const eligible = preApprovedAmountInr >= minLoanAmountInr;
 
     const [convertedStatus, appStatuses] = await Promise.all([

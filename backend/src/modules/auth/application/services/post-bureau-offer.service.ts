@@ -29,7 +29,7 @@ export class PostBureauOfferService {
 
   /**
    * After bureau data is available: run post-BRE, then persist a draft application
-   * with deterministic pre-approved ceiling (same seed as `/loans/eligibility`).
+   * with pre-approved ceiling from bureau credit-limit tier (same as `/loans/eligibility`).
    */
   async runAfterSuccessfulBureauFetch(params: {
     leadId: bigint;

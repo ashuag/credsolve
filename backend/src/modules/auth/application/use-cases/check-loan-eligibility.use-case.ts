@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
 import { computeMaxOpenUnsecuredExposureInr } from '../../../../common/cibil/cibil-tradeline.parser';
 import { CreditLimitTierResolverService } from '../../../../common/cibil/credit-limit-tier-resolver.service';
@@ -13,21 +13,12 @@ const LOAN_OFFER_UNAVAILABLE_MESSAGE =
   'We are unable to offer a loan based on your current credit profile.';
 
 export type LoanEligibilityResult = {
-  /** Pre-approved offer ceiling in whole INR (from bureau tier or seed fallback). */
+  /** Pre-approved offer ceiling in whole INR (from bureau tier). */
   preApprovedAmountInr: number;
   /** Bounds from `MIN_LOAN_AMOUNT` / `MAX_LOAN_AMOUNT` settings (same as `GET /loans/settings`). */
   minLoanAmountInr: number;
   maxLoanAmountInr: number;
 };
-
-function hashStringToUint32(s: string): number {
-  let h = 2_166_136_261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16_777_619);
-  }
-  return h >>> 0;
-}
 
 @Injectable()
 export class CheckLoanEligibilityUseCase {
@@ -48,24 +39,21 @@ export class CheckLoanEligibilityUseCase {
 
     const bounds = await this.loadLoanBounds();
     const rawPayload = await this.bureauReports.findLatestRawPayloadForLead(leadId);
-    if (rawPayload != null) {
-      const maxExposure = computeMaxOpenUnsecuredExposureInr(rawPayload);
-      const tier = await this.creditLimitTiers.resolveMaxBulletLoan(maxExposure);
-      if (tier) {
-        return {
-          preApprovedAmountInr: this.clampToBounds(tier.maxBulletLoan, bounds),
-          minLoanAmountInr: bounds.minInr,
-          maxLoanAmountInr: bounds.maxInr,
-        };
-      }
+    if (rawPayload == null) {
+      throw new ForbiddenException(LOAN_OFFER_UNAVAILABLE_MESSAGE);
     }
-    return this.computeFromSeedFallback(leadId.toString(), bounds);
-  }
 
-  /** @deprecated Prefer {@link computeForLead} when a lead id is known. */
-  async computeForSeed(seed: string): Promise<LoanEligibilityResult> {
-    const bounds = await this.loadLoanBounds();
-    return this.computeFromSeedFallback(seed, bounds);
+    const maxExposure = computeMaxOpenUnsecuredExposureInr(rawPayload);
+    const tier = await this.creditLimitTiers.resolveMaxBulletLoan(maxExposure);
+    if (!tier) {
+      throw new ForbiddenException(LOAN_OFFER_UNAVAILABLE_MESSAGE);
+    }
+
+    return {
+      preApprovedAmountInr: this.clampToBounds(tier.maxBulletLoan, bounds),
+      minLoanAmountInr: bounds.minInr,
+      maxLoanAmountInr: bounds.maxInr,
+    };
   }
 
   /**
@@ -83,13 +71,11 @@ export class CheckLoanEligibilityUseCase {
     }
 
     const lead = await this.leads.findActiveSummaryForCustomer(customer.id);
-    if (lead) {
-      return this.computeForLead(lead.id);
+    if (!lead) {
+      throw new NotFoundException('No active lead found.');
     }
 
-    const seed = `customer:${customer.id.toString()}`;
-    const bounds = await this.loadLoanBounds();
-    return this.computeFromSeedFallback(seed, bounds);
+    return this.computeForLead(lead.id);
   }
 
   private async loadLoanBounds(): Promise<{ minInr: number; maxInr: number }> {
@@ -139,19 +125,5 @@ export class CheckLoanEligibilityUseCase {
     if (isCibilNewToCreditScore(cibilScore)) {
       throw new ForbiddenException(LOAN_OFFER_UNAVAILABLE_MESSAGE);
     }
-  }
-
-  /** Deterministic demo fallback when bureau/tier data is unavailable (e.g. before bureau pull). */
-  private computeFromSeedFallback(
-    seed: string,
-    bounds: { minInr: number; maxInr: number },
-  ): LoanEligibilityResult {
-    const span = bounds.maxInr - bounds.minInr + 1;
-    const raw = bounds.minInr + (hashStringToUint32(seed || 'default') % span);
-    return {
-      preApprovedAmountInr: this.clampToBounds(raw, bounds),
-      minLoanAmountInr: bounds.minInr,
-      maxLoanAmountInr: bounds.maxInr,
-    };
   }
 }

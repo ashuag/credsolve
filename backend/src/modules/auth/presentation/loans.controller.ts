@@ -19,7 +19,7 @@ export class LoansController {
   @Get('eligibility')
   @ApiOperation({
     summary:
-      'Pre-approved eligibility ceiling in INR (demo: deterministic amount from active lead seed, clamped to MIN_LOAN_AMOUNT / MAX_LOAN_AMOUNT settings)',
+      'Pre-approved eligibility ceiling in INR from bureau credit-limit tier, clamped to MIN_LOAN_AMOUNT / MAX_LOAN_AMOUNT settings',
   })
   @ApiOkResponse({
     description: 'Pre-approved ceiling and the min/max bounds used for clamping',
