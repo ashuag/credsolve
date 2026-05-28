@@ -23,6 +23,7 @@ import { UpdateUtmMediumDto } from './dto/update-utm-medium.dto';
 import { UpdateUtmSourceDto } from './dto/update-utm-source.dto';
 import { UpdateBankMasterDto } from './dto/update-bank-master.dto';
 import { UpdateEligibilityCriterionDto } from './dto/update-eligibility-criterion.dto';
+import { UpdateCreditLimitTierDto } from './dto/update-credit-limit-tier.dto';
 import { LosDataService } from './los-data.service';
 
 @ApiTags('LOS Masters')
@@ -41,6 +42,18 @@ export class LosMastersController {
   @ApiOperation({ summary: 'Update eligibility criterion value and/or active flag' })
   eligibilityCriteriaPatch(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateEligibilityCriterionDto) {
     return this.losData.updateEligibilityCriterion(id, body);
+  }
+
+  @Get('credit-limit-tiers')
+  @ApiOperation({ summary: 'List credit limit tiers for LOS' })
+  creditLimitTiersList() {
+    return this.losData.getCreditLimitTiersForLos();
+  }
+
+  @Patch('credit-limit-tiers/:id')
+  @ApiOperation({ summary: 'Update credit limit tier band and/or active flag' })
+  creditLimitTierPatch(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateCreditLimitTierDto) {
+    return this.losData.updateCreditLimitTier(id, body);
   }
 
   @Post('banks')

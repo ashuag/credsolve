@@ -95,6 +95,7 @@ const navGroups: { section: string; color: string; items: NavItem[] }[] = [
     section: 'BRE',
     color: '#1496f3',
     items: [
+      { href: '/eligibility-criteria/credit-limit-eligibility-check', label: 'Credit Limit Tier', icon: 'eligibility' },
       { href: '/eligibility-criteria/negative-pincode', label: 'Negative Pincode', icon: 'eligibility' },
       { href: '/eligibility-criteria/negative-city', label: 'Negative City', icon: 'eligibility' },
       { href: '/eligibility-criteria/negative-state', label: 'Negative State', icon: 'eligibility' },
@@ -160,6 +161,7 @@ const BREADCRUMBS: Record<string, string> = {
   '/developer-tools/cibil-report-download': 'Bureau Report Generate',
   '/developer-tools/post-bre-rules': 'Post BRE Rules',
   ...Object.fromEntries(ELIGIBILITY_SECTION_DEFINITIONS.map((item) => [item.href, item.label])),
+  '/eligibility-criteria/credit-limit-eligibility-check': 'Credit Limit Tier',
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

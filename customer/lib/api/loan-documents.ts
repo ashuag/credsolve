@@ -36,7 +36,15 @@ export async function fetchLoanDocuments(): Promise<LoanDocumentsResponse> {
 }
 
 export function loanDocumentPdfAbsoluteUrl(pdfUrlFragment: string): string {
-  return `${getApiUrl()}${pdfUrlFragment}`;
+  const fragment = pdfUrlFragment.trim();
+  if (!fragment) return '';
+
+  // In browser, keep PDF fetch same-origin through Next `/api` rewrite so session cookies are sent reliably.
+  if (typeof window !== 'undefined' && fragment.startsWith('/')) {
+    return `/api${fragment}`;
+  }
+
+  return `${getApiUrl()}${fragment}`;
 }
 
 export async function sendLoanDocumentsOtp(): Promise<SendLoanDocumentsOtpResponse> {

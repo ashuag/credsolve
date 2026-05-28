@@ -34,6 +34,32 @@ function formatDateOnly(iso: string | null | undefined) {
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+function ageFromDateOfBirth(iso: string | null | undefined) {
+  if (!iso) return '—';
+  const dob = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(dob.getTime())) return '—';
+
+  const now = new Date();
+  if (now < dob) return '—';
+
+  let years = now.getFullYear() - dob.getFullYear();
+  let months = now.getMonth() - dob.getMonth();
+  let days = now.getDate() - dob.getDate();
+
+  if (days < 0) {
+    months -= 1;
+    const prevMonthDays = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+    days += prevMonthDays;
+  }
+
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+
+  return `${years} yrs, ${months} months, ${days} days`;
+}
+
 function formatInr(value: string | null | undefined): string {
   if (value == null || value === '') return '—';
   const n = Number(value);
@@ -420,6 +446,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
             rows={[
               { label: 'Full name as per PAN card', value: profile.fullName ?? '—' },
               { label: 'Date of birth', value: formatDateOnly(profile.dateOfBirth ?? undefined) },
+              { label: 'Age', value: ageFromDateOfBirth(profile.dateOfBirth ?? undefined) },
               { label: 'PAN', value: profile.panNumber ?? '—' },
               { label: 'Gender', value: profile.gender ?? '—' },
               { label: 'Occupation', value: profile.occupation ?? '—' },

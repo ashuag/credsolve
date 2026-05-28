@@ -1,9 +1,11 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import type { Response } from 'express';
 import { LeadSourceType, Prisma } from '@prisma/client';
 import { APPLICATION_STATUS } from '../../common/constants/application.constants';
 import { LEAD_STATUS } from '../../common/constants/lead.constants';
 import { PAN_VERIFIED } from '../../common/constants/pan-verification.constants';
 import { BureauReportPdfService } from '../../common/cibil/bureau-report-pdf.service';
+import { KycFilesService } from '../../common/kyc/kyc-files.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CreateNegativeCityDto } from './dto/create-negative-city.dto';
 import type { CreateNegativePincodeDto } from './dto/create-negative-pincode.dto';
@@ -14,6 +16,7 @@ import type { UpdateUtmMediumDto } from './dto/update-utm-medium.dto';
 import type { UpdateUtmSourceDto } from './dto/update-utm-source.dto';
 import type { UpdateBankMasterDto } from './dto/update-bank-master.dto';
 import type { UpdateEligibilityCriterionDto } from './dto/update-eligibility-criterion.dto';
+import type { UpdateCreditLimitTierDto } from './dto/update-credit-limit-tier.dto';
 
 type LosAuditUser = { id: string; fullName: string; email: string } | null;
 
@@ -227,6 +230,7 @@ export class LosDataService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly bureauReportPdf: BureauReportPdfService,
+    private readonly kycFiles: KycFilesService,
   ) {}
 
   async listLeads() {
@@ -543,6 +547,14 @@ export class LosDataService {
       kycCompletedAt: application.kycCompletedAt?.toISOString() ?? null,
       livenessPassed: application.livenessPassed,
       livenessCheckedAt: application.livenessCheckedAt?.toISOString() ?? null,
+      kycPhotos: {
+        selfieUrl: application.selfieRelativePath?.trim()
+          ? `/applications/${application.uuid}/kyc/selfie-photo`
+          : null,
+        aadhaarPhotoUrl: application.aadhaarPhotoRelativePath?.trim()
+          ? `/applications/${application.uuid}/kyc/aadhaar-photo`
+          : null,
+      },
       preApprovedLoanAmount: application.preApprovedLoanAmount?.toString() ?? null,
       createdAt: application.createdAt.toISOString(),
       updatedAt: application.updatedAt.toISOString(),
@@ -623,6 +635,45 @@ export class LosDataService {
           }
         : null,
     };
+  }
+
+  async serveApplicationSelfiePhoto(applicationUuid: string, res: Response): Promise<void> {
+    const application = await this.prisma.client.application.findUnique({
+      where: { uuid: applicationUuid },
+      select: { selfieRelativePath: true },
+    });
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+    const rel = application.selfieRelativePath?.trim();
+    if (!rel) {
+      throw new NotFoundException('Selfie is not saved yet.');
+    }
+    await this.streamKycPhoto(rel, res);
+  }
+
+  async serveApplicationAadhaarPhoto(applicationUuid: string, res: Response): Promise<void> {
+    const application = await this.prisma.client.application.findUnique({
+      where: { uuid: applicationUuid },
+      select: { aadhaarPhotoRelativePath: true },
+    });
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+    const rel = application.aadhaarPhotoRelativePath?.trim();
+    if (!rel) {
+      throw new NotFoundException('Aadhaar photo is not available yet.');
+    }
+    await this.streamKycPhoto(rel, res);
+  }
+
+  private async streamKycPhoto(relativePath: string, res: Response): Promise<void> {
+    const buf = await this.kycFiles.readBytes(relativePath);
+    const lower = relativePath.toLowerCase();
+    const mime = lower.endsWith('.png') ? 'image/png' : 'image/jpeg';
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.send(buf);
   }
 
   async getApplicationCibilReport(applicationUuid: string) {
@@ -1089,6 +1140,71 @@ export class LosDataService {
       label: row.label,
       value: row.value,
       description: row.description,
+      isActive: row.isActive,
+    };
+  }
+
+  async getCreditLimitTiersForLos() {
+    const rows = await this.prisma.client.creditLimitTier.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+    });
+
+    const creditLimitTiers = rows.map((row) => ({
+      id: row.id,
+      minUnsecuredLoan: row.minUnsecuredLoan,
+      maxUnsecuredLoan: row.maxUnsecuredLoan,
+      maxBulletLoan: row.maxBulletLoan,
+      sortOrder: row.sortOrder,
+      isActive: row.isActive,
+    }));
+
+    return { creditLimitTiers };
+  }
+
+  async updateCreditLimitTier(id: number, dto: UpdateCreditLimitTierDto) {
+    const hasMin = dto.minUnsecuredLoan !== undefined;
+    const hasMax = dto.maxUnsecuredLoan !== undefined;
+    const hasBullet = dto.maxBulletLoan !== undefined;
+    const hasSort = dto.sortOrder !== undefined;
+    const hasActive = dto.isActive !== undefined;
+
+    if (!hasMin && !hasMax && !hasBullet && !hasSort && !hasActive) {
+      throw new BadRequestException(
+        'Provide minUnsecuredLoan, maxUnsecuredLoan, maxBulletLoan, sortOrder, and/or isActive to update.',
+      );
+    }
+
+    const existing = await this.prisma.client.creditLimitTier.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('Credit limit tier not found');
+    }
+
+    const nextMin = hasMin ? dto.minUnsecuredLoan! : existing.minUnsecuredLoan;
+    const nextMax = hasMax ? dto.maxUnsecuredLoan! : existing.maxUnsecuredLoan;
+    const nextBullet = hasBullet ? dto.maxBulletLoan! : existing.maxBulletLoan;
+    const nextSort = hasSort ? dto.sortOrder! : existing.sortOrder;
+
+    if (nextMax != null && nextMax < nextMin) {
+      throw new BadRequestException('maxUnsecuredLoan cannot be less than minUnsecuredLoan.');
+    }
+
+    const row = await this.prisma.client.creditLimitTier.update({
+      where: { id },
+      data: {
+        ...(hasMin ? { minUnsecuredLoan: nextMin } : {}),
+        ...(hasMax ? { maxUnsecuredLoan: nextMax } : {}),
+        ...(hasBullet ? { maxBulletLoan: nextBullet } : {}),
+        ...(hasSort ? { sortOrder: nextSort } : {}),
+        ...(hasActive ? { isActive: dto.isActive } : {}),
+      },
+    });
+
+    return {
+      id: row.id,
+      minUnsecuredLoan: row.minUnsecuredLoan,
+      maxUnsecuredLoan: row.maxUnsecuredLoan,
+      maxBulletLoan: row.maxBulletLoan,
+      sortOrder: row.sortOrder,
       isActive: row.isActive,
     };
   }

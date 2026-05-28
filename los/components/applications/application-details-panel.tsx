@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ApplicationCibilReportTab } from '@/components/applications/application-cibil-report-tab';
 import { cx } from '@/components/eligibility/eligibility-ui';
-import { getApplicationDetails, type LosApplicationDetails } from '@/lib/api';
+import { getApplicationDetails, fetchLosAuthenticatedBlob, type LosApplicationDetails } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 
@@ -36,6 +36,32 @@ function formatDateOnly(iso: string | null | undefined) {
   const d = new Date(`${iso}T12:00:00`);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function ageFromDateOfBirth(iso: string | null | undefined) {
+  if (!iso) return '—';
+  const dob = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(dob.getTime())) return '—';
+
+  const now = new Date();
+  if (now < dob) return '—';
+
+  let years = now.getFullYear() - dob.getFullYear();
+  let months = now.getMonth() - dob.getMonth();
+  let days = now.getDate() - dob.getDate();
+
+  if (days < 0) {
+    months -= 1;
+    const prevMonthDays = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+    days += prevMonthDays;
+  }
+
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+
+  return `${years} yrs, ${months} months, ${days} days`;
 }
 
 function formatInr(value: string | null | undefined): string {
@@ -153,6 +179,99 @@ function MonoValue({ children, copyLabel }: { children: string; copyLabel: strin
   );
 }
 
+function AuthenticatedKycPhoto({
+  token,
+  path,
+  label,
+  emptyLabel,
+  compact = false,
+}: {
+  token: string;
+  path: string;
+  label: string;
+  emptyLabel: string;
+  compact?: boolean;
+}) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!path.trim()) {
+      setLoading(false);
+      setError(null);
+      setSrc(null);
+      return;
+    }
+
+    let objectUrl: string | null = null;
+    let cancelled = false;
+
+    setLoading(true);
+    setError(null);
+    setSrc(null);
+
+    void fetchLosAuthenticatedBlob(token, path, `Failed to load ${label.toLowerCase()}.`)
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setSrc(objectUrl);
+      })
+      .catch((loadError) => {
+        if (cancelled) return;
+        setError(loadError instanceof Error ? loadError.message : `Failed to load ${label.toLowerCase()}.`);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [token, path, label]);
+
+  if (compact) {
+    return (
+      <figure className="m-0 w-[112px] shrink-0 overflow-hidden rounded-[12px] border border-[rgba(23,44,113,0.1)] bg-white">
+        <figcaption className="border-b border-[rgba(23,44,113,0.07)] px-2 py-1.5 text-center text-[0.62rem] font-extrabold uppercase tracking-[0.06em] text-brand-muted">
+          {label}
+        </figcaption>
+        <div className="flex h-[132px] items-center justify-center bg-[rgba(248,250,255,0.9)] p-1.5">
+          {loading ? (
+            <span className="text-[0.68rem] font-semibold text-brand-muted">…</span>
+          ) : error ? (
+            <span className="px-1 text-center text-[0.62rem] font-semibold leading-tight text-[#8d3434]">Unavailable</span>
+          ) : src ? (
+            <img src={src} alt={label} className="h-full w-full rounded-[8px] object-cover" />
+          ) : (
+            <span className="px-1 text-center text-[0.62rem] font-semibold leading-tight text-brand-muted">{emptyLabel}</span>
+          )}
+        </div>
+      </figure>
+    );
+  }
+
+  return (
+    <figure className="m-0 overflow-hidden rounded-[14px] border border-[rgba(23,44,113,0.1)] bg-[rgba(248,250,255,0.72)]">
+      <figcaption className="border-b border-[rgba(23,44,113,0.07)] px-3 py-2 text-[0.72rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted">
+        {label}
+      </figcaption>
+      <div className="flex min-h-[220px] items-center justify-center p-3">
+        {loading ? (
+          <span className="text-[0.84rem] font-semibold text-brand-muted">Loading photo…</span>
+        ) : error ? (
+          <span className="px-3 text-center text-[0.82rem] font-semibold text-[#8d3434]">{error}</span>
+        ) : src ? (
+          <img src={src} alt={label} className="max-h-[320px] w-full rounded-[10px] object-contain" />
+        ) : (
+          <span className="text-[0.84rem] font-semibold text-brand-muted">{emptyLabel}</span>
+        )}
+      </div>
+    </figure>
+  );
+}
+
 export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: string }) {
   const [row, setRow] = useState<LosApplicationDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -230,6 +349,7 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
 
   const profile = row.lead.profile;
   const displayName = profile?.fullName?.trim() || 'Applicant (name pending)';
+  const authToken = getToken();
 
   return (
     <div className="grid gap-5 pb-2">
@@ -289,17 +409,50 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
                 </span>
               </span>
             </div>
+            <p className="m-0 mt-3 text-[0.78rem] font-semibold text-brand-muted">
+              Opened {formatDateTime(row.createdAt)} · Updated {formatDateTime(row.updatedAt)}
+            </p>
           </div>
-          <div className="grid w-full max-w-sm gap-2 rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.72)] p-4 text-[0.82rem] lg:justify-self-end">
-            <div className="flex justify-between gap-3 border-b border-[rgba(23,44,113,0.06)] pb-2">
-              <span className="font-extrabold uppercase tracking-[0.08em] text-brand-muted">Opened</span>
-              <span className="text-right font-semibold text-brand-text">{formatDateTime(row.createdAt)}</span>
+          {authToken ? (
+            <div className="flex flex-wrap gap-3 lg:justify-self-end">
+              {row.kycPhotos.aadhaarPhotoUrl ? (
+                <AuthenticatedKycPhoto
+                  token={authToken}
+                  path={row.kycPhotos.aadhaarPhotoUrl}
+                  label="Aadhaar pic"
+                  emptyLabel="Not available"
+                  compact
+                />
+              ) : (
+                <figure className="m-0 w-[112px] shrink-0 overflow-hidden rounded-[12px] border border-[rgba(23,44,113,0.1)] bg-white">
+                  <figcaption className="border-b border-[rgba(23,44,113,0.07)] px-2 py-1.5 text-center text-[0.62rem] font-extrabold uppercase tracking-[0.06em] text-brand-muted">
+                    Aadhaar pic
+                  </figcaption>
+                  <div className="flex h-[132px] items-center justify-center bg-[rgba(248,250,255,0.9)] p-1.5">
+                    <span className="px-1 text-center text-[0.62rem] font-semibold leading-tight text-brand-muted">Not available</span>
+                  </div>
+                </figure>
+              )}
+              {row.kycPhotos.selfieUrl ? (
+                <AuthenticatedKycPhoto
+                  token={authToken}
+                  path={row.kycPhotos.selfieUrl}
+                  label="Selfie"
+                  emptyLabel="Not captured"
+                  compact
+                />
+              ) : (
+                <figure className="m-0 w-[112px] shrink-0 overflow-hidden rounded-[12px] border border-[rgba(23,44,113,0.1)] bg-white">
+                  <figcaption className="border-b border-[rgba(23,44,113,0.07)] px-2 py-1.5 text-center text-[0.62rem] font-extrabold uppercase tracking-[0.06em] text-brand-muted">
+                    Selfie
+                  </figcaption>
+                  <div className="flex h-[132px] items-center justify-center bg-[rgba(248,250,255,0.9)] p-1.5">
+                    <span className="px-1 text-center text-[0.62rem] font-semibold leading-tight text-brand-muted">Not captured</span>
+                  </div>
+                </figure>
+              )}
             </div>
-            <div className="flex justify-between gap-3 pt-0.5">
-              <span className="font-extrabold uppercase tracking-[0.08em] text-brand-muted">Updated</span>
-              <span className="text-right font-semibold text-brand-text">{formatDateTime(row.updatedAt)}</span>
-            </div>
-          </div>
+          ) : null}
         </div>
       </header>
 
@@ -388,6 +541,7 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
             rows={[
               { label: 'Full name as per PAN card', value: profile.fullName ?? '—' },
               { label: 'Date of birth', value: formatDateOnly(profile.dateOfBirth ?? undefined) },
+              { label: 'Age', value: ageFromDateOfBirth(profile.dateOfBirth ?? undefined) },
               { label: 'PAN', value: profile.panNumber ?? '—' },
               { label: 'Gender', value: profile.gender ?? '—' },
               { label: 'Occupation', value: profile.occupation ?? '—' },
@@ -443,7 +597,7 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
         <SectionCard
           eyebrow="Verification"
           title="KYC & liveness"
-          description="High-level flags only; documents stay in secure storage."
+          description="Verification status from onboarding."
         >
           <DetailGrid
             rows={[
@@ -473,13 +627,25 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
                 {
                   label: 'Full bureau view',
                   value: row.bureauReport ? (
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('cibil')}
-                      className="border-0 bg-transparent p-0 font-bold text-brand-blue underline"
-                    >
-                      Open CIBIL report tab
-                    </button>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('cibil')}
+                        className="border-0 bg-transparent p-0 font-bold text-brand-blue underline"
+                      >
+                        Open CIBIL report tab
+                      </button>
+                      {row.bureauReport.reportPdfUrl ? (
+                        <a
+                          href={row.bureauReport.reportPdfUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-bold text-brand-blue underline"
+                        >
+                          Download report PDF
+                        </a>
+                      ) : null}
+                    </div>
                   ) : (
                     'No bureau pull on file'
                   ),

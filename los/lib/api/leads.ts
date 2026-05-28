@@ -1,4 +1,4 @@
-import { cachedAuthorizedLosGet } from './_shared';
+import { cachedAuthorizedLosGet, clientApiUrl, fetchWithTimeout, messageFromBody, parseJsonResponse } from './_shared';
 
 export type LosLead = {
   uuid: string;
@@ -113,6 +113,10 @@ export type LosApplicationDetails = {
   kycCompletedAt: string | null;
   livenessPassed: boolean;
   livenessCheckedAt: string | null;
+  kycPhotos: {
+    selfieUrl: string | null;
+    aadhaarPhotoUrl: string | null;
+  };
   preApprovedLoanAmount: string | null;
   createdAt: string;
   updatedAt: string;
@@ -188,4 +192,18 @@ export async function getApplicationDetails(token: string, applicationUuid: stri
     `/applications/${encodeURIComponent(applicationUuid)}`,
     'Failed to fetch application details',
   );
+}
+
+export async function fetchLosAuthenticatedBlob(token: string, path: string, fallbackMessage: string): Promise<Blob> {
+  const response = await fetchWithTimeout(`${clientApiUrl()}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    const body = await parseJsonResponse(response);
+    throw new Error(messageFromBody(body) ?? fallbackMessage);
+  }
+
+  return response.blob();
 }

@@ -1,5 +1,6 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Res, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { LosAuthGuard } from './auth/los-auth.guard';
 import { LosDataService } from './los-data.service';
 
@@ -33,6 +34,24 @@ export class LosDataController {
   @ApiOperation({ summary: 'Get application details by application uuid' })
   applicationByUuid(@Param('applicationUuid') applicationUuid: string) {
     return this.losData.getApplicationDetails(applicationUuid);
+  }
+
+  @Get('applications/:applicationUuid/kyc/selfie-photo')
+  @ApiOperation({ summary: 'Stream customer selfie for an application (LOS auth)' })
+  async applicationSelfiePhoto(
+    @Param('applicationUuid') applicationUuid: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    await this.losData.serveApplicationSelfiePhoto(applicationUuid, res);
+  }
+
+  @Get('applications/:applicationUuid/kyc/aadhaar-photo')
+  @ApiOperation({ summary: 'Stream DigiLocker Aadhaar photo for an application (LOS auth)' })
+  async applicationAadhaarPhoto(
+    @Param('applicationUuid') applicationUuid: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    await this.losData.serveApplicationAadhaarPhoto(applicationUuid, res);
   }
 
   @Get('applications/:applicationUuid/cibil-report')
