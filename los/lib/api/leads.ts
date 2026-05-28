@@ -207,3 +207,42 @@ export async function fetchLosAuthenticatedBlob(token: string, path: string, fal
 
   return response.blob();
 }
+
+type FetchBureauResponse = {
+  success: boolean;
+  configured: boolean;
+  message?: string | null;
+  transportError?: string | null;
+};
+
+export async function createApplicationCibilReport(
+  token: string,
+  payload: { leadUuid: string; mobileNumber: string; fullName: string; panNumber: string },
+): Promise<void> {
+  const vendorApiBase = clientApiUrl().replace(/\/los$/, '');
+  const response = await fetchWithTimeout(`${vendorApiBase}/vendor/tenacio/bureau`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      leadUuid: payload.leadUuid,
+      input: {
+        mobileNumber: payload.mobileNumber,
+        name: payload.fullName,
+        panNumber: payload.panNumber,
+        consent: true,
+      },
+    }),
+    cache: 'no-store',
+  });
+
+  const body = (await parseJsonResponse(response)) as FetchBureauResponse | null;
+  if (!response.ok) {
+    throw new Error(messageFromBody(body) ?? 'Failed to create CIBIL report.');
+  }
+  if (!body?.success) {
+    throw new Error(body?.message ?? body?.transportError ?? 'CIBIL report creation failed.');
+  }
+}

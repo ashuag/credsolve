@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ApplicationCibilReportTab } from '@/components/applications/application-cibil-report-tab';
 import { cx } from '@/components/eligibility/eligibility-ui';
-import { getApplicationDetails, fetchLosAuthenticatedBlob, type LosApplicationDetails } from '@/lib/api';
+import { createApplicationCibilReport, getApplicationDetails, fetchLosAuthenticatedBlob, type LosApplicationDetails } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 
@@ -277,6 +277,8 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ApplicationDetailsTab>('overview');
+  const [creatingBureau, setCreatingBureau] = useState(false);
+  const [bureauActionError, setBureauActionError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -350,6 +352,13 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
   const profile = row.lead.profile;
   const displayName = profile?.fullName?.trim() || 'Applicant (name pending)';
   const authToken = getToken();
+  const canCreateBureauReport = Boolean(
+    authToken &&
+      row.leadUuid &&
+      row.mobileNumber &&
+      row.lead.panNumber?.trim() &&
+      profile?.fullName?.trim(),
+  );
 
   return (
     <div className="grid gap-5 pb-2">
@@ -647,7 +656,56 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
                       ) : null}
                     </div>
                   ) : (
-                    'No bureau pull on file'
+                    <div className="grid gap-2">
+                      <span>No bureau pull on file</span>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          className="los-btn-primary min-h-[34px] px-3 text-[0.78rem]"
+                          disabled={!canCreateBureauReport || creatingBureau}
+                          onClick={() => {
+                            if (!authToken) {
+                              setBureauActionError('Session expired - please log in again.');
+                              return;
+                            }
+                            if (!profile?.fullName?.trim() || !row.lead.panNumber?.trim()) {
+                              setBureauActionError('Full name and PAN are required to create CIBIL report.');
+                              return;
+                            }
+                            setBureauActionError(null);
+                            setCreatingBureau(true);
+                            void createApplicationCibilReport(authToken, {
+                              leadUuid: row.leadUuid,
+                              mobileNumber: row.mobileNumber,
+                              fullName: profile.fullName.trim(),
+                              panNumber: row.lead.panNumber.trim().toUpperCase(),
+                            })
+                              .then(async () => {
+                                await load();
+                                setActiveTab('cibil');
+                              })
+                              .catch((actionError) => {
+                                setBureauActionError(
+                                  actionError instanceof Error
+                                    ? actionError.message
+                                    : 'Unable to create CIBIL report.',
+                                );
+                              })
+                              .finally(() => setCreatingBureau(false));
+                          }}
+                        >
+                          {creatingBureau ? 'Creating report...' : 'Create CIBIL report'}
+                        </button>
+                        {!canCreateBureauReport ? (
+                          <span className="text-[0.78rem] text-brand-muted">
+                            Requires full name and PAN on lead profile.
+                          </span>
+                        ) : null}
+                      </div>
+                      {bureauActionError ? (
+                        <span className="text-[0.8rem] font-semibold text-[#8d3434]">{bureauActionError}</span>
+                      ) : null}
+                    </div>
                   ),
                 },
               ]}
