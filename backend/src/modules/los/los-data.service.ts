@@ -720,6 +720,7 @@ export class LosDataService {
       fetchedAt: bureauReportRow.createdAt.toISOString(),
       reportPdfUrl: pdfResult?.publicUrl ?? null,
       htmlUrl: bureauReportRow.htmlUrl,
+      rawPayload: bureauReportRow.rawPayload,
       report,
     };
   }

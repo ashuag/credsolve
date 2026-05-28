@@ -1,9 +1,23 @@
 'use client';
 
 import { CibilReportViewer } from '@/components/applications/cibil-report-viewer';
-import { getApplicationCibilReport, type LosApplicationCibilReportPayload } from '@/lib/api';
+import { cx } from '@/components/eligibility/eligibility-ui';
+import {
+  createApplicationCibilReport,
+  getApplicationCibilReport,
+  getApplicationDetails,
+  type LosApplicationCibilReportPayload,
+} from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+type CibilReportView = 'report' | 'json';
+
+type ApplicationCibilReportTabProps = {
+  applicationUuid: string;
+  /** Called after a bureau pull succeeds so the parent can refresh summary data. */
+  onReportCreated?: () => void;
+};
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -16,17 +30,137 @@ function getToken(): string | null {
   }
 }
 
-export function ApplicationCibilReportTab({ applicationUuid }: { applicationUuid: string }) {
+function formatJson(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function CibilJsonViewer({ rawPayload }: { rawPayload: unknown }) {
+  const formatted = useMemo(() => formatJson(rawPayload), [rawPayload]);
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(formatted);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <div className="los-card overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.85)] px-5 py-3">
+        <div>
+          <h3 className="m-0 text-[0.95rem] font-extrabold text-brand-navy">Bureau JSON</h3>
+          <p className="m-0 mt-0.5 text-[0.78rem] text-brand-muted">Raw Tenacio / TrueLink payload stored on the bureau report.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void handleCopy()}
+          className="inline-flex min-h-[34px] items-center rounded-full border border-[rgba(23,44,113,0.12)] bg-white px-4 text-[0.78rem] font-bold text-brand-navy hover:border-[rgba(20,150,243,0.35)]"
+        >
+          {copied ? 'Copied' : 'Copy JSON'}
+        </button>
+      </div>
+      <pre className="m-0 max-h-[min(72vh,900px)] overflow-auto bg-[#0f172a] p-4 text-[0.72rem] leading-relaxed text-[#e2e8f0]">
+        <code>{formatted}</code>
+      </pre>
+    </div>
+  );
+}
+
+function CibilReportUnavailable({
+  applicationUuid,
+  onCreated,
+}: {
+  applicationUuid: string;
+  onCreated?: () => void;
+}) {
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleDownloadReport() {
+    const token = getToken();
+    if (!token) {
+      setError('Session expired — please log in again.');
+      return;
+    }
+
+    setCreating(true);
+    setError(null);
+
+    try {
+      const details = await getApplicationDetails(token, applicationUuid);
+      const profile = details.lead.profile;
+      const fullName = profile?.fullName?.trim();
+      const panNumber = details.lead.panNumber?.trim().toUpperCase();
+
+      if (!fullName || !panNumber) {
+        setError('Full name and PAN are required on the lead profile before fetching a CIBIL report.');
+        return;
+      }
+
+      await createApplicationCibilReport(token, {
+        leadUuid: details.leadUuid,
+        mobileNumber: details.mobileNumber,
+        fullName,
+        panNumber,
+      });
+
+      onCreated?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to download CIBIL report.');
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  return (
+    <div className="los-card border border-dashed border-[rgba(23,44,113,0.18)] bg-[rgba(248,250,255,0.88)] p-6 md:p-8">
+      <span className="los-chip mb-3">CIBIL report</span>
+      <h3 className="m-0 text-[1.05rem] font-extrabold tracking-[-0.02em] text-brand-navy">
+        No bureau report on file
+      </h3>
+      <p className="m-0 mt-2 max-w-[52ch] text-[0.88rem] leading-relaxed text-brand-muted">
+        Pull the customer&apos;s CIBIL bureau report from Tenacio. Once downloaded, you can view the formatted report
+        and raw JSON here.
+      </p>
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className="los-btn-primary min-h-[40px] px-4"
+          disabled={creating}
+          onClick={() => void handleDownloadReport()}
+        >
+          {creating ? 'Downloading report…' : 'Download CIBIL report'}
+        </button>
+      </div>
+      {error ? <p className="m-0 mt-4 text-[0.82rem] font-semibold text-[#8d3434]">{error}</p> : null}
+    </div>
+  );
+}
+
+export function ApplicationCibilReportTab({ applicationUuid, onReportCreated }: ApplicationCibilReportTabProps) {
   const [payload, setPayload] = useState<LosApplicationCibilReportPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [missingReport, setMissingReport] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<CibilReportView>('report');
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setMissingReport(false);
+
     const token = getToken();
     if (!token) {
       setError('Session expired — please log in again.');
+      setPayload(null);
       setLoading(false);
       return;
     }
@@ -36,7 +170,13 @@ export function ApplicationCibilReportTab({ applicationUuid }: { applicationUuid
       setPayload(data);
     } catch (e) {
       setPayload(null);
-      setError(e instanceof Error ? e.message : 'Failed to load CIBIL report.');
+      const message = e instanceof Error ? e.message : 'Failed to load CIBIL report.';
+      if (/not found|no bureau|no stored json/i.test(message)) {
+        setMissingReport(true);
+        setError(null);
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -45,6 +185,11 @@ export function ApplicationCibilReportTab({ applicationUuid }: { applicationUuid
   useEffect(() => {
     void load();
   }, [load]);
+
+  function handleReportCreated() {
+    onReportCreated?.();
+    void load();
+  }
 
   if (loading) {
     return (
@@ -56,6 +201,10 @@ export function ApplicationCibilReportTab({ applicationUuid }: { applicationUuid
         </div>
       </div>
     );
+  }
+
+  if (missingReport) {
+    return <CibilReportUnavailable applicationUuid={applicationUuid} onCreated={handleReportCreated} />;
   }
 
   if (error) {
@@ -78,5 +227,47 @@ export function ApplicationCibilReportTab({ applicationUuid }: { applicationUuid
     );
   }
 
-  return <CibilReportViewer payload={payload} />;
+  const viewTabs: Array<{ id: CibilReportView; label: string }> = [
+    { id: 'report', label: 'View CIBIL report' },
+    { id: 'json', label: 'View JSON' },
+  ];
+
+  return (
+    <div className="grid gap-4">
+      <nav
+        className="los-card flex flex-wrap gap-1 p-1.5"
+        aria-label="CIBIL report views"
+      >
+        {viewTabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveView(tab.id)}
+            className={cx(
+              'min-h-[38px] flex-1 rounded-[10px] px-4 text-[0.82rem] font-extrabold transition-colors sm:flex-none',
+              activeView === tab.id
+                ? 'bg-brand-navy text-white shadow-sm'
+                : 'text-brand-navy hover:bg-[rgba(23,44,113,0.06)]',
+            )}
+            aria-current={activeView === tab.id ? 'page' : undefined}
+          >
+            {tab.label}
+          </button>
+        ))}
+        {payload.reportPdfUrl ? (
+          <a
+            href={payload.reportPdfUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-auto inline-flex min-h-[38px] items-center rounded-[10px] border border-[rgba(23,44,113,0.12)] bg-white px-4 text-[0.82rem] font-bold text-brand-blue no-underline hover:border-[rgba(20,150,243,0.35)]"
+          >
+            Download PDF
+          </a>
+        ) : null}
+      </nav>
+
+      {activeView === 'report' ? <CibilReportViewer payload={payload} /> : null}
+      {activeView === 'json' ? <CibilJsonViewer rawPayload={payload.rawPayload} /> : null}
+    </div>
+  );
 }

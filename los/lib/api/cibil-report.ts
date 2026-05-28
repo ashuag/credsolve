@@ -131,6 +131,8 @@ export type LosApplicationCibilReportPayload = {
   fetchedAt: string;
   reportPdfUrl: string | null;
   htmlUrl: string | null;
+  /** Original Tenacio / TrueLink bureau JSON stored on the bureau report row. */
+  rawPayload: unknown;
   report: CibilReportData;
 };
 

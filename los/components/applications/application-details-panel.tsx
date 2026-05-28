@@ -505,7 +505,7 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
       </nav>
 
       {activeTab === 'cibil' ? (
-        <ApplicationCibilReportTab applicationUuid={applicationUuid} />
+        <ApplicationCibilReportTab applicationUuid={applicationUuid} onReportCreated={() => void load()} />
       ) : null}
 
       {activeTab === 'overview' ? (
