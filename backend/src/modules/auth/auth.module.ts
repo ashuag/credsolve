@@ -5,6 +5,7 @@ import { EmailModule } from '../../common/email/email.module';
 import { VendorApiModule } from '../../common/vendor/vendor-api.module';
 import { LoanDocumentsModule } from '../../common/loan-documents/loan-documents.module';
 import { DigilockerSessionStore } from '../../common/kyc/digilocker-session.store';
+import { KycIdentityRejectionService } from '../../common/kyc/kyc-identity-rejection.service';
 import { RedisIpRateLimitGuard } from '../../common/rate-limit/redis-ip-rate-limit.guard';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { CheckLoanEligibilityUseCase } from './application/use-cases/check-loan-eligibility.use-case';
@@ -106,6 +107,7 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     DownloadAadhaarDigilockerUseCase,
     GetPendingDigilockerSessionUseCase,
     DigilockerSessionStore,
+    KycIdentityRejectionService,
     SaveKycSelfieUseCase,
     RunKycLivenessUseCase,
     ServeDigilockerAadhaarPhotoUseCase,

@@ -120,6 +120,8 @@ export type LosApplicationDetails = {
     uuid: string;
     statusCode: string;
     statusLabel: string;
+    sourceName: string | null;
+    sourceType: string | null;
     panNumber: string | null;
     profile: LosLeadDetails['profile'];
   };

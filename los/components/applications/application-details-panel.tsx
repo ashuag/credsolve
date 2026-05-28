@@ -45,6 +45,11 @@ function formatInr(value: string | null | undefined): string {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
 }
 
+function leadSourceSummary(sourceName: string | null | undefined, sourceType: string | null | undefined): string {
+  if (!sourceName) return 'Unattributed';
+  return sourceType ? `${sourceName} · ${sourceType}` : sourceName;
+}
+
 function statusPillStyles(code: string): { bg: string; text: string; ring: string } {
   const c = code.toUpperCase();
   if (c === 'DRAFT') {
@@ -277,6 +282,12 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
                 Lead status:{' '}
                 <span className="ml-1 text-brand-text">{row.lead.statusLabel}</span>
               </span>
+              <span className="inline-flex items-center rounded-full border border-[rgba(23,44,113,0.1)] bg-[rgba(255,255,255,0.75)] px-3 py-1 text-[0.72rem] font-bold text-brand-muted">
+                Lead source:{' '}
+                <span className="ml-1 text-brand-text">
+                  {leadSourceSummary(row.lead.sourceName, row.lead.sourceType)}
+                </span>
+              </span>
             </div>
           </div>
           <div className="grid w-full max-w-sm gap-2 rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.72)] p-4 text-[0.82rem] lg:justify-self-end">
@@ -348,6 +359,7 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
               { label: 'Application UUID', value: <MonoValue copyLabel="Application UUID">{row.uuid}</MonoValue> },
               { label: 'Lead UUID', value: <MonoValue copyLabel="Lead UUID">{row.leadUuid}</MonoValue> },
               { label: 'Customer UUID', value: <MonoValue copyLabel="Customer UUID">{row.customerUuid}</MonoValue> },
+              { label: 'Lead source', value: leadSourceSummary(row.lead.sourceName, row.lead.sourceType) },
             ]}
           />
         </SectionCard>

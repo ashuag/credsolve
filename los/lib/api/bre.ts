@@ -192,11 +192,35 @@ export type PostBreRuleCatalogEntry = {
   notes: string | null;
 };
 
+export type PostBreUnsecuredExposureGuide = {
+  phaseLabel: string;
+  summary: string;
+  maxExposureDefinition: string;
+  totalExposureDefinition: string;
+  tierSelectionRule: string;
+  preApprovedFormula: string;
+  minLoanAmountInr: number;
+  maxLoanAmountInr: number;
+  accountTypes: Array<{ symbol: string; label: string; exposureBasis: string }>;
+  openDpdExcludedAccountTypes: Array<{ symbol: string; label: string; reason: string }>;
+  creditLimitTiers: Array<{
+    id: number;
+    minUnsecuredLoan: number;
+    maxUnsecuredLoan: number | null;
+    maxBulletLoan: number;
+    sortOrder: number;
+    isActive: boolean;
+  }>;
+  relatedToolPath: string;
+  configurationPaths: string[];
+};
+
 export type PostBreRulesCatalogResult = {
   enquiryWindowDays: number;
   thresholds: PostBreDryRunResult['thresholds'];
   criteria: PostBreCriteriaConfigRow[];
   rules: PostBreRuleCatalogEntry[];
+  unsecuredExposure: PostBreUnsecuredExposureGuide;
 };
 
 export async function fetchPostBreRulesCatalog(token: string): Promise<PostBreRulesCatalogResult> {

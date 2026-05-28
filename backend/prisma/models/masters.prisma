@@ -86,22 +86,21 @@ model KycDocument {
 }
 
 model LeadSource {
-  id           Int            @id @default(autoincrement())
-  name         String         @unique @db.VarChar(50)
-  type         LeadSourceType
-  isActive     Boolean        @default(true) @map("is_active")
-  leads        Lead[]
-  utmSources   UtmSource[]
-  utmMediums   UtmMedium[]
-  utmCampaigns UtmCampaign[]
+  id       Int            @id @default(autoincrement())
+  name     String         @unique @db.VarChar(50)
+  type     LeadSourceType
+  isActive Boolean        @default(true) @map("is_active")
+  leads    Lead[]
+  sourceUtms SourceUtm[]
 
   @@map("lead_source")
 }
 
-/// Allowed `utm_source` tag values per LOS lead source (e.g. google, meta).
-model UtmSource {
+/// Unified source + UTM tag master values (`SOURCE` / `MEDIUM` / `CAMPAIGN`) per lead source.
+model SourceUtm {
   id           Int      @id @default(autoincrement()) @db.SmallInt
   leadSourceId Int      @map("lead_source_id")
+  type         SourceUtmType
   name         String   @db.VarChar(100)
   isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at")
@@ -109,41 +108,9 @@ model UtmSource {
 
   leadSource LeadSource @relation(fields: [leadSourceId], references: [id])
 
-  @@unique([leadSourceId, name])
-  @@index([leadSourceId])
-  @@map("utm_source")
-}
-
-/// Allowed `utm_medium` tag values per LOS lead source (e.g. cpc, email).
-model UtmMedium {
-  id           Int      @id @default(autoincrement()) @db.SmallInt
-  leadSourceId Int      @map("lead_source_id")
-  name         String   @db.VarChar(100)
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  leadSource LeadSource @relation(fields: [leadSourceId], references: [id])
-
-  @@unique([leadSourceId, name])
-  @@index([leadSourceId])
-  @@map("utm_medium")
-}
-
-/// Allowed `utm_campaign` tag values per LOS lead source.
-model UtmCampaign {
-  id           Int      @id @default(autoincrement()) @db.SmallInt
-  leadSourceId Int      @map("lead_source_id")
-  name         String   @db.VarChar(100)
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  leadSource LeadSource @relation(fields: [leadSourceId], references: [id])
-
-  @@unique([leadSourceId, name])
-  @@index([leadSourceId])
-  @@map("utm_campaign")
+  @@unique([leadSourceId, type, name])
+  @@index([leadSourceId, type])
+  @@map("source_utm")
 }
 
 model LeadStatus {

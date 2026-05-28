@@ -143,6 +143,14 @@ function DigilockerCallbackContent() {
         }
         if (!out.ok) {
           setStatus('error');
+          if (out.identityMismatch) {
+            setError(
+              out.identityMismatchMessage ??
+                'Name or date of birth on Aadhaar does not match your loan application. This application cannot proceed.',
+            );
+            await refresh();
+            return;
+          }
           const vendorMsg = pickDigilockerDownloadErrorMessage(out.vendor);
           setError(vendorMsg ?? `Aadhaar download failed (HTTP ${out.httpStatus ?? 'n/a'}).`);
           return;

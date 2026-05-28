@@ -3,6 +3,8 @@ export const APPLICATION_STATUS = {
   IN_REVIEW: 'IN_REVIEW',
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
+  /** Aadhaar / identity verification failed (name or DOB mismatch with profile). */
+  KYC_FAILED: 'KYC_FAILED',
   DISBURSED: 'DISBURSED',
 } as const;
 

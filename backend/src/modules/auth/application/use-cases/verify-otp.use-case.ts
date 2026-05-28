@@ -114,6 +114,28 @@ export class VerifyOtpUseCase {
         recentLead = autoRejectResult;
       }
 
+      if (!recentLead) {
+        throw new InternalServerErrorException('Failed to resolve lead for customer.');
+      }
+
+      const utmSource = request.utmSource?.trim() || null;
+      const utmMedium = request.utmMedium?.trim() || null;
+      const utmCampaign = request.utmCampaign?.trim() || null;
+      const utmTerm = request.utmTerm?.trim() || null;
+      const utmContent = request.utmContent?.trim() || null;
+      if (utmSource || utmMedium || utmCampaign || utmTerm || utmContent) {
+        await tx.leadUtm.create({
+          data: {
+            leadId: recentLead.id,
+            utmSource,
+            utmMedium,
+            utmCampaign,
+            utmTerm,
+            utmContent,
+          },
+        });
+      }
+
       return { customer: cust, lead: recentLead };
     });
 

@@ -61,8 +61,8 @@ const navGroups: { section: string; color: string; items: NavItem[] }[] = [
     section: 'Team',
     color: '#0d9488',
     items: [
-      { href: '/agents', label: 'Agents', icon: 'agents' },
-      { href: '/roles', label: 'Roles & Access', icon: 'roles' },
+      { href: '/agents', label: 'User', icon: 'agents' },
+      { href: '/roles', label: 'Role Management', icon: 'roles' },
     ],
   },
   {
@@ -73,19 +73,40 @@ const navGroups: { section: string; color: string; items: NavItem[] }[] = [
         href: '/masters',
         label: 'Masters',
         icon: 'masters',
-        children: [{ href: '/masters/source-utm', label: 'Source & UTM' }],
       },
-      { href: '/eligibility-criteria', label: 'Business Rule Engine', icon: 'eligibility' },
-      { href: '/eligibility-criteria/serviceability-lists', label: 'Serviceability Lists', icon: 'eligibility' },
     ],
   },
   {
-    section: 'Developer Tools',
+    section: 'Sources & Utm',
+    color: '#f59e0b',
+    items: [
+      {
+        href: '/masters/source-utm',
+        label: 'Sources & Utm',
+        icon: 'masters',
+        children: [
+          { href: '/masters/lead-sources', label: 'Source Management' },
+          { href: '/masters/source-utm', label: 'Utm Management' },
+        ],
+      },
+    ],
+  },
+  {
+    section: 'BRE',
+    color: '#1496f3',
+    items: [
+      { href: '/eligibility-criteria/negative-pincode', label: 'Negative Pincode', icon: 'eligibility' },
+      { href: '/eligibility-criteria/negative-city', label: 'Negative City', icon: 'eligibility' },
+      { href: '/eligibility-criteria/negative-state', label: 'Negative State', icon: 'eligibility' },
+    ],
+  },
+  {
+    section: 'Developer Tool',
     color: '#8b5cf6',
     items: [
       {
         href: '/developer-tools',
-        label: 'Developer Tools',
+        label: 'Developer Tool',
         icon: 'developer',
         children: DEVELOPER_TOOL_LINKS.map((item) => ({
           href: item.href,
@@ -108,7 +129,9 @@ const GROUP_ACCENT: Record<string, { dot: string; bg: string; border: string; te
   'Loan Pipeline': { dot: 'bg-indigo-500',  bg: 'rgba(99,102,241,0.07)', border: 'rgba(99,102,241,0.18)', text: '#6366f1' },
   'Team':          { dot: 'bg-teal-600',    bg: 'rgba(13,148,136,0.07)', border: 'rgba(13,148,136,0.18)', text: '#0d9488' },
   'Configuration': { dot: 'bg-amber-400',  bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)',  text: '#d97706' },
-  'Developer Tools': { dot: 'bg-violet-500', bg: 'rgba(139,92,246,0.08)', border: 'rgba(139,92,246,0.2)', text: '#7c3aed' },
+  'Sources & Utm': { dot: 'bg-amber-500',  bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)', text: '#d97706' },
+  'BRE':           { dot: 'bg-brand-blue', bg: 'rgba(20,150,243,0.07)', border: 'rgba(20,150,243,0.18)', text: '#1496f3' },
+  'Developer Tool': { dot: 'bg-violet-500', bg: 'rgba(139,92,246,0.08)', border: 'rgba(139,92,246,0.2)', text: '#7c3aed' },
 };
 
 const toneColors: Record<NotificationItem['tone'], string> = {
@@ -126,14 +149,16 @@ const BREADCRUMBS: Record<string, string> = {
   '/agents': 'Agent Management',
   '/roles': 'Role Management',
   '/masters': 'Masters',
-  '/masters/source-utm': 'Source & UTM',
-  '/eligibility-criteria': 'Eligibility Criteria',
-  '/eligibility-criteria/serviceability-lists': 'Serviceability Lists',
-  '/developer-tools': 'Developer Tools',
+  '/masters/lead-sources': 'Source Management',
+  '/masters/source-utm': 'Utm Management',
+  '/eligibility-criteria/negative-pincode': 'Negative Pincode',
+  '/eligibility-criteria/negative-city': 'Negative City',
+  '/eligibility-criteria/negative-state': 'Negative State',
+  '/developer-tools': 'Developer Tool',
   '/developer-tools/pre-bre-check': 'Pre BRE Check',
-  '/developer-tools/pre-approved-offer': 'Pre-approved Offer',
-  '/developer-tools/post-bureau-check': 'Post BRE Inspector',
-  '/developer-tools/cibil-report-download': 'CIBIL Report Download',
+  '/developer-tools/post-bureau-check': 'Post BRE Check',
+  '/developer-tools/cibil-report-download': 'Bureau Report Generate',
+  '/developer-tools/post-bre-rules': 'Post BRE Rules',
   ...Object.fromEntries(ELIGIBILITY_SECTION_DEFINITIONS.map((item) => [item.href, item.label])),
 };
 
@@ -144,11 +169,18 @@ function persistSidebarMode(mode: SidebarMode) {
   window.localStorage.removeItem(LEGACY_SIDEBAR_COLLAPSED_KEY);
 }
 
+function stripRouteDecorators(href: string) {
+  return href.split(/[?#]/, 1)[0] ?? href;
+}
+
 function isNavActive(pathname: string, item: NavItem) {
   if (item.children?.length) {
     if (pathname === item.href) return true;
     return item.children.some(
-      (child) => pathname === child.href || pathname.startsWith(`${child.href}/`),
+      (child) => {
+        const childPath = stripRouteDecorators(child.href);
+        return pathname === childPath || pathname.startsWith(`${childPath}/`);
+      },
     );
   }
   // Overview hub only — sub-routes have their own sidebar links.
@@ -531,15 +563,15 @@ export function CrmShell({
                     </div>
                   )}
                   <div className="flex flex-col gap-0.5">
-                    {group.items.map((item) => {
+                    {group.items.map((item, itemIndex) => {
                       const active = isNavActive(pathname, item);
-                      const hasActiveChild = item.children?.some((child) => pathname === child.href) ?? false;
+                      const hasActiveChild = item.children?.some((child) => pathname === stripRouteDecorators(child.href)) ?? false;
                       const showExpandedChildren = !isIcons && active && item.children?.length;
                       const navChildren = item.children ?? [];
                       const parentActive = active && !hasActiveChild;
                       const parentExpanded = hasActiveChild && !parentActive;
                       return (
-                        <div key={item.href} className="flex flex-col gap-1">
+                        <div key={`${group.section}-${item.href}-${item.label}-${itemIndex}`} className="flex flex-col gap-1">
                           <Link
                             href={item.href}
                             title={item.label}
@@ -594,11 +626,11 @@ export function CrmShell({
                               className="ml-3 grid gap-1 rounded-[12px] border px-2 py-2"
                               style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.76), rgba(248,250,255,0.92))', borderColor: accent.border }}
                             >
-                              {navChildren.map((child) => {
-                                const childActive = pathname === child.href;
+                              {navChildren.map((child, childIndex) => {
+                                const childActive = pathname === stripRouteDecorators(child.href);
                                 return (
                                   <Link
-                                    key={child.href}
+                                    key={`${item.href}-${child.href}-${child.label}-${childIndex}`}
                                     href={child.href}
                                     aria-current={childActive ? 'page' : undefined}
                                     className={cx(

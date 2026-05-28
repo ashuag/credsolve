@@ -5,10 +5,20 @@ import {
   type PostBreCriteriaConfigRow,
   type PostBreRuleCatalogEntry,
   type PostBreRulesCatalogResult,
+  type PostBreUnsecuredExposureGuide,
 } from '@/lib/api';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { cx, getLosToken } from '@/components/eligibility/eligibility-ui';
+
+function formatInr(n: number) {
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
+}
+
+function formatTierBand(min: number, max: number | null) {
+  if (max == null) return `≥ ${formatInr(min)}`;
+  return `${formatInr(min)} – ${formatInr(max)}`;
+}
 
 const CATEGORY_LABELS: Record<PostBreRuleCatalogEntry['category'], string> = {
   score: 'Bureau score',
@@ -153,6 +163,143 @@ function RuleCard({ rule, criteriaByKey }: { rule: PostBreRuleCatalogEntry; crit
   );
 }
 
+function UnsecuredExposureSection({ guide }: { guide: PostBreUnsecuredExposureGuide }) {
+  const activeTiers = guide.creditLimitTiers.filter((t) => t.isActive);
+
+  return (
+    <section className="grid gap-3">
+      <div>
+        <h2 className="m-0 text-[1rem] font-extrabold tracking-[-0.03em] text-brand-navy">
+          Open unsecured loans & pre-approved offer
+        </h2>
+        <p className="m-0 mt-1 text-[0.82rem] leading-[1.5] text-brand-muted">
+          <span className="font-semibold text-[#7c3aed]">{guide.phaseLabel}</span> — {guide.summary}
+        </p>
+      </div>
+
+      <div className="grid gap-2 rounded-[12px] border border-[rgba(20,150,243,0.18)] bg-[rgba(20,150,243,0.05)] p-4 text-[0.8rem] leading-[1.5] text-brand-text">
+        <p className="m-0">
+          <strong className="text-brand-navy">Max exposure (tier driver):</strong> {guide.maxExposureDefinition}
+        </p>
+        <p className="m-0">
+          <strong className="text-brand-navy">Total exposure:</strong> {guide.totalExposureDefinition}
+        </p>
+        <p className="m-0">
+          <strong className="text-brand-navy">Tier pick:</strong> {guide.tierSelectionRule}
+        </p>
+        <p className="m-0">
+          <strong className="text-brand-navy">Pre-approved amount:</strong> {guide.preApprovedFormula} Current bounds:{' '}
+          {formatInr(guide.minLoanAmountInr)} – {formatInr(guide.maxLoanAmountInr)}.
+        </p>
+        <p className="m-0 text-[0.78rem] text-brand-muted">
+          Dry-run with bureau JSON:{' '}
+          <Link href={guide.relatedToolPath} className="font-semibold text-brand-blue underline">
+            Pre-approved Offer
+          </Link>
+          .
+        </p>
+      </div>
+
+      <div>
+        <h3 className="m-0 text-[0.9rem] font-extrabold text-brand-navy">TUEF unsecured account types (Appendix E)</h3>
+        <p className="m-0 mt-1 text-[0.78rem] text-brand-muted">
+          Open tradelines with these types count toward exposure. MFI types 40–43 are secured and use post-BRE{' '}
+          <code className="text-[0.76rem]">no_active_mfi</code> instead.
+        </p>
+      </div>
+      <div className="overflow-x-auto rounded-[12px] border border-[rgba(23,44,113,0.1)]">
+        <table className="w-full min-w-[640px] border-collapse text-left text-[0.76rem]">
+          <thead>
+            <tr className="bg-[rgba(248,250,255,0.95)] text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
+              <th className="px-2.5 py-2">Code</th>
+              <th className="px-2.5 py-2">Type</th>
+              <th className="px-2.5 py-2">Exposure basis</th>
+            </tr>
+          </thead>
+          <tbody>
+            {guide.accountTypes.map((row) => (
+              <tr key={row.symbol} className="border-t border-[rgba(23,44,113,0.06)]">
+                <td className="px-2.5 py-2 font-mono font-semibold text-brand-navy">{row.symbol}</td>
+                <td className="px-2.5 py-2 font-semibold text-brand-text">{row.label}</td>
+                <td className="px-2.5 py-2 text-brand-muted">{row.exposureBasis}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div>
+        <h3 className="m-0 text-[0.9rem] font-extrabold text-brand-navy">Open-loan DPD vs unsecured</h3>
+        <p className="m-0 mt-1 text-[0.78rem] text-brand-muted">
+          These types are excluded from the <code className="text-[0.76rem]">open_dpd_months</code> rule only (30/60/90+ DPD
+          still applies where relevant).
+        </p>
+      </div>
+      <div className="overflow-x-auto rounded-[12px] border border-[rgba(23,44,113,0.1)]">
+        <table className="w-full min-w-[480px] border-collapse text-left text-[0.76rem]">
+          <thead>
+            <tr className="bg-[rgba(248,250,255,0.95)] text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
+              <th className="px-2.5 py-2">Code</th>
+              <th className="px-2.5 py-2">Type</th>
+              <th className="px-2.5 py-2">Note</th>
+            </tr>
+          </thead>
+          <tbody>
+            {guide.openDpdExcludedAccountTypes.map((row) => (
+              <tr key={row.symbol} className="border-t border-[rgba(23,44,113,0.06)]">
+                <td className="px-2.5 py-2 font-mono font-semibold text-brand-navy">{row.symbol}</td>
+                <td className="px-2.5 py-2 text-brand-text">{row.label}</td>
+                <td className="px-2.5 py-2 text-brand-muted">{row.reason}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div>
+        <h3 className="m-0 text-[0.9rem] font-extrabold text-brand-navy">Credit limit tiers (live)</h3>
+        <p className="m-0 mt-1 text-[0.78rem] text-brand-muted">
+          Edit bands in{' '}
+          <Link href="/eligibility-criteria/credit-limit-eligibility-check" className="font-semibold text-brand-blue underline">
+            Credit Limit Eligibility Check
+          </Link>
+          . {activeTiers.length} active tier(s).
+        </p>
+      </div>
+      <div className="overflow-x-auto rounded-[12px] border border-[rgba(23,44,113,0.1)]">
+        <table className="w-full min-w-[560px] border-collapse text-left text-[0.76rem]">
+          <thead>
+            <tr className="bg-[rgba(248,250,255,0.95)] text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
+              <th className="px-2.5 py-2">#</th>
+              <th className="px-2.5 py-2">Max open unsecured band</th>
+              <th className="px-2.5 py-2">Max bullet loan</th>
+              <th className="px-2.5 py-2">Active</th>
+            </tr>
+          </thead>
+          <tbody>
+            {guide.creditLimitTiers.map((tier) => (
+              <tr
+                key={tier.id}
+                className={cx(
+                  'border-t border-[rgba(23,44,113,0.06)]',
+                  !tier.isActive && 'opacity-60',
+                )}
+              >
+                <td className="px-2.5 py-2 text-brand-muted">{tier.sortOrder}</td>
+                <td className="px-2.5 py-2 font-semibold text-brand-navy">
+                  {formatTierBand(tier.minUnsecuredLoan, tier.maxUnsecuredLoan)}
+                </td>
+                <td className="px-2.5 py-2 font-mono font-bold text-brand-navy">{formatInr(tier.maxBulletLoan)}</td>
+                <td className="px-2.5 py-2">{tier.isActive ? 'Yes' : 'No'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function CatalogContent({ data }: { data: PostBreRulesCatalogResult }) {
   const criteriaByKey = new Map(data.criteria.map((c) => [c.key, c]));
   const blockingCount = data.rules.filter((r) => !r.informationalOnly && (r.alwaysEvaluated || (r.toggleCriteriaKey && criteriaByKey.get(r.toggleCriteriaKey)?.ruleEnabled))).length;
@@ -173,6 +320,8 @@ function CatalogContent({ data }: { data: PostBreRulesCatalogResult }) {
           rules when enabled: <strong className="text-brand-navy">{blockingCount}</strong>
         </p>
       </div>
+
+      <UnsecuredExposureSection guide={data.unsecuredExposure} />
 
       <section className="grid gap-3">
         <h2 className="m-0 text-[1rem] font-extrabold tracking-[-0.03em] text-brand-navy">

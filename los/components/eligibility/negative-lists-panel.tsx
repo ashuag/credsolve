@@ -563,7 +563,7 @@ function StatePanel({
   );
 }
 
-export function NegativeListsPanel() {
+export function NegativeListsPanel({ scope = 'all' }: { scope?: 'all' | 'pincode' | 'city' | 'state' }) {
   const [pincodes, setPincodes] = useState<LosNegativePincode[]>([]);
   const [cities, setCities] = useState<LosNegativeCity[]>([]);
   const [states, setStates] = useState<LosNegativeState[]>([]);
@@ -639,83 +639,89 @@ export function NegativeListsPanel() {
         </div>
       ) : null}
 
-      <div className="grid gap-3 xl:grid-cols-3">
-        <PincodePanel
-          items={pincodes}
-          busyId={busyPincodeId}
-          onAdd={async (pincode, reason) => {
-            setActionError(null);
-            const saved = await withToken((token) => addNegativePincode(token, { pincode, reason: reason || undefined }));
-            setPincodes((current) => {
-              const without = current.filter((item) => item.id !== saved.id);
-              return [saved, ...without];
-            });
-          }}
-          onRemove={async (id) => {
-            setActionError(null);
-            setBusyPincodeId(id);
-            try {
-              const saved = await withToken((token) => removeNegativePincode(token, id));
-              setPincodes((current) => current.map((item) => (item.id === saved.id ? saved : item)));
-            } catch (error) {
-              setActionError(error instanceof Error ? error.message : 'Unable to remove pincode.');
-            } finally {
-              setBusyPincodeId(null);
-            }
-          }}
-        />
+      <div className={scope === 'all' ? 'grid gap-3 xl:grid-cols-3' : 'grid gap-3'}>
+        {(scope === 'all' || scope === 'pincode') ? (
+          <PincodePanel
+            items={pincodes}
+            busyId={busyPincodeId}
+            onAdd={async (pincode, reason) => {
+              setActionError(null);
+              const saved = await withToken((token) => addNegativePincode(token, { pincode, reason: reason || undefined }));
+              setPincodes((current) => {
+                const without = current.filter((item) => item.id !== saved.id);
+                return [saved, ...without];
+              });
+            }}
+            onRemove={async (id) => {
+              setActionError(null);
+              setBusyPincodeId(id);
+              try {
+                const saved = await withToken((token) => removeNegativePincode(token, id));
+                setPincodes((current) => current.map((item) => (item.id === saved.id ? saved : item)));
+              } catch (error) {
+                setActionError(error instanceof Error ? error.message : 'Unable to remove pincode.');
+              } finally {
+                setBusyPincodeId(null);
+              }
+            }}
+          />
+        ) : null}
 
-        <CityPanel
-          items={cities}
-          cities={masterCities}
-          busyId={busyCityId}
-          onAdd={async (cityId, reason) => {
-            setActionError(null);
-            const saved = await withToken((token) => addNegativeCity(token, { cityId, reason: reason || undefined }));
-            setCities((current) => {
-              const without = current.filter((item) => item.id !== saved.id);
-              return [saved, ...without];
-            });
-          }}
-          onRemove={async (id) => {
-            setActionError(null);
-            setBusyCityId(id);
-            try {
-              const saved = await withToken((token) => removeNegativeCity(token, id));
-              setCities((current) => current.map((item) => (item.id === saved.id ? saved : item)));
-            } catch (error) {
-              setActionError(error instanceof Error ? error.message : 'Unable to remove city.');
-            } finally {
-              setBusyCityId(null);
-            }
-          }}
-        />
+        {(scope === 'all' || scope === 'city') ? (
+          <CityPanel
+            items={cities}
+            cities={masterCities}
+            busyId={busyCityId}
+            onAdd={async (cityId, reason) => {
+              setActionError(null);
+              const saved = await withToken((token) => addNegativeCity(token, { cityId, reason: reason || undefined }));
+              setCities((current) => {
+                const without = current.filter((item) => item.id !== saved.id);
+                return [saved, ...without];
+              });
+            }}
+            onRemove={async (id) => {
+              setActionError(null);
+              setBusyCityId(id);
+              try {
+                const saved = await withToken((token) => removeNegativeCity(token, id));
+                setCities((current) => current.map((item) => (item.id === saved.id ? saved : item)));
+              } catch (error) {
+                setActionError(error instanceof Error ? error.message : 'Unable to remove city.');
+              } finally {
+                setBusyCityId(null);
+              }
+            }}
+          />
+        ) : null}
 
-        <StatePanel
-          items={states}
-          states={masterStates}
-          busyId={busyStateId}
-          onAdd={async (stateId, reason) => {
-            setActionError(null);
-            const saved = await withToken((token) => addNegativeState(token, { stateId, reason: reason || undefined }));
-            setStates((current) => {
-              const without = current.filter((item) => item.id !== saved.id);
-              return [saved, ...without];
-            });
-          }}
-          onRemove={async (id) => {
-            setActionError(null);
-            setBusyStateId(id);
-            try {
-              const saved = await withToken((token) => removeNegativeState(token, id));
-              setStates((current) => current.map((item) => (item.id === saved.id ? saved : item)));
-            } catch (error) {
-              setActionError(error instanceof Error ? error.message : 'Unable to remove state.');
-            } finally {
-              setBusyStateId(null);
-            }
-          }}
-        />
+        {(scope === 'all' || scope === 'state') ? (
+          <StatePanel
+            items={states}
+            states={masterStates}
+            busyId={busyStateId}
+            onAdd={async (stateId, reason) => {
+              setActionError(null);
+              const saved = await withToken((token) => addNegativeState(token, { stateId, reason: reason || undefined }));
+              setStates((current) => {
+                const without = current.filter((item) => item.id !== saved.id);
+                return [saved, ...without];
+              });
+            }}
+            onRemove={async (id) => {
+              setActionError(null);
+              setBusyStateId(id);
+              try {
+                const saved = await withToken((token) => removeNegativeState(token, id));
+                setStates((current) => current.map((item) => (item.id === saved.id ? saved : item)));
+              } catch (error) {
+                setActionError(error instanceof Error ? error.message : 'Unable to remove state.');
+              } finally {
+                setBusyStateId(null);
+              }
+            }}
+          />
+        ) : null}
       </div>
     </div>
   );

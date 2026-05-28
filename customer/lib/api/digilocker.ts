@@ -108,6 +108,8 @@ export type DownloadAadhaarDigilockerResponse = {
   vendor: unknown;
   businessSuccess?: boolean;
   persisted?: boolean;
+  identityMismatch?: boolean;
+  identityMismatchMessage?: string;
 };
 
 /** Best-effort message from Tenacio-style `vendor` bodies on download failures. */

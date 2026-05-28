@@ -178,7 +178,8 @@ export function buildPostBreRulesCatalog(thresholds: PostBreThresholdsSnapshot):
       passCondition: 'No positive DPD on open loan accounts in window.',
       dataSources: ['PayStatusHistory on loan tradelines (excludes CC 10, telco 18–20)'],
       tuefReference: 'Monthly pay status → DPD days mapping',
-      notes: null,
+      notes:
+        'Unsecured personal loans (05, 06, etc.) are included. Credit cards (10) are excluded from this open-DPD check only — see Open unsecured exposure section.',
     },
     {
       id: 'dpd_dpd_30plus',

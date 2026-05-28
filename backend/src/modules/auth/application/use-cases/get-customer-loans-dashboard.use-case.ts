@@ -10,6 +10,12 @@ import type {
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { PrismaService } from '../../../../prisma/prisma.service';
 
+function isTerminalApplicationStatus(statusName: string): boolean {
+  return (
+    statusName === APPLICATION_STATUS.REJECTED || statusName === APPLICATION_STATUS.KYC_FAILED
+  );
+}
+
 function decToAmountString(value: Prisma.Decimal | null | undefined): string | null {
   if (value == null) return null;
   const n = value.toNumber();
@@ -146,7 +152,7 @@ export class GetCustomerLoansDashboardUseCase {
     const activeIndices = rows
       .map((raw, i) => ({ raw, i }))
       .filter(({ raw }) => {
-        if (raw.applicationStatus.name === APPLICATION_STATUS.REJECTED) return false;
+        if (isTerminalApplicationStatus(raw.applicationStatus.name)) return false;
         const maturity = raw.details?.loanMaturityDate ?? null;
         if (!maturity) return false;
         const maturityStart = new Date(
@@ -167,7 +173,7 @@ export class GetCustomerLoansDashboardUseCase {
     const pastLoans = cards.filter((c, i) => {
       const raw = rows[i];
       const status = raw.applicationStatus.name;
-      if (status === APPLICATION_STATUS.REJECTED) return true;
+      if (isTerminalApplicationStatus(status)) return true;
       const maturity = raw.details?.loanMaturityDate ?? null;
       if (!maturity) return false;
       const maturityStart = new Date(
@@ -178,7 +184,7 @@ export class GetCustomerLoansDashboardUseCase {
     });
 
     const isActiveRow = (raw: (typeof rows)[number]): boolean => {
-      if (raw.applicationStatus.name === APPLICATION_STATUS.REJECTED) return false;
+      if (isTerminalApplicationStatus(raw.applicationStatus.name)) return false;
       const maturity = raw.details?.loanMaturityDate ?? null;
       if (!maturity) return false;
       const maturityStart = new Date(
@@ -189,7 +195,7 @@ export class GetCustomerLoansDashboardUseCase {
     };
 
     const isPastRow = (raw: (typeof rows)[number]): boolean => {
-      if (raw.applicationStatus.name === APPLICATION_STATUS.REJECTED) return true;
+      if (isTerminalApplicationStatus(raw.applicationStatus.name)) return true;
       const maturity = raw.details?.loanMaturityDate ?? null;
       if (!maturity) return false;
       const maturityStart = new Date(

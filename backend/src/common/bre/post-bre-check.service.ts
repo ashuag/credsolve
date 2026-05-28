@@ -24,14 +24,20 @@ import {
 } from '../cibil/cibil-bureau-rules.parser';
 import { parseTenacioBureauVendorBody } from '../vendor/tenacio-bureau-payload.mapper';
 import { PrismaService } from '../../prisma/prisma.service';
+import { loadLoanAmountBounds } from './bre-settings.loader';
 import {
   buildPostBreRulesCatalog,
   POST_BRE_ENQUIRY_WINDOW_DAYS,
   type PostBreRuleCatalogEntry,
   type PostBreRulesCatalog,
 } from './post-bre-rules.catalog';
+import {
+  buildPostBreUnsecuredExposureGuide,
+  type CreditLimitTierRef,
+  type PostBreUnsecuredExposureGuide,
+} from './post-bre-unsecured-guide';
 
-export type { PostBreRuleCatalogEntry, PostBreRulesCatalog };
+export type { PostBreRuleCatalogEntry, PostBreRulesCatalog, PostBreUnsecuredExposureGuide, CreditLimitTierRef };
 
 export interface PostBreCheckInput {
   leadId: bigint;
@@ -128,11 +134,39 @@ export class PostBreCheckService {
     thresholds: PostBreThresholds;
     criteria: PostBreCriteriaConfigRow[];
     rules: PostBreRuleCatalogEntry[];
+    unsecuredExposure: PostBreUnsecuredExposureGuide;
   }> {
     const thresholds = await this.loadPostBreThresholds();
     const criteria = await this.loadPostBreCriteriaConfig(thresholds);
     const { rules, enquiryWindowDays } = buildPostBreRulesCatalog(thresholds);
-    return { enquiryWindowDays, thresholds, criteria, rules };
+    const [tierRows, bounds] = await Promise.all([
+      this.prisma.client.creditLimitTier.findMany({
+        orderBy: { sortOrder: 'asc' },
+        select: {
+          id: true,
+          minUnsecuredLoan: true,
+          maxUnsecuredLoan: true,
+          maxBulletLoan: true,
+          sortOrder: true,
+          isActive: true,
+        },
+      }),
+      loadLoanAmountBounds(this.prisma),
+    ]);
+    const creditLimitTiers: CreditLimitTierRef[] = tierRows.map((t) => ({
+      id: t.id,
+      minUnsecuredLoan: t.minUnsecuredLoan,
+      maxUnsecuredLoan: t.maxUnsecuredLoan,
+      maxBulletLoan: t.maxBulletLoan,
+      sortOrder: t.sortOrder,
+      isActive: t.isActive,
+    }));
+    const unsecuredExposure = buildPostBreUnsecuredExposureGuide({
+      creditLimitTiers,
+      minLoanAmountInr: bounds.minLoanAmountInr,
+      maxLoanAmountInr: bounds.maxLoanAmountInr,
+    });
+    return { enquiryWindowDays, thresholds, criteria, rules, unsecuredExposure };
   }
 
   /**

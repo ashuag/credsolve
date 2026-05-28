@@ -5,9 +5,9 @@ export default function SourceUtmPage() {
   return (
     <CrmShell
       title="Source & UTM"
-      subtitle="Manage LOS lead source masters and UTM source/medium/campaign values from one panel."
+      subtitle="View UTM listing with source mapping, and manage activation or edits."
     >
-      <SourceUtmPanel />
+      <SourceUtmPanel mode="list" />
     </CrmShell>
   );
 }

@@ -173,6 +173,14 @@ function sumDisbursementsByUtcDayKeys(
   return agg;
 }
 
+type LosUtmMasterRow = {
+  id: number;
+  leadSourceId: number;
+  name: string;
+  isActive: boolean;
+  leadSource: { name: string };
+};
+
 type LosDashboardDailyPoint = {
   date: string;
   newLeads: number;
@@ -223,7 +231,14 @@ export class LosDataService {
 
   async listLeads() {
     const leads = await this.prisma.client.lead.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        // Handed off to Applications — hide from lead queue once converted with an app row.
+        NOT: {
+          leadStatus: { name: LEAD_STATUS.CONVERTED },
+          applications: { some: {} },
+        },
+      },
       orderBy: { createdAt: 'desc' },
       include: {
         customer: { select: { uuid: true, mobileNumber: true } },
@@ -465,6 +480,7 @@ export class LosDataService {
         lead: {
           include: {
             leadStatus: { select: { name: true, displayName: true } },
+            source: { select: { name: true, type: true } },
             leadDetail: {
               include: {
                 city: { select: { name: true, state: { select: { name: true, code: true } } } },
@@ -534,6 +550,8 @@ export class LosDataService {
         uuid: lead.uuid,
         statusCode: lead.leadStatus.name,
         statusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
+        sourceName: lead.source?.name ?? null,
+        sourceType: lead.source?.type ?? null,
         panNumber: lead.panNumber,
         profile: detail
           ? {
@@ -656,10 +674,11 @@ export class LosDataService {
   }
 
   async getMasters() {
-    const utmQuery = {
+    const utmQueryBase = {
       include: { leadSource: { select: { name: true } } },
       orderBy: [{ leadSource: { name: 'asc' as const } }, { name: 'asc' as const }],
     };
+    const prismaAny = this.prisma.client as any;
 
     const [
       leadStatuses,
@@ -686,9 +705,9 @@ export class LosDataService {
       this.prisma.client.gender.findMany({ orderBy: { name: 'asc' } }),
       this.prisma.client.bank.findMany({ orderBy: { name: 'asc' } }),
       this.prisma.client.rejectionReason.findMany({ orderBy: { name: 'asc' } }),
-      this.prisma.client.utmSource.findMany(utmQuery),
-      this.prisma.client.utmMedium.findMany(utmQuery),
-      this.prisma.client.utmCampaign.findMany(utmQuery),
+      prismaAny.sourceUtm.findMany({ ...utmQueryBase, where: { type: 'SOURCE' } }),
+      prismaAny.sourceUtm.findMany({ ...utmQueryBase, where: { type: 'MEDIUM' } }),
+      prismaAny.sourceUtm.findMany({ ...utmQueryBase, where: { type: 'CAMPAIGN' } }),
     ]);
 
     return {
@@ -752,9 +771,9 @@ export class LosDataService {
         name: item.name,
         isActive: item.isActive,
       })),
-      utmSources: utmSources.map((item) => this.mapUtmTag(item)),
-      utmMediums: utmMediums.map((item) => this.mapUtmTag(item)),
-      utmCampaigns: utmCampaigns.map((item) => this.mapUtmTag(item)),
+      utmSources: (utmSources as LosUtmMasterRow[]).map((item: LosUtmMasterRow) => this.mapUtmTag(item)),
+      utmMediums: (utmMediums as LosUtmMasterRow[]).map((item: LosUtmMasterRow) => this.mapUtmTag(item)),
+      utmCampaigns: (utmCampaigns as LosUtmMasterRow[]).map((item: LosUtmMasterRow) => this.mapUtmTag(item)),
     };
   }
 
@@ -913,8 +932,8 @@ export class LosDataService {
   async createUtmSource(input: { leadSourceId: number; name: string }) {
     await this.assertLeadSourceExists(input.leadSourceId);
     try {
-      const row = await this.prisma.client.utmSource.create({
-        data: { leadSourceId: input.leadSourceId, name: input.name, isActive: true },
+      const row = await (this.prisma.client as any).sourceUtm.create({
+        data: { leadSourceId: input.leadSourceId, type: 'SOURCE', name: input.name, isActive: true },
         include: { leadSource: { select: { name: true } } },
       });
       return this.mapUtmTag(row);
@@ -927,14 +946,14 @@ export class LosDataService {
   }
 
   async updateUtmSource(id: number, dto: UpdateUtmSourceDto) {
-    return this.updateUtmTagRow('utmSource', id, dto, 'UTM source');
+    return this.updateUtmTagRow(id, dto, 'UTM source', 'SOURCE');
   }
 
   async createUtmMedium(input: { leadSourceId: number; name: string }) {
     await this.assertLeadSourceExists(input.leadSourceId);
     try {
-      const row = await this.prisma.client.utmMedium.create({
-        data: { leadSourceId: input.leadSourceId, name: input.name, isActive: true },
+      const row = await (this.prisma.client as any).sourceUtm.create({
+        data: { leadSourceId: input.leadSourceId, type: 'MEDIUM', name: input.name, isActive: true },
         include: { leadSource: { select: { name: true } } },
       });
       return this.mapUtmTag(row);
@@ -947,14 +966,14 @@ export class LosDataService {
   }
 
   async updateUtmMedium(id: number, dto: UpdateUtmMediumDto) {
-    return this.updateUtmTagRow('utmMedium', id, dto, 'UTM medium');
+    return this.updateUtmTagRow(id, dto, 'UTM medium', 'MEDIUM');
   }
 
   async createUtmCampaign(input: { leadSourceId: number; name: string }) {
     await this.assertLeadSourceExists(input.leadSourceId);
     try {
-      const row = await this.prisma.client.utmCampaign.create({
-        data: { leadSourceId: input.leadSourceId, name: input.name, isActive: true },
+      const row = await (this.prisma.client as any).sourceUtm.create({
+        data: { leadSourceId: input.leadSourceId, type: 'CAMPAIGN', name: input.name, isActive: true },
         include: { leadSource: { select: { name: true } } },
       });
       return this.mapUtmTag(row);
@@ -967,14 +986,14 @@ export class LosDataService {
   }
 
   async updateUtmCampaign(id: number, dto: UpdateUtmCampaignDto) {
-    return this.updateUtmTagRow('utmCampaign', id, dto, 'UTM campaign');
+    return this.updateUtmTagRow(id, dto, 'UTM campaign', 'CAMPAIGN');
   }
 
   private async updateUtmTagRow(
-    model: 'utmSource' | 'utmMedium' | 'utmCampaign',
     id: number,
     dto: { name?: string; isActive?: boolean },
     label: string,
+    type: 'SOURCE' | 'MEDIUM' | 'CAMPAIGN',
   ) {
     const hasName = dto.name !== undefined;
     const hasActive = dto.isActive !== undefined;
@@ -983,9 +1002,12 @@ export class LosDataService {
     }
 
     const client = this.prisma.client as any;
-    const existing = await client[model].findUnique({ where: { id } });
+    const existing = await client.sourceUtm.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException(`${label} not found`);
+    }
+    if (existing.type !== type) {
+      throw new BadRequestException(`${label} does not match requested UTM type.`);
     }
 
     const data: { name?: string; isActive?: boolean } = {};
@@ -1001,7 +1023,7 @@ export class LosDataService {
     }
 
     try {
-      const row = await client[model].update({
+      const row = await client.sourceUtm.update({
         where: { id },
         data,
         include: { leadSource: { select: { name: true } } },

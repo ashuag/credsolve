@@ -398,7 +398,13 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
           title="Acquisition context"
           description="How this lead entered the funnel — CRM source or last-touch UTM, when available."
         >
-          {lead.utm ? <UtmGrid utm={lead.utm} /> : (
+          <div className="mb-3 rounded-[12px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.62)] px-3 py-2.5">
+            <span className="block text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">Lead source</span>
+            <span className="mt-0.5 block text-[0.9rem] font-bold text-brand-text">{sourceSummary(lead)}</span>
+          </div>
+          {lead.utm ? (
+            <UtmGrid utm={lead.utm} />
+          ) : (
             <p className="m-0 text-[0.88rem] text-brand-muted">No campaign attribution payload was stored for this lead.</p>
           )}
         </SectionCard>

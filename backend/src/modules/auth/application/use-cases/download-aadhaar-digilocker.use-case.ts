@@ -9,7 +9,9 @@ import {
   extractAadhaarPhotoString,
   isTenacioVendorBusinessSuccess,
 } from '../../../../common/kyc/aadhaar-vendor-parse.util';
+import { compareAadhaarToLeadProfile } from '../../../../common/kyc/aadhaar-lead-identity-match.util';
 import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
+import { KycIdentityRejectionService } from '../../../../common/kyc/kyc-identity-rejection.service';
 import { assertApplicationKycNotCompleted } from '../../../../common/kyc/application-kyc-guard.util';
 import { assertActiveApplicationLoanDocumentsAccepted } from '../../../../common/loan-documents/application-loan-documents-guard.util';
 import { PrismaService } from '../../../../prisma/prisma.service';
@@ -28,6 +30,9 @@ export type DownloadAadhaarDigilockerResult = {
   businessSuccess?: boolean;
   /** When Aadhaar JSON + optional photo were written to DB / disk. */
   persisted?: boolean;
+  /** Name or DOB on Aadhaar did not match lead profile — application set to KYC_FAILED. */
+  identityMismatch?: boolean;
+  identityMismatchMessage?: string;
 };
 
 @Injectable()
@@ -41,6 +46,7 @@ export class DownloadAadhaarDigilockerUseCase {
     private readonly digilockerSession: DigilockerSessionStore,
     private readonly applications: ApplicationRepository,
     private readonly kycFiles: KycFilesService,
+    private readonly kycIdentityRejection: KycIdentityRejectionService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -114,6 +120,38 @@ export class DownloadAadhaarDigilockerUseCase {
         httpStatus: out.httpStatus,
         vendor,
         businessSuccess: false,
+      };
+    }
+
+    const leadProfile = await this.prisma.client.leadDetail.findUnique({
+      where: { leadId: lead.id },
+      select: { fullName: true, dateOfBirth: true },
+    });
+
+    const identityMatch = compareAadhaarToLeadProfile({
+      leadFullName: leadProfile?.fullName ?? null,
+      leadDateOfBirth: leadProfile?.dateOfBirth ?? null,
+      vendor,
+    });
+
+    if (!identityMatch.matched) {
+      await this.kycIdentityRejection.rejectForAadhaarProfileMismatch({
+        leadId: lead.id,
+        applicationId: applicationRow.id,
+        note: identityMatch.message,
+      });
+      await this.digilockerSession.clear(applicationRow.uuid);
+      this.logger.warn(
+        `Aadhaar identity mismatch (leadId=${lead.id.toString()}, reason=${identityMatch.reason}): ${identityMatch.message}`,
+      );
+      return {
+        configured: true,
+        ok: false,
+        httpStatus: out.httpStatus,
+        vendor,
+        businessSuccess: true,
+        identityMismatch: true,
+        identityMismatchMessage: identityMatch.message,
       };
     }
 

@@ -16,7 +16,9 @@ export class LosDataController {
   }
 
   @Get('leads/new')
-  @ApiOperation({ summary: 'List latest leads for LOS lead management' })
+  @ApiOperation({
+    summary: 'List open leads for LOS lead management (excludes CONVERTED leads with an application)',
+  })
   leads() {
     return this.losData.listLeads();
   }
