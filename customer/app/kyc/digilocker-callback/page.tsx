@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Suspense, useCallback, useEffect, useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams, type ReadonlyURLSearchParams } from 'next/navigation';
 import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { JourneyProgressProvider } from '@/components/journey/journey-progress-context';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
@@ -38,7 +38,8 @@ function describeContinueStep(href: string): string {
   return 'Continue your application.';
 }
 
-function readTokenFromSearchParams(params: URLSearchParams): string {
+function readTokenFromSearchParams(params: URLSearchParams | ReadonlyURLSearchParams | null): string {
+  if (!params) return '';
   return (
     params.get('sessionToken') ??
     params.get('session_token') ??
