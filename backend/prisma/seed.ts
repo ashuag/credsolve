@@ -6,7 +6,6 @@ import {seedUser} from './seeds/user.seed';
 import {createPrismaClient} from './prisma-client';
 import {seedLeadStatus} from "./seeds/lead_status.seed";
 import {seedState} from './seeds/state.seed';
-import {seedCity} from './seeds/city.seed';
 import {seedApplicationStatus} from "./seeds/application_status.seed";
 import {seedLoanReason} from "./seeds/loanReason.seed";
 import {seedSetting} from "./seeds/setting.seed";
@@ -68,7 +67,7 @@ async function main() {
         await seedOtpType(prisma);
         await seedLeadStatus(prisma);
         await seedState(prisma);
-        await seedCity(prisma);
+        // Cities/pincodes: use scripts/import-geography-bulk.mjs (see scripts/IMPORT_GEOGRAPHY.md).
         await seedUserRole(prisma);
         await seedUser(prisma);
         await seedApplicationStatus(prisma);

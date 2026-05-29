@@ -52,6 +52,13 @@ function asArray<T>(v: T | T[] | null | undefined): T[] {
   return Array.isArray(v) ? v : [v];
 }
 
+function resolvePayStatusHistory(lineRec: Record<string, unknown>): Record<string, unknown> | null {
+  const direct = asRecord(lineRec.PayStatusHistory);
+  if (direct) return direct;
+  const granted = asRecord(lineRec.GrantedTrade);
+  return granted ? asRecord(granted.PayStatusHistory) : null;
+}
+
 /** Parse CIBIL / ISO dates such as `2026-03-26+05:30` or `20260326`. */
 export function parseCibilDate(raw: unknown): Date | null {
   if (raw == null) return null;
@@ -296,7 +303,7 @@ export function auditNoAdverseTradelineInLookback(
         }
       }
 
-      const payHistory = asRecord(lineRec.PayStatusHistory);
+      const payHistory = resolvePayStatusHistory(lineRec);
       if (payHistory) {
         for (const entry of asArray(payHistory.MonthlyPayStatus)) {
           const entryRec = asRecord(entry);
@@ -526,7 +533,7 @@ function collectMonthlyDpdEntries(body: unknown): MonthlyDpdEntry[] {
       const isOpen = isCibilTradelineOpen(lineRec);
       const isLoanRelated = isLoanRelatedAccountType(partitionSymbol);
 
-      const payHistory = asRecord(lineRec.PayStatusHistory);
+      const payHistory = resolvePayStatusHistory(lineRec);
       if (payHistory) {
         let monthlyAdded = false;
         for (const entry of asArray(payHistory.MonthlyPayStatus)) {
@@ -784,7 +791,7 @@ export function auditNoSmaPwosTradelines(body: unknown): BureauTradelineRuleChec
       });
     }
 
-    const payHistory = asRecord(lineRec.PayStatusHistory);
+    const payHistory = resolvePayStatusHistory(lineRec);
     if (payHistory) {
       for (const entry of asArray(payHistory.MonthlyPayStatus)) {
         const entryRec = asRecord(entry);
@@ -982,7 +989,7 @@ function tradelineHasSmaPwosSignal(lineRec: Record<string, unknown>): boolean {
   const worst = granted ? readSymbol(granted.WorstPayStatus) : null;
   if (worst && isSmaOrPwosPayStatus(worst)) return true;
 
-  const payHistory = asRecord(lineRec.PayStatusHistory);
+  const payHistory = resolvePayStatusHistory(lineRec);
   if (payHistory) {
     for (const entry of asArray(payHistory.MonthlyPayStatus)) {
       const entryRec = asRecord(entry);

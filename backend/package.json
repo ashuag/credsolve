@@ -20,6 +20,7 @@
     "loan-docs:generate-field-maps": "node scripts/generate-loan-document-field-maps.mjs",
     "storage:migrate-to-spaces": "node scripts/migrate-local-storage-to-spaces.mjs",
     "storage:migrate-to-spaces:dry-run": "node scripts/migrate-local-storage-to-spaces.mjs --dry-run",
+    "geography:import": "node scripts/import-geography-bulk.mjs",
     "nest": "nest"
   },
   "dependencies": {

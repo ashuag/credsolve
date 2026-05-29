@@ -115,4 +115,44 @@ export class LookupController {
     }));
     return { values };
   }
+
+  @Get('pincodes')
+  @ApiOperation({ summary: 'Resolve a 6-digit pincode to city and state (master data)' })
+  @ApiQuery({ name: 'code', required: true, description: '6-digit Indian pincode' })
+  @ApiOkResponse({ description: 'Pincode row or null' })
+  async pincode(@Query('code') code?: string) {
+    const normalized = (code ?? '').trim();
+    if (!/^\d{6}$/.test(normalized)) {
+      return { value: null };
+    }
+
+    const row = await this.prisma.client.pincode.findFirst({
+      where: { code: normalized, isActive: true },
+      select: {
+        code: true,
+        city: {
+          select: {
+            id: true,
+            name: true,
+            state: { select: { id: true, code: true, name: true } },
+          },
+        },
+      },
+    });
+
+    if (!row) {
+      return { value: null };
+    }
+
+    return {
+      value: {
+        code: row.code,
+        cityId: row.city.id,
+        cityName: `${row.city.name}, ${row.city.state.code}`,
+        stateId: row.city.state.id,
+        stateCode: row.city.state.code,
+        stateName: row.city.state.name,
+      },
+    };
+  }
 }

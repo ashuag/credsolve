@@ -21,16 +21,33 @@ model City {
   id        Int      @id @default(autoincrement())
   name      String   @db.VarChar(100)
   stateId   Int      @map("state_id")
+  /// Legacy id from generic city export (row 1..N); used for pincode bulk import joins.
+  sourceCityId Int?  @unique @map("source_city_id")
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
 
   state        State         @relation(fields: [stateId], references: [id])
   leadDetails  LeadDetail[]
   negativeCity NegativeCity?
+  pincodes     Pincode[]
 
   @@unique([name, stateId])
   @@index([stateId])
   @@map("city")
+}
+
+/// Indian postal pincode master (6-digit code → city).
+model Pincode {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique @db.Char(6)
+  cityId    Int      @map("city_id")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  city City @relation(fields: [cityId], references: [id], onDelete: Restrict)
+
+  @@index([cityId])
+  @@map("pincode")
 }
 
 /// Serviceability: blocklisted 6-digit Indian pincodes (no FK — pincodes may exist outside `city` master).
