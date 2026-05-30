@@ -19,11 +19,15 @@ export type LosLeadSourceMaster = {
   isActive: boolean;
 };
 
-export type LosUtmTagMaster = {
+export type LosSourceUtmMaster = {
   id: number;
   leadSourceId: number;
   leadSourceName: string;
-  name: string;
+  utmSource: string | null;
+  utmCampaign: string | null;
+  utmTerm: string | null;
+  utmMedium: string | null;
+  utmContent: string | null;
   isActive: boolean;
 };
 
@@ -61,9 +65,7 @@ export type LosMastersPayload = {
   genders: LosNamedMaster[];
   banks: LosNamedMaster[];
   rejectionReasons: LosNamedMaster[];
-  utmSources: LosUtmTagMaster[];
-  utmMediums: LosUtmTagMaster[];
-  utmCampaigns: LosUtmTagMaster[];
+  sourceUtms: LosSourceUtmMaster[];
 };
 
 export type LosEligibilityCriterion = {
@@ -145,78 +147,42 @@ export async function updateLeadSource(
   );
 }
 
-export async function createUtmSource(
+export async function createSourceUtm(
   token: string,
-  data: { leadSourceId: number; name: string },
-): Promise<LosUtmTagMaster> {
-  return authorizedLosRequest<LosUtmTagMaster>(
+  data: {
+    leadSourceId: number;
+    utmSource?: string;
+    utmCampaign?: string;
+    utmTerm?: string;
+    utmMedium?: string;
+    utmContent?: string;
+  },
+): Promise<LosSourceUtmMaster> {
+  return authorizedLosRequest<LosSourceUtmMaster>(
     token,
-    '/masters/utm-sources',
+    '/masters/source-utms',
     { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(data) },
-    'Failed to create UTM source',
+    'Failed to create source UTM',
   );
 }
 
-export async function updateUtmSource(
+export async function updateSourceUtm(
   token: string,
   id: number,
-  data: { name?: string; isActive?: boolean },
-): Promise<LosUtmTagMaster> {
-  return authorizedLosRequest<LosUtmTagMaster>(
+  data: {
+    utmSource?: string;
+    utmCampaign?: string;
+    utmTerm?: string;
+    utmMedium?: string;
+    utmContent?: string;
+    isActive?: boolean;
+  },
+): Promise<LosSourceUtmMaster> {
+  return authorizedLosRequest<LosSourceUtmMaster>(
     token,
-    `/masters/utm-sources/${id}`,
+    `/masters/source-utms/${id}`,
     { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(data) },
-    'Failed to update UTM source',
-  );
-}
-
-export async function createUtmMedium(
-  token: string,
-  data: { leadSourceId: number; name: string },
-): Promise<LosUtmTagMaster> {
-  return authorizedLosRequest<LosUtmTagMaster>(
-    token,
-    '/masters/utm-mediums',
-    { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(data) },
-    'Failed to create UTM medium',
-  );
-}
-
-export async function updateUtmMedium(
-  token: string,
-  id: number,
-  data: { name?: string; isActive?: boolean },
-): Promise<LosUtmTagMaster> {
-  return authorizedLosRequest<LosUtmTagMaster>(
-    token,
-    `/masters/utm-mediums/${id}`,
-    { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(data) },
-    'Failed to update UTM medium',
-  );
-}
-
-export async function createUtmCampaign(
-  token: string,
-  data: { leadSourceId: number; name: string },
-): Promise<LosUtmTagMaster> {
-  return authorizedLosRequest<LosUtmTagMaster>(
-    token,
-    '/masters/utm-campaigns',
-    { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(data) },
-    'Failed to create UTM campaign',
-  );
-}
-
-export async function updateUtmCampaign(
-  token: string,
-  id: number,
-  data: { name?: string; isActive?: boolean },
-): Promise<LosUtmTagMaster> {
-  return authorizedLosRequest<LosUtmTagMaster>(
-    token,
-    `/masters/utm-campaigns/${id}`,
-    { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(data) },
-    'Failed to update UTM campaign',
+    'Failed to update source UTM',
   );
 }
 

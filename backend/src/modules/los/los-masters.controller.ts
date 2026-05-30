@@ -14,13 +14,9 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { LosAuthGuard } from './auth/los-auth.guard';
 import { CreateBankMasterDto } from './dto/create-bank-master.dto';
 import { CreateLeadSourceMasterDto } from './dto/create-lead-source-master.dto';
-import { CreateUtmCampaignDto } from './dto/create-utm-campaign.dto';
-import { CreateUtmMediumDto } from './dto/create-utm-medium.dto';
-import { CreateUtmSourceDto } from './dto/create-utm-source.dto';
 import { UpdateLeadSourceMasterDto } from './dto/update-lead-source-master.dto';
-import { UpdateUtmCampaignDto } from './dto/update-utm-campaign.dto';
-import { UpdateUtmMediumDto } from './dto/update-utm-medium.dto';
-import { UpdateUtmSourceDto } from './dto/update-utm-source.dto';
+import { CreateSourceUtmDto } from './dto/create-source-utm.dto';
+import { UpdateSourceUtmDto } from './dto/update-source-utm.dto';
 import { UpdateBankMasterDto } from './dto/update-bank-master.dto';
 import { UpdateEligibilityCriterionDto } from './dto/update-eligibility-criterion.dto';
 import { UpdateCreditLimitTierDto } from './dto/update-credit-limit-tier.dto';
@@ -94,48 +90,15 @@ export class LosMastersController {
     return this.losData.updateLeadSource(id, body);
   }
 
-  @Post('utm-sources')
-  @ApiOperation({ summary: 'Create UTM source tag for a lead source' })
-  createUtmSource(@Body() body: CreateUtmSourceDto) {
-    return this.losData.createUtmSource({
-      leadSourceId: body.leadSourceId,
-      name: body.name.trim(),
-    });
+  @Post('source-utms')
+  @ApiOperation({ summary: 'Create a source UTM record for a lead source' })
+  createSourceUtm(@Body() body: CreateSourceUtmDto) {
+    return this.losData.createSourceUtm(body);
   }
 
-  @Patch('utm-sources/:id')
-  @ApiOperation({ summary: 'Update UTM source tag' })
-  updateUtmSource(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateUtmSourceDto) {
-    return this.losData.updateUtmSource(id, body);
-  }
-
-  @Post('utm-mediums')
-  @ApiOperation({ summary: 'Create UTM medium tag for a lead source' })
-  createUtmMedium(@Body() body: CreateUtmMediumDto) {
-    return this.losData.createUtmMedium({
-      leadSourceId: body.leadSourceId,
-      name: body.name.trim(),
-    });
-  }
-
-  @Patch('utm-mediums/:id')
-  @ApiOperation({ summary: 'Update UTM medium tag' })
-  updateUtmMedium(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateUtmMediumDto) {
-    return this.losData.updateUtmMedium(id, body);
-  }
-
-  @Post('utm-campaigns')
-  @ApiOperation({ summary: 'Create UTM campaign tag for a lead source' })
-  createUtmCampaign(@Body() body: CreateUtmCampaignDto) {
-    return this.losData.createUtmCampaign({
-      leadSourceId: body.leadSourceId,
-      name: body.name.trim(),
-    });
-  }
-
-  @Patch('utm-campaigns/:id')
-  @ApiOperation({ summary: 'Update UTM campaign tag' })
-  updateUtmCampaign(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateUtmCampaignDto) {
-    return this.losData.updateUtmCampaign(id, body);
+  @Patch('source-utms/:id')
+  @ApiOperation({ summary: 'Update a source UTM record' })
+  updateSourceUtm(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateSourceUtmDto) {
+    return this.losData.updateSourceUtm(id, body);
   }
 }

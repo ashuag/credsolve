@@ -172,6 +172,17 @@ export async function verifyLeadPan(payload: VerifyLeadPanPayload): Promise<Veri
   );
 }
 
+/** Rejects the lead when client-side PAN name validation fails on the second attempt. */
+export async function rejectLeadPanClientValidation(leadUuid?: string): Promise<{ success: true; rejected: true }> {
+  return (
+    (await apiPost<{ success: true; rejected: true }>(
+      '/auth/reject-pan-client-validation',
+      leadUuid ? { leadUuid } : {},
+      'Unable to process your request right now.',
+    )) ?? { success: true, rejected: true }
+  );
+}
+
 export async function getCustomerLeadStatus(): Promise<CustomerLeadStatusResponse | null> {
   try {
     return await apiGet<CustomerLeadStatusResponse>(

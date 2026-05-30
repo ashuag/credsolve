@@ -45,20 +45,20 @@ export class PreBreCheckService {
 
     const [blockedPincode, blockedCity, blockedState] = await Promise.all([
       pincodeOk
-        ? this.prisma.client.negativePincode.findFirst({
-            where: { pincode: pincodeNorm, isActive: true },
+        ? this.prisma.client.pincode.findFirst({
+            where: { code: pincodeNorm, isNegative: true },
             select: { id: true },
           })
         : Promise.resolve(null),
       input.cityId != null
-        ? this.prisma.client.negativeCity.findFirst({
-            where: { cityId: input.cityId, isActive: true },
+        ? this.prisma.client.city.findFirst({
+            where: { id: input.cityId, isNegative: true },
             select: { id: true },
           })
         : Promise.resolve(null),
       input.stateId != null
-        ? this.prisma.client.negativeState.findFirst({
-            where: { stateId: input.stateId, isActive: true },
+        ? this.prisma.client.state.findFirst({
+            where: { id: input.stateId, isNegative: true },
             select: { id: true },
           })
         : Promise.resolve(null),

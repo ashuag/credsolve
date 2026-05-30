@@ -275,13 +275,22 @@ export class VerifyPanUseCase {
           ? leadPan
           : await this.updatePanStatus(leadRow.id, verification.panVerifiedStatus, verification.note);
 
-    if (verification.panVerifiedStatus === PAN_VERIFIED.NOT_VERIFIED) {
+    const shouldRejectForPan =
+      verification.panVerifiedStatus === PAN_VERIFIED.NOT_VERIFIED ||
+      verification.panVerifiedStatus === PAN_VERIFIED.API_FAILURE;
+
+    if (shouldRejectForPan) {
       await this.rejectLead(
         leadRow.id,
         this.buildPanRejectLeadNote(dto, verification),
         REJECTION_REASON.PAN_VERIFICATION_FAILED,
       );
       this.fireThankYouSms(customer.mobileNumber);
+      return {
+        success: true,
+        rejected: true,
+        message: BUREAU_THANK_YOU_MESSAGE,
+      };
     }
 
     if (verification.panVerifiedStatus === PAN_VERIFIED.VERIFIED) {
@@ -603,9 +612,8 @@ export class VerifyPanUseCase {
   private buildPanRejectLeadNote(dto: VerifyPanDto, verification: PanVerificationResult): string {
     const occ = OCCUPATION_SLUG_TO_DB[dto.occupation] ?? dto.occupation;
     const gen = GENDER_SLUG_TO_DB[dto.gender] ?? dto.gender;
-    const vendor = verification.note ? ` vendor=${verification.note.replace(/\s+/g, ' ').trim().slice(0, 80)}` : '';
-    const main = `PAN not verified: panStatus=${verification.panStatus ?? 'n/a'} nameMatch=${verification.nameMatch} dobMatch=${verification.dobMatch}${vendor}`;
-    return `${main} | occ=${occ} | gender=${gen}`.slice(0, 256);
+    const category = verification.category ? ` category=${verification.category}` : '';
+    return `PAN not verified: panStatus=${verification.panStatus ?? 'n/a'} nameMatch=${verification.nameMatch} dobMatch=${verification.dobMatch}${category} | occ=${occ} | gender=${gen}`.slice(0, 256);
   }
 
   /** Returns `true` when post-BRE rejects the lead (e.g. new-to-credit). */

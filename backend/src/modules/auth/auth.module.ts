@@ -23,6 +23,7 @@ import { SyncLeadEmailFromGoogleTokenUseCase } from './application/use-cases/syn
 import { VerifyOtpUseCase } from './application/use-cases/verify-otp.use-case';
 import { PostBureauOfferService } from './application/services/post-bureau-offer.service';
 import { VerifyPanUseCase } from './application/use-cases/verify-pan.use-case';
+import { RejectPanClientValidationUseCase } from './application/use-cases/reject-pan-client-validation.use-case';
 import { InitDigilockerUseCase } from './application/use-cases/init-digilocker.use-case';
 import { DownloadAadhaarDigilockerUseCase } from './application/use-cases/download-aadhaar-digilocker.use-case';
 import { GetPendingDigilockerSessionUseCase } from './application/use-cases/get-pending-digilocker-session.use-case';
@@ -103,6 +104,7 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     SendOtpUseCase,
     VerifyOtpUseCase,
     VerifyPanUseCase,
+    RejectPanClientValidationUseCase,
     InitDigilockerUseCase,
     DownloadAadhaarDigilockerUseCase,
     GetPendingDigilockerSessionUseCase,

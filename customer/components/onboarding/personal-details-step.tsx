@@ -8,7 +8,7 @@ import {DatePickerField} from '@/components/ui/date-picker-field';
 import {FlowLoader} from '@/components/ui/flow-loader';
 import {SearchableCityInput} from '@/components/ui/searchable-city-input';
 import type {CustomerPortalProfile} from '@/lib/api/customer-session';
-import {saveLeadDetails, saveLeadProfile, verifyLeadPan} from '@/lib/api/lead';
+import {rejectLeadPanClientValidation, saveLeadDetails, saveLeadProfile, verifyLeadPan} from '@/lib/api/lead';
 import {fetchPincodeLookup} from '@/lib/api/lookup';
 import {cn} from '@/lib/cn';
 import {
@@ -20,7 +20,7 @@ import {
 } from '@/lib/customer-details';
 import {formatDateDisplay, formatDateIso, getAge, parseDobDisplay, parseIsoDate,} from '@/lib/date-utils';
 import {useCustomerDetailLookups} from '@/lib/use-customer-detail-lookups';
-import {isValidPan, isValidPersonName, PERSON_NAME_VALIDATION_MESSAGE, PINCODE_REGEX, sanitizePersonNameInput} from '@/lib/validators';
+import {isPanNameMatch, isValidPan, isValidPersonName, PERSON_NAME_VALIDATION_MESSAGE, PINCODE_REGEX, sanitizePersonNameInput} from '@/lib/validators';
 import {useJourneyProgressOptional} from '@/components/journey/journey-progress-context';
 
 const SECTION_CLASS =
@@ -148,6 +148,8 @@ export function PersonalDetailsStep({
   const [errors, setErrors] = useState<FieldError>({});
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
+  const [panWarningShown, setPanWarningShown] = useState(false);
+  const [isRejectingPan, setIsRejectingPan] = useState(false);
   const [isLookingUpPincode, setIsLookingUpPincode] = useState(false);
   const [cityFromPincode, setCityFromPincode] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -408,14 +410,62 @@ export function PersonalDetailsStep({
   }
 
   async function handleContinueToFinancial() {
-    if (isSavingProfile) return;
+    if (isSavingProfile || isRejectingPan) return;
 
     const validation = validateProfileFields();
     const sectionErrors = pickErrors(validation, PROFILE_PAGE_FIELDS);
+
+    // Additional PAN name-match check (4th char = P, 5th char = last-name initial)
+    const pan = fields.panNumber.trim().toUpperCase();
+    const panFormatOk = Object.keys(sectionErrors).length === 0 || !sectionErrors.panNumber;
+    const panNameOk = panFormatOk && isPanNameMatch(pan, fields.fullName);
+
     if (Object.keys(sectionErrors).length > 0) {
       setErrors(sectionErrors);
       return;
     }
+
+    const profilePayload = {
+      leadUuid,
+      fullName: fields.fullName.trim(),
+      dob: fields.dob,
+      gender: fields.gender as CustomerGenderValue,
+      occupation: fields.occupation as CustomerOccupationValue,
+      panNumber: pan,
+      ...(usesMonthlyIncome ? { monthlyIncome: fields.monthlyIncome.trim() } : {}),
+      ...(isSelfEmployed
+        ? { annualTurnover: fields.annualTurnover.trim(), annualProfit: fields.annualProfit.trim() }
+        : {}),
+    };
+
+    if (!panNameOk) {
+      if (!panWarningShown) {
+        // First attempt — just show warning, no network call
+        setPanWarningShown(true);
+        setErrors((prev) => ({
+          ...prev,
+          panNumber: 'Please verify your pan number one more time',
+        }));
+        return;
+      }
+
+      // Second attempt — save profile then reject via dedicated endpoint
+      setSubmitError('');
+      setIsRejectingPan(true);
+      try {
+        await saveLeadProfile(profilePayload);
+        await rejectLeadPanClientValidation(leadUuid);
+      } catch {
+        // Redirect regardless — lead rejection is best-effort
+      } finally {
+        setIsRejectingPan(false);
+      }
+      router.push('/thank-you-interest');
+      return;
+    }
+
+    // PAN is valid — clear warning state and proceed
+    setPanWarningShown(false);
     setErrors((prev) => ({
       ...prev,
       fullName: undefined,
@@ -437,7 +487,7 @@ export function PersonalDetailsStep({
         dob: fields.dob,
         gender: fields.gender as CustomerGenderValue,
         occupation: fields.occupation as CustomerOccupationValue,
-        panNumber: fields.panNumber.trim().toUpperCase(),
+        panNumber: pan,
         ...(usesMonthlyIncome ? { monthlyIncome: fields.monthlyIncome.trim() } : {}),
         ...(isSelfEmployed
           ? { annualTurnover: fields.annualTurnover.trim(), annualProfit: fields.annualProfit.trim() }
@@ -628,6 +678,7 @@ export function PersonalDetailsStep({
                         setFields((prev) => ({ ...prev, panNumber: v }));
                         if (submitError) setSubmitError('');
                         if (errors.panNumber) setErrors((prev) => ({ ...prev, panNumber: undefined }));
+                        if (panWarningShown) setPanWarningShown(false);
                       }}
                       aria-invalid={Boolean(errors.panNumber)}
                       aria-describedby={errors.panNumber ? 'panNumber-error' : undefined}
@@ -725,18 +776,18 @@ export function PersonalDetailsStep({
                 <button
                   type="button"
                   onClick={() => void handleContinueToFinancial()}
-                  disabled={isSavingProfile}
-                  aria-busy={isSavingProfile}
+                  disabled={isSavingProfile || isRejectingPan}
+                  aria-busy={isSavingProfile || isRejectingPan}
                   className="mc-btn-primary flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <span className="inline-flex items-center justify-center gap-[10px]">
-                    {isSavingProfile ? (
+                    {(isSavingProfile || isRejectingPan) ? (
                       <span
                         className="w-[18px] h-[18px] shrink-0 rounded-full border-2 border-[rgba(255,248,223,0.28)] border-t-[#fff8df] animate-spin-btn"
                         aria-hidden
                       />
                     ) : null}
-                    <span>{isSavingProfile ? 'Saving…' : 'Continue'}</span>
+                    <span>{isSavingProfile ? 'Saving…' : isRejectingPan ? 'Verifying…' : 'Continue'}</span>
                   </span>
                 </button>
               </div>

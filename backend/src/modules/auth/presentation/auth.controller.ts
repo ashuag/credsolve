@@ -19,6 +19,8 @@ import { SaveLeadProfileUseCase } from '../application/use-cases/save-lead-profi
 import { SaveLeadReferencesUseCase } from '../application/use-cases/save-lead-references.use-case';
 import { VerifyOtpUseCase } from '../application/use-cases/verify-otp.use-case';
 import { VerifyPanUseCase } from '../application/use-cases/verify-pan.use-case';
+import { RejectPanClientValidationUseCase } from '../application/use-cases/reject-pan-client-validation.use-case';
+import { RejectPanClientValidationDto } from '../application/dto/reject-pan-client-validation.dto';
 import { InitDigilockerUseCase } from '../application/use-cases/init-digilocker.use-case';
 import { DownloadAadhaarDigilockerUseCase } from '../application/use-cases/download-aadhaar-digilocker.use-case';
 import { GetPendingDigilockerSessionUseCase } from '../application/use-cases/get-pending-digilocker-session.use-case';
@@ -61,6 +63,7 @@ export class AuthController {
     private readonly saveLeadProfileFlow: SaveLeadProfileUseCase,
     private readonly saveLeadReferencesFlow: SaveLeadReferencesUseCase,
     private readonly verifyPanFlow: VerifyPanUseCase,
+    private readonly rejectPanClientValidationFlow: RejectPanClientValidationUseCase,
     private readonly initDigilockerFlow: InitDigilockerUseCase,
     private readonly downloadAadhaarDigilockerFlow: DownloadAadhaarDigilockerUseCase,
     private readonly getPendingDigilockerSessionFlow: GetPendingDigilockerSessionUseCase,
@@ -269,6 +272,14 @@ export class AuthController {
     );
     
     return this.verifyPanFlow.execute(req, body);
+  }
+
+  @Post('reject-pan-client-validation')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reject lead when client-side PAN name validation fails on second attempt' })
+  rejectPanClientValidationRoute(@Req() req: Request, @Body() body: RejectPanClientValidationDto) {
+    return this.rejectPanClientValidationFlow.execute(req, body);
   }
 
   @Post('lead-references')

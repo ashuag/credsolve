@@ -1,494 +1,489 @@
 'use client';
 
 import {
-  createUtmCampaign,
-  createUtmMedium,
-  createUtmSource,
+  createSourceUtm,
   getMasters,
   type LosLeadSourceMaster,
-  type LosUtmTagMaster,
-  updateUtmCampaign,
-  updateUtmMedium,
-  updateUtmSource,
+  type LosSourceUtmMaster,
+  updateSourceUtm,
 } from '@/lib/api/masters';
 import { getLosToken } from '@/lib/auth';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
-type UtmKind = 'sources' | 'mediums' | 'campaigns';
+const PAGE_SIZE_OPTIONS = [10, 25, 50];
 
-const UTM_LABELS: Record<UtmKind, { title: string; singular: string; placeholder: string; create: typeof createUtmSource }> = {
-  sources: { title: 'UTM Source', singular: 'source', placeholder: 'e.g. google', create: createUtmSource },
-  mediums: { title: 'UTM Medium', singular: 'medium', placeholder: 'e.g. cpc', create: createUtmMedium },
-  campaigns: { title: 'UTM Campaign', singular: 'campaign', placeholder: 'e.g. summer-sale', create: createUtmCampaign },
-};
-
-type UtmRow = LosUtmTagMaster & { kind: UtmKind };
-type GroupedUtmRow = {
-  leadSourceId: number;
-  leadSourceName: string;
-  source: UtmRow | null;
-  medium: UtmRow | null;
-  campaign: UtmRow | null;
-};
-
-function IconActionButton({
-  title,
-  tone,
-  onClick,
-  disabled,
-  children,
-}: {
-  title: string;
-  tone: 'default' | 'danger' | 'success';
-  onClick: () => void;
-  disabled?: boolean;
-  children: React.ReactNode;
-}) {
-  const toneClass =
-    tone === 'danger'
-      ? 'border-[rgba(239,68,68,0.22)] text-[#9f1c1c]'
-      : tone === 'success'
-        ? 'border-[rgba(34,197,94,0.24)] text-[#166534]'
-        : 'border-[rgba(23,44,113,0.12)] text-brand-navy';
-  return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      disabled={disabled}
-      className={`inline-flex h-8 w-8 items-center justify-center rounded-[8px] border bg-white ${toneClass} disabled:cursor-not-allowed disabled:opacity-50`}
-    >
-      {children}
-      <span className="sr-only">{title}</span>
-    </button>
-  );
-}
+const UTM_COLS: { key: keyof LosSourceUtmMaster; label: string }[] = [
+  { key: 'leadSourceName', label: 'Lead Source' },
+  { key: 'utmSource',      label: 'Source' },
+  { key: 'utmCampaign',    label: 'Campaign' },
+  { key: 'utmMedium',      label: 'Medium' },
+  { key: 'utmTerm',        label: 'Term' },
+  { key: 'utmContent',     label: 'Content' },
+];
 
 export function SourceUtmPanel({
   mode = 'list',
-  editKind,
   editId,
 }: {
   mode?: 'list' | 'create' | 'edit';
-  editKind?: UtmKind;
   editId?: number;
 }) {
   const router = useRouter();
   const [leadSources, setLeadSources] = useState<LosLeadSourceMaster[]>([]);
-  const [utmSources, setUtmSources] = useState<LosUtmTagMaster[]>([]);
-  const [utmMediums, setUtmMediums] = useState<LosUtmTagMaster[]>([]);
-  const [utmCampaigns, setUtmCampaigns] = useState<LosUtmTagMaster[]>([]);
+  const [sourceUtms, setSourceUtms] = useState<LosSourceUtmMaster[]>([]);
+
+  // create / edit form
   const [leadSourceId, setLeadSourceId] = useState(0);
-  const [newSourceName, setNewSourceName] = useState('');
-  const [newMediumName, setNewMediumName] = useState('');
-  const [newCampaignName, setNewCampaignName] = useState('');
-  const [actionKindBySourceId, setActionKindBySourceId] = useState<Record<number, UtmKind>>({});
-  const [editName, setEditName] = useState('');
-  const [copiedSourceId, setCopiedSourceId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [formSource,   setFormSource]   = useState('');
+  const [formCampaign, setFormCampaign] = useState('');
+  const [formTerm,     setFormTerm]     = useState('');
+  const [formMedium,   setFormMedium]   = useState('');
+  const [formContent,  setFormContent]  = useState('');
+
+  // list filters + pagination
+  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [page,     setPage]    = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState<string | null>(null);
+  const [busy,     setBusy]     = useState(false);
 
   const loadData = useCallback(async () => {
     const token = getLosToken();
-    if (!token) {
-      setError('Session expired - please log in again.');
-      setLoading(false);
-      return;
-    }
-
+    if (!token) { setError('Session expired - please log in again.'); setLoading(false); return; }
     try {
       const masters = await getMasters(token);
       setLeadSources(masters.leadSources);
-      setUtmSources(masters.utmSources ?? []);
-      setUtmMediums(masters.utmMediums ?? []);
-      setUtmCampaigns(masters.utmCampaigns ?? []);
+      setSourceUtms(masters.sourceUtms ?? []);
       setError(null);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Failed to load source/UTM data.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load data.');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    void loadData();
-  }, [loadData]);
+  useEffect(() => { void loadData(); }, [loadData]);
+  useEffect(() => { if (!leadSourceId && leadSources[0]) setLeadSourceId(leadSources[0].id); }, [leadSourceId, leadSources]);
 
+  const editTarget = mode === 'edit' && editId ? (sourceUtms.find((r) => r.id === editId) ?? null) : null;
   useEffect(() => {
-    if (!leadSourceId && leadSources[0]) {
-      setLeadSourceId(leadSources[0].id);
+    if (editTarget) {
+      setFormSource(editTarget.utmSource ?? '');
+      setFormCampaign(editTarget.utmCampaign ?? '');
+      setFormTerm(editTarget.utmTerm ?? '');
+      setFormMedium(editTarget.utmMedium ?? '');
+      setFormContent(editTarget.utmContent ?? '');
     }
-  }, [leadSourceId, leadSources]);
-
-  const rows = useMemo<UtmRow[]>(() => {
-    return [
-      ...utmSources.map((row) => ({ ...row, kind: 'sources' as const })),
-      ...utmMediums.map((row) => ({ ...row, kind: 'mediums' as const })),
-      ...utmCampaigns.map((row) => ({ ...row, kind: 'campaigns' as const })),
-    ];
-  }, [utmCampaigns, utmMediums, utmSources]);
-
-  const groupedRows = useMemo<GroupedUtmRow[]>(() => {
-    const map = new Map<number, GroupedUtmRow>();
-    for (const row of rows) {
-      const existing = map.get(row.leadSourceId) ?? {
-        leadSourceId: row.leadSourceId,
-        leadSourceName: row.leadSourceName,
-        source: null,
-        medium: null,
-        campaign: null,
-      };
-      if (row.kind === 'sources') existing.source = row;
-      if (row.kind === 'mediums') existing.medium = row;
-      if (row.kind === 'campaigns') existing.campaign = row;
-      map.set(row.leadSourceId, existing);
-    }
-    return Array.from(map.values()).sort((a, b) => a.leadSourceName.localeCompare(b.leadSourceName));
-  }, [rows]);
-
-  const editTarget = useMemo(() => {
-    if (mode !== 'edit' || !editKind || !editId) return null;
-    return rows.find((row) => row.kind === editKind && row.id === editId) ?? null;
-  }, [editId, editKind, mode, rows]);
-
-  useEffect(() => {
-    if (editTarget) setEditName(editTarget.name);
   }, [editTarget]);
-
-  useEffect(() => {
-    setActionKindBySourceId((prev) => {
-      const next: Record<number, UtmKind> = { ...prev };
-      for (const group of groupedRows) {
-        const availableKinds = [
-          group.source ? 'sources' : null,
-          group.medium ? 'mediums' : null,
-          group.campaign ? 'campaigns' : null,
-        ].filter(Boolean) as UtmKind[];
-        if (availableKinds.length === 0) continue;
-        if (!next[group.leadSourceId] || !availableKinds.includes(next[group.leadSourceId]!)) {
-          next[group.leadSourceId] = availableKinds[0]!;
-        }
-      }
-      return next;
-    });
-  }, [groupedRows]);
 
   async function withBusy(task: (token: string) => Promise<unknown>) {
     const token = getLosToken();
-    if (!token) {
-      setError('Session expired - please log in again.');
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      await task(token);
-      await loadData();
-    } catch (taskError) {
-      setError(taskError instanceof Error ? taskError.message : 'Action failed.');
-    } finally {
-      setBusy(false);
-    }
+    if (!token) { setError('Session expired.'); return; }
+    setBusy(true); setError(null);
+    try { await task(token); await loadData(); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Action failed.'); }
+    finally { setBusy(false); }
   }
 
-  async function submitCreateUtm(event: FormEvent) {
-    event.preventDefault();
+  async function submitCreate(e: FormEvent) {
+    e.preventDefault();
     if (!leadSourceId) return;
-    const source = newSourceName.trim();
-    const medium = newMediumName.trim();
-    const campaign = newCampaignName.trim();
-    if (!source && !medium && !campaign) return;
-
+    const src = formSource.trim(), cmp = formCampaign.trim(), trm = formTerm.trim(), med = formMedium.trim(), cnt = formContent.trim();
+    if (!src && !cmp && !trm && !med && !cnt) return;
     await withBusy(async (token) => {
-      if (source) {
-        await createUtmSource(token, { leadSourceId, name: source });
-      }
-      if (medium) {
-        await createUtmMedium(token, { leadSourceId, name: medium });
-      }
-      if (campaign) {
-        await createUtmCampaign(token, { leadSourceId, name: campaign });
-      }
+      await createSourceUtm(token, {
+        leadSourceId,
+        utmSource:   src || undefined,
+        utmCampaign: cmp || undefined,
+        utmTerm:     trm || undefined,
+        utmMedium:   med || undefined,
+        utmContent:  cnt || undefined,
+      });
     });
-    setNewSourceName('');
-    setNewMediumName('');
-    setNewCampaignName('');
+    setFormSource(''); setFormCampaign(''); setFormTerm(''); setFormMedium(''); setFormContent('');
   }
 
-  async function copyUtmParams(group: GroupedUtmRow) {
+  async function copyUrl(row: LosSourceUtmMaster) {
     const params = new URLSearchParams();
-    if (group.source?.name) params.set('utm_source', group.source.name);
-    if (group.medium?.name) params.set('utm_medium', group.medium.name);
-    if (group.campaign?.name) params.set('utm_campaign', group.campaign.name);
-    const query = params.toString();
-    if (!query) return;
+    if (row.utmSource)   params.set('utm_source',   row.utmSource);
+    if (row.utmCampaign) params.set('utm_campaign',  row.utmCampaign);
+    if (row.utmTerm)     params.set('utm_term',      row.utmTerm);
+    if (row.utmMedium)   params.set('utm_medium',    row.utmMedium);
+    if (row.utmContent)  params.set('utm_content',   row.utmContent);
+    if (!params.size) return;
+    const base = (process.env.NEXT_PUBLIC_CUSTOMER_PORTAL_URL ?? '').replace(/\/$/, '');
     try {
-      await navigator.clipboard.writeText(query);
-      setCopiedSourceId(group.leadSourceId);
-      window.setTimeout(() => setCopiedSourceId((current) => (current === group.leadSourceId ? null : current)), 1400);
-    } catch {
-      /* ignore clipboard failure */
-    }
+      await navigator.clipboard.writeText(`${base}/?${params.toString()}`);
+      setCopiedId(row.id);
+      window.setTimeout(() => setCopiedId((c) => (c === row.id ? null : c)), 1600);
+    } catch { /* ignore */ }
+  }
+
+  // ── filtered + paginated rows ─────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    return sourceUtms.filter((row) =>
+      UTM_COLS.every(({ key }) => {
+        const f = (filters[key] ?? '').toLowerCase().trim();
+        if (!f) return true;
+        return String(row[key] ?? '').toLowerCase().includes(f);
+      }),
+    );
+  }, [sourceUtms, filters]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage   = Math.min(page, totalPages);
+  const paged      = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+  function setFilter(key: string, val: string) {
+    setFilters((prev) => ({ ...prev, [key]: val }));
+    setPage(1);
   }
 
   if (loading) {
-    return (
-      <div className="rounded-[12px] border border-[rgba(23,44,113,0.08)] bg-white p-6 text-brand-muted">
-        Loading source and UTM panel...
-      </div>
-    );
+    return <div className="rounded-[12px] border border-[rgba(23,44,113,0.08)] bg-white p-6 text-brand-muted">Loading…</div>;
   }
+
+  // ── shared form field style ───────────────────────────────────────────────
+  const inp = 'los-input';
 
   return (
     <div className="grid gap-4">
-      {error ? (
+      {error && (
         <div className="rounded-[10px] border border-[rgba(231,95,95,0.22)] bg-[rgba(255,241,241,0.92)] p-[10px_14px] text-[0.86rem] text-[#8d3434]">
           {error}
         </div>
-      ) : null}
+      )}
 
-      {mode === 'create' ? (
+      {/* ── CREATE ────────────────────────────────────────────────────────── */}
+      {mode === 'create' && (
         <section className="rounded-[16px] border border-[rgba(23,44,113,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,246,255,0.95))]">
-          <div className="border-b border-[rgba(23,44,113,0.07)] px-4 py-3">
-            <h2 className="m-0 text-[1.02rem] font-extrabold text-brand-navy">Create New UTM</h2>
-            <p className="m-0 mt-1 text-[0.84rem] text-brand-muted">
-              Select source, then add one or more UTM params together.
-            </p>
+          <div className="border-b border-[rgba(23,44,113,0.07)] px-5 py-4">
+            <h2 className="m-0 text-[1.02rem] font-extrabold text-brand-navy">Create Source UTM</h2>
+            <p className="m-0 mt-1 text-[0.84rem] text-brand-muted">Select a lead source and fill in the UTM parameters.</p>
           </div>
-          <form className="grid gap-3 px-4 py-4 md:grid-cols-2" onSubmit={(event) => void submitCreateUtm(event)}>
-            <label className="grid gap-1">
+          <form className="grid gap-4 px-5 py-5 md:grid-cols-2" onSubmit={(e) => void submitCreate(e)}>
+            <label className="grid gap-1 md:col-span-2">
               <span className="text-[0.78rem] font-bold text-brand-muted">Lead Source</span>
-              <select className="los-input" value={leadSourceId || ''} onChange={(event) => setLeadSourceId(Number(event.target.value))}>
-                {leadSources.map((source) => (
-                  <option key={source.id} value={source.id}>
-                    {source.name}
-                  </option>
-                ))}
+              <select className={inp} value={leadSourceId || ''} onChange={(e) => setLeadSourceId(Number(e.target.value))}>
+                {leadSources.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </label>
-            <div />
-            <label className="grid gap-1">
-              <span className="text-[0.78rem] font-bold text-brand-muted">UTM Source</span>
-              <input
-                className="los-input"
-                value={newSourceName}
-                placeholder="e.g. google"
-                onChange={(event) => setNewSourceName(event.target.value)}
-              />
-            </label>
-            <label className="grid gap-1">
-              <span className="text-[0.78rem] font-bold text-brand-muted">UTM Medium</span>
-              <input
-                className="los-input"
-                value={newMediumName}
-                placeholder="e.g. cpc"
-                onChange={(event) => setNewMediumName(event.target.value)}
-              />
-            </label>
-            <label className="grid gap-1 md:col-span-2">
-              <span className="text-[0.78rem] font-bold text-brand-muted">UTM Campaign</span>
-              <input
-                className="los-input"
-                value={newCampaignName}
-                placeholder="e.g. summer-sale"
-                onChange={(event) => setNewCampaignName(event.target.value)}
-              />
-            </label>
+            {[
+              { label: 'UTM Source',   val: formSource,   set: setFormSource,   ph: 'e.g. google' },
+              { label: 'UTM Campaign', val: formCampaign, set: setFormCampaign, ph: 'e.g. summer-sale' },
+              { label: 'UTM Medium',   val: formMedium,   set: setFormMedium,   ph: 'e.g. cpc' },
+              { label: 'UTM Term',     val: formTerm,     set: setFormTerm,     ph: 'e.g. personal+loan' },
+              { label: 'UTM Content',  val: formContent,  set: setFormContent,  ph: 'e.g. banner-v1' },
+            ].map(({ label, val, set, ph }) => (
+              <label key={label} className="grid gap-1">
+                <span className="text-[0.78rem] font-bold text-brand-muted">{label}</span>
+                <input className={inp} value={val} placeholder={ph} onChange={(e) => set(e.target.value)} />
+              </label>
+            ))}
             <div className="flex gap-2 md:col-span-2">
-              <Link href="/masters/source-utm" className="inline-flex min-h-[38px] items-center justify-center rounded-[8px] border border-[rgba(23,44,113,0.14)] px-4 text-[0.84rem] font-bold text-brand-navy no-underline">
-                Back
-              </Link>
-              <button
-                type="submit"
-                className="los-btn-primary"
-                disabled={busy || !leadSourceId || (!newSourceName.trim() && !newMediumName.trim() && !newCampaignName.trim())}
-              >
-                Create UTM
+              <Link href="/masters/source-utm" className="inline-flex min-h-[38px] items-center justify-center rounded-[8px] border border-[rgba(23,44,113,0.14)] px-4 text-[0.84rem] font-bold text-brand-navy no-underline">Back</Link>
+              <button type="submit" className="los-btn-primary" disabled={busy || !leadSourceId || (!formSource.trim() && !formCampaign.trim() && !formTerm.trim() && !formMedium.trim() && !formContent.trim())}>
+                Create
               </button>
             </div>
           </form>
         </section>
-      ) : mode === 'edit' ? (
+      )}
+
+      {/* ── EDIT ──────────────────────────────────────────────────────────── */}
+      {mode === 'edit' && (
         <section className="rounded-[16px] border border-[rgba(23,44,113,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,246,255,0.95))]">
-          <div className="border-b border-[rgba(23,44,113,0.07)] px-4 py-3">
-            <h2 className="m-0 text-[1.02rem] font-extrabold text-brand-navy">Edit UTM</h2>
-            <p className="m-0 mt-1 text-[0.84rem] text-brand-muted">Update a UTM tag for selected lead source.</p>
+          <div className="border-b border-[rgba(23,44,113,0.07)] px-5 py-4">
+            <h2 className="m-0 text-[1.02rem] font-extrabold text-brand-navy">Edit Source UTM</h2>
+            <p className="m-0 mt-1 text-[0.84rem] text-brand-muted">Update UTM parameters for this lead source.</p>
           </div>
           {!editTarget ? (
-            <div className="px-4 py-6 text-[0.9rem] text-brand-muted">UTM tag not found.</div>
+            <div className="px-5 py-6 text-[0.9rem] text-brand-muted">Source UTM not found.</div>
           ) : (
             <form
-              className="grid gap-3 px-4 py-4"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const trimmed = editName.trim();
-                if (!trimmed) return;
+              className="grid gap-4 px-5 py-5 md:grid-cols-2"
+              onSubmit={(e) => {
+                e.preventDefault();
                 void withBusy(async (token) => {
-                  if (editTarget.kind === 'sources') await updateUtmSource(token, editTarget.id, { name: trimmed });
-                  else if (editTarget.kind === 'mediums') await updateUtmMedium(token, editTarget.id, { name: trimmed });
-                  else await updateUtmCampaign(token, editTarget.id, { name: trimmed });
+                  await updateSourceUtm(token, editTarget.id, {
+                    utmSource:   formSource   || undefined,
+                    utmCampaign: formCampaign || undefined,
+                    utmTerm:     formTerm     || undefined,
+                    utmMedium:   formMedium   || undefined,
+                    utmContent:  formContent  || undefined,
+                  });
                   router.push('/masters/source-utm');
                 });
               }}
             >
-              <div className="grid gap-1">
+              <div className="grid gap-1 md:col-span-2">
                 <span className="text-[0.78rem] font-bold text-brand-muted">Lead Source</span>
-                <input className="los-input bg-[rgba(248,250,255,0.8)]" value={editTarget.leadSourceName} readOnly />
+                <input className={`${inp} bg-[rgba(248,250,255,0.8)]`} value={editTarget.leadSourceName} readOnly />
               </div>
-              <div className="grid gap-1">
-                <span className="text-[0.78rem] font-bold text-brand-muted">UTM Type</span>
-                <input className="los-input bg-[rgba(248,250,255,0.8)]" value={UTM_LABELS[editTarget.kind].title} readOnly />
-              </div>
-              <div className="grid gap-1">
-                <span className="text-[0.78rem] font-bold text-brand-muted">UTM Value</span>
-                <input className="los-input" value={editName} onChange={(event) => setEditName(event.target.value)} minLength={2} maxLength={100} required />
-              </div>
-              <div className="flex gap-2">
-                <Link href="/masters/source-utm" className="inline-flex min-h-[38px] items-center justify-center rounded-[8px] border border-[rgba(23,44,113,0.14)] px-4 text-[0.84rem] font-bold text-brand-navy no-underline">
-                  Back
-                </Link>
-                <button type="submit" className="los-btn-primary" disabled={busy || !editName.trim()}>
-                  Save Changes
-                </button>
+              {[
+                { label: 'UTM Source',   val: formSource,   set: setFormSource,   ph: 'e.g. google' },
+                { label: 'UTM Campaign', val: formCampaign, set: setFormCampaign, ph: 'e.g. summer-sale' },
+                { label: 'UTM Medium',   val: formMedium,   set: setFormMedium,   ph: 'e.g. cpc' },
+                { label: 'UTM Term',     val: formTerm,     set: setFormTerm,     ph: 'e.g. personal+loan' },
+                { label: 'UTM Content',  val: formContent,  set: setFormContent,  ph: 'e.g. banner-v1' },
+              ].map(({ label, val, set, ph }) => (
+                <label key={label} className="grid gap-1">
+                  <span className="text-[0.78rem] font-bold text-brand-muted">{label}</span>
+                  <input className={inp} value={val} placeholder={ph} onChange={(e) => set(e.target.value)} />
+                </label>
+              ))}
+              <div className="flex gap-2 md:col-span-2">
+                <Link href="/masters/source-utm" className="inline-flex min-h-[38px] items-center justify-center rounded-[8px] border border-[rgba(23,44,113,0.14)] px-4 text-[0.84rem] font-bold text-brand-navy no-underline">Back</Link>
+                <button type="submit" className="los-btn-primary" disabled={busy}>Save Changes</button>
               </div>
             </form>
           )}
         </section>
-      ) : (
-        <section className="rounded-[16px] border border-[rgba(23,44,113,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,246,255,0.95))]">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[rgba(23,44,113,0.07)] px-4 py-3">
+      )}
+
+      {/* ── LIST ──────────────────────────────────────────────────────────── */}
+      {mode === 'list' && (
+        <section className="overflow-hidden rounded-[18px] border border-[rgba(23,44,113,0.1)] bg-white shadow-[0_2px_16px_rgba(23,44,113,0.07)]">
+          {/* header */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[linear-gradient(135deg,rgba(23,44,113,0.05),rgba(59,130,246,0.04))] px-5 py-4">
             <div>
-              <h2 className="m-0 text-[1.02rem] font-extrabold text-brand-navy">UTM Listing with Source</h2>
-              <p className="m-0 mt-1 text-[0.82rem] text-brand-muted">
-                All UTM types listed with source mapping. Edit and activate/deactivate via actions.
+              <h2 className="m-0 text-[1.05rem] font-extrabold text-brand-navy">Source UTM Configurations</h2>
+              <p className="m-0 mt-0.5 text-[0.81rem] text-brand-muted">
+                {filtered.length} of {sourceUtms.length} record{sourceUtms.length !== 1 ? 's' : ''}
               </p>
             </div>
             <Link href="/masters/source-utm/create" className="los-btn-primary no-underline">
               + Create New
             </Link>
           </div>
+
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-[0.86rem]">
+            <table className="w-full border-collapse text-[0.85rem]">
               <thead>
-                <tr className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.82)] text-left">
-                  {['Lead Source', 'UTM Source', 'UTM Medium', 'UTM Campaign', 'Action'].map((heading) => (
-                    <th key={heading} className="px-4 py-2 text-[0.72rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-                      {heading}
+                {/* column labels */}
+                <tr className="bg-[rgba(23,44,113,0.04)]">
+                  {UTM_COLS.map(({ key, label }) => (
+                    <th key={key} className="border-b border-[rgba(23,44,113,0.08)] px-4 py-[10px] text-left text-[0.7rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
+                      {label}
                     </th>
                   ))}
+                  <th className="border-b border-[rgba(23,44,113,0.08)] px-4 py-[10px] text-left text-[0.7rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">Status</th>
+                  <th className="border-b border-[rgba(23,44,113,0.08)] px-4 py-[10px] text-left text-[0.7rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">Action</th>
+                </tr>
+                {/* filter row */}
+                <tr className="bg-[rgba(248,250,255,0.9)]">
+                  {UTM_COLS.map(({ key }) => (
+                    <td key={key} className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2">
+                      <input
+                        value={filters[key] ?? ''}
+                        onChange={(e) => setFilter(key, e.target.value)}
+                        placeholder="Filter…"
+                        className="w-full rounded-[7px] border border-[rgba(23,44,113,0.14)] bg-white px-2.5 py-1.5 text-[0.78rem] text-brand-text placeholder-brand-muted outline-none focus:border-[rgba(23,44,113,0.4)] focus:ring-0"
+                      />
+                    </td>
+                  ))}
+                  <td className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2">
+                    <select
+                      value={filters['isActive'] ?? ''}
+                      onChange={(e) => setFilter('isActive', e.target.value)}
+                      className="w-full rounded-[7px] border border-[rgba(23,44,113,0.14)] bg-white px-2 py-1.5 text-[0.78rem] text-brand-text outline-none focus:border-[rgba(23,44,113,0.4)]"
+                    >
+                      <option value="">All</option>
+                      <option value="true">Active</option>
+                      <option value="false">Inactive</option>
+                    </select>
+                  </td>
+                  <td className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2">
+                    {Object.values(filters).some(Boolean) && (
+                      <button
+                        type="button"
+                        onClick={() => { setFilters({}); setPage(1); }}
+                        className="rounded-[7px] border border-[rgba(239,68,68,0.22)] bg-white px-3 py-1.5 text-[0.75rem] font-bold text-[#9f1c1c] hover:bg-[rgba(254,242,242,0.8)]"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </td>
                 </tr>
               </thead>
               <tbody>
-                {groupedRows.map((group) => (
-                  <tr key={group.leadSourceId} className="border-b border-[rgba(23,44,113,0.05)]">
-                    <td className="px-4 py-3 font-semibold text-brand-text">{group.leadSourceName}</td>
-                    {[group.source, group.medium, group.campaign].map((entry, idx) => (
-                      <td key={`${group.leadSourceId}-${idx}`} className="px-4 py-3">
-                        {entry ? (
-                          <span className="font-semibold text-brand-navy">{entry.name}</span>
-                        ) : (
-                          <span className="text-brand-muted">—</span>
-                        )}
+                {paged.map((row, i) => {
+                  const hasParams = !!(row.utmSource || row.utmCampaign || row.utmTerm || row.utmMedium || row.utmContent);
+                  const rowBg = i % 2 === 0 ? 'bg-white' : 'bg-[rgba(248,250,255,0.55)]';
+                  return (
+                    <tr key={row.id} className={`${rowBg} transition-colors hover:bg-[rgba(235,242,255,0.7)]`}>
+                      <td className="border-b border-[rgba(23,44,113,0.04)] px-4 py-3 font-bold text-brand-navy">
+                        {row.leadSourceName}
                       </td>
-                    ))}
-                    <td className="px-4 py-3">
-                      {(() => {
-                        const selectedKind = actionKindBySourceId[group.leadSourceId] ?? 'sources';
-                        const target =
-                          selectedKind === 'sources'
-                            ? group.source
-                            : selectedKind === 'mediums'
-                              ? group.medium
-                              : group.campaign;
-                        const options = [
-                          group.source ? { value: 'sources' as const, label: 'Source' } : null,
-                          group.medium ? { value: 'mediums' as const, label: 'Medium' } : null,
-                          group.campaign ? { value: 'campaigns' as const, label: 'Campaign' } : null,
-                        ].filter(Boolean) as Array<{ value: UtmKind; label: string }>;
-
-                        if (!target || options.length === 0) return <span className="text-brand-muted">—</span>;
-
-                        return (
-                          <div className="flex items-center gap-2">
-                            <select
-                              className="los-input h-8 min-w-[98px] py-1 text-[0.78rem]"
-                              value={selectedKind}
-                              onChange={(event) =>
-                                setActionKindBySourceId((prev) => ({
-                                  ...prev,
-                                  [group.leadSourceId]: event.target.value as UtmKind,
-                                }))
-                              }
-                            >
-                              {options.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                            <Link
-                              href={`/masters/source-utm/edit?kind=${selectedKind}&id=${target.id}`}
-                              title="Edit"
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border border-[rgba(23,44,113,0.12)] text-brand-navy no-underline"
-                            >
-                              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
-                                <path d="M12 20h9" />
-                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                      {([row.utmSource, row.utmCampaign, row.utmMedium, row.utmTerm, row.utmContent] as (string | null)[]).map((val, idx) => (
+                        <td key={idx} className="border-b border-[rgba(23,44,113,0.04)] px-4 py-3">
+                          {val ? (
+                            <span className="inline-block rounded-[6px] bg-[rgba(59,130,246,0.08)] px-2 py-0.5 font-semibold text-[0.81rem] text-[#1e40af]">
+                              {val}
+                            </span>
+                          ) : (
+                            <span className="text-[0.8rem] text-brand-muted">—</span>
+                          )}
+                        </td>
+                      ))}
+                      <td className="border-b border-[rgba(23,44,113,0.04)] px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[0.74rem] font-bold ${row.isActive ? 'bg-[rgba(34,197,94,0.1)] text-[#15803d]' : 'bg-[rgba(156,163,175,0.15)] text-[#6b7280]'}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${row.isActive ? 'bg-[#22c55e]' : 'bg-[#9ca3af]'}`} />
+                          {row.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="border-b border-[rgba(23,44,113,0.04)] px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          {/* Edit */}
+                          <Link
+                            href={`/masters/source-utm/edit?id=${row.id}`}
+                            title="Edit"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-white text-brand-navy no-underline hover:bg-[rgba(235,242,255,0.8)]"
+                          >
+                            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                              <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                            </svg>
+                            <span className="sr-only">Edit</span>
+                          </Link>
+                          {/* Toggle active */}
+                          <button
+                            type="button"
+                            title={row.isActive ? 'Deactivate' : 'Activate'}
+                            onClick={() => void withBusy((t) => updateSourceUtm(t, row.id, { isActive: !row.isActive }))}
+                            disabled={busy}
+                            className={`inline-flex h-8 w-8 items-center justify-center rounded-[8px] border bg-white disabled:opacity-50 ${row.isActive ? 'border-[rgba(239,68,68,0.22)] text-[#dc2626] hover:bg-[rgba(254,242,242,0.8)]' : 'border-[rgba(34,197,94,0.24)] text-[#16a34a] hover:bg-[rgba(240,253,244,0.8)]'}`}
+                          >
+                            {row.isActive ? (
+                              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} aria-hidden>
+                                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                               </svg>
-                              <span className="sr-only">Edit</span>
-                            </Link>
-                            <IconActionButton
-                              title={target.isActive ? 'Deactivate' : 'Activate'}
-                              tone={target.isActive ? 'danger' : 'success'}
-                              onClick={() => {
-                                void withBusy((token) => {
-                                  if (target.kind === 'sources') return updateUtmSource(token, target.id, { isActive: !target.isActive });
-                                  if (target.kind === 'mediums') return updateUtmMedium(token, target.id, { isActive: !target.isActive });
-                                  return updateUtmCampaign(token, target.id, { isActive: !target.isActive });
-                                });
-                              }}
-                              disabled={busy}
-                            >
-                              {target.isActive ? (
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
-                                  <line x1="18" y1="6" x2="6" y2="18" />
-                                  <line x1="6" y1="6" x2="18" y2="18" />
+                            ) : (
+                              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} aria-hidden>
+                                <path d="M20 6 9 17l-5-5" />
+                              </svg>
+                            )}
+                            <span className="sr-only">{row.isActive ? 'Deactivate' : 'Activate'}</span>
+                          </button>
+                          {/* Copy URL */}
+                          <button
+                            type="button"
+                            onClick={() => void copyUrl(row)}
+                            disabled={busy || !hasParams}
+                            className={`inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-3 text-[0.75rem] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${copiedId === row.id ? 'border-[rgba(34,197,94,0.3)] bg-[rgba(240,253,244,0.9)] text-[#15803d]' : 'border-[rgba(23,44,113,0.18)] bg-white text-brand-navy hover:bg-[rgba(235,242,255,0.8)]'}`}
+                          >
+                            {copiedId === row.id ? (
+                              <>
+                                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} aria-hidden><path d="M20 6 9 17l-5-5" /></svg>
+                                Copied
+                              </>
+                            ) : (
+                              <>
+                                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                                 </svg>
-                              ) : (
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
-                                  <path d="M20 6 9 17l-5-5" />
-                                </svg>
-                              )}
-                            </IconActionButton>
-                            <button
-                              type="button"
-                              title="Copy UTM params"
-                              className="inline-flex h-8 items-center justify-center rounded-[8px] border border-[rgba(23,44,113,0.12)] px-2.5 text-[0.72rem] font-bold text-brand-navy"
-                              onClick={() => void copyUtmParams(group)}
-                              disabled={busy || (!group.source && !group.medium && !group.campaign)}
-                            >
-                              {copiedSourceId === group.leadSourceId ? 'Copied' : 'Copy'}
-                            </button>
-                          </div>
-                        );
-                      })()}
+                                Copy
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {paged.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-10 text-center text-[0.88rem] text-brand-muted">
+                      {Object.values(filters).some(Boolean) ? 'No records match your filters.' : 'No source UTMs found.'}
                     </td>
                   </tr>
-                ))}
-                {groupedRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-7 text-center text-brand-muted">No UTM tags found.</td>
-                  </tr>
-                ) : null}
+                )}
               </tbody>
             </table>
           </div>
+
+          {/* pagination */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.6)] px-5 py-3">
+            <div className="flex items-center gap-2 text-[0.8rem] text-brand-muted">
+              <span>Rows per page:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+                className="rounded-[7px] border border-[rgba(23,44,113,0.14)] bg-white px-2 py-1 text-[0.8rem] text-brand-text outline-none"
+              >
+                {PAGE_SIZE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+              <span className="ml-1">
+                {filtered.length === 0 ? '0' : `${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, filtered.length)}`} of {filtered.length}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setPage(1)}
+                disabled={safePage === 1}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-[7px] border border-[rgba(23,44,113,0.14)] bg-white text-brand-navy disabled:opacity-30"
+                title="First page"
+              >
+                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden><polyline points="11 17 6 12 11 7" /><polyline points="18 17 13 12 18 7" /></svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={safePage === 1}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-[7px] border border-[rgba(23,44,113,0.14)] bg-white text-brand-navy disabled:opacity-30"
+                title="Previous"
+              >
+                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden><polyline points="15 18 9 12 15 6" /></svg>
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                .reduce<(number | '…')[]>((acc, p, idx, arr) => {
+                  if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('…');
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, idx) =>
+                  p === '…' ? (
+                    <span key={`ellipsis-${idx}`} className="flex h-8 w-8 items-center justify-center text-[0.8rem] text-brand-muted">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPage(p as number)}
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-[7px] border text-[0.8rem] font-semibold transition-colors ${p === safePage ? 'border-brand-navy bg-brand-navy text-white' : 'border-[rgba(23,44,113,0.14)] bg-white text-brand-navy hover:bg-[rgba(235,242,255,0.8)]'}`}
+                    >
+                      {p}
+                    </button>
+                  ),
+                )}
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safePage === totalPages}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-[7px] border border-[rgba(23,44,113,0.14)] bg-white text-brand-navy disabled:opacity-30"
+                title="Next"
+              >
+                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden><polyline points="9 18 15 12 9 6" /></svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage(totalPages)}
+                disabled={safePage === totalPages}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-[7px] border border-[rgba(23,44,113,0.14)] bg-white text-brand-navy disabled:opacity-30"
+                title="Last page"
+              >
+                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden><polyline points="13 17 18 12 13 7" /><polyline points="6 17 11 12 6 7" /></svg>
+              </button>
+            </div>
+          </div>
         </section>
       )}
-
     </div>
   );
 }

@@ -96,20 +96,25 @@ model LeadSource {
   @@map("lead_source")
 }
 
-/// Unified source + UTM tag master values (`SOURCE` / `MEDIUM` / `CAMPAIGN`) per lead source.
 model SourceUtm {
-  id           Int      @id @default(autoincrement()) @db.SmallInt
-  leadSourceId Int      @map("lead_source_id")
-  type         SourceUtmType
-  name         String   @db.VarChar(100)
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id           Int       @id @default(autoincrement()) @db.SmallInt
+  leadSourceId Int       @map("lead_source_id")
+  utmSource    String?   @map("utm_source") @db.VarChar(100)
+  utmCampaign  String?   @map("utm_campaign") @db.VarChar(100)
+  utmTerm      String?   @map("utm_term") @db.VarChar(100)
+  utmMedium    String?   @map("utm_medium") @db.VarChar(100)
+  utmContent   String?   @map("utm_content") @db.VarChar(100)
+  createdBy    BigInt?   @map("created_by") @db.UnsignedBigInt
+  createdAt    DateTime  @default(now()) @map("created_at")
+  isActive     Boolean   @default(true) @map("is_active")
+  updatedBy    BigInt?   @map("updated_by") @db.UnsignedBigInt
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  leadSource LeadSource @relation(fields: [leadSourceId], references: [id])
+  leadSource      LeadSource @relation(fields: [leadSourceId], references: [id])
+  createdByUser   User?      @relation("SourceUtmCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser   User?      @relation("SourceUtmUpdatedBy", fields: [updatedBy], references: [id])
 
-  @@unique([leadSourceId, type, name])
-  @@index([leadSourceId, type])
+  @@index([leadSourceId])
   @@map("source_utm")
 }
 

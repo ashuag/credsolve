@@ -329,35 +329,24 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
               <span className="inline-flex items-center rounded-full border border-[rgba(23,44,113,0.1)] bg-[rgba(255,255,255,0.75)] px-3 py-1 text-[0.72rem] font-bold text-brand-muted">
                 Source: <span className="ml-1 text-brand-text">{sourceSummary(lead)}</span>
               </span>
+              {lead.rejectionReason && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(239,68,68,0.2)] bg-[rgba(254,242,242,0.85)] px-3 py-1 text-[0.72rem] font-bold text-[#b91c1c]">
+                  <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} aria-hidden><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  {lead.rejectionReason.label}
+                </span>
+              )}
             </div>
-            {(lead.rejectionReason ||
-              lead.leadStatusNote ||
-              lead.bureauFetchedNote ||
-              lead.statusCode.toUpperCase() === 'REJECTED') ? (
+            {(lead.leadStatusNote || lead.bureauFetchedNote) ? (
               <dl className="m-0 mt-4 grid gap-3 rounded-[12px] border border-[rgba(23,44,113,0.1)] bg-[rgba(248,250,255,0.85)] px-4 py-3 text-[0.84rem] leading-relaxed">
-                {(lead.rejectionReason || lead.statusCode.toUpperCase() === 'REJECTED') && (
-                  <div>
-                    <dt className="m-0 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-                      Rejection reason
-                    </dt>
-                    <dd className="m-0 mt-1 font-semibold text-brand-text">
-                      {lead.rejectionReason ? lead.rejectionReason.label : '—'}
-                    </dd>
-                  </div>
-                )}
                 {lead.leadStatusNote ? (
                   <div>
-                    <dt className="m-0 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-                      Notes
-                    </dt>
+                    <dt className="m-0 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">Notes</dt>
                     <dd className="m-0 mt-1 whitespace-pre-wrap break-words text-brand-text">{lead.leadStatusNote}</dd>
                   </div>
                 ) : null}
                 {lead.bureauFetchedNote ? (
                   <div>
-                    <dt className="m-0 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-                      Bureau / vendor note
-                    </dt>
+                    <dt className="m-0 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">Bureau / vendor note</dt>
                     <dd className="m-0 mt-1 whitespace-pre-wrap break-words text-brand-text">{lead.bureauFetchedNote}</dd>
                   </div>
                 ) : null}
@@ -400,25 +389,6 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <SectionCard
-          eyebrow="Identifiers"
-          title="Lead & customer references"
-          description="Stable IDs for CRM, underwriting, and support. Use copy when pasting into tickets or tools."
-        >
-          <DetailGrid
-            rows={[
-              {
-                label: 'Lead UUID',
-                value: <MonoValue copyLabel="Lead UUID">{lead.uuid}</MonoValue>,
-              },
-              {
-                label: 'Customer UUID',
-                value: <MonoValue copyLabel="Customer UUID">{lead.customerUuid}</MonoValue>,
-              },
-            ]}
-          />
-        </SectionCard>
-
         <SectionCard
           eyebrow="Attribution"
           title="Acquisition context"
