@@ -43,6 +43,8 @@ export default function KycSelfiePage() {
   /** Open webcam only while capturing; not after a saved selfie (avoids permission prompts on refresh / return visits). */
   const [retakeSelfie, setRetakeSelfie] = useState(false);
 
+  const navigatingRef = useRef(false);
+
   const kyc = session?.authenticated === true ? session.kycFaceProgress : null;
   const photoHref =
     kyc?.digilockerAadhaarPhotoUrl && session?.authenticated === true
@@ -111,8 +113,13 @@ export default function KycSelfiePage() {
   }, [needsWebcamStream, stopCamera]);
 
   async function continueToNextStep() {
+    if (navigatingRef.current) return;
+    navigatingRef.current = true;
     const next = await refresh();
-    if (!next.authenticated) return;
+    if (!next.authenticated) {
+      navigatingRef.current = false;
+      return;
+    }
     router.replace(getCustomerJourneyResumePath(next));
   }
 
