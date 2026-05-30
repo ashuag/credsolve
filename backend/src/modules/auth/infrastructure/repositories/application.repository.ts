@@ -92,6 +92,8 @@ export class ApplicationRepository {
       data: {
         selfieRelativePath: params.selfieRelativePath,
         livenessPassed: false,
+        livenessDone: false,
+        livenessDoneAt: null,
         livenessCheckedAt: null,
         livenessVendorJson: Prisma.JsonNull,
       },
@@ -104,6 +106,8 @@ export class ApplicationRepository {
       livenessVendorJson: Prisma.InputJsonValue;
       passed: boolean;
       checkedAt: Date;
+      done?: boolean;
+      doneAt?: Date | null;
     },
     tx?: DbClient,
   ) {
@@ -113,6 +117,8 @@ export class ApplicationRepository {
         livenessVendorJson: params.livenessVendorJson,
         livenessPassed: params.passed,
         livenessCheckedAt: params.checkedAt,
+        ...(params.done !== undefined ? { livenessDone: params.done } : {}),
+        ...(params.doneAt !== undefined ? { livenessDoneAt: params.doneAt } : {}),
       },
     });
   }

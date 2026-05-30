@@ -158,6 +158,8 @@ export class RunKycLivenessUseCase {
       livenessVendorJson: (vendor ?? null) as Prisma.InputJsonValue,
       passed: businessOk,
       checkedAt,
+      done: businessOk,
+      doneAt: businessOk ? checkedAt : null,
     });
 
     if (businessOk) {

@@ -26,6 +26,8 @@ model Application {
   livenessVendorJson    Json?                     @map("liveness_vendor_json")
   livenessCheckedAt     DateTime?                 @map("liveness_checked_at")
   livenessPassed        Boolean                   @default(false) @map("liveness_passed")
+  livenessDone          Boolean                   @default(false) @map("liveness_done")
+  livenessDoneAt        DateTime?                 @map("liveness_done_at")
   /// Object key: `customer/{uuid}/loan-documents/{app_uuid}/key-fact-statement.pdf` (and loan-agreement.pdf)
   keyFactPdfRelativePath     String?              @map("key_fact_pdf_relative_path") @db.VarChar(512)
   /// `customer/{uuid}/loan-documents/{app_uuid}/loan-agreement.pdf`

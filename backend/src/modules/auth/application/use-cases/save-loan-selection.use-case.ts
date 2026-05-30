@@ -157,6 +157,8 @@ export class SaveLoanSelectionUseCase {
           livenessVendorJson: Prisma.JsonNull,
           livenessCheckedAt: null,
           livenessPassed: false,
+          livenessDone: false,
+          livenessDoneAt: null,
           kycStatus: 0,
           kycCompletedAt: null,
         },
