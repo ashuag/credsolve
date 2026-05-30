@@ -127,6 +127,82 @@ export function decodeAadhaarPhoto(raw: string): { buffer: Buffer; ext: 'jpg' | 
 }
 
 /**
+ * Extracts the liveness score from a Tenacio vendor response.
+ * Tries common paths: `output.liveness_score`, `output.score`, `data.liveness_score`,
+ * `data.score`, and top-level `liveness_score` / `score`.
+ * Returns `null` when no numeric score is found.
+ */
+export function extractLivenessScore(vendor: unknown): number | null {
+  if (!isRecord(vendor)) return null;
+
+  const candidates = [vendor.output, vendor.data, vendor];
+
+  for (const obj of candidates) {
+    if (!isRecord(obj)) continue;
+    for (const key of ['liveness_score', 'score'] as const) {
+      const v = obj[key];
+      if (typeof v === 'number' && Number.isFinite(v)) return v;
+      if (typeof v === 'string') {
+        const n = parseFloat(v);
+        if (Number.isFinite(n)) return n;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Returns `true` when the Tenacio liveness response confirms `isLive`.
+ * Searches `output`, `data`, and root; treats absent field as `null` (caller decides fallback).
+ */
+export function extractLivenessIsLive(vendor: unknown): boolean | null {
+  if (!isRecord(vendor)) return null;
+
+  const candidates = [vendor.output, vendor.data, vendor];
+
+  for (const obj of candidates) {
+    if (!isRecord(obj)) continue;
+    for (const key of ['isLive', 'is_live', 'liveness'] as const) {
+      const v = obj[key];
+      if (typeof v === 'boolean') return v;
+      if (typeof v === 'string') {
+        const lower = v.trim().toLowerCase();
+        if (lower === 'true' || lower === 'live') return true;
+        if (lower === 'false' || lower === 'not_live' || lower === 'spoof') return false;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Returns `true` when the Tenacio response signals that multiple faces were detected.
+ * Searches `output`, `data`, and root; treats absent field as `null`.
+ */
+export function extractLivenessMultipleFacesDetected(vendor: unknown): boolean | null {
+  if (!isRecord(vendor)) return null;
+
+  const candidates = [vendor.output, vendor.data, vendor];
+
+  for (const obj of candidates) {
+    if (!isRecord(obj)) continue;
+    for (const key of ['multipleFacesDetected', 'multiple_faces_detected', 'multipleFaces'] as const) {
+      const v = obj[key];
+      if (typeof v === 'boolean') return v;
+      if (typeof v === 'string') {
+        const lower = v.trim().toLowerCase();
+        if (lower === 'true') return true;
+        if (lower === 'false') return false;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
  * Shallow `data` object for form binding; replaces `photo` with a short reference
  * (relative path under `KYC_FILES_ROOT`) when provided.
  */

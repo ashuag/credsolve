@@ -1,0 +1,1186 @@
+{
+  "data": {
+    "htmlUrl": null,
+    "cibilData": {
+      "GetCustomerAssetsResponse": {
+        "ResponseKey": "8ebc5d181f1948149a5dc564a83ef3a0",
+        "ResponseStatus": "Success",
+        "GetCustomerAssetsSuccess": {
+          "Asset": {
+            "Type": "SingleCreditReport",
+            "Status": "Active",
+            "AssetId": "143514328",
+            "CreationDate": "2026-05-28.000+05:30",
+            "ExpirationDate": "2026-05-28.000+05:30",
+            "SafetyCheckFailure": false,
+            "TrueLinkCreditReport": {
+              "Frozen": "",
+              "Message": {
+                "Code": {
+                  "rank": "100000",
+                  "symbol": "",
+                  "description": "",
+                  "abbreviation": ""
+                },
+                "Type": {
+                  "rank": "100000",
+                  "symbol": "ZZ",
+                  "description": "",
+                  "abbreviation": ""
+                },
+                "text": ""
+              },
+              "Sources": {
+                "Source": {
+                  "Bureau": {
+                    "rank": "100000",
+                    "symbol": "CIBIL",
+                    "description": "",
+                    "abbreviation": ""
+                  },
+                  "InquiryDate": "2026-05-28.000+05:30",
+                  "OriginalData": ""
+                }
+              },
+              "Borrower": {
+                "Birth": {
+                  "age": "0",
+                  "date": "",
+                  "Source": {
+                    "Bureau": {
+                      "rank": "100000",
+                      "symbol": "CIBIL",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "Locale": "en_IN",
+                    "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                    "BorrowerKey": "207135962",
+                    "InquiryDate": "2026-05-28+05:30"
+                  },
+                  "BirthDate": {
+                    "day": "",
+                    "year": "",
+                    "month": ""
+                  },
+                  "partitionSet": "0"
+                },
+                "Gender": "Female",
+                "Employer": {
+                  "name": "",
+                  "Source": {
+                    "Bureau": {
+                      "rank": "100000",
+                      "symbol": "CIBIL",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "Locale": "en_IN",
+                    "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                    "BorrowerKey": "207135962",
+                    "InquiryDate": "2026-05-28+05:30"
+                  },
+                  "account": "10",
+                  "dateReported": "2025-08-31+05:30",
+                  "partitionSet": "0",
+                  "serialNumber": "387819269",
+                  "CreditAddress": {
+                    "City": "",
+                    "Region": "",
+                    "PostalCode": "",
+                    "AddressType": "",
+                    "StreetAddress": ""
+                  },
+                  "OccupationCode": {
+                    "rank": "100000",
+                    "symbol": "01",
+                    "description": "Salaried",
+                    "abbreviation": ""
+                  },
+                  "NetGrossIndicator": "",
+                  "IncomeFreqIndicator": ""
+                },
+                "CreditScore": {
+                  "Source": {
+                    "Bureau": {
+                      "rank": "100000",
+                      "symbol": "CIBIL",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "Locale": "en_IN",
+                    "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                    "BorrowerKey": "207135962",
+                    "InquiryDate": "2026-05-28+05:30"
+                  },
+                  "riskScore": "670",
+                  "scoreName": "CIBILTransUnionScore3",
+                  "NoScoreReason": {
+                    "rank": "100000",
+                    "symbol": "",
+                    "description": "",
+                    "abbreviation": ""
+                  },
+                  "populationRank": "25",
+                  "CreditScoreModel": {
+                    "rank": "100000",
+                    "symbol": "CIBILTUSC3",
+                    "description": "",
+                    "abbreviation": ""
+                  },
+                  "CreditScoreFactor": []
+                },
+                "borrowerKey": "207135962",
+                "BorrowerName": {
+                  "Name": {
+                    "Surname": "SINGH",
+                    "Forename": "SUNITA"
+                  },
+                  "Source": {
+                    "Bureau": {
+                      "rank": "100000",
+                      "symbol": "CIBIL",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "Locale": "en_IN",
+                    "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                    "BorrowerKey": "207135962",
+                    "InquiryDate": "2026-05-28+05:30"
+                  },
+                  "NameType": {
+                    "rank": "100000",
+                    "symbol": "",
+                    "description": "",
+                    "abbreviation": ""
+                  },
+                  "partitionSet": "0"
+                },
+                "EmailAddress": [
+                  {
+                    "Email": "BIGBASKETMANDI@GMAIL.COM",
+                    "serialNumber": "1593044538"
+                  }
+                ],
+                "BorrowerAddress": [
+                  {
+                    "Origin": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "Dwelling": {
+                      "rank": "100000",
+                      "symbol": "04",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "Ownership": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enrichMode": "R",
+                    "addressOrder": "0",
+                    "dateReported": "2024-06-04+05:30",
+                    "partitionSet": "0",
+                    "CreditAddress": {
+                      "City": "",
+                      "Region": "",
+                      "PostalCode": "122505",
+                      "AddressType": "",
+                      "SerialNumber": "1201506147",
+                      "StreetAddress": "GURGAON HARYANA HARYANA Haryana"
+                    }
+                  }
+                ],
+                "CreditStatement": {
+                  "Source": {
+                    "Bureau": {
+                      "rank": "100000",
+                      "symbol": "CIBIL",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "Locale": "en_IN",
+                    "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                    "BorrowerKey": "207135962",
+                    "InquiryDate": "2026-05-28+05:30"
+                  },
+                  "statement": "",
+                  "dateUpdated": "",
+                  "StatementType": {
+                    "rank": "100000",
+                    "symbol": "DISPUTE",
+                    "description": "",
+                    "abbreviation": ""
+                  }
+                },
+                "BorrowerTelephone": [
+                  {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "PhoneType": {
+                      "rank": "100000",
+                      "symbol": "01",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enrichMode": "R",
+                    "PhoneNumber": {
+                      "Number": "9729816192",
+                      "SerialNumber": "3956040232"
+                    },
+                    "partitionSet": "0"
+                  }
+                ],
+                "IdentifierPartition": {
+                  "Identifier": [
+                    {
+                      "ID": {
+                        "Id": "207135962",
+                        "IdentifierName": "SocialId"
+                      },
+                      "Source": {
+                        "Bureau": {
+                          "rank": "100000",
+                          "symbol": "CIBIL",
+                          "description": "",
+                          "abbreviation": ""
+                        },
+                        "Locale": "en_IN",
+                        "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                        "BorrowerKey": "207135962",
+                        "InquiryDate": "2026-05-28+05:30"
+                      }
+                    }
+                  ]
+                }
+              },
+              "ReferenceKey": "1418265953",
+              "FraudIndicator": false,
+              "currentversion": "5.0",
+              "InquiryPartition": [
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2026-05-28+05:30",
+                    "inquiryType": "10",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "4143217820",
+                    "subscriberName": "DMIFINANCE",
+                    "subscriberNumber": ""
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2026-05-25+05:30",
+                    "inquiryType": "05",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "633748",
+                    "subscriberName": "BAJAJ FIN LTD",
+                    "subscriberNumber": ""
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2026-05-25+05:30",
+                    "inquiryType": "06",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "123282749",
+                    "subscriberName": "BAJAJ FIN LTD",
+                    "subscriberNumber": ""
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2026-05-19+05:30",
+                    "inquiryType": "05",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "1859640625",
+                    "subscriberName": "BAJAJ FIN LTD",
+                    "subscriberNumber": ""
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2026-05-19+05:30",
+                    "inquiryType": "06",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "3821953451",
+                    "subscriberName": "BAJAJ FIN LTD",
+                    "subscriberNumber": ""
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2026-05-19+05:30",
+                    "inquiryType": "05",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "2363578239",
+                    "subscriberName": "KRAZYBEE",
+                    "subscriberNumber": ""
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2026-05-19+05:30",
+                    "inquiryType": "05",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "3248795217",
+                    "subscriberName": "TRUE CREDITS",
+                    "subscriberNumber": ""
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2025-08-11+05:30",
+                    "inquiryType": "05",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "385653403",
+                    "subscriberName": "SMICC",
+                    "subscriberNumber": ""
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2025-07-08+05:30",
+                    "inquiryType": "05",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "3118490850",
+                    "subscriberName": "SMICC",
+                    "subscriberNumber": ""
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2025-02-19+05:30",
+                    "inquiryType": "05",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "2435998235",
+                    "subscriberName": "BAJAJ FIN LTD",
+                    "subscriberNumber": ""
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2025-02-05+05:30",
+                    "inquiryType": "06",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "4270870523",
+                    "subscriberName": "BAJAJ FIN LTD",
+                    "subscriberNumber": ""
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2025-01-13+05:30",
+                    "inquiryType": "05",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "2294262254",
+                    "subscriberName": "TRUE CREDITS",
+                    "subscriberNumber": ""
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2025-01-13+05:30",
+                    "inquiryType": "05",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "3123205659",
+                    "subscriberName": "WHIZDMFINANCE",
+                    "subscriberNumber": ""
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2025-01-13+05:30",
+                    "inquiryType": "05",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "2838559048",
+                    "subscriberName": "AKARACAPL",
+                    "subscriberNumber": ""
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2025-01-11+05:30",
+                    "inquiryType": "05",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "1871937142",
+                    "subscriberName": "INCRED FINANCE",
+                    "subscriberNumber": ""
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2024-10-11+05:30",
+                    "inquiryType": "05",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "3231863815",
+                    "subscriberName": "FICCL",
+                    "subscriberNumber": ""
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2024-06-04+05:30",
+                    "inquiryType": "05",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "404686233",
+                    "subscriberName": "FICCL",
+                    "subscriberNumber": ""
+                  }
+                }
+              ],
+              "DeceasedIndicator": false,
+              "SafetyCheckPassed": true,
+              "TradeLinePartition": [
+                {
+                  "Tradeline": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "branch": "",
+                    "bureau": "",
+                    "position": "0",
+                    "PayStatus": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "OpenClosed": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "dateOpened": "2025-08-27+05:30",
+                    "dateClosed": "2026-04-29+05:30",
+                    "DisputeFlag": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "highBalance": "450000",
+                    "GrantedTrade": {
+                      "TermType": {
+                        "rank": "100000",
+                        "symbol": "",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "CashLimit": "-1",
+                      "EMIAmount": "-1",
+                      "CreditType": {
+                        "rank": "100000",
+                        "symbol": "05",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "collateral": "-1",
+                      "termMonths": "-1",
+                      "AccountType": {
+                        "rank": "100000",
+                        "symbol": "05",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "CreditLimit": "450000",
+                      "interestRate": "-1",
+                      "serialNumber": "2657519123",
+                      "amountPastDue": "0",
+                      "CollateralType": {
+                        "rank": "100000",
+                        "symbol": "",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "WorstPayStatus": {
+                        "rank": "100000",
+                        "symbol": "",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "dateLastPayment": "2026-04-29+05:30",
+                      "PayStatusHistory": {
+                        "status": "1,3,23,26,48,79,107,138,0,0,",
+                        "endDate": "2026-05-01+05:30",
+                        "startDate": "2025-08-01+05:30",
+                        "MonthlyPayStatus": [
+                          {
+                            "date": "2026-05-01+05:30",
+                            "status": "0"
+                          },
+                          {
+                            "date": "2026-04-01+05:30",
+                            "status": "0"
+                          },
+                          {
+                            "date": "2026-03-01+05:30",
+                            "status": "138"
+                          },
+                          {
+                            "date": "2026-02-01+05:30",
+                            "status": "107"
+                          },
+                          {
+                            "date": "2026-01-01+05:30",
+                            "status": "79"
+                          },
+                          {
+                            "date": "2025-12-01+05:30",
+                            "status": "48"
+                          },
+                          {
+                            "date": "2025-11-01+05:30",
+                            "status": "26"
+                          },
+                          {
+                            "date": "2025-10-01+05:30",
+                            "status": "23"
+                          },
+                          {
+                            "date": "2025-09-01+05:30",
+                            "status": "3"
+                          },
+                          {
+                            "date": "2025-08-01+05:30",
+                            "status": "1"
+                          }
+                        ]
+                      },
+                      "PaymentFrequency": {
+                        "rank": "100000",
+                        "symbol": "03",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "actualPaymentAmount": "-1"
+                    },
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "creditorName": "SMICC",
+                    "dateReported": "2026-05-15+05:30",
+                    "accountNumber": "220046208227329",
+                    "accountsSoldTo": "",
+                    "currentBalance": "0",
+                    "subscriberCode": "3519123",
+                    "thirdPartyName": "",
+                    "AccountCondition": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "noOfParticipants": "",
+                    "settlementAmount": "-1",
+                    "AccountDesignator": {
+                      "rank": "100000",
+                      "symbol": "1",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "dateAccountStatus": "2026-04-29+05:30",
+                    "writtenOffAmtTotal": "-1",
+                    "writtenOffPrincipal": "-1",
+                    "VerificationIndicator": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    }
+                  },
+                  "accountTypeSymbol": "05",
+                  "accountTypeDescription": "",
+                  "accountTypeAbbreviation": ""
+                },
+                {
+                  "Tradeline": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "c70ab958-ecbb-4241-bfb3-bcfe7a90a142",
+                      "BorrowerKey": "207135962",
+                      "InquiryDate": "2026-05-28+05:30"
+                    },
+                    "branch": "",
+                    "bureau": "",
+                    "position": "1",
+                    "PayStatus": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "OpenClosed": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "dateOpened": "2024-10-28+05:30",
+                    "dateClosed": "2025-08-27+05:30",
+                    "DisputeFlag": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "highBalance": "50000",
+                    "GrantedTrade": {
+                      "TermType": {
+                        "rank": "100000",
+                        "symbol": "",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "CashLimit": "-1",
+                      "EMIAmount": "-1",
+                      "CreditType": {
+                        "rank": "100000",
+                        "symbol": "05",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "collateral": "-1",
+                      "termMonths": "-1",
+                      "AccountType": {
+                        "rank": "100000",
+                        "symbol": "05",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "CreditLimit": "50000",
+                      "interestRate": "-1",
+                      "serialNumber": "3948797807",
+                      "amountPastDue": "0",
+                      "CollateralType": {
+                        "rank": "100000",
+                        "symbol": "",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "WorstPayStatus": {
+                        "rank": "100000",
+                        "symbol": "",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "dateLastPayment": "2025-08-27+05:30",
+                      "PayStatusHistory": {
+                        "status": "0,0,0,0,0,0,0,0,0,0,0,0,0,",
+                        "endDate": "2025-10-01+05:30",
+                        "startDate": "2024-10-01+05:30",
+                        "MonthlyPayStatus": [
+                          {
+                            "date": "2025-10-01+05:30",
+                            "status": "0"
+                          },
+                          {
+                            "date": "2025-09-01+05:30",
+                            "status": "0"
+                          },
+                          {
+                            "date": "2025-08-01+05:30",
+                            "status": "0"
+                          },
+                          {
+                            "date": "2025-07-01+05:30",
+                            "status": "0"
+                          },
+                          {
+                            "date": "2025-06-01+05:30",
+                            "status": "0"
+                          },
+                          {
+                            "date": "2025-05-01+05:30",
+                            "status": "0"
+                          },
+                          {
+                            "date": "2025-04-01+05:30",
+                            "status": "0"
+                          },
+                          {
+                            "date": "2025-03-01+05:30",
+                            "status": "0"
+                          },
+                          {
+                            "date": "2025-02-01+05:30",
+                            "status": "0"
+                          },
+                          {
+                            "date": "2025-01-01+05:30",
+                            "status": "0"
+                          },
+                          {
+                            "date": "2024-12-01+05:30",
+                            "status": "0"
+                          },
+                          {
+                            "date": "2024-11-01+05:30",
+                            "status": "0"
+                          },
+                          {
+                            "date": "2024-10-01+05:30",
+                            "status": "0"
+                          }
+                        ]
+                      },
+                      "PaymentFrequency": {
+                        "rank": "100000",
+                        "symbol": "03",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "actualPaymentAmount": "-1"
+                    },
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "creditorName": "SMICC",
+                    "dateReported": "2025-10-31+05:30",
+                    "accountNumber": "220046206525401",
+                    "accountsSoldTo": "",
+                    "currentBalance": "0",
+                    "subscriberCode": "7797807",
+                    "thirdPartyName": "",
+                    "AccountCondition": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "noOfParticipants": "",
+                    "settlementAmount": "-1",
+                    "AccountDesignator": {
+                      "rank": "100000",
+                      "symbol": "1",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "dateAccountStatus": "2025-08-27+05:30",
+                    "writtenOffAmtTotal": "-1",
+                    "writtenOffPrincipal": "-1",
+                    "VerificationIndicator": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    }
+                  },
+                  "accountTypeSymbol": "05",
+                  "accountTypeDescription": "",
+                  "accountTypeAbbreviation": ""
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "type": "point",
+  "status": "success",
+  "requestId": "914bb6e9-2230-4675-9ca1-36e389133f1f",
+  "vendorResponse": [
+    {
+      "name": "SapphireSwan",
+      "sequence": 1,
+      "statusCode": 200
+    }
+  ],
+  "serviceStatusCode": 200,
+  "_meta": {
+    "convertedFromHtml": "30+ last 3 months 2.html",
+    "convertedAt": "2026-05-29T16:35:25.062Z",
+    "accountCount": 2,
+    "inquiryCount": 17
+  }
+}

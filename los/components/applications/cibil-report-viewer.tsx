@@ -98,48 +98,102 @@ function ReportSection({
   );
 }
 
-function paymentStatusClass(status: string): string {
-  const s = status.trim().toUpperCase();
-  if (s === '000' || s === 'STD' || s === 'XXX') {
-    return 'bg-[rgba(34,197,94,0.14)] text-[#166534]';
+type PayStatusStyle = { bg: string; fg: string };
+
+function parsePayStatusToDpdDays(raw: string): number | null {
+  if (!raw) return null;
+  if (raw === '0' || raw === '00' || raw === '000') return 0;
+  if (/^\d+$/.test(raw)) {
+    const n = Number.parseInt(raw, 10);
+    return Number.isFinite(n) ? n : null;
   }
-  if (s === 'SUB' || s === 'DBT' || s === 'LSS' || s === 'SMA' || s === 'DEL' || /^\d{3}$/.test(s) && Number(s) > 0) {
-    return 'bg-[rgba(239,68,68,0.12)] text-[#991b1b]';
-  }
-  return 'bg-[rgba(148,163,184,0.18)] text-brand-muted';
+  return null;
 }
+
+function resolvePaymentStatusStyle(raw: string): PayStatusStyle {
+  const s = raw.trim().toUpperCase();
+  if (!s) return { bg: 'transparent', fg: '#8c9199' };
+  if (s === 'XXX') return { bg: 'transparent', fg: '#8c9199' };
+  if (s === 'STD' || s === '0' || s === '00' || s === '000') return { bg: '#e6f5e6', fg: '#197a38' };
+  if (s === 'SMA' || s.startsWith('SMA')) return { bg: '#ffeda6', fg: '#8c5905' };
+  if (s === 'PWOS') return { bg: '#f2bf8c', fg: '#732e0d' };
+  if (s === 'SUB') return { bg: '#fad1b8', fg: '#b2381f' };
+  if (s === 'DBT') return { bg: '#eb7261', fg: '#fff' };
+  if (s === 'LSS' || s === 'LOSS') return { bg: '#b81f24', fg: '#fff' };
+  if (s === 'SET' || s === 'SETTLED') return { bg: '#8c479e', fg: '#fff' };
+  if (s === 'WOF' || s === 'WOFF' || s === 'WO' || s.includes('WRITTEN')) return { bg: '#731f1f', fg: '#fff' };
+
+  const dpd = parsePayStatusToDpdDays(s);
+  if (dpd != null) {
+    if (dpd === 0) return { bg: '#e6f5e6', fg: '#197a38' };
+    if (dpd >= 90) return { bg: '#b81f24', fg: '#fff' };
+    if (dpd >= 60) return { bg: '#fab8ad', fg: '#9e1a1a' };
+    if (dpd >= 30) return { bg: '#ffd18c', fg: '#9e4705' };
+    return { bg: '#fff2b8', fg: '#856105' };
+  }
+
+  return { bg: '#f0f0f0', fg: '#1f2429' };
+}
+
+const MONTHS_DESC = [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
 
 function PaymentHistoryGrid({ history }: { history: CibilReportPaymentMonth[] }) {
   if (!history.length) {
     return <p className="m-0 text-[0.82rem] text-brand-muted">No payment history in bureau payload.</p>;
   }
 
-  const sorted = [...history].sort((a, b) => a.year - b.year || a.month - b.month);
+  const byYearMonth = new Map<string, string>();
+  for (const cell of history) {
+    byYearMonth.set(`${cell.year}-${cell.month}`, cell.status);
+  }
+
+  const years = [...new Set(history.map((c) => c.year))].sort((a, b) => b - a);
 
   return (
     <div className="overflow-x-auto">
-      <div className="flex min-w-max gap-1.5">
-        {sorted.map((cell) => (
-          <div
-            key={`${cell.year}-${cell.month}`}
-            className="flex w-[52px] flex-col items-center gap-1 rounded-[8px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.9)] p-1.5"
-            title={`${MONTH_LABELS[cell.month - 1] ?? cell.month} ${cell.year}: ${cell.status}`}
-          >
-            <span className="text-[0.6rem] font-extrabold uppercase tracking-wide text-brand-muted">
-              {MONTH_LABELS[cell.month - 1] ?? cell.month}
-            </span>
-            <span className="text-[0.58rem] font-bold text-brand-muted">{String(cell.year).slice(-2)}</span>
-            <span
-              className={cx(
-                'w-full rounded-[4px] px-0.5 py-0.5 text-center font-mono text-[0.62rem] font-extrabold',
-                paymentStatusClass(cell.status),
-              )}
-            >
-              {cell.status || '—'}
-            </span>
-          </div>
-        ))}
-      </div>
+      <table className="min-w-max border-collapse text-sm">
+        <thead>
+          <tr>
+            <th className="w-16 pr-4 text-right text-xs font-extrabold uppercase tracking-wide text-brand-muted">Year</th>
+            {MONTHS_DESC.map((m) => (
+              <th key={m} className="w-16 px-1 pb-2 text-center text-xs font-extrabold uppercase tracking-wide text-brand-muted">
+                {MONTH_LABELS[m - 1]}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {years.map((year) => (
+            <tr key={year}>
+              <td className="pr-4 text-right text-sm font-extrabold text-brand-navy">{year}</td>
+              {MONTHS_DESC.map((m) => {
+                const status = byYearMonth.get(`${year}-${m}`);
+                const { bg, fg } = resolvePaymentStatusStyle(status ?? '');
+                return (
+                  <td
+                    key={m}
+                    className="px-1 py-1"
+                    title={status ? `${MONTH_LABELS[m - 1]} ${year}: ${status}` : undefined}
+                  >
+                    {status != null ? (
+                      <span
+                        className="flex h-10 w-full items-center justify-center rounded font-mono text-sm font-extrabold"
+                        style={{ backgroundColor: bg, color: fg }}
+                      >
+                        {status || '—'}
+                      </span>
+                    ) : (
+                      <span className="flex h-10 w-full items-center justify-center rounded bg-[rgba(23,44,113,0.03)] text-sm text-[rgba(23,44,113,0.2)]">
+                        –
+                      </span>
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

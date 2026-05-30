@@ -17,6 +17,7 @@ import {
   checkNoSmaPwosTradelines,
   countBureauEnquiriesInLastDays,
   evaluateBureauDpdRulesDetailed,
+  resolveBureauAsOfDate,
   type BureauRuleFinding,
   type PostBreBureauSummary,
   type PostBreEnquiryInspectionRow,
@@ -184,6 +185,7 @@ export class PostBreCheckService {
     const criteriaConfig = await this.loadPostBreCriteriaConfig(thresholds);
     const parsed = parseTenacioBureauVendorBody(input.rawPayload);
     const cibilScore = parsed.bureauScore;
+    const bureauAsOf = resolveBureauAsOfDate(input.rawPayload);
     const checks: PostBreRuleCheck[] = [];
     const activeTradelineRuleIds: string[] = ['adverse_tradeline'];
 
@@ -288,16 +290,17 @@ export class PostBreCheckService {
     const adverse = auditNoAdverseTradelineInLookback(
       input.rawPayload,
       thresholds.settledLookbackMonths,
+      bureauAsOf,
     );
     push({
       id: 'adverse_tradeline',
-      label: `No adverse tradeline / settlement (${thresholds.settledLookbackMonths} months)`,
+      label: `No Doubtful / Loss / Written-off / Settled / Suit Filed (last ${thresholds.settledLookbackMonths} months)`,
       passed: adverse.passed,
       rejectionReasonCode: adverse.passed ? null : REJECTION_REASON.BUREAU_ADVERSE_TRADELINE,
       detail:
         adverse.detail ??
         (adverse.passed
-          ? `No adverse tradeline signals in the last ${thresholds.settledLookbackMonths} months.`
+          ? `No adverse tradeline signals (including suit filed / wilful default) in the last ${thresholds.settledLookbackMonths} months.`
           : `Adverse bureau tradeline status in the last ${thresholds.settledLookbackMonths} months.`),
       meta: { lookbackMonths: thresholds.settledLookbackMonths, hitCount: adverse.findings.length },
       criteriaKeys: ['settled_months'],
@@ -343,7 +346,7 @@ export class PostBreCheckService {
       const mfi = auditNoActiveMfiLoans(input.rawPayload);
       push({
         id: 'no_active_mfi',
-        label: 'No active MFI loans (Appendix A types 40–43)',
+        label: 'No active MFI / microfinance loans (Appendix A types 40–43)',
         passed: mfi.passed,
         rejectionReasonCode: mfi.passed ? null : REJECTION_REASON.BUREAU_ACTIVE_MFI_LOAN,
         detail: mfi.passed ? 'No open microfinance loan tradelines.' : mfi.detail,
@@ -411,7 +414,7 @@ export class PostBreCheckService {
       dpd_90plus: 'dpd_90plus_months',
     };
 
-    for (const dpdRule of evaluateBureauDpdRulesDetailed(input.rawPayload, dpdThresholds)) {
+    for (const dpdRule of evaluateBureauDpdRulesDetailed(input.rawPayload, dpdThresholds, bureauAsOf)) {
       const checkId = `dpd_${dpdRule.ruleKey}`;
       activeTradelineRuleIds.push(checkId);
       push({
@@ -513,6 +516,7 @@ export class PostBreCheckService {
     const adverse = checkNoAdverseTradelineInLookback(
       rawPayload,
       thresholds.settledLookbackMonths,
+      resolveBureauAsOfDate(rawPayload),
     );
     if (!adverse.passed) {
       return {
@@ -566,12 +570,16 @@ export class PostBreCheckService {
       };
     }
 
-    const dpd = checkBureauDpdRules(rawPayload, {
-      openDpdMonths: thresholds.openDpdMonths,
-      dpd30PlusMonths: thresholds.dpd30PlusMonths,
-      dpd60PlusMonths: thresholds.dpd60PlusMonths,
-      dpd90PlusMonths: thresholds.dpd90PlusMonths,
-    });
+    const dpd = checkBureauDpdRules(
+      rawPayload,
+      {
+        openDpdMonths: thresholds.openDpdMonths,
+        dpd30PlusMonths: thresholds.dpd30PlusMonths,
+        dpd60PlusMonths: thresholds.dpd60PlusMonths,
+        dpd90PlusMonths: thresholds.dpd90PlusMonths,
+      },
+      resolveBureauAsOfDate(rawPayload),
+    );
     if (!dpd.passed) {
       return {
         passed: false,

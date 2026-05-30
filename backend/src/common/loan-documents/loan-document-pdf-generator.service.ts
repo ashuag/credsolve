@@ -35,7 +35,7 @@ export class LoanDocumentPdfGeneratorService {
     } catch (err) {
       this.logger.error(err instanceof Error ? err.message : String(err));
       throw new InternalServerErrorException(
-        `Loan document PDF template missing for "${docType}". Run: npm run loan-docs:build-templates`,
+        `Loan document PDF template missing for "${docType}". See backend/assets/loan-documents/README.md`,
       );
     }
 

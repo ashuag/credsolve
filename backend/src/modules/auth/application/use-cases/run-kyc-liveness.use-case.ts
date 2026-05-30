@@ -5,6 +5,9 @@ import { APPLICATION_KYC_STATUS } from '../../../../common/constants/application
 import { extractProfileFromDigilockerFormJson } from '../../../../common/kyc/digilocker-form-profile.util';
 import { LivenessVendorService } from '../../../../common/vendor/liveness-vendor.service';
 import {
+  extractLivenessIsLive,
+  extractLivenessMultipleFacesDetected,
+  extractLivenessScore,
   isTenacioVendorBusinessSuccess,
   pickTenacioVendorErrorMessage,
 } from '../../../../common/kyc/aadhaar-vendor-parse.util';
@@ -20,6 +23,7 @@ import {
 import { assertActiveApplicationLoanDocumentsAccepted } from '../../../../common/loan-documents/application-loan-documents-guard.util';
 import { fetchLatestApplicationKycSnapshot } from '../../../../prisma/application-kyc-snapshot.query';
 import { PrismaService } from '../../../../prisma/prisma.service';
+import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
 
 export type RunKycLivenessResult = {
   configured: boolean;
@@ -43,6 +47,7 @@ export class RunKycLivenessUseCase {
     private readonly liveness: LivenessVendorService,
     private readonly kycFiles: KycFilesService,
     private readonly prisma: PrismaService,
+    private readonly settings: SettingsRepository,
   ) {}
 
   async execute(req: Request): Promise<RunKycLivenessResult> {
@@ -133,7 +138,19 @@ export class RunKycLivenessUseCase {
     }
 
     const vendor = out.vendorBody ?? null;
-    const businessOk = out.ok && isTenacioVendorBusinessSuccess(vendor);
+    const vendorStatusOk = out.ok && isTenacioVendorBusinessSuccess(vendor);
+
+    const minScore = await this.settings.loadMinLivenessApiScore();
+    const livenessScore = extractLivenessScore(vendor);
+    const scoreOk = livenessScore === null || livenessScore >= minScore;
+
+    const isLive = extractLivenessIsLive(vendor);
+    const isLiveOk = isLive === null || isLive === true;
+
+    const multipleFaces = extractLivenessMultipleFacesDetected(vendor);
+    const multipleFacesOk = multipleFaces === null || multipleFaces === false;
+
+    const businessOk = vendorStatusOk && scoreOk && isLiveOk && multipleFacesOk;
     const checkedAt = new Date();
 
     await this.applications.updateLivenessResult({

@@ -130,4 +130,9 @@ export const SettingKey = {
         default: '4,5,6',
         description: 'Comma-separated list of blocked occupations',
     },
+    MIN_LIVENESS_API_SCORE: {
+        key: 'MIN_LIVENESS_API_SCORE',
+        default: '0.8',
+        description: 'Minimum liveness score from third-party API to pass liveness check',  
+    }
 } as const;

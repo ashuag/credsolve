@@ -5,7 +5,7 @@ export const LOAN_DOCUMENT_TYPE = {
 
 export type LoanDocumentType = (typeof LOAN_DOCUMENT_TYPE)[keyof typeof LOAN_DOCUMENT_TYPE];
 
-/** Source Word files (dev-only; used by `npm run loan-docs:build-templates`). */
+/** Source Word files (dev-only; see assets/loan-documents/README.md). */
 export const LOAN_DOCUMENT_TEMPLATE_DOCX_FILES: Record<LoanDocumentType, string> = {
   [LOAN_DOCUMENT_TYPE.KEY_FACT]: 'key-fact-statement.docx',
   [LOAN_DOCUMENT_TYPE.LOAN_AGREEMENT]: 'loan-agreement.docx',

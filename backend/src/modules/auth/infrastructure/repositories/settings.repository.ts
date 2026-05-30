@@ -372,6 +372,16 @@ export class SettingsRepository {
     };
   }
 
+  async loadMinLivenessApiScore(): Promise<number> {
+    const meta = SettingKey.MIN_LIVENESS_API_SCORE;
+    const row = await this.prisma.client.setting.findFirst({
+      where: { key: meta.key, isActive: true },
+      select: { value: true },
+    });
+    const parsed = parseFloat(row?.value?.trim() ?? meta.default);
+    return Number.isFinite(parsed) ? parsed : parseFloat(meta.default);
+  }
+
   private async fetchAuthOtpSettings(): Promise<AuthOtpSettings> {
     const rows = await this.prisma.client.setting.findMany({
       where: { key: { in: [...KEYS] }, isActive: true },

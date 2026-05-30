@@ -40,3 +40,32 @@ export async function fetchCustomerCityLookupValues() {
 export async function fetchCustomerReferenceRelationLookupValues() {
   return fetchLookupValues('reference-relations');
 }
+
+export type PincodeLookupValue = {
+  code: string;
+  cityId: number;
+  cityName: string;
+  stateId: number;
+  stateCode: string;
+  stateName: string;
+};
+
+export async function fetchPincodeLookup(code: string): Promise<PincodeLookupValue | null> {
+  const normalized = code.trim();
+  if (!/^\d{6}$/.test(normalized)) {
+    return null;
+  }
+
+  try {
+    const data = await apiGet<{ value: PincodeLookupValue | null }>(
+      `/lookup/pincodes?code=${encodeURIComponent(normalized)}`,
+      'Unable to look up pincode right now.',
+    );
+    return data?.value ?? null;
+  } catch (e) {
+    if (e instanceof ApiRequestError && (e.statusCode === 404 || e.statusCode === 405 || e.statusCode === 501)) {
+      return null;
+    }
+    throw e;
+  }
+}

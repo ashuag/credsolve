@@ -1,5 +1,8 @@
 import { formatInrAmountForPdf } from '../pdf/pdf-safe-text.util';
-import { parseCibilDate } from './cibil-bureau-rules.parser';
+import {
+  formatSuitFiledWilfulDefaultLabel,
+  parseCibilDate,
+} from './cibil-bureau-rules.parser';
 import {
   computeMaxOpenUnsecuredExposureInr,
   isCibilTradelineOpen,
@@ -37,6 +40,8 @@ export type CibilReportAccountRow = {
   writtenOffTotal: string;
   writtenOffPrincipal: string;
   settlementAmount: string;
+  collateralValue: string;
+  collateralType: string;
   suitFiled: string;
   status: string;
   paymentHistory: CibilReportPaymentMonth[];
@@ -234,6 +239,13 @@ function formatSentinelText(raw: unknown): string {
   if (raw == null || raw === '' || raw === '-1' || raw === -1) return '-';
   const s = String(raw).trim();
   return s || '-';
+}
+
+function formatCollateralType(raw: unknown): string {
+  const rec = raw !== null && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
+  const description = rec?.description ?? rec?.Description;
+  if (description != null && String(description).trim()) return String(description).trim();
+  return formatSentinelText(readSymbol(raw));
 }
 
 function maskAccountNumber(raw: unknown): string {
@@ -706,7 +718,9 @@ export function extractCibilReportData(vendorBody: unknown): CibilReportData {
           writtenOffTotal: formatSentinelAmount(lineRec.writtenOffAmtTotal),
           writtenOffPrincipal: formatSentinelAmount(lineRec.writtenOffPrincipal),
           settlementAmount: formatSentinelAmount(lineRec.settlementAmount),
-          suitFiled: formatSentinelText(readSymbol(lineRec.AccountCondition)),
+          collateralValue: formatSentinelAmount(granted?.collateral),
+          collateralType: formatCollateralType(granted?.CollateralType),
+          suitFiled: formatSuitFiledWilfulDefaultLabel(lineRec),
           status: isOpen ? 'Open' : 'Closed',
           paymentHistory: extractPaymentHistory(lineRec),
         });

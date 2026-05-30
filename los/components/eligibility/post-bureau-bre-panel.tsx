@@ -125,7 +125,7 @@ function CheckCard({ check }: { check: PostBreRuleCheck }) {
   );
 }
 
-function ResultsSummary({ result }: { result: PostBreDryRunResult }) {
+export function PostBreResultsSummary({ result }: { result: PostBreDryRunResult }) {
   const failed = result.checks.filter((c) => c.id !== 'bureau_score_present' && !c.passed);
 
   return (
@@ -299,7 +299,7 @@ export function PostBureauBrePanel() {
         </div>
       </form>
 
-      {result ? <ResultsSummary result={result} /> : null}
+      {result ? <PostBreResultsSummary result={result} /> : null}
     </div>
   );
 }

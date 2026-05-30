@@ -2,11 +2,15 @@
  * Post-bureau eligibility rules over Tenacio / CIBIL soft-pull payloads.
  */
 import {
+  TUEF_ADVERSE_SUIT_FILED_WILFUL_DEFAULT_CODES,
+  TUEF_ADVERSE_WRITTEN_OFF_SETTLED_STATUS_CODES,
+  TUEF_ADVERSE_WRITTEN_OFF_SETTLED_STATUS_LABELS,
   TUEF_MFI_ACCOUNT_TYPE_SYMBOLS,
   TUEF_NON_LOAN_ENQUIRY_PURPOSE_CODES,
   TUEF_RESTRUCTURED_STATUS_LABELS,
   TUEF_RESTRUCTURED_WRITTEN_OFF_SETTLED_CODES,
   TUEF_SMA_PWOS_ASSET_CLASSIFICATION_CODES,
+  TUEF_SUIT_FILED_WILFUL_DEFAULT_LABELS,
 } from './cibil-tuef.constants';
 import {
   cibilAccountTypeDisplayLabel,
@@ -147,29 +151,175 @@ function readWrittenOffSettledStatusCode(lineRec: Record<string, unknown>): stri
   return fromSymbol;
 }
 
-function tradelineHasRestructureSignal(lineRec: Record<string, unknown>): boolean {
-  const statusCode = readWrittenOffSettledStatusCode(lineRec);
-  if (statusCode && TUEF_RESTRUCTURED_WRITTEN_OFF_SETTLED_CODES.has(statusCode)) {
-    return true;
-  }
-
+function readGrantedWrittenOffSettledStatusCode(lineRec: Record<string, unknown>): string | null {
   const granted = asRecord(lineRec.GrantedTrade);
-  if (granted) {
-    const grantedCode =
-      normalizeTuefStatusCode(granted.writtenOffSettledStatus) ??
-      normalizeTuefStatusCode(granted.WrittenOffSettledStatus) ??
-      normalizeTuefStatusCode(readSymbol(granted.WrittenOffSettled));
-    if (grantedCode && TUEF_RESTRUCTURED_WRITTEN_OFF_SETTLED_CODES.has(grantedCode)) {
+  if (!granted) return null;
+  return (
+    normalizeTuefStatusCode(granted.writtenOffSettledStatus) ??
+    normalizeTuefStatusCode(granted.WrittenOffSettledStatus) ??
+    normalizeTuefStatusCode(readSymbol(granted.WrittenOffSettled))
+  );
+}
+
+function readTradelineWrittenOffSettledStatusCodes(lineRec: Record<string, unknown>): string[] {
+  const codes = new Set<string>();
+  const direct = readWrittenOffSettledStatusCode(lineRec);
+  if (direct) codes.add(direct);
+  const grantedCode = readGrantedWrittenOffSettledStatusCode(lineRec);
+  if (grantedCode) codes.add(grantedCode);
+  return [...codes];
+}
+
+function tradelineHasRestructureSignal(lineRec: Record<string, unknown>): boolean {
+  for (const statusCode of readTradelineWrittenOffSettledStatusCodes(lineRec)) {
+    if (TUEF_RESTRUCTURED_WRITTEN_OFF_SETTLED_CODES.has(statusCode)) {
       return true;
     }
   }
-
   return false;
+}
+
+function findAdverseWrittenOffSettledStatus(
+  lineRec: Record<string, unknown>,
+): { code: string; label: string } | null {
+  for (const statusCode of readTradelineWrittenOffSettledStatusCodes(lineRec)) {
+    if (!TUEF_ADVERSE_WRITTEN_OFF_SETTLED_STATUS_CODES.has(statusCode)) continue;
+    return {
+      code: statusCode,
+      label: TUEF_ADVERSE_WRITTEN_OFF_SETTLED_STATUS_LABELS[statusCode] ?? statusCode,
+    };
+  }
+  return null;
+}
+
+type MonthlyPayStatusRow = {
+  monthDate: Date;
+  status: unknown;
+};
+
+function collectMonthlyPayStatusRows(lineRec: Record<string, unknown>): MonthlyPayStatusRow[] {
+  const payHistory = resolvePayStatusHistory(lineRec);
+  if (!payHistory) return [];
+
+  const rows: MonthlyPayStatusRow[] = [];
+  let monthlyAdded = false;
+  for (const entry of asArray(payHistory.MonthlyPayStatus)) {
+    const entryRec = asRecord(entry);
+    if (!entryRec) continue;
+    const monthDate = parseCibilDate(entryRec.date);
+    if (!monthDate) continue;
+    rows.push({ monthDate, status: entryRec.status });
+    monthlyAdded = true;
+  }
+
+  if (!monthlyAdded && typeof payHistory.status === 'string') {
+    const statuses = String(payHistory.status)
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const end = parseCibilDate(payHistory.endDate);
+    const start = parseCibilDate(payHistory.startDate);
+    for (let i = 0; i < statuses.length; i++) {
+      let monthDate: Date | null = null;
+      if (end) {
+        monthDate = new Date(end);
+        monthDate.setUTCMonth(monthDate.getUTCMonth() - (statuses.length - 1 - i));
+      } else if (start) {
+        monthDate = new Date(start);
+        monthDate.setUTCMonth(monthDate.getUTCMonth() + i);
+      }
+      if (!monthDate) continue;
+      rows.push({ monthDate, status: statuses[i] });
+    }
+  }
+
+  return rows;
 }
 
 function isMfiAccountType(symbol: string | null): boolean {
   const norm = symbol ? normalizeCibilAccountTypeSymbol(symbol) : null;
   return norm != null && TUEF_MFI_ACCOUNT_TYPE_SYMBOLS.has(norm);
+}
+
+function resolveTradelineAccountTypeSymbol(
+  partitionSymbol: string | null,
+  lineRec: Record<string, unknown>,
+): string | null {
+  if (isMfiAccountType(partitionSymbol)) return normalizeCibilAccountTypeSymbol(partitionSymbol);
+
+  const granted = asRecord(lineRec.GrantedTrade);
+  const fromGranted =
+    readSymbol(granted?.AccountType) ?? readSymbol(granted?.CreditType);
+  if (isMfiAccountType(fromGranted)) return normalizeCibilAccountTypeSymbol(fromGranted);
+
+  if (partitionSymbol != null) return normalizeCibilAccountTypeSymbol(partitionSymbol);
+  return fromGranted;
+}
+
+function isMicrofinanceTradeline(partitionSymbol: string | null, lineRec: Record<string, unknown>): boolean {
+  const accountType = resolveTradelineAccountTypeSymbol(partitionSymbol, lineRec);
+  if (isMfiAccountType(accountType)) return true;
+
+  const industry = readSymbol(lineRec.IndustryCode);
+  if (industry?.toUpperCase() === 'MFI') return true;
+
+  const description = String(lineRec.accountTypeDescription ?? '').trim();
+  if (/micro\s*finance/i.test(description)) return true;
+
+  return false;
+}
+
+/** TUEF Tag 34 — Suit Filed / Wilful Default on TrueLink tradelines. */
+export function readSuitFiledWilfulDefaultCode(lineRec: Record<string, unknown>): string | null {
+  const direct =
+    lineRec.suitFiledWilfulDefault ??
+    lineRec.SuitFiledWilfulDefault ??
+    lineRec.suitFiledStatus ??
+    lineRec.SuitFiledStatus;
+  const fromDirect = normalizeTuefStatusCode(direct);
+  if (fromDirect) return fromDirect;
+
+  for (const node of [lineRec.SuitFiled, lineRec.suitFiled]) {
+    const symbol = normalizeTuefStatusCode(readSymbol(node));
+    if (symbol) return symbol;
+    const rec = asRecord(node);
+    const fromDescription = normalizeSuitFiledWilfulDefaultText(rec?.description ?? rec?.Description);
+    if (fromDescription) return fromDescription;
+  }
+
+  return null;
+}
+
+function normalizeSuitFiledWilfulDefaultText(raw: unknown): string | null {
+  const text = String(raw ?? '')
+    .trim()
+    .toLowerCase();
+  if (!text || text === '-' || text === 'no suit filed') return '00';
+  if (text.includes('wilful') && text.includes('suit')) return '03';
+  if (text.includes('wilful')) return '02';
+  if (text.includes('suit filed') || text === 'suit') return '01';
+  return null;
+}
+
+export function isAdverseSuitFiledWilfulDefault(raw: unknown): boolean {
+  const code =
+    normalizeTuefStatusCode(raw) ??
+    normalizeSuitFiledWilfulDefaultText(raw) ??
+    normalizeSuitFiledWilfulDefaultText(readSymbol(raw));
+  if (!code || code === '00') return false;
+  if (TUEF_ADVERSE_SUIT_FILED_WILFUL_DEFAULT_CODES.has(code)) return true;
+
+  const norm = normalizePayStatus(raw);
+  if (!norm || norm === '00' || norm === 'NO SUIT FILED') return false;
+  if (norm.includes('WILFUL')) return true;
+  if (norm.includes('SUIT')) return true;
+  return false;
+}
+
+export function formatSuitFiledWilfulDefaultLabel(lineRec: Record<string, unknown>): string {
+  const code = readSuitFiledWilfulDefaultCode(lineRec);
+  if (!code || code === '00') return '-';
+  return TUEF_SUIT_FILED_WILFUL_DEFAULT_LABELS[code] ?? code;
 }
 
 function isLoanEnquiryPurpose(code: string | null): boolean {
@@ -279,14 +429,16 @@ export function auditNoAdverseTradelineInLookback(
 
       const parsed = parseCibilTradeline(rawLine, partitionSymbol);
       const creditor = String(lineRec.creditorName ?? 'account').trim() || 'account';
+      const reported = parseCibilDate(lineRec.dateReported);
+      const reportedInLookback =
+        !reported || isWithinLookbackMonths(reported, asOf, lookbackMonths);
 
       if (
         !isCibilSentinelAmount(lineRec.writtenOffAmtTotal) ||
         !isCibilSentinelAmount(lineRec.writtenOffPrincipal) ||
         !isCibilSentinelAmount(lineRec.settlementAmount)
       ) {
-        const reported = parseCibilDate(lineRec.dateReported);
-        if (!reported || isWithinLookbackMonths(reported, asOf, lookbackMonths)) {
+        if (reportedInLookback) {
           findings.push({
             title: creditor,
             detail: 'Write-off or settlement amount reported on tradeline (expected -1).',
@@ -303,56 +455,89 @@ export function auditNoAdverseTradelineInLookback(
         }
       }
 
-      const payHistory = resolvePayStatusHistory(lineRec);
-      if (payHistory) {
-        for (const entry of asArray(payHistory.MonthlyPayStatus)) {
-          const entryRec = asRecord(entry);
-          if (!entryRec) continue;
-          const status = entryRec.status;
-          if (!isAdversePayStatus(status)) continue;
-          const monthDate = parseCibilDate(entryRec.date);
-          if (monthDate && isWithinLookbackMonths(monthDate, asOf, lookbackMonths)) {
-            findings.push({
-              title: creditor,
-              detail: `Adverse monthly payment status "${String(status)}".`,
-              data: {
-                source: 'MonthlyPayStatus',
-                payStatus: String(status),
-                month: formatCibilDateLabel(monthDate),
-                lookbackMonths,
-              },
-            });
-          }
-        }
+      const adverseWrittenOffSettled = findAdverseWrittenOffSettledStatus(lineRec);
+      if (adverseWrittenOffSettled && reportedInLookback) {
+        findings.push({
+          title: creditor,
+          detail: `Written-off / settled status: ${adverseWrittenOffSettled.label} (TUEF code ${adverseWrittenOffSettled.code}).`,
+          data: {
+            source: 'WrittenOffSettledStatus',
+            writtenOffSettledStatus: adverseWrittenOffSettled.code,
+            dateReported: formatCibilDateLabel(reported),
+            lookbackMonths,
+          },
+        });
       }
 
-      const granted = asRecord(lineRec.GrantedTrade);
-      const worst = granted ? readSymbol(granted.WorstPayStatus) : null;
-      if (worst && isAdversePayStatus(worst)) {
-        const reported = parseCibilDate(lineRec.dateReported);
-        if (!reported || isWithinLookbackMonths(reported, asOf, lookbackMonths)) {
+      const suitFiledCode = readSuitFiledWilfulDefaultCode(lineRec);
+      if (suitFiledCode && isAdverseSuitFiledWilfulDefault(suitFiledCode) && reportedInLookback) {
+        findings.push({
+          title: creditor,
+          detail: `Suit filed / wilful default: ${TUEF_SUIT_FILED_WILFUL_DEFAULT_LABELS[suitFiledCode] ?? suitFiledCode}.`,
+          data: {
+            source: 'SuitFiledWilfulDefault',
+            suitFiledWilfulDefault: suitFiledCode,
+            dateReported: formatCibilDateLabel(reported),
+            lookbackMonths,
+          },
+        });
+      }
+
+      const currentPayStatus = readSymbol(lineRec.PayStatus);
+      if (currentPayStatus && isAdversePayStatus(currentPayStatus) && reportedInLookback) {
+        findings.push({
+          title: creditor,
+          detail: `Current pay status "${currentPayStatus}" is doubtful / loss / written-off / settled.`,
+          data: {
+            source: 'PayStatus',
+            payStatus: currentPayStatus,
+            dateReported: formatCibilDateLabel(reported),
+            lookbackMonths,
+          },
+        });
+      }
+
+      for (const entry of collectMonthlyPayStatusRows(lineRec)) {
+        if (!isAdversePayStatus(entry.status)) continue;
+        if (isWithinLookbackMonths(entry.monthDate, asOf, lookbackMonths)) {
           findings.push({
             title: creditor,
-            detail: `Worst pay status "${worst}" on tradeline.`,
+            detail: `Adverse monthly payment status "${String(entry.status)}".`,
             data: {
-              source: 'GrantedTrade.WorstPayStatus',
-              worstPayStatus: worst,
-              dateReported: formatCibilDateLabel(reported),
+              source: 'MonthlyPayStatus',
+              payStatus: String(entry.status),
+              month: formatCibilDateLabel(entry.monthDate),
               lookbackMonths,
             },
           });
         }
       }
 
+      const granted = asRecord(lineRec.GrantedTrade);
+      const worst = granted ? readSymbol(granted.WorstPayStatus) : null;
+      if (worst && isAdversePayStatus(worst) && reportedInLookback) {
+        findings.push({
+          title: creditor,
+          detail: `Worst pay status "${worst}" on tradeline.`,
+          data: {
+            source: 'GrantedTrade.WorstPayStatus',
+            worstPayStatus: worst,
+            dateReported: formatCibilDateLabel(reported),
+            lookbackMonths,
+          },
+        });
+      }
+
       if (parsed) {
         const accountCondition = readSymbol(lineRec.AccountCondition);
-        if (accountCondition && isAdversePayStatus(accountCondition)) {
+        if (accountCondition && isAdversePayStatus(accountCondition) && reportedInLookback) {
           findings.push({
             title: creditor,
             detail: `Adverse account condition "${accountCondition}".`,
             data: {
               source: 'AccountCondition',
               accountCondition,
+              dateReported: formatCibilDateLabel(reported),
               lookbackMonths,
             },
           });
@@ -492,7 +677,35 @@ type MonthlyDpdEntry = {
   isOpen: boolean;
   isLoanRelated: boolean;
   accountLabel: string;
+  /** Latest payment-history month for this tradeline (capped at bureau inquiry date). */
+  lookbackAnchorDate: Date;
 };
+
+/** Bureau inquiry / report date used as the upper bound for DPD lookback windows. */
+export function resolveBureauAsOfDate(body: unknown, fallback: Date = new Date()): Date {
+  const tlr = readTrueLinkCreditReport(body);
+  if (!tlr) return fallback;
+
+  const sources = asRecord(tlr.Sources);
+  const source = sources ? asRecord(sources.Source) : null;
+  const inquiryDate = source?.InquiryDate ? parseCibilDate(source.InquiryDate) : null;
+  if (inquiryDate) return inquiryDate;
+
+  return fallback;
+}
+
+function resolveTradelineLookbackAnchor(
+  payHistory: Record<string, unknown>,
+  monthDates: Date[],
+  bureauAsOf: Date,
+): Date {
+  let anchor = parseCibilDate(payHistory.endDate) ?? null;
+  for (const monthDate of monthDates) {
+    if (!anchor || monthDate > anchor) anchor = monthDate;
+  }
+  if (!anchor) return bureauAsOf;
+  return anchor > bureauAsOf ? bureauAsOf : anchor;
+}
 
 /** Map CIBIL monthly pay status to days past due (`null` = not a delinquency signal). */
 export function parsePayStatusToDpdDays(raw: unknown): number | null {
@@ -510,7 +723,7 @@ export function parsePayStatusToDpdDays(raw: unknown): number | null {
   return null;
 }
 
-function collectMonthlyDpdEntries(body: unknown): MonthlyDpdEntry[] {
+function collectMonthlyDpdEntries(body: unknown, bureauAsOf: Date = new Date()): MonthlyDpdEntry[] {
   const entries: MonthlyDpdEntry[] = [];
   const tlr = readTrueLinkCreditReport(body);
   if (!tlr) return entries;
@@ -534,40 +747,52 @@ function collectMonthlyDpdEntries(body: unknown): MonthlyDpdEntry[] {
       const isLoanRelated = isLoanRelatedAccountType(partitionSymbol);
 
       const payHistory = resolvePayStatusHistory(lineRec);
-      if (payHistory) {
-        let monthlyAdded = false;
-        for (const entry of asArray(payHistory.MonthlyPayStatus)) {
-          const entryRec = asRecord(entry);
-          if (!entryRec) continue;
-          const monthDate = parseCibilDate(entryRec.date);
-          const dpdDays = parsePayStatusToDpdDays(entryRec.status);
-          if (!monthDate || dpdDays == null) continue;
-          entries.push({ monthDate, dpdDays, isOpen, isLoanRelated, accountLabel });
-          monthlyAdded = true;
-        }
+      if (!payHistory) continue;
 
-        if (!monthlyAdded && typeof payHistory.status === 'string') {
-          const statuses = String(payHistory.status)
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean);
-          const end = parseCibilDate(payHistory.endDate);
-          const start = parseCibilDate(payHistory.startDate);
-          for (let i = 0; i < statuses.length; i++) {
-            const dpdDays = parsePayStatusToDpdDays(statuses[i]);
-            if (dpdDays == null) continue;
-            let monthDate: Date | null = null;
-            if (end) {
-              monthDate = new Date(end);
-              monthDate.setUTCMonth(monthDate.getUTCMonth() - (statuses.length - 1 - i));
-            } else if (start) {
-              monthDate = new Date(start);
-              monthDate.setUTCMonth(monthDate.getUTCMonth() + i);
-            }
-            if (!monthDate) continue;
-            entries.push({ monthDate, dpdDays, isOpen, isLoanRelated, accountLabel });
+      const pending: Array<Omit<MonthlyDpdEntry, 'lookbackAnchorDate'>> = [];
+      let monthlyAdded = false;
+      for (const entry of asArray(payHistory.MonthlyPayStatus)) {
+        const entryRec = asRecord(entry);
+        if (!entryRec) continue;
+        const monthDate = parseCibilDate(entryRec.date);
+        const dpdDays = parsePayStatusToDpdDays(entryRec.status);
+        if (!monthDate || dpdDays == null) continue;
+        pending.push({ monthDate, dpdDays, isOpen, isLoanRelated, accountLabel });
+        monthlyAdded = true;
+      }
+
+      if (!monthlyAdded && typeof payHistory.status === 'string') {
+        const statuses = String(payHistory.status)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const end = parseCibilDate(payHistory.endDate);
+        const start = parseCibilDate(payHistory.startDate);
+        for (let i = 0; i < statuses.length; i++) {
+          const dpdDays = parsePayStatusToDpdDays(statuses[i]);
+          if (dpdDays == null) continue;
+          let monthDate: Date | null = null;
+          if (end) {
+            monthDate = new Date(end);
+            monthDate.setUTCMonth(monthDate.getUTCMonth() - (statuses.length - 1 - i));
+          } else if (start) {
+            monthDate = new Date(start);
+            monthDate.setUTCMonth(monthDate.getUTCMonth() + i);
           }
+          if (!monthDate) continue;
+          pending.push({ monthDate, dpdDays, isOpen, isLoanRelated, accountLabel });
         }
+      }
+
+      if (!pending.length) continue;
+
+      const lookbackAnchorDate = resolveTradelineLookbackAnchor(
+        payHistory,
+        pending.map((entry) => entry.monthDate),
+        bureauAsOf,
+      );
+      for (const entry of pending) {
+        entries.push({ ...entry, lookbackAnchorDate });
       }
     }
   }
@@ -584,10 +809,10 @@ export function checkBureauDpdRules(
   thresholds: BureauDpdThresholds,
   asOf: Date = new Date(),
 ): BureauAdverseTradelineCheck {
-  const entries = collectMonthlyDpdEntries(body);
+  const entries = collectMonthlyDpdEntries(body, asOf);
 
   for (const entry of entries) {
-    if (!isWithinLookbackMonths(entry.monthDate, asOf, thresholds.dpd90PlusMonths)) {
+    if (!isWithinLookbackMonths(entry.monthDate, entry.lookbackAnchorDate, thresholds.dpd90PlusMonths)) {
       continue;
     }
     if (entry.dpdDays >= 90) {
@@ -599,7 +824,7 @@ export function checkBureauDpdRules(
   }
 
   for (const entry of entries) {
-    if (!isWithinLookbackMonths(entry.monthDate, asOf, thresholds.dpd60PlusMonths)) {
+    if (!isWithinLookbackMonths(entry.monthDate, entry.lookbackAnchorDate, thresholds.dpd60PlusMonths)) {
       continue;
     }
     if (entry.dpdDays >= 60) {
@@ -611,7 +836,7 @@ export function checkBureauDpdRules(
   }
 
   for (const entry of entries) {
-    if (!isWithinLookbackMonths(entry.monthDate, asOf, thresholds.dpd30PlusMonths)) {
+    if (!isWithinLookbackMonths(entry.monthDate, entry.lookbackAnchorDate, thresholds.dpd30PlusMonths)) {
       continue;
     }
     if (entry.dpdDays >= 30) {
@@ -624,7 +849,7 @@ export function checkBureauDpdRules(
 
   for (const entry of entries) {
     if (!entry.isOpen || !entry.isLoanRelated) continue;
-    if (!isWithinLookbackMonths(entry.monthDate, asOf, thresholds.openDpdMonths)) {
+    if (!isWithinLookbackMonths(entry.monthDate, entry.lookbackAnchorDate, thresholds.openDpdMonths)) {
       continue;
     }
     if (entry.dpdDays > 0) {
@@ -653,7 +878,7 @@ export function evaluateBureauDpdRulesDetailed(
   thresholds: BureauDpdThresholds,
   asOf: Date = new Date(),
 ): BureauDpdRuleResult[] {
-  const entries = collectMonthlyDpdEntries(body);
+  const entries = collectMonthlyDpdEntries(body, asOf);
   const failureFindings: Partial<Record<BureauDpdRuleKey, BureauRuleFinding[]>> = {};
 
   const pushFailure = (
@@ -681,7 +906,7 @@ export function evaluateBureauDpdRulesDetailed(
 
   for (const entry of entries) {
     if (
-      isWithinLookbackMonths(entry.monthDate, asOf, thresholds.dpd90PlusMonths) &&
+      isWithinLookbackMonths(entry.monthDate, entry.lookbackAnchorDate, thresholds.dpd90PlusMonths) &&
       entry.dpdDays >= 90
     ) {
       pushFailure('dpd_90plus', entry, 90, thresholds.dpd90PlusMonths);
@@ -690,7 +915,7 @@ export function evaluateBureauDpdRulesDetailed(
 
   for (const entry of entries) {
     if (
-      isWithinLookbackMonths(entry.monthDate, asOf, thresholds.dpd60PlusMonths) &&
+      isWithinLookbackMonths(entry.monthDate, entry.lookbackAnchorDate, thresholds.dpd60PlusMonths) &&
       entry.dpdDays >= 60
     ) {
       pushFailure('dpd_60plus', entry, 60, thresholds.dpd60PlusMonths);
@@ -699,7 +924,7 @@ export function evaluateBureauDpdRulesDetailed(
 
   for (const entry of entries) {
     if (
-      isWithinLookbackMonths(entry.monthDate, asOf, thresholds.dpd30PlusMonths) &&
+      isWithinLookbackMonths(entry.monthDate, entry.lookbackAnchorDate, thresholds.dpd30PlusMonths) &&
       entry.dpdDays >= 30
     ) {
       pushFailure('dpd_30plus', entry, 30, thresholds.dpd30PlusMonths);
@@ -709,7 +934,7 @@ export function evaluateBureauDpdRulesDetailed(
   for (const entry of entries) {
     if (!entry.isOpen || !entry.isLoanRelated) continue;
     if (
-      isWithinLookbackMonths(entry.monthDate, asOf, thresholds.openDpdMonths) &&
+      isWithinLookbackMonths(entry.monthDate, entry.lookbackAnchorDate, thresholds.openDpdMonths) &&
       entry.dpdDays > 0
     ) {
       pushFailure('open_dpd', entry, 1, thresholds.openDpdMonths);
@@ -834,20 +1059,20 @@ export function auditNoActiveMfiLoans(body: unknown): BureauTradelineRuleCheck {
   walkTradelines(body, ({ lineRec, partitionSymbol, creditor }) => {
     if (!isCibilTradelineOpen(lineRec)) return;
 
+    const accountType = resolveTradelineAccountTypeSymbol(partitionSymbol, lineRec);
     const industry = readSymbol(lineRec.IndustryCode);
-    const mfiByType = isMfiAccountType(partitionSymbol);
-    const mfiByIndustry = industry?.toUpperCase() === 'MFI';
+    const mfiByType = isMicrofinanceTradeline(partitionSymbol, lineRec);
 
-    if (!mfiByType && !mfiByIndustry) return;
+    if (!mfiByType) return;
 
     findings.push({
       title: creditor,
       detail: 'Open microfinance (MFI) loan tradeline on bureau report.',
       data: {
-        accountType: partitionSymbol,
+        accountType,
         industryCode: industry,
         open: true,
-        source: mfiByType ? 'accountType' : 'IndustryCode',
+        source: isMfiAccountType(accountType) ? 'accountType' : 'IndustryCode',
       },
     });
   });
@@ -1033,8 +1258,7 @@ export function buildPostBreTradelineInspection(
     const accountNumber =
       lineRec.accountNumber != null ? String(lineRec.accountNumber).trim() : null;
     const industry = readSymbol(lineRec.IndustryCode);
-    const isMfi =
-      isMfiAccountType(partitionSymbol) || industry?.toUpperCase() === 'MFI';
+    const isMfi = isMicrofinanceTradeline(partitionSymbol, lineRec);
     const isOpen = isCibilTradelineOpen(lineRec);
     const isLoanRelated = isLoanRelatedAccountType(partitionSymbol);
     const accountStatus = isOpen ? 'Open' : 'Closed';

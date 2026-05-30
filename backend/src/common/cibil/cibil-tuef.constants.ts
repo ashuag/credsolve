@@ -54,3 +54,47 @@ export const TUEF_RESTRUCTURED_STATUS_LABELS: Record<string, string> = {
   '10': 'Account Purchased and Restructured',
   '11': 'Restructured due to Natural Calamity',
 };
+
+/** TUEF Tag 33 — non-restructure written-off / settled / sold statuses (post-BRE adverse tradeline). */
+export const TUEF_ADVERSE_WRITTEN_OFF_SETTLED_STATUS_CODES = new Set([
+  '02', // Written-off
+  '03', // Settled
+  '04', // Post (WO) Settled
+  '05', // Account Sold
+  '06', // Written Off and Account Sold
+  '07', // Account Purchased
+  '08', // Account Purchased and Written Off
+  '09', // Account Purchased and Settled
+]);
+
+export const TUEF_ADVERSE_WRITTEN_OFF_SETTLED_STATUS_LABELS: Record<string, string> = {
+  '02': 'Written-off',
+  '03': 'Settled',
+  '04': 'Post (WO) Settled',
+  '05': 'Account Sold',
+  '06': 'Written Off and Account Sold',
+  '07': 'Account Purchased',
+  '08': 'Account Purchased and Written Off',
+  '09': 'Account Purchased and Settled',
+};
+
+/** TUEF Tag 34 — Suit Filed / Wilful Default Status (01–03 are adverse). */
+export const TUEF_SUIT_FILED_WILFUL_DEFAULT_CODES = {
+  NONE: '00',
+  SUIT_FILED: '01',
+  WILFUL_DEFAULT: '02',
+  SUIT_FILED_WILFUL_DEFAULT: '03',
+} as const;
+
+export const TUEF_ADVERSE_SUIT_FILED_WILFUL_DEFAULT_CODES = new Set<string>([
+  TUEF_SUIT_FILED_WILFUL_DEFAULT_CODES.SUIT_FILED,
+  TUEF_SUIT_FILED_WILFUL_DEFAULT_CODES.WILFUL_DEFAULT,
+  TUEF_SUIT_FILED_WILFUL_DEFAULT_CODES.SUIT_FILED_WILFUL_DEFAULT,
+]);
+
+export const TUEF_SUIT_FILED_WILFUL_DEFAULT_LABELS: Record<string, string> = {
+  '00': 'No suit filed',
+  '01': 'Suit filed',
+  '02': 'Wilful default',
+  '03': 'Suit filed (Wilful default)',
+};

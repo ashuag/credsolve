@@ -1,0 +1,773 @@
+{
+  "data": {
+    "htmlUrl": null,
+    "cibilData": {
+      "GetCustomerAssetsResponse": {
+        "ResponseKey": "d7dbd207117e4a7497313b3b55e68822",
+        "ResponseStatus": "Success",
+        "GetCustomerAssetsSuccess": {
+          "Asset": {
+            "Type": "SingleCreditReport",
+            "Status": "Active",
+            "AssetId": "735029182",
+            "CreationDate": "2026-05-29.000+05:30",
+            "ExpirationDate": "2026-05-29.000+05:30",
+            "SafetyCheckFailure": false,
+            "TrueLinkCreditReport": {
+              "Frozen": "",
+              "Message": {
+                "Code": {
+                  "rank": "100000",
+                  "symbol": "",
+                  "description": "",
+                  "abbreviation": ""
+                },
+                "Type": {
+                  "rank": "100000",
+                  "symbol": "ZZ",
+                  "description": "",
+                  "abbreviation": ""
+                },
+                "text": ""
+              },
+              "Sources": {
+                "Source": {
+                  "Bureau": {
+                    "rank": "100000",
+                    "symbol": "CIBIL",
+                    "description": "",
+                    "abbreviation": ""
+                  },
+                  "InquiryDate": "2026-05-29.000+05:30",
+                  "OriginalData": ""
+                }
+              },
+              "Borrower": {
+                "Birth": {
+                  "age": "0",
+                  "date": "",
+                  "Source": {
+                    "Bureau": {
+                      "rank": "100000",
+                      "symbol": "CIBIL",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "Locale": "en_IN",
+                    "Reference": "393c555d-9b93-4912-9621-893d5c7b5dba",
+                    "BorrowerKey": "204481075",
+                    "InquiryDate": "2026-05-29+05:30"
+                  },
+                  "BirthDate": {
+                    "day": "",
+                    "year": "",
+                    "month": ""
+                  },
+                  "partitionSet": "0"
+                },
+                "Gender": "Female",
+                "Employer": {
+                  "name": "",
+                  "Source": {
+                    "Bureau": {
+                      "rank": "100000",
+                      "symbol": "CIBIL",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "Locale": "en_IN",
+                    "Reference": "393c555d-9b93-4912-9621-893d5c7b5dba",
+                    "BorrowerKey": "204481075",
+                    "InquiryDate": "2026-05-29+05:30"
+                  },
+                  "account": "10",
+                  "dateReported": "2025-10-31+05:30",
+                  "partitionSet": "0",
+                  "serialNumber": "2210731218",
+                  "CreditAddress": {
+                    "City": "",
+                    "Region": "",
+                    "PostalCode": "",
+                    "AddressType": "",
+                    "StreetAddress": ""
+                  },
+                  "OccupationCode": {
+                    "rank": "100000",
+                    "symbol": "01",
+                    "description": "Others",
+                    "abbreviation": ""
+                  },
+                  "NetGrossIndicator": "",
+                  "IncomeFreqIndicator": ""
+                },
+                "CreditScore": {
+                  "Source": {
+                    "Bureau": {
+                      "rank": "100000",
+                      "symbol": "CIBIL",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "Locale": "en_IN",
+                    "Reference": "393c555d-9b93-4912-9621-893d5c7b5dba",
+                    "BorrowerKey": "204481075",
+                    "InquiryDate": "2026-05-29+05:30"
+                  },
+                  "riskScore": "612",
+                  "scoreName": "CIBILTransUnionScore3",
+                  "NoScoreReason": {
+                    "rank": "100000",
+                    "symbol": "",
+                    "description": "",
+                    "abbreviation": ""
+                  },
+                  "populationRank": "25",
+                  "CreditScoreModel": {
+                    "rank": "100000",
+                    "symbol": "CIBILTUSC3",
+                    "description": "",
+                    "abbreviation": ""
+                  },
+                  "CreditScoreFactor": []
+                },
+                "borrowerKey": "204481075",
+                "BorrowerName": {
+                  "Name": {
+                    "Surname": "DEVI",
+                    "Forename": "KAMLA"
+                  },
+                  "Source": {
+                    "Bureau": {
+                      "rank": "100000",
+                      "symbol": "CIBIL",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "Locale": "en_IN",
+                    "Reference": "393c555d-9b93-4912-9621-893d5c7b5dba",
+                    "BorrowerKey": "204481075",
+                    "InquiryDate": "2026-05-29+05:30"
+                  },
+                  "NameType": {
+                    "rank": "100000",
+                    "symbol": "",
+                    "description": "",
+                    "abbreviation": ""
+                  },
+                  "partitionSet": "0"
+                },
+                "EmailAddress": [
+                  {
+                    "Email": "KULDEEPSINGHG16.KS@GMAIL.COM",
+                    "serialNumber": "1981678163"
+                  },
+                  {
+                    "Email": "ABC@GMAIL.COM",
+                    "serialNumber": "3455716011"
+                  }
+                ],
+                "BorrowerAddress": [
+                  {
+                    "Origin": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "393c555d-9b93-4912-9621-893d5c7b5dba",
+                      "BorrowerKey": "204481075",
+                      "InquiryDate": "2026-05-29+05:30"
+                    },
+                    "Dwelling": {
+                      "rank": "100000",
+                      "symbol": "04",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "Ownership": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enrichMode": "R",
+                    "addressOrder": "0",
+                    "dateReported": "2025-03-31+05:30",
+                    "partitionSet": "0",
+                    "CreditAddress": {
+                      "City": "",
+                      "Region": "",
+                      "PostalCode": "332711",
+                      "AddressType": "",
+                      "SerialNumber": "2902334641",
+                      "StreetAddress": "LAKHA KI NANGAL NKT NKT Rajasthan"
+                    }
+                  },
+                  {
+                    "Origin": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "393c555d-9b93-4912-9621-893d5c7b5dba",
+                      "BorrowerKey": "204481075",
+                      "InquiryDate": "2026-05-29+05:30"
+                    },
+                    "Dwelling": {
+                      "rank": "100000",
+                      "symbol": "04",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "Ownership": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enrichMode": "R",
+                    "addressOrder": "1",
+                    "dateReported": null,
+                    "partitionSet": "1",
+                    "CreditAddress": {
+                      "City": "",
+                      "Region": "",
+                      "PostalCode": "",
+                      "AddressType": "",
+                      "SerialNumber": "3782649619",
+                      "StreetAddress": "Address1 (e)"
+                    }
+                  },
+                  {
+                    "Origin": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "393c555d-9b93-4912-9621-893d5c7b5dba",
+                      "BorrowerKey": "204481075",
+                      "InquiryDate": "2026-05-29+05:30"
+                    },
+                    "Dwelling": {
+                      "rank": "100000",
+                      "symbol": "04",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "Ownership": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enrichMode": "R",
+                    "addressOrder": "2",
+                    "dateReported": "2025-02-03+05:30",
+                    "partitionSet": "2",
+                    "CreditAddress": {
+                      "City": "",
+                      "Region": "",
+                      "PostalCode": "332711",
+                      "AddressType": "",
+                      "SerialNumber": "3108105057",
+                      "StreetAddress": "LAKHA KI NANGAL Rajasthan"
+                    }
+                  }
+                ],
+                "CreditStatement": {
+                  "Source": {
+                    "Bureau": {
+                      "rank": "100000",
+                      "symbol": "CIBIL",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "Locale": "en_IN",
+                    "Reference": "393c555d-9b93-4912-9621-893d5c7b5dba",
+                    "BorrowerKey": "204481075",
+                    "InquiryDate": "2026-05-29+05:30"
+                  },
+                  "statement": "",
+                  "dateUpdated": "",
+                  "StatementType": {
+                    "rank": "100000",
+                    "symbol": "DISPUTE",
+                    "description": "",
+                    "abbreviation": ""
+                  }
+                },
+                "BorrowerTelephone": [
+                  {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "393c555d-9b93-4912-9621-893d5c7b5dba",
+                      "BorrowerKey": "204481075",
+                      "InquiryDate": "2026-05-29+05:30"
+                    },
+                    "PhoneType": {
+                      "rank": "100000",
+                      "symbol": "02",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enrichMode": "R",
+                    "PhoneNumber": {
+                      "Number": "9461450813",
+                      "SerialNumber": "3048377370"
+                    },
+                    "partitionSet": "0"
+                  },
+                  {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "393c555d-9b93-4912-9621-893d5c7b5dba",
+                      "BorrowerKey": "204481075",
+                      "InquiryDate": "2026-05-29+05:30"
+                    },
+                    "PhoneType": {
+                      "rank": "100000",
+                      "symbol": "01",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enrichMode": "R",
+                    "PhoneNumber": {
+                      "Number": "9461450813",
+                      "SerialNumber": "1572776837"
+                    },
+                    "partitionSet": "1"
+                  },
+                  {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "393c555d-9b93-4912-9621-893d5c7b5dba",
+                      "BorrowerKey": "204481075",
+                      "InquiryDate": "2026-05-29+05:30"
+                    },
+                    "PhoneType": {
+                      "rank": "100000",
+                      "symbol": "01",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enrichMode": "R",
+                    "PhoneNumber": {
+                      "Number": "7891402816",
+                      "SerialNumber": "565527025"
+                    },
+                    "partitionSet": "2"
+                  }
+                ],
+                "IdentifierPartition": {
+                  "Identifier": [
+                    {
+                      "ID": {
+                        "Id": "204481075",
+                        "IdentifierName": "SocialId"
+                      },
+                      "Source": {
+                        "Bureau": {
+                          "rank": "100000",
+                          "symbol": "CIBIL",
+                          "description": "",
+                          "abbreviation": ""
+                        },
+                        "Locale": "en_IN",
+                        "Reference": "393c555d-9b93-4912-9621-893d5c7b5dba",
+                        "BorrowerKey": "204481075",
+                        "InquiryDate": "2026-05-29+05:30"
+                      }
+                    }
+                  ]
+                }
+              },
+              "ReferenceKey": "1545465193",
+              "FraudIndicator": false,
+              "currentversion": "5.0",
+              "InquiryPartition": [
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "393c555d-9b93-4912-9621-893d5c7b5dba",
+                      "BorrowerKey": "204481075",
+                      "InquiryDate": "2026-05-29+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2026-05-28+05:30",
+                    "inquiryType": "05",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "819232262",
+                    "subscriberName": "RINGKISSHTSICREV",
+                    "subscriberNumber": ""
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "393c555d-9b93-4912-9621-893d5c7b5dba",
+                      "BorrowerKey": "204481075",
+                      "InquiryDate": "2026-05-29+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2026-05-28+05:30",
+                    "inquiryType": "05",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "1944012388",
+                    "subscriberName": "TRUE CREDITS",
+                    "subscriberNumber": ""
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "393c555d-9b93-4912-9621-893d5c7b5dba",
+                      "BorrowerKey": "204481075",
+                      "InquiryDate": "2026-05-29+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2026-04-16+05:30",
+                    "inquiryType": "05",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "2316388603",
+                    "subscriberName": "TRUE CREDITS",
+                    "subscriberNumber": ""
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "393c555d-9b93-4912-9621-893d5c7b5dba",
+                      "BorrowerKey": "204481075",
+                      "InquiryDate": "2026-05-29+05:30"
+                    },
+                    "amount": "10000",
+                    "bureau": "",
+                    "description": "",
+                    "inquiryDate": "2025-02-03+05:30",
+                    "inquiryType": "10",
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "enqControlNum": "755303577",
+                    "subscriberName": "BARODARAJKGB LICENCECANCELLED",
+                    "subscriberNumber": ""
+                  }
+                }
+              ],
+              "DeceasedIndicator": false,
+              "SafetyCheckPassed": true,
+              "TradeLinePartition": [
+                {
+                  "Tradeline": {
+                    "Source": {
+                      "Bureau": {
+                        "rank": "100000",
+                        "symbol": "CIBIL",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "Locale": "en_IN",
+                      "Reference": "393c555d-9b93-4912-9621-893d5c7b5dba",
+                      "BorrowerKey": "204481075",
+                      "InquiryDate": "2026-05-29+05:30"
+                    },
+                    "branch": "",
+                    "bureau": "",
+                    "position": "0",
+                    "PayStatus": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "OpenClosed": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "dateOpened": "2025-03-21+05:30",
+                    "DisputeFlag": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "highBalance": "132000",
+                    "GrantedTrade": {
+                      "TermType": {
+                        "rank": "100000",
+                        "symbol": "",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "CashLimit": "-1",
+                      "EMIAmount": "-1",
+                      "CreditType": {
+                        "rank": "100000",
+                        "symbol": "00",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "collateral": "-1",
+                      "termMonths": "-1",
+                      "AccountType": {
+                        "rank": "100000",
+                        "symbol": "00",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "CreditLimit": "132000",
+                      "interestRate": "7",
+                      "serialNumber": "2330491779",
+                      "amountPastDue": "0",
+                      "CollateralType": {
+                        "rank": "100000",
+                        "symbol": "",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "WorstPayStatus": {
+                        "rank": "100000",
+                        "symbol": "",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "dateLastPayment": "2026-05-07+05:30",
+                      "PayStatusHistory": {
+                        "status": "STD,STD,STD,STD,STD,STD,SMA,SMA,SMA,SMA,SMA,SMA,SMA,SMA,STD,",
+                        "endDate": "2026-05-01+05:30",
+                        "startDate": "2025-03-01+05:30",
+                        "MonthlyPayStatus": [
+                          {
+                            "date": "2026-05-01+05:30",
+                            "status": "STD"
+                          },
+                          {
+                            "date": "2026-04-01+05:30",
+                            "status": "SMA"
+                          },
+                          {
+                            "date": "2026-03-01+05:30",
+                            "status": "SMA"
+                          },
+                          {
+                            "date": "2026-02-01+05:30",
+                            "status": "SMA"
+                          },
+                          {
+                            "date": "2026-01-01+05:30",
+                            "status": "SMA"
+                          },
+                          {
+                            "date": "2025-12-01+05:30",
+                            "status": "SMA"
+                          },
+                          {
+                            "date": "2025-11-01+05:30",
+                            "status": "SMA"
+                          },
+                          {
+                            "date": "2025-10-01+05:30",
+                            "status": "SMA"
+                          },
+                          {
+                            "date": "2025-09-01+05:30",
+                            "status": "SMA"
+                          },
+                          {
+                            "date": "2025-08-01+05:30",
+                            "status": "STD"
+                          },
+                          {
+                            "date": "2025-07-01+05:30",
+                            "status": "STD"
+                          },
+                          {
+                            "date": "2025-06-01+05:30",
+                            "status": "STD"
+                          },
+                          {
+                            "date": "2025-05-01+05:30",
+                            "status": "STD"
+                          },
+                          {
+                            "date": "2025-04-01+05:30",
+                            "status": "STD"
+                          },
+                          {
+                            "date": "2025-03-01+05:30",
+                            "status": "STD"
+                          }
+                        ]
+                      },
+                      "PaymentFrequency": {
+                        "rank": "100000",
+                        "symbol": "03",
+                        "description": "",
+                        "abbreviation": ""
+                      },
+                      "actualPaymentAmount": "-1"
+                    },
+                    "IndustryCode": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "creditorName": "RAJGRABNK",
+                    "dateReported": "2026-05-15+05:30",
+                    "accountNumber": "0000002133101028",
+                    "accountsSoldTo": "",
+                    "currentBalance": "131015",
+                    "subscriberCode": "9491779",
+                    "thirdPartyName": "",
+                    "AccountCondition": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "noOfParticipants": "",
+                    "settlementAmount": "-1",
+                    "AccountDesignator": {
+                      "rank": "100000",
+                      "symbol": "1",
+                      "description": "",
+                      "abbreviation": ""
+                    },
+                    "dateAccountStatus": "2026-05-07+05:30",
+                    "writtenOffAmtTotal": "-1",
+                    "writtenOffPrincipal": "-1",
+                    "VerificationIndicator": {
+                      "rank": "100000",
+                      "symbol": "",
+                      "description": "",
+                      "abbreviation": ""
+                    }
+                  },
+                  "accountTypeSymbol": "00",
+                  "accountTypeDescription": "",
+                  "accountTypeAbbreviation": ""
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "type": "point",
+  "status": "success",
+  "requestId": "44a9afc7-ceb9-4728-b6a2-49cc3e39c89b",
+  "vendorResponse": [
+    {
+      "name": "SapphireSwan",
+      "sequence": 1,
+      "statusCode": 200
+    }
+  ],
+  "serviceStatusCode": 200,
+  "_meta": {
+    "convertedFromHtml": "SMA (1).html",
+    "convertedAt": "2026-05-29T17:11:33.394Z",
+    "accountCount": 1,
+    "inquiryCount": 4
+  }
+}

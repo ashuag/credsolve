@@ -23,7 +23,7 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', le
   const [emailError, setEmailError] = useState('');
   const [optionError, setOptionError] = useState('');
   const [selectedOption, setSelectedOption] = useState<LoginOption>(
-    initialEmail || initialMode === 'register' ? 'manual' : null,
+    initialEmail ? 'manual' : null,
   );
   const [isSending, setIsSending] = useState(false);
   const emailInputRef = useRef<HTMLInputElement | null>(null);

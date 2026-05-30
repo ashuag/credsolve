@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { PDFDocument, StandardFonts, rgb, type PDFImage, type PDFPage, type PDFFont } from 'pdf-lib';
 import { pdfSafeText } from '../pdf/pdf-safe-text.util';
+import { parsePayStatusToDpdDays } from './cibil-bureau-rules.parser';
 import { formatControlNumberDisplay } from './cibil-report-data.extractor';
+import {
+  isAdverseAmountDisplay,
+  PAYMENT_STATUS_LEGEND,
+  resolvePaymentStatusVisual,
+} from './cibil-payment-status-style.util';
 import type {
   CibilReportAccountRow,
   CibilReportData,
@@ -13,18 +19,52 @@ import type {
 
 const PAGE_W = 595;
 const PAGE_H = 842;
-const MARGIN = 36;
+const MARGIN = 32;
 const CONTENT_W = PAGE_W - MARGIN * 2;
 
-const CIBIL_TEAL = rgb(0.32, 0.63, 0.67);
-const OPEN_GREEN = rgb(0.12, 0.55, 0.28);
-const BORDER = rgb(0.86, 0.88, 0.9);
-const LABEL = rgb(0.45, 0.48, 0.52);
-const TEXT = rgb(0.15, 0.17, 0.2);
-const MUTED = rgb(0.4, 0.42, 0.46);
-const GAUGE_ORANGE = rgb(0.95, 0.55, 0.2);
-const GAUGE_YELLOW = rgb(0.98, 0.82, 0.2);
-const GAUGE_GREEN = rgb(0.2, 0.7, 0.35);
+/** Typography scale — tuned for readable print/PDF viewing. */
+const TYPE = {
+  hero: 26,
+  title: 16,
+  section: 12,
+  subheading: 11,
+  body: 10,
+  bodySm: 9,
+  caption: 8,
+  tableHead: 9,
+  tableCell: 9.5,
+  gaugeScore: 30,
+  gaugeScale: 8.5,
+} as const;
+
+const SPACE = {
+  sectionAfterBanner: 10,
+  rowHeight: 20,
+  bannerHeight: 24,
+  accountBarHeight: 24,
+  paymentCellHeight: 17,
+  footerReserve: 36,
+  runningHeaderHeight: 30,
+} as const;
+
+const CIBIL_TEAL = rgb(0.2, 0.58, 0.62);
+const CIBIL_NAVY = rgb(0.12, 0.32, 0.48);
+const ACCOUNT_HEADER_GOLD = rgb(0.99, 0.84, 0.0);
+const HEADER_BAND = rgb(0.1, 0.28, 0.42);
+const SCORE_PANEL_BG = rgb(0.94, 0.98, 0.99);
+const ROW_ALT_BG = rgb(0.97, 0.98, 0.99);
+const RISK_PANEL_BG = rgb(0.98, 0.96, 0.92);
+const RISK_OK = rgb(0.1, 0.48, 0.24);
+const RISK_WARN = rgb(0.78, 0.45, 0.05);
+const OPEN_GREEN = rgb(0.08, 0.52, 0.28);
+const ADVERSE_AMOUNT = rgb(0.72, 0.12, 0.14);
+const BORDER = rgb(0.82, 0.85, 0.88);
+const LABEL = rgb(0.38, 0.42, 0.48);
+const TEXT = rgb(0.12, 0.14, 0.18);
+const MUTED = rgb(0.42, 0.45, 0.5);
+const GAUGE_ORANGE = rgb(0.95, 0.52, 0.15);
+const GAUGE_YELLOW = rgb(0.98, 0.78, 0.15);
+const GAUGE_GREEN = rgb(0.15, 0.68, 0.32);
 
 const MONTH_COLS = ['Dec', 'Nov', 'Oct', 'Sep', 'Aug', 'Jul', 'Jun', 'May', 'Apr', 'Mar', 'Feb', 'Jan'] as const;
 
@@ -35,7 +75,7 @@ const MONEYCASH_LOGO_PATH = path.join(
   'moneycash-logo.png',
 );
 
-const HEADER_LOGO_HEIGHT = 44;
+const HEADER_LOGO_HEIGHT = 48;
 
 type Fonts = { regular: PDFFont; bold: PDFFont };
 
@@ -56,9 +96,10 @@ export async function buildCibilStyleReportPdf(data: CibilReportData): Promise<U
   };
   const logo = await embedMoneyCashLogo(pdf);
 
-  const ctx = new PdfCanvas(pdf, fonts, logo);
+  const ctx = new PdfCanvas(pdf, fonts, logo, data);
   drawPrintHeader(ctx, data);
   drawScoreSection(ctx, data);
+  drawRiskSummaryStrip(ctx, data);
   drawCreditInsights(ctx, data);
   drawPreApprovedInsight(ctx, data);
   drawPersonalDetails(ctx, data);
@@ -71,6 +112,7 @@ export async function buildCibilStyleReportPdf(data: CibilReportData): Promise<U
   drawAllAccounts(ctx, data);
   drawEnquiryDetails(ctx, data.inquiries);
   drawReportFooter(ctx, data);
+  stampPageFooters(pdf, fonts, data);
 
   return pdf.save();
 }
@@ -78,22 +120,26 @@ export async function buildCibilStyleReportPdf(data: CibilReportData): Promise<U
 class PdfCanvas {
   page: PDFPage;
   y = PAGE_H - MARGIN;
+  pageIndex = 0;
 
   constructor(
     readonly pdf: PDFDocument,
     readonly fonts: Fonts,
     readonly logo: PDFImage | null = null,
+    readonly reportData: CibilReportData,
   ) {
     this.page = pdf.addPage([PAGE_W, PAGE_H]);
   }
 
   newPage() {
     this.page = this.pdf.addPage([PAGE_W, PAGE_H]);
-    this.y = PAGE_H - MARGIN;
+    this.pageIndex += 1;
+    drawRunningPageHeader(this);
+    this.y = PAGE_H - MARGIN - SPACE.runningHeaderHeight;
   }
 
   ensure(needed: number) {
-    if (this.y - needed >= MARGIN + 24) return;
+    if (this.y - needed >= MARGIN + SPACE.footerReserve) return;
     this.newPage();
   }
 
@@ -111,159 +157,487 @@ class PdfCanvas {
     let cy = y;
     for (const line of lines) {
       this.page.drawText(line, { x, y: cy, size, font, color });
-      cy -= size + 3;
+      cy -= size + 4;
     }
     return cy;
   }
 
   line(x1: number, y1: number, x2: number, y2: number) {
-    this.page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: 0.5, color: BORDER });
+    this.page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: 0.6, color: BORDER });
   }
 
   tealHeader(title: string) {
-    this.ensure(22);
-    this.y -= 4;
-    this.y = this.drawText(title, MARGIN, this.y, 11, { bold: true, color: CIBIL_TEAL });
-    this.y -= 6;
+    this.sectionBanner(title, CIBIL_NAVY, rgb(1, 1, 1));
   }
 
   /** Label (left) | value (right) rows like CIBIL print view. */
-  stripedRows(rows: Array<{ label: string; value: string }>) {
-    for (const row of rows) {
-      this.ensure(16);
-      const rowH = 14;
+  stripedRows(rows: Array<{ label: string; value: string; valueColor?: ReturnType<typeof rgb> }>) {
+    rows.forEach((row, index) => {
+      this.ensure(SPACE.rowHeight + 4);
+      const rowH = SPACE.rowHeight;
       const baseY = this.y - rowH;
+
+      if (index % 2 === 0) {
+        this.page.drawRectangle({
+          x: MARGIN,
+          y: baseY,
+          width: CONTENT_W,
+          height: rowH,
+          color: ROW_ALT_BG,
+        });
+      }
+
       this.line(MARGIN, baseY, PAGE_W - MARGIN, baseY);
       this.page.drawText(pdfSafeText(row.label), {
-        x: MARGIN + 4,
-        y: baseY + 3,
-        size: 8,
-        font: this.fonts.regular,
+        x: MARGIN + 6,
+        y: baseY + 5,
+        size: TYPE.bodySm,
+        font: this.fonts.bold,
         color: LABEL,
       });
-      const val = wrap(pdfSafeText(row.value), CONTENT_W * 0.55, 8, this.fonts.regular)[0] ?? '-';
+      const val = wrap(pdfSafeText(row.value), CONTENT_W * 0.55, TYPE.body, this.fonts.regular)[0] ?? '-';
+      const valueColor = row.valueColor ?? TEXT;
+      const valueFont = row.valueColor ? this.fonts.bold : this.fonts.regular;
       this.page.drawText(val, {
-        x: PAGE_W - MARGIN - 4 - this.fonts.regular.widthOfTextAtSize(val, 8),
-        y: baseY + 3,
-        size: 8,
-        font: this.fonts.regular,
-        color: TEXT,
+        x: PAGE_W - MARGIN - 6 - valueFont.widthOfTextAtSize(val, TYPE.body),
+        y: baseY + 5,
+        size: TYPE.body,
+        font: valueFont,
+        color: valueColor,
       });
       this.y = baseY - 2;
-    }
+    });
     this.line(MARGIN, this.y, PAGE_W - MARGIN, this.y);
-    this.y -= 8;
+    this.y -= SPACE.sectionAfterBanner;
+  }
+
+  sectionBanner(title: string, fill: ReturnType<typeof rgb>, textColor: ReturnType<typeof rgb>) {
+    this.ensure(SPACE.bannerHeight + 12);
+    const barH = SPACE.bannerHeight;
+    const baseY = this.y - barH;
+    this.page.drawRectangle({
+      x: MARGIN,
+      y: baseY,
+      width: CONTENT_W,
+      height: barH,
+      color: fill,
+    });
+    this.page.drawRectangle({
+      x: MARGIN,
+      y: baseY,
+      width: 4,
+      height: barH,
+      color: CIBIL_TEAL,
+    });
+    this.page.drawText(pdfSafeText(title), {
+      x: MARGIN + 12,
+      y: baseY + 6,
+      size: TYPE.section,
+      font: this.fonts.bold,
+      color: textColor,
+    });
+    this.y = baseY - SPACE.sectionAfterBanner;
   }
 
   dataTable(headers: string[], rows: string[][], colWidths: number[]) {
     const tableW = colWidths.reduce((a, b) => a + b, 0);
+    const rowH = SPACE.rowHeight;
     let x0 = MARGIN;
 
-    this.ensure(18 + rows.length * 14);
+    this.ensure(rowH + 8 + rows.length * (rowH + 2));
+    const headY = this.y - rowH;
+    this.page.drawRectangle({
+      x: MARGIN,
+      y: headY,
+      width: tableW,
+      height: rowH,
+      color: rgb(0.9, 0.93, 0.96),
+    });
+
     headers.forEach((h, i) => {
       this.page.drawText(pdfSafeText(h.toUpperCase()), {
-        x: x0 + 4,
-        y: this.y,
-        size: 7,
+        x: x0 + 6,
+        y: headY + 5,
+        size: TYPE.tableHead,
         font: this.fonts.bold,
-        color: LABEL,
+        color: CIBIL_NAVY,
       });
       x0 += colWidths[i];
     });
-    this.y -= 12;
+    this.y = headY - 4;
     this.line(MARGIN, this.y, MARGIN + tableW, this.y);
-    this.y -= 6;
+    this.y -= 4;
 
     for (const row of rows) {
-      this.ensure(14);
+      this.ensure(rowH + 4);
       let cx = MARGIN;
-      const baseY = this.y - 12;
+      const baseY = this.y - rowH;
       row.forEach((cell, i) => {
-        const line = wrap(pdfSafeText(cell), colWidths[i] - 8, 7.5, this.fonts.regular)[0] ?? '-';
+        const line = wrap(pdfSafeText(cell), colWidths[i] - 10, TYPE.tableCell, this.fonts.regular)[0] ?? '-';
         this.page.drawText(line, {
-          x: cx + 4,
-          y: baseY,
-          size: 7.5,
+          x: cx + 6,
+          y: baseY + 5,
+          size: TYPE.tableCell,
           font: this.fonts.regular,
           color: TEXT,
         });
         cx += colWidths[i];
       });
-      this.line(MARGIN, baseY - 2, MARGIN + tableW, baseY - 2);
-      this.y = baseY - 6;
+      this.line(MARGIN, baseY - 1, MARGIN + tableW, baseY - 1);
+      this.y = baseY - 3;
     }
-    this.y -= 4;
+    this.y -= 6;
   }
 }
 
 function drawPrintHeader(ctx: PdfCanvas, data: CibilReportData) {
-  const headerTop = PAGE_H - 46;
+  const bandH = 72;
+  ctx.page.drawRectangle({
+    x: 0,
+    y: PAGE_H - bandH,
+    width: PAGE_W,
+    height: bandH,
+    color: HEADER_BAND,
+  });
+  ctx.page.drawRectangle({
+    x: 0,
+    y: PAGE_H - bandH,
+    width: PAGE_W,
+    height: 4,
+    color: CIBIL_TEAL,
+  });
+
+  const headerTop = PAGE_H - 20;
   let textX = MARGIN;
-  let blockBottom = headerTop - 36;
+  let blockBottom = headerTop - 40;
 
   if (ctx.logo) {
     const scale = HEADER_LOGO_HEIGHT / ctx.logo.height;
     const logoW = ctx.logo.width * scale;
-    const logoY = headerTop - HEADER_LOGO_HEIGHT;
+    const logoY = headerTop - HEADER_LOGO_HEIGHT + 4;
+    ctx.page.drawRectangle({
+      x: MARGIN - 4,
+      y: logoY - 4,
+      width: logoW + 8,
+      height: HEADER_LOGO_HEIGHT + 8,
+      color: rgb(1, 1, 1),
+    });
     ctx.page.drawImage(ctx.logo, {
       x: MARGIN,
       y: logoY,
       width: logoW,
       height: HEADER_LOGO_HEIGHT,
     });
-    textX = MARGIN + logoW + 12;
-    blockBottom = Math.min(blockBottom, logoY - 4);
+    textX = MARGIN + logoW + 14;
+    blockBottom = Math.min(blockBottom, logoY - 8);
   }
 
-  const titleY = headerTop - 4;
-  ctx.drawText('CIBIL', textX, titleY, 18, { bold: true, color: CIBIL_TEAL });
-  ctx.drawText('CIBIL Score & Report', textX, titleY - 22, 11, { bold: true, color: TEXT });
-  blockBottom = Math.min(blockBottom, titleY - 38);
+  const titleY = headerTop - 2;
+  ctx.drawText('CIBIL', textX, titleY, TYPE.hero, { bold: true, color: rgb(1, 1, 1) });
+  ctx.drawText('Score & Credit Report', textX, titleY - 26, TYPE.title, { bold: true, color: rgb(0.85, 0.92, 0.96) });
+  blockBottom = Math.min(blockBottom, titleY - 44);
 
   const control = formatControlNumberDisplay(data.controlNumber) ?? '-';
   const dateStr = data.reportDateDisplay ?? data.bureauInquiryDate ?? '-';
-  ctx.drawText(`Control Number: ${control}`, PAGE_W - MARGIN - 160, PAGE_H - 42, 8, {
-    color: MUTED,
-    maxWidth: 160,
+  ctx.drawText(`Control Number: ${control}`, PAGE_W - MARGIN - 170, PAGE_H - 28, TYPE.bodySm, {
+    color: rgb(0.82, 0.88, 0.92),
+    maxWidth: 170,
   });
-  ctx.drawText(`Date: ${dateStr}`, PAGE_W - MARGIN - 160, PAGE_H - 54, 8, { color: MUTED, maxWidth: 160 });
+  ctx.drawText(`Report Date: ${dateStr}`, PAGE_W - MARGIN - 170, PAGE_H - 42, TYPE.bodySm, {
+    color: rgb(0.82, 0.88, 0.92),
+    maxWidth: 170,
+  });
 
-  ctx.y = blockBottom - 16;
+  ctx.y = blockBottom - 20;
+}
+
+function drawRunningPageHeader(ctx: PdfCanvas) {
+  const barH = SPACE.runningHeaderHeight - 6;
+  const baseY = PAGE_H - MARGIN - barH + 2;
+  ctx.page.drawRectangle({
+    x: MARGIN,
+    y: baseY,
+    width: CONTENT_W,
+    height: barH,
+    color: rgb(0.94, 0.96, 0.98),
+    borderColor: BORDER,
+    borderWidth: 0.5,
+  });
+  ctx.page.drawRectangle({
+    x: MARGIN,
+    y: baseY,
+    width: 3,
+    height: barH,
+    color: CIBIL_TEAL,
+  });
+
+  const name = pdfSafeText(ctx.reportData.consumerName);
+  const score = ctx.reportData.cibilScore ?? 'N/A';
+  ctx.page.drawText(name, {
+    x: MARGIN + 10,
+    y: baseY + 8,
+    size: TYPE.bodySm,
+    font: ctx.fonts.bold,
+    color: CIBIL_NAVY,
+  });
+  ctx.page.drawText(`CIBIL Score: ${score}`, {
+    x: PAGE_W - MARGIN - 90,
+    y: baseY + 8,
+    size: TYPE.bodySm,
+    font: ctx.fonts.bold,
+    color: CIBIL_TEAL,
+  });
+}
+
+type ReportRiskHighlights = {
+  openAccounts: number;
+  closedAccounts: number;
+  maxDpd: number;
+  adverseAccounts: number;
+  openOverdueAccounts: number;
+  enquiryCount: number;
+};
+
+function computeReportRiskHighlights(data: CibilReportData): ReportRiskHighlights {
+  let maxDpd = 0;
+  let adverseAccounts = 0;
+  let openOverdueAccounts = 0;
+
+  for (const account of data.accounts) {
+    const hasAdverseSignal =
+      isAdverseAmountDisplay(account.writtenOffTotal) ||
+      isAdverseAmountDisplay(account.writtenOffPrincipal) ||
+      isAdverseAmountDisplay(account.settlementAmount) ||
+      (account.suitFiled.trim() !== '-' && account.suitFiled.trim() !== '');
+
+    if (hasAdverseSignal) adverseAccounts += 1;
+    if (account.status === 'Open' && isAdverseAmountDisplay(account.overdueAmount)) {
+      openOverdueAccounts += 1;
+    }
+
+    for (const month of account.paymentHistory) {
+      const dpd = parsePayStatusToDpdDays(month.status);
+      if (dpd != null) maxDpd = Math.max(maxDpd, dpd);
+    }
+  }
+
+  const openAccounts = data.accounts.filter((a) => a.status === 'Open').length;
+  return {
+    openAccounts,
+    closedAccounts: data.accounts.length - openAccounts,
+    maxDpd,
+    adverseAccounts,
+    openOverdueAccounts,
+    enquiryCount: data.inquiries.length,
+  };
+}
+
+function drawRiskSummaryStrip(ctx: PdfCanvas, data: CibilReportData) {
+  const risk = computeReportRiskHighlights(data);
+  const panelH = 68;
+  ctx.ensure(panelH + 8);
+  const panelTop = ctx.y;
+  const panelBase = panelTop - panelH;
+
+  ctx.page.drawRectangle({
+    x: MARGIN,
+    y: panelBase,
+    width: CONTENT_W,
+    height: panelH,
+    color: RISK_PANEL_BG,
+    borderColor: rgb(0.88, 0.82, 0.68),
+    borderWidth: 0.75,
+  });
+
+  ctx.page.drawText('CREDIT RISK SNAPSHOT', {
+    x: MARGIN + 10,
+    y: panelTop - 14,
+    size: TYPE.bodySm,
+    font: ctx.fonts.bold,
+    color: CIBIL_NAVY,
+  });
+
+  const row1: Array<{ label: string; value: string; tone: ReturnType<typeof rgb> }> = [
+    {
+      label: 'CIBIL Score',
+      value: data.cibilScore != null ? String(data.cibilScore) : 'N/A',
+      tone: scoreTone(data.cibilScore),
+    },
+    { label: 'Open accounts', value: String(risk.openAccounts), tone: TEXT },
+    { label: 'Closed accounts', value: String(risk.closedAccounts), tone: MUTED },
+    {
+      label: 'Max DPD (history)',
+      value: risk.maxDpd > 0 ? String(risk.maxDpd) : '0',
+      tone: risk.maxDpd >= 90 ? ADVERSE_AMOUNT : risk.maxDpd >= 30 ? RISK_WARN : RISK_OK,
+    },
+  ];
+  const row2: Array<{ label: string; value: string; tone: ReturnType<typeof rgb> }> = [
+    {
+      label: 'Adverse tradelines',
+      value: String(risk.adverseAccounts),
+      tone: risk.adverseAccounts > 0 ? ADVERSE_AMOUNT : RISK_OK,
+    },
+    {
+      label: 'Open with overdue',
+      value: String(risk.openOverdueAccounts),
+      tone: risk.openOverdueAccounts > 0 ? ADVERSE_AMOUNT : RISK_OK,
+    },
+    { label: 'Total enquiries', value: String(risk.enquiryCount), tone: TEXT },
+    {
+      label: 'Rating',
+      value: data.scoreRatingLabel ?? '-',
+      tone: scoreTone(data.cibilScore),
+    },
+  ];
+
+  drawRiskMetricRow(ctx, row1, panelBase + 34, panelTop - 20);
+  ctx.page.drawLine({
+    start: { x: MARGIN + 8, y: panelBase + 30 },
+    end: { x: PAGE_W - MARGIN - 8, y: panelBase + 30 },
+    thickness: 0.4,
+    color: BORDER,
+  });
+  drawRiskMetricRow(ctx, row2, panelBase + 8, panelBase + 30);
+
+  ctx.y = panelBase - 12;
+}
+
+function drawRiskMetricRow(
+  ctx: PdfCanvas,
+  metrics: Array<{ label: string; value: string; tone: ReturnType<typeof rgb> }>,
+  valueY: number,
+  dividerTop: number,
+) {
+  const colW = CONTENT_W / metrics.length;
+  metrics.forEach((metric, index) => {
+    const x = MARGIN + index * colW + 8;
+    ctx.page.drawText(pdfSafeText(metric.label), {
+      x,
+      y: valueY - 14,
+      size: TYPE.caption,
+      font: ctx.fonts.regular,
+      color: LABEL,
+    });
+    ctx.page.drawText(pdfSafeText(metric.value), {
+      x,
+      y: valueY,
+      size: TYPE.subheading,
+      font: ctx.fonts.bold,
+      color: metric.tone,
+    });
+    if (index > 0) {
+      ctx.page.drawLine({
+        start: { x: MARGIN + index * colW, y: dividerTop },
+        end: { x: MARGIN + index * colW, y: dividerTop + 22 },
+        thickness: 0.5,
+        color: BORDER,
+      });
+    }
+  });
+}
+
+function scoreTone(score: number | null): ReturnType<typeof rgb> {
+  if (score == null || score <= 0) return MUTED;
+  if (score >= 750) return RISK_OK;
+  if (score >= 650) return RISK_WARN;
+  return ADVERSE_AMOUNT;
+}
+
+function stampPageFooters(pdf: PDFDocument, fonts: Fonts, data: CibilReportData) {
+  const pages = pdf.getPages();
+  const total = pages.length;
+  const dateStr = data.reportDateDisplay ?? data.bureauInquiryDate ?? '-';
+
+  pages.forEach((page, index) => {
+    const pageNum = index + 1;
+    const footerY = 22;
+    page.drawLine({
+      start: { x: MARGIN, y: footerY + 10 },
+      end: { x: PAGE_W - MARGIN, y: footerY + 10 },
+      thickness: 0.5,
+      color: BORDER,
+    });
+    page.drawText(pdfSafeText(data.consumerName), {
+      x: MARGIN,
+      y: footerY,
+      size: TYPE.caption,
+      font: fonts.regular,
+      color: MUTED,
+    });
+    page.drawText(`Report date: ${pdfSafeText(dateStr)}`, {
+      x: MARGIN + 140,
+      y: footerY,
+      size: TYPE.caption,
+      font: fonts.regular,
+      color: MUTED,
+    });
+    const pageLabel = `Page ${pageNum} of ${total}`;
+    page.drawText(pageLabel, {
+      x: PAGE_W - MARGIN - fonts.regular.widthOfTextAtSize(pageLabel, TYPE.caption),
+      y: footerY,
+      size: TYPE.caption,
+      font: fonts.regular,
+      color: CIBIL_NAVY,
+    });
+  });
 }
 
 function drawScoreSection(ctx: PdfCanvas, data: CibilReportData) {
   const score = data.cibilScore ?? 0;
-  const gaugeY = ctx.y - 8;
-  drawSemiCircularGauge(ctx, MARGIN + 8, gaugeY, 70, score);
+  const panelH = 118;
+  ctx.ensure(panelH + 12);
+  const panelTop = ctx.y;
+  const panelBase = panelTop - panelH;
 
-  const textX = MARGIN + 130;
-  let ty = gaugeY - 6;
-  ty = ctx.drawText(`Hello, ${data.consumerName}`, textX, ty, 11, { bold: true });
+  ctx.page.drawRectangle({
+    x: MARGIN,
+    y: panelBase,
+    width: CONTENT_W,
+    height: panelH,
+    color: SCORE_PANEL_BG,
+    borderColor: BORDER,
+    borderWidth: 0.75,
+  });
+  ctx.page.drawRectangle({
+    x: MARGIN,
+    y: panelBase,
+    width: 4,
+    height: panelH,
+    color: CIBIL_TEAL,
+  });
+
+  const gaugeY = panelTop - 18;
+  drawSemiCircularGauge(ctx, MARGIN + 24, gaugeY, 52, score);
+
+  const textX = MARGIN + 148;
+  let ty = gaugeY - 4;
+  ty = ctx.drawText(`Hello, ${data.consumerName}`, textX, ty, TYPE.title, { bold: true });
   const asOf = data.reportDateDisplay ?? '-';
   ty = ctx.drawText(
-    `Your CIBIL Score is ${data.cibilScore ?? 'N/A'} as of Date : ${asOf}`,
+    `Your CIBIL Score is ${data.cibilScore ?? 'N/A'} as of ${asOf}`,
     textX,
-    ty - 4,
-    10,
-    { bold: true, maxWidth: CONTENT_W - 130 },
+    ty - 6,
+    TYPE.subheading,
+    { bold: true, maxWidth: CONTENT_W - 148 },
   );
   if (data.scoreRatingLabel) {
-    ty = ctx.drawText(`Rating: ${data.scoreRatingLabel}`, textX, ty - 4, 9, {
+    ty = ctx.drawText(`Rating: ${data.scoreRatingLabel}`, textX, ty - 6, TYPE.body, {
       bold: true,
       color: OPEN_GREEN,
-      maxWidth: CONTENT_W - 130,
+      maxWidth: CONTENT_W - 148,
     });
   }
   const meta: string[] = [];
   if (data.scoreName) meta.push(`Model: ${data.scoreName}`);
   if (data.populationRank) meta.push(`Population rank: ${data.populationRank}`);
   if (meta.length) {
-    ty = ctx.drawText(meta.join('  |  '), textX, ty - 4, 7.5, {
+    ty = ctx.drawText(meta.join('  |  '), textX, ty - 6, TYPE.bodySm, {
       color: MUTED,
-      maxWidth: CONTENT_W - 130,
+      maxWidth: CONTENT_W - 148,
     });
   }
-  ctx.y = drawScoreParagraph(ctx, textX, ty - 6) - 16;
+  drawScoreParagraph(ctx, textX, ty - 8);
+  ctx.y = panelBase - 14;
 }
 
 function drawCreditInsights(ctx: PdfCanvas, data: CibilReportData) {
@@ -299,7 +673,7 @@ function drawCreditInsights(ctx: PdfCanvas, data: CibilReportData) {
 
   if (scoreFactors.length) {
     ctx.ensure(20);
-    ctx.y = ctx.drawText('Factors affecting your score', MARGIN, ctx.y, 9, {
+    ctx.y = ctx.drawText('Factors affecting your score', MARGIN, ctx.y, TYPE.subheading, {
       bold: true,
       color: TEXT,
     });
@@ -311,9 +685,9 @@ function drawCreditInsights(ctx: PdfCanvas, data: CibilReportData) {
 function drawScoreFactorList(ctx: PdfCanvas, factors: CibilReportScoreFactor[]) {
   for (const factor of factors) {
     ctx.ensure(28);
-    ctx.y = ctx.drawText(`${factor.code}.`, MARGIN, ctx.y, 8, { bold: true, color: CIBIL_TEAL });
-    const textX = MARGIN + 18;
-    ctx.y = ctx.drawText(factor.text, textX, ctx.y + 1, 7.5, {
+    ctx.y = ctx.drawText(`${factor.code}.`, MARGIN, ctx.y, TYPE.bodySm, { bold: true, color: CIBIL_TEAL });
+    const textX = MARGIN + 20;
+    ctx.y = ctx.drawText(factor.text, textX, ctx.y + 1, TYPE.bodySm, {
       color: MUTED,
       maxWidth: CONTENT_W - 18,
     });
@@ -368,7 +742,7 @@ function drawPreApprovedInsight(ctx: PdfCanvas, data: CibilReportData) {
   ]);
   if (insight?.detail) {
     ctx.ensure(16);
-    ctx.y = ctx.drawText(insight.detail, MARGIN, ctx.y, 7.5, { color: MUTED, maxWidth: CONTENT_W });
+    ctx.y = ctx.drawText(insight.detail, MARGIN, ctx.y, TYPE.bodySm, { color: MUTED, maxWidth: CONTENT_W });
     ctx.y -= 8;
   }
 }
@@ -413,7 +787,7 @@ function drawAccountsSummary(ctx: PdfCanvas, data: CibilReportData) {
 function drawScoreParagraph(ctx: PdfCanvas, x: number, startY: number): number {
   const para =
     'Your CIBIL Score is a 3-digit numeric summary of your credit history. Lenders use it as a measure of your creditworthiness when you apply for a loan or credit card.';
-  return ctx.drawText(para, x, startY, 8, { color: MUTED, maxWidth: CONTENT_W - (x - MARGIN) });
+  return ctx.drawText(para, x, startY, TYPE.bodySm, { color: MUTED, maxWidth: CONTENT_W - (x - MARGIN) });
 }
 
 function drawSemiCircularGauge(ctx: PdfCanvas, cx: number, cy: number, radius: number, score: number) {
@@ -427,25 +801,25 @@ function drawSemiCircularGauge(ctx: PdfCanvas, cx: number, cy: number, radius: n
     ctx.page.drawLine({
       start: { x: cx + Math.cos(a0) * radius, y: cy + Math.sin(a0) * radius },
       end: { x: cx + Math.cos(a1) * radius, y: cy + Math.sin(a1) * radius },
-      thickness: 7,
+      thickness: 8,
       color,
     });
   }
-  ctx.page.drawText('300', { x: cx - radius - 4, y: cy - 4, size: 7, font: ctx.fonts.regular, color: LABEL });
+  ctx.page.drawText('300', { x: cx - radius - 6, y: cy - 4, size: TYPE.gaugeScale, font: ctx.fonts.regular, color: LABEL });
   ctx.page.drawText('900', {
-    x: cx + radius - 10,
+    x: cx + radius - 12,
     y: cy - 4,
-    size: 7,
+    size: TYPE.gaugeScale,
     font: ctx.fonts.regular,
     color: LABEL,
   });
   const label = score > 0 ? String(score) : 'N/A';
   ctx.page.drawText(pdfSafeText(label), {
-    x: cx - ctx.fonts.bold.widthOfTextAtSize(label, 22) / 2,
-    y: cy - 18,
-    size: 22,
+    x: cx - ctx.fonts.bold.widthOfTextAtSize(label, TYPE.gaugeScore) / 2,
+    y: cy - 20,
+    size: TYPE.gaugeScore,
     font: ctx.fonts.bold,
-    color: TEXT,
+    color: CIBIL_NAVY,
   });
 }
 
@@ -536,18 +910,18 @@ function drawAllAccounts(ctx: PdfCanvas, data: CibilReportData) {
   ctx.tealHeader('ALL ACCOUNTS');
 
   if (open.length) {
-    ctx.ensure(20);
-    ctx.y = ctx.drawText('OPEN ACCOUNTS', MARGIN, ctx.y, 10, { bold: true, color: OPEN_GREEN });
-    ctx.y -= 8;
+    ctx.ensure(24);
+    ctx.y = ctx.drawText('OPEN ACCOUNTS', MARGIN, ctx.y, TYPE.subheading, { bold: true, color: OPEN_GREEN });
+    ctx.y -= 10;
     for (const account of open) {
       drawSingleAccount(ctx, account);
     }
   }
 
   if (closed.length) {
-    ctx.ensure(20);
-    ctx.y = ctx.drawText('CLOSED ACCOUNTS', MARGIN, ctx.y, 10, { bold: true, color: MUTED });
-    ctx.y -= 8;
+    ctx.ensure(24);
+    ctx.y = ctx.drawText('CLOSED ACCOUNTS', MARGIN, ctx.y, TYPE.subheading, { bold: true, color: MUTED });
+    ctx.y -= 10;
     for (const account of closed) {
       drawSingleAccount(ctx, account);
     }
@@ -555,24 +929,23 @@ function drawAllAccounts(ctx: PdfCanvas, data: CibilReportData) {
 }
 
 function drawSingleAccount(ctx: PdfCanvas, account: CibilReportAccountRow) {
-  if (ctx.y < 200) ctx.newPage();
+  if (ctx.y < 240) ctx.newPage();
 
-  ctx.ensure(24);
-  ctx.stripedRows([
-    { label: 'Member Name', value: account.creditor },
-    { label: 'Account Type', value: account.accountType },
-    { label: 'Account Number', value: account.accountNumber },
-    { label: 'Ownership', value: account.ownership },
-  ]);
+  const cardTop = ctx.y;
+  drawAccountHeaderBar(ctx, account);
 
-  ctx.y = ctx.drawText('ACCOUNT DETAILS', MARGIN, ctx.y, 9, { bold: true, color: CIBIL_TEAL });
-  ctx.y -= 4;
+  ctx.y = ctx.drawText('ACCOUNT DETAILS', MARGIN, ctx.y, TYPE.subheading, { bold: true, color: CIBIL_TEAL });
+  ctx.y -= 6;
   ctx.stripedRows([
     { label: 'Credit Limit', value: account.sanctionedAmount },
     { label: 'High Credit', value: account.highBalance },
     { label: 'Current Balance', value: account.currentBalance },
     { label: 'Cash Limit', value: account.cashLimit },
-    { label: 'Amount Overdue', value: account.overdueAmount },
+    {
+      label: 'Amount Overdue',
+      value: account.overdueAmount,
+      valueColor: isAdverseAmountDisplay(account.overdueAmount) ? ADVERSE_AMOUNT : undefined,
+    },
     { label: 'Rate of Interest', value: account.rateOfInterest },
     { label: 'Repayment Tenure', value: account.repaymentTenure },
     { label: 'EMI Amount', value: account.emiAmount },
@@ -584,21 +957,80 @@ function drawSingleAccount(ctx: PdfCanvas, account: CibilReportAccountRow) {
     { label: 'Date Closed', value: account.dateClosed ?? '-' },
     { label: 'Date of Last Payment', value: account.dateLastPayment ?? '-' },
     { label: 'Date Reported And Certified', value: account.dateReported ?? '-' },
-    { label: 'Value of Collateral', value: '-' },
-    { label: 'Type of Collateral', value: '-' },
-    { label: 'Suit - Filed / Wilful Default', value: account.suitFiled },
-    { label: 'Written-off Amount (Total)', value: account.writtenOffTotal },
-    { label: 'Written-off Amount (Principal)', value: account.writtenOffPrincipal },
-    { label: 'Settlement Amount', value: account.settlementAmount },
+    { label: 'Value of Collateral', value: account.collateralValue },
+    { label: 'Type of Collateral', value: account.collateralType },
+    {
+      label: 'Suit - Filed / Wilful Default',
+      value: account.suitFiled,
+      valueColor:
+        account.suitFiled.trim() !== '-' && account.suitFiled.trim() !== ''
+          ? ADVERSE_AMOUNT
+          : undefined,
+    },
+    {
+      label: 'Written-off Amount (Total)',
+      value: account.writtenOffTotal,
+      valueColor: isAdverseAmountDisplay(account.writtenOffTotal) ? ADVERSE_AMOUNT : undefined,
+    },
+    {
+      label: 'Written-off Amount (Principal)',
+      value: account.writtenOffPrincipal,
+      valueColor: isAdverseAmountDisplay(account.writtenOffPrincipal) ? ADVERSE_AMOUNT : undefined,
+    },
+    {
+      label: 'Settlement Amount',
+      value: account.settlementAmount,
+      valueColor: isAdverseAmountDisplay(account.settlementAmount) ? ADVERSE_AMOUNT : undefined,
+    },
   ]);
 
   drawPaymentStatusSection(ctx, account);
+  ctx.y -= 8;
+
+  const cardBottom = ctx.y;
+  ctx.page.drawRectangle({
+    x: MARGIN - 3,
+    y: cardBottom - 2,
+    width: CONTENT_W + 6,
+    height: cardTop - cardBottom + 6,
+    borderColor: BORDER,
+    borderWidth: 0.75,
+  });
   ctx.y -= 6;
 }
 
+function drawAccountHeaderBar(ctx: PdfCanvas, account: CibilReportAccountRow) {
+  ctx.ensure(SPACE.accountBarHeight + 10);
+  const barH = SPACE.accountBarHeight;
+  const baseY = ctx.y - barH;
+  ctx.page.drawRectangle({
+    x: MARGIN,
+    y: baseY,
+    width: CONTENT_W,
+    height: barH,
+    color: ACCOUNT_HEADER_GOLD,
+    borderColor: rgb(0.75, 0.62, 0),
+    borderWidth: 0.5,
+  });
+
+  const cols = [account.creditor, account.accountType, account.accountNumber, account.ownership];
+  const colW = CONTENT_W / cols.length;
+  cols.forEach((text, index) => {
+    const cell = wrap(pdfSafeText(text), colW - 10, TYPE.body, ctx.fonts.bold)[0] ?? '-';
+    ctx.page.drawText(cell, {
+      x: MARGIN + index * colW + 6,
+      y: baseY + 6,
+      size: TYPE.body,
+      font: ctx.fonts.bold,
+      color: rgb(0, 0, 0),
+    });
+  });
+  ctx.y = baseY - 10;
+}
+
 function drawPaymentStatusSection(ctx: PdfCanvas, account: CibilReportAccountRow) {
-  ctx.y = ctx.drawText('PAYMENT STATUS', MARGIN, ctx.y, 9, { bold: true, color: CIBIL_TEAL });
-  ctx.y -= 4;
+  ctx.y = ctx.drawText('PAYMENT STATUS', MARGIN, ctx.y, TYPE.subheading, { bold: true, color: CIBIL_TEAL });
+  ctx.y -= 6;
   ctx.stripedRows([
     { label: 'Payment Start Date', value: account.paymentStartDate ?? '-' },
     { label: 'Payment End Date', value: account.paymentEndDate ?? '-' },
@@ -626,82 +1058,144 @@ function drawPaymentCalendar(ctx: PdfCanvas, history: CibilReportPaymentMonth[])
   const years = [...byYear.keys()].sort((a, b) => b - a).slice(0, 4);
   if (!years.length) return;
 
-  const yearColW = 36;
+  const yearColW = 40;
   const colW = (CONTENT_W - yearColW) / MONTH_COLS.length;
+  const cellH = SPACE.paymentCellHeight;
   const headers = ['Year', ...MONTH_COLS];
   const widths = [yearColW, ...MONTH_COLS.map(() => colW)];
 
-  ctx.ensure(16 + years.length * 14);
+  ctx.ensure(18 + years.length * (cellH + 5));
+  const headBase = ctx.y - cellH;
+  ctx.page.drawRectangle({
+    x: MARGIN,
+    y: headBase,
+    width: CONTENT_W,
+    height: cellH,
+    color: rgb(0.9, 0.93, 0.96),
+  });
   let x = MARGIN;
   headers.forEach((h, i) => {
     ctx.page.drawText(pdfSafeText(h), {
-      x: x + 2,
-      y: ctx.y,
-      size: 6.5,
+      x: x + 3,
+      y: headBase + 4,
+      size: TYPE.caption,
       font: ctx.fonts.bold,
-      color: LABEL,
+      color: CIBIL_NAVY,
     });
     x += widths[i];
   });
-  ctx.y -= 11;
+  ctx.y = headBase - 4;
   ctx.line(MARGIN, ctx.y, PAGE_W - MARGIN, ctx.y);
   ctx.y -= 5;
 
   for (const year of years) {
-    ctx.ensure(14);
+    ctx.ensure(cellH + 8);
     const months = byYear.get(year)!;
+    const rowTop = ctx.y;
+    const baseY = rowTop - cellH;
     let cx = MARGIN;
-    const baseY = ctx.y - 11;
-    const cells = [
-      String(year),
-      ...MONTH_COLS.map((_, idx) => {
-        const monthNum = 12 - idx;
-        return formatPaymentStatusCell(months.get(monthNum));
-      }),
-    ];
-    cells.forEach((cell, i) => {
-      ctx.page.drawText(pdfSafeText(cell), {
-        x: cx + 2,
-        y: baseY,
-        size: 6.5,
-        font: ctx.fonts.regular,
-        color: TEXT,
-      });
-      cx += widths[i];
+
+    drawPaymentStatusCell(ctx, cx, rowTop, widths[0], cellH, String(year), false);
+    cx += widths[0];
+
+    MONTH_COLS.forEach((_, idx) => {
+      const monthNum = 12 - idx;
+      const rawStatus = months.get(monthNum) ?? '';
+      drawPaymentStatusCell(ctx, cx, rowTop, colW, cellH, rawStatus, true);
+      cx += colW;
     });
-    ctx.line(MARGIN, baseY - 2, PAGE_W - MARGIN, baseY - 2);
-    ctx.y = baseY - 5;
+
+    ctx.line(MARGIN, baseY - 1, PAGE_W - MARGIN, baseY - 1);
+    ctx.y = baseY - 4;
   }
   ctx.y -= 6;
 }
 
-function drawPaymentStatusLegend(ctx: PdfCanvas) {
-  ctx.ensure(36);
-  const colW = CONTENT_W / 3;
-  const rows: Array<[string, string, string]> = [
-    ['STD: Standard', 'DBT: Doubtful', '###: Number of days past due'],
-    ['SMA: Special Mention account', 'LSS: Loss', 'XXX: Not Reported'],
-    ['SUB: Substandard', '', ''],
-  ];
-  for (const [a, b, c] of rows) {
-    ctx.page.drawText(pdfSafeText(a), { x: MARGIN, y: ctx.y, size: 6, font: ctx.fonts.regular, color: MUTED });
-    ctx.page.drawText(pdfSafeText(b), {
-      x: MARGIN + colW,
-      y: ctx.y,
-      size: 6,
-      font: ctx.fonts.regular,
-      color: MUTED,
+function drawPaymentStatusCell(
+  ctx: PdfCanvas,
+  x: number,
+  rowTop: number,
+  width: number,
+  height: number,
+  rawStatus: string,
+  colorize: boolean,
+) {
+  const cell = colorize ? formatPaymentStatusCell(rawStatus) : rawStatus;
+  const visual = colorize ? resolvePaymentStatusVisual(rawStatus) : null;
+  const baseY = rowTop - height;
+
+  if (visual?.bg) {
+    ctx.page.drawRectangle({
+      x: x + 0.5,
+      y: baseY + 0.5,
+      width: width - 1,
+      height: height - 1,
+      color: visual.bg,
+      borderColor: BORDER,
+      borderWidth: 0.25,
     });
-    ctx.page.drawText(pdfSafeText(c), {
-      x: MARGIN + colW * 2,
-      y: ctx.y,
-      size: 6,
-      font: ctx.fonts.regular,
-      color: MUTED,
-    });
-    ctx.y -= 9;
   }
-  ctx.y -= 4;
+
+  if (!cell) return;
+
+  const font =
+    visual && ['dpd_90plus', 'doubtful', 'loss', 'settled', 'written_off'].includes(visual.category)
+      ? ctx.fonts.bold
+      : ctx.fonts.regular;
+  const color = visual?.fg ?? TEXT;
+  const size = TYPE.caption;
+  const text = pdfSafeText(cell);
+  const textW = font.widthOfTextAtSize(text, size);
+  ctx.page.drawText(text, {
+    x: x + Math.max(2, (width - textW) / 2),
+    y: baseY + 4,
+    size,
+    font,
+    color,
+  });
+}
+
+function drawPaymentStatusLegend(ctx: PdfCanvas) {
+  ctx.ensure(56);
+  ctx.y = ctx.drawText('Payment status legend', MARGIN, ctx.y, TYPE.bodySm, { bold: true, color: CIBIL_NAVY });
+  ctx.y -= 8;
+
+  const swatch = 10;
+  const gap = 6;
+  const itemW = CONTENT_W / 2;
+  let column = 0;
+  let rowY = ctx.y;
+
+  for (const item of PAYMENT_STATUS_LEGEND) {
+    if (!item.legendLabel) continue;
+    const x = MARGIN + column * itemW;
+    if (item.bg) {
+      ctx.page.drawRectangle({
+        x,
+        y: rowY - swatch,
+        width: swatch,
+        height: swatch,
+        color: item.bg,
+        borderColor: BORDER,
+        borderWidth: 0.35,
+      });
+    }
+    ctx.page.drawText(pdfSafeText(item.legendLabel), {
+      x: x + swatch + gap,
+      y: rowY - swatch + 2,
+      size: TYPE.caption,
+      font: ctx.fonts.regular,
+      color: MUTED,
+    });
+
+    column += 1;
+    if (column >= 2) {
+      column = 0;
+      rowY -= 14;
+    }
+  }
+
+  ctx.y = rowY - (column === 0 ? 10 : 14);
 }
 
 function drawEnquiryDetails(ctx: PdfCanvas, inquiries: CibilReportInquiryRow[]) {
@@ -711,7 +1205,7 @@ function drawEnquiryDetails(ctx: PdfCanvas, inquiries: CibilReportInquiryRow[]) 
     '(*) Indicates the value provided by bank when you applied for a credit facility.',
     MARGIN,
     ctx.y,
-    6.5,
+    TYPE.caption,
     { color: MUTED, maxWidth: CONTENT_W },
   );
   ctx.y -= 4;
@@ -734,27 +1228,27 @@ function drawReportFooter(ctx: PdfCanvas, data: CibilReportData) {
   const midX = PAGE_W / 2;
   ctx.line(MARGIN + 80, ctx.y, PAGE_W - MARGIN - 80, ctx.y);
   ctx.page.drawText('End of report', {
-    x: midX - ctx.fonts.bold.widthOfTextAtSize('End of report', 9) / 2,
+    x: midX - ctx.fonts.bold.widthOfTextAtSize('End of report', TYPE.subheading) / 2,
     y: ctx.y + 4,
-    size: 9,
+    size: TYPE.subheading,
     font: ctx.fonts.bold,
-    color: TEXT,
+    color: CIBIL_NAVY,
   });
-  ctx.y -= 16;
+  ctx.y -= 18;
 
   const disclaimer =
     'Disclaimer: All information contained in this credit report has been collated by TransUnion CIBIL Limited (TU CIBIL) based on information provided/submitted by its Members. This internal reproduction from TrueLink bureau data is for operational use; refer to the official bureau portal for the authoritative report.';
-  ctx.y = ctx.drawText(disclaimer, MARGIN, ctx.y, 6.5, { color: MUTED, maxWidth: CONTENT_W });
-  ctx.y -= 8;
+  ctx.y = ctx.drawText(disclaimer, MARGIN, ctx.y, TYPE.caption, { color: MUTED, maxWidth: CONTENT_W });
+  ctx.y -= 10;
   ctx.y = ctx.drawText(
     'COPYRIGHT 2026 TRANSUNION CIBIL. ALL RIGHTS RESERVED. For more information, visit www.cibil.com',
     MARGIN,
     ctx.y,
-    6.5,
+    TYPE.caption,
     { color: MUTED, maxWidth: CONTENT_W },
   );
   if (data.vendorHtmlUrl) {
-    ctx.drawText(`Bureau portal: ${data.vendorHtmlUrl}`, MARGIN, ctx.y - 4, 6.5, {
+    ctx.drawText(`Bureau portal: ${data.vendorHtmlUrl}`, MARGIN, ctx.y - 4, TYPE.caption, {
       color: CIBIL_TEAL,
       maxWidth: CONTENT_W,
     });

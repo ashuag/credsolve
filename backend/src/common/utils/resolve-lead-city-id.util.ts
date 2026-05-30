@@ -13,13 +13,14 @@ export async function resolveLeadCityId(
   }
 
   const normalized = input.currentCity.replace(/\s+/g, ' ').trim();
+  const normalizedUpper = normalized.toUpperCase();
   const parts = normalized
     .split(',')
     .map((p) => p.trim())
     .filter(Boolean);
 
   if (parts.length >= 2) {
-    const cityName = parts[0]!;
+    const cityName = parts[0]!.toUpperCase();
     const stateSegment = parts[parts.length - 1]!.trim();
     const stateCode = stateSegment.length <= 3 ? stateSegment.toUpperCase() : null;
 
@@ -40,7 +41,7 @@ export async function resolveLeadCityId(
     const state = await prisma.state.findFirst({
       where: {
         isActive: true,
-        OR: [...(stateCode ? [{ code: stateCode }] : []), { name: stateSegment }],
+        OR: [...(stateCode ? [{ code: stateCode }] : []), { name: stateSegment.toUpperCase() }],
       },
       select: { id: true },
     });
@@ -56,7 +57,7 @@ export async function resolveLeadCityId(
   }
 
   const single = await prisma.city.findFirst({
-    where: { name: normalized, isActive: true },
+    where: { name: normalizedUpper, isActive: true },
     select: { id: true },
   });
   return single?.id ?? null;

@@ -13,7 +13,6 @@ backend/
 │   ├── prisma/          # PrismaModule + PrismaService
 │   └── common/constants # shared enums/strings for seeds
 ├── nest-cli.json
-├── scripts/             # Prisma CLI wrapper
 └── package.json
 ```
 
@@ -29,7 +28,7 @@ backend/
 
 ### Inside Docker (`docker exec -it <backend-container> sh`)
 
-Use `**prisma**` (not `prism`). Prefer **npm scripts** so the same CLI wrapper and `prisma.config.ts` are used:
+Use **npm scripts** with Node 20+ (`engines` in package.json). Docker Compose uses Node 22.
 
 ```sh
 cd /workspace/backend

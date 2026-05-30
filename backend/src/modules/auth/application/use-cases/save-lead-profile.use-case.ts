@@ -66,7 +66,6 @@ export class SaveLeadProfileUseCase {
     const netMonthlyIncome = parseOptionalInrAmount(dto.monthlyIncome);
     const annualTurnover = parseOptionalInrAmount(dto.annualTurnover);
     const annualProfit = parseOptionalInrAmount(dto.annualProfit);
-    const consentAt = dto.creditConsentAccepted ? new Date() : null;
     const panUpper = dto.panNumber.trim().toUpperCase();
 
     const profilePayload = {
@@ -77,7 +76,7 @@ export class SaveLeadProfileUseCase {
       netMonthlyIncome,
       annualTurnover,
       annualProfit,
-      cibilConsentAt: consentAt,
+      ...(dto.creditConsentAccepted === true ? { cibilConsentAt: new Date() } : {}),
     };
 
     await this.prisma.client.leadDetail.upsert({

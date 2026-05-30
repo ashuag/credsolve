@@ -1,6 +1,6 @@
 'use client';
 
-import {type ChangeEvent, type ReactNode, type SubmitEvent, useEffect, useState,} from 'react';
+import {type ChangeEvent, type ReactNode, type SubmitEvent, useEffect, useRef, useState,} from 'react';
 import {useRouter} from 'next/navigation';
 import {SessionRequiredAlert} from '@/components/auth/session-required-alert';
 import {AlertBanner} from '@/components/ui/alert-banner';
@@ -9,6 +9,7 @@ import {FlowLoader} from '@/components/ui/flow-loader';
 import {SearchableCityInput} from '@/components/ui/searchable-city-input';
 import type {CustomerPortalProfile} from '@/lib/api/customer-session';
 import {saveLeadDetails, saveLeadProfile, verifyLeadPan} from '@/lib/api/lead';
+import {fetchPincodeLookup} from '@/lib/api/lookup';
 import {cn} from '@/lib/cn';
 import {
   CUSTOMER_CREDIT_CONSENT_TEXT,
@@ -60,15 +61,15 @@ function computeProfileCompletionRatio(fields: Fields, dobDisplay: string): numb
     checks.push(Boolean(fields.annualTurnover && Number(fields.annualTurnover) > 0));
     checks.push(Boolean(fields.annualProfit && Number(fields.annualProfit) > 0));
   }
-  checks.push(fields.creditConsentAccepted);
   return checks.length === 0 ? 0 : checks.filter(Boolean).length / checks.length;
 }
 
 function computeFinancialCompletionRatio(fields: Fields): number {
   const core = [
-    fields.addressLine1.trim().length >= 5,
-    Boolean(fields.currentCity.trim()),
     PINCODE_REGEX.test(fields.pincode),
+    Boolean(fields.currentCity.trim()),
+    fields.addressLine1.trim().length >= 5,
+    fields.creditConsentAccepted,
   ];
   let score = core.filter(Boolean).length / core.length;
   if (fields.addressLine2.trim()) {
@@ -90,7 +91,6 @@ const PROFILE_PAGE_FIELDS: Array<keyof Fields> = [
   'monthlyIncome',
   'annualTurnover',
   'annualProfit',
-  'creditConsentAccepted',
 ];
 
 type PersonalDetailsStepProps = {
@@ -148,6 +148,8 @@ export function PersonalDetailsStep({
   const [errors, setErrors] = useState<FieldError>({});
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
+  const [isLookingUpPincode, setIsLookingUpPincode] = useState(false);
+  const [cityFromPincode, setCityFromPincode] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const { cityOptions, genderOptions, occupationOptions, isLoading: isLoadingLookups } = useCustomerDetailLookups();
 
@@ -159,6 +161,7 @@ export function PersonalDetailsStep({
   const usesMonthlyIncome = usesMonthlyIncomeMetric(fields.occupation || undefined);
   const draftStorageKey = `${DETAILS_DRAFT_KEY_PREFIX}${leadUuid}`;
   const setCompletion01 = useJourneyProgressOptional()?.setCompletion01;
+  const lastResolvedPincodeRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!setCompletion01) return;
@@ -230,6 +233,63 @@ export function PersonalDetailsStep({
     }
   }, [draftStorageKey, fields, dobDisplay]);
 
+  useEffect(() => {
+    if (!PINCODE_REGEX.test(fields.pincode)) {
+      if (lastResolvedPincodeRef.current) {
+        lastResolvedPincodeRef.current = null;
+        setCityFromPincode(false);
+        setFields((prev) => ({ ...prev, currentCity: '', currentCityId: null }));
+      }
+      return;
+    }
+
+    if (lastResolvedPincodeRef.current === fields.pincode) {
+      return;
+    }
+
+    let isActive = true;
+
+    async function resolvePincode() {
+      setIsLookingUpPincode(true);
+      try {
+        const result = await fetchPincodeLookup(fields.pincode);
+        if (!isActive) return;
+
+        if (result) {
+          lastResolvedPincodeRef.current = fields.pincode;
+          setFields((prev) => ({
+            ...prev,
+            currentCity: result.cityName,
+            currentCityId: result.cityId,
+          }));
+          setCityFromPincode(true);
+          setErrors((prev) => ({ ...prev, pincode: undefined, currentCity: undefined }));
+        } else {
+          lastResolvedPincodeRef.current = null;
+          setCityFromPincode(false);
+          setErrors((prev) => ({
+            ...prev,
+            pincode: 'We could not find this pincode. Please enter a valid 6-digit pincode.',
+          }));
+        }
+      } catch {
+        if (!isActive) return;
+        lastResolvedPincodeRef.current = null;
+        setCityFromPincode(false);
+      } finally {
+        if (isActive) {
+          setIsLookingUpPincode(false);
+        }
+      }
+    }
+
+    void resolvePincode();
+
+    return () => {
+      isActive = false;
+    };
+  }, [fields.pincode]);
+
   function handleDobChange(displayValue: string) {
     setDobDisplay(displayValue);
     const parsed = parseDobDisplay(displayValue);
@@ -292,7 +352,7 @@ export function PersonalDetailsStep({
     if (errors.creditConsentAccepted && next) setErrors((prev) => ({ ...prev, creditConsentAccepted: undefined }));
   }
 
-  function validate(): FieldError {
+  function validateProfileFields(): FieldError {
     const today = new Date();
     const next: FieldError = {};
 
@@ -316,11 +376,6 @@ export function PersonalDetailsStep({
       next.panNumber = 'Please enter a valid 10-character PAN.';
     }
     if (!fields.occupation) next.occupation = 'Please select your occupation.';
-    if (!fields.addressLine1.trim() || fields.addressLine1.trim().length < 5) {
-      next.addressLine1 = 'Please enter your address line 1.';
-    }
-    if (!fields.currentCity.trim()) next.currentCity = 'Please enter your current city.';
-    if (!PINCODE_REGEX.test(fields.pincode)) next.pincode = 'Please enter a valid 6-digit pincode.';
     if (usesMonthlyIncome) {
       const raw = fields.monthlyIncome.trim();
       if (!raw || !Number.isFinite(Number(raw)) || Number(raw) < 0) {
@@ -331,15 +386,31 @@ export function PersonalDetailsStep({
       if (!fields.annualTurnover || Number(fields.annualTurnover) <= 0) next.annualTurnover = 'Please enter your annual turnover.';
       if (!fields.annualProfit || Number(fields.annualProfit) <= 0) next.annualProfit = 'Please enter your annual profit.';
     }
+
+    return next;
+  }
+
+  function validateFinancialFields(): FieldError {
+    const next: FieldError = {};
+
+    if (!PINCODE_REGEX.test(fields.pincode)) next.pincode = 'Please enter a valid 6-digit pincode.';
+    if (!fields.currentCity.trim()) next.currentCity = 'Please enter your current city.';
+    if (!fields.addressLine1.trim() || fields.addressLine1.trim().length < 5) {
+      next.addressLine1 = 'Please enter your address line 1.';
+    }
     if (!fields.creditConsentAccepted) next.creditConsentAccepted = 'Please accept the consent declaration to continue.';
 
     return next;
   }
 
+  function validate(): FieldError {
+    return { ...validateProfileFields(), ...validateFinancialFields() };
+  }
+
   async function handleContinueToFinancial() {
     if (isSavingProfile) return;
 
-    const validation = validate();
+    const validation = validateProfileFields();
     const sectionErrors = pickErrors(validation, PROFILE_PAGE_FIELDS);
     if (Object.keys(sectionErrors).length > 0) {
       setErrors(sectionErrors);
@@ -355,7 +426,6 @@ export function PersonalDetailsStep({
       monthlyIncome: undefined,
       annualTurnover: undefined,
       annualProfit: undefined,
-      creditConsentAccepted: undefined,
     }));
     setSubmitError('');
     setIsSavingProfile(true);
@@ -368,7 +438,6 @@ export function PersonalDetailsStep({
         gender: fields.gender as CustomerGenderValue,
         occupation: fields.occupation as CustomerOccupationValue,
         panNumber: fields.panNumber.trim().toUpperCase(),
-        creditConsentAccepted: fields.creditConsentAccepted,
         ...(usesMonthlyIncome ? { monthlyIncome: fields.monthlyIncome.trim() } : {}),
         ...(isSelfEmployed
           ? { annualTurnover: fields.annualTurnover.trim(), annualProfit: fields.annualProfit.trim() }
@@ -470,7 +539,9 @@ export function PersonalDetailsStep({
               </svg>
             </div>
             <p className="text-[0.88rem] text-slate-600 leading-relaxed m-0 pt-0.5">
-              Please provide your personal and financial details to complete your loan profile.
+              {activeSection === 'profile'
+                ? 'Please provide your personal and financial details to complete your loan profile.'
+                : 'Enter your residential pincode and address to finish your application.'}
             </p>
           </div>
         </div>
@@ -646,25 +717,6 @@ export function PersonalDetailsStep({
                 )}
               </div>
 
-              <div className="mt-4 md:mt-5 p-4 rounded-xl bg-slate-50 border border-slate-200 md:col-span-2">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    id="creditConsentAccepted"
-                    name="creditConsentAccepted"
-                    type="checkbox"
-                    checked={fields.creditConsentAccepted}
-                    onChange={setConsent}
-                    className="mt-1 h-5 w-5 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-[0.85rem] leading-relaxed text-slate-600">{CUSTOMER_CREDIT_CONSENT_TEXT}</span>
-                </label>
-                {errors.creditConsentAccepted && (
-                  <p id="creditConsentAccepted-error" className="mt-2 text-[#b2372d] text-sm font-medium">
-                    {errors.creditConsentAccepted}
-                  </p>
-                )}
-              </div>
-
               {/* Sticky CTA row — pins to bottom of scroll container on mobile */}
               <div className="sticky bottom-0 z-10 bg-white/95 backdrop-blur-sm mt-6 flex flex-col sm:flex-row gap-3 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] border-t border-slate-100 -mx-5 px-5 lg:mx-0 lg:px-0">
                 <button type="button" onClick={onBack} className="py-3 px-4 rounded-xl font-bold text-[0.95rem] text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors text-center border border-slate-200">
@@ -692,6 +744,56 @@ export function PersonalDetailsStep({
           ) : (
             <div className="w-full">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
+                <div className="md:col-span-2">
+                  <FieldGroup label="Pincode" htmlFor="pincode" error={errors.pincode}>
+                    <input
+                      id="pincode"
+                      name="pincode"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="postal-code"
+                      placeholder="400001"
+                      maxLength={6}
+                      required
+                      value={fields.pincode}
+                      onChange={setField('pincode')}
+                      aria-invalid={Boolean(errors.pincode)}
+                      aria-describedby={errors.pincode ? 'pincode-error' : undefined}
+                      className={inputClass(Boolean(errors.pincode))}
+                    />
+                    {isLookingUpPincode && (
+                      <p className="text-[0.75rem] text-slate-500 pl-1 mt-1">Looking up city for this pincode…</p>
+                    )}
+                  </FieldGroup>
+                </div>
+
+                <div className="md:col-span-2">
+                  <FieldGroup label="City" htmlFor="currentCity" error={errors.currentCity}>
+                    <SearchableCityInput
+                      id="currentCity"
+                      name="currentCity"
+                      value={fields.currentCity}
+                      options={cityOptions}
+                      onChange={(next) => {
+                        setCityFromPincode(false);
+                        lastResolvedPincodeRef.current = null;
+                        setFields((prev) => ({
+                          ...prev,
+                          currentCity: next.label,
+                          currentCityId: next.cityId,
+                        }));
+                        if (errors.currentCity) setErrors((prev) => ({ ...prev, currentCity: undefined }));
+                      }}
+                      className={inputClass(Boolean(errors.currentCity))}
+                      placeholder={cityFromPincode ? 'Auto-filled from pincode' : 'Start typing your city'}
+                      isLoading={isLoadingLookups}
+                      disabled={cityFromPincode || isLookingUpPincode}
+                      ariaInvalid={Boolean(errors.currentCity)}
+                      ariaDescribedBy={errors.currentCity ? 'currentCity-error' : undefined}
+                    />
+                  </FieldGroup>
+                </div>
+
                 <div className="md:col-span-2">
                   <FieldGroup label="Address line 1" htmlFor="addressLine1" error={errors.addressLine1}>
                     <input
@@ -726,46 +828,25 @@ export function PersonalDetailsStep({
                     />
                   </FieldGroup>
                 </div>
+              </div>
 
-                <FieldGroup label="City" htmlFor="currentCity" error={errors.currentCity}>
-                  <SearchableCityInput
-                    id="currentCity"
-                    name="currentCity"
-                    value={fields.currentCity}
-                    options={cityOptions}
-                    onChange={(next) => {
-                      setFields((prev) => ({
-                        ...prev,
-                        currentCity: next.label,
-                        currentCityId: next.cityId,
-                      }));
-                      if (errors.currentCity) setErrors((prev) => ({ ...prev, currentCity: undefined }));
-                    }}
-                    className={inputClass(Boolean(errors.currentCity))}
-                    placeholder="Start typing your city"
-                    isLoading={isLoadingLookups}
-                    ariaInvalid={Boolean(errors.currentCity)}
-                    ariaDescribedBy={errors.currentCity ? 'currentCity-error' : undefined}
-                  />
-                </FieldGroup>
-
-                <FieldGroup label="Pincode" htmlFor="pincode" error={errors.pincode}>
+              <div className="mt-4 md:mt-5 p-4 rounded-xl bg-slate-50 border border-slate-200 md:col-span-2">
+                <label className="flex items-start gap-3 cursor-pointer">
                   <input
-                    id="pincode"
-                    name="pincode"
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="postal-code"
-                    placeholder="400001"
-                    maxLength={6}
-                    required
-                    value={fields.pincode}
-                    onChange={setField('pincode')}
-                    aria-invalid={Boolean(errors.pincode)}
-                    aria-describedby={errors.pincode ? 'pincode-error' : undefined}
-                    className={inputClass(Boolean(errors.pincode))}
+                    id="creditConsentAccepted"
+                    name="creditConsentAccepted"
+                    type="checkbox"
+                    checked={fields.creditConsentAccepted}
+                    onChange={setConsent}
+                    className="mt-1 h-5 w-5 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                   />
-                </FieldGroup>
+                  <span className="text-[0.85rem] leading-relaxed text-slate-600">{CUSTOMER_CREDIT_CONSENT_TEXT}</span>
+                </label>
+                {errors.creditConsentAccepted && (
+                  <p id="creditConsentAccepted-error" className="mt-2 text-[#b2372d] text-sm font-medium">
+                    {errors.creditConsentAccepted}
+                  </p>
+                )}
               </div>
 
               {submitError && <SessionRequiredAlert message={submitError} />}

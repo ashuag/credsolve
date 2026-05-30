@@ -77,8 +77,6 @@ export class GetCustomerSessionUseCase {
 
     let statusName = leadRow.leadStatus.name;
 
-    // CONVERTED after a completed disbursement → deactivate so a new journey can start.
-    // Mid-journey CONVERTED (post-BRE / professional handoff) keeps the active lead + application.
     if (statusName === LEAD_STATUS.CONVERTED) {
       const disbursedApp = await this.prisma.client.application.findFirst({
         where: {
@@ -87,6 +85,7 @@ export class GetCustomerSessionUseCase {
         },
         select: { id: true },
       });
+
       if (disbursedApp) {
         await this.leads.deactivate(leadRow.id);
         return noLeadResult;
@@ -116,11 +115,15 @@ export class GetCustomerSessionUseCase {
       leadId: leadRow.id,
     });
 
+    logger.debug("application", application);
+
     const emailVerified = isLeadEmailVerifiedForPortal(
       statusName,
       application?.email ?? null,
       application?.emailVerificationType ?? null,
     );
+
+    logger.debug("emailVerified", emailVerified);
 
     let profile = formatLeadDetailForPortal(
       leadRow.leadDetail

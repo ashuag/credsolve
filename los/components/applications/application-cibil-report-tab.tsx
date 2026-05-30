@@ -2,16 +2,19 @@
 
 import { CibilReportViewer } from '@/components/applications/cibil-report-viewer';
 import { cx } from '@/components/eligibility/eligibility-ui';
+import { PostBreResultsSummary } from '@/components/eligibility/post-bureau-bre-panel';
 import {
   createApplicationCibilReport,
   getApplicationCibilReport,
   getApplicationDetails,
+  runPostBureauBreCheck,
   type LosApplicationCibilReportPayload,
+  type PostBreDryRunResult,
 } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-type CibilReportView = 'report' | 'json';
+type CibilReportView = 'report' | 'json' | 'bre';
 
 type ApplicationCibilReportTabProps = {
   applicationUuid: string;
@@ -145,6 +148,72 @@ function CibilReportUnavailable({
   );
 }
 
+function PostBreView({ rawPayload }: { rawPayload: unknown }) {
+  const [result, setResult] = useState<PostBreDryRunResult | null>(null);
+  const [isExistingCustomer, setIsExistingCustomer] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function runCheck() {
+    const token = getToken();
+    if (!token) { setError('Session expired — please log in again.'); return; }
+    if (!rawPayload || typeof rawPayload !== 'object' || Array.isArray(rawPayload)) {
+      setError('Raw bureau payload is not a valid object.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await runPostBureauBreCheck(token, {
+        bureauPayload: rawPayload as Record<string, unknown>,
+        isExistingCustomer,
+      });
+      setResult(res);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Post-BRE check failed.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="grid gap-4">
+      <div className="los-card flex flex-wrap items-center justify-between gap-3 p-4">
+        <div>
+          <h3 className="m-0 text-[0.95rem] font-extrabold text-brand-navy">Post-BRE eligibility check</h3>
+          <p className="m-0 mt-0.5 text-[0.8rem] text-brand-muted">Runs all post-bureau rules against the stored bureau payload.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex cursor-pointer items-center gap-2 text-[0.84rem] font-semibold text-brand-navy">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-brand-blue"
+              checked={isExistingCustomer}
+              onChange={(e) => setIsExistingCustomer(e.target.checked)}
+            />
+            Existing customer
+          </label>
+          <button
+            type="button"
+            className="los-btn-primary min-h-9.5 px-4"
+            disabled={loading}
+            onClick={() => void runCheck()}
+          >
+            {loading ? 'Running…' : result ? 'Re-run check' : 'Run post-BRE check'}
+          </button>
+        </div>
+      </div>
+      {error ? (
+        <div className="los-card border border-[rgba(231,95,95,0.28)] bg-[rgba(255,241,241,0.88)] p-4 text-[0.86rem] text-[#8d3434]">
+          {error}
+        </div>
+      ) : null}
+      {result ? <PostBreResultsSummary result={result} /> : null}
+    </div>
+  );
+}
+
 export function ApplicationCibilReportTab({ applicationUuid, onReportCreated }: ApplicationCibilReportTabProps) {
   const [payload, setPayload] = useState<LosApplicationCibilReportPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -229,6 +298,7 @@ export function ApplicationCibilReportTab({ applicationUuid, onReportCreated }: 
 
   const viewTabs: Array<{ id: CibilReportView; label: string }> = [
     { id: 'report', label: 'View CIBIL report' },
+    { id: 'bre', label: 'Post BRE check' },
     { id: 'json', label: 'View JSON' },
   ];
 
@@ -267,6 +337,7 @@ export function ApplicationCibilReportTab({ applicationUuid, onReportCreated }: 
       </nav>
 
       {activeView === 'report' ? <CibilReportViewer payload={payload} /> : null}
+      {activeView === 'bre' ? <PostBreView rawPayload={payload.rawPayload} /> : null}
       {activeView === 'json' ? <CibilJsonViewer rawPayload={payload.rawPayload} /> : null}
     </div>
   );

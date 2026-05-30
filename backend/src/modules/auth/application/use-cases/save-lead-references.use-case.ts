@@ -71,30 +71,46 @@ export class SaveLeadReferencesUseCase {
       throw new BadRequestException('One or more relation options are invalid.');
     }
 
-    await this.prisma.client.$transaction(
-      refs.map((ref) =>
-        this.prisma.client.leadReference.upsert({
-          where: {
-            leadId_referenceIndex: {
+    await this.prisma.client.$transaction(async (tx) => {
+      // Saving references is the checkpoint before email verification.
+      // Reset email so the email-verify step is always required after this point.
+      await tx.application.updateMany({
+        where: { leadId: leadRow.id, customerId: customer.id },
+        data: {
+          email: null,
+          emailVerifiedAt: null,
+          emailVerificationType: null,
+          loanDocumentsAcceptedAt: null,
+          keyFactPdfRelativePath: null,
+          loanAgreementPdfRelativePath: null,
+        },
+      });
+
+      await Promise.all(
+        refs.map((ref) =>
+          tx.leadReference.upsert({
+            where: {
+              leadId_referenceIndex: {
+                leadId: leadRow.id,
+                referenceIndex: ref.referenceIndex,
+              },
+            },
+            create: {
               leadId: leadRow.id,
               referenceIndex: ref.referenceIndex,
+              fullName: ref.fullName,
+              mobileNumber: ref.mobileNumber,
+              relationId: ref.relationId,
             },
-          },
-          create: {
-            leadId: leadRow.id,
-            referenceIndex: ref.referenceIndex,
-            fullName: ref.fullName,
-            mobileNumber: ref.mobileNumber,
-            relationId: ref.relationId,
-          },
-          update: {
-            fullName: ref.fullName,
-            mobileNumber: ref.mobileNumber,
-            relationId: ref.relationId,
-          },
-        }),
-      ),
-    );
+            update: {
+              fullName: ref.fullName,
+              mobileNumber: ref.mobileNumber,
+              relationId: ref.relationId,
+            },
+          }),
+        ),
+      );
+    });
 
     return { success: true, leadUuid: leadRow.uuid };
   }

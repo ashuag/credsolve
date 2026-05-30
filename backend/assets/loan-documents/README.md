@@ -16,12 +16,16 @@ Per-application filled PDFs are written under `KYC_FILES_ROOT`:
 
 ## After editing Word templates
 
-On a machine with LibreOffice and poppler (`pdftotext`):
+On a machine with LibreOffice and poppler (`pdftotext`), convert each DOCX to PDF and commit the outputs:
 
 ```bash
-cd backend
-npm run loan-docs:build-templates
-npm run loan-docs:generate-field-maps
+cd backend/assets/loan-documents/templates
+soffice --headless --convert-to pdf --outdir . key-fact-statement.docx
+soffice --headless --convert-to pdf --outdir . loan-agreement.docx
+mv key-fact-statement.pdf key-fact-statement.template.pdf
+mv loan-agreement.pdf loan-agreement.template.pdf
 ```
+
+Regenerate `*.fields.json` overlay maps from the template PDFs (requires `pdftotext -bbox`) or adjust coordinates manually in the JSON files.
 
 Commit updated `*.template.pdf` and `*.fields.json`.

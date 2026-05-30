@@ -134,7 +134,6 @@ export type SaveLeadProfilePayload = {
   gender: CustomerGenderValue;
   occupation: CustomerOccupationValue;
   panNumber: string;
-  creditConsentAccepted: boolean;
   monthlyIncome?: string;
   annualTurnover?: string;
   annualProfit?: string;

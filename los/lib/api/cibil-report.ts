@@ -29,6 +29,8 @@ export type CibilReportAccountRow = {
   writtenOffTotal: string;
   writtenOffPrincipal: string;
   settlementAmount: string;
+  collateralValue: string;
+  collateralType: string;
   suitFiled: string;
   status: string;
   paymentHistory: CibilReportPaymentMonth[];

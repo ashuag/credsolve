@@ -45,9 +45,10 @@ export class SaveLeadProfileDto {
   @Matches(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i)
   panNumber!: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsBoolean()
-  creditConsentAccepted!: boolean;
+  creditConsentAccepted?: boolean;
 
   @ApiPropertyOptional()
   @IsOptional()

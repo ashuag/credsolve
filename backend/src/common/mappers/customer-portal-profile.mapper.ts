@@ -79,12 +79,6 @@ export function isLeadEmailVerifiedForPortal(
   email: string | null,
   emailVerificationType: unknown
 ): boolean {
-  // Email verification must reflect actual email proof, not lead status.
-  // IN_PROGRESS can occur before email step completes (e.g. after references),
-  // so status alone must not unlock downstream journey stages.
-  if (leadStatusName === LEAD_STATUS.CONVERTED) {
-    return true;
-  }
   return Boolean(email?.trim()) && emailVerificationType != null;
 }
 
