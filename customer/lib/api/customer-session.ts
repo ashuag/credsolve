@@ -9,15 +9,8 @@ export type CustomerPortalProfile = {
   panNumber: string | null;
   panVerified: boolean;
   panVerifiedAt: string | null;
-  gender: 'male' | 'female' | 'others' | null;
-  occupation:
-    | 'salaried'
-    | 'self_employed_professional'
-    | 'self_employed_business'
-    | 'student'
-    | 'homemaker'
-    | 'retired'
-    | null;
+  gender: string | null;
+  occupation: string | null;
   addressLine1: string | null;
   addressLine2: string | null;
   currentCity: string | null;

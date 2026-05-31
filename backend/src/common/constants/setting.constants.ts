@@ -110,29 +110,14 @@ export const SettingKey = {
         default: '90',
         description:  'Days after which lead can be re-applied after consecutive rejection',
     },
-    BRE_MIN_AGE: {
-        key: 'BRE_MIN_AGE',
-        default: '21',
-        description: 'Minimum borrower age (years)',
-    },
-    BRE_MAX_AGE: {
-        key: 'BRE_MAX_AGE',
-        default: '57',
-        description: 'Maximum borrower age (years)',
-    },
-    BRE_REJECTED_GENDERS: {
-        key: 'BRE_REJECTED_GENDERS',
-        default: '3',
-        description: 'Comma-separated list of blocked genders',
-    },
-    BRE_REJECTED_OCCUPATIONS: {
-        key: 'BRE_REJECTED_OCCUPATIONS',
-        default: '4,5,6',
-        description: 'Comma-separated list of blocked occupations',
-    },
     MIN_LIVENESS_API_SCORE: {
         key: 'MIN_LIVENESS_API_SCORE',
         default: '0.8',
         description: 'Minimum liveness score from third-party API to pass liveness check',  
+    },
+    PAN_VALIDATION_ATTEMPTS: {
+        key: 'PAN_VALIDATION_ATTEMPTS',
+        default: '2',
+        description: 'Number of attempts allowed for PAN validation BEFORE HITTING THE pan nsdl api',
     }
 } as const;

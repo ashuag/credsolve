@@ -2,6 +2,7 @@
  * Post-bureau eligibility rules over Tenacio / CIBIL soft-pull payloads.
  */
 import {
+  MORATORIUM_CREDIT_FACILITY_KEYWORDS,
   TUEF_ADVERSE_SUIT_FILED_WILFUL_DEFAULT_CODES,
   TUEF_ADVERSE_WRITTEN_OFF_SETTLED_STATUS_CODES,
   TUEF_ADVERSE_WRITTEN_OFF_SETTLED_STATUS_LABELS,
@@ -170,13 +171,32 @@ function readTradelineWrittenOffSettledStatusCodes(lineRec: Record<string, unkno
   return [...codes];
 }
 
+/** Reads the Credit Facility Status text from various field name variants. */
+function readCreditFacilityStatusText(lineRec: Record<string, unknown>): string | null {
+  const raw =
+    lineRec.CreditFacilityStatus ??
+    lineRec.creditFacilityStatus ??
+    lineRec.Credit_Facility_Status ??
+    readSymbol(lineRec.CreditFacilityStatus);
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  return s.length > 0 ? s : null;
+}
+
+/** Returns true when the credit facility status text contains a moratorium/regulatory keyword. */
+function isMoratoriumCreditFacilityStatus(lineRec: Record<string, unknown>): boolean {
+  const text = readCreditFacilityStatusText(lineRec)?.toUpperCase();
+  if (!text) return false;
+  return MORATORIUM_CREDIT_FACILITY_KEYWORDS.some((kw) => text.includes(kw));
+}
+
 function tradelineHasRestructureSignal(lineRec: Record<string, unknown>): boolean {
   for (const statusCode of readTradelineWrittenOffSettledStatusCodes(lineRec)) {
     if (TUEF_RESTRUCTURED_WRITTEN_OFF_SETTLED_CODES.has(statusCode)) {
       return true;
     }
   }
-  return false;
+  return isMoratoriumCreditFacilityStatus(lineRec);
 }
 
 function findAdverseWrittenOffSettledStatus(
@@ -964,14 +984,19 @@ export function auditNoRestructuredLoans(body: unknown): BureauTradelineRuleChec
     if (!tradelineHasRestructureSignal(lineRec)) return;
     const statusCode = readWrittenOffSettledStatusCode(lineRec);
     const statusLabel = statusCode ? TUEF_RESTRUCTURED_STATUS_LABELS[statusCode] : null;
+    const moratoriumText = readCreditFacilityStatusText(lineRec);
+    const isMoratorium = !statusCode && isMoratoriumCreditFacilityStatus(lineRec);
     findings.push({
       title: creditor,
       detail: statusLabel
         ? `Written-off / settled status: ${statusLabel} (TUEF code ${statusCode}).`
-        : 'Tradeline flagged as restructured (TUEF Tag 33 — Written-off and Settled Status).',
+        : isMoratorium
+          ? `Credit Facility Status: ${moratoriumText} — flagged as regulatory restructure.`
+          : 'Tradeline flagged as restructured (TUEF Tag 33 — Written-off and Settled Status).',
       data: {
         accountType: partitionSymbol,
-        writtenOffSettledStatus: statusCode,
+        writtenOffSettledStatus: statusCode ?? 'n/a',
+        creditFacilityStatus: moratoriumText ?? 'n/a',
         accountCondition: readSymbol(lineRec.AccountCondition),
         source: 'TradeLinePartition',
       },
@@ -1052,6 +1077,40 @@ export function checkNoSmaPwosTradelines(body: unknown): BureauAdverseTradelineC
   return { passed: audit.passed, detail: audit.detail };
 }
 
+/** No suit filed / wilful default on any tradeline (lifetime — no lookback limit). */
+export function auditNoWilfulDefault(body: unknown): BureauTradelineRuleCheck {
+  const findings: BureauRuleFinding[] = [];
+
+  walkTradelines(body, ({ lineRec, partitionSymbol, creditor }) => {
+    const code = readSuitFiledWilfulDefaultCode(lineRec);
+    if (!code || !isAdverseSuitFiledWilfulDefault(code)) return;
+    const label = TUEF_SUIT_FILED_WILFUL_DEFAULT_LABELS[code] ?? code;
+    findings.push({
+      title: creditor,
+      detail: `Suit filed / wilful default: ${label} (TUEF code ${code}).`,
+      data: {
+        accountType: partitionSymbol,
+        suitFiledWilfulDefault: code,
+        label,
+        dateReported: formatCibilDateLabel(parseCibilDate(lineRec.dateReported)),
+      },
+    });
+  });
+
+  return {
+    passed: findings.length === 0,
+    detail: findings[0]
+      ? `${findings[0].title}: ${findings[0].detail ?? 'Wilful default / suit filed found.'}`
+      : null,
+    findings,
+  };
+}
+
+export function checkNoWilfulDefault(body: unknown): BureauAdverseTradelineCheck {
+  const audit = auditNoWilfulDefault(body);
+  return { passed: audit.passed, detail: audit.detail };
+}
+
 /** No open microfinance (MFI) loan tradelines. */
 export function auditNoActiveMfiLoans(body: unknown): BureauTradelineRuleCheck {
   const findings: BureauRuleFinding[] = [];
@@ -1089,6 +1148,44 @@ export function auditNoActiveMfiLoans(body: unknown): BureauTradelineRuleCheck {
 export function checkNoActiveMfiLoans(body: unknown): BureauAdverseTradelineCheck {
   const audit = auditNoActiveMfiLoans(body);
   return { passed: audit.passed, detail: audit.detail };
+}
+
+/**
+ * Counts (tradeline × month) pairs where DPD > 0 in the last N months.
+ * A "missed payment" is any month on any tradeline with positive DPD.
+ */
+export function auditMissedPayments(
+  body: unknown,
+  lookbackMonths: number,
+  maxAllowed: number,
+  asOf: Date = new Date(),
+): BureauTradelineRuleCheck {
+  const findings: BureauRuleFinding[] = [];
+  const entries = collectMonthlyDpdEntries(body, asOf);
+
+  for (const entry of entries) {
+    if (!isWithinLookbackMonths(entry.monthDate, entry.lookbackAnchorDate, lookbackMonths)) continue;
+    if (entry.dpdDays <= 0) continue;
+    findings.push({
+      title: entry.accountLabel,
+      detail: `${entry.dpdDays} DPD in ${formatCibilDateLabel(entry.monthDate) ?? 'unknown'} — counted as missed payment.`,
+      data: {
+        account: entry.accountLabel,
+        month: formatCibilDateLabel(entry.monthDate),
+        dpdDays: entry.dpdDays,
+        lookbackMonths,
+      },
+    });
+  }
+
+  const passed = findings.length <= maxAllowed;
+  return {
+    passed,
+    detail: passed
+      ? null
+      : `${findings.length} missed payment(s) in the last ${lookbackMonths} months (max allowed: ${maxAllowed}).`,
+    findings,
+  };
 }
 
 export type PostBreTradelineInspectionRow = {

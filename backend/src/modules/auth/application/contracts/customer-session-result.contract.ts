@@ -1,3 +1,6 @@
+import type { GenderKey } from '../../../../common/constants/gender.constants';
+import type { OccupationKey } from '../../../../common/constants/occupation.constants';
+
 export type CustomerPortalLeadSnapshot = {
   uuid: string;
   status: string;
@@ -13,15 +16,8 @@ export type CustomerPortalProfileSnapshot = {
   panNumber: string | null;
   panVerified: boolean;
   panVerifiedAt: string | null;
-  gender: 'male' | 'female' | 'others' | null;
-  occupation:
-    | 'salaried'
-    | 'self_employed_professional'
-    | 'self_employed_business'
-    | 'student'
-    | 'homemaker'
-    | 'retired'
-    | null;
+  gender: GenderKey | null;
+  occupation: OccupationKey | null;
   addressLine1: string | null;
   addressLine2: string | null;
   currentCity: string | null;

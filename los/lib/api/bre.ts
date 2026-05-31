@@ -88,9 +88,21 @@ export type PostBreDryRunResult = {
     enforceNoRestructuredLoans: boolean;
     enforceNoSmaPwos: boolean;
     enforceNoActiveMfi: boolean;
+    maxMissedPayments6Months: number;
   };
   checks: PostBreRuleCheck[];
   inspection: PostBreInspection;
+  unsecuredExposure: {
+    totalOpenUnsecuredExposureInr: number;
+    maxOpenUnsecuredExposureInr: number;
+  } | null;
+  creditLimit: {
+    preApprovedAmountInr: number;
+    minLoanAmountInr: number;
+    maxLoanAmountInr: number;
+    totalOpenUnsecuredExposureInr: number;
+    maxOpenUnsecuredExposureInr: number;
+  } | null;
 };
 
 export type PreBreDryRunResult = {

@@ -1,34 +1,21 @@
-import { GENDER } from '../constants/gender.constants';
+import { GENDER, type GenderKey } from '../constants/gender.constants';
 import { LEAD_STATUS } from '../constants/lead.constants';
-import { OCCUPATION } from '../constants/occupation.constants';
+import { OCCUPATION, type OccupationKey } from '../constants/occupation.constants';
 import { PAN_VERIFIED } from '../constants/pan-verification.constants';
 
-/** FE `CustomerGenderValue` slugs (customer app). */
-export type CustomerPortalGenderSlug = 'male' | 'female' | 'others';
+/** FE `CustomerGenderValue` keys (customer app). */
+export type CustomerPortalGenderSlug = GenderKey;
 
-/** FE `CustomerOccupationValue` slugs (customer app). */
-export type CustomerPortalOccupationSlug =
-  | 'salaried'
-  | 'self_employed_professional'
-  | 'self_employed_business'
-  | 'student'
-  | 'homemaker'
-  | 'retired';
+/** FE `CustomerOccupationValue` keys (customer app). */
+export type CustomerPortalOccupationSlug = OccupationKey;
 
-const GENDER_DB_TO_SLUG: Record<string, CustomerPortalGenderSlug> = {
-  [GENDER.MALE]: 'male',
-  [GENDER.FEMALE]: 'female',
-  [GENDER.OTHERS]: 'others',
-};
+const GENDER_DB_TO_SLUG: Record<string, CustomerPortalGenderSlug> = Object.fromEntries(
+  Object.values(GENDER).map(({ key, name }) => [name, key]),
+);
 
-const OCC_DB_TO_SLUG: Record<string, CustomerPortalOccupationSlug> = {
-  [OCCUPATION.SALARIED]: 'salaried',
-  [OCCUPATION.SELF_EMPLOYED_PROFESSIONAL]: 'self_employed_professional',
-  [OCCUPATION.SELF_EMPLOYED_BUSINESS]: 'self_employed_business',
-  [OCCUPATION.STUDENT]: 'student',
-  [OCCUPATION.HOMEMAKER]: 'homemaker',
-  [OCCUPATION.RETIRED]: 'retired',
-};
+const OCC_DB_TO_SLUG: Record<string, CustomerPortalOccupationSlug> = Object.fromEntries(
+  Object.values(OCCUPATION).map(({ key, name }) => [name, key]),
+);
 
 function decimalToString(value: { toString(): string } | null | undefined): string | null {
   if (value == null) {

@@ -4,6 +4,7 @@
  * the public surface can't reach into transport plumbing.
  */
 import { getLosClientApiBase, getLosServerApiBase } from '../api-env';
+import { LOS_COOKIE_NAME, LOS_STORAGE_KEY } from '../auth';
 
 export const API_URL = getLosServerApiBase();
 export const SERVER_REVALIDATE_SECONDS = 30;
@@ -28,6 +29,13 @@ export function messageFromBody(body: unknown) {
   return typeof body === 'object' && body !== null && 'message' in body
     ? (body as { message?: string }).message
     : undefined;
+}
+
+function handleUnauthorized() {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(LOS_STORAGE_KEY);
+  document.cookie = `${LOS_COOKIE_NAME}=; path=/; max-age=0; samesite=lax`;
+  window.location.href = '/login';
 }
 
 type ClientReadCacheEntry = {
@@ -79,6 +87,7 @@ export async function cachedAuthorizedLosGet<T>(
     const body = await parseJsonResponse(response);
 
     if (!response.ok) {
+      if (response.status === 401) handleUnauthorized();
       throw new Error(messageFromBody(body) ?? fallbackMessage);
     }
 
@@ -121,6 +130,7 @@ export async function authorizedLosRequest<T>(
   const body = await parseJsonResponse(response);
 
   if (!response.ok) {
+    if (response.status === 401) handleUnauthorized();
     throw new Error(messageFromBody(body) ?? fallbackMessage);
   }
 

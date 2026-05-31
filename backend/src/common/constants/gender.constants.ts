@@ -1,7 +1,8 @@
 export const GENDER = {
-    MALE: 'Male',
-    FEMALE: 'Female',
-    OTHERS: 'Others',
+  MALE: { key: 'MALE', name: 'Male' },
+  FEMALE: { key: 'FEMALE', name: 'Female' },
+  OTHERS: { key: 'OTHERS', name: 'Others' },
 } as const;
 
-export type Gender = typeof GENDER[keyof typeof GENDER];
+export type GenderKey = typeof GENDER[keyof typeof GENDER]['key'];
+export type Gender = typeof GENDER[keyof typeof GENDER]['name'];

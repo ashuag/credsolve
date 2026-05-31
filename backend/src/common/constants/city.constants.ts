@@ -234,4 +234,50 @@ export const INDIAN_CITIES = [
     // ── Puducherry (PY) ──────────────────────────
     {id: 167, name: 'PUDUCHERRY', stateId: 37},
     {id: 168, name: 'KARAIKAL', stateId: 37},
+
+    // ── Andhra Pradesh – additional cities ───────────
+    {id: 169, name: 'KADAPA', stateId: 1},
+    {id: 170, name: 'CHITTOOR', stateId: 1},
+    {id: 171, name: 'NARASARAOPET', stateId: 1},
+    {id: 172, name: 'ONGOLE', stateId: 1},
+    {id: 173, name: 'SRIKAKULAM', stateId: 1},
+
+    // ── Arunachal Pradesh – additional cities ────────
+    {id: 174, name: 'PASIGHAT', stateId: 2},
+
+    // ── Manipur – additional cities ──────────────────
+    {id: 175, name: 'SENAPATI', stateId: 15},
+    {id: 176, name: 'CHURACHANDPUR', stateId: 15},
+
+    // ── Meghalaya – additional cities ────────────────
+    {id: 177, name: 'TURA', stateId: 16},
+    {id: 178, name: 'NONGSTOIN', stateId: 16},
+    {id: 179, name: 'BAGHMARA', stateId: 16},
+
+    // ── Mizoram – additional cities ──────────────────
+    {id: 180, name: 'KOLASIB', stateId: 17},
+    {id: 181, name: 'MAMIT', stateId: 17},
+    {id: 182, name: 'LAWNGTLAI', stateId: 17},
+
+    // ── Nagaland – additional cities ─────────────────
+    {id: 183, name: 'PEREN', stateId: 18},
+    {id: 184, name: 'MOKOKCHUNG', stateId: 18},
+    {id: 185, name: 'MON', stateId: 18},
+
+    // ── Tripura – additional cities ───────────────────
+    {id: 186, name: 'BISHALGARH', stateId: 25},
+    {id: 187, name: 'UDAIPUR', stateId: 25},
+    {id: 188, name: 'DHARMANAGAR', stateId: 25},
+
+    // ── Jammu and Kashmir ─────────────────────────────
+    {id: 189, name: 'JAMMU', stateId: 34},
+    {id: 190, name: 'RAMBAN', stateId: 34},
+    {id: 191, name: 'UDHAMPUR', stateId: 34},
+    {id: 192, name: 'KISHTWAR', stateId: 34},
+    {id: 193, name: 'KATHUA', stateId: 34},
+    {id: 194, name: 'RAJOURI', stateId: 34},
+    {id: 195, name: 'SRINAGAR', stateId: 34},
+    {id: 196, name: 'BARAMULLA', stateId: 34},
+    {id: 197, name: 'KUPWARA', stateId: 34},
+    {id: 198, name: 'BANDIPORA', stateId: 34},
 ] as const;

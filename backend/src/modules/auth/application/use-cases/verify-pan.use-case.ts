@@ -7,9 +7,18 @@ import { BUREAU_FETCHED } from '../../../../common/constants/bureau-fetch.consta
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { PAN_VERIFIED } from '../../../../common/constants/pan-verification.constants';
 import { REJECTION_REASON } from '../../../../common/constants/rejection-reason.constants';
+import { SettingKey } from '../../../../common/constants/setting.constants';
 import { isPanVerifiedFromDb } from '../../../../common/mappers/customer-portal-profile.mapper';
-import { GENDER_SLUG_TO_DB, OCCUPATION_SLUG_TO_DB } from '../../../../common/mappers/lead-detail-master-slugs';
+import { GENDER } from '../../../../common/constants/gender.constants';
+import { OCCUPATION } from '../../../../common/constants/occupation.constants';
 import { parseOptionalInrAmount } from '../../../../common/utils/parse-inr-amount';
+
+const GENDER_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
+  Object.values(GENDER).map(({ key, name }) => [key, name]),
+);
+const OCCUPATION_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
+  Object.values(OCCUPATION).map(({ key, name }) => [key, name]),
+);
 import { resolveLeadCityId } from '../../../../common/utils/resolve-lead-city-id.util';
 import { SmsService } from '../../../../common/sms/sms.service';
 import { parseTenacioBureauVendorBody } from '../../../../common/vendor/tenacio-bureau-payload.mapper';
@@ -67,6 +76,7 @@ type LeadPanVerificationRow = {
   panNumber: string | null;
   panVerified: number;
   panVerifiedAt: Date | null;
+  panValidationAttempts: number;
   leadStatusNote: string | null;
   bureauFetched: number;
 };
@@ -210,8 +220,8 @@ export class VerifyPanUseCase {
         dateOfBirth: detail.dateOfBirth,
         genderId: detail.genderId,
         occupationId: detail.occupationId,
-        genderDisplay: GENDER_SLUG_TO_DB[dto.gender] ?? dto.gender,
-        occupationDisplay: OCCUPATION_SLUG_TO_DB[dto.occupation] ?? dto.occupation,
+        genderDisplay: GENDER_KEY_TO_NAME[dto.gender] ?? dto.gender,
+        occupationDisplay: OCCUPATION_KEY_TO_NAME[dto.occupation] ?? dto.occupation,
         pincode: detail.pincode,
         cityId: detail.city?.id ?? null,
         stateId: detail.city?.stateId ?? null,
@@ -280,6 +290,29 @@ export class VerifyPanUseCase {
       verification.panVerifiedStatus === PAN_VERIFIED.API_FAILURE;
 
     if (shouldRejectForPan) {
+      const maxAttempts = await this.loadPanValidationMaxAttempts();
+      const panAttemptRows = await this.prisma.client.$queryRaw<Array<{ pan_validation_attempts: number }>>`
+        SELECT \`pan_validation_attempts\` FROM \`lead\` WHERE \`id\` = ${leadRow.id} LIMIT 1
+      `;
+      const attemptsUsed = Number(panAttemptRows[0]?.pan_validation_attempts ?? 0) + 1;
+
+      await this.prisma.client.$executeRaw`
+        UPDATE \`lead\` SET \`pan_validation_attempts\` = ${attemptsUsed} WHERE \`id\` = ${leadRow.id}
+      `;
+
+      if (attemptsUsed < maxAttempts) {
+        this.logger.log(
+          `Lead ${leadRow.id.toString()} PAN verification failed (attempt ${attemptsUsed}/${maxAttempts}) — retry allowed.`,
+        );
+        return {
+          success: true,
+          rejected: false,
+          attemptsUsed,
+          attemptsAllowed: maxAttempts,
+          message: `PAN verification failed. You have ${maxAttempts - attemptsUsed} attempt(s) remaining.`,
+        } as any;
+      }
+
       await this.rejectLead(
         leadRow.id,
         this.buildPanRejectLeadNote(dto, verification),
@@ -572,8 +605,8 @@ export class VerifyPanUseCase {
   private async resolveGenderOccupationIds(
     dto: VerifyPanDto,
   ): Promise<{ genderId: number; occupationId: number }> {
-    const genderName = GENDER_SLUG_TO_DB[dto.gender];
-    const occupationName = OCCUPATION_SLUG_TO_DB[dto.occupation];
+    const genderName = GENDER_KEY_TO_NAME[dto.gender];
+    const occupationName = OCCUPATION_KEY_TO_NAME[dto.occupation];
     if (!genderName || !occupationName) {
       throw new BadRequestException('Invalid gender or occupation.');
     }
@@ -610,8 +643,8 @@ export class VerifyPanUseCase {
   }
 
   private buildPanRejectLeadNote(dto: VerifyPanDto, verification: PanVerificationResult): string {
-    const occ = OCCUPATION_SLUG_TO_DB[dto.occupation] ?? dto.occupation;
-    const gen = GENDER_SLUG_TO_DB[dto.gender] ?? dto.gender;
+    const occ = OCCUPATION_KEY_TO_NAME[dto.occupation] ?? dto.occupation;
+    const gen = GENDER_KEY_TO_NAME[dto.gender] ?? dto.gender;
     const category = verification.category ? ` category=${verification.category}` : '';
     return `PAN not verified: panStatus=${verification.panStatus ?? 'n/a'} nameMatch=${verification.nameMatch} dobMatch=${verification.dobMatch}${category} | occ=${occ} | gender=${gen}`.slice(0, 256);
   }
@@ -712,5 +745,14 @@ export class VerifyPanUseCase {
         leadStatusNote: leadPan.leadStatusNote ?? null,
       },
     };
+  }
+
+  private async loadPanValidationMaxAttempts(): Promise<number> {
+    const row = await this.prisma.client.setting.findFirst({
+      where: { key: SettingKey.PAN_VALIDATION_ATTEMPTS.key, isActive: true },
+      select: { value: true },
+    });
+    const n = row ? Number.parseInt(row.value.trim(), 10) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : Number.parseInt(SettingKey.PAN_VALIDATION_ATTEMPTS.default, 10);
   }
 }

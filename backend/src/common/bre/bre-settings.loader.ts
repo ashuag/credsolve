@@ -1,41 +1,45 @@
+import { ELIGIBILITY_CRITERIA as EC } from '../constants/eligibility-criteria.constants';
 import { SettingKey } from '../constants/setting.constants';
 import type { BreSettings } from '../../modules/auth/infrastructure/repositories/settings.repository';
 import { PrismaService } from '../../prisma/prisma.service';
 
-function breMeta(key: keyof typeof SettingKey): (typeof SettingKey)[typeof key] {
-  return SettingKey[key];
-}
-
 export async function loadBreSettings(prisma: PrismaService): Promise<BreSettings> {
-  const keys = [
-    breMeta('BRE_MIN_AGE').key,
-    breMeta('BRE_MAX_AGE').key,
-    breMeta('BRE_REJECTED_GENDERS').key,
-    breMeta('BRE_REJECTED_OCCUPATIONS').key,
-  ] as const;
+  const criteriaKeys = [EC.MIN_AGE, EC.MAX_AGE, EC.REJECTED_GENDERS, EC.REJECTED_OCCUPATIONS];
 
-  const rows = await prisma.client.setting.findMany({
-    where: { key: { in: [...keys] }, isActive: true },
+  const criteriaRows = await prisma.client.eligibilityCriteria.findMany({
+    where: { key: { in: criteriaKeys }, isActive: true },
     select: { key: true, value: true },
   });
-  const map = new Map(rows.map((r) => [r.key, r.value]));
-  const pick = (key: string, def: string) => map.get(key)?.trim() || def;
+  const cm = new Map(criteriaRows.map((r) => [r.key, r.value]));
+  const pickCriteria = (key: string, def: string) => cm.get(key)?.trim() || def;
+  const parseKeyList = (raw: string): string[] =>
+    raw.split(',').map((s) => s.trim()).filter(Boolean);
 
-  const parseIdList = (raw: string): number[] =>
-    raw
-      .split(',')
-      .map((s) => Number.parseInt(s.trim(), 10))
-      .filter((n) => Number.isFinite(n));
+  const minAge = Math.max(1, Number.parseInt(pickCriteria(EC.MIN_AGE, '21'), 10) || 21);
+  const maxAge = Math.max(1, Number.parseInt(pickCriteria(EC.MAX_AGE, '57'), 10) || 57);
+  const rejectedGenderKeys = parseKeyList(pickCriteria(EC.REJECTED_GENDERS, 'OTHERS'));
+  const rejectedOccupationKeys = parseKeyList(pickCriteria(EC.REJECTED_OCCUPATIONS, 'STUDENT,HOMEMAKER,RETIRED'));
+
+  const [genderRows, occupationRows] = await Promise.all([
+    rejectedGenderKeys.length > 0
+      ? prisma.client.gender.findMany({
+          where: { key: { in: rejectedGenderKeys }, isActive: true },
+          select: { id: true },
+        })
+      : Promise.resolve([]),
+    rejectedOccupationKeys.length > 0
+      ? prisma.client.occupation.findMany({
+          where: { key: { in: rejectedOccupationKeys }, isActive: true },
+          select: { id: true },
+        })
+      : Promise.resolve([]),
+  ]);
 
   return {
-    minAge: Math.max(1, parseInt(pick(breMeta('BRE_MIN_AGE').key, breMeta('BRE_MIN_AGE').default), 10) || 21),
-    maxAge: Math.max(1, parseInt(pick(breMeta('BRE_MAX_AGE').key, breMeta('BRE_MAX_AGE').default), 10) || 57),
-    rejectedGenderIds: parseIdList(
-      pick(breMeta('BRE_REJECTED_GENDERS').key, breMeta('BRE_REJECTED_GENDERS').default),
-    ),
-    rejectedOccupationIds: parseIdList(
-      pick(breMeta('BRE_REJECTED_OCCUPATIONS').key, breMeta('BRE_REJECTED_OCCUPATIONS').default),
-    ),
+    minAge,
+    maxAge,
+    rejectedGenderIds: genderRows.map((r) => r.id),
+    rejectedOccupationIds: occupationRows.map((r) => r.id),
   };
 }
 

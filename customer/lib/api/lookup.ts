@@ -3,6 +3,7 @@ import { ApiRequestError, apiGet } from './client';
 type LookupValueResponse = {
   values: Array<{
     id: number;
+    key: string;
     name: string;
   }>;
 };
@@ -33,8 +34,19 @@ export async function fetchCustomerOccupationLookupValues() {
   return fetchLookupValues('occupations');
 }
 
-export async function fetchCustomerCityLookupValues() {
-  return fetchLookupValues('cities');
+export async function fetchCitiesByQuery(query: string): Promise<Array<{ id: number; name: string }>> {
+  try {
+    const data = await apiGet<{ values: Array<{ id: number; name: string }> }>(
+      `/lookup/cities?q=${encodeURIComponent(query)}&limit=20`,
+      'Unable to search cities right now.',
+    );
+    return Array.isArray(data?.values) ? data.values : [];
+  } catch (e) {
+    if (e instanceof ApiRequestError && (e.statusCode === 404 || e.statusCode === 405 || e.statusCode === 501)) {
+      return [];
+    }
+    throw e;
+  }
 }
 
 export async function fetchCustomerReferenceRelationLookupValues() {

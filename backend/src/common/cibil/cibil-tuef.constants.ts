@@ -78,6 +78,17 @@ export const TUEF_ADVERSE_WRITTEN_OFF_SETTLED_STATUS_LABELS: Record<string, stri
   '09': 'Account Purchased and Settled',
 };
 
+/**
+ * Credit Facility Status strings that indicate a moratorium / regulatory restructure.
+ * These appear as text values (not TUEF codes) in the CreditFacilityStatus or similar fields
+ * on TrueLink bureau payloads — e.g. "Moratorium (Regulatory Measures)".
+ */
+export const MORATORIUM_CREDIT_FACILITY_KEYWORDS = [
+  'MORATORIUM',
+  'REGULATORY MEASURE',
+  'COVID',
+];
+
 /** TUEF Tag 34 — Suit Filed / Wilful Default Status (01–03 are adverse). */
 export const TUEF_SUIT_FILED_WILFUL_DEFAULT_CODES = {
   NONE: '00',

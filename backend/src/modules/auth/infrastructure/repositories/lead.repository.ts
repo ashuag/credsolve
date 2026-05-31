@@ -131,14 +131,14 @@ export class LeadRepository {
     return this.db(tx).lead.findFirst({
       where: { customerId, isActive: true },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, uuid: true },
+      select: { id: true, uuid: true, panNumber: true },
     });
   }
 
   findByUuidForCustomer(uuid: string, customerId: bigint, tx?: DbClient) {
     return this.db(tx).lead.findFirst({
       where: { uuid, customerId, isActive: true },
-      select: { id: true, uuid: true },
+      select: { id: true, uuid: true, panNumber: true },
     });
   }
 

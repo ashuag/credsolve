@@ -1,11 +1,11 @@
 'use client';
 
+import { useState, useRef, useEffect, useCallback } from 'react';
 import type { CustomerCityLookupOption } from '@/lib/customer-city-lookup';
-import { useState, useRef, useEffect } from 'react';
+import { fetchCitiesByQuery } from '@/lib/api/lookup';
 
 export type CityInputChange = {
   label: string;
-  /** Set when the user picks a row from the lookup list; cleared when they type freely. */
   cityId: number | null;
 };
 
@@ -13,13 +13,10 @@ type SearchableCityInputProps = {
   id: string;
   name: string;
   value: string;
-  options: CustomerCityLookupOption[];
   onChange: (next: CityInputChange) => void;
   className: string;
-  placeholder: string;
-  isLoading?: boolean;
+  placeholder?: string;
   disabled?: boolean;
-  autoComplete?: string;
   ariaInvalid?: boolean;
   ariaDescribedBy?: string;
 };
@@ -28,31 +25,27 @@ export function SearchableCityInput({
   id,
   name,
   value,
-  options,
   onChange,
   className,
-  placeholder,
-  isLoading = false,
+  placeholder = 'Start typing your city',
   disabled = false,
-  autoComplete = 'off',
   ariaInvalid,
-  ariaDescribedBy
+  ariaDescribedBy,
 }: SearchableCityInputProps) {
-  const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState(value || '');
+  const [options, setOptions] = useState<CustomerCityLookupOption[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setSearchTerm(value || '');
   }, [value]);
 
-  const filteredOptions = (options || [])
-    .filter((opt) => opt.label.toLowerCase().includes(searchTerm.toLowerCase()))
-    .slice(0, 100);
-
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     }
@@ -60,17 +53,41 @@ export function SearchableCityInput({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSelect = (city: CustomerCityLookupOption) => {
-    setSearchTerm(city.label);
-    onChange({ label: city.label, cityId: city.id });
-    setIsOpen(false);
-  };
+  const searchCities = useCallback((query: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (query.trim().length < 2) {
+      setOptions([]);
+      setIsOpen(false);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await fetchCitiesByQuery(query.trim());
+        setOptions(results);
+        setIsOpen(results.length > 0);
+      } catch {
+        setOptions([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setSearchTerm(val);
     onChange({ label: val, cityId: null });
-    if (!isOpen) setIsOpen(true);
+    searchCities(val);
+  };
+
+  const handleSelect = (city: CustomerCityLookupOption) => {
+    setSearchTerm(city.label);
+    onChange({ label: city.label, cityId: city.id });
+    setIsOpen(false);
+    setOptions([]);
   };
 
   return (
@@ -80,26 +97,32 @@ export function SearchableCityInput({
           id={id}
           name={name}
           type="text"
-          autoComplete={autoComplete}
-          placeholder={isLoading && options.length === 0 ? 'Loading cities...' : placeholder}
+          autoComplete="off"
+          placeholder={placeholder}
           value={searchTerm}
           onChange={handleInputChange}
-          onFocus={() => setIsOpen(true)}
-          disabled={disabled || (isLoading && options.length === 0)}
+          disabled={disabled}
           aria-invalid={ariaInvalid}
           aria-describedby={ariaDescribedBy}
           className={`${className} pr-10`}
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-          <svg className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+          {isSearching ? (
+            <svg className="w-4 h-4 text-slate-400 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+            </svg>
+          ) : (
+            <svg className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          )}
         </div>
       </div>
 
-      {isOpen && filteredOptions.length > 0 && (
+      {isOpen && options.length > 0 && (
         <div className="absolute z-[100] mt-1 w-full max-h-[240px] overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-[0_12px_30px_rgba(0,0,0,0.1)] py-1 custom-scrollbar">
-          {filteredOptions.map((option) => (
+          {options.map((option) => (
             <button
               key={`${option.id}-${option.label}`}
               type="button"

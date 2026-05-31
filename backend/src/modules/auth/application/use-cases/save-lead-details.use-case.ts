@@ -6,7 +6,15 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { parseOptionalInrAmount } from '../../../../common/utils/parse-inr-amount';
-import { GENDER_SLUG_TO_DB, OCCUPATION_SLUG_TO_DB } from '../../../../common/mappers/lead-detail-master-slugs';
+import { GENDER } from '../../../../common/constants/gender.constants';
+import { OCCUPATION } from '../../../../common/constants/occupation.constants';
+
+const GENDER_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
+  Object.values(GENDER).map(({ key, name }) => [key, name]),
+);
+const OCCUPATION_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
+  Object.values(OCCUPATION).map(({ key, name }) => [key, name]),
+);
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { resolveLeadCityId } from '../../../../common/utils/resolve-lead-city-id.util';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
@@ -48,8 +56,8 @@ export class SaveLeadDetailsUseCase {
       throw new NotFoundException('No matching active lead was found.');
     }
 
-    const genderName = GENDER_SLUG_TO_DB[dto.gender];
-    const occupationName = OCCUPATION_SLUG_TO_DB[dto.occupation];
+    const genderName = GENDER_KEY_TO_NAME[dto.gender];
+    const occupationName = OCCUPATION_KEY_TO_NAME[dto.occupation];
     if (!genderName || !occupationName) {
       throw new BadRequestException('Invalid gender or occupation.');
     }

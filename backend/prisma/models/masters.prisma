@@ -8,6 +8,7 @@
 
 model Gender {
   id          Int          @id @default(autoincrement()) @db.SmallInt
+  key         String       @unique @db.VarChar(20)
   name        String       @unique @db.VarChar(20)
   isActive    Boolean      @default(true) @map("is_active")
   leadDetails LeadDetail[]
@@ -17,6 +18,7 @@ model Gender {
 
 model Occupation {
   id          Int          @id @default(autoincrement()) @db.SmallInt
+  key         String       @unique @db.VarChar(50)
   name        String       @unique @db.VarChar(50)
   isActive    Boolean      @default(true) @map("is_active")
   leadDetails LeadDetail[]

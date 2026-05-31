@@ -100,6 +100,34 @@ export class PanVerificationService {
 
   constructor(private readonly vendorApi: VendorApiService) {}
 
+  /**
+   * Client-side PAN structural check before hitting the vendor:
+   * - Must be 10 chars: 5 alpha, 4 numeric, 1 alpha
+   * - 4th character must be 'P' (individual PAN)
+   * - 5th character must match the first letter of the last word in fullName
+   */
+  validatePanStructure(pan: string, fullName: string): { valid: boolean; note: string } {
+    const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+    if (!PAN_REGEX.test(pan)) {
+      return { valid: false, note: 'Invalid PAN format' };
+    }
+    if (pan[3] !== 'P') {
+      return { valid: false, note: `PAN 4th character must be P (individual PAN), got '${pan[3]}'` };
+    }
+    const nameParts = fullName.trim().toUpperCase().split(/\s+/).filter(Boolean);
+    if (nameParts.length === 0) {
+      return { valid: false, note: 'Full name is required for PAN validation' };
+    }
+    const lastNameInitial = nameParts[nameParts.length - 1]![0]!;
+    if (pan[4] !== lastNameInitial) {
+      return {
+        valid: false,
+        note: `PAN 5th character '${pan[4]}' does not match last name initial '${lastNameInitial}'`,
+      };
+    }
+    return { valid: true, note: '' };
+  }
+
   async verify(input: PanVerificationInput): Promise<PanVerificationResult> {
     const notChecked: PanVerificationResult = {
       panVerifiedStatus: PAN_VERIFIED.NOT_CHECKED,
@@ -111,15 +139,29 @@ export class PanVerificationService {
       note: null,
     };
 
+    // Structural PAN validation before calling the vendor
+    const structCheck = this.validatePanStructure(input.panNumber, input.fullName);
+    if (!structCheck.valid) {
+      this.logger.warn(
+        `PAN structural validation failed (leadId=${input.leadId.toString()}): ${structCheck.note}`,
+      );
+      return {
+        panVerifiedStatus: PAN_VERIFIED.NOT_VERIFIED,
+        nameMatch: false,
+        dobMatch: false,
+        panStatus: 'invalid',
+        category: null,
+        vendorRequestId: null,
+        note: structCheck.note,
+      };
+    }
+
     try {
       const baseUrl = (process.env.VENDOR_HOST ?? '').trim();
       const clientId = (process.env.TENACIO_CLIENT_ID ?? '').trim();
       const apiKey = (process.env.TENACIO_API_KEY ?? '').trim();
       const workflowId = (process.env.TENACIO_PAN_NSDL_WORKFLOW_ID ?? '').trim();
       const logger = new Logger(PanVerificationService.name);
-      logger.warn(clientId);
-      logger.warn(apiKey);
-      logger.warn(workflowId)
       if (!baseUrl || !clientId || !apiKey || !workflowId) {
         this.logger.warn(
           'Tenacio credentials missing — skipping PAN verification. Set VENDOR_HOST, TENACIO_CLIENT_ID, TENACIO_API_KEY, TENACIO_PAN_NSDL_WORKFLOW_ID.',

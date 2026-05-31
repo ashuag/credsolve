@@ -2,12 +2,12 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, IsUUID, MaxLength, Matches } from 'class-validator';
 
 const OCCUPATIONS = [
-  'salaried',
-  'self_employed_professional',
-  'self_employed_business',
-  'student',
-  'homemaker',
-  'retired',
+  'SALARIED',
+  'SELF_EMPLOYED_PROFESSIONAL',
+  'SELF_EMPLOYED_BUSINESS',
+  'STUDENT',
+  'HOMEMAKER',
+  'RETIRED',
 ] as const;
 
 export class SaveProfessionalDetailsDto {

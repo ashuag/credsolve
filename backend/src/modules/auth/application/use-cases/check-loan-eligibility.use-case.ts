@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
-import { computeMaxOpenUnsecuredExposureInr } from '../../../../common/cibil/cibil-tradeline.parser';
+import { computeOpenUnsecuredExposureBreakdown } from '../../../../common/cibil/cibil-tradeline.parser';
 import { CreditLimitTierResolverService } from '../../../../common/cibil/credit-limit-tier-resolver.service';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { isCibilNewToCreditScore } from '../../../../common/vendor/tenacio-bureau-payload.mapper';
@@ -43,8 +43,8 @@ export class CheckLoanEligibilityUseCase {
       throw new ForbiddenException(LOAN_OFFER_UNAVAILABLE_MESSAGE);
     }
 
-    const maxExposure = computeMaxOpenUnsecuredExposureInr(rawPayload);
-    const tier = await this.creditLimitTiers.resolveMaxBulletLoan(maxExposure);
+    const { totalOpenUnsecuredExposureInr } = computeOpenUnsecuredExposureBreakdown(rawPayload);
+    const tier = await this.creditLimitTiers.resolveMaxBulletLoan(totalOpenUnsecuredExposureInr);
     if (!tier) {
       throw new ForbiddenException(LOAN_OFFER_UNAVAILABLE_MESSAGE);
     }

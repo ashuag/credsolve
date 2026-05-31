@@ -5,14 +5,14 @@ import {
   PERSON_NAME_VALIDATION_MESSAGE,
 } from '../../../../common/utils/person-name.util';
 
-const GENDERS = ['male', 'female', 'others'] as const;
+const GENDERS = ['MALE', 'FEMALE', 'OTHERS'] as const;
 const OCCUPATIONS = [
-  'salaried',
-  'self_employed_professional',
-  'self_employed_business',
-  'student',
-  'homemaker',
-  'retired',
+  'SALARIED',
+  'SELF_EMPLOYED_PROFESSIONAL',
+  'SELF_EMPLOYED_BUSINESS',
+  'STUDENT',
+  'HOMEMAKER',
+  'RETIRED',
 ] as const;
 
 export class SaveLeadProfileDto {

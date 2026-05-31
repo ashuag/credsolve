@@ -150,6 +150,46 @@ export function PostBreResultsSummary({ result }: { result: PostBreDryRunResult 
         </p>
       </div>
 
+      {result.unsecuredExposure && (
+        <div className="rounded-[14px] border border-[rgba(20,150,243,0.22)] bg-[rgba(20,150,243,0.06)] px-4 py-4 grid gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="m-0 text-[0.7rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
+                Total Open Unsecured Loan
+              </p>
+              <p className="m-0 mt-0.5 text-[1.1rem] font-extrabold text-brand-navy">
+                ₹{result.unsecuredExposure.totalOpenUnsecuredExposureInr.toLocaleString('en-IN')}
+              </p>
+            </div>
+            <div>
+              <p className="m-0 text-[0.7rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
+                Max Single Unsecured Loan
+              </p>
+              <p className="m-0 mt-0.5 text-[1.1rem] font-extrabold text-brand-navy">
+                ₹{result.unsecuredExposure.maxOpenUnsecuredExposureInr.toLocaleString('en-IN')}
+              </p>
+            </div>
+          </div>
+
+          {result.overallPassed && result.creditLimit && (
+            <div className="grid gap-2 border-t border-[rgba(20,150,243,0.14)] pt-3">
+              <div>
+                <p className="m-0 text-[0.72rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">
+                  Pre-Approved Credit Limit
+                </p>
+                <p className="m-0 mt-1 text-[1.6rem] font-extrabold tracking-[-0.03em] text-brand-navy">
+                  ₹{result.creditLimit.preApprovedAmountInr.toLocaleString('en-IN')}
+                </p>
+                <p className="m-0 mt-1 text-[0.82rem] text-brand-muted">
+                  Product range: ₹{result.creditLimit.minLoanAmountInr.toLocaleString('en-IN')} –{' '}
+                  ₹{result.creditLimit.maxLoanAmountInr.toLocaleString('en-IN')}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <PostBreInspectionSections result={result} />
 
       <section className="grid gap-3">
@@ -166,11 +206,11 @@ export function PostBreResultsSummary({ result }: { result: PostBreDryRunResult 
         </div>
       </section>
 
-      <details className="rounded-[12px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.72)] p-3">
+      <details className="rounded-xl border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.72)] p-3">
         <summary className="cursor-pointer text-[0.84rem] font-bold text-brand-navy">
           Resolved thresholds (raw JSON)
         </summary>
-        <pre className="mt-2 overflow-x-auto text-[0.75rem] leading-[1.5] text-brand-muted">
+        <pre className="mt-2 overflow-x-auto text-[0.75rem] leading-normal text-brand-muted">
           {JSON.stringify(result.thresholds, null, 2)}
         </pre>
       </details>
@@ -228,7 +268,7 @@ export function PostBureauBrePanel() {
   return (
     <div className="grid gap-6">
       <form
-        className="grid gap-4 rounded-[16px] border border-[rgba(23,44,113,0.1)] bg-[rgba(255,255,255,0.94)] p-5 shadow-[0_12px_40px_rgba(23,44,113,0.06)]"
+        className="grid gap-4 rounded-2xl border border-[rgba(23,44,113,0.1)] bg-[rgba(255,255,255,0.94)] p-5 shadow-[0_12px_40px_rgba(23,44,113,0.06)]"
         onSubmit={handleSubmit}
       >
         <div>
@@ -245,7 +285,7 @@ export function PostBureauBrePanel() {
         <label className="grid gap-1.5">
           <span className="text-[0.84rem] font-bold text-brand-muted">Payload</span>
           <textarea
-            className="los-input min-h-[280px] resize-y font-mono text-[0.78rem] leading-[1.5]"
+            className="los-input min-h-70 resize-y font-mono text-[0.78rem] leading-normal"
             value={jsonText}
             onChange={(event) => setJsonText(event.target.value)}
             placeholder='{"requestId":"...","data":{"cibilData":{...}}}'
@@ -278,14 +318,14 @@ export function PostBureauBrePanel() {
         <div className="flex flex-wrap gap-3">
           <button
             type="submit"
-            className="los-btn-primary min-h-[42px] px-5"
+            className="los-btn-primary min-h-10.5 px-5"
             disabled={loading || !jsonText.trim()}
           >
             {loading ? 'Running checks…' : 'Run post-BRE check'}
           </button>
           <button
             type="button"
-            className="min-h-[42px] cursor-pointer rounded-[10px] border border-[rgba(23,44,113,0.14)] bg-white px-5 text-[0.88rem] font-bold text-brand-navy transition-colors hover:border-[rgba(20,150,243,0.28)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-10.5 cursor-pointer rounded-[10px] border border-[rgba(23,44,113,0.14)] bg-white px-5 text-[0.88rem] font-bold text-brand-navy transition-colors hover:border-[rgba(20,150,243,0.28)] disabled:cursor-not-allowed disabled:opacity-50"
             disabled={loading}
             onClick={() => {
               setJsonText('');

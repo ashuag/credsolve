@@ -1,44 +1,32 @@
 import type { Prisma } from '@prisma/client';
 
-const CRITERIA: Array<{ key: string; label: string; value: string; description: string }> = [
-  { key: 'cibil_min_new', label: 'Min CIBIL score (new customer)', value: '700', description: 'Minimum CIBIL Vision Score for first-time borrowers' },
-  { key: 'cibil_min_existing', label: 'Min CIBIL score (existing customer)', value: '650', description: 'Minimum CIBIL Vision Score for repeat / existing borrowers' },
-  { key: 'cibil_max', label: 'Max CIBIL score', value: '900', description: 'Maximum CIBIL Vision Score (upper ceiling)' },
-  { key: 'ntc_allowed', label: 'NTC (New to Credit) allowed', value: 'false', description: 'Whether New-to-Credit customers are eligible (true/false)' },
-  { key: 'min_age', label: 'Minimum borrower age (years)', value: '21', description: 'Customer must be at least this age at loan origination' },
-  { key: 'max_age', label: 'Maximum borrower age at end of tenure', value: '58', description: 'Customer age must not exceed this at end of loan tenure' },
-  { key: 'min_loan_amount', label: 'Minimum loan amount (₹)', value: '500', description: 'Minimum permissible loan request amount in INR' },
-  { key: 'max_loan_amount', label: 'Maximum loan amount (₹)', value: '30000', description: 'Maximum permissible loan request amount in INR' },
-  { key: 'open_dpd_months', label: 'No open DPD in last N months', value: '6', description: 'Customer must have no open DPD within this many months' },
-  { key: 'dpd_30plus_months', label: 'No 30+ DPD in last N months', value: '3', description: 'Customer must have no 30+ DPD within this many months' },
-  { key: 'dpd_60plus_months', label: 'No 60+ DPD in last N months', value: '9', description: 'Customer must have no 60+ DPD within this many months' },
-  { key: 'dpd_90plus_months', label: 'No 90+ DPD in last N months', value: '12', description: 'Customer must have no 90+ DPD within this many months' },
-  { key: 'settled_months', label: 'No Doubtful/Loss/Written-off/Settled in last N months', value: '18', description: 'No adverse classification in this window' },
-  { key: 'no_restructured_loans', label: 'No restructured loans allowed', value: 'true', description: 'Customer must have no restructured loan trades' },
-  { key: 'no_sma_pwos', label: 'No SMA or PWOS trade lines', value: 'true', description: 'Customer must have no Special Mention Account or Pre-Written-Off Status trades' },
-  { key: 'no_active_mfi', label: 'No active MFI loans', value: 'true', description: 'Customer must not have an active microfinance loan' },
-  { key: 'max_enquiries_30_days', label: 'Max loan enquiries in last 30 days', value: '10', description: 'Customer must have ≤ this many credit enquiries in the past 30 days' },
-  {
-    key: 'enforce_negative_state',
-    label: 'Enforce negative state list',
-    value: 'true',
-    description:
-      'When true, origination is blocked when the customer address maps to a state present in the negative_state serviceability master.',
-  },
-  {
-    key: 'enforce_negative_pincode',
-    label: 'Enforce negative pincode list',
-    value: 'true',
-    description:
-      'When true, origination is blocked when the customer pincode matches an active row in the negative_pincode serviceability master.',
-  },
-  {
-    key: 'enforce_negative_city',
-    label: 'Enforce negative city list',
-    value: 'true',
-    description:
-      'When true, origination is blocked when the customer city matches an active row in the negative_city serviceability master.',
-  },
+const PRE_BRE = 'PRE_BRE';
+const POST_BRE = 'POST_BRE';
+
+const CRITERIA: Array<{ key: string; label: string; value: string; breType: string; description: string }> = [
+  { key: 'MIN_LOAN_AMOUNT', label: 'Minimum loan amount (₹)', value: '500', breType: PRE_BRE, description: 'Minimum permissible loan request amount in INR' },
+  { key: 'MAX_LOAN_AMOUNT', label: 'Maximum loan amount (₹)', value: '30000', breType: PRE_BRE, description: 'Maximum permissible loan request amount in INR' },
+  { key: 'MIN_AGE', label: 'Minimum borrower age (years)', value: '21', breType: PRE_BRE, description: 'Customer must be at least this age at loan origination' },
+  { key: 'MAX_AGE', label: 'Maximum borrower age at end of tenure', value: '58', breType: PRE_BRE, description: 'Customer age must not exceed this at end of loan tenure' },
+  { key: 'ENFORCE_NEGATIVE_STATE', label: 'Enforce negative state list', value: 'true', breType: PRE_BRE, description: 'When true, origination is blocked when the customer address maps to a state present in the negative_state serviceability master.' },
+  { key: 'ENFORCE_NEGATIVE_PINCODE', label: 'Enforce negative pincode list', value: 'true', breType: PRE_BRE, description: 'When true, origination is blocked when the customer pincode matches an active row in the negative_pincode serviceability master.' },
+  { key: 'ENFORCE_NEGATIVE_CITY', label: 'Enforce negative city list', value: 'true', breType: PRE_BRE, description: 'When true, origination is blocked when the customer city matches an active row in the negative_city serviceability master.' },
+  { key: 'REJECTED_OCCUPATIONS', label: 'Rejected occupations', value: 'STUDENT,HOMEMAKER,RETIRED', breType: PRE_BRE, description: 'Comma-separated list of occupation keys blocked from origination' },
+  { key: 'REJECTED_GENDERS', label: 'Rejected genders', value: 'OTHERS', breType: PRE_BRE, description: 'Comma-separated list of gender keys blocked from origination' },
+  { key: 'CIBIL_MIN_NEW', label: 'Min CIBIL score (new customer)', value: '700', breType: POST_BRE, description: 'Minimum CIBIL Vision Score for first-time borrowers' },
+  { key: 'CIBIL_MIN_EXISTING', label: 'Min CIBIL score (existing customer)', value: '650', breType: POST_BRE, description: 'Minimum CIBIL Vision Score for repeat / existing borrowers' },
+  { key: 'CIBIL_MAX', label: 'Max CIBIL score', value: '900', breType: POST_BRE, description: 'Maximum CIBIL Vision Score (upper ceiling)' },
+  { key: 'NTC_ALLOWED', label: 'NTC (New to Credit) allowed', value: 'false', breType: POST_BRE, description: 'Whether New-to-Credit customers are eligible (true/false)' },
+  { key: 'OPEN_DPD_MONTHS', label: 'No open DPD in last N months', value: '6', breType: POST_BRE, description: 'Customer must have no open DPD within this many months' },
+  { key: 'DPD_30PLUS_MONTHS', label: 'No 30+ DPD in last N months', value: '3', breType: POST_BRE, description: 'Customer must have no 30+ DPD within this many months' },
+  { key: 'DPD_60PLUS_MONTHS', label: 'No 60+ DPD in last N months', value: '9', breType: POST_BRE, description: 'Customer must have no 60+ DPD within this many months' },
+  { key: 'DPD_90PLUS_MONTHS', label: 'No 90+ DPD in last N months', value: '12', breType: POST_BRE, description: 'Customer must have no 90+ DPD within this many months' },
+  { key: 'SETTLED_MONTHS', label: 'No Doubtful/Loss/Written-off/Settled in last N months', value: '18', breType: POST_BRE, description: 'No adverse classification in this window' },
+  { key: 'NO_RESTRUCTURED_LOANS', label: 'No restructured loans allowed', value: 'true', breType: POST_BRE, description: 'Customer must have no restructured loan trades' },
+  { key: 'NO_SMA_PWOS', label: 'No SMA or PWOS trade lines', value: 'true', breType: POST_BRE, description: 'Customer must have no Special Mention Account or Pre-Written-Off Status trades' },
+  { key: 'NO_ACTIVE_MFI', label: 'No active MFI loans', value: 'true', breType: POST_BRE, description: 'Customer must not have an active microfinance loan' },
+  { key: 'MAX_ENQUIRIES_30_DAYS', label: 'Max loan enquiries in last 30 days', value: '10', breType: POST_BRE, description: 'Customer must have ≤ this many credit enquiries in the past 30 days' },
+  { key: 'MAX_MISSED_PAYMENTS_6_MONTHS', label: 'Max missed payments in last 6 months', value: '1', breType: POST_BRE, description: 'Customer must have ≤ this many months with any DPD > 0 across all tradelines in the past 6 months' },
 ];
 
 export async function seedEligibilityCriteria(prisma: Prisma.TransactionClient) {
@@ -49,11 +37,13 @@ export async function seedEligibilityCriteria(prisma: Prisma.TransactionClient) 
         key: c.key,
         label: c.label,
         value: c.value,
+        breType: c.breType,
         description: c.description,
         isActive: true,
       },
       update: {
         label: c.label,
+        breType: c.breType,
         description: c.description,
         isActive: true,
       },

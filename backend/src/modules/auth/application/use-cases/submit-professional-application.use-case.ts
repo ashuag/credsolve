@@ -9,6 +9,10 @@ import type { Request } from 'express';
 import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { OCCUPATION } from '../../../../common/constants/occupation.constants';
+
+const OCCUPATION_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
+  Object.values(OCCUPATION).map(({ key, name }) => [key, name]),
+);
 import { parseOptionalInrAmount } from '../../../../common/utils/parse-inr-amount';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
@@ -17,14 +21,6 @@ import { LeadRepository } from '../../infrastructure/repositories/lead.repositor
 import { CheckLoanEligibilityUseCase } from './check-loan-eligibility.use-case';
 import type { SaveProfessionalDetailsDto } from '../dto/save-professional-details.dto';
 
-const OCC_SLUG_TO_DB: Record<string, string> = {
-  salaried: OCCUPATION.SALARIED,
-  self_employed_professional: OCCUPATION.SELF_EMPLOYED_PROFESSIONAL,
-  self_employed_business: OCCUPATION.SELF_EMPLOYED_BUSINESS,
-  student: OCCUPATION.STUDENT,
-  homemaker: OCCUPATION.HOMEMAKER,
-  retired: OCCUPATION.RETIRED,
-};
 
 export type SubmitProfessionalApplicationResult = {
   success: true;
@@ -63,7 +59,7 @@ export class SubmitProfessionalApplicationUseCase {
       throw new NotFoundException('No matching active lead was found.');
     }
 
-    const occupationName = OCC_SLUG_TO_DB[dto.occupation];
+    const occupationName = OCCUPATION_KEY_TO_NAME[dto.occupation];
     if (!occupationName) {
       throw new BadRequestException('Invalid occupation.');
     }

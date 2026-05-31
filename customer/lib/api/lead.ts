@@ -1,4 +1,3 @@
-import type { CustomerGenderValue, CustomerOccupationValue } from '../customer-details';
 import type { PanVerificationStatus } from '../pan-verification';
 import { ApiRequestError, apiGet, apiPost, apiPostFormData } from './client';
 
@@ -10,6 +9,7 @@ type SyncLeadEmailResponse = {
 type SaveLeadDetailsResponse = {
   success: boolean;
   leadUuid?: string;
+  rejected?: boolean;
 };
 
 /**
@@ -25,8 +25,8 @@ export type SaveLeadDetailsPayload = {
   leadUuid?: string;
   fullName: string;
   dob: string;
-  gender: CustomerGenderValue;
-  occupation: CustomerOccupationValue;
+  gender: string;
+  occupation: string;
   addressLine1: string;
   addressLine2?: string;
   currentCity: string;
@@ -45,8 +45,8 @@ export type VerifyLeadPanPayload = {
   panNumber: string;
   fullName: string;
   dob: string;
-  gender: CustomerGenderValue;
-  occupation: CustomerOccupationValue;
+  gender: string;
+  occupation: string;
   /** Optional when address was just saved via `saveLeadDetails`. */
   addressLine1?: string;
   addressLine2?: string;
@@ -63,6 +63,8 @@ export type VerifyLeadPanPayload = {
 export type VerifyLeadPanResponse = {
   success: boolean;
   rejected?: boolean;
+  attemptsUsed?: number;
+  attemptsAllowed?: number;
   message?: string;
   matched: boolean;
   panVerified: boolean;
@@ -94,7 +96,7 @@ export type SaveApplicationDetailsPayload = {
 
 export type SaveProfessionalDetailsPayload = {
   leadUuid?: string;
-  occupation: CustomerOccupationValue;
+  occupation: string;
   monthlyIncome?: string;
   annualTurnover?: string;
   annualProfit?: string;
@@ -131,8 +133,8 @@ export type SaveLeadProfilePayload = {
   leadUuid?: string;
   fullName: string;
   dob: string;
-  gender: CustomerGenderValue;
-  occupation: CustomerOccupationValue;
+  gender: string;
+  occupation: string;
   panNumber: string;
   monthlyIncome?: string;
   annualTurnover?: string;
@@ -172,10 +174,13 @@ export async function verifyLeadPan(payload: VerifyLeadPanPayload): Promise<Veri
   );
 }
 
-/** Rejects the lead when client-side PAN name validation fails on the second attempt. */
-export async function rejectLeadPanClientValidation(leadUuid?: string): Promise<{ success: true; rejected: true }> {
+export type RejectPanClientValidationResult =
+  | { success: true; rejected: false; attemptsUsed: number; attemptsAllowed: number }
+  | { success: true; rejected: true };
+
+export async function rejectLeadPanClientValidation(leadUuid?: string): Promise<RejectPanClientValidationResult> {
   return (
-    (await apiPost<{ success: true; rejected: true }>(
+    (await apiPost<RejectPanClientValidationResult>(
       '/auth/reject-pan-client-validation',
       leadUuid ? { leadUuid } : {},
       'Unable to process your request right now.',

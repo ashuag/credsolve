@@ -46,7 +46,7 @@ export class LookupController {
   async gender() {
     const values = await this.prisma.client.gender.findMany({
       where: { isActive: true },
-      select: { id: true, name: true },
+      select: { id: true, key: true, name: true },
       orderBy: { id: 'asc' },
     });
     return { values };
@@ -58,7 +58,7 @@ export class LookupController {
   async occupations() {
     const values = await this.prisma.client.occupation.findMany({
       where: { isActive: true },
-      select: { id: true, name: true },
+      select: { id: true, key: true, name: true },
       orderBy: { id: 'asc' },
     });
     return { values };

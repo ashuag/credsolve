@@ -1,3 +1,4 @@
+import { ELIGIBILITY_CRITERIA as EC } from '../constants/eligibility-criteria.constants';
 import { REJECTION_REASON } from '../constants/rejection-reason.constants';
 
 export const POST_BRE_ENQUIRY_WINDOW_DAYS = 30;
@@ -14,6 +15,7 @@ export type PostBreThresholdsSnapshot = {
   enforceNoRestructuredLoans: boolean;
   enforceNoSmaPwos: boolean;
   enforceNoActiveMfi: boolean;
+  maxMissedPayments6Months: number;
 };
 
 export type PostBreRuleCatalogEntry = {
@@ -79,7 +81,7 @@ export function buildPostBreRulesCatalog(thresholds: PostBreThresholdsSnapshot):
       informationalOnly: false,
       alwaysEvaluated: true,
       toggleCriteriaKey: null,
-      criteriaKeys: ['cibil_min_new', 'cibil_min_existing'],
+      criteriaKeys: [EC.CIBIL_MIN_NEW, EC.CIBIL_MIN_EXISTING],
       rejectionReasonCode: REJECTION_REASON.CIBIL_SCORE_LOW,
       condition: `New customers: score < ${thresholds.cibilMinNew}. Existing (repeat) customers: score < ${thresholds.cibilMinExisting}.`,
       passCondition: `Score ≥ configured minimum for customer type (new vs existing repeat borrower with a disbursed loan).`,
@@ -94,7 +96,7 @@ export function buildPostBreRulesCatalog(thresholds: PostBreThresholdsSnapshot):
       informationalOnly: false,
       alwaysEvaluated: true,
       toggleCriteriaKey: null,
-      criteriaKeys: ['settled_months'],
+      criteriaKeys: [EC.SETTLED_MONTHS],
       rejectionReasonCode: REJECTION_REASON.BUREAU_ADVERSE_TRADELINE,
       condition: `No DBT, LSS, SUB, SET, 90+ DPD, suit filed / wilful default, write-off / settlement amounts, or TUEF Tag 33 written-off / settled status within last ${thresholds.settledLookbackMonths} months.`,
       passCondition: 'No doubtful / loss / written-off / settled / suit-filed signals in the lookback window.',
@@ -107,13 +109,13 @@ export function buildPostBreRulesCatalog(thresholds: PostBreThresholdsSnapshot):
       notes: null,
     },
     {
-      id: 'no_restructured_loans',
+      id: EC.NO_RESTRUCTURED_LOANS,
       label: 'No restructured loans',
       category: 'tradeline',
       informationalOnly: false,
       alwaysEvaluated: false,
-      toggleCriteriaKey: 'no_restructured_loans',
-      criteriaKeys: ['no_restructured_loans'],
+      toggleCriteriaKey: EC.NO_RESTRUCTURED_LOANS,
+      criteriaKeys: [EC.NO_RESTRUCTURED_LOANS],
       rejectionReasonCode: REJECTION_REASON.BUREAU_RESTRUCTURED_LOAN,
       condition: 'Any tradeline with TUEF Tag 33 Written-off and Settled Status in restructure set (00, 01, 10, 11).',
       passCondition: 'No restructure status on any tradeline.',
@@ -122,13 +124,13 @@ export function buildPostBreRulesCatalog(thresholds: PostBreThresholdsSnapshot):
       notes: 'Skipped when no_restructured_loans is false.',
     },
     {
-      id: 'no_sma_pwos',
+      id: EC.NO_SMA_PWOS,
       label: 'No SMA or PWOS trade lines',
       category: 'tradeline',
       informationalOnly: false,
       alwaysEvaluated: false,
-      toggleCriteriaKey: 'no_sma_pwos',
-      criteriaKeys: ['no_sma_pwos'],
+      toggleCriteriaKey: EC.NO_SMA_PWOS,
+      criteriaKeys: [EC.NO_SMA_PWOS],
       rejectionReasonCode: REJECTION_REASON.BUREAU_SMA_PWOS_TRADELINE,
       condition: 'SMA, SMA0–SMA2, or PWOS on current pay status, worst pay status, or monthly history.',
       passCondition: 'No SMA / PWOS classification on any tradeline.',
@@ -137,13 +139,13 @@ export function buildPostBreRulesCatalog(thresholds: PostBreThresholdsSnapshot):
       notes: 'Skipped when no_sma_pwos is false.',
     },
     {
-      id: 'no_active_mfi',
+      id: EC.NO_ACTIVE_MFI,
       label: 'No active MFI / microfinance loans',
       category: 'tradeline',
       informationalOnly: false,
       alwaysEvaluated: false,
-      toggleCriteriaKey: 'no_active_mfi',
-      criteriaKeys: ['no_active_mfi'],
+      toggleCriteriaKey: EC.NO_ACTIVE_MFI,
+      criteriaKeys: [EC.NO_ACTIVE_MFI],
       rejectionReasonCode: REJECTION_REASON.BUREAU_ACTIVE_MFI_LOAN,
       condition: 'Open tradeline with MFI account type (40–43), GrantedTrade account type, IndustryCode MFI, or microfinance account label.',
       passCondition: 'No open microfinance loan tradelines.',
@@ -158,7 +160,7 @@ export function buildPostBreRulesCatalog(thresholds: PostBreThresholdsSnapshot):
       informationalOnly: false,
       alwaysEvaluated: true,
       toggleCriteriaKey: null,
-      criteriaKeys: ['max_enquiries_30_days'],
+      criteriaKeys: [EC.MAX_ENQUIRIES_30_DAYS],
       rejectionReasonCode: REJECTION_REASON.BUREAU_ENQUIRIES_EXCEEDED,
       condition: `More than ${thresholds.maxEnquiries30Days} loan-purpose enquiries in the last ${POST_BRE_ENQUIRY_WINDOW_DAYS} days.`,
       passCondition: `Count ≤ ${thresholds.maxEnquiries30Days} within the rolling window.`,
@@ -173,7 +175,7 @@ export function buildPostBreRulesCatalog(thresholds: PostBreThresholdsSnapshot):
       informationalOnly: false,
       alwaysEvaluated: true,
       toggleCriteriaKey: null,
-      criteriaKeys: ['open_dpd_months'],
+      criteriaKeys: [EC.OPEN_DPD_MONTHS],
       rejectionReasonCode: REJECTION_REASON.BUREAU_DPD_FAILED,
       condition: `Open, loan-related tradeline with DPD > 0 in any month within last ${thresholds.openDpdMonths} months.`,
       passCondition: 'No positive DPD on open loan accounts in window.',
@@ -189,7 +191,7 @@ export function buildPostBreRulesCatalog(thresholds: PostBreThresholdsSnapshot):
       informationalOnly: false,
       alwaysEvaluated: true,
       toggleCriteriaKey: null,
-      criteriaKeys: ['dpd_30plus_months'],
+      criteriaKeys: [EC.DPD_30PLUS_MONTHS],
       rejectionReasonCode: REJECTION_REASON.BUREAU_DPD_FAILED,
       condition: `Any tradeline month with ≥ 30 DPD within last ${thresholds.dpd30PlusMonths} months.`,
       passCondition: 'No 30+ DPD breach in window.',
@@ -204,7 +206,7 @@ export function buildPostBreRulesCatalog(thresholds: PostBreThresholdsSnapshot):
       informationalOnly: false,
       alwaysEvaluated: true,
       toggleCriteriaKey: null,
-      criteriaKeys: ['dpd_60plus_months'],
+      criteriaKeys: [EC.DPD_60PLUS_MONTHS],
       rejectionReasonCode: REJECTION_REASON.BUREAU_DPD_FAILED,
       condition: `Any tradeline month with ≥ 60 DPD within last ${thresholds.dpd60PlusMonths} months.`,
       passCondition: 'No 60+ DPD breach in window.',
@@ -219,13 +221,28 @@ export function buildPostBreRulesCatalog(thresholds: PostBreThresholdsSnapshot):
       informationalOnly: false,
       alwaysEvaluated: true,
       toggleCriteriaKey: null,
-      criteriaKeys: ['dpd_90plus_months'],
+      criteriaKeys: [EC.DPD_90PLUS_MONTHS],
       rejectionReasonCode: REJECTION_REASON.BUREAU_DPD_FAILED,
       condition: `Any tradeline month with ≥ 90 DPD within last ${thresholds.dpd90PlusMonths} months.`,
       passCondition: 'No 90+ DPD breach in window.',
       dataSources: ['PayStatusHistory → MonthlyPayStatus'],
       tuefReference: null,
       notes: null,
+    },
+    {
+      id: 'missed_payments_6_months',
+      label: 'Missed payments in last 6 months',
+      category: 'dpd',
+      informationalOnly: false,
+      alwaysEvaluated: true,
+      toggleCriteriaKey: null,
+      criteriaKeys: [EC.MAX_MISSED_PAYMENTS_6_MONTHS],
+      rejectionReasonCode: REJECTION_REASON.BUREAU_DPD_FAILED,
+      condition: `More than ${thresholds.maxMissedPayments6Months} (tradeline × month) instances of DPD > 0 in the last 6 months.`,
+      passCondition: `≤ ${thresholds.maxMissedPayments6Months} missed payment(s) across all tradelines in the 6-month window.`,
+      dataSources: ['PayStatusHistory → MonthlyPayStatus (all tradelines)'],
+      tuefReference: null,
+      notes: 'Counts every (tradeline, month) pair with any positive DPD. Threshold is the maximum allowed count.',
     },
   ];
 

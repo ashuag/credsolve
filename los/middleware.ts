@@ -11,6 +11,7 @@ const PROTECTED_PREFIXES = [
   '/partners',
   '/masters',
   '/eligibility-criteria',
+  '/developer-tools',
 ] as const;
 
 export function middleware(request: NextRequest) {
@@ -42,5 +43,6 @@ export const config = {
     '/partners/:path*',
     '/masters/:path*',
     '/eligibility-criteria/:path*',
+    '/developer-tools/:path*',
   ],
 };

@@ -1042,6 +1042,7 @@ export class LosDataService {
       key: row.key,
       label: row.label,
       value: row.value,
+      breType: row.breType,
       description: row.description,
       isActive: row.isActive,
     }));
@@ -1083,6 +1084,7 @@ export class LosDataService {
       key: row.key,
       label: row.label,
       value: row.value,
+      breType: row.breType,
       description: row.description,
       isActive: row.isActive,
     };

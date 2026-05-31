@@ -5,8 +5,20 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { GENDER_SLUG_TO_DB, OCCUPATION_SLUG_TO_DB } from '../../../../common/mappers/lead-detail-master-slugs';
+import { GENDER } from '../../../../common/constants/gender.constants';
+import { OCCUPATION } from '../../../../common/constants/occupation.constants';
+import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
+import { REJECTION_REASON } from '../../../../common/constants/rejection-reason.constants';
+import { SettingKey } from '../../../../common/constants/setting.constants';
 import { parseOptionalInrAmount } from '../../../../common/utils/parse-inr-amount';
+
+const GENDER_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
+  Object.values(GENDER).map(({ key, name }) => [key, name]),
+);
+const OCCUPATION_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
+  Object.values(OCCUPATION).map(({ key, name }) => [key, name]),
+);
+import { PanVerificationService } from '../../../../common/vendor/pan-verification.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
@@ -26,9 +38,10 @@ export class SaveLeadProfileUseCase {
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
     private readonly prisma: PrismaService,
+    private readonly panVerification: PanVerificationService,
   ) {}
 
-  async execute(req: Request, dto: SaveLeadProfileDto): Promise<{ success: true; leadUuid: string }> {
+  async execute(req: Request, dto: SaveLeadProfileDto): Promise<{ success: true; leadUuid: string } | { success: false; rejected: true }> {
     const session = req.customerSession;
     if (!session) {
       throw new UnauthorizedException('Sign in with mobile OTP before continuing.');
@@ -47,8 +60,8 @@ export class SaveLeadProfileUseCase {
       throw new NotFoundException('No matching active lead was found.');
     }
 
-    const genderName = GENDER_SLUG_TO_DB[dto.gender];
-    const occupationName = OCCUPATION_SLUG_TO_DB[dto.occupation];
+    const genderName = GENDER_KEY_TO_NAME[dto.gender];
+    const occupationName = OCCUPATION_KEY_TO_NAME[dto.occupation];
     if (!genderName || !occupationName) {
       throw new BadRequestException('Invalid gender or occupation.');
     }
@@ -93,6 +106,51 @@ export class SaveLeadProfileUseCase {
       data: { panNumber: panUpper },
     });
 
+    const panCheck = this.panVerification.validatePanStructure(panUpper, dto.fullName.trim());
+    if (!panCheck.valid) {
+      const maxAttempts = await this.loadMaxPanAttempts();
+      const currentAttempts = await this.fetchPanAttempts(leadRow.id);
+      const attemptsUsed = currentAttempts + 1;
+
+      await this.prisma.client.$executeRaw`
+        UPDATE \`lead\` SET \`pan_validation_attempts\` = ${attemptsUsed} WHERE \`id\` = ${leadRow.id}
+      `;
+
+      if (attemptsUsed >= maxAttempts) {
+        await this.prisma.client.$executeRaw`
+          UPDATE \`lead\` l
+          JOIN \`lead_status\` ls ON ls.name = ${LEAD_STATUS.REJECTED} AND ls.is_active = 1
+          LEFT JOIN \`rejection_reason\` rr ON rr.name = ${REJECTION_REASON.PAN_VERIFICATION_FAILED} AND rr.is_active = 1
+          SET l.lead_status_id = ls.id,
+              l.rejection_reason_id = rr.id,
+              l.lead_status_note = 'pan not verified, failed in initial check'
+          WHERE l.id = ${leadRow.id}
+        `;
+        return { success: false, rejected: true };
+      }
+
+      const remaining = maxAttempts - attemptsUsed;
+      throw new BadRequestException(
+        `Please enter a valid PAN number. You have ${remaining} attempt(s) remaining.`,
+      );
+    }
+
     return { success: true, leadUuid: leadRow.uuid };
+  }
+
+  private async fetchPanAttempts(leadId: bigint): Promise<number> {
+    const rows = await this.prisma.client.$queryRaw<Array<{ pan_validation_attempts: number }>>`
+      SELECT \`pan_validation_attempts\` FROM \`lead\` WHERE \`id\` = ${leadId} LIMIT 1
+    `;
+    return Number(rows[0]?.pan_validation_attempts ?? 0);
+  }
+
+  private async loadMaxPanAttempts(): Promise<number> {
+    const row = await this.prisma.client.setting.findFirst({
+      where: { key: SettingKey.PAN_VALIDATION_ATTEMPTS.key, isActive: true },
+      select: { value: true },
+    });
+    const n = row ? Number.parseInt(row.value.trim(), 10) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : Number.parseInt(SettingKey.PAN_VALIDATION_ATTEMPTS.default, 10);
   }
 }
