@@ -19,9 +19,11 @@ function parseScoreFromRiskScore(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** CIBIL reports -1 or 0 when the borrower has no usable credit history (NTC). */
-export function isCibilNewToCreditScore(score: number | null): boolean {
-  return score === -1 || score === 0;
+/** CIBIL reports -1, 0 or 1 when the borrower has no usable credit history (NTC). */
+export function isCibilNewToCreditScore(
+  score: number | null | undefined,
+): boolean {
+  return score == null || Number.isNaN(score) || [-1, 0, 1].includes(score);
 }
 
 /** Walk `GetCustomerAssetsSuccess.Asset` (object or first element of array). */

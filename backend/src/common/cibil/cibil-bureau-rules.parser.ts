@@ -2,7 +2,9 @@
  * Post-bureau eligibility rules over Tenacio / CIBIL soft-pull payloads.
  */
 import {
+  ADVERSE_PAY_STATUS_CODES,
   MORATORIUM_CREDIT_FACILITY_KEYWORDS,
+  NEUTRAL_PAY_STATUS_CODES,
   TUEF_ADVERSE_SUIT_FILED_WILFUL_DEFAULT_CODES,
   TUEF_ADVERSE_WRITTEN_OFF_SETTLED_STATUS_CODES,
   TUEF_ADVERSE_WRITTEN_OFF_SETTLED_STATUS_LABELS,
@@ -12,41 +14,16 @@ import {
   TUEF_RESTRUCTURED_WRITTEN_OFF_SETTLED_CODES,
   TUEF_SMA_PWOS_ASSET_CLASSIFICATION_CODES,
   TUEF_SUIT_FILED_WILFUL_DEFAULT_LABELS,
+  ACCOUNT_TYPE_LABELS
 } from './cibil-tuef.constants';
+import { ELIGIBILITY_CRITERIA as EC } from '../constants/eligibility-criteria.constants';
 import {
   cibilAccountTypeDisplayLabel,
   extractTradelinesFromBureauVendorBody,
   isCibilTradelineOpen,
-  isLoanRelatedAccountType,
   normalizeCibilAccountTypeSymbol,
   parseCibilTradeline,
 } from './cibil-tradeline.parser';
-
-/** Payment-history / asset-classification markers that fail "no DBT/LSS/SUB/settled" rules. */
-const ADVERSE_PAY_STATUS_CODES = new Set([
-  'SUB',
-  'DBT',
-  'LSS',
-  'LOSS',
-  'SMA',
-  'SMA0',
-  'SMA1',
-  'SMA2',
-  'PWOS',
-  'SET',
-  'SETTLED',
-  'WOF',
-  'WOFF',
-  'WO',
-  'WRITTEN',
-  'WRITTENOFF',
-  'RGM',
-  'RCV',
-  'DEV',
-  'SPM',
-]);
-
-const NEUTRAL_PAY_STATUS_CODES = new Set(['0', '00', '000', 'STD', 'XXX', 'CLSD', 'CLOSED', '-1', '-2']);
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   return v !== null && typeof v === 'object' ? (v as Record<string, unknown>) : null;
@@ -70,15 +47,9 @@ export function parseCibilDate(raw: unknown): Date | null {
   const s = String(raw).trim();
   if (!s) return null;
 
-  const isoLike = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (isoLike) {
-    const d = new Date(`${isoLike[1]}-${isoLike[2]}-${isoLike[3]}T00:00:00.000Z`);
-    return Number.isNaN(d.getTime()) ? null : d;
-  }
-
-  const compact = s.match(/^(\d{4})(\d{2})(\d{2})/);
-  if (compact) {
-    const d = new Date(`${compact[1]}-${compact[2]}-${compact[3]}T00:00:00.000Z`);
+  const m = s.match(/^(\d{4})-?(\d{2})-?(\d{2})/);
+  if (m) {
+    const d = new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00.000Z`);
     return Number.isNaN(d.getTime()) ? null : d;
   }
 
@@ -91,7 +62,8 @@ function monthsBetween(start: Date, end: Date): number {
 }
 
 function isWithinLookbackMonths(eventDate: Date, asOf: Date, lookbackMonths: number): boolean {
-  return monthsBetween(eventDate, asOf) >= 0 && monthsBetween(eventDate, asOf) < lookbackMonths;
+  const months = monthsBetween(eventDate, asOf);
+  return months >= 0 && months < lookbackMonths;
 }
 
 function readSymbol(node: unknown): string | null {
@@ -191,25 +163,20 @@ function isMoratoriumCreditFacilityStatus(lineRec: Record<string, unknown>): boo
 }
 
 function tradelineHasRestructureSignal(lineRec: Record<string, unknown>): boolean {
-  for (const statusCode of readTradelineWrittenOffSettledStatusCodes(lineRec)) {
-    if (TUEF_RESTRUCTURED_WRITTEN_OFF_SETTLED_CODES.has(statusCode)) {
-      return true;
-    }
-  }
-  return isMoratoriumCreditFacilityStatus(lineRec);
+  return (
+    readTradelineWrittenOffSettledStatusCodes(lineRec).some((c) =>
+      TUEF_RESTRUCTURED_WRITTEN_OFF_SETTLED_CODES.has(c),
+    ) || isMoratoriumCreditFacilityStatus(lineRec)
+  );
 }
 
 function findAdverseWrittenOffSettledStatus(
   lineRec: Record<string, unknown>,
 ): { code: string; label: string } | null {
-  for (const statusCode of readTradelineWrittenOffSettledStatusCodes(lineRec)) {
-    if (!TUEF_ADVERSE_WRITTEN_OFF_SETTLED_STATUS_CODES.has(statusCode)) continue;
-    return {
-      code: statusCode,
-      label: TUEF_ADVERSE_WRITTEN_OFF_SETTLED_STATUS_LABELS[statusCode] ?? statusCode,
-    };
-  }
-  return null;
+  const code = readTradelineWrittenOffSettledStatusCodes(lineRec).find((c) =>
+    TUEF_ADVERSE_WRITTEN_OFF_SETTLED_STATUS_CODES.has(c),
+  );
+  return code ? { code, label: TUEF_ADVERSE_WRITTEN_OFF_SETTLED_STATUS_LABELS[code] ?? code } : null;
 }
 
 type MonthlyPayStatusRow = {
@@ -221,39 +188,30 @@ function collectMonthlyPayStatusRows(lineRec: Record<string, unknown>): MonthlyP
   const payHistory = resolvePayStatusHistory(lineRec);
   if (!payHistory) return [];
 
-  const rows: MonthlyPayStatusRow[] = [];
-  let monthlyAdded = false;
-  for (const entry of asArray(payHistory.MonthlyPayStatus)) {
+  const structured: MonthlyPayStatusRow[] = asArray(payHistory.MonthlyPayStatus).flatMap((entry) => {
     const entryRec = asRecord(entry);
-    if (!entryRec) continue;
+    if (!entryRec) return [];
     const monthDate = parseCibilDate(entryRec.date);
-    if (!monthDate) continue;
-    rows.push({ monthDate, status: entryRec.status });
-    monthlyAdded = true;
-  }
+    return monthDate ? [{ monthDate, status: entryRec.status }] : [];
+  });
 
-  if (!monthlyAdded && typeof payHistory.status === 'string') {
-    const statuses = String(payHistory.status)
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const end = parseCibilDate(payHistory.endDate);
-    const start = parseCibilDate(payHistory.startDate);
-    for (let i = 0; i < statuses.length; i++) {
-      let monthDate: Date | null = null;
-      if (end) {
-        monthDate = new Date(end);
-        monthDate.setUTCMonth(monthDate.getUTCMonth() - (statuses.length - 1 - i));
-      } else if (start) {
-        monthDate = new Date(start);
-        monthDate.setUTCMonth(monthDate.getUTCMonth() + i);
-      }
-      if (!monthDate) continue;
-      rows.push({ monthDate, status: statuses[i] });
+  if (structured.length > 0 || typeof payHistory.status !== 'string') return structured;
+
+  const statuses = String(payHistory.status).split(',').map((s) => s.trim()).filter(Boolean);
+  const end = parseCibilDate(payHistory.endDate);
+  const start = parseCibilDate(payHistory.startDate);
+
+  return statuses.flatMap((status, i) => {
+    let monthDate: Date | null = null;
+    if (end) {
+      monthDate = new Date(end);
+      monthDate.setUTCMonth(monthDate.getUTCMonth() - (statuses.length - 1 - i));
+    } else if (start) {
+      monthDate = new Date(start);
+      monthDate.setUTCMonth(monthDate.getUTCMonth() + i);
     }
-  }
-
-  return rows;
+    return monthDate ? [{ monthDate, status }] : [];
+  });
 }
 
 function isMfiAccountType(symbol: string | null): boolean {
@@ -310,15 +268,16 @@ export function readSuitFiledWilfulDefaultCode(lineRec: Record<string, unknown>)
   return null;
 }
 
+const SUIT_FILED_TEXT_RULES: [(text: string) => boolean, string][] = [
+  [(t) => !t || t === '-' || t === 'no suit filed', '00'],
+  [(t) => t.includes('wilful') && t.includes('suit'), '03'],
+  [(t) => t.includes('wilful'), '02'],
+  [(t) => t.includes('suit filed') || t === 'suit', '01'],
+];
+
 function normalizeSuitFiledWilfulDefaultText(raw: unknown): string | null {
-  const text = String(raw ?? '')
-    .trim()
-    .toLowerCase();
-  if (!text || text === '-' || text === 'no suit filed') return '00';
-  if (text.includes('wilful') && text.includes('suit')) return '03';
-  if (text.includes('wilful')) return '02';
-  if (text.includes('suit filed') || text === 'suit') return '01';
-  return null;
+  const text = String(raw ?? '').trim().toLowerCase();
+  return SUIT_FILED_TEXT_RULES.find(([predicate]) => predicate(text))?.[1] ?? null;
 }
 
 export function isAdverseSuitFiledWilfulDefault(raw: unknown): boolean {
@@ -330,10 +289,7 @@ export function isAdverseSuitFiledWilfulDefault(raw: unknown): boolean {
   if (TUEF_ADVERSE_SUIT_FILED_WILFUL_DEFAULT_CODES.has(code)) return true;
 
   const norm = normalizePayStatus(raw);
-  if (!norm || norm === '00' || norm === 'NO SUIT FILED') return false;
-  if (norm.includes('WILFUL')) return true;
-  if (norm.includes('SUIT')) return true;
-  return false;
+  return !!norm && norm !== '00' && norm !== 'NO SUIT FILED' && (norm.includes('WILFUL') || norm.includes('SUIT'));
 }
 
 export function formatSuitFiledWilfulDefaultLabel(lineRec: Record<string, unknown>): string {
@@ -356,6 +312,10 @@ function walkTradelines(
     creditor: string;
   }) => void,
 ): void {
+  if (body && typeof body === 'object' && 'isParsedCibilReport' in body) {
+    for (const t of (body as ParsedCibilReport).tradelines) visit(t);
+    return;
+  }
   const tlr = readTrueLinkCreditReport(body);
   if (!tlr) return;
 
@@ -414,6 +374,52 @@ function formatCibilDateLabel(d: Date | null): string | null {
   return d.toISOString().slice(0, 10);
 }
 
+export type ParsedBureauTradeline = {
+  lineRec: Record<string, unknown>;
+  partitionSymbol: string | null;
+  creditor: string;
+};
+
+export type ParsedCibilReport = {
+  isParsedCibilReport: true;
+  tlr: Record<string, unknown> | null;
+  tradelines: ParsedBureauTradeline[];
+  enquiries: ParsedBureauInquiry[];
+  bureauAsOfDate: Date;
+};
+
+export function parseBureauReport(
+  rawPayload: unknown,
+  asOf: Date = new Date()
+): ParsedCibilReport {
+  if (rawPayload && typeof rawPayload === 'object' && 'isParsedCibilReport' in rawPayload) {
+    return rawPayload as ParsedCibilReport;
+  }
+  const tlr = readTrueLinkCreditReport(rawPayload);
+  const tradelines: ParsedBureauTradeline[] = [];
+  if (tlr) {
+    for (const partition of asArray(tlr.TradeLinePartition)) {
+      const partitionRec = asRecord(partition);
+      if (!partitionRec) continue;
+      const partitionSymbol = partitionRec.accountTypeSymbol != null ? String(partitionRec.accountTypeSymbol).trim() : null;
+      for (const rawLine of asArray(partitionRec.Tradeline)) {
+        const lineRec = asRecord(rawLine);
+        if (!lineRec) continue;
+        const creditor = String(lineRec.creditorName ?? 'account').trim() || 'account';
+        tradelines.push({ lineRec, partitionSymbol, creditor });
+      }
+    }
+  }
+  const enquiries = extractBureauInquiries(rawPayload);
+  return {
+    isParsedCibilReport: true,
+    tlr,
+    tradelines,
+    enquiries,
+    bureauAsOfDate: resolveBureauAsOfDate(rawPayload, asOf)
+  };
+}
+
 /**
  * Collects every adverse tradeline signal in the lookback window (LOS dry-run drill-down).
  */
@@ -423,7 +429,11 @@ export function auditNoAdverseTradelineInLookback(
   asOf: Date = new Date(),
 ): BureauAdverseTradelineCheck & { findings: BureauRuleFinding[] } {
   const findings: BureauRuleFinding[] = [];
-  const tlr = readTrueLinkCreditReport(body);
+
+  const tlr =
+    body && typeof body === 'object' && 'isParsedCibilReport' in body
+      ? (body as ParsedCibilReport).tlr
+      : readTrueLinkCreditReport(body);
 
   if (!tlr) {
     findings.push({
@@ -433,138 +443,123 @@ export function auditNoAdverseTradelineInLookback(
     return { passed: true, detail: null, findings };
   }
 
-  const partitions = asArray(tlr.TradeLinePartition);
-  for (const partition of partitions) {
-    const partitionRec = asRecord(partition);
-    if (!partitionRec) continue;
+  walkTradelines(body, ({ lineRec, partitionSymbol, creditor }) => {
+    const parsed = parseCibilTradeline(lineRec, partitionSymbol);
+    const reported = parseCibilDate(lineRec.dateReported);
+    const reportedInLookback =
+      !reported || isWithinLookbackMonths(reported, asOf, lookbackMonths);
 
-    const partitionSymbol =
-      partitionRec.accountTypeSymbol != null
-        ? String(partitionRec.accountTypeSymbol).trim()
-        : null;
-
-    for (const rawLine of asArray(partitionRec.Tradeline)) {
-      const lineRec = asRecord(rawLine);
-      if (!lineRec) continue;
-
-      const parsed = parseCibilTradeline(rawLine, partitionSymbol);
-      const creditor = String(lineRec.creditorName ?? 'account').trim() || 'account';
-      const reported = parseCibilDate(lineRec.dateReported);
-      const reportedInLookback =
-        !reported || isWithinLookbackMonths(reported, asOf, lookbackMonths);
-
-      if (
-        !isCibilSentinelAmount(lineRec.writtenOffAmtTotal) ||
-        !isCibilSentinelAmount(lineRec.writtenOffPrincipal) ||
-        !isCibilSentinelAmount(lineRec.settlementAmount)
-      ) {
-        if (reportedInLookback) {
-          findings.push({
-            title: creditor,
-            detail: 'Write-off or settlement amount reported on tradeline (expected -1).',
-            data: {
-              source: 'TradeLinePartition',
-              accountType: partitionSymbol,
-              writtenOffAmtTotal: String(lineRec.writtenOffAmtTotal ?? ''),
-              writtenOffPrincipal: String(lineRec.writtenOffPrincipal ?? ''),
-              settlementAmount: String(lineRec.settlementAmount ?? ''),
-              dateReported: formatCibilDateLabel(reported),
-              lookbackMonths,
-            },
-          });
-        }
-      }
-
-      const adverseWrittenOffSettled = findAdverseWrittenOffSettledStatus(lineRec);
-      if (adverseWrittenOffSettled && reportedInLookback) {
+    if (
+      !isCibilSentinelAmount(lineRec.writtenOffAmtTotal) ||
+      !isCibilSentinelAmount(lineRec.writtenOffPrincipal) ||
+      !isCibilSentinelAmount(lineRec.settlementAmount)
+    ) {
+      if (reportedInLookback) {
         findings.push({
           title: creditor,
-          detail: `Written-off / settled status: ${adverseWrittenOffSettled.label} (TUEF code ${adverseWrittenOffSettled.code}).`,
+          detail: 'Write-off or settlement amount reported on tradeline (expected -1).',
           data: {
-            source: 'WrittenOffSettledStatus',
-            writtenOffSettledStatus: adverseWrittenOffSettled.code,
+            source: 'TradeLinePartition',
+            accountType: partitionSymbol,
+            writtenOffAmtTotal: String(lineRec.writtenOffAmtTotal ?? ''),
+            writtenOffPrincipal: String(lineRec.writtenOffPrincipal ?? ''),
+            settlementAmount: String(lineRec.settlementAmount ?? ''),
             dateReported: formatCibilDateLabel(reported),
             lookbackMonths,
           },
         });
-      }
-
-      const suitFiledCode = readSuitFiledWilfulDefaultCode(lineRec);
-      if (suitFiledCode && isAdverseSuitFiledWilfulDefault(suitFiledCode) && reportedInLookback) {
-        findings.push({
-          title: creditor,
-          detail: `Suit filed / wilful default: ${TUEF_SUIT_FILED_WILFUL_DEFAULT_LABELS[suitFiledCode] ?? suitFiledCode}.`,
-          data: {
-            source: 'SuitFiledWilfulDefault',
-            suitFiledWilfulDefault: suitFiledCode,
-            dateReported: formatCibilDateLabel(reported),
-            lookbackMonths,
-          },
-        });
-      }
-
-      const currentPayStatus = readSymbol(lineRec.PayStatus);
-      if (currentPayStatus && isAdversePayStatus(currentPayStatus) && reportedInLookback) {
-        findings.push({
-          title: creditor,
-          detail: `Current pay status "${currentPayStatus}" is doubtful / loss / written-off / settled.`,
-          data: {
-            source: 'PayStatus',
-            payStatus: currentPayStatus,
-            dateReported: formatCibilDateLabel(reported),
-            lookbackMonths,
-          },
-        });
-      }
-
-      for (const entry of collectMonthlyPayStatusRows(lineRec)) {
-        if (!isAdversePayStatus(entry.status)) continue;
-        if (isWithinLookbackMonths(entry.monthDate, asOf, lookbackMonths)) {
-          findings.push({
-            title: creditor,
-            detail: `Adverse monthly payment status "${String(entry.status)}".`,
-            data: {
-              source: 'MonthlyPayStatus',
-              payStatus: String(entry.status),
-              month: formatCibilDateLabel(entry.monthDate),
-              lookbackMonths,
-            },
-          });
-        }
-      }
-
-      const granted = asRecord(lineRec.GrantedTrade);
-      const worst = granted ? readSymbol(granted.WorstPayStatus) : null;
-      if (worst && isAdversePayStatus(worst) && reportedInLookback) {
-        findings.push({
-          title: creditor,
-          detail: `Worst pay status "${worst}" on tradeline.`,
-          data: {
-            source: 'GrantedTrade.WorstPayStatus',
-            worstPayStatus: worst,
-            dateReported: formatCibilDateLabel(reported),
-            lookbackMonths,
-          },
-        });
-      }
-
-      if (parsed) {
-        const accountCondition = readSymbol(lineRec.AccountCondition);
-        if (accountCondition && isAdversePayStatus(accountCondition) && reportedInLookback) {
-          findings.push({
-            title: creditor,
-            detail: `Adverse account condition "${accountCondition}".`,
-            data: {
-              source: 'AccountCondition',
-              accountCondition,
-              dateReported: formatCibilDateLabel(reported),
-              lookbackMonths,
-            },
-          });
-        }
       }
     }
-  }
+
+    const adverseWrittenOffSettled = findAdverseWrittenOffSettledStatus(lineRec);
+    if (adverseWrittenOffSettled && reportedInLookback) {
+      findings.push({
+        title: creditor,
+        detail: `Written-off / settled status: ${adverseWrittenOffSettled.label} (TUEF code ${adverseWrittenOffSettled.code}).`,
+        data: {
+          source: 'WrittenOffSettledStatus',
+          writtenOffSettledStatus: adverseWrittenOffSettled.code,
+          dateReported: formatCibilDateLabel(reported),
+          lookbackMonths,
+        },
+      });
+    }
+
+    const suitFiledCode = readSuitFiledWilfulDefaultCode(lineRec);
+    if (suitFiledCode && isAdverseSuitFiledWilfulDefault(suitFiledCode) && reportedInLookback) {
+      findings.push({
+        title: creditor,
+        detail: `Suit filed / wilful default: ${TUEF_SUIT_FILED_WILFUL_DEFAULT_LABELS[suitFiledCode] ?? suitFiledCode}.`,
+        data: {
+          source: 'SuitFiledWilfulDefault',
+          suitFiledWilfulDefault: suitFiledCode,
+          dateReported: formatCibilDateLabel(reported),
+          lookbackMonths,
+        },
+      });
+    }
+
+    const currentPayStatus = readSymbol(lineRec.PayStatus);
+    if (currentPayStatus && isAdversePayStatus(currentPayStatus) && reportedInLookback) {
+      findings.push({
+        title: creditor,
+        detail: `Current pay status "${currentPayStatus}" is doubtful / loss / written-off / settled.`,
+        data: {
+          source: 'PayStatus',
+          payStatus: currentPayStatus,
+          dateReported: formatCibilDateLabel(reported),
+          lookbackMonths,
+        },
+      });
+    }
+
+    for (const entry of collectMonthlyPayStatusRows(lineRec)) {
+      if (!isAdversePayStatus(entry.status)) continue;
+      if (isWithinLookbackMonths(entry.monthDate, asOf, lookbackMonths)) {
+        findings.push({
+          title: creditor,
+          detail: `Adverse monthly payment status "${String(entry.status)}".`,
+          data: {
+            source: 'MonthlyPayStatus',
+            payStatus: String(entry.status),
+            month: formatCibilDateLabel(entry.monthDate),
+            lookbackMonths,
+          },
+        });
+      }
+    }
+
+    const granted = asRecord(lineRec.GrantedTrade);
+    const worst = granted ? readSymbol(granted.WorstPayStatus) : null;
+    if (worst && isAdversePayStatus(worst) && reportedInLookback) {
+      findings.push({
+        title: creditor,
+        detail: `Worst pay status "${worst}" on tradeline.`,
+        data: {
+          source: 'GrantedTrade.WorstPayStatus',
+          worstPayStatus: worst,
+          dateReported: formatCibilDateLabel(reported),
+          lookbackMonths,
+        },
+      });
+    }
+
+    if (parsed) {
+      const accountCondition = readSymbol(lineRec.AccountCondition);
+      if (accountCondition && isAdversePayStatus(accountCondition) && reportedInLookback) {
+        findings.push({
+          title: creditor,
+          detail: `Adverse account condition "${accountCondition}".`,
+          data: {
+            source: 'AccountCondition',
+            accountCondition,
+            dateReported: formatCibilDateLabel(reported),
+            lookbackMonths,
+          },
+        });
+      }
+    }
+  });
 
   const detail = findings[0]?.detail ? `${findings[0].title}: ${findings[0].detail}` : null;
   return { passed: findings.length === 0, detail, findings };
@@ -591,8 +586,57 @@ export type ParsedBureauInquiry = {
   amount: string | null;
 };
 
-/** Collect credit enquiries from TrueLink `InquiryPartition` (deduped). */
+/**
+ * Decode base64 OriginalData and return a map of enqControlNum → ParsedBureauInquiry.
+ * The TUEF data uses clean YYYYMMDD dates, unlike the TrueLinkCreditReport which can
+ * have malformed dates (e.g. month=20).
+ */
+function buildOriginalDataInquiryMap(tlr: Record<string, unknown>): Map<string, ParsedBureauInquiry> {
+  const map = new Map<string, ParsedBureauInquiry>();
+  const sources = asRecord(tlr.Sources);
+  const source = sources ? asRecord(sources.Source) : null;
+  const raw = source?.OriginalData;
+  if (!raw || typeof raw !== 'string') return map;
+
+  let tuef: unknown;
+  try {
+    tuef = JSON.parse(Buffer.from(raw, 'base64').toString('utf8'));
+  } catch {
+    return map;
+  }
+
+  const tuefRec = asRecord(tuef);
+  const icrs = tuefRec ? asRecord(tuefRec.ICRS_SubjectInquiryByTUEF_Response) : null;
+  if (!icrs) return map;
+
+  for (const subjectNode of asArray(icrs.subject)) {
+    const subject = asRecord(subjectNode);
+    if (!subject) continue;
+    for (const inqNode of asArray(subject.inquiry)) {
+      const inq = asRecord(inqNode);
+      if (!inq) continue;
+      const controlNumber = inq.enqControlNum != null ? String(inq.enqControlNum).trim() : null;
+      if (!controlNumber) continue;
+      const date = parseCibilDate(inq.dateOfInquiry);
+      if (!date) continue;
+      const purposeRaw = inq.inquiryPurpose != null ? String(inq.inquiryPurpose).trim().padStart(2, '0') : null;
+      map.set(controlNumber, {
+        date,
+        inquiryType: purposeRaw,
+        controlNumber,
+        subscriberName: inq.memberShortName != null ? String(inq.memberShortName).trim() : null,
+        amount: inq.inquiryAmount != null ? String(inq.inquiryAmount).trim() : null,
+      });
+    }
+  }
+  return map;
+}
+
+/** Collect credit enquiries from TrueLink `InquiryPartition`, falling back to `OriginalData` TUEF. */
 export function extractBureauInquiries(body: unknown): ParsedBureauInquiry[] {
+  if (body && typeof body === 'object' && 'isParsedCibilReport' in body) {
+    return (body as ParsedCibilReport).enquiries;
+  }
   const out: ParsedBureauInquiry[] = [];
   const seen = new Set<string>();
 
@@ -607,21 +651,28 @@ export function extractBureauInquiries(body: unknown): ParsedBureauInquiry[] {
 
   const tlr = readTrueLinkCreditReport(body);
   if (tlr) {
-    for (const partition of asArray(tlr.InquiryPartition)) {
-      const partitionRec = asRecord(partition);
-      const inquiry = partitionRec ? asRecord(partitionRec.Inquiry) : null;
-      if (!inquiry) continue;
-      const date = parseCibilDate(inquiry.inquiryDate);
-      if (!date) continue;
-      push({
-        date,
-        inquiryType: inquiry.inquiryType != null ? String(inquiry.inquiryType).trim() : null,
-        controlNumber:
-          inquiry.enqControlNum != null ? String(inquiry.enqControlNum).trim() : null,
-        subscriberName:
-          inquiry.subscriberName != null ? String(inquiry.subscriberName).trim() : null,
-        amount: inquiry.amount != null ? String(inquiry.amount).trim() : null,
-      });
+    const originalDataMap = buildOriginalDataInquiryMap(tlr);
+    const partitions = asArray(tlr.InquiryPartition);
+    if (partitions.length > 0) {
+      for (const partition of partitions) {
+        const partitionRec = asRecord(partition);
+        const inquiry = partitionRec ? asRecord(partitionRec.Inquiry) : null;
+        if (!inquiry) continue;
+        const controlNumber = inquiry.enqControlNum != null ? String(inquiry.enqControlNum).trim() : null;
+        // TrueLinkCreditReport dates can be malformed (e.g. month=20); fall back to OriginalData date
+        const date = parseCibilDate(inquiry.inquiryDate) ?? (controlNumber ? originalDataMap.get(controlNumber)?.date ?? null : null);
+        if (!date) continue;
+        push({
+          date,
+          inquiryType: inquiry.inquiryType != null ? String(inquiry.inquiryType).trim() : null,
+          controlNumber,
+          subscriberName:
+            inquiry.subscriberName != null ? String(inquiry.subscriberName).trim() : null,
+          amount: inquiry.amount != null ? String(inquiry.amount).trim() : null,
+        });
+      }
+    } else {
+      for (const item of originalDataMap.values()) push(item);
     }
   }
 
@@ -695,7 +746,6 @@ type MonthlyDpdEntry = {
   monthDate: Date;
   dpdDays: number;
   isOpen: boolean;
-  isLoanRelated: boolean;
   accountLabel: string;
   /** Latest payment-history month for this tradeline (capped at bureau inquiry date). */
   lookbackAnchorDate: Date;
@@ -712,19 +762,6 @@ export function resolveBureauAsOfDate(body: unknown, fallback: Date = new Date()
   if (inquiryDate) return inquiryDate;
 
   return fallback;
-}
-
-function resolveTradelineLookbackAnchor(
-  payHistory: Record<string, unknown>,
-  monthDates: Date[],
-  bureauAsOf: Date,
-): Date {
-  let anchor = parseCibilDate(payHistory.endDate) ?? null;
-  for (const monthDate of monthDates) {
-    if (!anchor || monthDate > anchor) anchor = monthDate;
-  }
-  if (!anchor) return bureauAsOf;
-  return anchor > bureauAsOf ? bureauAsOf : anchor;
 }
 
 /** Map CIBIL monthly pay status to days past due (`null` = not a delinquency signal). */
@@ -745,80 +782,73 @@ export function parsePayStatusToDpdDays(raw: unknown): number | null {
 
 function collectMonthlyDpdEntries(body: unknown, bureauAsOf: Date = new Date()): MonthlyDpdEntry[] {
   const entries: MonthlyDpdEntry[] = [];
-  const tlr = readTrueLinkCreditReport(body);
-  if (!tlr) return entries;
 
-  for (const partition of asArray(tlr.TradeLinePartition)) {
-    const partitionRec = asRecord(partition);
-    if (!partitionRec) continue;
+  walkTradelines(body, ({ lineRec, creditor: accountLabel }) => {
+    const isOpen = isCibilTradelineOpen(lineRec);
 
-    const partitionSymbol = normalizeCibilAccountTypeSymbol(
-      partitionRec.accountTypeSymbol != null
-        ? String(partitionRec.accountTypeSymbol)
-        : undefined,
-    );
+    const payHistory = resolvePayStatusHistory(lineRec);
+    if (!payHistory) return;
 
-    for (const rawLine of asArray(partitionRec.Tradeline)) {
-      const lineRec = asRecord(rawLine);
-      if (!lineRec) continue;
+    const pending: Array<Omit<MonthlyDpdEntry, 'lookbackAnchorDate'>> = [];
+    let monthlyAdded = false;
+    for (const entry of asArray(payHistory.MonthlyPayStatus)) {
+      const entryRec = asRecord(entry);
+      if (!entryRec) continue;
+      const monthDate = parseCibilDate(entryRec.date);
+      const dpdDays = parsePayStatusToDpdDays(entryRec.status);
+      if (!monthDate || dpdDays == null) continue;
+      pending.push({ monthDate, dpdDays, isOpen, accountLabel });
+      monthlyAdded = true;
+    }
 
-      const accountLabel = String(lineRec.creditorName ?? 'account').trim() || 'account';
-      const isOpen = isCibilTradelineOpen(lineRec);
-      const isLoanRelated = isLoanRelatedAccountType(partitionSymbol);
-
-      const payHistory = resolvePayStatusHistory(lineRec);
-      if (!payHistory) continue;
-
-      const pending: Array<Omit<MonthlyDpdEntry, 'lookbackAnchorDate'>> = [];
-      let monthlyAdded = false;
-      for (const entry of asArray(payHistory.MonthlyPayStatus)) {
-        const entryRec = asRecord(entry);
-        if (!entryRec) continue;
-        const monthDate = parseCibilDate(entryRec.date);
-        const dpdDays = parsePayStatusToDpdDays(entryRec.status);
-        if (!monthDate || dpdDays == null) continue;
-        pending.push({ monthDate, dpdDays, isOpen, isLoanRelated, accountLabel });
-        monthlyAdded = true;
-      }
-
-      if (!monthlyAdded && typeof payHistory.status === 'string') {
-        const statuses = String(payHistory.status)
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean);
-        const end = parseCibilDate(payHistory.endDate);
-        const start = parseCibilDate(payHistory.startDate);
-        for (let i = 0; i < statuses.length; i++) {
-          const dpdDays = parsePayStatusToDpdDays(statuses[i]);
-          if (dpdDays == null) continue;
-          let monthDate: Date | null = null;
-          if (end) {
-            monthDate = new Date(end);
-            monthDate.setUTCMonth(monthDate.getUTCMonth() - (statuses.length - 1 - i));
-          } else if (start) {
-            monthDate = new Date(start);
-            monthDate.setUTCMonth(monthDate.getUTCMonth() + i);
-          }
-          if (!monthDate) continue;
-          pending.push({ monthDate, dpdDays, isOpen, isLoanRelated, accountLabel });
+    if (!monthlyAdded && typeof payHistory.status === 'string') {
+      const statuses = String(payHistory.status)
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const end = parseCibilDate(payHistory.endDate);
+      const start = parseCibilDate(payHistory.startDate);
+      for (let i = 0; i < statuses.length; i++) {
+        const dpdDays = parsePayStatusToDpdDays(statuses[i]);
+        if (dpdDays == null) continue;
+        let monthDate: Date | null = null;
+        if (end) {
+          monthDate = new Date(end);
+          monthDate.setUTCMonth(monthDate.getUTCMonth() - (statuses.length - 1 - i));
+        } else if (start) {
+          monthDate = new Date(start);
+          monthDate.setUTCMonth(monthDate.getUTCMonth() + i);
         }
-      }
-
-      if (!pending.length) continue;
-
-      const lookbackAnchorDate = resolveTradelineLookbackAnchor(
-        payHistory,
-        pending.map((entry) => entry.monthDate),
-        bureauAsOf,
-      );
-      for (const entry of pending) {
-        entries.push({ ...entry, lookbackAnchorDate });
+        if (!monthDate) continue;
+        pending.push({ monthDate, dpdDays, isOpen, accountLabel });
       }
     }
-  }
+
+    if (!pending.length) return;
+
+    const lookbackAnchorDate = bureauAsOf;
+    for (const entry of pending) {
+      entries.push({ ...entry, lookbackAnchorDate });
+    }
+  });
 
   return entries;
 }
+
+type DpdWindowRule = {
+  ruleKey: BureauDpdRuleKey;
+  thresholdKey: keyof BureauDpdThresholds;
+  minDpd: number;
+  onlyOpenLoan: boolean;
+  detailLabel: string;
+};
+
+const DPD_WINDOW_RULES: DpdWindowRule[] = [
+  { ruleKey: EC.DPD_90PLUS_MONTHS, thresholdKey: 'dpd90PlusMonths', minDpd: 90, onlyOpenLoan: false, detailLabel: '90+ DPD' },
+  { ruleKey: EC.DPD_60PLUS_MONTHS, thresholdKey: 'dpd60PlusMonths', minDpd: 60, onlyOpenLoan: false, detailLabel: '60+ DPD' },
+  { ruleKey: EC.DPD_30PLUS_MONTHS, thresholdKey: 'dpd30PlusMonths', minDpd: 30, onlyOpenLoan: false, detailLabel: '30+ DPD' },
+  { ruleKey: EC.OPEN_DPD_MONTHS, thresholdKey: 'openDpdMonths', minDpd: 1, onlyOpenLoan: true, detailLabel: 'open loan DPD > 0' },
+];
 
 /**
  * DPD windows from bureau payment history (all tradelines + open loan accounts).
@@ -831,51 +861,18 @@ export function checkBureauDpdRules(
 ): BureauAdverseTradelineCheck {
   const entries = collectMonthlyDpdEntries(body, asOf);
 
-  for (const entry of entries) {
-    if (!isWithinLookbackMonths(entry.monthDate, entry.lookbackAnchorDate, thresholds.dpd90PlusMonths)) {
-      continue;
-    }
-    if (entry.dpdDays >= 90) {
+  for (const { thresholdKey, minDpd, onlyOpenLoan, detailLabel } of DPD_WINDOW_RULES) {
+    const lookback = thresholds[thresholdKey];
+    const hit = entries.find(
+      (e) =>
+        (!onlyOpenLoan || e.isOpen) &&
+        isWithinLookbackMonths(e.monthDate, e.lookbackAnchorDate, lookback) &&
+        e.dpdDays >= minDpd,
+    );
+    if (hit) {
       return {
         passed: false,
-        detail: `${entry.accountLabel}: 90+ DPD (${entry.dpdDays} days) reported within the last ${thresholds.dpd90PlusMonths} months.`,
-      };
-    }
-  }
-
-  for (const entry of entries) {
-    if (!isWithinLookbackMonths(entry.monthDate, entry.lookbackAnchorDate, thresholds.dpd60PlusMonths)) {
-      continue;
-    }
-    if (entry.dpdDays >= 60) {
-      return {
-        passed: false,
-        detail: `${entry.accountLabel}: 60+ DPD (${entry.dpdDays} days) reported within the last ${thresholds.dpd60PlusMonths} months.`,
-      };
-    }
-  }
-
-  for (const entry of entries) {
-    if (!isWithinLookbackMonths(entry.monthDate, entry.lookbackAnchorDate, thresholds.dpd30PlusMonths)) {
-      continue;
-    }
-    if (entry.dpdDays >= 30) {
-      return {
-        passed: false,
-        detail: `${entry.accountLabel}: 30+ DPD (${entry.dpdDays} days) reported within the last ${thresholds.dpd30PlusMonths} months.`,
-      };
-    }
-  }
-
-  for (const entry of entries) {
-    if (!entry.isOpen || !entry.isLoanRelated) continue;
-    if (!isWithinLookbackMonths(entry.monthDate, entry.lookbackAnchorDate, thresholds.openDpdMonths)) {
-      continue;
-    }
-    if (entry.dpdDays > 0) {
-      return {
-        passed: false,
-        detail: `${entry.accountLabel}: open loan account with DPD (${entry.dpdDays} days) in the last ${thresholds.openDpdMonths} months.`,
+        detail: `${hit.accountLabel}: ${detailLabel} (${hit.dpdDays} days) in the last ${lookback} months.`,
       };
     }
   }
@@ -883,7 +880,11 @@ export function checkBureauDpdRules(
   return { passed: true, detail: null };
 }
 
-export type BureauDpdRuleKey = 'open_dpd' | 'dpd_30plus' | 'dpd_60plus' | 'dpd_90plus';
+export type BureauDpdRuleKey =
+  | typeof EC.OPEN_DPD_MONTHS
+  | typeof EC.DPD_30PLUS_MONTHS
+  | typeof EC.DPD_60PLUS_MONTHS
+  | typeof EC.DPD_90PLUS_MONTHS;
 
 export type BureauDpdRuleResult = {
   ruleKey: BureauDpdRuleKey;
@@ -899,74 +900,30 @@ export function evaluateBureauDpdRulesDetailed(
   asOf: Date = new Date(),
 ): BureauDpdRuleResult[] {
   const entries = collectMonthlyDpdEntries(body, asOf);
-  const failureFindings: Partial<Record<BureauDpdRuleKey, BureauRuleFinding[]>> = {};
 
-  const pushFailure = (
-    ruleKey: BureauDpdRuleKey,
-    entry: MonthlyDpdEntry,
-    minDpd: number,
-    lookbackMonths: number,
-  ) => {
-    const list = failureFindings[ruleKey] ?? [];
-    list.push({
-      title: entry.accountLabel,
-      detail: `${entry.dpdDays} DPD in month ${formatCibilDateLabel(entry.monthDate) ?? 'unknown'} (threshold ≥ ${minDpd} days).`,
-      data: {
-        account: entry.accountLabel,
-        month: formatCibilDateLabel(entry.monthDate),
-        dpdDays: entry.dpdDays,
-        openAccount: entry.isOpen,
-        loanRelated: entry.isLoanRelated,
-        lookbackMonths,
-        minDpdDays: minDpd,
-      },
-    });
-    failureFindings[ruleKey] = list;
-  };
+  return DPD_WINDOW_RULES.map(({ ruleKey, thresholdKey, minDpd, onlyOpenLoan }) => {
+    const lookback = thresholds[thresholdKey];
+    const findings: BureauRuleFinding[] = entries
+      .filter(
+        (e) =>
+          (!onlyOpenLoan || e.isOpen) &&
+          isWithinLookbackMonths(e.monthDate, e.lookbackAnchorDate, lookback) &&
+          e.dpdDays >= minDpd,
+      )
+      .map((e) => ({
+        title: e.accountLabel,
+        detail: `${e.dpdDays} DPD in month ${formatCibilDateLabel(e.monthDate) ?? 'unknown'} (threshold ≥ ${minDpd} days).`,
+        data: {
+          account: e.accountLabel,
+          month: formatCibilDateLabel(e.monthDate),
+          dpdDays: e.dpdDays,
+          openAccount: e.isOpen,
+          lookbackMonths: lookback,
+          minDpdDays: minDpd,
+        },
+      }));
 
-  for (const entry of entries) {
-    if (
-      isWithinLookbackMonths(entry.monthDate, entry.lookbackAnchorDate, thresholds.dpd90PlusMonths) &&
-      entry.dpdDays >= 90
-    ) {
-      pushFailure('dpd_90plus', entry, 90, thresholds.dpd90PlusMonths);
-    }
-  }
-
-  for (const entry of entries) {
-    if (
-      isWithinLookbackMonths(entry.monthDate, entry.lookbackAnchorDate, thresholds.dpd60PlusMonths) &&
-      entry.dpdDays >= 60
-    ) {
-      pushFailure('dpd_60plus', entry, 60, thresholds.dpd60PlusMonths);
-    }
-  }
-
-  for (const entry of entries) {
-    if (
-      isWithinLookbackMonths(entry.monthDate, entry.lookbackAnchorDate, thresholds.dpd30PlusMonths) &&
-      entry.dpdDays >= 30
-    ) {
-      pushFailure('dpd_30plus', entry, 30, thresholds.dpd30PlusMonths);
-    }
-  }
-
-  for (const entry of entries) {
-    if (!entry.isOpen || !entry.isLoanRelated) continue;
-    if (
-      isWithinLookbackMonths(entry.monthDate, entry.lookbackAnchorDate, thresholds.openDpdMonths) &&
-      entry.dpdDays > 0
-    ) {
-      pushFailure('open_dpd', entry, 1, thresholds.openDpdMonths);
-    }
-  }
-
-  const ruleKeys: BureauDpdRuleKey[] = ['dpd_90plus', 'dpd_60plus', 'dpd_30plus', 'open_dpd'];
-  return ruleKeys.map((ruleKey) => {
-    const findings = failureFindings[ruleKey] ?? [];
-    if (!findings.length) {
-      return { ruleKey, passed: true, detail: null, findings: [] };
-    }
+    if (!findings.length) return { ruleKey, passed: true, detail: null, findings: [] };
     const detail = findings.map((f) => `${f.title}: ${f.detail ?? ''}`.trim()).join(' ');
     return { ruleKey, passed: false, detail, findings };
   });
@@ -1160,23 +1117,20 @@ export function auditMissedPayments(
   maxAllowed: number,
   asOf: Date = new Date(),
 ): BureauTradelineRuleCheck {
-  const findings: BureauRuleFinding[] = [];
-  const entries = collectMonthlyDpdEntries(body, asOf);
-
-  for (const entry of entries) {
-    if (!isWithinLookbackMonths(entry.monthDate, entry.lookbackAnchorDate, lookbackMonths)) continue;
-    if (entry.dpdDays <= 0) continue;
-    findings.push({
-      title: entry.accountLabel,
-      detail: `${entry.dpdDays} DPD in ${formatCibilDateLabel(entry.monthDate) ?? 'unknown'} — counted as missed payment.`,
+  const findings: BureauRuleFinding[] = collectMonthlyDpdEntries(body, asOf)
+    .filter(
+      (e) => e.dpdDays > 0 && isWithinLookbackMonths(e.monthDate, e.lookbackAnchorDate, lookbackMonths),
+    )
+    .map((e) => ({
+      title: e.accountLabel,
+      detail: `${e.dpdDays} DPD in ${formatCibilDateLabel(e.monthDate) ?? 'unknown'} — counted as missed payment.`,
       data: {
-        account: entry.accountLabel,
-        month: formatCibilDateLabel(entry.monthDate),
-        dpdDays: entry.dpdDays,
+        account: e.accountLabel,
+        month: formatCibilDateLabel(e.monthDate),
+        dpdDays: e.dpdDays,
         lookbackMonths,
       },
-    });
-  }
+    }));
 
   const passed = findings.length <= maxAllowed;
   return {
@@ -1196,7 +1150,6 @@ export type PostBreTradelineInspectionRow = {
   accountTypeLabel: string;
   accountStatus: string;
   isOpen: boolean;
-  isLoanRelated: boolean;
   isMfiAccount: boolean;
   restructureSignal: boolean;
   smaPwosSignal: boolean;
@@ -1228,69 +1181,10 @@ export type PostBreBureauSummary = {
   enquiryWindowDays: number;
 };
 
-const TUEF_ENQUIRY_PURPOSE_LABELS: Record<string, string> = {
-  '00': 'Other',
-  '01': 'Auto loan',
-  '02': 'Housing loan',
-  '03': 'Property loan',
-  '04': 'Personal loan',
-  '05': 'Consumer loan',
-  '06': 'Gold loan',
-  '07': 'Education loan',
-  '08': 'Loan to professional',
-  '09': 'Credit card',
-  '10': 'Lease',
-  '11': 'Two-wheeler loan',
-  '12': 'Non-funded credit facility',
-  '13': 'Loan against bank deposits',
-  '14': 'Fleet card',
-  '15': 'Commercial vehicle loan',
-  '16': 'Telco – wireless',
-  '17': 'Telco – broadband',
-  '18': 'Telco – landline',
-  '31': 'Secured credit card',
-  '32': 'Used car loan',
-  '33': 'Construction equipment loan',
-  '34': 'Tractor loan',
-  '35': 'Corporate credit card',
-  '36': 'Kisan credit card',
-  '37': 'Loan on credit card',
-  '38': 'PMJDY overdraft',
-  '39': 'Mudra loan',
-  '40': 'Microfinance – business',
-  '41': 'Microfinance – personal',
-  '42': 'Microfinance – housing',
-  '43': 'Microfinance – other',
-  '44': 'Pramaan (NREGA)',
-  '45': 'P2P personal loan',
-  '46': 'P2P auto loan',
-  '47': 'P2P education loan',
-  '50': 'Business loan – general',
-  '51': 'Business loan – priority sector – small',
-  '52': 'Business loan – priority sector – medium',
-  '53': 'Business loan – priority sector – other',
-  '54': 'Business non-funded credit facility – general',
-  '55': 'Business non-funded credit facility – priority sector – small',
-  '56': 'Business non-funded credit facility – priority sector – medium',
-  '57': 'Business non-funded credit facility – priority sector – other',
-  '58': 'Business loan against bank deposits',
-  '59': 'Business loan – unsecured',
-  '61': 'Business loan – unsecured',
-  '80': 'Microfinance detailed report',
-  '81': 'Summary report',
-  '88': 'Locate plus for insurance',
-  '90': 'Account review',
-  '91': 'Retro enquiry',
-  '92': 'Locate plus for non-credit',
-  '97': 'Adviser liability',
-  '98': 'Secured (generic)',
-  '99': 'Unsecured (generic)',
-};
-
 function enquiryPurposeLabel(code: string | null): string {
   if (!code) return 'Unknown';
   const norm = code.trim().padStart(2, '0');
-  return TUEF_ENQUIRY_PURPOSE_LABELS[norm] ?? `Purpose ${norm}`;
+  return ACCOUNT_TYPE_LABELS[norm] ?? `Purpose ${norm}`;
 }
 
 function readBureauInquiryDate(body: unknown): string | null {
@@ -1323,23 +1217,20 @@ function tradelineHasSmaPwosSignal(lineRec: Record<string, unknown>): boolean {
 
 function resolveTradelineEvaluatedRules(input: {
   isOpen: boolean;
-  isLoanRelated: boolean;
   isMfiAccount: boolean;
   activeRuleIds: Set<string>;
 }): string[] {
-  const rules: string[] = [];
-  if (input.activeRuleIds.has('adverse_tradeline')) rules.push('adverse_tradeline');
-  if (input.activeRuleIds.has('no_restructured_loans')) rules.push('no_restructured_loans');
-  if (input.activeRuleIds.has('no_sma_pwos')) rules.push('no_sma_pwos');
-  if (input.activeRuleIds.has('no_active_mfi') && input.isMfiAccount && input.isOpen) {
-    rules.push('no_active_mfi');
-  }
-  if (input.isLoanRelated) {
-    for (const id of input.activeRuleIds) {
-      if (id.startsWith('dpd_')) rules.push(id);
-    }
-  }
-  return rules;
+  const always = [EC.SETTLED_MONTHS, EC.NO_RESTRUCTURED_LOANS, EC.NO_SMA_PWOS].filter((k) =>
+    input.activeRuleIds.has(k),
+  );
+  const mfi =
+    input.activeRuleIds.has(EC.NO_ACTIVE_MFI) && input.isMfiAccount && input.isOpen
+      ? [EC.NO_ACTIVE_MFI]
+      : [];
+  const dpd = [EC.OPEN_DPD_MONTHS, EC.DPD_30PLUS_MONTHS, EC.DPD_60PLUS_MONTHS, EC.DPD_90PLUS_MONTHS].filter(
+    (k) => input.activeRuleIds.has(k),
+  );
+  return [...always, ...mfi, ...dpd];
 }
 
 /** Every tradeline on the bureau report with flags and which post-BRE rules evaluate it. */
@@ -1357,7 +1248,6 @@ export function buildPostBreTradelineInspection(
     const industry = readSymbol(lineRec.IndustryCode);
     const isMfi = isMicrofinanceTradeline(partitionSymbol, lineRec);
     const isOpen = isCibilTradelineOpen(lineRec);
-    const isLoanRelated = isLoanRelatedAccountType(partitionSymbol);
     const accountStatus = isOpen ? 'Open' : 'Closed';
 
     rows.push({
@@ -1368,13 +1258,11 @@ export function buildPostBreTradelineInspection(
       accountTypeLabel: cibilAccountTypeDisplayLabel(partitionSymbol),
       accountStatus,
       isOpen,
-      isLoanRelated,
       isMfiAccount: isMfi,
       restructureSignal: tradelineHasRestructureSignal(lineRec),
       smaPwosSignal: tradelineHasSmaPwosSignal(lineRec),
       evaluatedByRules: resolveTradelineEvaluatedRules({
         isOpen,
-        isLoanRelated,
         isMfiAccount: isMfi,
         activeRuleIds: active,
       }),
@@ -1396,19 +1284,9 @@ export function buildPostBreEnquiryInspection(
 
   return extractBureauInquiries(body).map((inq) => {
     const inRollingWindow = inq.date >= windowStart && inq.date <= asOf;
-    const loanPurpose = isLoanEnquiryPurpose(inq.inquiryType);
-    let excludeReason: string | null = null;
-    if (!inRollingWindow) {
-      excludeReason = `Outside ${windowDays}-day window`;
-    } else if (!loanPurpose) {
-      const norm = inq.inquiryType?.trim().padStart(2, '0') ?? '';
-      excludeReason =
-        norm === '10'
-          ? 'Credit card enquiry (excluded from loan enquiry count)'
-          : norm === '90' || norm === '91'
-            ? 'Portfolio / retro enquiry (excluded)'
-            : 'Non-loan enquiry purpose (excluded)';
-    }
+    const excludeReason: string | null = !inRollingWindow
+      ? `Outside ${windowDays}-day window`
+      : null;
 
     return {
       inquiryDate: formatCibilDateLabel(inq.date) ?? inq.date.toISOString().slice(0, 10),
@@ -1418,7 +1296,7 @@ export function buildPostBreEnquiryInspection(
       controlNumber: inq.controlNumber,
       amount: inq.amount,
       inRollingWindow,
-      countsTowardLoanEnquiryLimit: inRollingWindow && loanPurpose,
+      countsTowardLoanEnquiryLimit: inRollingWindow,
       excludeReason,
     };
   });

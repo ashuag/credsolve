@@ -20,36 +20,36 @@ import { UpdateSourceUtmDto } from './dto/update-source-utm.dto';
 import { UpdateBankMasterDto } from './dto/update-bank-master.dto';
 import { UpdateEligibilityCriterionDto } from './dto/update-eligibility-criterion.dto';
 import { UpdateCreditLimitTierDto } from './dto/update-credit-limit-tier.dto';
-import { LosDataService } from './los-data.service';
+import { LosMasterService } from './services/los-master.service';
 
 @ApiTags('LOS Masters')
 @Controller('los/masters')
 @UseGuards(LosAuthGuard)
 export class LosMastersController {
-  constructor(private readonly losData: LosDataService) {}
+  constructor(private readonly losMaster: LosMasterService) {}
 
   @Get('eligibility-criteria')
   @ApiOperation({ summary: 'List profile eligibility criteria for LOS' })
   eligibilityCriteriaList() {
-    return this.losData.getEligibilityCriteriaForLos();
+    return this.losMaster.getEligibilityCriteriaForLos();
   }
 
   @Patch('eligibility-criteria/:id')
   @ApiOperation({ summary: 'Update eligibility criterion value and/or active flag' })
   eligibilityCriteriaPatch(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateEligibilityCriterionDto) {
-    return this.losData.updateEligibilityCriterion(id, body);
+    return this.losMaster.updateEligibilityCriterion(id, body);
   }
 
   @Get('credit-limit-tiers')
   @ApiOperation({ summary: 'List credit limit tiers for LOS' })
   creditLimitTiersList() {
-    return this.losData.getCreditLimitTiersForLos();
+    return this.losMaster.getCreditLimitTiersForLos();
   }
 
   @Patch('credit-limit-tiers/:id')
   @ApiOperation({ summary: 'Update credit limit tier band and/or active flag' })
   creditLimitTierPatch(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateCreditLimitTierDto) {
-    return this.losData.updateCreditLimitTier(id, body);
+    return this.losMaster.updateCreditLimitTier(id, body);
   }
 
   @Post('banks')
@@ -59,19 +59,19 @@ export class LosMastersController {
     if (!name) {
       throw new BadRequestException('Bank name is required.');
     }
-    return this.losData.createBank(name);
+    return this.losMaster.createBank(name);
   }
 
   @Patch('banks/:id')
   @ApiOperation({ summary: 'Update bank master (name and/or active state)' })
   updateBank(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateBankMasterDto) {
-    return this.losData.updateBank(id, body);
+    return this.losMaster.updateBank(id, body);
   }
 
   @Delete('banks/:id')
   @ApiOperation({ summary: 'Permanently delete bank master record' })
   deleteBank(@Param('id', ParseIntPipe) id: number) {
-    return this.losData.deleteBank(id);
+    return this.losMaster.deleteBank(id);
   }
 
   @Post('lead-sources')
@@ -81,24 +81,24 @@ export class LosMastersController {
     if (!name) {
       throw new BadRequestException('Lead source name is required.');
     }
-    return this.losData.createLeadSource({ name, type: body.type });
+    return this.losMaster.createLeadSource({ name, type: body.type });
   }
 
   @Patch('lead-sources/:id')
   @ApiOperation({ summary: 'Update lead source master (name/type/active state)' })
   updateLeadSource(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateLeadSourceMasterDto) {
-    return this.losData.updateLeadSource(id, body);
+    return this.losMaster.updateLeadSource(id, body);
   }
 
   @Post('source-utms')
   @ApiOperation({ summary: 'Create a source UTM record for a lead source' })
   createSourceUtm(@Body() body: CreateSourceUtmDto) {
-    return this.losData.createSourceUtm(body);
+    return this.losMaster.createSourceUtm(body);
   }
 
   @Patch('source-utms/:id')
   @ApiOperation({ summary: 'Update a source UTM record' })
   updateSourceUtm(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateSourceUtmDto) {
-    return this.losData.updateSourceUtm(id, body);
+    return this.losMaster.updateSourceUtm(id, body);
   }
 }

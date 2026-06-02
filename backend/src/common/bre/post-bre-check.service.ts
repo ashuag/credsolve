@@ -22,6 +22,7 @@ import {
   countBureauEnquiriesInLastDays,
   evaluateBureauDpdRulesDetailed,
   resolveBureauAsOfDate,
+  parseBureauReport,
   type BureauRuleFinding,
   type PostBreBureauSummary,
   type PostBreEnquiryInspectionRow,
@@ -31,6 +32,7 @@ import {
   isCibilNewToCreditScore,
   parseTenacioBureauVendorBody,
 } from '../vendor/tenacio-bureau-payload.mapper';
+import { extractCibilReportData } from '../cibil/cibil-report-data.extractor';
 import { computeOpenUnsecuredExposureBreakdown } from '../cibil/cibil-tradeline.parser';
 import { CreditLimitTierResolverService } from '../cibil/credit-limit-tier-resolver.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -58,7 +60,6 @@ export interface PostBreCheckResult {
   passed: boolean;
   rejectReason: string | null;
   rejectionReasonCode: string | null;
-  /** Bureau score used for the decision, when available. */
   cibilScore: number | null;
 }
 
@@ -84,8 +85,6 @@ export type PostBreCriteriaConfigRow = {
   value: string;
   /** Whether this criterion is turned on for post-BRE in this run. */
   ruleEnabled: boolean;
-  /** Post-BRE check ids that read this key when enabled. */
-  appliesToCheckIds: string[];
 };
 
 export type PostBreInspection = {
@@ -117,30 +116,7 @@ export type PostBreDryRunResult = {
   } | null;
 };
 
-/** Maps eligibility_criteria.key → post-BRE check id(s). */
-const POST_BRE_CRITERIA_TO_CHECKS: Record<string, string[]> = {
-  [EC.CIBIL_MIN_NEW]: ['cibil_score_minimum'],
-  [EC.CIBIL_MIN_EXISTING]: ['cibil_score_minimum'],
-  [EC.SETTLED_MONTHS]: ['adverse_tradeline'],
-  [EC.NO_RESTRUCTURED_LOANS]: [EC.NO_RESTRUCTURED_LOANS],
-  [EC.NO_SMA_PWOS]: [EC.NO_SMA_PWOS],
-  [EC.NO_ACTIVE_MFI]: [EC.NO_ACTIVE_MFI],
-  [EC.MAX_ENQUIRIES_30_DAYS]: ['credit_enquiries'],
-  [EC.OPEN_DPD_MONTHS]: ['dpd_open_dpd'],
-  [EC.DPD_30PLUS_MONTHS]: ['dpd_dpd_30plus'],
-  [EC.DPD_60PLUS_MONTHS]: ['dpd_dpd_60plus'],
-  [EC.DPD_90PLUS_MONTHS]: ['dpd_dpd_90plus'],
-  [EC.MAX_MISSED_PAYMENTS_6_MONTHS]: ['missed_payments_6_months'],
-};
 
-const DEFAULT_CIBIL_MIN_NEW = 700;
-const DEFAULT_CIBIL_MIN_EXISTING = 650;
-const DEFAULT_SETTLED_LOOKBACK_MONTHS = 18;
-const DEFAULT_MAX_ENQUIRIES_30_DAYS = 10;
-const DEFAULT_OPEN_DPD_MONTHS = 6;
-const DEFAULT_DPD_30PLUS_MONTHS = 3;
-const DEFAULT_DPD_60PLUS_MONTHS = 9;
-const DEFAULT_DPD_90PLUS_MONTHS = 12;
 const ENQUIRY_WINDOW_DAYS = POST_BRE_ENQUIRY_WINDOW_DAYS;
 
 /**
@@ -163,8 +139,9 @@ export class PostBreCheckService {
     rules: PostBreRuleCatalogEntry[];
     unsecuredExposure: PostBreUnsecuredExposureGuide;
   }> {
-    const thresholds = await this.loadPostBreThresholds();
-    const criteria = await this.loadPostBreCriteriaConfig(thresholds);
+    const postBreRows = await this.loadPostBreRows();
+    const thresholds = this.buildPostBreThresholds(postBreRows);
+    const criteria = this.buildPostBreCriteriaConfig(postBreRows, thresholds);
     const { rules, enquiryWindowDays } = buildPostBreRulesCatalog(thresholds);
     const [tierRows, bounds] = await Promise.all([
       this.prisma.client.creditLimitTier.findMany({
@@ -204,13 +181,16 @@ export class PostBreCheckService {
     rawPayload: unknown;
     isExistingCustomer: boolean;
   }): Promise<PostBreDryRunResult> {
-    const thresholds = await this.loadPostBreThresholds();
-    const criteriaConfig = await this.loadPostBreCriteriaConfig(thresholds);
+    const postBreRows = await this.loadPostBreRows();
+    const thresholds = this.buildPostBreThresholds(postBreRows);
+    const criteriaConfig = this.buildPostBreCriteriaConfig(postBreRows, thresholds);
+    
     const parsed = parseTenacioBureauVendorBody(input.rawPayload);
     const cibilScore = parsed.bureauScore;
-    const bureauAsOf = resolveBureauAsOfDate(input.rawPayload);
+    const parsedReport = parseBureauReport(input.rawPayload);
+    const bureauAsOf = parsedReport.bureauAsOfDate;
     const checks: PostBreRuleCheck[] = [];
-    const activeTradelineRuleIds: string[] = ['adverse_tradeline'];
+    const activeTradelineRuleIds: string[] = [EC.SETTLED_MONTHS];
 
     const push = (check: PostBreRuleCheck) => {
       checks.push(check);
@@ -221,33 +201,10 @@ export class PostBreCheckService {
       label: 'Bureau score available',
       passed: cibilScore !== null,
       rejectionReasonCode: null,
-      detail:
-        cibilScore !== null
-          ? `CIBIL / bureau score parsed: ${cibilScore}.`
-          : 'No riskScore found in bureau payload (Borrower.CreditScore). Score-based rules are skipped in production when missing.',
+      detail: cibilScore !== null
+        ? `Bureau score parsed successfully: ${cibilScore}.`
+        : 'No bureau score found in payload.',
       meta: { cibilScore },
-      findings:
-        cibilScore !== null
-          ? [
-              {
-                title: 'Borrower.CreditScore.riskScore',
-                detail: `Parsed bureau score: ${cibilScore}`,
-                data: {
-                  cibilScore,
-                  jsonPath: 'data.cibilData.GetCustomerAssetsResponse…TrueLinkCreditReport.Borrower.CreditScore.riskScore',
-                },
-              },
-            ]
-          : [
-              {
-                title: 'Score path missing',
-                detail: 'Expected riskScore under TrueLinkCreditReport → Borrower → CreditScore.',
-                data: {
-                  responseStatus: parsed.responseStatus,
-                  vendorRequestId: parsed.vendorRequestId,
-                },
-              },
-            ],
     });
 
     if (isCibilNewToCreditScore(cibilScore)) {
@@ -261,29 +218,46 @@ export class PostBreCheckService {
         findings: [
           {
             title: 'NTC score',
-            detail: 'CIBIL reports -1 or 0 when the borrower has no usable credit history.',
+            detail: 'CIBIL reports -1, 0 or 1 OR NULL when the borrower has no usable credit history.',
             data: { cibilScore },
           },
         ],
       });
+      const inspection: PostBreInspection = {
+        bureau: buildPostBreBureauSummary(parsedReport, parsed, ENQUIRY_WINDOW_DAYS),
+        criteria: criteriaConfig,
+        tradelines: buildPostBreTradelineInspection(parsedReport, []),
+        enquiries: buildPostBreEnquiryInspection(parsedReport, ENQUIRY_WINDOW_DAYS),
+      };
+
+      return {
+        overallPassed: false,
+        cibilScore,
+        isExistingCustomer: input.isExistingCustomer,
+        thresholds,
+        checks,
+        inspection,
+        unsecuredExposure: null,
+        creditLimit: null,
+      };
     } else {
       push({
         id: 'new_to_credit',
         label: 'New to credit (NTC)',
         passed: true,
         rejectionReasonCode: null,
-        detail: 'Score is not 0 or -1.',
+        detail: 'Score is not 0, 1, -1 OR null',
         meta: { cibilScore },
       });
     }
 
-    if (cibilScore !== null && !isCibilNewToCreditScore(cibilScore)) {
+    if (cibilScore !== null) {
       const minScore = input.isExistingCustomer ? thresholds.cibilMinExisting : thresholds.cibilMinNew;
       const customerLabel = input.isExistingCustomer ? 'existing' : 'new';
       const scorePassed = cibilScore >= minScore;
       const gap = minScore - cibilScore;
       push({
-        id: 'cibil_score_minimum',
+        id: input.isExistingCustomer ? EC.CIBIL_MIN_EXISTING : EC.CIBIL_MIN_NEW,
         label: `Minimum CIBIL score (${customerLabel} customer)`,
         passed: scorePassed,
         rejectionReasonCode: scorePassed ? null : REJECTION_REASON.CIBIL_SCORE_LOW,
@@ -291,7 +265,6 @@ export class PostBreCheckService {
           ? `Score ${cibilScore} meets minimum ${minScore} for ${customerLabel} customers.`
           : `Score ${cibilScore} is below minimum ${minScore} for ${customerLabel} customers.`,
         meta: { cibilScore, minScore, customerType: customerLabel },
-        criteriaKeys: [input.isExistingCustomer ? EC.CIBIL_MIN_EXISTING : EC.CIBIL_MIN_NEW],
         findings: scorePassed
           ? undefined
           : [
@@ -310,95 +283,13 @@ export class PostBreCheckService {
       });
     }
 
-    const wilfulDefault = auditNoWilfulDefault(input.rawPayload);
-    push({
-      id: 'no_wilful_default',
-      label: 'No suit filed / wilful default (lifetime)',
-      passed: wilfulDefault.passed,
-      rejectionReasonCode: wilfulDefault.passed ? null : REJECTION_REASON.BUREAU_ADVERSE_TRADELINE,
-      detail: wilfulDefault.passed
-        ? 'No suit filed or wilful default on any bureau tradeline.'
-        : wilfulDefault.detail,
-      meta: { hitCount: wilfulDefault.findings.length },
-      findings: wilfulDefault.passed ? undefined : wilfulDefault.findings,
-    });
-
-    const adverse = auditNoAdverseTradelineInLookback(
-      input.rawPayload,
-      thresholds.settledLookbackMonths,
-      bureauAsOf,
-    );
-    push({
-      id: 'adverse_tradeline',
-      label: `No Doubtful / Loss / Written-off / Settled / Suit Filed (last ${thresholds.settledLookbackMonths} months)`,
-      passed: adverse.passed,
-      rejectionReasonCode: adverse.passed ? null : REJECTION_REASON.BUREAU_ADVERSE_TRADELINE,
-      detail:
-        adverse.detail ??
-        (adverse.passed
-          ? `No adverse tradeline signals (including suit filed / wilful default) in the last ${thresholds.settledLookbackMonths} months.`
-          : `Adverse bureau tradeline status in the last ${thresholds.settledLookbackMonths} months.`),
-      meta: { lookbackMonths: thresholds.settledLookbackMonths, hitCount: adverse.findings.length },
-      criteriaKeys: [EC.SETTLED_MONTHS],
-      findings: adverse.passed ? undefined : adverse.findings,
-    });
-
-    if (thresholds.enforceNoRestructuredLoans) {
-      activeTradelineRuleIds.push(EC.NO_RESTRUCTURED_LOANS);
-      const restructured = auditNoRestructuredLoans(input.rawPayload);
-      push({
-        id: EC.NO_RESTRUCTURED_LOANS,
-        label: 'No restructured loans (TUEF Tag 33)',
-        passed: restructured.passed,
-        rejectionReasonCode: restructured.passed ? null : REJECTION_REASON.BUREAU_RESTRUCTURED_LOAN,
-        detail: restructured.passed
-          ? 'No restructured loan tradelines on bureau report.'
-          : restructured.detail,
-        meta: { hitCount: restructured.findings.length },
-        criteriaKeys: [EC.NO_RESTRUCTURED_LOANS],
-        findings: restructured.passed ? undefined : restructured.findings,
-      });
-    }
-
-    if (thresholds.enforceNoSmaPwos) {
-      activeTradelineRuleIds.push(EC.NO_SMA_PWOS);
-      const smaPwos = auditNoSmaPwosTradelines(input.rawPayload);
-      push({
-        id: EC.NO_SMA_PWOS,
-        label: 'No SMA or PWOS trade lines (TUEF asset class)',
-        passed: smaPwos.passed,
-        rejectionReasonCode: smaPwos.passed ? null : REJECTION_REASON.BUREAU_SMA_PWOS_TRADELINE,
-        detail: smaPwos.passed
-          ? 'No SMA / PWOS payment status on any tradeline.'
-          : smaPwos.detail,
-        meta: { hitCount: smaPwos.findings.length },
-        criteriaKeys: [EC.NO_SMA_PWOS],
-        findings: smaPwos.passed ? undefined : smaPwos.findings,
-      });
-    }
-
-    if (thresholds.enforceNoActiveMfi) {
-      activeTradelineRuleIds.push(EC.NO_ACTIVE_MFI);
-      const mfi = auditNoActiveMfiLoans(input.rawPayload);
-      push({
-        id: EC.NO_ACTIVE_MFI,
-        label: 'No active MFI / microfinance loans (Appendix A types 40–43)',
-        passed: mfi.passed,
-        rejectionReasonCode: mfi.passed ? null : REJECTION_REASON.BUREAU_ACTIVE_MFI_LOAN,
-        detail: mfi.passed ? 'No open microfinance loan tradelines.' : mfi.detail,
-        meta: { hitCount: mfi.findings.length },
-        criteriaKeys: [EC.NO_ACTIVE_MFI],
-        findings: mfi.passed ? undefined : mfi.findings,
-      });
-    }
-
     const enquiries = auditBureauEnquiriesInLastDays(
-      input.rawPayload,
+      parsedReport,
       ENQUIRY_WINDOW_DAYS,
       thresholds.maxEnquiries30Days,
     );
     push({
-      id: 'credit_enquiries',
+      id: EC.MAX_ENQUIRIES_30_DAYS,
       label: `Not more than ${thresholds.maxEnquiries30Days} loan enquiries (last ${ENQUIRY_WINDOW_DAYS} days)`,
       passed: enquiries.passed,
       rejectionReasonCode: enquiries.passed ? null : REJECTION_REASON.BUREAU_ENQUIRIES_EXCEEDED,
@@ -410,7 +301,6 @@ export class PostBreCheckService {
         maxEnquiries: thresholds.maxEnquiries30Days,
         windowDays: ENQUIRY_WINDOW_DAYS,
       },
-      criteriaKeys: [EC.MAX_ENQUIRIES_30_DAYS],
       findings: enquiries.passed
         ? enquiries.count > 0
           ? enquiries.findings
@@ -429,6 +319,111 @@ export class PostBreCheckService {
           ],
     });
 
+    const missedPayments = auditMissedPayments(
+      parsedReport,
+      6,
+      thresholds.maxMissedPayments6Months,
+      bureauAsOf,
+    );
+    push({
+      id: EC.MAX_MISSED_PAYMENTS_6_MONTHS,
+      label: `Missed payments in last 6 months (max ${thresholds.maxMissedPayments6Months})`,
+      passed: missedPayments.passed,
+      rejectionReasonCode: missedPayments.passed ? null : REJECTION_REASON.BUREAU_DPD_FAILED,
+      detail: missedPayments.detail ?? (
+        missedPayments.passed
+          ? `${missedPayments.findings.length} missed payment(s) within limit of ${thresholds.maxMissedPayments6Months}.`
+          : `Too many missed payments (${missedPayments.findings.length}) in the last 6 months; maximum allowed is ${thresholds.maxMissedPayments6Months}.`
+      ),
+      meta: {
+        missedPaymentCount: missedPayments.findings.length,
+        maxAllowed: thresholds.maxMissedPayments6Months,
+        lookbackMonths: 6,
+      },
+      findings: missedPayments.findings.length > 0 ? missedPayments.findings : undefined,
+    });
+
+    if (thresholds.enforceNoActiveMfi) {
+      activeTradelineRuleIds.push(EC.NO_ACTIVE_MFI);
+      const mfi = auditNoActiveMfiLoans(parsedReport);
+      push({
+        id: EC.NO_ACTIVE_MFI,
+        label: 'No active MFI / microfinance loans',
+        passed: mfi.passed,
+        rejectionReasonCode: mfi.passed ? null : REJECTION_REASON.BUREAU_ACTIVE_MFI_LOAN,
+        detail: mfi.passed ? 'No open microfinance loan tradelines.' : mfi.detail,
+        meta: { hitCount: mfi.findings.length },
+        criteriaKeys: [EC.NO_ACTIVE_MFI],
+        findings: mfi.passed ? undefined : mfi.findings,
+      });
+    }
+
+    const wilfulDefault = auditNoWilfulDefault(parsedReport);
+    push({
+      id: 'no_wilful_default',
+      label: 'No suit filed / wilful default (lifetime)',
+      passed: wilfulDefault.passed,
+      rejectionReasonCode: wilfulDefault.passed ? null : REJECTION_REASON.BUREAU_ADVERSE_TRADELINE,
+      detail: wilfulDefault.passed
+        ? 'No suit filed or wilful default on any bureau tradeline.'
+        : wilfulDefault.detail,
+      meta: { hitCount: wilfulDefault.findings.length },
+      findings: wilfulDefault.passed ? undefined : wilfulDefault.findings,
+    });
+
+    const adverse = auditNoAdverseTradelineInLookback(
+      parsedReport,
+      thresholds.settledLookbackMonths,
+      bureauAsOf,
+    );
+    push({
+      id: EC.SETTLED_MONTHS,
+      label: `No Doubtful / Loss / Written-off / Settled / Suit Filed (last ${thresholds.settledLookbackMonths} months)`,
+      passed: adverse.passed,
+      rejectionReasonCode: adverse.passed ? null : REJECTION_REASON.BUREAU_ADVERSE_TRADELINE,
+      detail:
+        adverse.detail ??
+        (adverse.passed
+          ? `No adverse tradeline signals (including suit filed / wilful default) in the last ${thresholds.settledLookbackMonths} months.`
+          : `Adverse bureau tradeline status in the last ${thresholds.settledLookbackMonths} months.`),
+      meta: { lookbackMonths: thresholds.settledLookbackMonths, hitCount: adverse.findings.length },
+      findings: adverse.passed ? undefined : adverse.findings,
+    });
+
+    if (thresholds.enforceNoRestructuredLoans) {
+      activeTradelineRuleIds.push(EC.NO_RESTRUCTURED_LOANS);
+      const restructured = auditNoRestructuredLoans(parsedReport);
+      push({
+        id: EC.NO_RESTRUCTURED_LOANS,
+        label: 'No restructured loans (TUEF Tag 33)',
+        passed: restructured.passed,
+        rejectionReasonCode: restructured.passed ? null : REJECTION_REASON.BUREAU_RESTRUCTURED_LOAN,
+        detail: restructured.passed
+          ? 'No restructured loan tradelines on bureau report.'
+          : restructured.detail,
+        meta: { hitCount: restructured.findings.length },
+        criteriaKeys: [EC.NO_RESTRUCTURED_LOANS],
+        findings: restructured.passed ? undefined : restructured.findings,
+      });
+    }
+
+    if (thresholds.enforceNoSmaPwos) {
+      activeTradelineRuleIds.push(EC.NO_SMA_PWOS);
+      const smaPwos = auditNoSmaPwosTradelines(parsedReport);
+      push({
+        id: EC.NO_SMA_PWOS,
+        label: 'No SMA or PWOS trade lines (TUEF asset class)',
+        passed: smaPwos.passed,
+        rejectionReasonCode: smaPwos.passed ? null : REJECTION_REASON.BUREAU_SMA_PWOS_TRADELINE,
+        detail: smaPwos.passed
+          ? 'No SMA / PWOS payment status on any tradeline.'
+          : smaPwos.detail,
+        meta: { hitCount: smaPwos.findings.length },
+        criteriaKeys: [EC.NO_SMA_PWOS],
+        findings: smaPwos.passed ? undefined : smaPwos.findings,
+      });
+    }
+
     const dpdThresholds = {
       openDpdMonths: thresholds.openDpdMonths,
       dpd30PlusMonths: thresholds.dpd30PlusMonths,
@@ -437,24 +432,16 @@ export class PostBreCheckService {
     };
 
     const dpdLabels: Record<string, string> = {
-      dpd_90plus: `90+ DPD (last ${thresholds.dpd90PlusMonths} months)`,
-      dpd_60plus: `60+ DPD (last ${thresholds.dpd60PlusMonths} months)`,
-      dpd_30plus: `30+ DPD (last ${thresholds.dpd30PlusMonths} months)`,
-      open_dpd: `Open loan DPD > 0 (last ${thresholds.openDpdMonths} months)`,
+      [EC.DPD_90PLUS_MONTHS]: `90+ DPD (last ${thresholds.dpd90PlusMonths} months)`,
+      [EC.DPD_60PLUS_MONTHS]: `60+ DPD (last ${thresholds.dpd60PlusMonths} months)`,
+      [EC.DPD_30PLUS_MONTHS]: `30+ DPD (last ${thresholds.dpd30PlusMonths} months)`,
+      [EC.OPEN_DPD_MONTHS]: `Open loan DPD > 0 (last ${thresholds.openDpdMonths} months)`,
     };
 
-    const dpdCriteriaKeys: Record<string, string> = {
-      open_dpd: EC.OPEN_DPD_MONTHS,
-      dpd_30plus: EC.DPD_30PLUS_MONTHS,
-      dpd_60plus: EC.DPD_60PLUS_MONTHS,
-      dpd_90plus: EC.DPD_90PLUS_MONTHS,
-    };
-
-    for (const dpdRule of evaluateBureauDpdRulesDetailed(input.rawPayload, dpdThresholds, bureauAsOf)) {
-      const checkId = `dpd_${dpdRule.ruleKey}`;
-      activeTradelineRuleIds.push(checkId);
+    for (const dpdRule of evaluateBureauDpdRulesDetailed(parsedReport, dpdThresholds, bureauAsOf)) {
+      activeTradelineRuleIds.push(dpdRule.ruleKey);
       push({
-        id: checkId,
+        id: dpdRule.ruleKey,
         label: dpdLabels[dpdRule.ruleKey] ?? dpdRule.ruleKey,
         passed: dpdRule.passed,
         rejectionReasonCode: dpdRule.passed ? null : REJECTION_REASON.BUREAU_DPD_FAILED,
@@ -462,31 +449,9 @@ export class PostBreCheckService {
           dpdRule.detail ??
           (dpdRule.passed ? 'No delinquency breach for this window.' : 'Bureau DPD rules failed.'),
         meta: { hitCount: dpdRule.findings.length },
-        criteriaKeys: [dpdCriteriaKeys[dpdRule.ruleKey]],
         findings: dpdRule.passed ? undefined : dpdRule.findings,
       });
     }
-
-    const missedPayments = auditMissedPayments(
-      input.rawPayload,
-      6,
-      thresholds.maxMissedPayments6Months,
-      bureauAsOf,
-    );
-    push({
-      id: 'missed_payments_6_months',
-      label: `Missed payments in last 6 months (max ${thresholds.maxMissedPayments6Months})`,
-      passed: missedPayments.passed,
-      rejectionReasonCode: missedPayments.passed ? null : REJECTION_REASON.BUREAU_DPD_FAILED,
-      detail: missedPayments.detail ?? `${missedPayments.findings.length} missed payment(s) within limit of ${thresholds.maxMissedPayments6Months}.`,
-      meta: {
-        missedPaymentCount: missedPayments.findings.length,
-        maxAllowed: thresholds.maxMissedPayments6Months,
-        lookbackMonths: 6,
-      },
-      criteriaKeys: [EC.MAX_MISSED_PAYMENTS_6_MONTHS],
-      findings: missedPayments.findings.length > 0 ? missedPayments.findings : undefined,
-    });
 
     const blockingChecks = checks.filter(
       (c) =>
@@ -497,10 +462,10 @@ export class PostBreCheckService {
 
     const uniqueTradelineRules = [...new Set(activeTradelineRuleIds)];
     const inspection: PostBreInspection = {
-      bureau: buildPostBreBureauSummary(input.rawPayload, parsed, ENQUIRY_WINDOW_DAYS),
+      bureau: buildPostBreBureauSummary(parsedReport, parsed, ENQUIRY_WINDOW_DAYS),
       criteria: criteriaConfig,
-      tradelines: buildPostBreTradelineInspection(input.rawPayload, uniqueTradelineRules),
-      enquiries: buildPostBreEnquiryInspection(input.rawPayload, ENQUIRY_WINDOW_DAYS),
+      tradelines: buildPostBreTradelineInspection(parsedReport, uniqueTradelineRules),
+      enquiries: buildPostBreEnquiryInspection(parsedReport, ENQUIRY_WINDOW_DAYS),
     };
 
     let unsecuredExposure: PostBreDryRunResult['unsecuredExposure'] = null;
@@ -544,7 +509,29 @@ export class PostBreCheckService {
   }
 
   async run(input: PostBreCheckInput): Promise<PostBreCheckResult> {
-    const bureauRow = await this.findLatestBureauReportForLead(input.leadId);
+    const [bureauRow, lead] = await Promise.all([
+      this.findLatestBureauReportForLead(input.leadId),
+      this.prisma.client.lead.findUnique({
+        where: { id: input.leadId },
+        select: {
+          panNumber: true,
+          leadDetail: { select: { dateOfBirth: true } },
+        },
+      }),
+    ]);
+
+    if (bureauRow?.rawPayload != null && lead != null) {
+      const identityCheck = this.checkBureauIdentity(bureauRow.rawPayload, lead);
+      if (!identityCheck.passed) {
+        return {
+          passed: false,
+          rejectReason: identityCheck.rejectReason,
+          rejectionReasonCode: REJECTION_REASON.BUREAU_IDENTITY_MISMATCH,
+          cibilScore: bureauRow.cibilScore ?? null,
+        };
+      }
+    }
+
     const cibilScore = bureauRow?.cibilScore ?? null;
 
     if (cibilScore === null) {
@@ -561,8 +548,11 @@ export class PostBreCheckService {
       };
     }
 
-    const thresholds = await this.loadPostBreThresholds();
-    const isExistingCustomer = await this.customerHasDisbursedLoan(input.customerId);
+    const [postBreRows, isExistingCustomer] = await Promise.all([
+      this.loadPostBreRows(),
+      this.customerHasDisbursedLoan(input.customerId),
+    ]);
+    const thresholds = this.buildPostBreThresholds(postBreRows);
 
     if (isExistingCustomer) {
       if (cibilScore < thresholds.cibilMinExisting) {
@@ -600,7 +590,8 @@ export class PostBreCheckService {
     rawPayload: unknown,
     thresholds: PostBreThresholds,
   ): Pick<PostBreCheckResult, 'passed' | 'rejectReason' | 'rejectionReasonCode'> {
-    const wilfulDefault = checkNoWilfulDefault(rawPayload);
+    const parsedReport = parseBureauReport(rawPayload);
+    const wilfulDefault = checkNoWilfulDefault(parsedReport);
     if (!wilfulDefault.passed) {
       return {
         passed: false,
@@ -610,9 +601,9 @@ export class PostBreCheckService {
     }
 
     const adverse = checkNoAdverseTradelineInLookback(
-      rawPayload,
+      parsedReport,
       thresholds.settledLookbackMonths,
-      resolveBureauAsOfDate(rawPayload),
+      parsedReport.bureauAsOfDate,
     );
     if (!adverse.passed) {
       return {
@@ -625,7 +616,7 @@ export class PostBreCheckService {
     }
 
     if (thresholds.enforceNoRestructuredLoans) {
-      const restructured = checkNoRestructuredLoans(rawPayload);
+      const restructured = checkNoRestructuredLoans(parsedReport);
       if (!restructured.passed) {
         return {
           passed: false,
@@ -636,7 +627,7 @@ export class PostBreCheckService {
     }
 
     if (thresholds.enforceNoSmaPwos) {
-      const smaPwos = checkNoSmaPwosTradelines(rawPayload);
+      const smaPwos = checkNoSmaPwosTradelines(parsedReport);
       if (!smaPwos.passed) {
         return {
           passed: false,
@@ -647,7 +638,7 @@ export class PostBreCheckService {
     }
 
     if (thresholds.enforceNoActiveMfi) {
-      const mfi = checkNoActiveMfiLoans(rawPayload);
+      const mfi = checkNoActiveMfiLoans(parsedReport);
       if (!mfi.passed) {
         return {
           passed: false,
@@ -657,7 +648,7 @@ export class PostBreCheckService {
       }
     }
 
-    const enquiryCount = countBureauEnquiriesInLastDays(rawPayload, ENQUIRY_WINDOW_DAYS);
+    const enquiryCount = countBureauEnquiriesInLastDays(parsedReport, ENQUIRY_WINDOW_DAYS);
     if (enquiryCount > thresholds.maxEnquiries30Days) {
       return {
         passed: false,
@@ -667,14 +658,14 @@ export class PostBreCheckService {
     }
 
     const dpd = checkBureauDpdRules(
-      rawPayload,
+      parsedReport,
       {
         openDpdMonths: thresholds.openDpdMonths,
         dpd30PlusMonths: thresholds.dpd30PlusMonths,
         dpd60PlusMonths: thresholds.dpd60PlusMonths,
         dpd90PlusMonths: thresholds.dpd90PlusMonths,
       },
-      resolveBureauAsOfDate(rawPayload),
+      parsedReport.bureauAsOfDate,
     );
     if (!dpd.passed) {
       return {
@@ -685,10 +676,10 @@ export class PostBreCheckService {
     }
 
     const missedPayments = auditMissedPayments(
-      rawPayload,
+      parsedReport,
       6,
       thresholds.maxMissedPayments6Months,
-      resolveBureauAsOfDate(rawPayload),
+      parsedReport.bureauAsOfDate,
     );
     if (!missedPayments.passed) {
       return {
@@ -699,6 +690,41 @@ export class PostBreCheckService {
     }
 
     return { passed: true, rejectReason: null, rejectionReasonCode: null };
+  }
+
+  private checkBureauIdentity(
+    rawPayload: unknown,
+    lead: { panNumber: string | null; leadDetail: { dateOfBirth: Date | null } | null },
+  ): { passed: boolean; rejectReason: string } {
+    let reportData: ReturnType<typeof extractCibilReportData>;
+    try {
+      reportData = extractCibilReportData(rawPayload);
+    } catch {
+      return { passed: true, rejectReason: '' };
+    }
+
+    const leadPan = lead.panNumber?.trim().toUpperCase() ?? null;
+    const reportPan = reportData.pan?.trim().toUpperCase() ?? null;
+    if (leadPan && reportPan && leadPan !== reportPan) {
+      return {
+        passed: false,
+        rejectReason: `Bureau PAN mismatch: entered ${leadPan} but bureau report contains ${reportPan}.`,
+      };
+    }
+
+    const leadDob = lead.leadDetail?.dateOfBirth;
+    const reportDobStr = reportData.dateOfBirth;
+    if (leadDob && reportDobStr) {
+      const leadDobIso = leadDob.toISOString().slice(0, 10);
+      if (leadDobIso !== reportDobStr) {
+        return {
+          passed: false,
+          rejectReason: `Bureau DOB mismatch: entered ${leadDobIso} but bureau report contains ${reportDobStr}.`,
+        };
+      }
+    }
+
+    return { passed: true, rejectReason: '' };
   }
 
   private async findLatestBureauReportForLead(leadId: bigint): Promise<{
@@ -722,115 +748,64 @@ export class PostBreCheckService {
     return row;
   }
 
-  private async loadPostBreCriteriaConfig(
-    thresholds: PostBreThresholds,
-  ): Promise<PostBreCriteriaConfigRow[]> {
-    const keys = Object.keys(POST_BRE_CRITERIA_TO_CHECKS);
-    const rows = await this.prisma.client.eligibilityCriteria.findMany({
-      where: { key: { in: keys }, isActive: true },
+  private async loadPostBreRows(): Promise<{ key: string; label: string; description: string | null; value: string }[]> {
+    return this.prisma.client.eligibilityCriteria.findMany({
+      where: { breType: 'POST_BRE', isActive: true },
       select: { key: true, label: true, description: true, value: true },
-    });
-    const map = new Map(rows.map((r) => [r.key, r]));
-
-    const ruleEnabledForKey = (key: string): boolean => {
-      switch (key) {
-        case EC.NO_RESTRUCTURED_LOANS:
-          return thresholds.enforceNoRestructuredLoans;
-        case EC.NO_SMA_PWOS:
-          return thresholds.enforceNoSmaPwos;
-        case EC.NO_ACTIVE_MFI:
-          return thresholds.enforceNoActiveMfi;
-        default:
-          return true;
-      }
-    };
-
-    const valueForKey = (key: string): string => {
-      switch (key) {
-        case EC.CIBIL_MIN_NEW:
-          return String(thresholds.cibilMinNew);
-        case EC.CIBIL_MIN_EXISTING:
-          return String(thresholds.cibilMinExisting);
-        case EC.SETTLED_MONTHS:
-          return String(thresholds.settledLookbackMonths);
-        case EC.MAX_ENQUIRIES_30_DAYS:
-          return String(thresholds.maxEnquiries30Days);
-        case EC.OPEN_DPD_MONTHS:
-          return String(thresholds.openDpdMonths);
-        case EC.DPD_30PLUS_MONTHS:
-          return String(thresholds.dpd30PlusMonths);
-        case EC.DPD_60PLUS_MONTHS:
-          return String(thresholds.dpd60PlusMonths);
-        case EC.DPD_90PLUS_MONTHS:
-          return String(thresholds.dpd90PlusMonths);
-        case EC.NO_RESTRUCTURED_LOANS:
-          return thresholds.enforceNoRestructuredLoans ? 'true' : 'false';
-        case EC.NO_SMA_PWOS:
-          return thresholds.enforceNoSmaPwos ? 'true' : 'false';
-        case EC.NO_ACTIVE_MFI:
-          return thresholds.enforceNoActiveMfi ? 'true' : 'false';
-        default:
-          return map.get(key)?.value ?? '';
-      }
-    };
-
-    return keys.map((key) => {
-      const row = map.get(key);
-      return {
-        key,
-        label: row?.label ?? key,
-        description: row?.description ?? null,
-        value: valueForKey(key),
-        ruleEnabled: ruleEnabledForKey(key),
-        appliesToCheckIds: POST_BRE_CRITERIA_TO_CHECKS[key] ?? [],
-      };
     });
   }
 
-  private async loadPostBreThresholds(): Promise<PostBreThresholds> {
-    const keys = [
-      EC.CIBIL_MIN_NEW,
-      EC.CIBIL_MIN_EXISTING,
-      EC.SETTLED_MONTHS,
-      EC.MAX_ENQUIRIES_30_DAYS,
-      EC.OPEN_DPD_MONTHS,
-      EC.DPD_30PLUS_MONTHS,
-      EC.DPD_60PLUS_MONTHS,
-      EC.DPD_90PLUS_MONTHS,
-      EC.NO_RESTRUCTURED_LOANS,
-      EC.NO_SMA_PWOS,
-      EC.NO_ACTIVE_MFI,
-      EC.MAX_MISSED_PAYMENTS_6_MONTHS,
-    ] as const;
-    const rows = await this.prisma.client.eligibilityCriteria.findMany({
-      where: { key: { in: [...keys] }, isActive: true },
-      select: { key: true, value: true },
-    });
+  private buildPostBreCriteriaConfig(
+    rows: { key: string; label: string; description: string | null; value: string }[],
+    thresholds: PostBreThresholds,
+  ): PostBreCriteriaConfigRow[] {
+    const ruleEnabledForKey = (key: string): boolean => {
+      switch (key) {
+        case EC.NO_RESTRUCTURED_LOANS: return thresholds.enforceNoRestructuredLoans;
+        case EC.NO_SMA_PWOS: return thresholds.enforceNoSmaPwos;
+        case EC.NO_ACTIVE_MFI: return thresholds.enforceNoActiveMfi;
+        default: return true;
+      }
+    };
+
+    return rows.map((row) => ({
+      key: row.key,
+      label: row.label,
+      description: row.description,
+      value: row.value,
+      ruleEnabled: ruleEnabledForKey(row.key),
+    }));
+  }
+
+  private buildPostBreThresholds(rows: { key: string; value: string }[]): PostBreThresholds {
     const map = new Map(rows.map((r) => [r.key, r.value]));
-    const pickInt = (key: (typeof keys)[number], fallback: number) => {
+    const pickInt = (key: string) => {
       const raw = map.get(key)?.trim();
       const n = raw ? Number.parseInt(raw, 10) : NaN;
-      return Number.isFinite(n) ? n : fallback;
+      if (!Number.isFinite(n)) throw new Error(`Missing or invalid eligibility_criteria: ${key}`);
+      return n;
     };
-    const pickBool = (key: (typeof keys)[number], fallback: boolean) => {
+    const FALSY = new Set(['false', '0', 'no']);
+    const TRUTHY = new Set(['true', '1', 'yes']);
+    const pickBool = (key: string) => {
       const raw = map.get(key)?.trim().toLowerCase();
-      if (raw === 'false' || raw === '0' || raw === 'no') return false;
-      if (raw === 'true' || raw === '1' || raw === 'yes') return true;
-      return fallback;
+      if (FALSY.has(raw!)) return false;
+      if (TRUTHY.has(raw!)) return true;
+      throw new Error(`Missing or invalid eligibility_criteria: ${key}`);
     };
     return {
-      cibilMinNew: pickInt(EC.CIBIL_MIN_NEW, DEFAULT_CIBIL_MIN_NEW),
-      cibilMinExisting: pickInt(EC.CIBIL_MIN_EXISTING, DEFAULT_CIBIL_MIN_EXISTING),
-      settledLookbackMonths: pickInt(EC.SETTLED_MONTHS, DEFAULT_SETTLED_LOOKBACK_MONTHS),
-      maxEnquiries30Days: pickInt(EC.MAX_ENQUIRIES_30_DAYS, DEFAULT_MAX_ENQUIRIES_30_DAYS),
-      openDpdMonths: pickInt(EC.OPEN_DPD_MONTHS, DEFAULT_OPEN_DPD_MONTHS),
-      dpd30PlusMonths: pickInt(EC.DPD_30PLUS_MONTHS, DEFAULT_DPD_30PLUS_MONTHS),
-      dpd60PlusMonths: pickInt(EC.DPD_60PLUS_MONTHS, DEFAULT_DPD_60PLUS_MONTHS),
-      dpd90PlusMonths: pickInt(EC.DPD_90PLUS_MONTHS, DEFAULT_DPD_90PLUS_MONTHS),
-      enforceNoRestructuredLoans: pickBool(EC.NO_RESTRUCTURED_LOANS, true),
-      enforceNoSmaPwos: pickBool(EC.NO_SMA_PWOS, true),
-      enforceNoActiveMfi: pickBool(EC.NO_ACTIVE_MFI, true),
-      maxMissedPayments6Months: pickInt(EC.MAX_MISSED_PAYMENTS_6_MONTHS, 1),
+      cibilMinNew: pickInt(EC.CIBIL_MIN_NEW),
+      cibilMinExisting: pickInt(EC.CIBIL_MIN_EXISTING),
+      settledLookbackMonths: pickInt(EC.SETTLED_MONTHS),
+      maxEnquiries30Days: pickInt(EC.MAX_ENQUIRIES_30_DAYS),
+      openDpdMonths: pickInt(EC.OPEN_DPD_MONTHS),
+      dpd30PlusMonths: pickInt(EC.DPD_30PLUS_MONTHS),
+      dpd60PlusMonths: pickInt(EC.DPD_60PLUS_MONTHS),
+      dpd90PlusMonths: pickInt(EC.DPD_90PLUS_MONTHS),
+      enforceNoRestructuredLoans: pickBool(EC.NO_RESTRUCTURED_LOANS),
+      enforceNoSmaPwos: pickBool(EC.NO_SMA_PWOS),
+      enforceNoActiveMfi: pickBool(EC.NO_ACTIVE_MFI),
+      maxMissedPayments6Months: pickInt(EC.MAX_MISSED_PAYMENTS_6_MONTHS),
     };
   }
 

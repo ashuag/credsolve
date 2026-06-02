@@ -16,6 +16,7 @@ import type {
   CibilReportPaymentMonth,
   CibilReportScoreFactor,
 } from './cibil-report-data.extractor';
+import { Logger } from '@nestjs/common/services/logger.service';
 
 const PAGE_W = 595;
 const PAGE_H = 842;
@@ -75,7 +76,7 @@ const MONEYCASH_LOGO_PATH = path.join(
   'moneycash-logo.png',
 );
 
-const HEADER_LOGO_HEIGHT = 48;
+const HEADER_LOGO_HEIGHT = 45;
 
 type Fonts = { regular: PDFFont; bold: PDFFont };
 
@@ -434,7 +435,7 @@ function computeReportRiskHighlights(data: CibilReportData): ReportRiskHighlight
 
 function drawRiskSummaryStrip(ctx: PdfCanvas, data: CibilReportData) {
   const risk = computeReportRiskHighlights(data);
-  const panelH = 68;
+  const panelH = 88;
   ctx.ensure(panelH + 8);
   const panelTop = ctx.y;
   const panelBase = panelTop - panelH;
@@ -607,7 +608,7 @@ function drawScoreSection(ctx: PdfCanvas, data: CibilReportData) {
   });
 
   const gaugeY = panelTop - 18;
-  drawSemiCircularGauge(ctx, MARGIN + 24, gaugeY, 52, score);
+  drawSemiCircularGauge(ctx, MARGIN + 62, gaugeY, 52, score);
 
   const textX = MARGIN + 148;
   let ty = gaugeY - 4;
@@ -860,9 +861,9 @@ function drawAddressDetails(ctx: PdfCanvas, data: CibilReportData) {
     a.dateReported ?? '-',
   ]);
   ctx.dataTable(
-    ['Address', 'Category', 'Residence Code', 'Date Reported'],
+    ['Address', 'Category', 'Res. Code', 'Date Reported'],
     rows,
-    [CONTENT_W * 0.48, CONTENT_W * 0.22, CONTENT_W * 0.12, CONTENT_W * 0.18],
+    [CONTENT_W * 0.44, CONTENT_W * 0.22, CONTENT_W * 0.14, CONTENT_W * 0.2],
   );
 }
 
@@ -996,7 +997,7 @@ function drawSingleAccount(ctx: PdfCanvas, account: CibilReportAccountRow) {
     borderColor: BORDER,
     borderWidth: 0.75,
   });
-  ctx.y -= 6;
+  ctx.y -= 18;
 }
 
 function drawAccountHeaderBar(ctx: PdfCanvas, account: CibilReportAccountRow) {
@@ -1014,6 +1015,12 @@ function drawAccountHeaderBar(ctx: PdfCanvas, account: CibilReportAccountRow) {
   });
 
   const cols = [account.creditor, account.accountType, account.accountNumber, account.ownership];
+
+const logger = new Logger('CibilReportPdf');
+logger.log("+++++++++");
+logger.log(account);
+logger.log("+++++++++");
+
   const colW = CONTENT_W / cols.length;
   cols.forEach((text, index) => {
     const cell = wrap(pdfSafeText(text), colW - 10, TYPE.body, ctx.fonts.bold)[0] ?? '-';

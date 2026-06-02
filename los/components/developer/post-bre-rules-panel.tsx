@@ -65,7 +65,7 @@ function CriteriaTable({ rows }: { rows: PostBreCriteriaConfigRow[] }) {
                 </span>
               </td>
               <td className="px-3 py-2.5 font-mono text-[0.72rem] text-brand-text">
-                {row.appliesToCheckIds.length ? row.appliesToCheckIds.join(', ') : '—'}
+                {row.appliesToCheckIds?.length ? row.appliesToCheckIds.join(', ') : '—'}
               </td>
             </tr>
           ))}
@@ -222,34 +222,6 @@ function UnsecuredExposureSection({ guide }: { guide: PostBreUnsecuredExposureGu
                 <td className="px-2.5 py-2 font-mono font-semibold text-brand-navy">{row.symbol}</td>
                 <td className="px-2.5 py-2 font-semibold text-brand-text">{row.label}</td>
                 <td className="px-2.5 py-2 text-brand-muted">{row.exposureBasis}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div>
-        <h3 className="m-0 text-[0.9rem] font-extrabold text-brand-navy">Open-loan DPD vs unsecured</h3>
-        <p className="m-0 mt-1 text-[0.78rem] text-brand-muted">
-          These types are excluded from the <code className="text-[0.76rem]">open_dpd_months</code> rule only (30/60/90+ DPD
-          still applies where relevant).
-        </p>
-      </div>
-      <div className="overflow-x-auto rounded-[12px] border border-[rgba(23,44,113,0.1)]">
-        <table className="w-full min-w-[480px] border-collapse text-left text-[0.76rem]">
-          <thead>
-            <tr className="bg-[rgba(248,250,255,0.95)] text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-              <th className="px-2.5 py-2">Code</th>
-              <th className="px-2.5 py-2">Type</th>
-              <th className="px-2.5 py-2">Note</th>
-            </tr>
-          </thead>
-          <tbody>
-            {guide.openDpdExcludedAccountTypes.map((row) => (
-              <tr key={row.symbol} className="border-t border-[rgba(23,44,113,0.06)]">
-                <td className="px-2.5 py-2 font-mono font-semibold text-brand-navy">{row.symbol}</td>
-                <td className="px-2.5 py-2 text-brand-text">{row.label}</td>
-                <td className="px-2.5 py-2 text-brand-muted">{row.reason}</td>
               </tr>
             ))}
           </tbody>

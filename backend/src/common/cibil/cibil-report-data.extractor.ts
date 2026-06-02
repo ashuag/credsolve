@@ -1,3 +1,8 @@
+import {
+  ACCOUNT_TYPE_LABELS,
+  DWELLING_LABELS,
+  PHONE_TYPE_LABELS,
+} from './cibil-tuef.constants';
 import { formatInrAmountForPdf } from '../pdf/pdf-safe-text.util';
 import {
   formatSuitFiledWilfulDefaultLabel,
@@ -10,6 +15,7 @@ import {
   parseCibilTradeline,
 } from './cibil-tradeline.parser';
 import { parseTenacioBureauVendorBody } from '../vendor/tenacio-bureau-payload.mapper';
+import { response } from 'express';
 
 export type CibilReportPaymentMonth = {
   year: number;
@@ -139,45 +145,6 @@ export type CibilReportData = {
   preApprovedInsight: CibilReportPreApprovedInsight | null;
 };
 
-const ACCOUNT_TYPE_LABELS: Record<string, string> = {
-  '01': 'Auto loan',
-  '02': 'Housing loan',
-  '03': 'Property loan',
-  '04': 'Loan against property',
-  '05': 'Personal loan',
-  '06': 'Consumer loan',
-  '07': 'Gold loan',
-  '08': 'Education loan',
-  '09': 'Loan to professional',
-  '10': 'Credit card',
-  '11': 'Lease',
-  '12': 'Overdraft',
-  '13': 'Two-wheeler loan',
-  '14': 'Non-funded credit facility',
-  '15': 'Loan against bank deposits',
-  '16': 'Fleet card',
-  '17': 'Commercial vehicle loan',
-};
-
-const INQUIRY_PURPOSE_LABELS: Record<string, string> = {
-  '00': 'Other',
-  '05': 'Personal loan',
-  '06': 'Consumer loan',
-  '10': 'Credit card',
-};
-
-const DWELLING_LABELS: Record<string, string> = {
-  '01': 'Permanent address',
-  '02': 'Residence address',
-  '03': 'Office address',
-  '04': 'Not categorized',
-};
-
-const PHONE_TYPE_LABELS: Record<string, string> = {
-  '01': 'Mobile phone',
-  '02': 'Office phone',
-  '03': 'Home phone',
-};
 
 const IDENTIFIER_LABELS: Record<string, string> = {
   TaxId: 'Income Tax ID Number (PAN)',
@@ -262,16 +229,16 @@ function accountTypeLabel(symbol: string | null): string {
 
 function inquiryPurposeLabel(code: unknown): string {
   const s = String(code ?? '').trim().padStart(2, '0');
-  return INQUIRY_PURPOSE_LABELS[s] ?? (s ? `Purpose ${s}` : '-');
+  const labels: Record<string, string> = { '00': 'Other', '05': 'Personal loan', '06': 'Consumer loan', '10': 'Credit card' };
+  return labels[s] ?? (s ? `Purpose ${s}` : '-');
 }
 
 function scoreRatingFromScore(score: number | null): string | null {
   if (score == null) return null;
-  if (score >= 750) return 'VERY GOOD';
-  if (score >= 700) return 'GOOD';
-  if (score >= 650) return 'FAIR';
-  if (score >= 550) return 'AVERAGE';
-  return 'NEEDS ATTENTION';
+  if (score >= 750) return 'LOW RISK';
+  if (score >= 700) return 'MODERATE RISK';
+  if (score >= 550) return 'HIGH RISK';
+  return 'VERY HIGH RISK';
 }
 
 function formatExposureInr(n: number): string {

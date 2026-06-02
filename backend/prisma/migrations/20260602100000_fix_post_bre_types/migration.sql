@@ -1,0 +1,35 @@
+-- Set bre_type = 'POST_BRE' for exactly the keys used by post-BRE rules.
+-- All other keys revert to 'PRE_BRE'.
+UPDATE `eligibility_criteria`
+SET `bre_type` = 'POST_BRE'
+WHERE `key` IN (
+  'CIBIL_MIN_NEW',
+  'CIBIL_MIN_EXISTING',
+  'SETTLED_MONTHS',
+  'NO_RESTRUCTURED_LOANS',
+  'NO_SMA_PWOS',
+  'NO_ACTIVE_MFI',
+  'MAX_ENQUIRIES_30_DAYS',
+  'OPEN_DPD_MONTHS',
+  'DPD_30PLUS_MONTHS',
+  'DPD_60PLUS_MONTHS',
+  'DPD_90PLUS_MONTHS',
+  'MAX_MISSED_PAYMENTS_6_MONTHS'
+);
+
+UPDATE `eligibility_criteria`
+SET `bre_type` = 'PRE_BRE'
+WHERE `key` NOT IN (
+  'CIBIL_MIN_NEW',
+  'CIBIL_MIN_EXISTING',
+  'SETTLED_MONTHS',
+  'NO_RESTRUCTURED_LOANS',
+  'NO_SMA_PWOS',
+  'NO_ACTIVE_MFI',
+  'MAX_ENQUIRIES_30_DAYS',
+  'OPEN_DPD_MONTHS',
+  'DPD_30PLUS_MONTHS',
+  'DPD_60PLUS_MONTHS',
+  'DPD_90PLUS_MONTHS',
+  'MAX_MISSED_PAYMENTS_6_MONTHS'
+);

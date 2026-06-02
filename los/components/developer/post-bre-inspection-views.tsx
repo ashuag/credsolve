@@ -8,7 +8,7 @@ import type {
 } from '@/lib/api';
 import { cx } from '@/components/eligibility/eligibility-ui';
 
-function RuleBadges({ rules }: { rules: string[] }) {
+function RuleBadges({ rules = [] }: { rules?: string[] }) {
   if (!rules.length) {
     return <span className="text-[0.72rem] text-brand-muted">—</span>;
   }
@@ -165,9 +165,6 @@ export function PostBreTradelinesTable({ rows }: { rows: PostBreTradelineInspect
                 >
                   {row.accountStatus}
                 </span>
-                {!row.isLoanRelated ? (
-                  <span className="ml-1 text-[0.65rem] text-brand-muted">non-loan</span>
-                ) : null}
                 {row.isMfiAccount ? (
                   <span className="ml-1 text-[0.65rem] font-bold text-[#92400e]">MFI</span>
                 ) : null}
@@ -290,7 +287,7 @@ export function PostBreInspectionSections({ result }: { result: PostBreDryRunRes
             Credit enquiries
           </h2>
           <p className="m-0 mt-1 text-[0.82rem] text-brand-muted">
-            Loan enquiry count uses the rolling window and excludes credit-card-only and portfolio purposes.
+            Loan enquiry count uses the rolling window. All enquiry purposes are counted.
           </p>
         </div>
         <PostBreEnquiriesTable rows={result.inspection.enquiries} />

@@ -1,0 +1,219 @@
+{
+  "data": {
+    "htmlUrl": null,
+    "cibilData": {
+      "GetCustomerAssetsResponse": {
+        "ResponseKey": "sample-10-plus-enquiries",
+        "ResponseStatus": "Success",
+        "GetCustomerAssetsSuccess": {
+          "Asset": {
+            "Type": "SingleCreditReport",
+            "Status": "Active",
+            "AssetId": "99000000001",
+            "CreationDate": "2026-06-01T10:00:00.000+05:30",
+            "ExpirationDate": "2028-06-01T10:00:00.000+05:30",
+            "SafetyCheckFailure": false,
+            "TrueLinkCreditReport": {
+              "Frozen": "",
+              "Sources": {
+                "Source": {
+                  "Bureau": {
+                    "rank": "100000",
+                    "symbol": "CIBIL",
+                    "description": "",
+                    "abbreviation": ""
+                  },
+                  "InquiryDate": "2026-06-01T10:00:00.000+05:30"
+                }
+              },
+              "Borrower": {
+                "borrowerKey": "999000001",
+                "BorrowerName": {
+                  "Name": { "Forename": "SAMPLE USER" }
+                },
+                "Birth": {
+                  "date": "1990-05-15+05:30",
+                  "BirthDate": { "day": "15", "month": "5", "year": "1990" }
+                },
+                "Gender": "Male",
+                "CreditScore": {
+                  "riskScore": "720",
+                  "scoreName": "CIBILTransUnionScore3",
+                  "populationRank": "25"
+                }
+              },
+              "TradeLinePartition": [
+                {
+                  "accountTypeSymbol": "05",
+                  "Tradeline": {
+                    "creditorName": "HDFC BANK",
+                    "accountNumber": "HDFC00012345",
+                    "dateOpened": "2023-01-15+05:30",
+                    "reportedDate": "2026-05-30+05:30",
+                    "highBalance": 500000,
+                    "currentBalance": 320000,
+                    "amountOverdue": 0,
+                    "GrantedTrade": {
+                      "CreditLimit": 500000,
+                      "PayStatusHistory": {
+                        "MonthlyPayStatus": [
+                          { "date": "2026-05-01+05:30", "status": "0" },
+                          { "date": "2026-04-01+05:30", "status": "0" },
+                          { "date": "2026-03-01+05:30", "status": "0" },
+                          { "date": "2026-02-01+05:30", "status": "0" },
+                          { "date": "2026-01-01+05:30", "status": "0" },
+                          { "date": "2025-12-01+05:30", "status": "0" }
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "accountTypeSymbol": "10",
+                  "Tradeline": {
+                    "creditorName": "ICICI BANK",
+                    "accountNumber": "ICICI00056789",
+                    "dateOpened": "2021-06-01+05:30",
+                    "reportedDate": "2026-05-28+05:30",
+                    "highBalance": 85000,
+                    "currentBalance": 42000,
+                    "amountOverdue": 0,
+                    "GrantedTrade": {
+                      "CreditLimit": 150000,
+                      "PayStatusHistory": {
+                        "MonthlyPayStatus": [
+                          { "date": "2026-05-01+05:30", "status": "0" },
+                          { "date": "2026-04-01+05:30", "status": "0" },
+                          { "date": "2026-03-01+05:30", "status": "0" }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ],
+              "InquiryPartition": [
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-05-28+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "1001000001",
+                    "subscriberName": "EARLYSALARY",
+                    "amount": "200000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-05-20+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "1001000002",
+                    "subscriberName": "BAJAJ FINSERV",
+                    "amount": "300000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-05-15+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "1001000003",
+                    "subscriberName": "TATA CAPITAL",
+                    "amount": "150000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-05-10+05:30",
+                    "inquiryType": "10",
+                    "enqControlNum": "1001000004",
+                    "subscriberName": "HDFC BANK",
+                    "amount": "1000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-05-05+05:30",
+                    "inquiryType": "06",
+                    "enqControlNum": "1001000005",
+                    "subscriberName": "KOTAK BANK",
+                    "amount": "100000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-04-25+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "1001000006",
+                    "subscriberName": "MONEYVIEW",
+                    "amount": "250000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-04-18+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "1001000007",
+                    "subscriberName": "LENDINGKART",
+                    "amount": "500000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-04-10+05:30",
+                    "inquiryType": "39",
+                    "enqControlNum": "1001000008",
+                    "subscriberName": "PAYTM PAYMENTS BANK",
+                    "amount": "50000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-03-20+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "1001000009",
+                    "subscriberName": "FULLERTON INDIA",
+                    "amount": "400000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-03-05+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "1001000010",
+                    "subscriberName": "DMI FINANCE",
+                    "amount": "175000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-02-14+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "1001000011",
+                    "subscriberName": "STASHFIN",
+                    "amount": "120000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2025-12-20+05:30",
+                    "inquiryType": "10",
+                    "enqControlNum": "1001000012",
+                    "subscriberName": "SBI CARD",
+                    "amount": "100"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2025-10-05+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "1001000013",
+                    "subscriberName": "INDUSIND BANK",
+                    "amount": "600000"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

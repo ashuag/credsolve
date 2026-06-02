@@ -1,16 +1,9 @@
 import {
+  ACCOUNT_TYPE_LABELS,
   CIBIL_CREDIT_CARD_ACCOUNT_TYPE_SYMBOLS,
   CIBIL_UNSECURED_ACCOUNT_TYPE_SYMBOLS,
-} from './cibil-account-type.constants';
+} from './cibil-tuef.constants';
 
-/** Non-loan tradelines excluded from "open loan DPD" checks (cards, telco). */
-const NON_LOAN_ACCOUNT_TYPE_SYMBOLS = new Set(['10', '18', '19', '20']);
-
-/** Loan / overdraft tradelines only (excludes credit card and telco). */
-export function isLoanRelatedAccountType(accountTypeSymbol: string | null): boolean {
-  if (!accountTypeSymbol) return true;
-  return !NON_LOAN_ACCOUNT_TYPE_SYMBOLS.has(accountTypeSymbol);
-}
 
 export type ParsedCibilTradeline = {
   accountTypeSymbol: string | null;
@@ -79,8 +72,12 @@ export function isCibilTradelineOpen(tradeline: Record<string, unknown>): boolea
   if (dateClosed != null && String(dateClosed).trim() !== '') {
     return false;
   }
+  
   const openClosed = readSymbol(tradeline.OpenClosed);
-  if (openClosed?.toUpperCase() === 'C') return false;
+  if (openClosed?.toUpperCase() === 'C') {
+    return false;
+  }
+
   return true;
 }
 
@@ -164,23 +161,6 @@ export function extractTradelinesFromBureauVendorBody(body: unknown): ParsedCibi
   return parsed;
 }
 
-const ACCOUNT_TYPE_LABELS: Record<string, string> = {
-  '00': 'Other',
-  '05': 'Personal loan',
-  '06': 'Consumer loan',
-  '08': 'Education loan',
-  '09': 'Loan to professional',
-  '10': 'Credit card',
-  '12': 'Overdraft',
-  '16': 'Fleet card',
-  '36': 'Kisan credit card',
-  '37': 'Loan on credit card',
-  '38': 'PMJDY overdraft',
-  '39': 'Mudra loan',
-  '45': 'P2P personal loan',
-  '61': 'Business loan – unsecured',
-  '99': 'Current unsecured',
-};
 
 function accountTypeLabel(symbol: string | null): string {
   if (!symbol) return 'Account';

@@ -1,0 +1,16 @@
+{
+    "type": "point", 
+    "status": "error", 
+    "requestId": "26041bec-71f8-49a2-b810-088dd351ca88", 
+    "serviceError": {
+        "details": {}, 
+        "message": "No Data Found"
+    }, 
+    "vendorResponse": [
+        {
+            "name": "SapphireSwan", 
+            "sequence": 1, "statusCode": 422
+        }
+    ], 
+    "serviceStatusCode": 422
+}

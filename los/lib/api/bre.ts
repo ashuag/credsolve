@@ -34,7 +34,6 @@ export type PostBreTradelineInspectionRow = {
   accountTypeLabel: string;
   accountStatus: string;
   isOpen: boolean;
-  isLoanRelated: boolean;
   isMfiAccount: boolean;
   restructureSignal: boolean;
   smaPwosSignal: boolean;
@@ -214,7 +213,6 @@ export type PostBreUnsecuredExposureGuide = {
   minLoanAmountInr: number;
   maxLoanAmountInr: number;
   accountTypes: Array<{ symbol: string; label: string; exposureBasis: string }>;
-  openDpdExcludedAccountTypes: Array<{ symbol: string; label: string; reason: string }>;
   creditLimitTiers: Array<{
     id: number;
     minUnsecuredLoan: number;

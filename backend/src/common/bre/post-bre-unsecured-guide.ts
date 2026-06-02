@@ -1,11 +1,8 @@
 import {
   CIBIL_CREDIT_CARD_ACCOUNT_TYPE_SYMBOLS,
   CIBIL_UNSECURED_ACCOUNT_TYPE_SYMBOLS,
-} from '../cibil/cibil-account-type.constants';
+} from '../cibil/cibil-tuef.constants';
 import { cibilAccountTypeDisplayLabel } from '../cibil/cibil-tradeline.parser';
-
-/** Account types excluded from “open loan DPD” (still in 30/60/90+ DPD windows). */
-export const POST_BRE_NON_LOAN_ACCOUNT_TYPES_FOR_OPEN_DPD = ['10', '18', '19', '20'] as const;
 
 export type UnsecuredAccountTypeRef = {
   symbol: string;
@@ -33,7 +30,6 @@ export type PostBreUnsecuredExposureGuide = {
   minLoanAmountInr: number;
   maxLoanAmountInr: number;
   accountTypes: UnsecuredAccountTypeRef[];
-  openDpdExcludedAccountTypes: Array<{ symbol: string; label: string; reason: string }>;
   creditLimitTiers: CreditLimitTierRef[];
   relatedToolPath: string;
   configurationPaths: string[];
@@ -56,19 +52,6 @@ export function buildUnsecuredAccountTypeCatalog(): UnsecuredAccountTypeRef[] {
     }));
 }
 
-export function buildOpenDpdExcludedAccountTypes(): PostBreUnsecuredExposureGuide['openDpdExcludedAccountTypes'] {
-  const reasons: Record<string, string> = {
-    '10': 'Credit card — excluded from open-loan DPD only',
-    '18': 'Telco — not a loan tradeline',
-    '19': 'Telco — not a loan tradeline',
-    '20': 'Telco — not a loan tradeline',
-  };
-  return POST_BRE_NON_LOAN_ACCOUNT_TYPES_FOR_OPEN_DPD.map((symbol) => ({
-    symbol,
-    label: cibilAccountTypeDisplayLabel(symbol),
-    reason: reasons[symbol] ?? 'Excluded from open-loan DPD',
-  }));
-}
 
 export function buildPostBreUnsecuredExposureGuide(input: {
   creditLimitTiers: CreditLimitTierRef[];
@@ -90,7 +73,6 @@ export function buildPostBreUnsecuredExposureGuide(input: {
     minLoanAmountInr: input.minLoanAmountInr,
     maxLoanAmountInr: input.maxLoanAmountInr,
     accountTypes: buildUnsecuredAccountTypeCatalog(),
-    openDpdExcludedAccountTypes: buildOpenDpdExcludedAccountTypes(),
     creditLimitTiers: input.creditLimitTiers,
     relatedToolPath: '/developer-tools/pre-approved-offer',
     configurationPaths: [

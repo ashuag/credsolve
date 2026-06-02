@@ -2,18 +2,25 @@ import { Controller, Get, Param, Res, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { LosAuthGuard } from './auth/los-auth.guard';
-import { LosDataService } from './los-data.service';
-
+import { LosLeadService } from './services/los-lead.service';
+import { LosApplicationService } from './services/los-application.service';
+import { LosDashboardService } from './services/los-dashboard.service';
+import { LosMasterService } from './services/los-master.service';
 @ApiTags('LOS Data')
 @Controller('los')
 @UseGuards(LosAuthGuard)
 export class LosDataController {
-  constructor(private readonly losData: LosDataService) {}
+  constructor(
+    private readonly losLead: LosLeadService,
+    private readonly losApplication: LosApplicationService,
+    private readonly losDashboard: LosDashboardService,
+    private readonly losMaster: LosMasterService,
+  ) {}
 
   @Get('dashboard/crm')
   @ApiOperation({ summary: 'LOS CRM dashboard aggregates (live counts from the book)' })
   dashboardCrm() {
-    return this.losData.getDashboardCrm();
+    return this.losDashboard.getDashboardCrm();
   }
 
   @Get('leads/new')
@@ -21,19 +28,19 @@ export class LosDataController {
     summary: 'List open leads for LOS lead management (excludes CONVERTED leads with an application)',
   })
   leads() {
-    return this.losData.listLeads();
+    return this.losLead.listLeads();
   }
 
   @Get('applications')
   @ApiOperation({ summary: 'List latest applications for LOS application management' })
   applications() {
-    return this.losData.listApplications();
+    return this.losApplication.listApplications();
   }
 
   @Get('applications/:applicationUuid')
   @ApiOperation({ summary: 'Get application details by application uuid' })
   applicationByUuid(@Param('applicationUuid') applicationUuid: string) {
-    return this.losData.getApplicationDetails(applicationUuid);
+    return this.losApplication.getApplicationDetails(applicationUuid);
   }
 
   @Get('applications/:applicationUuid/kyc/selfie-photo')
@@ -42,7 +49,7 @@ export class LosDataController {
     @Param('applicationUuid') applicationUuid: string,
     @Res() res: Response,
   ): Promise<void> {
-    await this.losData.serveApplicationSelfiePhoto(applicationUuid, res);
+    await this.losApplication.serveApplicationSelfiePhoto(applicationUuid, res);
   }
 
   @Get('applications/:applicationUuid/kyc/aadhaar-photo')
@@ -51,7 +58,7 @@ export class LosDataController {
     @Param('applicationUuid') applicationUuid: string,
     @Res() res: Response,
   ): Promise<void> {
-    await this.losData.serveApplicationAadhaarPhoto(applicationUuid, res);
+    await this.losApplication.serveApplicationAadhaarPhoto(applicationUuid, res);
   }
 
   @Get('applications/:applicationUuid/cibil-report')
@@ -59,18 +66,18 @@ export class LosDataController {
     summary: 'Structured CIBIL report view for an application (from latest bureau pull)',
   })
   applicationCibilReport(@Param('applicationUuid') applicationUuid: string) {
-    return this.losData.getApplicationCibilReport(applicationUuid);
+    return this.losApplication.getApplicationCibilReport(applicationUuid);
   }
 
   @Get('leads/:leadUuid')
   @ApiOperation({ summary: 'Get lead details by lead uuid' })
   leadByUuid(@Param('leadUuid') leadUuid: string) {
-    return this.losData.getLeadDetails(leadUuid);
+    return this.losLead.getLeadDetails(leadUuid);
   }
 
   @Get('masters')
   @ApiOperation({ summary: 'Fetch LOS masters for filters/lookups' })
   masters() {
-    return this.losData.getMasters();
+    return this.losMaster.getMasters();
   }
 }

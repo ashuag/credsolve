@@ -1,0 +1,203 @@
+{
+  "data": {
+    "htmlUrl": null,
+    "cibilData": {
+      "GetCustomerAssetsResponse": {
+        "ResponseKey": "sample-10-plus-enquiries-30-days",
+        "ResponseStatus": "Success",
+        "GetCustomerAssetsSuccess": {
+          "Asset": {
+            "Type": "SingleCreditReport",
+            "Status": "Active",
+            "AssetId": "99000000002",
+            "CreationDate": "2026-06-02T10:00:00.000+05:30",
+            "ExpirationDate": "2028-06-02T10:00:00.000+05:30",
+            "SafetyCheckFailure": false,
+            "TrueLinkCreditReport": {
+              "Frozen": "",
+              "Sources": {
+                "Source": {
+                  "Bureau": {
+                    "rank": "100000",
+                    "symbol": "CIBIL",
+                    "description": "",
+                    "abbreviation": ""
+                  },
+                  "InquiryDate": "2026-06-02T10:00:00.000+05:30"
+                }
+              },
+              "Borrower": {
+                "borrowerKey": "999000002",
+                "BorrowerName": {
+                  "Name": { "Forename": "RAHUL SHARMA" }
+                },
+                "Birth": {
+                  "date": "1992-03-10+05:30",
+                  "BirthDate": { "day": "10", "month": "3", "year": "1992" }
+                },
+                "Gender": "Male",
+                "CreditScore": {
+                  "riskScore": "680",
+                  "scoreName": "CIBILTransUnionScore3",
+                  "populationRank": "40"
+                }
+              },
+              "TradeLinePartition": [
+                {
+                  "accountTypeSymbol": "05",
+                  "Tradeline": {
+                    "creditorName": "HDFC BANK",
+                    "accountNumber": "HDFC00099001",
+                    "dateOpened": "2024-06-01+05:30",
+                    "reportedDate": "2026-05-30+05:30",
+                    "highBalance": 300000,
+                    "currentBalance": 180000,
+                    "amountOverdue": 0,
+                    "GrantedTrade": {
+                      "CreditLimit": 300000,
+                      "PayStatusHistory": {
+                        "MonthlyPayStatus": [
+                          { "date": "2026-05-01+05:30", "status": "0" },
+                          { "date": "2026-04-01+05:30", "status": "0" },
+                          { "date": "2026-03-01+05:30", "status": "0" }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ],
+              "InquiryPartition": [
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-06-01+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "2001000001",
+                    "subscriberName": "EARLYSALARY",
+                    "amount": "200000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-05-31+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "2001000002",
+                    "subscriberName": "MONEYVIEW",
+                    "amount": "150000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-05-29+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "2001000003",
+                    "subscriberName": "BAJAJ FINSERV",
+                    "amount": "300000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-05-27+05:30",
+                    "inquiryType": "10",
+                    "enqControlNum": "2001000004",
+                    "subscriberName": "ICICI BANK",
+                    "amount": "1000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-05-25+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "2001000005",
+                    "subscriberName": "TATA CAPITAL",
+                    "amount": "250000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-05-22+05:30",
+                    "inquiryType": "06",
+                    "enqControlNum": "2001000006",
+                    "subscriberName": "KOTAK MAHINDRA BANK",
+                    "amount": "100000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-05-20+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "2001000007",
+                    "subscriberName": "DMI FINANCE",
+                    "amount": "175000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-05-18+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "2001000008",
+                    "subscriberName": "STASHFIN",
+                    "amount": "120000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-05-15+05:30",
+                    "inquiryType": "39",
+                    "enqControlNum": "2001000009",
+                    "subscriberName": "PAYTM PAYMENTS BANK",
+                    "amount": "50000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-05-12+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "2001000010",
+                    "subscriberName": "LENDINGKART",
+                    "amount": "400000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-05-08+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "2001000011",
+                    "subscriberName": "FULLERTON INDIA",
+                    "amount": "500000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-05-05+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "2001000012",
+                    "subscriberName": "INDUSIND BANK",
+                    "amount": "350000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2026-04-10+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "2001000013",
+                    "subscriberName": "AXIS BANK",
+                    "amount": "200000"
+                  }
+                },
+                {
+                  "Inquiry": {
+                    "inquiryDate": "2025-12-15+05:30",
+                    "inquiryType": "05",
+                    "enqControlNum": "2001000014",
+                    "subscriberName": "SBI",
+                    "amount": "600000"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

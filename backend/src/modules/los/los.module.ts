@@ -7,7 +7,11 @@ import { LosAuthService } from './auth/los-auth.service';
 import { LosAuthGuard } from './auth/los-auth.guard';
 import { LosSessionService } from './auth/los-session.service';
 import { LosDataController } from './los-data.controller';
-import { LosDataService } from './los-data.service';
+import { LosLeadService } from './services/los-lead.service';
+import { LosApplicationService } from './services/los-application.service';
+import { LosDashboardService } from './services/los-dashboard.service';
+import { LosMasterService } from './services/los-master.service';
+import { LosNegativeListService } from './services/los-negative-list.service';
 import { LosMastersController } from './los-masters.controller';
 import { LosNegativeListsController } from './los-negative-lists.controller';
 import { LosBreController } from './los-bre.controller';
@@ -24,7 +28,17 @@ import { LosTeamService } from './los-team.service';
     LosTeamController,
     LosBreController,
   ],
-  providers: [LosAuthService, LosSessionService, LosAuthGuard, LosDataService, LosTeamService],
+  providers: [
+    LosAuthService,
+    LosSessionService,
+    LosAuthGuard,
+    LosTeamService,
+    LosLeadService,
+    LosApplicationService,
+    LosDashboardService,
+    LosMasterService,
+    LosNegativeListService,
+  ],
   exports: [LosSessionService],
 })
 export class LosModule {}
