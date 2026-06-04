@@ -30,7 +30,6 @@ export default function LoanDocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [documents, setDocuments] = useState<LoanDocumentItem[]>([]);
-  const [docIndex, setDocIndex] = useState(0);
   const [agreedByType, setAgreedByType] = useState<Record<string, boolean>>({});
   const [phase, setPhase] = useState<'review' | 'otp'>('review');
   const [otpRequest, setOtpRequest] = useState<SendLoanDocumentsOtpResponse | null>(null);
@@ -68,7 +67,7 @@ export default function LoanDocumentsPage() {
     };
   }, [refreshSession, router]);
 
-  const current = documents[docIndex];
+  const current = documents[0];
   const allAgreed =
     documents.length > 0 && documents.every((d) => agreedByType[d.type] === true);
 
@@ -124,7 +123,7 @@ export default function LoanDocumentsPage() {
   }
 
   const journeyPanel = (
-    <div className="w-full max-w-xl mx-auto">
+    <div className="w-full h-full flex flex-col">
       {loading ? (
         <div className="flex flex-col items-center gap-4 py-16">
           <Spinner size={48} />
@@ -134,8 +133,8 @@ export default function LoanDocumentsPage() {
         <form onSubmit={handleVerifyOtp} className="flex flex-col gap-6">
           <h1 className="text-2xl font-black text-brand-navy">Confirm with OTP</h1>
           <p className="text-slate-500 text-sm">
-            Enter the code sent to your registered mobile number to accept the Key Fact Statement and Loan Agreement.
-            We will email both documents to your registered email address after verification.
+            Enter the code sent to your registered mobile number to accept the Loan Sanction letter cum Key Fact
+            Statement. We will email the document to your registered email address after verification.
           </p>
           {otpStatus ? <p className="text-sm text-emerald-700 font-medium">{otpStatus}</p> : null}
           {otpError ? <AlertBanner variant="error">{otpError}</AlertBanner> : null}
@@ -174,13 +173,10 @@ export default function LoanDocumentsPage() {
         </form>
       ) : current ? (
         <>
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-            Document {docIndex + 1} of {documents.length}
-          </p>
-          <h1 className="text-2xl font-black text-brand-navy mb-2">Sanction letter &amp; agreement</h1>
+          <h1 className="text-2xl font-black text-brand-navy mb-2">Sanction letter cum Key Fact Statement</h1>
           <p className="text-sm text-slate-500 mb-6">
-            Read the sanction letter (Key Fact Statement) and loan agreement. After both are accepted, we will send an
-            OTP to your mobile to confirm. Once verified, both documents will be emailed to your registered email address.
+            Read the full loan document below. When you are ready, confirm your agreement and we will send an OTP to
+            your mobile. After verification, the signed PDF will be emailed to your registered email address.
           </p>
           {error ? <AlertBanner variant="error">{error}</AlertBanner> : null}
           <LoanDocumentScrollPanel
@@ -192,41 +188,21 @@ export default function LoanDocumentsPage() {
               setAgreedByType((prev) => ({ ...prev, [current.type]: next }))
             }
           />
-          <div className="mt-8 flex flex-col sm:flex-row gap-3">
-            {docIndex < documents.length - 1 ? (
-              <button
-                type="button"
-                disabled={!agreedByType[current.type]}
-                onClick={() => setDocIndex((i) => i + 1)}
-                className="mc-btn-primary flex-1 py-4"
-              >
-                Next document
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={!allAgreed || isSendingOtp}
-                onClick={() => void goToOtpStep()}
-                className="mc-btn-primary flex-1 py-4"
-              >
-                {isSendingOtp ? (
-                  <span className="inline-flex items-center justify-center gap-2">
-                    <Spinner size={20} /> Sending OTP…
-                  </span>
-                ) : (
-                  'I agree — send OTP'
-                )}
-              </button>
-            )}
-            {docIndex > 0 ? (
-              <button
-                type="button"
-                onClick={() => setDocIndex((i) => i - 1)}
-                className="py-4 px-6 rounded-xl font-bold border border-slate-200 text-slate-600"
-              >
-                Back
-              </button>
-            ) : null}
+          <div className="mt-8">
+            <button
+              type="button"
+              disabled={!allAgreed || isSendingOtp}
+              onClick={() => void goToOtpStep()}
+              className="mc-btn-primary w-full py-4"
+            >
+              {isSendingOtp ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Spinner size={20} /> Sending OTP…
+                </span>
+              ) : (
+                'I agree — send OTP'
+              )}
+            </button>
           </div>
         </>
       ) : (
@@ -238,13 +214,14 @@ export default function LoanDocumentsPage() {
   return (
     <CustomerJourneyGuard>
       <LoanLandingShell
+        fullBleedPanel
         journeyPanel={journeyPanel}
         leftTitle={
           <>
             Sanction <span className="text-[#60a5fa]">letter</span>
           </>
         }
-        leftDescription="Review your sanction letter and loan agreement before identity verification (KYC)."
+        leftDescription="Review your sanction letter cum Key Fact Statement before identity verification (KYC)."
         leftInfographic={<LoanSummaryLeftRail loanSelection={loanSelection} />}
         mobileStepLabel="Sanction letter"
         mobileOnBack={() => router.push(CUSTOMER_EMAIL_JOURNEY_PATH)}

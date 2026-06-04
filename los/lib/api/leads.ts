@@ -1,4 +1,4 @@
-import { cachedAuthorizedLosGet, clientApiUrl, fetchWithTimeout, messageFromBody, parseJsonResponse } from './_shared';
+import { authorizedLosRequest, cachedAuthorizedLosGet, clientApiUrl, fetchWithTimeout, messageFromBody, parseJsonResponse } from './_shared';
 
 export type LosLead = {
   uuid: string;
@@ -168,6 +168,12 @@ export type LosApplicationDetails = {
     utr: string | null;
     disbursedAt: string | null;
   } | null;
+  loanDocuments: {
+    keyFactReady: boolean;
+    keyFactEsigned: boolean;
+    loanAgreementReady: boolean;
+    acceptedAt: string | null;
+  };
 };
 
 export async function getNewLeads(token: string): Promise<LosLead[]> {
@@ -245,4 +251,28 @@ export async function createApplicationCibilReport(
   if (!body?.success) {
     throw new Error(body?.message ?? body?.transportError ?? 'CIBIL report creation failed.');
   }
+}
+
+export async function fetchApplicationLoanDocumentBlob(
+  token: string,
+  applicationUuid: string,
+  docType: 'key-fact',
+): Promise<Blob> {
+  return fetchLosAuthenticatedBlob(
+    token,
+    `/applications/${encodeURIComponent(applicationUuid)}/loan-documents/${encodeURIComponent(docType)}`,
+    'Failed to fetch loan document PDF.',
+  );
+}
+
+export async function generateApplicationLoanDocuments(
+  token: string,
+  applicationUuid: string,
+): Promise<{ applicationUuid: string; generated: string[] }> {
+  return authorizedLosRequest(
+    token,
+    `/applications/${encodeURIComponent(applicationUuid)}/loan-documents/generate`,
+    { method: 'POST' },
+    'Failed to generate loan documents.',
+  );
 }

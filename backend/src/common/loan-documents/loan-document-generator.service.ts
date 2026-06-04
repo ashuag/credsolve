@@ -1,15 +1,23 @@
-import { Injectable } from '@nestjs/common';
-import { LOAN_DOCUMENT_PDF_FILES, type LoanDocumentType } from '../constants/loan-document.constants';
-import { LoanDocumentPdfGeneratorService } from './loan-document-pdf-generator.service';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { LOAN_DOCUMENT_PDF_FILES, LOAN_DOCUMENT_TYPE, type LoanDocumentType } from '../constants/loan-document.constants';
+import { LoanDocumentDigitalSignerService } from './loan-document-digital-signer.service';
+import { LoanDocumentHtmlPdfGeneratorService } from './loan-document-html-pdf-generator.service';
 import type { LoanDocumentMergeInput } from './loan-document.types';
 
-/** Fills pre-built PDF templates (no LibreOffice / DOCX at runtime). */
+/** Generates sanction letter cum KFS PDF from HTML template, then PKCS#7-signs. */
 @Injectable()
 export class LoanDocumentGeneratorService {
-  constructor(private readonly pdfGenerator: LoanDocumentPdfGeneratorService) {}
+  constructor(
+    private readonly htmlPdfGenerator: LoanDocumentHtmlPdfGeneratorService,
+    private readonly signer: LoanDocumentDigitalSignerService,
+  ) {}
 
-  generatePdf(docType: LoanDocumentType, merge: LoanDocumentMergeInput): Promise<Buffer> {
-    return this.pdfGenerator.generatePdf(docType, merge);
+  async generatePdf(docType: LoanDocumentType, merge: LoanDocumentMergeInput): Promise<{ pdf: Buffer; esigned: boolean }> {
+    if (docType !== LOAN_DOCUMENT_TYPE.KEY_FACT) {
+      throw new BadRequestException('Only the sanction letter cum Key Fact Statement PDF is generated.');
+    }
+    const pdf = await this.htmlPdfGenerator.generatePdf(merge);
+    return this.signer.sign(pdf);
   }
 
   pdfFileName(docType: LoanDocumentType): string {

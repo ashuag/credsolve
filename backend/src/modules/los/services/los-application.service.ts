@@ -1,9 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { BureauReportPdfService } from '../../../common/cibil/bureau-report-pdf.service';
 import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { LoanDocumentApplicationService } from '../../auth/application/services/loan-document-application.service';
+import { LOAN_DOCUMENT_TYPE, type LoanDocumentType } from '../../../common/constants/loan-document.constants';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -56,6 +58,7 @@ export class LosApplicationService {
     private readonly prisma: PrismaService,
     private readonly bureauReportPdf: BureauReportPdfService,
     private readonly kycFiles: KycFilesService,
+    private readonly loanDocs: LoanDocumentApplicationService,
   ) {}
 
   async listApplications() {
@@ -282,6 +285,12 @@ export class LosApplicationService {
             disbursedAt: application.disbursement.disbursedAt?.toISOString() ?? null,
           }
         : null,
+      loanDocuments: {
+        keyFactReady: !!application.keyFactPdfRelativePath?.trim(),
+        keyFactEsigned: application.keyFactEsigned ?? false,
+        loanAgreementReady: !!application.loanAgreementPdfRelativePath?.trim(),
+        acceptedAt: application.loanDocumentsAcceptedAt?.toISOString() ?? null,
+      },
     };
   }
 
@@ -313,6 +322,30 @@ export class LosApplicationService {
       throw new NotFoundException('Aadhaar photo is not available yet.');
     }
     await this.streamKycPhoto(rel, res);
+  }
+
+  async serveApplicationLoanDocument(applicationUuid: string, docTypeRaw: string, res: Response): Promise<void> {
+    const allowed: LoanDocumentType[] = [LOAN_DOCUMENT_TYPE.KEY_FACT];
+    if (!allowed.includes(docTypeRaw as LoanDocumentType)) {
+      throw new BadRequestException('Unknown loan document type.');
+    }
+    const docType = docTypeRaw as LoanDocumentType;
+
+    const application = await this.prisma.client.application.findUnique({
+      where: { uuid: applicationUuid },
+      select: { keyFactPdfRelativePath: true, loanAgreementPdfRelativePath: true },
+    });
+    if (!application) throw new NotFoundException('Application not found.');
+
+    const rel = this.loanDocs.relativePathForType(docType, application)?.trim() ?? null;
+    if (!rel) throw new NotFoundException('This document has not been generated yet.');
+
+    const buf = await this.kycFiles.readBytes(rel);
+    const title = this.loanDocs.documentTitle(docType);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${title}.pdf"`);
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.send(buf);
   }
 
   private async streamKycPhoto(relativePath: string, res: Response): Promise<void> {
@@ -371,5 +404,74 @@ export class LosApplicationService {
       rawPayload: bureauReportRow.rawPayload,
       report,
     };
+  }
+
+  async generateLoanDocuments(applicationUuid: string) {
+    const application = await this.prisma.client.application.findUnique({
+      where: { uuid: applicationUuid },
+      select: {
+        id: true,
+        uuid: true,
+        email: true,
+        emailVerificationType: true,
+        loanDocumentsAcceptedAt: true,
+        keyFactPdfRelativePath: true,
+        keyFactEsigned: true,
+        loanAgreementPdfRelativePath: true,
+        details: {
+          select: {
+            loanAmount: true,
+            loanTenure: true,
+            loanMaturityDate: true,
+            interestRate: true,
+            interestAmount: true,
+            processingFee: true,
+            processingFeeAmount: true,
+            gstAmount: true,
+            reasonForLoan: { select: { name: true } },
+          },
+        },
+        customer: { select: { id: true, uuid: true, mobileNumber: true } },
+        lead: {
+          select: {
+            panNumber: true,
+            leadDetail: {
+              select: {
+                fullName: true,
+                addressLine1: true,
+                addressLine2: true,
+                pincode: true,
+                city: { select: { name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!application) throw new NotFoundException(`Application ${applicationUuid} not found`);
+    if (!application.details?.loanAmount || !application.details?.loanTenure) {
+      throw new NotFoundException('Loan selection is incomplete — cannot generate documents.');
+    }
+
+    const merge = this.loanDocs.buildMergeInput({
+      customer: application.customer,
+      lead: application.lead,
+      application,
+    });
+
+    const docType = LOAN_DOCUMENT_TYPE.KEY_FACT;
+    const existing = this.loanDocs.relativePathForType(docType, application);
+    await this.loanDocs.ensurePdf(
+      docType,
+      application.customer.uuid,
+      application.uuid,
+      application.id,
+      merge,
+      existing,
+    );
+    const generated = [docType];
+
+    return { applicationUuid, generated };
   }
 }

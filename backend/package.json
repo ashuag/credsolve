@@ -21,6 +21,7 @@
     "prisma:seed": "prisma db seed --config prisma.config.ts",
     "cibil:html-to-json": "node scripts/convert-cibil-html-to-json.mjs",
     "cibil:preview-pdf": "npm run build && node scripts/preview-cibil-report-pdf.mjs",
+    "loan-docs:preview-pdf": "npm run build && node scripts/preview-loan-document-pdf.mjs",
     "nest": "nest"
   },
   "dependencies": {
@@ -39,8 +40,10 @@
     "dotenv": "^17.2.3",
     "helmet": "^8.1.0",
     "ioredis": "^5.10.1",
+    "node-signpdf": "^2.0.0",
     "nodemailer": "6.10.1",
     "pdf-lib": "^1.17.1",
+    "puppeteer": "^24.36.0",
     "prisma": "^7.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"

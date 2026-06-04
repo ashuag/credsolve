@@ -1,7 +1,7 @@
 import { getApiUrl } from '../api-url';
 import { apiGet, apiPost } from './client';
 
-export type LoanDocumentType = 'key-fact' | 'loan-agreement';
+export type LoanDocumentType = 'key-fact';
 
 export type LoanDocumentItem = {
   type: LoanDocumentType;

@@ -120,12 +120,12 @@ export class AcceptLoanDocumentsUseCase {
         where: { applicationId: app.id },
         create: {
           applicationId: app.id,
-          documentName: 'Key Fact Statement + Loan Agreement',
+          documentName: 'Loan Sanction letter cum Key Fact Statement',
           ipAddress: ip ?? null,
           signedAt: verifiedAt,
         },
         update: {
-          documentName: 'Key Fact Statement + Loan Agreement',
+          documentName: 'Loan Sanction letter cum Key Fact Statement',
           ipAddress: ip ?? null,
           signedAt: verifiedAt,
         },
@@ -141,7 +141,7 @@ export class AcceptLoanDocumentsUseCase {
 
   private async sendAcceptedDocumentsEmail(
     ctx: Awaited<ReturnType<LoanDocumentApplicationService['loadApplicationContext']>>,
-    customerUuid: string,
+    _customerUuid: string,
   ): Promise<void> {
     const email = ctx.application.email?.trim();
     if (!email) {
@@ -156,31 +156,18 @@ export class AcceptLoanDocumentsUseCase {
       return;
     }
 
-    const merge = this.loanDocs.buildMergeInput({
-      customer: ctx.customer,
-      lead: ctx.lead,
-      application: ctx.application,
-    });
-
-    const docTypes = [LOAN_DOCUMENT_TYPE.KEY_FACT, LOAN_DOCUMENT_TYPE.LOAN_AGREEMENT] as const;
     const attachments = [];
 
     try {
-      for (const docType of docTypes) {
-        const existing = this.loanDocs.relativePathForType(docType, ctx.application);
-        const relativePath = await this.loanDocs.ensurePdf(
-          docType,
-          customerUuid,
-          ctx.application.uuid,
-          ctx.application.id,
-          merge,
-          existing,
+      const docType = LOAN_DOCUMENT_TYPE.KEY_FACT;
+      const rel = this.loanDocs.relativePathForType(docType, ctx.application)?.trim() || null;
+      if (!rel || !(await this.kycFiles.exists(rel))) {
+        this.logger.warn(
+          `[loan-docs] PDF not found for application ${ctx.application.uuid}; omitting from email.`,
         );
-        const content = await this.kycFiles.readBytes(relativePath);
-        attachments.push({
-          filename: LOAN_DOCUMENT_PDF_FILES[docType],
-          content,
-        });
+      } else {
+        const content = await this.kycFiles.readBytes(rel);
+        attachments.push({ filename: LOAN_DOCUMENT_PDF_FILES[docType], content });
       }
 
       await this.emailService.sendLoanDocumentsEmail(email, attachments);

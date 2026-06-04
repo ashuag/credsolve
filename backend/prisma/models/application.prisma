@@ -30,6 +30,7 @@ model Application {
   livenessDoneAt        DateTime?                 @map("liveness_done_at")
   /// Object key: `customer/{uuid}/loan-documents/{app_uuid}/key-fact-statement.pdf` (and loan-agreement.pdf)
   keyFactPdfRelativePath     String?              @map("key_fact_pdf_relative_path") @db.VarChar(512)
+  keyFactEsigned             Boolean              @default(false) @map("key_fact_esigned")
   /// `customer/{uuid}/loan-documents/{app_uuid}/loan-agreement.pdf`
   loanAgreementPdfRelativePath String?            @map("loan_agreement_pdf_relative_path") @db.VarChar(512)
   loanDocumentsAcceptedAt    DateTime?           @map("loan_documents_accepted_at")
@@ -45,7 +46,8 @@ model Application {
   disbursement      ApplicationDisbursement?
 
   @@index([customerId, applicationStatusId])
-  @@index([leadId])
+  @@index([leadId, createdAt])
+  @@index([leadId, applicationStatusId])
   @@index([applicationStatusId])
   @@map("application")
 }

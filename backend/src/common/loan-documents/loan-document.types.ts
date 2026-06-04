@@ -14,5 +14,7 @@ export type LoanDocumentMergeInput = {
   gstAmountInr: string | number | null;
   loanTenureDays: number | null;
   loanMaturityDate: Date | string | null;
+  applicationUuid?: string | null;
+  processingFeePercent?: string | number | null;
   asOf?: Date;
 };

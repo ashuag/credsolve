@@ -48,3 +48,8 @@ los/public/image
 ## Local KYC file store (DigiLocker photo, selfie under storage/customer/…)
 backend/storage/customer/
 backend/storage/kyc-files/
+
+## Digital signing certificates (never commit private PFX/keys)
+backend/storage/digital-signin/
+*.pfx
+*.p12

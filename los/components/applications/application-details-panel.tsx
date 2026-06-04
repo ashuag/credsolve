@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ApplicationCibilReportTab } from '@/components/applications/application-cibil-report-tab';
 import { cx } from '@/components/eligibility/eligibility-ui';
-import { createApplicationCibilReport, getApplicationDetails, fetchLosAuthenticatedBlob, type LosApplicationDetails } from '@/lib/api';
+import { createApplicationCibilReport, generateApplicationLoanDocuments, fetchApplicationLoanDocumentBlob, getApplicationDetails, fetchLosAuthenticatedBlob, type LosApplicationDetails } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 
@@ -272,6 +272,74 @@ function AuthenticatedKycPhoto({
   );
 }
 
+function LoanDocumentCard({
+  label,
+  ready,
+  esigned,
+  docType,
+  applicationUuid,
+  token,
+}: {
+  label: string;
+  ready: boolean;
+  esigned: boolean;
+  docType: 'key-fact';
+  applicationUuid: string;
+  token: string | null;
+}) {
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState<string | null>(null);
+
+  const handleView = async () => {
+    if (!token) return;
+    setOpening(true);
+    setOpenError(null);
+    try {
+      const blob = await fetchApplicationLoanDocumentBlob(token, applicationUuid, docType);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener');
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch (e) {
+      setOpenError(e instanceof Error ? e.message : 'Failed to open document.');
+    } finally {
+      setOpening(false);
+    }
+  };
+
+  return (
+    <div className="rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)] px-3 py-2.5">
+      <span className="block text-[0.78rem] font-extrabold text-brand-navy">{label}</span>
+      {ready ? (
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <span className="text-[0.72rem] font-bold text-[#14523a]">Ready</span>
+          {esigned ? (
+            <span className="inline-flex items-center gap-0.5 rounded-[5px] border border-[rgba(29,157,112,0.3)] bg-[rgba(29,157,112,0.08)] px-1.5 py-0.5 text-[0.65rem] font-extrabold text-[#14523a]">
+              ✓ E-Signed
+            </span>
+          ) : (
+            <span className="inline-flex items-center rounded-[5px] border border-[rgba(180,100,0,0.25)] bg-[rgba(255,160,0,0.08)] px-1.5 py-0.5 text-[0.65rem] font-extrabold text-[#7a4800]">
+              Not E-Signed
+            </span>
+          )}
+          <button
+            type="button"
+            disabled={opening || !token}
+            onClick={() => void handleView()}
+            className="inline-flex items-center gap-1 rounded-[6px] border border-[rgba(20,150,243,0.28)] bg-[rgba(20,150,243,0.07)] px-2 py-0.5 text-[0.68rem] font-bold text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 hover:bg-[rgba(20,150,243,0.13)]"
+          >
+            {opening ? 'Opening…' : 'View PDF'}
+          </button>
+          {openError ? (
+            <span className="text-[0.68rem] font-semibold text-[#8d3434]">{openError}</span>
+          ) : null}
+        </div>
+      ) : (
+        <span className="block mt-0.5 text-[0.72rem] font-bold text-brand-muted">Not generated yet</span>
+      )}
+    </div>
+  );
+}
+
 export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: string }) {
   const [row, setRow] = useState<LosApplicationDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -279,6 +347,8 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
   const [activeTab, setActiveTab] = useState<ApplicationDetailsTab>('overview');
   const [creatingBureau, setCreatingBureau] = useState(false);
   const [bureauActionError, setBureauActionError] = useState<string | null>(null);
+  const [generatingDocs, setGeneratingDocs] = useState(false);
+  const [docsActionResult, setDocsActionResult] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -713,6 +783,75 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
           ) : (
             <p className="m-0 text-[0.9rem] text-brand-muted">No eligibility check has been stored for this application.</p>
           )}
+        </SectionCard>
+
+        <SectionCard
+          eyebrow="Loan documents"
+          title="Key Fact Statement & Loan Agreement"
+          description="PDFs must be generated here (LOS) before the customer can view or accept them."
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={generatingDocs}
+              onClick={async () => {
+                const token = getToken();
+                if (!token) return;
+                setGeneratingDocs(true);
+                setDocsActionResult(null);
+                try {
+                  const result = await generateApplicationLoanDocuments(token, applicationUuid);
+                  setDocsActionResult(`Generated: ${result.generated.join(', ')}`);
+                  void load();
+                } catch (e) {
+                  setDocsActionResult(e instanceof Error ? e.message : 'Failed to generate documents.');
+                } finally {
+                  setGeneratingDocs(false);
+                }
+              }}
+              className="inline-flex min-h-[38px] cursor-pointer items-center gap-2 rounded-[10px] border border-[rgba(23,44,113,0.18)] bg-[rgba(23,44,113,0.06)] px-4 text-[0.82rem] font-bold text-brand-navy disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {generatingDocs ? 'Generating…' : 'Generate PDFs'}
+            </button>
+            {row.lead.profile?.fullName && row.details?.loanAmount ? null : (
+              <span className="text-[0.78rem] text-[#b45309]">
+                Loan selection must be complete before generating.
+              </span>
+            )}
+            {docsActionResult && (
+              <span className={`text-[0.78rem] font-semibold ${docsActionResult.startsWith('Generated') ? 'text-[#14523a]' : 'text-[#8d3434]'}`}>
+                {docsActionResult}
+              </span>
+            )}
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {(
+              [
+                {
+                  label: 'Sanction letter cum KFS',
+                  ready: row.loanDocuments.keyFactReady,
+                  esigned: row.loanDocuments.keyFactEsigned,
+                  docType: 'key-fact' as const,
+                },
+              ]
+            ).map((doc) => (
+              <LoanDocumentCard
+                key={doc.label}
+                label={doc.label}
+                ready={doc.ready}
+                esigned={doc.esigned}
+                docType={doc.docType}
+                applicationUuid={applicationUuid}
+                token={authToken}
+              />
+            ))}
+            {row.loanDocuments.acceptedAt && (
+              <div className="rounded-[10px] border border-[rgba(29,157,112,0.2)] bg-[rgba(29,157,112,0.06)] px-3 py-2.5 sm:col-span-2">
+                <span className="block text-[0.72rem] font-extrabold text-brand-muted">Accepted by customer</span>
+                <span className="block text-[0.78rem] font-bold text-[#14523a]">{formatDateTime(row.loanDocuments.acceptedAt)}</span>
+              </div>
+            )}
+          </div>
         </SectionCard>
 
         <SectionCard

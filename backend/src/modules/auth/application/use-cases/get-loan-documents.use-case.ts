@@ -38,27 +38,20 @@ export class GetLoanDocumentsUseCase {
       throw new BadRequestException('Verify your email before reviewing loan documents.');
     }
 
-    const merge = this.loanDocs.buildMergeInput({
-      customer: ctx.customer,
-      lead: ctx.lead,
-      application: app,
-    });
-
     if (!app.details?.loanAmount || !app.details?.loanTenure) {
       throw new BadRequestException('Complete loan selection before reviewing documents.');
     }
 
-    const docTypes = [LOAN_DOCUMENT_TYPE.KEY_FACT, LOAN_DOCUMENT_TYPE.LOAN_AGREEMENT] as const;
-    const documents = [];
-    for (const docType of docTypes) {
-      const existing = this.loanDocs.relativePathForType(docType, app);
-      await this.loanDocs.ensurePdf(docType, customer.uuid, app.uuid, app.id, merge, existing);
-      documents.push({
-        type: docType,
-        title: this.loanDocs.documentTitle(docType),
-        pdfUrl: this.loanDocs.pdfUrlFragment(docType),
-      });
-    }
+    const merge = this.loanDocs.buildMergeInput({ customer: ctx.customer, lead: ctx.lead, application: app });
+    const docType = LOAN_DOCUMENT_TYPE.KEY_FACT;
+    const existing = this.loanDocs.relativePathForType(docType, app);
+    await this.loanDocs.ensurePdf(docType, customer.uuid, app.uuid, app.id, merge, existing);
+
+    const documents = [docType].map((type) => ({
+      type,
+      title: this.loanDocs.documentTitle(type),
+      pdfUrl: this.loanDocs.pdfUrlFragment(type),
+    }));
 
     return {
       accepted: app.loanDocumentsAcceptedAt != null,

@@ -9,6 +9,12 @@ import type { LoanDocumentMergeInput } from '../../../../common/loan-documents/l
 import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
 
+function toNumber(value: string | null | undefined): number | null {
+  if (value == null || value === '') return null;
+  const n = Number.parseFloat(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 @Injectable()
 export class LoanDocumentApplicationService {
   constructor(
@@ -42,6 +48,7 @@ export class LoanDocumentApplicationService {
             loanMaturityDate: true,
             interestRate: true,
             interestAmount: true,
+            processingFee: true,
             processingFeeAmount: true,
             gstAmount: true,
             reasonForLoan: { select: { name: true } },
@@ -83,12 +90,14 @@ export class LoanDocumentApplicationService {
       } | null;
     } | null;
     application: {
+      uuid: string;
       details: {
         loanAmount: { toString(): string } | null;
         loanTenure: number | null;
         loanMaturityDate: Date | null;
         interestRate: { toString(): string } | null;
         interestAmount: { toString(): string } | null;
+        processingFee: { toString(): string } | null;
         processingFeeAmount: { toString(): string } | null;
         gstAmount: { toString(): string } | null;
         reasonForLoan: { name: string } | null;
@@ -97,6 +106,13 @@ export class LoanDocumentApplicationService {
   }): LoanDocumentMergeInput {
     const detail = params.lead?.leadDetail;
     const appDetails = params.application.details;
+    const loanAmount = toNumber(appDetails?.loanAmount?.toString() ?? null);
+    const processingFeeAmount = toNumber(appDetails?.processingFeeAmount?.toString() ?? null);
+    const processingFeePercent =
+      loanAmount != null && loanAmount > 0 && processingFeeAmount != null
+        ? (processingFeeAmount / loanAmount) * 100
+        : toNumber(appDetails?.processingFee?.toString() ?? null);
+
     return {
       fullName: detail?.fullName ?? null,
       mobileNumber: params.customer.mobileNumber,
@@ -113,6 +129,8 @@ export class LoanDocumentApplicationService {
       gstAmountInr: appDetails?.gstAmount?.toString() ?? null,
       loanTenureDays: appDetails?.loanTenure ?? null,
       loanMaturityDate: appDetails?.loanMaturityDate ?? null,
+      applicationUuid: params.application.uuid,
+      processingFeePercent,
     };
   }
 
@@ -135,12 +153,12 @@ export class LoanDocumentApplicationService {
       }
     }
 
-    const pdf = await this.generator.generatePdf(docType, merge);
+    const { pdf, esigned } = await this.generator.generatePdf(docType, merge);
     await this.kycFiles.writeBytes(rel, pdf);
 
     const data =
       docType === LOAN_DOCUMENT_TYPE.KEY_FACT
-        ? { keyFactPdfRelativePath: rel }
+        ? { keyFactPdfRelativePath: rel, keyFactEsigned: esigned }
         : { loanAgreementPdfRelativePath: rel };
 
     await this.prisma.client.application.update({

@@ -1,3 +1,13 @@
+import {
+  DLA_NAME,
+  LENDER_NAME,
+  LSP_NAME,
+  NBFC_ADDRESS,
+  NBFC_EMAIL,
+  NBFC_NAME,
+  PAYABLE_TO,
+  RECOVERY_AGENT_NAME,
+} from '../constants/loan-document.constants';
 import type { LoanDocumentMergeInput } from './loan-document.types';
 
 const MONTH_NAMES = [
@@ -93,6 +103,14 @@ export function buildLoanDocumentReplacements(input: LoanDocumentMergeInput): Re
     'DD-MM-YYYY': maturity || formatDateDdMmYyyy(now),
     mobileNumber: input.mobileNumber?.trim() ?? '',
     panNumber: input.panNumber?.trim() ?? '',
+    NBFC_NAME: NBFC_NAME,
+    NBFC_ADDRESS: NBFC_ADDRESS,
+    NBFC_EMAIL: NBFC_EMAIL,
+    LENDER_NAME: LENDER_NAME,
+    LSP_NAME: LSP_NAME,
+    DLA_NAME: DLA_NAME,
+    RECOVERY_AGENT_NAME: RECOVERY_AGENT_NAME,
+    PAYABLE_TO: PAYABLE_TO,
   };
 }
 

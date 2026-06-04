@@ -42,7 +42,7 @@ export function LoanDocumentScrollPanel({
   const pdfSrc = loanDocumentPdfAbsoluteUrl(pdfUrlFragment);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 h-full">
       <h2 className="text-lg font-bold text-brand-navy">{title}</h2>
       <p className="text-sm text-slate-500">
         Scroll through the entire document to enable &quot;I agree&quot;. You can also open it in a new tab if the
@@ -59,12 +59,12 @@ export function LoanDocumentScrollPanel({
       <div
         ref={scrollRef}
         onScroll={checkScroll}
-        className="h-[min(52vh,520px)] overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50"
+        className="flex-1 min-h-100 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50"
       >
         <iframe
           title={title}
           src={pdfSrc}
-          className="h-[1200px] w-full min-h-full border-0 bg-white"
+          className="h-400 w-full min-h-full border-0 bg-white"
         />
       </div>
       {!scrolledToEnd ? (
