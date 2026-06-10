@@ -164,7 +164,8 @@ export async function verifyLeadPan(payload: VerifyLeadPanPayload): Promise<Veri
     (await apiPost<VerifyLeadPanResponse>(
       '/auth/verify-pan',
       payload,
-      'Unable to verify your PAN right now. Please try again.'
+      'Unable to verify your PAN right now. Please try again.',
+      { timeoutMs: 90_000 },
     )) ?? {
       success: false,
       matched: false,
@@ -213,7 +214,7 @@ export type SaveProfessionalDetailsResponse = {
 export type SaveLoanSelectionPayload = {
   loanAmount: number;
   tenureEndDate: string; // YYYY-MM-DD
-  loanPurpose?: string;
+  loanPurpose: string;
 };
 
 export type SaveKycDocumentsPayload = {

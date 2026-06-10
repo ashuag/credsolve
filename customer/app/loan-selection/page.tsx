@@ -12,6 +12,7 @@ import {
   type LoanCalculationSettingsResponse,
 } from '@/lib/api/eligibility';
 import { saveLoanSelection } from '@/lib/api/lead';
+import { CUSTOMER_LOAN_PURPOSE_OPTIONS } from '@/lib/loan-reasons';
 import { computeFixedRepaymentDate } from '@/lib/repayment-date';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { Spinner } from '@/components/ui/spinner';
@@ -61,6 +62,8 @@ function defaultLoanAmount(min: number, max: number): number {
 
 export default function LoanSelectionPage() {
   const router = useRouter();
+  const { refresh } = useCustomerSession();
+  const sessionExpiredHandledRef = useRef(false);
   const [settings, setSettings] = useState<LoanCalculationSettingsResponse>(DEFAULT_LOAN_SETTINGS);
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -83,6 +86,9 @@ export default function LoanSelectionPage() {
       } catch (e) {
         if (cancelled) return;
         if (e instanceof ApiRequestError && e.statusCode === 401) {
+          if (sessionExpiredHandledRef.current) return;
+          sessionExpiredHandledRef.current = true;
+          await refresh();
           router.replace('/apply-for-loan');
           return;
         }
@@ -98,7 +104,7 @@ export default function LoanSelectionPage() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, refresh]);
 
   /** Slider: product floor … up to pre-approved eligible amount (never above product `maxLoanAmount`). */
   const sliderMin = settings.minLoanAmount;
@@ -114,6 +120,7 @@ export default function LoanSelectionPage() {
   const selectedEndDate = useMemo(() => toDateInputValue(fixedRepaymentDate), [fixedRepaymentDate]);
 
   const [loanPurpose, setLoanPurpose] = useState('');
+  const [purposeError, setPurposeError] = useState<string | null>(null);
   const [selectedAmount, setSelectedAmount] = useState(DEFAULT_LOAN_SETTINGS.minLoanAmount);
   const hasInitializedAmount = useRef(false);
 
@@ -151,15 +158,18 @@ export default function LoanSelectionPage() {
     };
   }, [selectedAmount, settings.processingFeeGstPercent, settings.processingFeePercent, settings.roiPerDayPercent, tenureDays]);
 
-  const { refresh } = useCustomerSession();
-
   async function handleContinue() {
+    if (!loanPurpose.trim()) {
+      setPurposeError('Please select a purpose for your loan.');
+      return;
+    }
+    setPurposeError(null);
     setIsSaving(true);
     try {
       await saveLoanSelection({
         loanAmount: selectedAmount,
         tenureEndDate: selectedEndDate,
-        loanPurpose: loanPurpose || undefined,
+        loanPurpose,
       });
       await refresh();
       router.push('/references');
@@ -249,7 +259,14 @@ export default function LoanSelectionPage() {
             </div>
           </div>
 
-          <LoanPurposePicker value={loanPurpose} onChange={setLoanPurpose} />
+          <LoanPurposePicker
+            value={loanPurpose}
+            onChange={(next) => {
+              setLoanPurpose(next);
+              if (next.trim()) setPurposeError(null);
+            }}
+            error={purposeError}
+          />
 
           <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
             <label htmlFor="loanEndDate" className="block text-[0.75rem] font-bold text-slate-500 uppercase tracking-wider mb-3">
@@ -274,7 +291,7 @@ export default function LoanSelectionPage() {
         <div className="mt-10 flex flex-col sm:flex-row gap-3">
           <button
             onClick={handleContinue}
-            disabled={isSaving}
+            disabled={isSaving || !loanPurpose.trim()}
             className="mc-btn-primary flex-1 py-4 text-[1rem]"
           >
             {isSaving ? 'Processing...' : 'Confirm Loan Details'}
@@ -323,31 +340,30 @@ function SummaryRow({ label, value, strong = false }: { label: string; value: st
   );
 }
 
-const LOAN_PURPOSES = [
-  { label: 'Medical',      icon: '🏥' },
-  { label: 'Education',    icon: '🎓' },
-  { label: 'Home Repair',  icon: '🏠' },
-  { label: 'Travel',       icon: '✈️' },
-  { label: 'Wedding',      icon: '💍' },
-  { label: 'Business',     icon: '💼' },
-  { label: 'Electronics',  icon: '📱' },
-  { label: 'Other',        icon: '📋' },
-];
+const LOAN_PURPOSES = CUSTOMER_LOAN_PURPOSE_OPTIONS;
 
-function LoanPurposePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function LoanPurposePicker({
+  value,
+  onChange,
+  error,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  error?: string | null;
+}) {
   return (
     <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
       <div className="text-[0.75rem] font-bold text-slate-500 uppercase tracking-wider mb-4">
-        Purpose of Loan
+        Purpose of Loan <span className="text-red-500">*</span>
       </div>
       <div className="grid grid-cols-4 gap-2">
         {LOAN_PURPOSES.map((p) => {
-          const active = value === p.label;
+          const active = value === p.value;
           return (
             <button
-              key={p.label}
+              key={p.value}
               type="button"
-              onClick={() => onChange(active ? '' : p.label)}
+              onClick={() => onChange(active ? '' : p.value)}
               className={`flex flex-col items-center justify-center gap-1.5 rounded-xl py-3 px-1 border text-center transition-all duration-150 ${
                 active
                   ? 'border-brand-blue bg-blue-50 shadow-sm'
@@ -364,6 +380,7 @@ function LoanPurposePicker({ value, onChange }: { value: string; onChange: (v: s
           );
         })}
       </div>
+      {error ? <p className="mt-3 mb-0 text-[0.85rem] font-semibold text-red-600">{error}</p> : null}
     </div>
   );
 }

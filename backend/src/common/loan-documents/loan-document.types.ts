@@ -17,4 +17,11 @@ export type LoanDocumentMergeInput = {
   applicationUuid?: string | null;
   processingFeePercent?: string | number | null;
   asOf?: Date;
+  /** Captured when the customer accepts loan documents (OTP verified). */
+  acceptanceIpAddress?: string | null;
+  acceptanceSignedAt?: Date | string | null;
+  /** NBFC PKCS#7 stamp — set when generating the execution (signed) PDF. */
+  lenderDscSignerName?: string | null;
+  lenderDscSignedAt?: Date | string | null;
+  lenderDscSerial?: string | null;
 };

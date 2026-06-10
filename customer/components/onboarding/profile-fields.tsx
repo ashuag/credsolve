@@ -79,7 +79,6 @@ export function ProfileFields({
       </div>
 
       <StickyActions>
-        <button type="button" onClick={onBack} className={secondaryBtn}>← Back</button>
         <button type="button" onClick={onContinue} disabled={isBusy} aria-busy={isBusy}
           className="mc-btn-primary flex-1 disabled:opacity-60 disabled:cursor-not-allowed">
           <span className="inline-flex items-center justify-center gap-2.5">

@@ -1,13 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { ApplicationCibilReportTab } from '@/components/applications/application-cibil-report-tab';
-import { cx } from '@/components/eligibility/eligibility-ui';
-import { createApplicationCibilReport, generateApplicationLoanDocuments, fetchApplicationLoanDocumentBlob, getApplicationDetails, fetchLosAuthenticatedBlob, type LosApplicationDetails } from '@/lib/api';
+import { ApplicationOverviewCibilSection } from '@/components/applications/application-overview-cibil-section';
+import { CustomerJourneyTimeline } from '@/components/shared/customer-journey-timeline';
+import { WorkspaceRecordHeader } from '@/components/shared/workspace-record-header';
+import { buildApplicationJourney } from '@/lib/customer-journey';
+import { generateApplicationLoanDocuments, fetchApplicationLoanDocumentBlob, getApplicationDetails, fetchLosAuthenticatedBlob, type LosApplicationDetails } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
-
-type ApplicationDetailsTab = 'overview' | 'cibil';
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -31,112 +31,43 @@ function formatDateTime(iso: string | null | undefined) {
   });
 }
 
-function formatDateOnly(iso: string | null | undefined) {
-  if (!iso) return '—';
-  const d = new Date(`${iso}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-function ageFromDateOfBirth(iso: string | null | undefined) {
-  if (!iso) return '—';
-  const dob = new Date(`${iso}T12:00:00`);
-  if (Number.isNaN(dob.getTime())) return '—';
-
-  const now = new Date();
-  if (now < dob) return '—';
-
-  let years = now.getFullYear() - dob.getFullYear();
-  let months = now.getMonth() - dob.getMonth();
-  let days = now.getDate() - dob.getDate();
-
-  if (days < 0) {
-    months -= 1;
-    const prevMonthDays = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
-    days += prevMonthDays;
-  }
-
-  if (months < 0) {
-    years -= 1;
-    months += 12;
-  }
-
-  return `${years} yrs, ${months} months, ${days} days`;
-}
-
-function formatInr(value: string | null | undefined): string {
-  if (value == null || value === '') return '—';
-  const n = Number(value);
-  if (Number.isNaN(n)) return value;
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
-}
-
 function leadSourceSummary(sourceName: string | null | undefined, sourceType: string | null | undefined): string {
   if (!sourceName) return 'Unattributed';
   return sourceType ? `${sourceName} · ${sourceType}` : sourceName;
 }
 
-function statusPillStyles(code: string): { bg: string; text: string; ring: string } {
-  const c = code.toUpperCase();
-  if (c === 'DRAFT') {
-    return { bg: 'rgba(100,116,139,0.14)', text: '#334155', ring: 'rgba(100,116,139,0.28)' };
-  }
-  if (c === 'IN_REVIEW') {
-    return { bg: 'rgba(255,197,25,0.18)', text: '#6b4e00', ring: 'rgba(245,158,11,0.35)' };
-  }
-  if (c.includes('APPROVED') || c.includes('DISBURS')) {
-    return { bg: 'rgba(29,157,112,0.14)', text: '#14523a', ring: 'rgba(29,157,112,0.32)' };
-  }
-  if (c.includes('REJECT')) {
-    return { bg: 'rgba(231,95,95,0.14)', text: '#8d3434', ring: 'rgba(231,95,95,0.28)' };
-  }
-  return { bg: 'rgba(23,44,113,0.08)', text: '#172c71', ring: 'rgba(23,44,113,0.16)' };
-}
-
-function StatusPill({ code, label }: { code: string; label: string }) {
-  const s = statusPillStyles(code);
-  return (
-    <span
-      className="inline-flex max-w-full items-center rounded-full px-3 py-1 text-[0.72rem] font-extrabold uppercase tracking-[0.07em] ring-1 ring-inset"
-      style={{ backgroundColor: s.bg, color: s.text, boxShadow: `inset 0 0 0 1px ${s.ring}` }}
-    >
-      <span className="truncate">{label}</span>
-    </span>
-  );
-}
-
 function SectionCard({
   eyebrow,
   title,
-  description,
   children,
 }: {
   eyebrow: string;
   title: string;
-  description?: string;
+  description?: string; // kept for API compat, ignored
   children: ReactNode;
 }) {
   return (
-    <section className="los-card overflow-hidden">
-      <div className="border-b border-[var(--los-panel-border)] bg-[rgba(20,150,243,0.04)] px-5 py-4 md:px-6">
-        <span className="los-chip mb-2">{eyebrow}</span>
-        <h2 className="m-0 text-[1.05rem] font-extrabold tracking-[-0.02em] text-brand-navy md:text-[1.15rem]">{title}</h2>
-        {description ? (
-          <p className="m-0 mt-1.5 max-w-[62ch] text-[0.84rem] leading-relaxed text-brand-muted">{description}</p>
-        ) : null}
+    <section
+      className="overflow-hidden rounded-[12px] border border-[rgba(23,44,113,0.09)]"
+      style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,246,255,0.95))' }}
+    >
+      <div className="flex items-center gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.7)] px-4 py-2.5">
+        <span className="text-[0.6rem] font-extrabold uppercase tracking-[0.14em]" style={{ color: 'rgba(94,103,130,0.6)' }}>{eyebrow}</span>
+        <span className="w-px h-3 bg-[rgba(23,44,113,0.1)]" aria-hidden />
+        <h2 className="m-0 text-[0.88rem] font-extrabold tracking-[-0.01em] text-brand-navy">{title}</h2>
       </div>
-      <div className="px-5 py-4 md:px-6 md:py-5">{children}</div>
+      <div className="px-4 py-3">{children}</div>
     </section>
   );
 }
 
 function DetailGrid({ rows }: { rows: Array<{ label: string; value: ReactNode }> }) {
   return (
-    <dl className="m-0 divide-y divide-[rgba(23,44,113,0.08)]">
+    <dl className="m-0 divide-y divide-[rgba(23,44,113,0.06)]">
       {rows.map((row, idx) => (
-        <div key={`${row.label}-${idx}`} className="grid gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(140px,200px)_1fr] sm:items-start sm:gap-4">
-          <dt className="text-[0.72rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">{row.label}</dt>
-          <dd className="m-0 min-w-0 text-[0.92rem] font-semibold text-brand-text">{row.value}</dd>
+        <div key={`${row.label}-${idx}`} className="flex items-baseline gap-3 py-1.5 first:pt-0 last:pb-0">
+          <dt className="w-[140px] flex-shrink-0 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-brand-muted leading-tight">{row.label}</dt>
+          <dd className="m-0 min-w-0 flex-1 text-[0.84rem] font-semibold text-brand-text leading-snug">{row.value}</dd>
         </div>
       ))}
     </dl>
@@ -344,9 +275,6 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
   const [row, setRow] = useState<LosApplicationDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<ApplicationDetailsTab>('overview');
-  const [creatingBureau, setCreatingBureau] = useState(false);
-  const [bureauActionError, setBureauActionError] = useState<string | null>(null);
   const [generatingDocs, setGeneratingDocs] = useState(false);
   const [docsActionResult, setDocsActionResult] = useState<string | null>(null);
 
@@ -422,16 +350,10 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
   const profile = row.lead.profile;
   const displayName = profile?.fullName?.trim() || 'Applicant (name pending)';
   const authToken = getToken();
-  const canCreateBureauReport = Boolean(
-    authToken &&
-      row.leadUuid &&
-      row.mobileNumber &&
-      row.lead.panNumber?.trim() &&
-      profile?.fullName?.trim(),
-  );
+  const journeySteps = buildApplicationJourney(row);
 
   return (
-    <div className="grid gap-5 pb-2">
+    <div className="grid gap-4 pb-2">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
           <Link
@@ -456,59 +378,41 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
         </button>
       </div>
 
-      <header className="los-card relative overflow-hidden p-5 md:p-7">
-        <div
-          className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full opacity-90 blur-2xl"
-          style={{ background: 'radial-gradient(circle, rgba(20,150,243,0.22), transparent 68%)' }}
-          aria-hidden
-        />
-        <div className="relative grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
-          <div className="min-w-0">
-            <span className="los-chip mb-3">Loan application</span>
-            <h1 className="m-0 text-[1.45rem] font-extrabold leading-tight tracking-[-0.04em] text-brand-navy md:text-[1.75rem]">
-              {displayName}
-            </h1>
-            <p className="m-0 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.9rem] text-brand-muted">
-              <span className="font-bold text-brand-text">{row.mobileNumber}</span>
-              <span className="hidden text-brand-muted sm:inline" aria-hidden>
-                ·
-              </span>
-              <span className="min-w-0 break-all">{row.email ?? 'Email not captured on application'}</span>
-            </p>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <StatusPill code={row.statusCode} label={row.statusLabel} />
-              <span className="inline-flex items-center rounded-full border border-[rgba(23,44,113,0.1)] bg-[rgba(255,255,255,0.75)] px-3 py-1 text-[0.72rem] font-bold text-brand-muted">
-                Lead status:{' '}
-                <span className="ml-1 text-brand-text">{row.lead.statusLabel}</span>
-              </span>
-              <span className="inline-flex items-center rounded-full border border-[rgba(23,44,113,0.1)] bg-[rgba(255,255,255,0.75)] px-3 py-1 text-[0.72rem] font-bold text-brand-muted">
-                Lead source:{' '}
-                <span className="ml-1 text-brand-text">
-                  {leadSourceSummary(row.lead.sourceName, row.lead.sourceType)}
-                </span>
-              </span>
-            </div>
-            <p className="m-0 mt-3 text-[0.78rem] font-semibold text-brand-muted">
-              Opened {formatDateTime(row.createdAt)} · Updated {formatDateTime(row.updatedAt)}
-            </p>
-          </div>
-          {authToken ? (
-            <div className="flex flex-wrap gap-3 lg:justify-self-end">
+      <WorkspaceRecordHeader
+        eyebrow="Loan application"
+        title={displayName}
+        mobile={row.mobileNumber}
+        email={row.email}
+        statusCode={row.statusCode}
+        statusLabel={row.statusLabel}
+        sourceLabel={leadSourceSummary(row.lead.sourceName, row.lead.sourceType)}
+        createdAt={formatDateTime(row.createdAt)}
+        updatedAt={formatDateTime(row.updatedAt)}
+        createdLabel="Opened"
+        updatedLabel="Updated"
+        quickStats={[
+          { label: 'Lead', value: row.lead.statusLabel },
+          { label: 'CIBIL', value: row.bureauReport?.cibilScore ?? row.eligibility?.cibilScore ?? '—' },
+          { label: 'KYC', value: row.kycStatusLabel },
+        ]}
+        trailing={
+          authToken ? (
+            <div className="flex gap-2">
               {row.kycPhotos.aadhaarPhotoUrl ? (
                 <AuthenticatedKycPhoto
                   token={authToken}
                   path={row.kycPhotos.aadhaarPhotoUrl}
-                  label="Aadhaar pic"
+                  label="Aadhaar"
                   emptyLabel="Not available"
                   compact
                 />
               ) : (
-                <figure className="m-0 w-[112px] shrink-0 overflow-hidden rounded-[12px] border border-[rgba(23,44,113,0.1)] bg-white">
-                  <figcaption className="border-b border-[rgba(23,44,113,0.07)] px-2 py-1.5 text-center text-[0.62rem] font-extrabold uppercase tracking-[0.06em] text-brand-muted">
-                    Aadhaar pic
+                <figure className="m-0 w-[88px] shrink-0 overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.1)] bg-white">
+                  <figcaption className="border-b border-[rgba(23,44,113,0.07)] px-1.5 py-1 text-center text-[0.58rem] font-extrabold uppercase text-brand-muted">
+                    Aadhaar
                   </figcaption>
-                  <div className="flex h-[132px] items-center justify-center bg-[rgba(248,250,255,0.9)] p-1.5">
-                    <span className="px-1 text-center text-[0.62rem] font-semibold leading-tight text-brand-muted">Not available</span>
+                  <div className="flex h-[100px] items-center justify-center bg-[rgba(248,250,255,0.9)]">
+                    <span className="text-[0.58rem] font-semibold text-brand-muted">N/A</span>
                   </div>
                 </figure>
               )}
@@ -521,274 +425,46 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
                   compact
                 />
               ) : (
-                <figure className="m-0 w-[112px] shrink-0 overflow-hidden rounded-[12px] border border-[rgba(23,44,113,0.1)] bg-white">
-                  <figcaption className="border-b border-[rgba(23,44,113,0.07)] px-2 py-1.5 text-center text-[0.62rem] font-extrabold uppercase tracking-[0.06em] text-brand-muted">
+                <figure className="m-0 w-[88px] shrink-0 overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.1)] bg-white">
+                  <figcaption className="border-b border-[rgba(23,44,113,0.07)] px-1.5 py-1 text-center text-[0.58rem] font-extrabold uppercase text-brand-muted">
                     Selfie
                   </figcaption>
-                  <div className="flex h-[132px] items-center justify-center bg-[rgba(248,250,255,0.9)] p-1.5">
-                    <span className="px-1 text-center text-[0.62rem] font-semibold leading-tight text-brand-muted">Not captured</span>
+                  <div className="flex h-[100px] items-center justify-center bg-[rgba(248,250,255,0.9)]">
+                    <span className="text-[0.58rem] font-semibold text-brand-muted">N/A</span>
                   </div>
                 </figure>
               )}
             </div>
-          ) : null}
-        </div>
-      </header>
+          ) : null
+        }
+      />
 
-      <nav
-        className="los-card flex flex-wrap gap-1 p-1.5"
-        aria-label="Application workspace sections"
-      >
-        {(
-          [
-            { id: 'overview' as const, label: 'Overview' },
-            { id: 'cibil' as const, label: 'CIBIL report' },
-          ] satisfies Array<{ id: ApplicationDetailsTab; label: string }>
-        ).map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id)}
-            className={cx(
-              'min-h-[40px] flex-1 rounded-[10px] px-4 text-[0.84rem] font-extrabold transition-colors sm:flex-none',
-              activeTab === tab.id
-                ? 'bg-brand-navy text-white shadow-sm'
-                : 'text-brand-navy hover:bg-[rgba(23,44,113,0.06)]',
-            )}
-            aria-current={activeTab === tab.id ? 'page' : undefined}
-          >
-            {tab.label}
-            {tab.id === 'cibil' && row.bureauReport?.cibilScore != null ? (
-              <span
-                className={cx(
-                  'ml-1.5 inline-flex rounded-full px-1.5 py-0.5 text-[0.62rem] font-bold',
-                  activeTab === tab.id
-                    ? 'bg-[rgba(255,255,255,0.2)]'
-                    : 'bg-[rgba(20,150,243,0.12)] text-brand-blue',
-                )}
-              >
-                {row.bureauReport.cibilScore}
-              </span>
-            ) : null}
-          </button>
-        ))}
-      </nav>
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="grid min-w-0 gap-4">
+      <ApplicationOverviewCibilSection
+        row={row}
+        applicationUuid={applicationUuid}
+        authToken={authToken}
+        onReportCreated={() => void load()}
+      />
 
-      {activeTab === 'cibil' ? (
-        <ApplicationCibilReportTab applicationUuid={applicationUuid} onReportCreated={() => void load()} />
-      ) : null}
-
-      {activeTab === 'overview' ? (
-      <div className="grid gap-5">
-      <div className="grid gap-5 lg:grid-cols-2">
-        <SectionCard
-          eyebrow="Identifiers"
-          title="Application & lead references"
-          description="Cross-link support tickets, underwriting queues, and disbursement files."
-        >
+      <div className="grid gap-4 lg:grid-cols-2">
+        <SectionCard eyebrow="Identifiers" title="Record IDs">
           <DetailGrid
             rows={[
               { label: 'Application UUID', value: <MonoValue copyLabel="Application UUID">{row.uuid}</MonoValue> },
               { label: 'Lead UUID', value: <MonoValue copyLabel="Lead UUID">{row.leadUuid}</MonoValue> },
               { label: 'Customer UUID', value: <MonoValue copyLabel="Customer UUID">{row.customerUuid}</MonoValue> },
               { label: 'Lead source', value: leadSourceSummary(row.lead.sourceName, row.lead.sourceType) },
-            ]}
-          />
-        </SectionCard>
-
-        <SectionCard
-          eyebrow="Contact"
-          title="Verified contact on file"
-          description="Login email captured against the application record (not the lead row)."
-        >
-          <DetailGrid
-            rows={[
-              { label: 'Email on application', value: row.email ?? '—' },
+              { label: 'Email', value: row.email ?? '—' },
               { label: 'Email verified at', value: formatDateTime(row.emailVerifiedAt ?? undefined) },
             ]}
           />
         </SectionCard>
-      </div>
-
-      <SectionCard
-        eyebrow="Borrower profile"
-        title="Lead snapshot (shared intake)"
-        description="Same onboarding facts as on the lead page; shown here so credit analysts do not need to switch context."
-      >
-        {profile ? (
-          <DetailGrid
-            rows={[
-              { label: 'Full name as per PAN card', value: profile.fullName ?? '—' },
-              { label: 'Date of birth', value: formatDateOnly(profile.dateOfBirth ?? undefined) },
-              { label: 'Age', value: ageFromDateOfBirth(profile.dateOfBirth ?? undefined) },
-              { label: 'PAN', value: profile.panNumber ?? '—' },
-              { label: 'Gender', value: profile.gender ?? '—' },
-              { label: 'Occupation', value: profile.occupation ?? '—' },
-              { label: 'City', value: profile.city ?? '—' },
-              { label: 'State', value: profile.state ?? '—' },
-              { label: 'State code', value: profile.stateCode ?? '—' },
-              { label: 'PIN code', value: profile.pincode ?? '—' },
-              {
-                label: 'Address',
-                value: [profile.addressLine1, profile.addressLine2].filter(Boolean).join(', ') || '—',
-              },
-              { label: 'Net monthly income', value: formatInr(profile.netMonthlyIncome) },
-              { label: 'Annual turnover', value: formatInr(profile.annualTurnover) },
-              { label: 'Annual profit', value: formatInr(profile.annualProfit) },
-              { label: 'Bureau consent at', value: formatDateTime(profile.cibilConsentAt ?? undefined) },
-            ]}
-          />
-        ) : (
-          <p className="m-0 text-[0.9rem] text-brand-muted">No lead profile rows are linked to this application yet.</p>
-        )}
-      </SectionCard>
-
-      <div className="grid gap-5 lg:grid-cols-2">
-        <SectionCard
-          eyebrow="Product"
-          title="Loan terms & fees"
-          description="Structured offer fields from application details."
-        >
-          {row.details ? (
-            <DetailGrid
-              rows={[
-                { label: 'Reason for loan', value: row.details.reasonForLoan ?? '—' },
-                { label: 'Requested amount', value: formatInr(row.details.loanAmount) },
-                {
-                  label: 'Tenure',
-                  value: row.details.loanTenure != null ? `${row.details.loanTenure} months` : '—',
-                },
-                { label: 'Pre-approved amount', value: formatInr(row.preApprovedLoanAmount) },
-                { label: 'Interest rate', value: row.details.interestRate != null ? `${row.details.interestRate}%` : '—' },
-                { label: 'Interest amount', value: formatInr(row.details.interestAmount) },
-                { label: 'Processing fee %', value: row.details.processingFee != null ? `${row.details.processingFee}%` : '—' },
-                { label: 'Processing fee amount', value: formatInr(row.details.processingFeeAmount) },
-                { label: 'GST amount', value: formatInr(row.details.gstAmount) },
-                { label: 'Disbursement date (planned)', value: formatDateOnly(row.details.loanDisbursementDate ?? undefined) },
-                { label: 'Maturity date (planned)', value: formatDateOnly(row.details.loanMaturityDate ?? undefined) },
-              ]}
-            />
-          ) : (
-            <p className="m-0 text-[0.9rem] text-brand-muted">No application_details row exists yet.</p>
-          )}
-        </SectionCard>
-
-        <SectionCard
-          eyebrow="Verification"
-          title="KYC & liveness"
-          description="Verification status from onboarding."
-        >
-          <DetailGrid
-            rows={[
-              { label: 'KYC status', value: `${row.kycStatusLabel} (${row.kycStatus})` },
-              { label: 'KYC completed at', value: formatDateTime(row.kycCompletedAt ?? undefined) },
-              { label: 'Liveness passed', value: row.livenessPassed ? 'Yes' : 'No' },
-              { label: 'Liveness checked at', value: formatDateTime(row.livenessCheckedAt ?? undefined) },
-            ]}
-          />
-        </SectionCard>
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-2">
-        <SectionCard
-          eyebrow="Credit"
-          title="Eligibility outcome"
-          description="Latest bureau / rules snapshot tied to this application."
-        >
-          {row.eligibility ? (
-            <DetailGrid
-              rows={[
-                { label: 'Eligible', value: row.eligibility.isEligible ? 'Yes' : 'No' },
-                { label: 'Approved amount', value: formatInr(row.eligibility.approvedAmount) },
-                { label: 'CIBIL score', value: row.eligibility.cibilScore != null ? String(row.eligibility.cibilScore) : '—' },
-                { label: 'Ineligible reason', value: row.eligibility.ineligibleReason ?? '—' },
-                { label: 'Checked at', value: formatDateTime(row.eligibility.checkedAt) },
-                {
-                  label: 'Full bureau view',
-                  value: row.bureauReport ? (
-                    <div className="flex flex-wrap items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('cibil')}
-                        className="border-0 bg-transparent p-0 font-bold text-brand-blue underline"
-                      >
-                        Open CIBIL report tab
-                      </button>
-                      {row.bureauReport.reportPdfUrl ? (
-                        <a
-                          href={row.bureauReport.reportPdfUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="font-bold text-brand-blue underline"
-                        >
-                          Download report PDF
-                        </a>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <div className="grid gap-2">
-                      <span>No bureau pull on file</span>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <button
-                          type="button"
-                          className="los-btn-primary min-h-[34px] px-3 text-[0.78rem]"
-                          disabled={!canCreateBureauReport || creatingBureau}
-                          onClick={() => {
-                            if (!authToken) {
-                              setBureauActionError('Session expired - please log in again.');
-                              return;
-                            }
-                            if (!profile?.fullName?.trim() || !row.lead.panNumber?.trim()) {
-                              setBureauActionError('Full name and PAN are required to create CIBIL report.');
-                              return;
-                            }
-                            setBureauActionError(null);
-                            setCreatingBureau(true);
-                            void createApplicationCibilReport(authToken, {
-                              leadUuid: row.leadUuid,
-                              mobileNumber: row.mobileNumber,
-                              fullName: profile.fullName.trim(),
-                              panNumber: row.lead.panNumber.trim().toUpperCase(),
-                            })
-                              .then(async () => {
-                                await load();
-                                setActiveTab('cibil');
-                              })
-                              .catch((actionError) => {
-                                setBureauActionError(
-                                  actionError instanceof Error
-                                    ? actionError.message
-                                    : 'Unable to create CIBIL report.',
-                                );
-                              })
-                              .finally(() => setCreatingBureau(false));
-                          }}
-                        >
-                          {creatingBureau ? 'Creating report...' : 'Create CIBIL report'}
-                        </button>
-                        {!canCreateBureauReport ? (
-                          <span className="text-[0.78rem] text-brand-muted">
-                            Requires full name and PAN on lead profile.
-                          </span>
-                        ) : null}
-                      </div>
-                      {bureauActionError ? (
-                        <span className="text-[0.8rem] font-semibold text-[#8d3434]">{bureauActionError}</span>
-                      ) : null}
-                    </div>
-                  ),
-                },
-              ]}
-            />
-          ) : (
-            <p className="m-0 text-[0.9rem] text-brand-muted">No eligibility check has been stored for this application.</p>
-          )}
-        </SectionCard>
 
         <SectionCard
           eyebrow="Loan documents"
-          title="Key Fact Statement & Loan Agreement"
-          description="PDFs must be generated here (LOS) before the customer can view or accept them."
+          title="Generate sanction letter"
         >
           <div className="flex flex-wrap items-center gap-3">
             <button
@@ -854,12 +530,8 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
           </div>
         </SectionCard>
 
-        <SectionCard
-          eyebrow="Agreement"
-          title="E-sign & legal"
-          description="Agreement metadata after the borrower completes signing."
-        >
-          {row.agreement ? (
+        {row.agreement ? (
+          <SectionCard eyebrow="Agreement" title="E-sign & legal">
             <DetailGrid
               rows={[
                 { label: 'Document', value: row.agreement.documentName ?? '—' },
@@ -867,34 +539,20 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
                 { label: 'IP address', value: row.agreement.ipAddress ?? '—' },
               ]}
             />
-          ) : (
-            <p className="m-0 text-[0.9rem] text-brand-muted">No agreement record yet.</p>
-          )}
-        </SectionCard>
+          </SectionCard>
+        ) : null}
       </div>
+        </div>
 
-      <SectionCard
-        eyebrow="Disbursement"
-        title="Payout & bank confirmation"
-        description="Post-approval settlement details when disbursement is executed."
-      >
-        {row.disbursement ? (
-          <DetailGrid
-            rows={[
-              { label: 'Amount', value: formatInr(row.disbursement.amount) },
-              { label: 'Account number', value: row.disbursement.accountNumber ?? '—' },
-              { label: 'IFSC', value: row.disbursement.ifscCode ?? '—' },
-              { label: 'Bank', value: row.disbursement.bankName ?? '—' },
-              { label: 'UTR', value: row.disbursement.utr ?? '—' },
-              { label: 'Disbursed at', value: formatDateTime(row.disbursement.disbursedAt ?? undefined) },
-            ]}
+        <aside className="min-w-0 lg:order-last">
+          <CustomerJourneyTimeline
+            title="Application progress"
+            subtitle="Intake through KYC and bank details"
+            steps={journeySteps}
+            orientation="vertical"
           />
-        ) : (
-          <p className="m-0 text-[0.9rem] text-brand-muted">No disbursement record yet.</p>
-        )}
-      </SectionCard>
+        </aside>
       </div>
-      ) : null}
     </div>
   );
 }

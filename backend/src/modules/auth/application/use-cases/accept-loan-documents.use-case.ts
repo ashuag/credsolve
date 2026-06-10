@@ -134,7 +134,26 @@ export class AcceptLoanDocumentsUseCase {
       return updated.loanDocumentsAcceptedAt!;
     });
 
-    await this.sendAcceptedDocumentsEmail(ctx, customer.uuid);
+    const merge = this.loanDocs.buildMergeInput({
+      customer: ctx.customer,
+      lead: ctx.lead,
+      application: ctx.application,
+      acceptanceIpAddress: ip ?? null,
+      acceptanceSignedAt: verifiedAt,
+    });
+    const docType = LOAN_DOCUMENT_TYPE.KEY_FACT;
+    await this.loanDocs.ensurePdf(
+      docType,
+      customer.uuid,
+      ctx.application.uuid,
+      ctx.application.id,
+      merge,
+      this.loanDocs.relativePathForType(docType, ctx.application),
+      true,
+      true,
+    );
+
+    await this.sendAcceptedDocumentsEmail(ctx, customer.uuid, lead.id);
 
     return { success: true, acceptedAt: acceptedAt.toISOString() };
   }
@@ -142,6 +161,7 @@ export class AcceptLoanDocumentsUseCase {
   private async sendAcceptedDocumentsEmail(
     ctx: Awaited<ReturnType<LoanDocumentApplicationService['loadApplicationContext']>>,
     _customerUuid: string,
+    leadId: bigint,
   ): Promise<void> {
     const email = ctx.application.email?.trim();
     if (!email) {
@@ -170,7 +190,7 @@ export class AcceptLoanDocumentsUseCase {
         attachments.push({ filename: LOAN_DOCUMENT_PDF_FILES[docType], content });
       }
 
-      await this.emailService.sendLoanDocumentsEmail(email, attachments);
+      await this.emailService.sendLoanDocumentsEmail(email, attachments, { leadId });
       this.logger.log(`Loan document PDFs emailed to ${maskEmail(email)} for application ${ctx.application.uuid}.`);
     } catch (error) {
       this.logger.error(

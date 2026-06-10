@@ -10,6 +10,7 @@ model Lead {
   panVerified             Int       @default(0) @map("pan_verified") @db.SmallInt
   panVerifiedAt           DateTime? @map("pan_verified_at")
   panValidationAttempts   Int       @default(0) @map("pan_validation_attempts") @db.SmallInt
+  digilockerAadhaarDownloadAttempts Int @default(0) @map("digilocker_aadhaar_download_attempts") @db.SmallInt
   bureauFetched         Int       @default(0) @map("bureau_fetched") @db.SmallInt
   bureauFetchedAt       DateTime? @map("bureau_fetched_at")
   bureauFetchedNote     String?   @map("bureau_fetched_note") @db.VarChar(500)

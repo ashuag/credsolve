@@ -1,37 +1,59 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { LoanLandingShell } from '@/components/home/loan-landing-shell';
-import { LoanSummaryLeftRail } from '@/components/loan/loan-summary-left-rail';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
-import {
-  extractDigilockerSessionTokenFromUrl,
-  extractDigilockerSessionTokenFromVendor,
-  initDigilockerSession,
-  persistDigilockerSessionTokenForCallback,
-} from '@/lib/api/digilocker';
+import { startDigilockerLoginFlow } from '@/lib/api/digilocker';
 import { getKycHubBackPath } from '@/lib/api/customer-session';
 import { isLoanDocumentsJourneyComplete } from '@/lib/loan-documents-journey';
+import { kycJourneyProgressFromSession } from '@/lib/kyc-journey-progress';
+import { KycJourneyLeftPanel } from '@/components/kyc/kyc-journey-left-panel';
 import { AlertBanner } from '@/components/ui/alert-banner';
+import { Spinner } from '@/components/ui/spinner';
+import styles from './kyc-hub-flow.module.css';
 
-function findRedirectUrl(vendor: unknown, depth = 0): string | null {
-  if (depth > 5 || vendor == null) return null;
-  if (typeof vendor === 'string' && /^https?:\/\//i.test(vendor.trim())) {
-    return vendor.trim();
-  }
-  if (typeof vendor !== 'object') return null;
-  const o = vendor as Record<string, unknown>;
-  for (const key of ['redirectUrl', 'url', 'authorizationUrl', 'authUrl', 'redirect_uri']) {
-    const v = o[key];
-    if (typeof v === 'string' && /^https?:\/\//i.test(v)) return v;
-  }
-  for (const v of Object.values(o)) {
-    const found = findRedirectUrl(v, depth + 1);
-    if (found) return found;
-  }
-  return null;
+function ShieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M12 2 4 6v6c0 5 3.4 8.3 8 10 4.6-1.7 8-5 8-10V6l-8-4Z"
+        stroke="#fff"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path
+        d="m8.5 12 2.4 2.4 4.6-4.8"
+        stroke="#fff"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ArrowRightIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M5 12h14M13 6l6 6-6 6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ArrowLeftIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M19 12H5M11 6l-6 6 6 6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 export function KycHubFlow() {
@@ -41,9 +63,16 @@ export function KycHubFlow() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const loanSelection = session?.authenticated === true ? session.loanSelection : null;
+
+  const { progressPct, activeStepIndex } = useMemo(
+    () => kycJourneyProgressFromSession(session),
+    [session],
+  );
+
   useEffect(() => {
-    journey?.setCompletion01(0.42);
-  }, [journey]);
+    journey?.setCompletion01(progressPct / 100);
+  }, [journey, progressPct]);
 
   useEffect(() => {
     if (session?.authenticated === true && session.lead && !isLoanDocumentsJourneyComplete(session)) {
@@ -51,61 +80,21 @@ export function KycHubFlow() {
     }
   }, [router, session]);
 
-  const loanSelection =
-    session?.authenticated === true ? (session.loanSelection ?? null) : null;
-  const hasLoanSnapshot = Boolean(
-    loanSelection?.amountInr?.trim() ||
-      (loanSelection?.tenureDays != null && Number.isFinite(loanSelection.tenureDays)) ||
-      loanSelection?.maturityDate?.trim(),
-  );
-
   async function handleDigilocker() {
     setError('');
     setBusy(true);
     try {
-      const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      const out = await initDigilockerSession(
-        origin ? { redirectUrl: `${origin}/kyc/digilocker-callback` } : {},
-      );
-      if (!out.configured) {
-        setError(out.skipReason ?? 'DigiLocker is not configured on the server.');
-        return;
-      }
-      if (!out.ok) {
-        setError(
-          typeof out.vendor === 'object' && out.vendor && 'message' in (out.vendor as object)
-            ? String((out.vendor as { message?: unknown }).message)
-            : `DigiLocker request failed (${out.httpStatus ?? 'no status'}).`,
-        );
+      const result = await startDigilockerLoginFlow('/kyc/digilocker-callback');
+      if (!result.ok) {
+        setError(result.message);
         return;
       }
       await refresh();
-      const redirect = out.digilockerLoginUrl ?? findRedirectUrl(out.vendor);
-      if (redirect) {
-        const sessionToken =
-          out.sessionToken ??
-          extractDigilockerSessionTokenFromVendor(out.vendor) ??
-          extractDigilockerSessionTokenFromUrl(redirect);
-        persistDigilockerSessionTokenForCallback(sessionToken);
-        if (!sessionToken) {
-          setError(
-            'DigiLocker started, but no session token was returned. Check Tenacio configuration or try again.',
-          );
-          return;
-        }
-        window.location.assign(redirect);
-        return;
-      }
-      setError('DigiLocker started, but no login URL was returned. Check with support or use CKYC upload.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to start DigiLocker.');
     } finally {
       setBusy(false);
     }
-  }
-
-  function handleCkyc() {
-    router.push('/kyc/upload-documents');
   }
 
   function handleBack() {
@@ -116,68 +105,125 @@ export function KycHubFlow() {
     router.push('/apply-for-loan');
   }
 
-  const journeyPanel = (
-    <div className="h-full flex flex-col gap-5">
-      <header>
-        <p className="m-0 text-[0.7rem] font-[800] uppercase tracking-[0.14em] text-[#1496f3]">KYC</p>
-        <h1 className="mt-2 mb-2 text-brand-navy text-[clamp(1.75rem,4vw,2.25rem)] font-[900] tracking-[-0.04em] leading-[1.1]">
-          Verify your identity
-        </h1>
-        <p className="m-0 text-brand-muted text-[0.95rem] leading-[1.65]">
-          Choose DigiLocker for a quick fetch of KYC data from issued documents, or CKYC to upload documents manually.
-        </p>
-      </header>
-
-      {error ? <AlertBanner variant="error">{error}</AlertBanner> : null}
-
-      <div className="grid gap-3">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void handleDigilocker()}
-          className="group grid gap-2 rounded-[22px] p-4 border border-[rgba(18,36,79,0.12)] bg-[rgba(255,255,255,0.92)] text-left hover:-translate-y-[1px] transition disabled:opacity-60"
-        >
-          <strong className="text-brand-navy text-[1.05rem]">Login with DigiLocker</strong>
-          <span className="text-brand-muted text-[0.92rem] leading-[1.6]">
-            Continue with DigiLocker to pull verified documents where supported.
-          </span>
-        </button>
-
-        <button
-          type="button"
-          disabled={busy}
-          onClick={handleCkyc}
-          className="group grid gap-2 rounded-[22px] p-4 border border-[rgba(18,36,79,0.12)] bg-[rgba(255,255,255,0.86)] text-left hover:-translate-y-[1px] transition disabled:opacity-60"
-        >
-          <strong className="text-brand-navy text-[1.05rem]">CKYC</strong>
-          <span className="text-brand-muted text-[0.92rem] leading-[1.6]">
-            Upload PAN and Aadhaar (or other proofs) manually for verification.
-          </span>
-        </button>
-      </div>
-
-      <button type="button" className="mc-btn-secondary self-start" onClick={handleBack}>
-        Back
-      </button>
-    </div>
-  );
-
-  const leftDescription = hasLoanSnapshot
-    ? 'The amount and tenure you selected stay visible while you complete KYC.'
-    : 'KYC comes first. You will choose loan amount and tenure on the offer step after identity verification.';
-
   return (
-    <LoanLandingShell
-      journeyPanel={journeyPanel}
-      leftTitle={
-        <>
-          Loan <span className="text-[#60a5fa]">details</span>
-        </>
-      }
-      leftDescription={leftDescription}
-      leftInfographic={<LoanSummaryLeftRail loanSelection={loanSelection} />}
-      mobileStepLabel="KYC"
-      mobileOnBack={handleBack}
-    />
+    <div className={styles.page}>
+      <div className={styles.shell}>
+        <KycJourneyLeftPanel
+          loanSelection={loanSelection}
+          progressPct={progressPct}
+          activeStepIndex={activeStepIndex}
+        />
+
+        <section className={styles.right}>
+          <div className={`${styles.reveal} ${styles.d1}`}>
+            <span className={styles.eyebrow}>KYC</span>
+          </div>
+          <h1 className={`${styles.rightTitle} ${styles.reveal} ${styles.d1}`}>Verify your identity</h1>
+          <p className={`${styles.lede} ${styles.reveal} ${styles.d2}`}>
+            We use <strong>DigiLocker</strong> to securely fetch your government-issued documents — no uploads, no
+            waiting. Here&apos;s exactly what to expect.
+          </p>
+
+          <button
+            type="button"
+            className={`${styles.method} ${styles.reveal} ${styles.d2}`}
+            disabled={busy}
+            onClick={() => void handleDigilocker()}
+          >
+            <div className={styles.methodTop}>
+              <span className={styles.dlIcon}>
+                <ShieldIcon />
+              </span>
+              <h3 className={styles.methodTitle}>Login with DigiLocker</h3>
+              <span className={styles.badge}>Recommended</span>
+            </div>
+            <p className={styles.methodDesc}>
+              Government of India&apos;s secure document wallet. Verified instantly from your Aadhaar — the fastest way
+              to finish KYC.
+            </p>
+          </button>
+
+          <p className={`${styles.howTitle} ${styles.reveal} ${styles.d3}`}>How it works</p>
+          <div className={styles.flow}>
+            <div className={`${styles.flowStep} ${styles.reveal} ${styles.d3}`}>
+              <span className={styles.flowNum}>1</span>
+              <div className={styles.flowBody}>
+                <h4>Get an Aadhaar OTP</h4>
+                <p>
+                  An OTP is sent to the <span className={styles.hl}>mobile number registered with your Aadhaar</span>.
+                  Keep that phone handy.
+                </p>
+              </div>
+            </div>
+            <div className={`${styles.flowStep} ${styles.reveal} ${styles.d4}`}>
+              <span className={styles.flowNum}>2</span>
+              <div className={styles.flowBody}>
+                <h4>Log in to DigiLocker</h4>
+                <p>Enter the OTP to sign in securely. No passwords or paperwork needed.</p>
+              </div>
+            </div>
+            <div className={`${styles.flowStep} ${styles.reveal} ${styles.d5}`}>
+              <span className={styles.flowNum}>3</span>
+              <div className={styles.flowBody}>
+                <h4>Allow Aadhaar access</h4>
+                <p>
+                  On the consent screen, you <span className={styles.hl}>must tap &ldquo;Allow&rdquo;</span> to let
+                  DigiLocker share your Aadhaar with us.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className={`${styles.notice} ${styles.reveal} ${styles.d5}`}>
+            <span className={styles.noticeIc}>!</span>
+            <div>
+              <h5>Consent is required to finish KYC</h5>
+              <p>
+                If you decline the permission on the DigiLocker screen, we can&apos;t fetch your Aadhaar — and your KYC
+                will stay <strong>incomplete</strong>. Please tap &ldquo;Allow&rdquo; when prompted.
+              </p>
+            </div>
+          </div>
+
+          {error ? (
+            <div className={styles.errorBanner}>
+              <AlertBanner variant="error">{error}</AlertBanner>
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            id="go"
+            className={`${styles.cta} ${styles.reveal} ${styles.d6}`}
+            disabled={busy}
+            onClick={() => void handleDigilocker()}
+          >
+            {busy ? (
+              <>
+                <Spinner size={18} />
+                Connecting to DigiLocker…
+              </>
+            ) : (
+              <>
+                Continue with DigiLocker
+                <ArrowRightIcon />
+              </>
+            )}
+          </button>
+
+          <p className={`${styles.alt} ${styles.reveal} ${styles.d6}`}>
+            Don&apos;t have DigiLocker set up?{' '}
+            <Link href="/kyc/upload-documents">Upload documents manually (CKYC)</Link>
+          </p>
+
+          <div className={`${styles.back} ${styles.reveal} ${styles.d6}`}>
+            <button type="button" className={styles.backBtn} onClick={handleBack}>
+              <ArrowLeftIcon />
+              Back
+            </button>
+          </div>
+        </section>
+      </div>
+    </div>
   );
 }

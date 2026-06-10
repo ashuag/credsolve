@@ -129,7 +129,7 @@ export class SubmitVerifiedBankUseCase {
         throw new BadRequestException('Create application details before bank details.');
       }
 
-      const details = await tx.applicationDetails.findUnique({
+      const details = await tx.applicationDetail.findUnique({
         where: { applicationId: application.id },
         select: { loanAmount: true },
       });

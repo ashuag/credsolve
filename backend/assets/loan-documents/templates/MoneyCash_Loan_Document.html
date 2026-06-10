@@ -411,6 +411,79 @@ th.teal-hdr { background: var(--teal); }
   font-family: var(--font-ui); font-size: 11.5px; color: var(--muted);
 }
 
+.lender-dsc-notice {
+  margin-top: 18px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--slate-light);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.doc-closing-block {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.lender-dsc-stamp-wrap {
+  margin-top: 28px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.lender-dsc-stamp-wrap.hidden {
+  display: none;
+}
+
+.lender-dsc-stamp {
+  width: 242px;
+  min-height: 82px;
+  border: 1.2px solid var(--teal);
+  border-radius: 2px;
+  background: #f7fcfc;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 8px 8px;
+  font-family: var(--font-ui);
+}
+
+.lender-dsc-logo {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.lender-dsc-body {
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.lender-dsc-muted {
+  font-size: 7pt;
+  color: var(--muted);
+}
+
+.lender-dsc-name {
+  font-size: 9pt;
+  font-weight: 700;
+  color: var(--text);
+  margin: 1px 0 3px;
+}
+
+.lender-dsc-line {
+  font-size: 7.5pt;
+  color: var(--text);
+}
+
+.lender-dsc-legal {
+  font-size: 6.5pt;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
 /* ============================================================
    PRINT STYLES
    ============================================================ */
@@ -571,6 +644,13 @@ th.teal-hdr { background: var(--teal); }
     For any queries, you may write to us at <strong>info@moneycash.in</strong>. We look forward to
     serving you.
   </p>
+  <p class="para lender-dsc-notice">
+    This Sanction Letter is digitally signed by <strong>Aasra Fincorp Pvt. Ltd.</strong> using a
+    Digital Signature Certificate (DSC) issued under the <strong>Information Technology Act, 2000</strong>.
+    A physical wet signature is not required for validity. When signed, the NBFC digital signature
+    stamp (with date and DSC serial) appears at the bottom-right of the final page and is
+    cryptographically bound to the document.
+  </p>
 </div><!-- /sec-a -->
 
 <div class="page-break" data-label="Sanction Letter cum Key Fact Statement"></div>
@@ -647,42 +727,44 @@ th.teal-hdr { background: var(--teal); }
       </tr>
       <tr>
         <td class="td-sr">7</td>
-        <td class="td-label">Loan proposal / account No. &amp; Type of Loan</td>
-        <td class="td-val">
-          <div style="margin-bottom:4px">Account No.: <input type="text" id="kfs_account_no" class="field lf md" placeholder="Loan Account Number" title="Filled by moneycash / Lender" autocomplete="off"></div>
-          <div>Type: <span class="fixed-val">Bullet Loan / One-Time Repayment</span></div>
-        </td>
+        <td class="td-label">Loan proposal / account No.</td>
+        <td class="td-val"><input type="text" id="kfs_account_no" class="field lf md" placeholder="Loan Account Number" title="Filled by moneycash / Lender" autocomplete="off"></td>
       </tr>
       <tr>
         <td class="td-sr">8</td>
+        <td class="td-label">Type of Loan</td>
+        <td class="td-val fixed-val">Bullet Loan / One-Time Repayment</td>
+      </tr>
+      <tr>
+        <td class="td-sr">9</td>
         <td class="td-label">Sanctioned Loan Amount (in Rupees)</td>
         <td class="td-val"><input type="text" id="kfs_sanctioned_amt" class="field lf md" placeholder="INR Amount" title="Filled by moneycash / Lender" autocomplete="off"></td>
       </tr>
       <tr>
-        <td class="td-sr">9</td>
+        <td class="td-sr">10</td>
         <td class="td-label">Net disbursed amount</td>
         <td class="td-val">INR <input type="text" id="kfs_net_disbursed" class="field lf md" placeholder="Net Amount" title="Filled by moneycash / Lender" autocomplete="off"> <span class="muted">(after deduction of Processing Fee)</span></td>
       </tr>
       <tr>
-        <td class="td-sr">10</td>
+        <td class="td-sr">11</td>
         <td class="td-label"><strong>Disbursal schedule</strong> — Disbursement in stages or 100% upfront. If stage-wise, mention the clause of the loan agreement having the relevant details.</td>
         <td class="td-val fixed-val">100% upfront</td>
       </tr>
       <tr>
-        <td class="td-sr">11</td>
+        <td class="td-sr">12</td>
         <td class="td-label">Loan term (year / months / days)</td>
         <td class="td-val"><input type="text" id="kfs_loan_term" class="field lf sm" placeholder="e.g. 28 days / 45 days" title="Filled by moneycash / Lender" autocomplete="off"></td>
       </tr>
       <tr>
-        <td class="td-sr">12</td>
+        <td class="td-sr">13</td>
         <td class="td-label">Cooling-off / Look-up Period</td>
         <td class="td-val fixed-val">3 days</td>
       </tr>
     </tbody>
   </table>
 
-  <!-- Item 13: Instalment Details -->
-  <p class="sub-sh">13. &nbsp;Instalment Details</p>
+  <!-- Item 14: Instalment Details -->
+  <p class="sub-sh">14. &nbsp;Instalment Details</p>
   <table>
     <thead><tr>
       <th class="teal-hdr">Type of Instalments</th>
@@ -700,7 +782,7 @@ th.teal-hdr { background: var(--teal); }
     </tbody>
   </table>
 
-  <!-- Items 14 & 14a -->
+  <!-- Items 15 & 15a -->
   <table style="margin-top:10px">
     <thead><tr>
       <th style="width:44px" class="center">Sr.</th>
@@ -709,7 +791,7 @@ th.teal-hdr { background: var(--teal); }
     </tr></thead>
     <tbody>
       <tr>
-        <td class="td-sr">14</td>
+        <td class="td-sr">15</td>
         <td class="td-label">Interest rate (%) and type (fixed / floating / hybrid)</td>
         <td class="td-val"><input type="text" id="kfs_interest_rate" class="field lf md" placeholder="e.g. 1% per day, Fixed" title="Filled by moneycash / Lender" autocomplete="off"></td>
       </tr>
@@ -721,7 +803,7 @@ th.teal-hdr { background: var(--teal); }
     </tbody>
   </table>
 
-  <h3 class="sh">15. Fee / Charges</h3>
+  <h3 class="sh">16. Fee / Charges</h3>
   <p class="para">
     A cooling-off period allows you / the Borrower / end-user to cancel or withdraw from
     the loan until the expiry of the Cooling-off Period. Upon expiry of the Cooling-off
@@ -789,7 +871,7 @@ th.teal-hdr { background: var(--teal); }
     </tbody>
   </table>
 
-  <!-- Items 16–18 + Contingent Charges -->
+  <!-- Items 17–19 + Contingent Charges -->
   <table style="margin-top:12px">
     <thead><tr>
       <th style="width:44px" class="center">Sr.</th>
@@ -798,12 +880,12 @@ th.teal-hdr { background: var(--teal); }
     </tr></thead>
     <tbody>
       <tr>
-        <td class="td-sr">16</td>
+        <td class="td-sr">17</td>
         <td class="td-label">Annual Percentage Rate (APR) (%)</td>
         <td class="td-val"><input type="text" id="kfs_apr" class="field lf md" placeholder="APR %" title="Filled by moneycash / Lender" autocomplete="off"></td>
       </tr>
       <tr>
-        <td class="td-sr" rowspan="5" style="vertical-align:middle">17</td>
+        <td class="td-sr" rowspan="5" style="vertical-align:middle">18</td>
         <td class="td-label" colspan="2"><strong>Details of Contingent Charges</strong> (in Rs or %, as applicable)</td>
       </tr>
       <tr>
@@ -823,7 +905,7 @@ th.teal-hdr { background: var(--teal); }
         <td class="td-val fixed-val">NA</td>
       </tr>
       <tr>
-        <td class="td-sr">18</td>
+        <td class="td-sr">19</td>
         <td class="td-label">Total Amount to be paid by the Borrower (in Rupees)</td>
         <td class="td-val"><input type="text" id="kfs_total_payable" class="field lf md" placeholder="INR Total" title="Filled by moneycash / Lender" autocomplete="off"></td>
       </tr>
@@ -1204,22 +1286,37 @@ th.teal-hdr { background: var(--teal); }
 
   <div class="accept-cta">"I Accept"</div>
 
-  <div class="sig-block">
-    <div class="sig-row">
-      <span class="sig-label">Digitally Signed by:</span>
-      <input type="text" id="sig_signed_by" class="field cf xl" placeholder="Full Legal Name of Borrower" title="Filled by Customer / Borrower" autocomplete="off">
+  <div class="doc-closing-block">
+    <div class="sig-block">
+      <div class="sig-row">
+        <span class="sig-label">Digitally Signed by:</span>
+        <input type="text" id="sig_signed_by" class="field cf xl" placeholder="Full Legal Name of Borrower" title="Filled by Customer / Borrower" autocomplete="off">
+      </div>
+      <div class="sig-row">
+        <span class="sig-label">Name:</span>
+        <input type="text" id="sig_name" class="field cf xl" placeholder="Full Name" title="Filled by Customer / Borrower" autocomplete="off">
+      </div>
+      <div class="sig-row">
+        <span class="sig-label">IP Address:</span>
+        <input type="text" id="sig_ip" class="field lf sm" placeholder="Auto-filled" title="Auto-captured IP address" readonly style="color:var(--muted)">
+      </div>
+      <div class="sig-row">
+        <span class="sig-label">Timestamp:</span>
+        <input type="text" id="sig_ts" class="field lf md" placeholder="Auto-filled on acceptance" title="Auto-captured timestamp" readonly style="color:var(--muted)">
+      </div>
     </div>
-    <div class="sig-row">
-      <span class="sig-label">Name:</span>
-      <input type="text" id="sig_name" class="field cf xl" placeholder="Full Name" title="Filled by Customer / Borrower" autocomplete="off">
-    </div>
-    <div class="sig-row">
-      <span class="sig-label">IP Address:</span>
-      <input type="text" id="sig_ip" class="field lf sm" placeholder="Auto-filled" title="Auto-captured IP address" readonly style="color:var(--muted)">
-    </div>
-    <div class="sig-row">
-      <span class="sig-label">Timestamp:</span>
-      <input type="text" id="sig_ts" class="field lf md" placeholder="Auto-filled on acceptance" title="Auto-captured timestamp" readonly style="color:var(--muted)">
+
+    <div class="lender-dsc-stamp-wrap hidden" aria-hidden="true">
+      <div class="lender-dsc-stamp">
+        <img class="lender-dsc-logo" src="__LENDER_DSC_LOGO_SRC__" alt="Aasra Fincorp">
+        <div class="lender-dsc-body">
+          <div class="lender-dsc-muted">Digitally signed by</div>
+          <div class="lender-dsc-name"><input type="text" id="lender_dsc_signer" class="field fx" placeholder="Aasra Fincorp Pvt. Ltd." title="NBFC signer" autocomplete="off"></div>
+          <div class="lender-dsc-line">Date: <input type="text" id="lender_dsc_date" class="field fx" placeholder="On acceptance" title="DSC signing time" autocomplete="off"></div>
+          <div class="lender-dsc-line">DSC Serial: <input type="text" id="lender_dsc_serial" class="field fx" placeholder="Certificate serial" title="DSC serial number" autocomplete="off"></div>
+          <div class="lender-dsc-legal">Valid under the IT Act, 2000</div>
+        </div>
+      </div>
     </div>
   </div>
 

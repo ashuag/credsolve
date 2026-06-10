@@ -234,7 +234,7 @@ export class VerifyPanUseCase {
 
     if (!preBreResult.passed) {
       await this.rejectLead(leadRow.id, preBreResult.rejectReason ?? 'BRE check failed', preBreResult.rejectionReasonCode);
-      this.fireThankYouSms(customer.mobileNumber);
+      this.fireRejectionSms(customer.mobileNumber, leadRow.id);
       return {
         success: true,
         rejected: true,
@@ -318,7 +318,7 @@ export class VerifyPanUseCase {
         this.buildPanRejectLeadNote(dto, verification),
         REJECTION_REASON.PAN_VERIFICATION_FAILED,
       );
-      this.fireThankYouSms(customer.mobileNumber);
+      this.fireRejectionSms(customer.mobileNumber, leadRow.id);
       return {
         success: true,
         rejected: true,
@@ -349,7 +349,7 @@ export class VerifyPanUseCase {
             'Bureau soft-pull failed: credit bureau returned a non-200 response.',
             REJECTION_REASON.REJECTED_BY_CLIENTS,
           );
-          this.fireThankYouSms(customer.mobileNumber);
+          this.fireRejectionSms(customer.mobileNumber, leadRow.id);
           return {
             success: true,
             rejected: true,
@@ -357,7 +357,6 @@ export class VerifyPanUseCase {
           };
         }
         if (bureauOutcome === 'post_bre_failed') {
-          this.fireThankYouSms(customer.mobileNumber);
           return {
             success: true,
             rejected: true,
@@ -371,7 +370,6 @@ export class VerifyPanUseCase {
           leadUuid: leadRow.uuid,
         });
         if (postBreRejected) {
-          this.fireThankYouSms(customer.mobileNumber);
           return {
             success: true,
             rejected: true,
@@ -466,9 +464,9 @@ export class VerifyPanUseCase {
     };
   }
 
-  private fireThankYouSms(mobileNumber: string): void {
-    this.sms.sendThankYouSms(mobileNumber).catch((err) => {
-      this.logger.error('Failed to send thank-you SMS', err instanceof Error ? err.stack : err);
+  private fireRejectionSms(mobileNumber: string, leadId?: bigint): void {
+    this.sms.sendRejectionSms(mobileNumber, leadId ?? null).catch((err) => {
+      this.logger.error('Failed to send rejection SMS', err instanceof Error ? err.stack : err);
     });
   }
 

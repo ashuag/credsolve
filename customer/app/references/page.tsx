@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { AlertBanner } from '@/components/ui/alert-banner';
@@ -26,6 +26,22 @@ type ReferenceForm = {
 
 const EMPTY_REF: ReferenceForm = { fullName: '', mobileNumber: '', relationId: '' };
 
+function referencesFromSession(
+  saved: Array<{ referenceIndex: number; fullName: string; mobileNumber: string; relationId: number }>,
+): [ReferenceForm, ReferenceForm] {
+  const next: [ReferenceForm, ReferenceForm] = [{ ...EMPTY_REF }, { ...EMPTY_REF }];
+  for (const row of saved) {
+    const index = row.referenceIndex - 1;
+    if (index !== 0 && index !== 1) continue;
+    next[index] = {
+      fullName: row.fullName.trim(),
+      mobileNumber: row.mobileNumber.trim(),
+      relationId: String(row.relationId),
+    };
+  }
+  return next;
+}
+
 function inputClass(hasError: boolean) {
   return cn(
     'mc-autofill-fix w-full h-[48px] rounded-xl border px-3',
@@ -45,6 +61,14 @@ export default function ReferencesPage() {
   const [errors, setErrors] = useState<Array<Partial<Record<keyof ReferenceForm, string>>>>([{}, {}]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const hydratedFromSessionRef = useRef(false);
+
+  useEffect(() => {
+    if (hydratedFromSessionRef.current) return;
+    if (session?.authenticated !== true || !session.leadReferences?.length) return;
+    setRefs(referencesFromSession(session.leadReferences));
+    hydratedFromSessionRef.current = true;
+  }, [session]);
 
   useEffect(() => {
     let active = true;

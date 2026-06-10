@@ -222,11 +222,21 @@ export class DigilockerVendorService {
       },
     });
 
+    const vendorBody =
+      result.body ??
+      (result.rawText
+        ? {
+            _unparsedResponse: true,
+            httpStatus: result.httpStatus,
+            body: result.rawText.slice(0, 32_000),
+          }
+        : null);
+
     return {
       configured: true,
       ok: result.ok,
       httpStatus: result.httpStatus,
-      vendorBody: result.body,
+      vendorBody,
       error: result.error,
     };
   }

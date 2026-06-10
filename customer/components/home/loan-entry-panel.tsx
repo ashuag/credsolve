@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MobileEntryForm } from '@/components/forms/mobile-entry-form';
 import { OtpVerificationForm } from '@/app/login/otp-verification-form';
@@ -12,19 +12,35 @@ import { getCustomerJourneyResumePath, hasActiveLoanLead } from '@/lib/api/custo
 
 export function LoanEntryPanel() {
   const router = useRouter();
-  const { loading, session } = useCustomerSession();
+  const { loading, session, refresh } = useCustomerSession();
   const [otpRequest, setOtpRequest] = useState<SendOtpResponse | null>(null);
+  const [resumePending, setResumePending] = useState(false);
+  const resumeAttemptRef = useRef(false);
   const hasActiveLead = useMemo(() => hasActiveLoanLead(session), [session]);
-  const resumePath = useMemo(() => getCustomerJourneyResumePath(session), [session]);
 
   useEffect(() => {
     if (loading) return;
-    if (hasActiveLead) {
-      router.replace(resumePath);
+    if (!hasActiveLead) {
+      resumeAttemptRef.current = false;
+      setResumePending(false);
+      return;
     }
-  }, [hasActiveLead, loading, resumePath, router]);
+    if (resumeAttemptRef.current) return;
 
-  if (loading || hasActiveLead) {
+    resumeAttemptRef.current = true;
+    setResumePending(true);
+    void (async () => {
+      const latest = await refresh();
+      if (hasActiveLoanLead(latest)) {
+        router.replace(getCustomerJourneyResumePath(latest));
+        return;
+      }
+      resumeAttemptRef.current = false;
+      setResumePending(false);
+    })();
+  }, [hasActiveLead, loading, refresh, router]);
+
+  if (loading || resumePending) {
     return (
       <section className="h-full w-full">
         <div className="flex min-h-[220px] h-full items-center justify-center">

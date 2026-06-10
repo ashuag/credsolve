@@ -5,9 +5,18 @@ import type { UpdateLeadSourceMasterDto } from '../dto/update-lead-source-master
 import type { UpdateBankMasterDto } from '../dto/update-bank-master.dto';
 import type { UpdateEligibilityCriterionDto } from '../dto/update-eligibility-criterion.dto';
 import type { UpdateCreditLimitTierDto } from '../dto/update-credit-limit-tier.dto';
+import type { UpdateSmsTemplateDto } from '../dto/update-sms-template.dto';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
+}
+
+function maskBearerToken(token: string): string {
+  const trimmed = token.trim();
+  if (trimmed.length <= 8) {
+    return '****';
+  }
+  return `${trimmed.slice(0, 4)}…${trimmed.slice(-4)}`;
 }
 
 type LosSourceUtmRow = {
@@ -451,6 +460,94 @@ export class LosMasterService {
       maxUnsecuredLoan: row.maxUnsecuredLoan,
       maxBulletLoan: row.maxBulletLoan,
       sortOrder: row.sortOrder,
+      isActive: row.isActive,
+    };
+  }
+
+  async getSmsTemplatesForLos() {
+    const rows = await this.prisma.client.smsTemplate.findMany({
+      orderBy: { id: 'asc' },
+    });
+
+    const smsTemplates = rows.map((row) => ({
+      id: row.id,
+      templateId: row.templateId,
+      bearerToken: maskBearerToken(row.bearerToken),
+      message: row.message,
+      product: row.product,
+      isActive: row.isActive,
+    }));
+
+    return { smsTemplates };
+  }
+
+  async updateSmsTemplate(id: number, dto: UpdateSmsTemplateDto) {
+    const hasTemplateId = dto.templateId !== undefined;
+    const hasBearerToken = dto.bearerToken !== undefined;
+    const hasMessage = dto.message !== undefined;
+    const hasProduct = dto.product !== undefined;
+    const hasActive = dto.isActive !== undefined;
+
+    if (!hasTemplateId && !hasBearerToken && !hasMessage && !hasProduct && !hasActive) {
+      throw new BadRequestException('Provide templateId, bearerToken, message, product, and/or isActive to update.');
+    }
+
+    const existing = await this.prisma.client.smsTemplate.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('SMS template not found');
+    }
+
+    const data: {
+      templateId?: string;
+      bearerToken?: string;
+      message?: string;
+      product?: string;
+      isActive?: boolean;
+    } = {};
+
+    if (hasTemplateId) {
+      const trimmed = dto.templateId!.trim();
+      if (!trimmed) {
+        throw new BadRequestException('Template ID cannot be empty.');
+      }
+      data.templateId = trimmed;
+    }
+    if (hasBearerToken) {
+      const trimmed = dto.bearerToken!.trim();
+      if (!trimmed) {
+        throw new BadRequestException('Bearer token cannot be empty.');
+      }
+      data.bearerToken = trimmed;
+    }
+    if (hasMessage) {
+      const trimmed = dto.message!.trim();
+      if (!trimmed) {
+        throw new BadRequestException('Message cannot be empty.');
+      }
+      data.message = trimmed;
+    }
+    if (hasProduct) {
+      const trimmed = dto.product!.trim();
+      if (!trimmed) {
+        throw new BadRequestException('Product cannot be empty.');
+      }
+      data.product = trimmed;
+    }
+    if (hasActive) {
+      data.isActive = dto.isActive;
+    }
+
+    const row = await this.prisma.client.smsTemplate.update({
+      where: { id },
+      data,
+    });
+
+    return {
+      id: row.id,
+      templateId: row.templateId,
+      bearerToken: maskBearerToken(row.bearerToken),
+      message: row.message,
+      product: row.product,
       isActive: row.isActive,
     };
   }

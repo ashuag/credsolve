@@ -5,6 +5,8 @@ import { EmailModule } from '../../common/email/email.module';
 import { VendorApiModule } from '../../common/vendor/vendor-api.module';
 import { LoanDocumentsModule } from '../../common/loan-documents/loan-documents.module';
 import { DigilockerSessionStore } from '../../common/kyc/digilocker-session.store';
+import { KycCompletionService } from '../../common/kyc/kyc-completion.service';
+import { KycDigilockerDownloadFailureService } from '../../common/kyc/kyc-digilocker-download-failure.service';
 import { KycIdentityRejectionService } from '../../common/kyc/kyc-identity-rejection.service';
 import { RedisIpRateLimitGuard } from '../../common/rate-limit/redis-ip-rate-limit.guard';
 import { PrismaModule } from '../../prisma/prisma.module';
@@ -36,7 +38,6 @@ import { GetLoanDocumentsUseCase } from './application/use-cases/get-loan-docume
 import { ServeLoanDocumentPdfUseCase } from './application/use-cases/serve-loan-document-pdf.use-case';
 import { SendLoanDocumentsOtpUseCase } from './application/use-cases/send-loan-documents-otp.use-case';
 import { AcceptLoanDocumentsUseCase } from './application/use-cases/accept-loan-documents.use-case';
-import { LoanDocumentApplicationService } from './application/services/loan-document-application.service';
 import { SaveKycDocumentsUseCase } from './application/use-cases/save-kyc-documents.use-case';
 import { SaveBankDetailsUseCase } from './application/use-cases/save-bank-details.use-case';
 import { LookupIfscUseCase } from './application/use-cases/lookup-ifsc.use-case';
@@ -110,12 +111,13 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     GetPendingDigilockerSessionUseCase,
     DigilockerSessionStore,
     KycIdentityRejectionService,
+    KycDigilockerDownloadFailureService,
+    KycCompletionService,
     SaveKycSelfieUseCase,
     RunKycLivenessUseCase,
     ServeDigilockerAadhaarPhotoUseCase,
     ServeKycSelfiePhotoUseCase,
     ServeKycLivenessSelfieVendorUseCase,
-    LoanDocumentApplicationService,
     GetLoanDocumentsUseCase,
     ServeLoanDocumentPdfUseCase,
     SendLoanDocumentsOtpUseCase,

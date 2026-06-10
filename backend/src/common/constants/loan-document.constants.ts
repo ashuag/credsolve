@@ -25,6 +25,15 @@ export const LENDER_NODAL_PHONE = '+91-11-00000000';
 export const LENDER_REGISTERED_OFFICE =
   'Registered office of Aasra Fincorp Pvt. Ltd. (as per MCA records)';
 
+/** PKCS#7 / Adobe signature panel metadata for the NBFC (RE) digital signature. */
+export const LENDER_SIGNING_NAME = LENDER_NAME;
+export const LENDER_SIGNING_LOCATION = 'New Delhi, IN';
+export const LENDER_SIGNING_CONTACT = NBFC_EMAIL;
+export const LOAN_DOCUMENT_SIGNING_REASON = 'Loan Sanction Letter cum Key Fact Statement';
+
+/** Default placeholder size for PKCS#7 signature (hex chars in /Contents). */
+export const LOAN_DOCUMENT_SIGNATURE_PLACEHOLDER_LENGTH = 8192;
+
 /** Default penal charge parameters (sanction letter section A). */
 export const DEFAULT_PENAL_RATE_PERCENT = '10';
 export const DEFAULT_PENAL_MIN_INR = '100';

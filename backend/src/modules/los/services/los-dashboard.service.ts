@@ -83,6 +83,38 @@ type LosDashboardDailyPoint = {
   disbursedAmountInr: string | null;
 };
 
+type DashboardStatusMaster = {
+  id: number;
+  name: string;
+  displayName: string | null;
+};
+
+type DashboardStatusCount = {
+  code: string;
+  label: string;
+  count: number;
+};
+
+type LeadStatusGroup = {
+  leadStatusId: number;
+  _count: { _all: number };
+};
+
+type ApplicationStatusGroup = {
+  applicationStatusId: number;
+  _count: { _all: number };
+};
+
+type DashboardRecentApplication = {
+  uuid: string;
+  updatedAt: Date;
+  kycStatus: number;
+  livenessPassed: boolean;
+  applicationStatus: { name: string; displayName: string | null };
+  lead: { leadDetail: { fullName: string | null } | null };
+  customer: { mobileNumber: string };
+};
+
 function mergeLosDashboardDailySeries(
   keys: string[],
   leadRows: Array<{ d: Date | string; c: bigint }>,
@@ -238,7 +270,7 @@ export class LosDashboardService {
         },
         _sum: { approvedAmount: true },
       }),
-      prisma.applicationDetails.aggregate({
+      prisma.applicationDetail.aggregate({
         where: { loanAmount: { not: null } },
         _avg: { loanAmount: true },
       }),
@@ -275,10 +307,14 @@ export class LosDashboardService {
 
     const { leadRows: leadDailyRows, appRows: appDailyRows, disbRows: disbDailyRows } = dailyTrends;
 
-    const leadStatusById = new Map(leadStatuses.map((s) => [s.id, s]));
-    const applicationStatusById = new Map(applicationStatuses.map((s) => [s.id, s]));
+    const leadStatusById = new Map<number, DashboardStatusMaster>(
+      (leadStatuses as DashboardStatusMaster[]).map((s) => [s.id, s]),
+    );
+    const applicationStatusById = new Map<number, DashboardStatusMaster>(
+      (applicationStatuses as DashboardStatusMaster[]).map((s) => [s.id, s]),
+    );
 
-    const leadsByStatus = leadGroups.map((g) => {
+    const leadsByStatus: DashboardStatusCount[] = (leadGroups as LeadStatusGroup[]).map((g) => {
       const s = leadStatusById.get(g.leadStatusId);
       return {
         code: s?.name ?? String(g.leadStatusId),
@@ -287,20 +323,26 @@ export class LosDashboardService {
       };
     });
 
-    const applicationsByStatus = applicationGroups.map((g) => {
-      const s = applicationStatusById.get(g.applicationStatusId);
-      return {
-        code: s?.name ?? String(g.applicationStatusId),
-        label: displayName(s?.name ?? 'UNKNOWN', s?.displayName ?? null),
-        count: g._count._all,
-      };
-    });
+    const applicationsByStatus: DashboardStatusCount[] = (applicationGroups as ApplicationStatusGroup[]).map(
+      (g) => {
+        const s = applicationStatusById.get(g.applicationStatusId);
+        return {
+          code: s?.name ?? String(g.applicationStatusId),
+          label: displayName(s?.name ?? 'UNKNOWN', s?.displayName ?? null),
+          count: g._count._all,
+        };
+      },
+    );
 
     const countByLeadCode = (codes: readonly string[]) =>
-      leadsByStatus.filter((row) => codes.includes(row.code)).reduce((a, b) => a + b.count, 0);
+      leadsByStatus
+        .filter((row: DashboardStatusCount) => codes.includes(row.code))
+        .reduce((a: number, b: DashboardStatusCount) => a + b.count, 0);
 
     const countByAppCode = (codes: readonly string[]) =>
-      applicationsByStatus.filter((row) => codes.includes(row.code)).reduce((a, b) => a + b.count, 0);
+      applicationsByStatus
+        .filter((row: DashboardStatusCount) => codes.includes(row.code))
+        .reduce((a: number, b: DashboardStatusCount) => a + b.count, 0);
 
     const freshLeads = countByLeadCode([LEAD_STATUS.NEW, LEAD_STATUS.IN_PROGRESS]);
     const applicationInProgress = countByAppCode([APPLICATION_STATUS.DRAFT, APPLICATION_STATUS.IN_REVIEW]);
@@ -310,7 +352,7 @@ export class LosDashboardService {
     const decided = approvedCount + rejectedAppCount;
     const approvalRatePercent = decided > 0 ? Math.round((approvedCount / decided) * 100) : null;
 
-    const recentActivity = recentApplications.map((app) => {
+    const recentActivity = (recentApplications as DashboardRecentApplication[]).map((app) => {
       const name = app.lead.leadDetail?.fullName?.trim() || 'Borrower';
       const mobile = app.customer.mobileNumber;
       const tail = mobile.length >= 4 ? mobile.slice(-4) : mobile;

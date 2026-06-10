@@ -81,6 +81,8 @@ export type VendorApiCallResult<TResponse> = {
   httpStatus: number | null;
   /** Parsed JSON response, or `null` if empty/non-JSON/error. */
   body: TResponse | null;
+  /** Raw response text when the HTTP body was non-empty (including non-JSON error pages). */
+  rawText?: string;
   /** Set when the call threw (network/timeout/abort). 2xx + non-2xx HTTP responses do NOT set this. */
   error?: Error;
 };
@@ -201,9 +203,9 @@ export class VendorApiService {
     }
 
     const requestForAudit = opts.redactRequest ? opts.redactRequest(opts.body) : (opts.body ?? null);
-    const responseForAudit = buildResponseAuditPayload(rawText, parsedResponse);
+    const responseForAudit = buildResponseAuditPayload(rawText, parsedResponse, httpStatus);
 
-    void this.persistAuditRow({
+    await this.persistAuditRow({
       providerName: opts.providerName,
       serviceName: opts.serviceName,
       requestMethod: opts.method,
@@ -217,7 +219,45 @@ export class VendorApiService {
       respondedAt,
     });
 
-    return { ok, httpStatus, body: parsedResponse, error };
+    return {
+      ok,
+      httpStatus,
+      body: parsedResponse,
+      rawText: rawText || undefined,
+      error,
+    };
+  }
+
+  /**
+   * Persists a vendor_api_log row for outbound calls that do not go through {@link request}
+   * (e.g. SMTP email via nodemailer). Best-effort — failures are logged, not thrown.
+   */
+  async auditOutboundCall(row: {
+    providerName: string;
+    serviceName: string;
+    requestMethod: VendorHttpMethod;
+    requestPath: string;
+    leadId?: bigint | null;
+    requestHeaders?: Record<string, string>;
+    requestPayload: unknown;
+    responsePayload?: unknown;
+    httpStatus: number | null;
+    requestedAt: Date;
+    respondedAt: Date;
+  }): Promise<void> {
+    await this.persistAuditRow({
+      providerName: row.providerName,
+      serviceName: row.serviceName,
+      requestMethod: row.requestMethod,
+      requestPath: row.requestPath.slice(0, MAX_REQUEST_PATH_AUDIT_CHARS),
+      leadId: row.leadId ?? null,
+      requestHeaders: redactHeaders(row.requestHeaders ?? {}),
+      requestPayload: row.requestPayload,
+      responsePayload: row.responsePayload ?? null,
+      httpStatus: row.httpStatus,
+      requestedAt: row.requestedAt,
+      respondedAt: row.respondedAt,
+    });
   }
 
   private async persistAuditRow(row: {
@@ -290,18 +330,40 @@ function redactHeaders(headers: Record<string, string>): Record<string, string> 
  * Returns a payload safe to write to a `Json` column. Caps oversized
  * responses to keep audit rows from running away.
  */
-function buildResponseAuditPayload(rawText: string, parsed: unknown): unknown {
+function buildResponseAuditPayload(rawText: string, parsed: unknown, httpStatus: number | null): unknown {
   if (!rawText) {
-    return parsed ?? null;
+    if (httpStatus != null && httpStatus >= 400) {
+      return { _emptyBody: true, httpStatus };
+    }
+    return safeJsonForAudit(parsed ?? null);
   }
   if (rawText.length > MAX_LOGGED_RESPONSE_CHARS) {
-    return {
+    return safeJsonForAudit({
       _truncated: true,
       _originalSize: rawText.length,
+      httpStatus,
       snippet: rawText.slice(0, MAX_LOGGED_RESPONSE_CHARS),
-    };
+      ...(parsed != null ? { parsed } : {}),
+    });
   }
-  return parsed ?? rawText;
+  if (parsed != null) {
+    return safeJsonForAudit(parsed);
+  }
+  return safeJsonForAudit({
+    _unparsedBody: true,
+    httpStatus,
+    body: rawText,
+  });
+}
+
+/** Ensures audit JSON is serializable for Prisma/MySQL (drops cycles, BigInt, etc.). */
+function safeJsonForAudit(value: unknown): unknown {
+  if (value === null || value === undefined) return null;
+  try {
+    return JSON.parse(JSON.stringify(value)) as unknown;
+  } catch {
+    return { _serializationFailed: true };
+  }
 }
 
 /** Coerces unknown values to a Prisma `Json` (NOT NULL) input. */

@@ -18,10 +18,19 @@ With `SPACES_KEY_PREFIX=local`, objects live under `mcashin/local/customer/...` 
 ## Generation pipeline
 
 1. `buildLoanDocumentHtmlFieldValues()` fills HTML `input#id` fields from application/lead data.
-2. Puppeteer prints HTML to PDF (A4, print backgrounds).
+2. Puppeteer prints HTML to PDF (A4, print backgrounds) on **Aasra Fincorp Pvt. Ltd.** letterhead.
 3. `pdf-lib` rewrites the PDF with classic xref tables (required by `node-signpdf`).
-4. `LoanDocumentDigitalSignerService` PKCS#7-signs using `CRESAI_PFX_FILE` + password env vars.
-5. PDF bytes are uploaded to Spaces/local storage; `application.key_fact_esigned` is updated.
+4. On **contract execution** (customer OTP acceptance), `LoanDocumentDigitalSignerService` applies the NBFC (RE) **IT Act digital signature** via PKCS#7 using `CRESAI_PFX_FILE` + password. Pre-acceptance previews are generated **without** the NBFC certificate.
+5. PDF bytes are uploaded to Spaces/local storage; `application.key_fact_esigned` is updated; the signed PDF is emailed to the borrower.
+
+### Two kinds of “signature”
+
+| Layer | Who | How |
+|-------|-----|-----|
+| **NBFC (RE) eSign** | Aasra Fincorp Pvt. Ltd. | PKCS#7 certificate in `CRESAI_PFX_FILE` — cryptographically embedded in the PDF (visible stamp on the last page, bottom-right + Adobe Signatures panel) |
+| **Borrower acceptance** | Customer | OTP verification + IP address & timestamp rendered in the acceptance block (`sig_ip`, `sig_ts`, borrower name) |
+
+On acceptance, a **visible DSC stamp** (logo, signer name, date, DSC serial) is drawn onto the **last page** of the sanction letter (bottom-right) and overlaid with the signature widget so the stamp area is tamper-bound to the PKCS#7 signature.
 
 ## Environment
 
@@ -29,6 +38,13 @@ With `SPACES_KEY_PREFIX=local`, objects live under `mcashin/local/customer/...` 
 CRESAI_PFX_FILE=your-signing-cert.pfx
 CRESAI_PFX_PASSWORD=          # or CRESAI_PASSWORD
 PUPPETEER_EXECUTABLE_PATH=      # optional; system Chromium path
+# Signature panel metadata (defaults: Aasra Fincorp Pvt. Ltd., New Delhi IN, info@moneycash.in)
+# LOAN_DOCUMENT_SIGN_NAME=
+# LOAN_DOCUMENT_SIGN_LOCATION=
+# LOAN_DOCUMENT_SIGN_CONTACT=
+# Optional RFC-3161 TSA (DocTimeStamp after NBFC PKCS#7 sign)
+# LOAN_DOCUMENT_TSA_URL=https://your-tsa.example.com/tsr
+# LOAN_DOCUMENT_TSA_LTV=false
 ```
 
 Optional (not used by `node-signpdf` today): `CERSAI_INSTITUTION_CODE`, `CRESAI_USER_ADMINISTRATOR`.

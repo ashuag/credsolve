@@ -1,6 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { WorkspaceRecordHeader } from '@/components/shared/workspace-record-header';
+import { LosStatusPill } from '@/components/shared/los-status-pill';
+import { buildLeadIntakeJourney } from '@/lib/customer-journey';
 import { getLeadDetails, type LosLeadDetails } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
@@ -76,67 +79,31 @@ function sourceSummary(lead: LosLeadDetails) {
   return 'Unattributed';
 }
 
-function statusPillStyles(code: string): { bg: string; text: string; ring: string } {
-  const c = code.toUpperCase();
-  if (c === 'NEW') {
-    return { bg: 'rgba(20,150,243,0.14)', text: '#0b4f86', ring: 'rgba(20,150,243,0.35)' };
-  }
-  if (c === 'DRAFT') {
-    return { bg: 'rgba(100,116,139,0.14)', text: '#334155', ring: 'rgba(100,116,139,0.28)' };
-  }
-  if (c === 'CONVERTED' || c.includes('APPROVED') || c.includes('DISBURS')) {
-    return { bg: 'rgba(29,157,112,0.14)', text: '#14523a', ring: 'rgba(29,157,112,0.32)' };
-  }
-  if (c.includes('REJECT') || c.includes('DECLIN') || c.includes('CANCEL')) {
-    return { bg: 'rgba(231,95,95,0.14)', text: '#8d3434', ring: 'rgba(231,95,95,0.28)' };
-  }
-  return { bg: 'rgba(23,44,113,0.08)', text: '#172c71', ring: 'rgba(23,44,113,0.16)' };
-}
-
-function StatusPill({ code, label }: { code: string; label: string }) {
-  const s = statusPillStyles(code);
-  return (
-    <span
-      className="inline-flex max-w-full items-center rounded-full px-3 py-1 text-[0.72rem] font-extrabold uppercase tracking-[0.07em] ring-1 ring-inset"
-      style={{ backgroundColor: s.bg, color: s.text, boxShadow: `inset 0 0 0 1px ${s.ring}` }}
-    >
-      <span className="truncate">{label}</span>
-    </span>
-  );
-}
-
 function SectionCard({
-  eyebrow,
-  title,
-  description,
-  children,
-}: {
-  eyebrow: string;
-  title: string;
-  description?: string;
-  children: ReactNode;
-}) {
+  eyebrow, title, children,
+}: { eyebrow: string; title: string; description?: string; children: ReactNode }) {
   return (
-    <section className="los-card overflow-hidden">
-      <div className="border-b border-[var(--los-panel-border)] bg-[rgba(20,150,243,0.04)] px-5 py-4 md:px-6">
-        <span className="los-chip mb-2">{eyebrow}</span>
-        <h2 className="m-0 text-[1.05rem] font-extrabold tracking-[-0.02em] text-brand-navy md:text-[1.15rem]">{title}</h2>
-        {description ? (
-          <p className="m-0 mt-1.5 max-w-[62ch] text-[0.84rem] leading-relaxed text-brand-muted">{description}</p>
-        ) : null}
+    <section
+      className="overflow-hidden rounded-[12px] border border-[rgba(23,44,113,0.09)]"
+      style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,246,255,0.95))' }}
+    >
+      <div className="flex items-center gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.7)] px-4 py-2.5">
+        <span className="text-[0.6rem] font-extrabold uppercase tracking-[0.14em]" style={{ color: 'rgba(94,103,130,0.6)' }}>{eyebrow}</span>
+        <span className="w-px h-3 bg-[rgba(23,44,113,0.1)]" aria-hidden />
+        <h2 className="m-0 text-[0.88rem] font-extrabold tracking-[-0.01em] text-brand-navy">{title}</h2>
       </div>
-      <div className="px-5 py-4 md:px-6 md:py-5">{children}</div>
+      <div className="px-4 py-3">{children}</div>
     </section>
   );
 }
 
 function DetailGrid({ rows }: { rows: Array<{ label: string; value: ReactNode }> }) {
   return (
-    <dl className="m-0 divide-y divide-[rgba(23,44,113,0.08)]">
+    <dl className="m-0 divide-y divide-[rgba(23,44,113,0.06)]">
       {rows.map((row, idx) => (
-        <div key={`${row.label}-${idx}`} className="grid gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(140px,200px)_1fr] sm:items-start sm:gap-4">
-          <dt className="text-[0.72rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">{row.label}</dt>
-          <dd className="m-0 min-w-0 text-[0.92rem] font-semibold text-brand-text">{row.value}</dd>
+        <div key={`${row.label}-${idx}`} className="flex items-baseline gap-3 py-1.5 first:pt-0 last:pb-0">
+          <dt className="w-[140px] flex-shrink-0 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-brand-muted leading-tight">{row.label}</dt>
+          <dd className="m-0 min-w-0 flex-1 text-[0.84rem] font-semibold text-brand-text leading-snug">{row.value}</dd>
         </div>
       ))}
     </dl>
@@ -284,9 +251,10 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
 
   const displayName = lead.profile?.fullName?.trim() || 'Lead (name pending)';
   const profile = lead.profile;
+  const journeySteps = buildLeadIntakeJourney(lead);
 
   return (
-    <div className="grid gap-5 pb-2">
+    <div className="grid gap-4 pb-2">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
@@ -304,198 +272,116 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
         </button>
       </div>
 
-      {/* Hero */}
-      <header className="los-card relative overflow-hidden p-5 md:p-7">
-        <div
-          className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full opacity-90 blur-2xl"
-          style={{ background: 'radial-gradient(circle, rgba(20,150,243,0.22), transparent 68%)' }}
-          aria-hidden
-        />
-        <div className="relative grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
-          <div className="min-w-0">
-            <span className="los-chip mb-3">Loan pipeline</span>
-            <h1 className="m-0 text-[1.45rem] font-extrabold leading-tight tracking-[-0.04em] text-brand-navy md:text-[1.75rem]">
-              {displayName}
-            </h1>
-            <p className="m-0 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.9rem] text-brand-muted">
-              <span className="font-bold text-brand-text">{lead.mobileNumber}</span>
-              <span className="hidden text-brand-muted sm:inline" aria-hidden>
-                ·
-              </span>
-              <span className="min-w-0 break-all">{lead.email ?? 'Email not captured'}</span>
-            </p>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <StatusPill code={lead.statusCode} label={lead.statusLabel} />
-              <span className="inline-flex items-center rounded-full border border-[rgba(23,44,113,0.1)] bg-[rgba(255,255,255,0.75)] px-3 py-1 text-[0.72rem] font-bold text-brand-muted">
-                Source: <span className="ml-1 text-brand-text">{sourceSummary(lead)}</span>
-              </span>
-              {lead.rejectionReason && (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(239,68,68,0.2)] bg-[rgba(254,242,242,0.85)] px-3 py-1 text-[0.72rem] font-bold text-[#b91c1c]">
-                  <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} aria-hidden><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                  {lead.rejectionReason.label}
-                </span>
-              )}
-            </div>
-            {(lead.leadStatusNote || lead.bureauFetchedNote) ? (
-              <dl className="m-0 mt-4 grid gap-3 rounded-[12px] border border-[rgba(23,44,113,0.1)] bg-[rgba(248,250,255,0.85)] px-4 py-3 text-[0.84rem] leading-relaxed">
-                {lead.leadStatusNote ? (
-                  <div>
-                    <dt className="m-0 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">Notes</dt>
-                    <dd className="m-0 mt-1 whitespace-pre-wrap break-words text-brand-text">{lead.leadStatusNote}</dd>
-                  </div>
-                ) : null}
-                {lead.bureauFetchedNote ? (
-                  <div>
-                    <dt className="m-0 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">Bureau / vendor note</dt>
-                    <dd className="m-0 mt-1 whitespace-pre-wrap break-words text-brand-text">{lead.bureauFetchedNote}</dd>
-                  </div>
-                ) : null}
-              </dl>
-            ) : null}
-          </div>
-          <div className="grid w-full max-w-sm gap-2 rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.72)] p-4 text-[0.82rem] lg:justify-self-end">
-            <div className="flex justify-between gap-3 border-b border-[rgba(23,44,113,0.06)] pb-2">
-              <span className="font-extrabold uppercase tracking-[0.08em] text-brand-muted">Created</span>
-              <span className="text-right font-semibold text-brand-text">{formatDateTime(lead.createdAt)}</span>
-            </div>
-            <div className="flex justify-between gap-3 pt-0.5">
-              <span className="font-extrabold uppercase tracking-[0.08em] text-brand-muted">Updated</span>
-              <span className="text-right font-semibold text-brand-text">{formatDateTime(lead.updatedAt)}</span>
-            </div>
-          </div>
+      <WorkspaceRecordHeader
+        eyebrow="Loan pipeline"
+        title={displayName}
+        mobile={lead.mobileNumber}
+        email={lead.email}
+        statusCode={lead.statusCode}
+        statusLabel={lead.statusLabel}
+        sourceLabel={sourceSummary(lead)}
+        rejectionReason={lead.rejectionReason?.label}
+        note={lead.leadStatusNote}
+        secondaryNote={lead.bureauFetchedNote}
+        createdAt={formatDateTime(lead.createdAt)}
+        updatedAt={formatDateTime(lead.updatedAt)}
+        quickStats={[
+          { label: 'PAN', value: lead.panVerifiedLabel ?? '—' },
+          { label: 'Bureau', value: lead.bureauFetchedLabel ?? '—' },
+        ]}
+        journeyTitle="Intake progress"
+        journeySubtitle="Steps before an application is created"
+        journeySteps={journeySteps}
+      />
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 lg:col-span-2">
+          <SectionCard eyebrow="Borrower profile" title="Onboarding snapshot" description="Captured during customer onboarding.">
+            {profile ? (
+              <div className="grid gap-x-6 gap-y-0 sm:grid-cols-2">
+                <DetailGrid
+                  rows={[
+                    { label: 'Full name', value: profile.fullName ?? '—' },
+                    { label: 'Date of birth', value: formatDateOnly(profile.dateOfBirth ?? undefined) },
+                    { label: 'Age', value: ageFromDateOfBirth(profile.dateOfBirth ?? undefined) },
+                    { label: 'PAN', value: profile.panNumber ?? '—' },
+                    { label: 'PAN status', value: lead.panVerifiedLabel ?? '—' },
+                    { label: 'Bureau', value: lead.bureauFetchedLabel ?? '—' },
+                    { label: 'Gender', value: profile.gender ?? '—' },
+                    { label: 'Occupation', value: profile.occupation ?? '—' },
+                  ]}
+                />
+                <DetailGrid
+                  rows={[
+                    { label: 'City', value: profile.city ?? '—' },
+                    { label: 'State', value: profile.state ?? '—' },
+                    { label: 'PIN', value: profile.pincode ?? '—' },
+                    {
+                      label: 'Address',
+                      value: [profile.addressLine1, profile.addressLine2].filter(Boolean).join(', ') || '—',
+                    },
+                    { label: 'Net monthly income', value: formatInr(profile.netMonthlyIncome) },
+                    { label: 'Bureau consent', value: formatDateTime(profile.cibilConsentAt ?? undefined) },
+                  ]}
+                />
+              </div>
+            ) : (
+              <p className="m-0 text-[0.88rem] text-brand-muted">No profile saved yet.</p>
+            )}
+          </SectionCard>
         </div>
-      </header>
 
-      <div
-        className={
-          lead.applications.length === 0
-            ? 'rounded-[14px] border border-[rgba(100,116,139,0.25)] bg-[rgba(100,116,139,0.07)] px-4 py-3 text-[0.84rem] leading-relaxed text-brand-navy'
-            : 'rounded-[14px] border border-[rgba(20,150,243,0.22)] bg-[rgba(20,150,243,0.06)] px-4 py-3 text-[0.84rem] leading-relaxed text-brand-navy'
-        }
-      >
-        {lead.applications.length === 0 ? (
-          <>
-            <strong className="font-extrabold">Lead-only workspace.</strong>{' '}
-            No loan application has been created yet, so product, eligibility, and agreement data will appear once the
-            customer starts an application. Everything below reflects intake and onboarding captured on the lead.
-          </>
-        ) : (
-          <>
-            <strong className="font-extrabold">Application created.</strong>{' '}
-            Borrower intake below stays on the lead for context; open each application card for loan terms, bureau
-            outcome, KYC flags, agreement, and disbursement.
-          </>
-        )}
+        <div className="grid gap-4 content-start">
+          <SectionCard eyebrow="Attribution" title="Source & campaign" description="How this lead entered the funnel.">
+            <DetailGrid rows={[{ label: 'Lead source', value: sourceSummary(lead) }]} />
+            {lead.utm ? <div className="mt-3"><UtmGrid utm={lead.utm} /></div> : null}
+          </SectionCard>
+
+          {lead.applications.length === 0 ? (
+            <div className="rounded-[14px] border border-dashed border-[rgba(23,44,113,0.14)] bg-[rgba(248,250,255,0.5)] px-4 py-5 text-center text-[0.84rem] text-brand-muted">
+              No application yet — customer is still in lead intake.
+            </div>
+          ) : null}
+        </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <SectionCard
-          eyebrow="Attribution"
-          title="Acquisition context"
-          description="How this lead entered the funnel — CRM source or last-touch UTM, when available."
-        >
-          <div className="mb-3 rounded-[12px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.62)] px-3 py-2.5">
-            <span className="block text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">Lead source</span>
-            <span className="mt-0.5 block text-[0.9rem] font-bold text-brand-text">{sourceSummary(lead)}</span>
-          </div>
-          {lead.utm ? (
-            <UtmGrid utm={lead.utm} />
-          ) : (
-            <p className="m-0 text-[0.88rem] text-brand-muted">No campaign attribution payload was stored for this lead.</p>
-          )}
-        </SectionCard>
-      </div>
-
-      <SectionCard
-        eyebrow="Borrower profile"
-        title="Onboarding & KYC snapshot"
-        description="Facts captured during onboarding. Empty fields usually mean the customer has not completed that step yet."
-      >
-        {profile ? (
-          <DetailGrid
-            rows={[
-              { label: 'Full name as per PAN card', value: profile.fullName ?? '—' },
-              { label: 'Date of birth', value: formatDateOnly(profile.dateOfBirth ?? undefined) },
-              { label: 'Age', value: ageFromDateOfBirth(profile.dateOfBirth ?? undefined) },
-              { label: 'PAN', value: profile.panNumber ?? '—' },
-              { label: 'Gender', value: profile.gender ?? '—' },
-              { label: 'Occupation', value: profile.occupation ?? '—' },
-              { label: 'City', value: profile.city ?? '—' },
-              { label: 'State', value: profile.state ?? '—' },
-              { label: 'State code', value: profile.stateCode ?? '—' },
-              { label: 'PIN code', value: profile.pincode ?? '—' },
-              {
-                label: 'Address',
-                value: [profile.addressLine1, profile.addressLine2].filter(Boolean).join(', ') || '—',
-              },
-              { label: 'Net monthly income', value: formatInr(profile.netMonthlyIncome) },
-              { label: 'Annual turnover', value: formatInr(profile.annualTurnover) },
-              { label: 'Annual profit', value: formatInr(profile.annualProfit) },
-              { label: 'Bureau consent at', value: formatDateTime(profile.cibilConsentAt ?? undefined) },
-            ]}
-          />
-        ) : (
-          <p className="m-0 text-[0.9rem] text-brand-muted">No profile has been saved for this lead yet.</p>
-        )}
-      </SectionCard>
-
-      <SectionCard
-        eyebrow="Applications"
-        title="Linked loan applications"
-        description={
-          lead.applications.length === 0
-            ? 'When the customer starts an application, open it from here or from the Applications queue.'
-            : 'Loan structure and downstream checks live on each application page — use Open application for the full workspace.'
-        }
-      >
-        {lead.applications.length === 0 ? (
-          <div className="rounded-[14px] border border-dashed border-[rgba(23,44,113,0.16)] bg-[rgba(248,250,255,0.5)] px-4 py-8 text-center">
-            <p className="m-0 text-[0.9rem] font-semibold text-brand-navy">No applications yet</p>
-            <p className="m-0 mt-1 text-[0.84rem] text-brand-muted">When the customer starts an application, it will appear here.</p>
-          </div>
-        ) : (
-          <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2">
+      {lead.applications.length > 0 ? (
+        <SectionCard eyebrow="Applications" title="Linked loan applications" description="Open an application for loan terms, bureau, KYC, and disbursement.">
+          <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2 lg:grid-cols-3">
             {lead.applications.map((application) => (
               <li key={application.uuid}>
-                <article className="flex h-full flex-col rounded-[16px] border border-[rgba(23,44,113,0.1)] bg-[rgba(255,255,255,0.92)] p-4 shadow-sm transition-shadow hover:shadow-md">
+                <article className="flex h-full flex-col rounded-[14px] border border-[rgba(23,44,113,0.1)] bg-white p-3.5 shadow-sm">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <span className="text-[0.68rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">Application</span>
-                      <p className="m-0 mt-1 font-mono text-[0.78rem] font-bold leading-snug text-brand-navy">{application.uuid}</p>
+                      <span className="text-[0.65rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">Application</span>
+                      <p className="m-0 mt-1 font-mono text-[0.72rem] font-bold text-brand-navy">{application.uuid.slice(0, 8)}…</p>
                     </div>
-                    <StatusPill code={application.statusCode} label={application.statusLabel} />
+                    <LosStatusPill code={application.statusCode} label={application.statusLabel} />
                   </div>
-                  <dl className="m-0 mt-4 grid gap-2 border-t border-[rgba(23,44,113,0.06)] pt-3 text-[0.84rem]">
+                  <dl className="m-0 mt-3 grid gap-1.5 border-t border-[rgba(23,44,113,0.06)] pt-2.5 text-[0.8rem]">
                     <div className="flex justify-between gap-2">
-                      <dt className="font-bold text-brand-muted">Loan amount</dt>
-                      <dd className="m-0 font-extrabold text-brand-navy">{formatInr(application.loanAmount)}</dd>
+                      <dt className="text-brand-muted">Amount</dt>
+                      <dd className="m-0 font-bold text-brand-navy">{formatInr(application.loanAmount)}</dd>
                     </div>
-                    <div className="flex justify-between gap-2">
-                      <dt className="font-bold text-brand-muted">Tenure</dt>
-                      <dd className="m-0 font-semibold text-brand-text">
-                        {application.loanTenure != null ? `${application.loanTenure} months` : '—'}
-                      </dd>
-                    </div>
-                    <div className="flex justify-between gap-2 text-[0.78rem] text-brand-muted">
+                    <div className="flex justify-between gap-2 text-[0.75rem] text-brand-muted">
                       <dt>Opened</dt>
                       <dd className="m-0">{formatDateTime(application.createdAt)}</dd>
                     </div>
                   </dl>
-                  <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-[rgba(23,44,113,0.04)] pt-3">
-                    <CopyIdButton value={application.uuid} label="Application UUID" />
+                  <div className="mt-auto flex justify-end gap-2 pt-3">
                     <Link
                       href={`/applications/${application.uuid}`}
-                      className="inline-flex min-h-[36px] items-center justify-center rounded-full bg-brand-navy px-4 text-[0.78rem] font-extrabold text-white no-underline shadow-sm transition-opacity hover:opacity-95"
+                      className="inline-flex min-h-[34px] items-center rounded-full bg-brand-navy px-3.5 text-[0.75rem] font-extrabold text-white no-underline"
                     >
-                      Open application
+                      Open
                     </Link>
                   </div>
                 </article>
               </li>
             ))}
           </ul>
-        )}
-      </SectionCard>
+        </SectionCard>
+      ) : null}
     </div>
   );
 }

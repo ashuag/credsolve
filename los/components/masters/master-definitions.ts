@@ -89,6 +89,16 @@ export const MASTER_DEFINITIONS = [
     searchPlaceholder: 'Search banks...',
     canCreate: true,
   },
+  {
+    slug: 'sms-templates',
+    label: 'SMS Templates',
+    eyebrow: 'Communications',
+    description: 'Manage SMS provider templates, bearer tokens, and message content used for OTP delivery.',
+    pageTitle: 'SMS Templates',
+    pageSubtitle: 'Edit SMS template IDs, bearer tokens, message text, and active state.',
+    searchPlaceholder: 'Search SMS templates...',
+    canCreate: false,
+  },
 ] as const;
 
 export type MasterSlug = (typeof MASTER_DEFINITIONS)[number]['slug'];

@@ -110,7 +110,77 @@ export type DownloadAadhaarDigilockerResponse = {
   persisted?: boolean;
   identityMismatch?: boolean;
   identityMismatchMessage?: string;
+  attemptsUsed?: number;
+  attemptsAllowed?: number;
+  canRetry?: boolean;
+  leadRejected?: boolean;
+  terminalFailure?: boolean;
 };
+
+function findDigilockerRedirectUrl(vendor: unknown, depth = 0): string | null {
+  if (depth > 5 || vendor == null) return null;
+  if (typeof vendor === 'string' && /^https?:\/\//i.test(vendor.trim())) {
+    return vendor.trim();
+  }
+  if (typeof vendor !== 'object') return null;
+  const o = vendor as Record<string, unknown>;
+  for (const key of ['redirectUrl', 'url', 'authorizationUrl', 'authUrl', 'redirect_uri']) {
+    const v = o[key];
+    if (typeof v === 'string' && /^https?:\/\//i.test(v)) return v;
+  }
+  for (const v of Object.values(o)) {
+    const found = findDigilockerRedirectUrl(v, depth + 1);
+    if (found) return found;
+  }
+  return null;
+}
+
+export type StartDigilockerLoginResult = { ok: true } | { ok: false; message: string };
+
+/** Calls `digilocker-generate-url` and redirects the browser to DigiLocker login. */
+export async function startDigilockerLoginFlow(
+  redirectPath = '/kyc/digilocker-callback',
+): Promise<StartDigilockerLoginResult> {
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const out = await initDigilockerSession(
+    origin ? { redirectUrl: `${origin}${redirectPath}` } : {},
+  );
+
+  if (!out.configured) {
+    return { ok: false, message: out.skipReason ?? 'DigiLocker is not configured on the server.' };
+  }
+  if (!out.ok) {
+    const vendorMsg =
+      typeof out.vendor === 'object' && out.vendor && 'message' in (out.vendor as object)
+        ? String((out.vendor as { message?: unknown }).message)
+        : `DigiLocker request failed (${out.httpStatus ?? 'no status'}).`;
+    return { ok: false, message: vendorMsg };
+  }
+
+  const redirect = out.digilockerLoginUrl ?? findDigilockerRedirectUrl(out.vendor);
+  if (!redirect) {
+    return {
+      ok: false,
+      message: 'DigiLocker started, but no login URL was returned. Check with support or try again.',
+    };
+  }
+
+  const sessionToken =
+    out.sessionToken ??
+    extractDigilockerSessionTokenFromVendor(out.vendor) ??
+    extractDigilockerSessionTokenFromUrl(redirect);
+  persistDigilockerSessionTokenForCallback(sessionToken);
+  if (!sessionToken) {
+    return {
+      ok: false,
+      message:
+        'DigiLocker started, but no session token was returned. Check Tenacio configuration or try again.',
+    };
+  }
+
+  window.location.assign(redirect);
+  return { ok: true };
+}
 
 /** Best-effort message from Tenacio-style `vendor` bodies on download failures. */
 export function pickDigilockerDownloadErrorMessage(vendor: unknown): string | undefined {

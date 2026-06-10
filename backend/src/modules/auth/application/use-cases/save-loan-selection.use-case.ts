@@ -92,18 +92,15 @@ export class SaveLoanSelectionUseCase {
         });
       }
 
-      let reasonForLoanId: number | null | undefined;
-      if (dto.loanPurpose !== undefined) {
-        const trimmed = dto.loanPurpose.trim();
-        if (!trimmed) {
-          reasonForLoanId = null;
-        } else {
-          const row = await tx.reasonForLoan.findFirst({
-            where: { name: trimmed, isActive: true },
-            select: { id: true },
-          });
-          reasonForLoanId = row?.id ?? null;
-        }
+      const loanPurpose = dto.loanPurpose.trim();
+      const reasonForLoan = await tx.reasonForLoan.findFirst({
+        where: { name: loanPurpose, isActive: true },
+        select: { id: true },
+      });
+      if (!reasonForLoan) {
+        throw new BadRequestException(
+          `Loan purpose "${loanPurpose}" is not recognized. Choose a purpose from the list.`,
+        );
       }
 
       const principal = new Prisma.Decimal(dto.loanAmount);
@@ -117,22 +114,16 @@ export class SaveLoanSelectionUseCase {
         gstAmount: new Prisma.Decimal(gstAmountNum),
         loanMaturityDate: tenureEndDate,
         loanDisbursementDate: new Date(),
+        reasonForLoanId: reasonForLoan.id,
       };
 
-      const reasonPatch =
-        reasonForLoanId === undefined ? {} : { reasonForLoanId };
-
-      await tx.applicationDetails.upsert({
+      await tx.applicationDetail.upsert({
         where: { applicationId: application.id },
         create: {
           applicationId: application.id,
           ...detailsCore,
-          ...reasonPatch,
         },
-        update: {
-          ...detailsCore,
-          ...reasonPatch,
-        },
+        update: detailsCore,
       });
 
       // Loan selection is the upstream checkpoint for the rest of the journey.

@@ -11,11 +11,41 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
   const isApplyPage = pathname === '/apply-for-loan';
   const isAccountLoginPage = pathname === '/my-account';
   const isOnboardingLayout = pathname === '/onboarding' || pathname === '/email-verify';
+  const isLoanDocumentsPage = pathname === '/loan-documents';
+  const isKycHubPage = pathname === '/kyc';
 
-  if (isLandingPage || isApplyPage || isAccountLoginPage) {
+  if (isLandingPage || isApplyPage || isAccountLoginPage || isKycHubPage) {
+    if (isKycHubPage) {
+      return (
+        <div className="flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden">
+          {children}
+        </div>
+      );
+    }
     return <>{children}</>;
   }
 
+  if (isLoanDocumentsPage) {
+    return (
+      <>
+        <div className="hidden lg:block">
+          <Suspense
+            fallback={
+              <header
+                className="sticky top-0 z-20 min-h-[72px] border-b border-b-[rgba(18,36,79,0.09)] bg-[rgba(255,253,248,0.95)] backdrop-blur-[24px] shadow-[0_4px_32px_rgba(23,44,113,0.08)]"
+                aria-hidden
+              />
+            }
+          >
+            <BrandHeader />
+          </Suspense>
+        </div>
+        <div className="flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden lg:h-[calc(100dvh-80px)] lg:max-h-[calc(100dvh-80px)] lg:px-4 lg:py-3">
+          {children}
+        </div>
+      </>
+    );
+  }
   if (isOnboardingLayout) {
     return (
       <>

@@ -2,6 +2,24 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
+/** `digilocker_aadhaar_form_json` rows that only record a failed vendor attempt (not a captured Aadhaar). */
+export function isDigilockerAadhaarCaptureComplete(formJson: unknown): boolean {
+  if (formJson == null) return false;
+  return !(isRecord(formJson) && formJson._vendorAttempt === true);
+}
+
+export function buildDigilockerVendorAttemptJson(params: {
+  httpStatus: number | null;
+  vendor: unknown;
+}): Record<string, unknown> {
+  return {
+    _vendorAttempt: true,
+    httpStatus: params.httpStatus,
+    vendor: params.vendor ?? null,
+    recordedAt: new Date().toISOString(),
+  };
+}
+
 /** Tenacio-style envelopes often use `status: "success"` (see bureau mock). */
 export function isTenacioVendorBusinessSuccess(vendor: unknown): boolean {
   if (!isRecord(vendor)) return false;

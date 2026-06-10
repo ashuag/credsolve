@@ -14,6 +14,7 @@ import {seedCreditLimitTier} from './seeds/credit-limit-tier.seed';
 import { seedBank } from './seeds/bank.seed';
 import { seedRejectionReason } from './seeds/rejection-reason.seed';
 import { seedReferenceRelation } from './seeds/reference-relation.seed';
+import { seedSmsTemplate } from './seeds/sms-template.seed';
 
 async function assertMigrationsApplied(prisma: ReturnType<typeof createPrismaClient>) {
     const rows = await prisma.$queryRaw<{ cnt: bigint }[]>`
@@ -77,6 +78,7 @@ async function main() {
         await seedBank(prisma);
         await seedRejectionReason(prisma);
         await seedReferenceRelation(prisma);
+        await seedSmsTemplate(prisma);
 
         console.log(`Seed completed in ${Date.now() - start}ms`);
     } catch (error) {

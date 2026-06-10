@@ -73,6 +73,7 @@ const navGroups: { section: string; color: string; items: NavItem[] }[] = [
         href: '/masters',
         label: 'Masters',
         icon: 'masters',
+        children: [{ href: '/masters/sms-templates', label: 'SMS Templates' }],
       },
     ],
   },
@@ -150,6 +151,7 @@ const BREADCRUMBS: Record<string, string> = {
   '/agents': 'Agent Management',
   '/roles': 'Role Management',
   '/masters': 'Masters',
+  '/masters/sms-templates': 'SMS Templates',
   '/masters/lead-sources': 'Source Management',
   '/masters/source-utm': 'Utm Management',
   '/eligibility-criteria/negative-pincode': 'Negative Pincode',
@@ -519,8 +521,8 @@ export function CrmShell({
     isMobileLayout
       ? cx('fixed inset-y-0 left-0 z-50 p-3', sidebarOpen ? 'translate-x-0' : '-translate-x-[110%]', 'w-[min(280px,88vw)] min-w-[min(280px,88vw)]')
       : isHidden ? 'w-0 min-w-0 p-0 opacity-0 overflow-hidden pointer-events-none'
-      : isIcons  ? 'relative z-50 w-[72px] min-w-[72px] p-2'
-      :            'relative z-50 w-[248px] min-w-[248px] p-2',
+      : isIcons  ? 'relative z-50 w-[64px] min-w-[64px] p-2'
+      :            'relative z-50 w-[248px] min-w-[248px] p-3',
   );
 
   const toolBtn = 'inline-flex items-center justify-center w-8 h-8 border border-[rgba(23,44,113,0.12)] rounded-[8px] bg-[rgba(255,255,255,0.9)] text-brand-navy cursor-pointer transition-all duration-[140ms] hover:border-[rgba(20,150,243,0.28)] hover:bg-white hover:text-brand-blue disabled:opacity-40 disabled:cursor-not-allowed';
@@ -536,35 +538,51 @@ export function CrmShell({
       )}
 
       {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
-      <aside id="crm-sidebar-panel" className={sidebarWrapClass} aria-label="Main navigation">
+      <aside
+        id="crm-sidebar-panel"
+        className={sidebarWrapClass}
+        aria-label="Main navigation"
+      >
         <div
-          className={cx('sticky top-2 flex flex-col gap-2 min-h-[calc(100vh-16px)] max-h-[calc(100vh-16px)] rounded-[18px] border border-[rgba(23,44,113,0.1)] overflow-auto scrollbar-thin', isIcons ? 'p-2 items-center' : 'p-3')}
-          style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(237,244,255,0.95) 100%)', boxShadow: '0 4px 24px rgba(23,44,113,0.1), inset 0 1px 0 rgba(255,255,255,0.9)' }}
+          className={cx(
+            'sticky top-3 flex flex-col min-h-[calc(100vh-24px)] max-h-[calc(100vh-24px)] overflow-auto rounded-[20px]',
+            isIcons ? 'items-center p-2 gap-3' : 'p-4 gap-1',
+          )}
+          style={{
+            background: 'linear-gradient(160deg,#0f1829 0%,#0a1220 60%,#0d1830 100%)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.06)',
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgba(255,255,255,0.08) transparent',
+          }}
         >
           {/* Brand */}
-          <div className={cx('flex flex-col gap-2', isIcons && 'items-center')}>
+          <div className={cx('pb-3', isIcons ? '' : 'border-b border-white/[0.06] mb-2')}>
             <Link href="/dashboard" className="block">
-              <div className={cx('flex items-center justify-center border border-[rgba(18,36,79,0.09)] bg-white rounded-[12px] overflow-hidden transition-all duration-[120ms] hover:border-[rgba(20,150,243,0.22)] hover:shadow-[0_4px_14px_rgba(20,150,243,0.1)]', isIcons ? 'p-2' : 'p-2.5')}>
+              <div
+                className={cx(
+                  'flex items-center justify-center rounded-[14px] transition-all duration-[140ms]',
+                  isIcons ? 'p-2' : 'p-2.5',
+                )}
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+              >
                 <MoneyCashSidebarLogo isIcons={isIcons} />
               </div>
             </Link>
-            
           </div>
 
           {/* Nav groups */}
-          <nav className="flex flex-col gap-3" aria-label="Primary navigation">
+          <nav className={cx('flex flex-col', isIcons ? 'gap-1 items-center w-full' : 'gap-0 flex-1')} aria-label="Primary navigation">
             {navGroups.map((group) => {
               const accent = GROUP_ACCENT[group.section] ?? GROUP_ACCENT['Overview'];
               return (
-                <div key={group.section}>
+                <div key={group.section} className={isIcons ? 'w-full' : 'pt-3'}>
                   {!isIcons && (
-                    <div className="flex items-center gap-2 px-2 mb-1">
-                      <span className={cx('w-[5px] h-[5px] flex-shrink-0 rounded-full', accent.dot)} aria-hidden />
-                      <span className="text-[0.64rem] font-extrabold tracking-[0.14em] uppercase" style={{ color: accent.text }}>{group.section}</span>
-                      <span className="flex-1 h-px bg-[rgba(23,44,113,0.07)]" aria-hidden />
-                    </div>
+                    <p className="m-0 mb-1 px-2 text-[0.6rem] font-extrabold tracking-[0.18em] uppercase" style={{ color: 'rgba(148,163,210,0.45)' }}>
+                      {group.section}
+                    </p>
                   )}
-                  <div className="flex flex-col gap-0.5">
+                  <div className="flex flex-col gap-[2px]">
                     {group.items.map((item, itemIndex) => {
                       const active = isNavActive(pathname, item);
                       const hasActiveChild = item.children?.some((child) => pathname === stripRouteDecorators(child.href)) ?? false;
@@ -573,42 +591,38 @@ export function CrmShell({
                       const parentActive = active && !hasActiveChild;
                       const parentExpanded = hasActiveChild && !parentActive;
                       return (
-                        <div key={`${group.section}-${item.href}-${item.label}-${itemIndex}`} className="flex flex-col gap-1">
+                        <div key={`${group.section}-${item.href}-${item.label}-${itemIndex}`} className="flex flex-col gap-[2px]">
                           <Link
                             href={item.href}
                             title={item.label}
                             aria-current={parentActive ? 'page' : undefined}
                             className={cx(
-                              'group relative flex items-center gap-2.5 rounded-[10px] font-semibold text-[0.875rem] transition-all duration-[140ms] outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40',
-                              isIcons ? 'justify-center p-2.5' : 'px-3 py-2',
-                              parentActive
-                                ? 'text-brand-navy shadow-[0_2px_8px_rgba(23,44,113,0.08)]'
-                                : parentExpanded
-                                  ? 'text-brand-navy'
-                                  : 'text-brand-muted hover:text-brand-navy',
+                              'flex items-center gap-2.5 rounded-[12px] font-semibold text-[0.875rem] transition-all duration-[140ms] outline-none',
+                              isIcons ? 'justify-center p-2.5 w-full' : 'px-2.5 py-2',
                             )}
                             style={
                               parentActive
-                                ? { background: `linear-gradient(135deg, ${accent.bg}, rgba(255,255,255,0.5))`, border: `1px solid ${accent.border}` }
+                                ? {
+                                    background: `linear-gradient(135deg, rgba(20,150,243,0.2), rgba(99,102,241,0.14))`,
+                                    border: '1px solid rgba(20,150,243,0.28)',
+                                    color: '#e8f4ff',
+                                  }
                                 : parentExpanded
-                                  ? { background: 'linear-gradient(180deg, rgba(255,255,255,0.92), rgba(248,250,255,0.96))', border: `1px solid ${accent.border}` }
-                                  : { border: '1px solid transparent' }
+                                  ? { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#d0dcff' }
+                                  : { border: '1px solid transparent', color: 'rgba(180,195,230,0.7)' }
                             }
                           >
-                            {parentActive && !isIcons && (
-                              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[60%] rounded-full" style={{ background: accent.text }} aria-hidden />
-                            )}
                             <span
-                              className={cx(
-                                'flex-shrink-0 flex items-center justify-center rounded-[8px] transition-all duration-[140ms]',
-                                isIcons ? 'w-8 h-8' : 'w-7 h-7',
-                                parentActive
-                                  ? 'shadow-[0_2px_6px_rgba(23,44,113,0.12)]'
-                                  : parentExpanded
-                                    ? 'bg-[rgba(245,158,11,0.12)]'
-                                    : 'bg-[rgba(23,44,113,0.05)] group-hover:bg-[rgba(23,44,113,0.08)]',
-                              )}
-                              style={parentActive ? { background: accent.text, color: '#fff' } : parentExpanded ? { color: accent.text } : undefined}
+                              className="flex-shrink-0 flex items-center justify-center rounded-[9px] transition-all duration-[140ms]"
+                              style={{
+                                width: isIcons ? 36 : 30,
+                                height: isIcons ? 36 : 30,
+                                background: parentActive
+                                  ? 'rgba(20,150,243,0.28)'
+                                  : 'rgba(255,255,255,0.05)',
+                                color: parentActive ? '#60b8ff' : 'rgba(148,175,230,0.65)',
+                                boxShadow: parentActive ? '0 0 12px rgba(20,150,243,0.2)' : 'none',
+                              }}
                               aria-hidden
                             >
                               <NavIconSvg name={item.icon} size={isIcons ? 18 : 16} />
@@ -617,7 +631,12 @@ export function CrmShell({
                               <>
                                 <span className="flex-1 truncate">{item.label}</span>
                                 {item.badge && (
-                                  <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-brand-blue text-white text-[0.65rem] font-extrabold">{item.badge}</span>
+                                  <span
+                                    className="flex-shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full text-white text-[0.6rem] font-extrabold"
+                                    style={{ background: accent.text }}
+                                  >
+                                    {item.badge}
+                                  </span>
                                 )}
                               </>
                             )}
@@ -625,8 +644,8 @@ export function CrmShell({
 
                           {showExpandedChildren ? (
                             <div
-                              className="ml-3 grid gap-1 rounded-[12px] border px-2 py-2"
-                              style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.76), rgba(248,250,255,0.92))', borderColor: accent.border }}
+                              className="ml-2 flex flex-col gap-[2px] rounded-[10px] px-2 py-1.5"
+                              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
                             >
                               {navChildren.map((child, childIndex) => {
                                 const childActive = pathname === stripRouteDecorators(child.href);
@@ -635,18 +654,16 @@ export function CrmShell({
                                     key={`${item.href}-${child.href}-${child.label}-${childIndex}`}
                                     href={child.href}
                                     aria-current={childActive ? 'page' : undefined}
-                                    className={cx(
-                                      'flex items-start gap-2 rounded-[9px] px-2.5 py-2 text-[0.75rem] font-semibold leading-[1.25] transition-colors',
+                                    className="flex items-center gap-2 rounded-[8px] px-2.5 py-1.5 text-[0.78rem] font-semibold leading-snug transition-all duration-[120ms]"
+                                    style={
                                       childActive
-                                        ? 'border border-[rgba(245,158,11,0.2)] bg-[rgba(245,158,11,0.12)] text-brand-navy shadow-[0_1px_4px_rgba(23,44,113,0.06)]'
-                                        : 'border border-transparent text-brand-muted hover:border-[rgba(23,44,113,0.08)] hover:bg-[rgba(255,255,255,0.74)] hover:text-brand-navy',
-                                    )}
+                                        ? { background: 'rgba(20,150,243,0.18)', color: '#93c5fd', border: '1px solid rgba(20,150,243,0.2)' }
+                                        : { color: 'rgba(148,175,230,0.6)', border: '1px solid transparent' }
+                                    }
                                   >
                                     <span
-                                      className={cx(
-                                        'mt-[2px] h-[18px] w-[3px] flex-shrink-0 rounded-full',
-                                        childActive ? 'bg-amber-500' : 'bg-[rgba(23,44,113,0.12)]',
-                                      )}
+                                      className="flex-shrink-0 w-1 h-4 rounded-full"
+                                      style={{ background: childActive ? '#60b8ff' : 'rgba(255,255,255,0.12)' }}
                                       aria-hidden
                                     />
                                     <span className="min-w-0">{child.label}</span>
@@ -664,16 +681,26 @@ export function CrmShell({
             })}
           </nav>
 
-          {/* Footer */}
+          {/* Footer user card */}
           {!isIcons && (
-            <div className="mt-auto pt-2 border-t border-[rgba(23,44,113,0.08)]">
-              <div className="flex items-center gap-2 px-2 py-2 rounded-[10px] bg-[rgba(23,44,113,0.03)]">
-                <span className="flex-shrink-0 grid place-items-center w-7 h-7 rounded-[8px] bg-[linear-gradient(145deg,#1496f3,#172c71)] text-white text-[0.75rem] font-extrabold">
+            <div className="mt-auto pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <div
+                className="flex items-center gap-2.5 px-2.5 py-2 rounded-[12px]"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+              >
+                <span
+                  className="flex-shrink-0 grid place-items-center w-8 h-8 rounded-[9px] text-white text-[0.75rem] font-extrabold"
+                  style={{ background: 'linear-gradient(135deg,#1496f3,#3b5fd4)' }}
+                >
                   {(session?.user?.fullName ?? 'M').slice(0, 1).toUpperCase()}
                 </span>
                 <span className="flex flex-col min-w-0 flex-1">
-                  <strong className="text-[0.8rem] truncate leading-tight text-brand-navy">{session?.user?.fullName ?? 'MoneyCash Ops'}</strong>
-                  <span className="text-[0.68rem] text-brand-muted truncate leading-tight">{session?.user?.roleName ?? session?.user?.role ?? 'LOS'}</span>
+                  <strong className="text-[0.8rem] truncate leading-tight" style={{ color: '#d8e6ff' }}>
+                    {session?.user?.fullName ?? 'MoneyCash Ops'}
+                  </strong>
+                  <span className="text-[0.68rem] truncate leading-tight" style={{ color: 'rgba(148,163,210,0.6)' }}>
+                    {session?.user?.roleName ?? session?.user?.role ?? 'LOS'}
+                  </span>
                 </span>
               </div>
             </div>

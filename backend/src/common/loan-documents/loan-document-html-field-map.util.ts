@@ -7,6 +7,7 @@ import {
   LENDER_GRO_PHONE,
   LENDER_NODAL_NAME,
   LENDER_NODAL_PHONE,
+  LENDER_NAME,
   LENDER_REGISTERED_OFFICE,
   LSP_GRO_NAME,
   LSP_GRO_PHONE,
@@ -33,6 +34,21 @@ function formatDateDdMmYyyy(d: Date): string {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const yyyy = d.getFullYear();
   return `${dd}-${mm}-${yyyy}`;
+}
+
+function formatAcceptanceTimestamp(value: Date | string): string {
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  }).format(d)} IST`;
 }
 
 function computeAprPercent(
@@ -136,8 +152,13 @@ export function buildLoanDocumentHtmlFieldValues(input: LoanDocumentMergeInput):
     ct_lender_office: LENDER_REGISTERED_OFFICE,
     sig_signed_by: borrowerName,
     sig_name: borrowerName,
-    sig_ip: '',
-    sig_ts: '',
+    sig_ip: input.acceptanceIpAddress?.trim() ?? '',
+    sig_ts:
+      input.acceptanceSignedAt != null ? formatAcceptanceTimestamp(input.acceptanceSignedAt) : '',
+    lender_dsc_signer: input.lenderDscSignerName?.trim() || LENDER_NAME,
+    lender_dsc_date:
+      input.lenderDscSignedAt != null ? formatAcceptanceTimestamp(input.lenderDscSignedAt) : '',
+    lender_dsc_serial: input.lenderDscSerial?.trim() ?? '',
   };
 
   return Object.fromEntries(Object.entries(map).filter(([, v]) => v.length > 0));

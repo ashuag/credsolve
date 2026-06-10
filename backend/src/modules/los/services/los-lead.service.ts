@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { BUREAU_FETCHED } from '../../../common/constants/bureau-fetch.constants';
 import { LEAD_STATUS } from '../../../common/constants/lead.constants';
 import { PAN_VERIFIED } from '../../../common/constants/pan-verification.constants';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -19,6 +20,19 @@ function panVerifiedStatusLabel(code: number): string {
       return 'API failure';
     case PAN_VERIFIED.API_DISABLED:
       return 'Disabled';
+    default:
+      return `Unknown (${code})`;
+  }
+}
+
+function bureauFetchedStatusLabel(code: number): string {
+  switch (code) {
+    case BUREAU_FETCHED.NOT_FETCHED:
+      return 'Not fetched';
+    case BUREAU_FETCHED.SUCCESS:
+      return 'Fetched';
+    case BUREAU_FETCHED.FAILED:
+      return 'Failed';
     default:
       return `Unknown (${code})`;
   }
@@ -153,6 +167,10 @@ export class LosLeadService {
       email: lead.applications[0]?.email ?? null,
       statusCode: lead.leadStatus.name,
       statusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
+      panVerified: lead.panVerified,
+      panVerifiedLabel: panVerifiedStatusLabel(lead.panVerified),
+      bureauFetched: lead.bureauFetched,
+      bureauFetchedLabel: bureauFetchedStatusLabel(lead.bureauFetched),
       leadStatusNote: noteTrimmed,
       bureauFetchedNote: bureauNoteTrimmed,
       rejectionReason: lead.rejectionReason

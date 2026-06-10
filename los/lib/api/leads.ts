@@ -54,6 +54,10 @@ export type LosLeadDetails = {
   email: string | null;
   statusCode: string;
   statusLabel: string;
+  panVerified: number;
+  panVerifiedLabel: string;
+  bureauFetched: number;
+  bureauFetchedLabel: string;
   /** LOS / ops note on the lead row (`lead.lead_status_note`). */
   leadStatusNote: string | null;
   /** Vendor/bureau diagnostic text (`lead.bureau_fetched_note`). */
@@ -127,8 +131,24 @@ export type LosApplicationDetails = {
     sourceName: string | null;
     sourceType: string | null;
     panNumber: string | null;
+    panVerified: number;
+    bureauFetched: number;
     profile: LosLeadDetails['profile'];
   };
+  referencesCount: number;
+  references: Array<{
+    referenceIndex: number;
+    fullName: string;
+    mobileNumber: string;
+    relation: string;
+  }>;
+  aadhaarDetail: {
+    fullName: string | null;
+    dateOfBirth: string | null;
+    gender: string | null;
+    address: string | null;
+    maskedAadhaar: string | null;
+  } | null;
   details: {
     reasonForLoan: string | null;
     loanAmount: string | null;
@@ -137,7 +157,10 @@ export type LosApplicationDetails = {
     interestAmount: string | null;
     processingFee: string | null;
     processingFeeAmount: string | null;
+    gstPercent: string | null;
     gstAmount: string | null;
+    disbursedAmount: string | null;
+    repaymentAmount: string | null;
     loanDisbursementDate: string | null;
     loanMaturityDate: string | null;
   } | null;

@@ -50,7 +50,7 @@ model ReasonForLoan {
   name               String               @unique @db.VarChar(50)
   isActive           Boolean              @default(true) @map("is_active")
   createdAt          DateTime             @default(now()) @map("created_at")
-  applicationDetails ApplicationDetails[]
+  applicationDetail ApplicationDetail[]
 
   @@map("reason_for_loan")
 }

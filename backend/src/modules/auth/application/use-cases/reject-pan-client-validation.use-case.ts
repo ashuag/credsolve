@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, UnauthorizedException } from '@n
 import type { Request } from 'express';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { REJECTION_REASON } from '../../../../common/constants/rejection-reason.constants';
+import { SmsService } from '../../../../common/sms/sms.service';
 import { SettingKey } from '../../../../common/constants/setting.constants';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
@@ -22,6 +23,7 @@ export class RejectPanClientValidationUseCase {
     private readonly prisma: PrismaService,
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
+    private readonly sms: SmsService,
   ) {}
 
   async execute(req: Request, dto: RejectPanClientValidationDto): Promise<RejectPanClientValidationResult> {
@@ -67,6 +69,9 @@ export class RejectPanClientValidationUseCase {
     this.logger.log(
       `Lead ${leadRow.id.toString()} rejected after ${attemptsUsed} PAN client validation attempts.`,
     );
+    void this.sms.sendRejectionSms(customer.mobileNumber, leadRow.id).catch((err) => {
+      this.logger.error('Failed to send rejection SMS', err instanceof Error ? err.stack : err);
+    });
     return { success: true, rejected: true };
   }
 

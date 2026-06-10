@@ -31,7 +31,7 @@ export type CustomerPortalProfileSnapshot = {
 export type CustomerPortalJourneySnapshot = {
   /** Lead detail + consent are complete enough to proceed to pre-approved offer. */
   detailsCompleted: boolean;
-  /** Customer has selected a loan amount + tenure (application_details populated). */
+  /** Customer has selected a loan amount + tenure (application_detail populated). */
   loanSelectionCompleted: boolean;
   /** Key Fact Statement + Loan Agreement accepted (mobile OTP) before KYC. */
   loanDocumentsCompleted: boolean;
@@ -61,6 +61,9 @@ export type CustomerKycFaceProgressSnapshot = {
   digilockerAadhaarPhotoUrl: string | null;
   /** Path fragment for `GET {API}/auth/kyc/selfie-photo` when a selfie file exists. */
   kycSelfiePhotoUrl: string | null;
+  /** Failed DigiLocker Aadhaar download attempts for the active lead. */
+  digilockerAadhaarDownloadAttempts: number;
+  digilockerAadhaarDownloadMaxAttempts: number;
 };
 
 export type CustomerLoanSelectionSnapshot = {
@@ -69,6 +72,14 @@ export type CustomerLoanSelectionSnapshot = {
   tenureDays: number | null;
   /** ISO date-only for maturity when set. */
   maturityDate: string | null;
+};
+
+/** Saved personal reference (`lead_reference` row). */
+export type CustomerLeadReferenceSnapshot = {
+  referenceIndex: number;
+  fullName: string;
+  mobileNumber: string;
+  relationId: number;
 };
 
 export type CustomerSessionResult =
@@ -81,6 +92,8 @@ export type CustomerSessionResult =
       journey: CustomerPortalJourneySnapshot;
       /** Populated when the customer has saved loan amount / tenure on the application. */
       loanSelection: CustomerLoanSelectionSnapshot | null;
+      /** Saved lead references for form prepopulation; empty array when none. */
+      leadReferences: CustomerLeadReferenceSnapshot[];
       /** Active application DigiLocker / selfie / liveness state; `null` without an application row. */
       kycFaceProgress: CustomerKycFaceProgressSnapshot | null;
     }

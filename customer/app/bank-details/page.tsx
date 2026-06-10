@@ -4,10 +4,9 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { lookupBankIfsc, submitVerifiedBankDetails } from '@/lib/api/lead';
+import { IFSC_CODE_LENGTH, getIfscValidationError, isValidIfscCode, normalizeIfscInput } from '@/lib/ifsc';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
-
-const IFSC_RE = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 
 const DETAIL_LABELS: Record<string, string> = {
   bankName: 'Bank name',
@@ -73,6 +72,7 @@ export default function BankDetailsPage() {
 
   const [accountNumber, setAccountNumber] = useState('');
   const [ifscCode, setIfscCode] = useState('');
+  const [ifscTouched, setIfscTouched] = useState(false);
 
   const [ifscLookup, setIfscLookup] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
   const [ifscDetails, setIfscDetails] = useState<Record<string, unknown> | null>(null);
@@ -85,9 +85,13 @@ export default function BankDetailsPage() {
   const accountHolderDisplay =
     session?.authenticated === true ? (session.profile?.fullName?.trim() ?? '') : '';
 
+  const normalizedIfsc = ifscCode.trim().toUpperCase();
+  const ifscValidationError = getIfscValidationError(ifscCode, {
+    touched: ifscTouched || normalizedIfsc.length === IFSC_CODE_LENGTH,
+  });
+
   useEffect(() => {
-    const ifsc = ifscCode.trim().toUpperCase();
-    if (!IFSC_RE.test(ifsc)) {
+    if (!isValidIfscCode(normalizedIfsc)) {
       setIfscLookup('idle');
       setIfscDetails(null);
       setIfscLookupNote('');
@@ -100,7 +104,7 @@ export default function BankDetailsPage() {
     const handle = setTimeout(() => {
       void (async () => {
         try {
-          const out = await lookupBankIfsc(ifsc);
+          const out = await lookupBankIfsc(normalizedIfsc);
           if (cancelled) return;
           if (!out) {
             setIfscLookup('error');
@@ -135,18 +139,34 @@ export default function BankDetailsPage() {
       cancelled = true;
       clearTimeout(handle);
     };
-  }, [ifscCode]);
+  }, [normalizedIfsc]);
+
+  const ifscFieldMessage = ifscValidationError ?? (ifscLookup === 'error' ? ifscLookupNote : null);
+  const ifscFieldMessageIsError = Boolean(ifscValidationError || ifscLookup === 'error');
 
   const canSubmit =
     accountHolderDisplay.length >= 2 &&
     /^\d{9,18}$/.test(accountNumber.replace(/\D/g, '')) &&
-    IFSC_RE.test(ifscCode.trim().toUpperCase()) &&
+    isValidIfscCode(normalizedIfsc) &&
     ifscLookup === 'ok' &&
     ifscDetails !== null;
 
   function openConfirm() {
     setError('');
+    setIfscTouched(true);
+    if (ifscValidationError) {
+      setError(ifscValidationError);
+      return;
+    }
     if (!canSubmit) {
+      if (ifscLookup === 'loading') {
+        setError('Please wait while we fetch branch details for your IFSC.');
+        return;
+      }
+      if (ifscLookup === 'error' && ifscLookupNote) {
+        setError(ifscLookupNote);
+        return;
+      }
       setError('Enter a valid account number and IFSC, wait for branch details to load, and ensure your name is on file.');
       return;
     }
@@ -239,17 +259,41 @@ export default function BankDetailsPage() {
                 IFSC code
               </label>
               <input
-                className="w-full h-[52px] rounded-xl border border-slate-200 bg-white px-4 text-[0.95rem] font-bold text-brand-navy focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all uppercase"
+                className={[
+                  'w-full h-[52px] rounded-xl border bg-white px-4 text-[0.95rem] font-bold text-brand-navy focus:ring-2 outline-none transition-all uppercase',
+                  ifscFieldMessageIsError
+                    ? 'border-red-300 focus:ring-red-200'
+                    : 'border-slate-200 focus:ring-brand-blue/20',
+                ].join(' ')}
                 type="text"
-                placeholder="ABCD0123456"
+                placeholder="HDFC0001234"
                 value={ifscCode}
-                onChange={(e) => setIfscCode(e.target.value.toUpperCase())}
+                maxLength={IFSC_CODE_LENGTH}
+                onChange={(e) => {
+                  setIfscTouched(false);
+                  setIfscCode(normalizeIfscInput(e.target.value));
+                }}
+                onBlur={() => setIfscTouched(true)}
+                autoComplete="off"
+                spellCheck={false}
+                aria-invalid={ifscFieldMessageIsError}
+                aria-describedby="ifsc-field-help"
               />
               {ifscLookup === 'loading' ? (
                 <p className="mt-1.5 ml-1 text-[0.75rem] text-slate-500">Looking up IFSC…</p>
               ) : null}
-              {ifscLookup === 'error' && ifscLookupNote ? (
-                <p className="mt-1.5 ml-1 text-[0.75rem] text-red-600 font-semibold">{ifscLookupNote}</p>
+              {ifscFieldMessage ? (
+                <p
+                  className={[
+                    'mt-1.5 ml-1 text-[0.75rem] font-semibold',
+                    ifscFieldMessageIsError ? 'text-red-600' : 'text-slate-500',
+                  ].join(' ')}
+                >
+                  {ifscFieldMessage}
+                </p>
+              ) : null}
+              {ifscLookup === 'ok' && ifscDetails ? (
+                <p className="mt-1.5 ml-1 text-[0.75rem] font-semibold text-emerald-600">IFSC verified — branch details loaded.</p>
               ) : null}
             </div>
           </div>
@@ -273,7 +317,7 @@ export default function BankDetailsPage() {
             </button>
             <button
               type="button"
-              onClick={() => router.push('/kyc/upload-documents')}
+              onClick={() => router.push('/kyc')}
               className="py-4 px-6 rounded-xl font-bold text-[1rem] text-slate-600 bg-white hover:bg-slate-50 transition-colors text-center border border-slate-200"
             >
               Back

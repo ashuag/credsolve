@@ -40,7 +40,7 @@ model Application {
   customer          Customer                 @relation(fields: [customerId], references: [id])
   lead              Lead                     @relation(fields: [leadId], references: [id])
   applicationStatus ApplicationStatus        @relation(fields: [applicationStatusId], references: [id])
-  details           ApplicationDetails?
+  details           ApplicationDetail?
   eligibility       ApplicationEligibility?
   agreement         ApplicationAgreement?
   disbursement      ApplicationDisbursement?
@@ -52,7 +52,7 @@ model Application {
   @@map("application")
 }
 
-model ApplicationDetails {
+model ApplicationDetail {
   id                   BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
   uuid                 String    @unique @default(uuid()) @db.Char(36)
   applicationId        BigInt    @unique @map("application_id") @db.UnsignedBigInt
@@ -72,7 +72,7 @@ model ApplicationDetails {
   application   Application    @relation(fields: [applicationId], references: [id])
   reasonForLoan ReasonForLoan? @relation(fields: [reasonForLoanId], references: [id])
 
-  @@map("application_details")
+  @@map("application_detail")
 }
 
 model ApplicationEligibility {

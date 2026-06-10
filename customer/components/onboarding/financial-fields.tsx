@@ -35,7 +35,7 @@ export function FinancialFields({
         <div className="md:col-span-2 flex flex-col gap-1.5 w-full">
           <label htmlFor="currentCity" className="text-[0.75rem] font-bold text-slate-500 uppercase tracking-wider pl-1">City</label>
           <SearchableCityInput id="currentCity" name="currentCity"
-            value={fields.currentCity} onChange={onCityChange}
+            value={fields.currentCity ?? ''} onChange={onCityChange}
             className={inputCls(Boolean(errors.currentCity))}
             placeholder={cityFromPincode ? 'Auto-filled from pincode' : 'Type 2+ chars to search city'}
             disabled={cityFromPincode || isLookingUpPincode}

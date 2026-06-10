@@ -1,4 +1,4 @@
-import { ApiRequestError, apiGet } from './client';
+import { ApiClientError, ApiRequestError, apiGet } from './client';
 
 type LookupValueResponse = {
   values: Array<{
@@ -76,6 +76,10 @@ export async function fetchPincodeLookup(code: string): Promise<PincodeLookupVal
     return data?.value ?? null;
   } catch (e) {
     if (e instanceof ApiRequestError && (e.statusCode === 404 || e.statusCode === 405 || e.statusCode === 501)) {
+      return null;
+    }
+    // Timeout/network — treat like unknown pincode so the customer can pick a city manually.
+    if (e instanceof ApiClientError) {
       return null;
     }
     throw e;

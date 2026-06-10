@@ -5,12 +5,17 @@ import { DigilockerSessionStore } from '../../../../common/kyc/digilocker-sessio
 import { DigilockerVendorService } from '../../../../common/vendor/digilocker-vendor.service';
 import {
   buildDigilockerAadhaarFormJson,
+  buildDigilockerVendorAttemptJson,
   decodeAadhaarPhoto,
   extractAadhaarPhotoString,
+  isDigilockerAadhaarCaptureComplete,
   isTenacioVendorBusinessSuccess,
 } from '../../../../common/kyc/aadhaar-vendor-parse.util';
 import { compareAadhaarToLeadProfile } from '../../../../common/kyc/aadhaar-lead-identity-match.util';
 import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
+import { KycCompletionService } from '../../../../common/kyc/kyc-completion.service';
+import { DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS } from '../../../../common/constants/kyc.constants';
+import { KycDigilockerDownloadFailureService } from '../../../../common/kyc/kyc-digilocker-download-failure.service';
 import { KycIdentityRejectionService } from '../../../../common/kyc/kyc-identity-rejection.service';
 import { assertApplicationKycNotCompleted } from '../../../../common/kyc/application-kyc-guard.util';
 import { assertActiveApplicationLoanDocumentsAccepted } from '../../../../common/loan-documents/application-loan-documents-guard.util';
@@ -33,6 +38,11 @@ export type DownloadAadhaarDigilockerResult = {
   /** Name or DOB on Aadhaar did not match lead profile — application set to KYC_FAILED. */
   identityMismatch?: boolean;
   identityMismatchMessage?: string;
+  attemptsUsed?: number;
+  attemptsAllowed?: number;
+  canRetry?: boolean;
+  leadRejected?: boolean;
+  terminalFailure?: boolean;
 };
 
 @Injectable()
@@ -47,6 +57,8 @@ export class DownloadAadhaarDigilockerUseCase {
     private readonly applications: ApplicationRepository,
     private readonly kycFiles: KycFilesService,
     private readonly kycIdentityRejection: KycIdentityRejectionService,
+    private readonly kycDigilockerDownloadFailure: KycDigilockerDownloadFailureService,
+    private readonly kycCompletion: KycCompletionService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -76,6 +88,21 @@ export class DownloadAadhaarDigilockerUseCase {
     });
     assertApplicationKycNotCompleted(applicationRow.kycStatus);
 
+    const priorAttempts = await this.kycDigilockerDownloadFailure.readAttemptsUsed(lead.id);
+    if (priorAttempts >= DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS) {
+      return {
+        configured: true,
+        ok: false,
+        httpStatus: null,
+        vendor: null,
+        attemptsUsed: priorAttempts,
+        attemptsAllowed: DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS,
+        canRetry: false,
+        leadRejected: true,
+        terminalFailure: true,
+      };
+    }
+
     let sessionToken = dto.sessionToken?.trim() ?? '';
     if (!sessionToken) {
       sessionToken = (await this.digilockerSession.read(applicationRow.uuid)) ?? '';
@@ -92,36 +119,36 @@ export class DownloadAadhaarDigilockerUseCase {
       lead.id,
     );
 
+    const vendor = out.vendorBody ?? null;
+
     if (!out.configured) {
       return {
         configured: false,
         skipReason: out.skipReason,
         ok: false,
         httpStatus: out.httpStatus,
-        vendor: out.vendorBody ?? null,
+        vendor,
       };
     }
 
-    if (!out.ok) {
-      return {
-        configured: true,
-        ok: false,
-        httpStatus: out.httpStatus,
-        vendor: out.vendorBody ?? null,
-      };
-    }
-
-    const vendor = out.vendorBody ?? null;
-    const businessSuccess = isTenacioVendorBusinessSuccess(vendor);
-    if (!businessSuccess) {
+    if (!out.ok || !isTenacioVendorBusinessSuccess(vendor)) {
+      await this.persistVendorAttempt(applicationRow, out.httpStatus, vendor);
+      const escalation = await this.kycDigilockerDownloadFailure.recordFailureAndEscalate({
+        leadId: lead.id,
+        applicationId: applicationRow.id,
+        customerMobile: customer.mobileNumber,
+      });
       return {
         configured: true,
         ok: false,
         httpStatus: out.httpStatus,
         vendor,
-        businessSuccess: false,
+        businessSuccess: out.ok ? false : undefined,
+        ...escalation,
       };
     }
+
+    const businessSuccess = true;
 
     const leadProfile = await this.prisma.client.leadDetail.findUnique({
       where: { leadId: lead.id },
@@ -138,7 +165,7 @@ export class DownloadAadhaarDigilockerUseCase {
       await this.kycIdentityRejection.rejectForAadhaarProfileMismatch({
         leadId: lead.id,
         applicationId: applicationRow.id,
-        note: identityMatch.message,
+        customerMobile: customer.mobileNumber,
       });
       await this.digilockerSession.clear(applicationRow.uuid);
       this.logger.warn(
@@ -181,6 +208,14 @@ export class DownloadAadhaarDigilockerUseCase {
       });
       persisted = true;
       await this.digilockerSession.clear(application.uuid);
+
+      await this.kycCompletion.completeFromDigilockerAadhaar({
+        applicationId: application.id,
+        customerId: customer.id,
+        digilockerAadhaarFormJson: formJson as Prisma.JsonValue,
+        aadhaarPhotoRelativePath: photoRel,
+        verifiedAt: new Date(),
+      });
     } catch (err) {
       this.logger.error(
         `Failed to persist DigiLocker Aadhaar artifacts: ${err instanceof Error ? err.message : String(err)}`,
@@ -193,8 +228,34 @@ export class DownloadAadhaarDigilockerUseCase {
       ok: true,
       httpStatus: out.httpStatus,
       vendor,
-      businessSuccess: true,
+      businessSuccess,
       persisted,
     };
+  }
+
+  private async persistVendorAttempt(
+    application: { id: bigint; digilockerAadhaarFormJson: Prisma.JsonValue | null },
+    httpStatus: number | null,
+    vendor: unknown,
+  ): Promise<void> {
+    if (isDigilockerAadhaarCaptureComplete(application.digilockerAadhaarFormJson)) {
+      return;
+    }
+    try {
+      await this.applications.updateDigilockerAadhaarArtifacts({
+        applicationId: application.id,
+        digilockerAadhaarFormJson: buildDigilockerVendorAttemptJson({
+          httpStatus,
+          vendor,
+        }) as Prisma.InputJsonValue,
+        aadhaarPhotoRelativePath: null,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Failed to persist DigiLocker vendor attempt (applicationId=${application.id.toString()}): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
   }
 }

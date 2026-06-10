@@ -154,11 +154,13 @@ export function EmailOtpStep({
             <p className="text-[0.88rem] text-slate-600 leading-relaxed m-0 pt-0.5">
               {otpRequest?.debugOtp ? (
                 <>
-                  Your verification code is shown below for <strong className="text-slate-900 font-bold tracking-wider">{otpRequest.maskedEmail ?? email}</strong>.
+                  We also sent a code to <strong className="text-slate-900 font-bold tracking-wider">{otpRequest.maskedEmail ?? email}</strong> when possible.
+                  If it does not arrive within a minute, check spam and use the code shown below.
                 </>
               ) : (
                 <>
                   We sent a secure code to <strong className="text-slate-900 font-bold tracking-wider">{otpRequest?.maskedEmail ?? email}</strong>. Enter it below.
+                  Check your spam folder if you do not see it within a minute.
                 </>
               )}
             </p>
@@ -179,7 +181,7 @@ export function EmailOtpStep({
 
           {otpRequest?.debugOtp && (
             <AlertBanner variant="warn">
-              Verification code: <strong>{otpRequest.debugOtp}</strong>
+              Verification code (also check your inbox/spam): <strong>{otpRequest.debugOtp}</strong>
             </AlertBanner>
           )}
           {error && <AlertBanner variant="error">{error}</AlertBanner>}

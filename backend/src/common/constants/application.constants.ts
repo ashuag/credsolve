@@ -3,9 +3,11 @@ export const APPLICATION_STATUS = {
   IN_REVIEW: 'IN_REVIEW',
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
-  /** Aadhaar / identity verification failed (name or DOB mismatch with profile). */
   KYC_FAILED: 'KYC_FAILED',
   DISBURSED: 'DISBURSED',
+  CANCELLED: 'CANCELLED',
+  ACTIVE: 'ACTIVE',
+  EXPIRED: 'EXPIRED',
 } as const;
 
 export type ApplicationStatus = (typeof APPLICATION_STATUS)[keyof typeof APPLICATION_STATUS];
@@ -17,3 +19,10 @@ export const APPLICATION_KYC_STATUS = {
   FAILED: 2,
   TECHNICAL_ISSUE: 3,
 } as const;
+
+/** IFSC: 4 bank letters + 0 + 6 branch alphanumeric (11 chars). Example: HDFC0001234 */
+export const IFSC_CODE_LENGTH = 11;
+
+export const IFSC_CODE_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+
+export const IFSC_CODE_PATTERN = `${IFSC_CODE_REGEX.source}`;

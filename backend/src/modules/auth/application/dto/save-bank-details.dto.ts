@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsOptional, IsString, Length, Matches, MaxLength, MinLength } from 'class-validator';
+import { IFSC_CODE_LENGTH, IFSC_CODE_PATTERN } from '../../../../common/constants/application.constants';
 
 export class SaveBankDetailsDto {
   @ApiProperty({ description: 'Bank account number' })
@@ -7,9 +9,11 @@ export class SaveBankDetailsDto {
   @Matches(/^\d{9,18}$/)
   accountNumber!: string;
 
-  @ApiProperty({ description: 'IFSC code' })
+  @ApiProperty({ description: 'IFSC code (11 characters, e.g. HDFC0001234)', example: 'HDFC0001234' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toUpperCase() : value))
   @IsString()
-  @Matches(/^[A-Z]{4}0[A-Z0-9]{6}$/i)
+  @Length(IFSC_CODE_LENGTH, IFSC_CODE_LENGTH)
+  @Matches(new RegExp(IFSC_CODE_PATTERN))
   ifscCode!: string;
 
   @ApiPropertyOptional({

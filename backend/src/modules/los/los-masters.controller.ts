@@ -20,6 +20,7 @@ import { UpdateSourceUtmDto } from './dto/update-source-utm.dto';
 import { UpdateBankMasterDto } from './dto/update-bank-master.dto';
 import { UpdateEligibilityCriterionDto } from './dto/update-eligibility-criterion.dto';
 import { UpdateCreditLimitTierDto } from './dto/update-credit-limit-tier.dto';
+import { UpdateSmsTemplateDto } from './dto/update-sms-template.dto';
 import { LosMasterService } from './services/los-master.service';
 
 @ApiTags('LOS Masters')
@@ -100,5 +101,17 @@ export class LosMastersController {
   @ApiOperation({ summary: 'Update a source UTM record' })
   updateSourceUtm(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateSourceUtmDto) {
     return this.losMaster.updateSourceUtm(id, body);
+  }
+
+  @Get('sms-templates')
+  @ApiOperation({ summary: 'List SMS templates for LOS' })
+  smsTemplatesList() {
+    return this.losMaster.getSmsTemplatesForLos();
+  }
+
+  @Patch('sms-templates/:id')
+  @ApiOperation({ summary: 'Update SMS template fields and/or active flag' })
+  smsTemplatePatch(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateSmsTemplateDto) {
+    return this.losMaster.updateSmsTemplate(id, body);
   }
 }

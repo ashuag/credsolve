@@ -32,7 +32,8 @@ export function SearchableCityInput({
   ariaInvalid,
   ariaDescribedBy,
 }: SearchableCityInputProps) {
-  const [searchTerm, setSearchTerm] = useState(value || '');
+  const normalizedValue = value ?? '';
+  const [searchTerm, setSearchTerm] = useState(normalizedValue);
   const [options, setOptions] = useState<CustomerCityLookupOption[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -40,7 +41,7 @@ export function SearchableCityInput({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setSearchTerm(value || '');
+    setSearchTerm(value ?? '');
   }, [value]);
 
   useEffect(() => {
@@ -66,8 +67,9 @@ export function SearchableCityInput({
       setIsSearching(true);
       try {
         const results = await fetchCitiesByQuery(query.trim());
-        setOptions(results);
-        setIsOpen(results.length > 0);
+        const options = results.map((city) => ({ id: city.id, label: city.name }));
+        setOptions(options);
+        setIsOpen(options.length > 0);
       } catch {
         setOptions([]);
       } finally {
@@ -84,8 +86,9 @@ export function SearchableCityInput({
   };
 
   const handleSelect = (city: CustomerCityLookupOption) => {
-    setSearchTerm(city.label);
-    onChange({ label: city.label, cityId: city.id });
+    const label = city.label ?? '';
+    setSearchTerm(label);
+    onChange({ label, cityId: city.id });
     setIsOpen(false);
     setOptions([]);
   };
@@ -99,7 +102,7 @@ export function SearchableCityInput({
           type="text"
           autoComplete="off"
           placeholder={placeholder}
-          value={searchTerm}
+          value={searchTerm ?? ''}
           onChange={handleInputChange}
           disabled={disabled}
           aria-invalid={ariaInvalid}

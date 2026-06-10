@@ -37,6 +37,14 @@ export type CustomerLoanSelectionSnapshot = {
   maturityDate: string | null;
 };
 
+/** Mirrors backend `CustomerLeadReferenceSnapshot` (`GET /auth/me`). */
+export type CustomerLeadReferenceSnapshot = {
+  referenceIndex: number;
+  fullName: string;
+  mobileNumber: string;
+  relationId: number;
+};
+
 export type CustomerKycFaceProgress = {
   applicationKycStatus: number;
   digilockerAadhaarCaptured: boolean;
@@ -48,6 +56,8 @@ export type CustomerKycFaceProgress = {
   digilockerAadhaarPhotoUrl: string | null;
   /** Cookie-auth `GET …/auth/kyc/selfie-photo` when a selfie exists. */
   kycSelfiePhotoUrl?: string | null;
+  digilockerAadhaarDownloadAttempts?: number;
+  digilockerAadhaarDownloadMaxAttempts?: number;
 };
 
 export type CustomerSessionResponse =
@@ -66,6 +76,7 @@ export type CustomerSessionResponse =
         bankDetailsCompleted: boolean;
       };
       loanSelection: CustomerLoanSelectionSnapshot | null;
+      leadReferences: CustomerLeadReferenceSnapshot[];
       kycFaceProgress: CustomerKycFaceProgress | null;
     }
   | { authenticated: false };
@@ -192,6 +203,9 @@ export function getCustomerPostAuthResumePath(
 export function getPostDigilockerAadhaarContinuePath(
   session: Extract<CustomerSessionResponse, { authenticated: true }>
 ): string {
+  if (session.journey.kycCompleted) {
+    return getCustomerJourneyResumePath(session);
+  }
   const kyc = session.kycFaceProgress;
   const livenessNeeded = kyc?.livenessRequired !== false;
   if (

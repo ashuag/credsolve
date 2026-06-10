@@ -123,14 +123,14 @@ export default function LoanDocumentsPage() {
   }
 
   const journeyPanel = (
-    <div className="w-full h-full flex flex-col">
+    <div className="flex h-full min-h-0 w-full flex-col">
       {loading ? (
         <div className="flex flex-col items-center gap-4 py-16">
           <Spinner size={48} />
           <p className="text-slate-500 font-medium">Preparing your loan documents…</p>
         </div>
       ) : phase === 'otp' ? (
-        <form onSubmit={handleVerifyOtp} className="flex flex-col gap-6">
+        <form onSubmit={handleVerifyOtp} className="flex flex-col gap-6 overflow-y-auto">
           <h1 className="text-2xl font-black text-brand-navy">Confirm with OTP</h1>
           <p className="text-slate-500 text-sm">
             Enter the code sent to your registered mobile number to accept the Loan Sanction letter cum Key Fact
@@ -172,13 +172,15 @@ export default function LoanDocumentsPage() {
           </button>
         </form>
       ) : current ? (
-        <>
-          <h1 className="text-2xl font-black text-brand-navy mb-2">Sanction letter cum Key Fact Statement</h1>
-          <p className="text-sm text-slate-500 mb-6">
-            Read the full loan document below. When you are ready, confirm your agreement and we will send an OTP to
-            your mobile. After verification, the signed PDF will be emailed to your registered email address.
-          </p>
-          {error ? <AlertBanner variant="error">{error}</AlertBanner> : null}
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="shrink-0">
+            <h1 className="text-2xl font-black text-brand-navy mb-2">Sanction letter cum Key Fact Statement</h1>
+            <p className="text-sm text-slate-500 mb-4">
+              Read the full loan document below. When you are ready, confirm your agreement and we will send an OTP to
+              your mobile. After verification, the signed PDF will be emailed to your registered email address.
+            </p>
+            {error ? <AlertBanner variant="error">{error}</AlertBanner> : null}
+          </div>
           <LoanDocumentScrollPanel
             key={current.type}
             title={current.title}
@@ -188,7 +190,7 @@ export default function LoanDocumentsPage() {
               setAgreedByType((prev) => ({ ...prev, [current.type]: next }))
             }
           />
-          <div className="mt-8">
+          <div className="mt-4 shrink-0">
             <button
               type="button"
               disabled={!allAgreed || isSendingOtp}
@@ -204,7 +206,7 @@ export default function LoanDocumentsPage() {
               )}
             </button>
           </div>
-        </>
+        </div>
       ) : (
         <AlertBanner variant="error">{error || 'No documents available.'}</AlertBanner>
       )}
@@ -213,19 +215,21 @@ export default function LoanDocumentsPage() {
 
   return (
     <CustomerJourneyGuard>
-      <LoanLandingShell
-        fullBleedPanel
-        journeyPanel={journeyPanel}
-        leftTitle={
-          <>
-            Sanction <span className="text-[#60a5fa]">letter</span>
-          </>
-        }
-        leftDescription="Review your sanction letter cum Key Fact Statement before identity verification (KYC)."
-        leftInfographic={<LoanSummaryLeftRail loanSelection={loanSelection} />}
-        mobileStepLabel="Sanction letter"
-        mobileOnBack={() => router.push(CUSTOMER_EMAIL_JOURNEY_PATH)}
-      />
+      <div className="flex h-full min-h-0 w-full flex-col">
+        <LoanLandingShell
+          fullBleedPanel
+          journeyPanel={journeyPanel}
+          leftTitle={
+            <>
+              Sanction <span className="text-[#60a5fa]">letter</span>
+            </>
+          }
+          leftDescription="Review your sanction letter cum Key Fact Statement before identity verification (KYC)."
+          leftInfographic={<LoanSummaryLeftRail loanSelection={loanSelection} />}
+          mobileStepLabel="Sanction letter"
+          mobileOnBack={() => router.push(CUSTOMER_EMAIL_JOURNEY_PATH)}
+        />
+      </div>
     </CustomerJourneyGuard>
   );
 }

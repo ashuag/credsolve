@@ -83,16 +83,7 @@ export class BureauReportRepository {
   }
 
   async findLatestBureauScoreForLead(leadId: bigint): Promise<number | null> {
-    const client = this.prisma.client as unknown as {
-      bureauReport: {
-        findFirst: (args: {
-          where: { leadId: bigint };
-          orderBy: { createdAt: 'desc' };
-          select: { cibilScore: true };
-        }) => Promise<{ cibilScore: number | null } | null>;
-      };
-    };
-    const row = await client.bureauReport.findFirst({
+    const row = await this.prisma.client.bureauReport.findFirst({
       where: { leadId },
       orderBy: { createdAt: 'desc' },
       select: { cibilScore: true },

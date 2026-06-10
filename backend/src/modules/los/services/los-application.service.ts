@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import type { Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { BureauReportPdfService } from '../../../common/cibil/bureau-report-pdf.service';
+import { isDigilockerAadhaarCaptureComplete } from '../../../common/kyc/aadhaar-vendor-parse.util';
+import { extractProfileFromDigilockerFormJson } from '../../../common/kyc/digilocker-form-profile.util';
 import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { LoanDocumentApplicationService } from '../../auth/application/services/loan-document-application.service';
@@ -21,6 +23,73 @@ function sumDecimalAmounts(parts: Array<Prisma.Decimal | null | undefined>): str
   }
   if (!any) return null;
   return total.toFixed(2);
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+function pickAadhaarString(obj: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = obj[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function formatAadhaarDob(d: Date | null): string | null {
+  if (!d) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+function buildLosAadhaarDetail(formJson: unknown): {
+  fullName: string | null;
+  dateOfBirth: string | null;
+  gender: string | null;
+  address: string | null;
+  maskedAadhaar: string | null;
+} | null {
+  if (!isDigilockerAadhaarCaptureComplete(formJson) || !isRecord(formJson)) return null;
+
+  const identity = extractProfileFromDigilockerFormJson(formJson);
+  const gender = pickAadhaarString(formJson, ['gender', 'Gender']);
+  const maskedAadhaar = pickAadhaarString(formJson, [
+    'maskedAadhaar',
+    'masked_aadhaar',
+    'uid',
+    'aadhaarNumber',
+    'aadhaar_number',
+    'aadhaar',
+  ]);
+  const addressParts = [
+    pickAadhaarString(formJson, ['address', 'fullAddress', 'full_address', 'residentAddress', 'resident_address']),
+    pickAadhaarString(formJson, ['house', 'houseNo', 'house_no']),
+    pickAadhaarString(formJson, ['street', 'streetName', 'street_name']),
+    pickAadhaarString(formJson, ['landmark']),
+    pickAadhaarString(formJson, ['locality', 'vtc', 'villageTownCity']),
+    pickAadhaarString(formJson, ['district', 'dist']),
+    pickAadhaarString(formJson, ['state']),
+    pickAadhaarString(formJson, ['pincode', 'pin', 'pinCode']),
+  ].filter((part): part is string => Boolean(part));
+  const address = addressParts.length > 0 ? [...new Set(addressParts)].join(', ') : null;
+
+  return {
+    fullName: identity.fullName,
+    dateOfBirth: formatAadhaarDob(identity.dateOfBirth),
+    gender,
+    address,
+    maskedAadhaar,
+  };
+}
+
+function deriveGstPercent(
+  processingFeeAmount: Prisma.Decimal | null | undefined,
+  gstAmount: Prisma.Decimal | null | undefined,
+): string | null {
+  if (processingFeeAmount == null || gstAmount == null) return null;
+  const fee = processingFeeAmount.toNumber();
+  if (fee <= 0) return null;
+  return ((gstAmount.toNumber() / fee) * 100).toFixed(2);
 }
 
 function maskBankDetails(bankName: string | null | undefined, accountNumber: string | null | undefined, ifscCode: string | null | undefined): string | null {
@@ -136,6 +205,15 @@ export class LosApplicationService {
           include: {
             leadStatus: { select: { name: true, displayName: true } },
             source: { select: { name: true, type: true } },
+            leadReferences: {
+              orderBy: { referenceIndex: 'asc' },
+              select: {
+                referenceIndex: true,
+                fullName: true,
+                mobileNumber: true,
+                relation: { select: { name: true } },
+              },
+            },
             leadDetail: {
               include: {
                 city: { select: { name: true, state: { select: { name: true, code: true } } } },
@@ -216,6 +294,8 @@ export class LosApplicationService {
         sourceName: lead.source?.name ?? null,
         sourceType: lead.source?.type ?? null,
         panNumber: lead.panNumber,
+        panVerified: lead.panVerified,
+        bureauFetched: lead.bureauFetched,
         profile: detail
           ? {
               fullName: detail.fullName,
@@ -236,19 +316,47 @@ export class LosApplicationService {
             }
           : null,
       },
+      referencesCount: lead.leadReferences.length,
+      references: lead.leadReferences.map((ref) => ({
+        referenceIndex: ref.referenceIndex,
+        fullName: ref.fullName,
+        mobileNumber: ref.mobileNumber,
+        relation: ref.relation.name,
+      })),
+      aadhaarDetail: buildLosAadhaarDetail(application.digilockerAadhaarFormJson),
       details: application.details
-        ? {
-            reasonForLoan: application.details.reasonForLoan?.name ?? null,
-            loanAmount: application.details.loanAmount?.toString() ?? null,
-            loanTenure: application.details.loanTenure,
-            interestRate: application.details.interestRate?.toString() ?? null,
-            interestAmount: application.details.interestAmount?.toString() ?? null,
-            processingFee: application.details.processingFee?.toString() ?? null,
-            processingFeeAmount: application.details.processingFeeAmount?.toString() ?? null,
-            gstAmount: application.details.gstAmount?.toString() ?? null,
-            loanDisbursementDate: application.details.loanDisbursementDate?.toISOString().slice(0, 10) ?? null,
-            loanMaturityDate: application.details.loanMaturityDate?.toISOString().slice(0, 10) ?? null,
-          }
+        ? (() => {
+            const details = application.details;
+            const repaymentAmount = sumDecimalAmounts([
+              details.loanAmount,
+              details.interestAmount,
+              details.processingFeeAmount,
+              details.gstAmount,
+            ]);
+            const disbursedAmount =
+              details.loanAmount != null
+                ? (
+                    details.loanAmount.toNumber()
+                    - (details.processingFeeAmount?.toNumber() ?? 0)
+                    - (details.gstAmount?.toNumber() ?? 0)
+                  ).toFixed(2)
+                : null;
+            return {
+              reasonForLoan: details.reasonForLoan?.name ?? null,
+              loanAmount: details.loanAmount?.toString() ?? null,
+              loanTenure: details.loanTenure,
+              interestRate: details.interestRate?.toString() ?? null,
+              interestAmount: details.interestAmount?.toString() ?? null,
+              processingFee: details.processingFee?.toString() ?? null,
+              processingFeeAmount: details.processingFeeAmount?.toString() ?? null,
+              gstPercent: deriveGstPercent(details.processingFeeAmount, details.gstAmount),
+              gstAmount: details.gstAmount?.toString() ?? null,
+              disbursedAmount,
+              repaymentAmount,
+              loanDisbursementDate: details.loanDisbursementDate?.toISOString().slice(0, 10) ?? null,
+              loanMaturityDate: details.loanMaturityDate?.toISOString().slice(0, 10) ?? null,
+            };
+          })()
         : null,
       eligibility: application.eligibility
         ? {
@@ -418,6 +526,12 @@ export class LosApplicationService {
         keyFactPdfRelativePath: true,
         keyFactEsigned: true,
         loanAgreementPdfRelativePath: true,
+        agreement: {
+          select: {
+            ipAddress: true,
+            signedAt: true,
+          },
+        },
         details: {
           select: {
             loanAmount: true,
@@ -469,6 +583,8 @@ export class LosApplicationService {
       application.id,
       merge,
       existing,
+      true,
+      application.loanDocumentsAcceptedAt != null,
     );
     const generated = [docType];
 

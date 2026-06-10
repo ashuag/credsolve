@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/
 import type { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { APPLICATION_KYC_STATUS } from '../../../../common/constants/application.constants';
-import { extractProfileFromDigilockerFormJson } from '../../../../common/kyc/digilocker-form-profile.util';
+import { KycCompletionService } from '../../../../common/kyc/kyc-completion.service';
 import { LivenessVendorService } from '../../../../common/vendor/liveness-vendor.service';
 import {
   extractLivenessIsLive,
@@ -48,6 +48,7 @@ export class RunKycLivenessUseCase {
     private readonly kycFiles: KycFilesService,
     private readonly prisma: PrismaService,
     private readonly settings: SettingsRepository,
+    private readonly kycCompletion: KycCompletionService,
   ) {}
 
   async execute(req: Request): Promise<RunKycLivenessResult> {
@@ -163,13 +164,13 @@ export class RunKycLivenessUseCase {
     });
 
     if (businessOk) {
-      await this.finalizeKycForApplication({
+      await this.kycCompletion.completeFromDigilockerAadhaar({
         applicationId: application.id,
         customerId: customer.id,
         digilockerAadhaarFormJson: (application.digilockerAadhaarFormJson ?? null) as Prisma.JsonValue,
         aadhaarPhotoRelativePath: application.aadhaarPhotoRelativePath,
         selfieRelativePath: application.selfieRelativePath.trim(),
-        checkedAt,
+        verifiedAt: checkedAt,
       });
     }
 
@@ -181,88 +182,5 @@ export class RunKycLivenessUseCase {
       livenessPassed: businessOk,
       vendorErrorMessage: businessOk ? undefined : pickTenacioVendorErrorMessage(vendor),
     };
-  }
-
-  private async finalizeKycForApplication(params: {
-    applicationId: bigint;
-    customerId: bigint;
-    digilockerAadhaarFormJson: Prisma.JsonValue | null;
-    aadhaarPhotoRelativePath: string | null;
-    selfieRelativePath: string;
-    checkedAt: Date;
-  }): Promise<void> {
-    const profile = extractProfileFromDigilockerFormJson(params.digilockerAadhaarFormJson);
-
-    await this.prisma.client.$transaction(async (tx) => {
-      const app = await tx.application.findUnique({
-        where: { id: params.applicationId },
-        select: { kycStatus: true },
-      });
-      if (!app || app.kycStatus === APPLICATION_KYC_STATUS.COMPLETED) {
-        return;
-      }
-
-      await tx.application.update({
-        where: { id: params.applicationId },
-        data: {
-          kycStatus: APPLICATION_KYC_STATUS.COMPLETED,
-          kycCompletedAt: params.checkedAt,
-        },
-      });
-
-      let customerKyc = await tx.customerKyc.findFirst({
-        where: { customerId: params.customerId },
-        orderBy: { createdAt: 'desc' },
-      });
-      if (!customerKyc) {
-        customerKyc = await tx.customerKyc.create({
-          data: { customerId: params.customerId },
-        });
-      }
-
-      await tx.customerKyc.update({
-        where: { id: customerKyc.id },
-        data: {
-          kycVerifiedAt: params.checkedAt,
-          ...(profile.fullName ? { fullName: profile.fullName.slice(0, 100) } : {}),
-          ...(profile.dateOfBirth ? { dateOfBirth: profile.dateOfBirth } : {}),
-        },
-      });
-
-      const digilockerProvider = await tx.kycProvider.upsert({
-        where: { name: 'DIGILOCKER' },
-        create: { name: 'DIGILOCKER', displayName: 'DigiLocker', isActive: true },
-        update: { displayName: 'DigiLocker', isActive: true },
-      });
-
-      const aadhaarFrontType = await tx.kycDocument.upsert({
-        where: { name: 'AADHAAR_FRONT' },
-        create: { name: 'AADHAAR_FRONT', displayName: 'Aadhaar (front)', isActive: true },
-        update: { displayName: 'Aadhaar (front)', isActive: true },
-      });
-
-      await tx.customerKycDocument.deleteMany({
-        where: {
-          customerKycId: customerKyc.id,
-          documentTypeId: aadhaarFrontType.id,
-          kycProviderId: digilockerProvider.id,
-        },
-      });
-
-      const auditName = [params.aadhaarPhotoRelativePath, params.selfieRelativePath]
-        .filter(Boolean)
-        .join('|')
-        .slice(0, 255);
-
-      await tx.customerKycDocument.create({
-        data: {
-          customerKycId: customerKyc.id,
-          documentTypeId: aadhaarFrontType.id,
-          kycProviderId: digilockerProvider.id,
-          fileName: auditName.length > 0 ? auditName : 'digilocker+liveness',
-          verifiedAt: params.checkedAt,
-        },
-      });
-    });
   }
 }

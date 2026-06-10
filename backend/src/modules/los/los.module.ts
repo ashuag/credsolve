@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BreModule } from '../../common/bre/bre.module';
 import { CibilModule } from '../../common/cibil/cibil.module';
+import { LoanDocumentsModule } from '../../common/loan-documents/loan-documents.module';
 import { StorageModule } from '../../common/storage/storage.module';
 import { LosAuthController } from './auth/los-auth.controller';
 import { LosAuthService } from './auth/los-auth.service';
@@ -19,7 +20,7 @@ import { LosTeamController } from './los-team.controller';
 import { LosTeamService } from './los-team.service';
 
 @Module({
-  imports: [BreModule, CibilModule, StorageModule],
+  imports: [BreModule, CibilModule, StorageModule, LoanDocumentsModule],
   controllers: [
     LosAuthController,
     LosDataController,

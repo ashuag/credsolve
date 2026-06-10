@@ -10,6 +10,9 @@ type LoanDocumentScrollPanelProps = {
   onAgreedChange: (next: boolean) => void;
 };
 
+/** Tall iframe so the outer scroll container can scroll through every PDF page. */
+const PDF_IFRAME_MIN_HEIGHT_PX = 4800;
+
 export function LoanDocumentScrollPanel({
   title,
   pdfUrlFragment,
@@ -42,37 +45,33 @@ export function LoanDocumentScrollPanel({
   const pdfSrc = loanDocumentPdfAbsoluteUrl(pdfUrlFragment);
 
   return (
-    <div className="flex flex-col gap-4 h-full">
-      <h2 className="text-lg font-bold text-brand-navy">{title}</h2>
-      <p className="text-sm text-slate-500">
-        Scroll through the entire document to enable &quot;I agree&quot;. You can also open it in a new tab if the
-        preview is hard to read.
-      </p>
+    <div className="mt-3 flex min-h-0 flex-1 flex-col gap-3">
       <a
         href={pdfSrc}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-sm font-semibold text-brand-blue hover:underline w-fit"
+        className="w-fit shrink-0 text-sm font-semibold text-brand-blue hover:underline"
       >
         Open PDF in new tab
       </a>
       <div
         ref={scrollRef}
         onScroll={checkScroll}
-        className="flex-1 min-h-100 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50"
+        className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50"
       >
         <iframe
           title={title}
           src={pdfSrc}
-          className="h-400 w-full min-h-full border-0 bg-white"
+          className="block w-full border-0 bg-white"
+          style={{ minHeight: PDF_IFRAME_MIN_HEIGHT_PX }}
         />
       </div>
       {!scrolledToEnd ? (
-        <p className="text-xs text-amber-700 font-medium">Scroll to the bottom to continue.</p>
+        <p className="shrink-0 text-xs font-medium text-amber-700">Scroll to the bottom to continue.</p>
       ) : null}
       <label
-        className={`flex items-start gap-3 rounded-xl border p-4 cursor-pointer transition-colors ${
-          scrolledToEnd ? 'border-slate-200 bg-white' : 'border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed'
+        className={`flex shrink-0 cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${
+          scrolledToEnd ? 'border-slate-200 bg-white' : 'cursor-not-allowed border-slate-100 bg-slate-50 opacity-60'
         }`}
       >
         <input
@@ -82,7 +81,7 @@ export function LoanDocumentScrollPanel({
           checked={agreed}
           onChange={(e) => onAgreedChange(e.target.checked)}
         />
-        <span className="text-sm text-slate-700 leading-relaxed">
+        <span className="text-sm leading-relaxed text-slate-700">
           I have read and understood the <strong>{title}</strong> and agree to its terms.
         </span>
       </label>

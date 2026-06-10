@@ -41,6 +41,12 @@ export class LoanDocumentApplicationService {
         loanDocumentsAcceptedAt: true,
         keyFactPdfRelativePath: true,
         loanAgreementPdfRelativePath: true,
+        agreement: {
+          select: {
+            ipAddress: true,
+            signedAt: true,
+          },
+        },
         details: {
           select: {
             loanAmount: true,
@@ -91,6 +97,10 @@ export class LoanDocumentApplicationService {
     } | null;
     application: {
       uuid: string;
+      agreement?: {
+        ipAddress: string | null;
+        signedAt: Date | null;
+      } | null;
       details: {
         loanAmount: { toString(): string } | null;
         loanTenure: number | null;
@@ -103,6 +113,8 @@ export class LoanDocumentApplicationService {
         reasonForLoan: { name: string } | null;
       } | null;
     };
+    acceptanceIpAddress?: string | null;
+    acceptanceSignedAt?: Date | null;
   }): LoanDocumentMergeInput {
     const detail = params.lead?.leadDetail;
     const appDetails = params.application.details;
@@ -131,6 +143,14 @@ export class LoanDocumentApplicationService {
       loanMaturityDate: appDetails?.loanMaturityDate ?? null,
       applicationUuid: params.application.uuid,
       processingFeePercent,
+      acceptanceIpAddress:
+        params.application.agreement?.ipAddress?.trim()
+        ?? params.acceptanceIpAddress?.trim()
+        ?? null,
+      acceptanceSignedAt:
+        params.application.agreement?.signedAt
+        ?? params.acceptanceSignedAt
+        ?? null,
     };
   }
 
@@ -141,19 +161,21 @@ export class LoanDocumentApplicationService {
     applicationId: bigint,
     merge: LoanDocumentMergeInput,
     existingRelativePath: string | null,
+    forceRegenerate = false,
+    digitallySign = false,
   ): Promise<string> {
     const pdfName = this.generator.pdfFileName(docType) as 'key-fact-statement.pdf' | 'loan-agreement.pdf';
     const rel =
       existingRelativePath?.trim() ||
       this.kycFiles.loanDocumentPdfRelativePath(customerUuid, applicationUuid, pdfName);
 
-    if (existingRelativePath?.trim()) {
+    if (!forceRegenerate && existingRelativePath?.trim()) {
       if (await this.kycFiles.exists(rel)) {
         return rel;
       }
     }
 
-    const { pdf, esigned } = await this.generator.generatePdf(docType, merge);
+    const { pdf, esigned } = await this.generator.generatePdf(docType, merge, digitallySign);
     await this.kycFiles.writeBytes(rel, pdf);
 
     const data =

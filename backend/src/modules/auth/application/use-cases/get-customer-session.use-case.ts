@@ -5,6 +5,7 @@ import {
   APPLICATION_KYC_STATUS,
   APPLICATION_STATUS,
 } from '../../../../common/constants/application.constants';
+import { isDigilockerAadhaarCaptureComplete } from '../../../../common/kyc/aadhaar-vendor-parse.util';
 import {
   formatLeadDetailForPortal,
   isLeadEmailVerifiedForPortal,
@@ -18,6 +19,8 @@ import { CustomerRepository } from '../../infrastructure/repositories/customer.r
 import { BureauReportRepository } from '../../infrastructure/repositories/bureau-report.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
+import { DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS } from '../../../../common/constants/kyc.constants';
+import { KycDigilockerDownloadFailureService } from '../../../../common/kyc/kyc-digilocker-download-failure.service';
 import { isKycLivenessOutboundSkipped } from '../../../../common/kyc/kyc-liveness-env.util';
 import { fetchLatestApplicationKycSnapshot } from '../../../../prisma/application-kyc-snapshot.query';
 import { PrismaService } from '../../../../prisma/prisma.service';
@@ -31,6 +34,7 @@ export class GetCustomerSessionUseCase {
     private readonly settings: SettingsRepository,
     private readonly bureauReports: BureauReportRepository,
     private readonly postBureauOffer: PostBureauOfferService,
+    private readonly kycDigilockerDownloadFailure: KycDigilockerDownloadFailureService,
   ) {}
 
   async execute(req: Request): Promise<CustomerSessionResult> {
@@ -60,20 +64,20 @@ export class GetCustomerSessionUseCase {
         bankDetailsCompleted: false,
       },
       loanSelection: null,
+      leadReferences: [],
       kycFaceProgress: null,
     };
 
     let leadRow = await this.leads.findActiveByCustomerId(customer.id);
-    logger.debug("leadRow", leadRow);
-
+    
     if (!leadRow) {
       return noLeadResult;
     }
 
-    leadRow = await this.syncOfferEligibilityForLead(leadRow, customer.id);
-    if (!leadRow) {
-      return noLeadResult;
-    }
+    // leadRow = await this.syncOfferEligibilityForLead(leadRow, customer.id);
+    // if (!leadRow) {
+    //   return noLeadResult;
+    // }
 
     let statusName = leadRow.leadStatus.name;
 
@@ -136,13 +140,18 @@ export class GetCustomerSessionUseCase {
         : null,
     );
 
-    const [applicationExtras, latestCustomerKyc, leadReferenceCount] = await Promise.all([
+    const [applicationExtras, latestCustomerKyc, leadReferenceRows] = await Promise.all([
       application
         ? this.prisma.client.application.findUnique({
             where: { id: application.id },
             select: {
               details: {
-                select: { loanAmount: true, loanTenure: true, loanMaturityDate: true },
+                select: {
+                  loanAmount: true,
+                  loanTenure: true,
+                  loanMaturityDate: true,
+                  reasonForLoanId: true,
+                },
               },
               disbursement: {
                 select: { accountNumber: true, ifscCode: true, bankName: true },
@@ -160,11 +169,18 @@ export class GetCustomerSessionUseCase {
           _count: { select: { customerKycDocuments: true } },
         },
       }),
-      this.prisma.client.leadReference.count({
+      this.prisma.client.leadReference.findMany({
         where: {
           leadId: leadRow.id,
           fullName: { not: '' },
           mobileNumber: { not: '' },
+        },
+        orderBy: { referenceIndex: 'asc' },
+        select: {
+          referenceIndex: true,
+          fullName: true,
+          mobileNumber: true,
+          relationId: true,
         },
       }),
     ]);
@@ -191,14 +207,18 @@ export class GetCustomerSessionUseCase {
       isPanVerifiedFromDb(leadRow.panVerified) || leadRow.panVerified === PAN_VERIFIED.API_DISABLED;
     const detailsCompleted = profileFieldsComplete && panChecksComplete;
 
-    const loanSelectionCompleted = Boolean(appDetails?.loanAmount != null && appDetails?.loanTenure != null);
+    const loanSelectionCompleted = Boolean(
+      appDetails?.loanAmount != null &&
+        appDetails?.loanTenure != null &&
+        appDetails?.reasonForLoanId != null,
+    );
 
     const loanDocumentsCompleted = Boolean(application?.loanDocumentsAcceptedAt);
 
     const kycDocsCount = latestCustomerKyc?._count.customerKycDocuments ?? 0;
     const livenessOutboundSkipped = isKycLivenessOutboundSkipped();
     const hasSavedSelfie = Boolean(application?.selfieRelativePath?.trim());
-    const hasDigilockerForm = application?.digilockerAadhaarFormJson != null;
+    const hasDigilockerForm = isDigilockerAadhaarCaptureComplete(application?.digilockerAadhaarFormJson ?? null);
     /** Outbound Tenacio liveness can be skipped by env; DigiLocker + a stored selfie are always required for this path. */
     const faceStepCompleteForJourney = Boolean(
       application &&
@@ -214,7 +234,13 @@ export class GetCustomerSessionUseCase {
         faceStepCompleteForJourney,
     );
 
-    const referencesCompleted = leadReferenceCount >= 2;
+    const leadReferences = leadReferenceRows.map((row) => ({
+      referenceIndex: row.referenceIndex,
+      fullName: row.fullName,
+      mobileNumber: row.mobileNumber,
+      relationId: row.relationId,
+    }));
+    const referencesCompleted = leadReferences.length >= 2;
 
     const bankDetailsCompleted = Boolean(
       disbursement?.accountNumber?.trim() && disbursement?.ifscCode?.trim(),
@@ -232,11 +258,17 @@ export class GetCustomerSessionUseCase {
           }
         : null;
 
+    const digilockerAadhaarDownloadAttempts = await this.kycDigilockerDownloadFailure.readAttemptsUsed(
+      leadRow.id,
+    );
+
     const kycFaceProgress =
       application != null
         ? {
             applicationKycStatus: application.kycStatus,
-            digilockerAadhaarCaptured: application.digilockerAadhaarFormJson != null,
+            digilockerAadhaarCaptured: isDigilockerAadhaarCaptureComplete(
+              application.digilockerAadhaarFormJson,
+            ),
             selfieCaptured: Boolean(application.selfieRelativePath?.trim()),
             livenessPassed: application.livenessPassed === true,
             livenessRequired: !livenessOutboundSkipped,
@@ -245,6 +277,8 @@ export class GetCustomerSessionUseCase {
               ? '/auth/kyc/digilocker-aadhaar-photo'
               : null,
             kycSelfiePhotoUrl: application.selfieRelativePath?.trim() ? '/auth/kyc/selfie-photo' : null,
+            digilockerAadhaarDownloadAttempts,
+            digilockerAadhaarDownloadMaxAttempts: DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS,
           }
         : null;
 
@@ -269,6 +303,7 @@ export class GetCustomerSessionUseCase {
         bankDetailsCompleted,
       },
       loanSelection,
+      leadReferences,
       kycFaceProgress,
     };
   }
@@ -286,16 +321,18 @@ export class GetCustomerSessionUseCase {
       return leadRow;
     }
 
-    const cibilScore = await this.bureauReports.findLatestBureauScoreForLead(leadRow.id);
-    if (!isCibilNewToCreditScore(cibilScore)) {
-      return leadRow;
-    }
+    // const cibilScore = await this.bureauReports.findLatestBureauScoreForLead(leadRow.id);
+    // Logger.debug("cibilScore", cibilScore);
+    // if (!isCibilNewToCreditScore(cibilScore)) {
+    //   return leadRow;
+    // }
 
     const offerResult = await this.postBureauOffer.runAfterSuccessfulBureauFetch({
       leadId: leadRow.id,
       customerId,
       leadUuid: leadRow.uuid,
     });
+
     if (offerResult.ok) {
       return leadRow;
     }

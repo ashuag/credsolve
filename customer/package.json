@@ -7,7 +7,8 @@
     "dev": "next dev -p 3011 --turbo",
     "build": "next build",
     "start": "next start -p 3011",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "legal:build": "node scripts/build-legal-content.mjs"
   },
   "dependencies": {
     "next": "15.5.3",

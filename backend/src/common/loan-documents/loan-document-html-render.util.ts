@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { LOAN_DOCUMENT_HTML_TEMPLATE } from '../constants/loan-document.constants';
+import { LOAN_DOCUMENT_HTML_TEMPLATE, LENDER_LOGO_FILE } from '../constants/loan-document.constants';
 import { buildLoanDocumentHtmlFieldValues } from './loan-document-html-field-map.util';
 import type { LoanDocumentMergeInput } from './loan-document.types';
 
@@ -13,7 +13,11 @@ function escapeHtml(value: string): string {
 }
 
 function stripToolbar(html: string): string {
-  return html.replace(/<div class="toolbar">[\s\S]*?<\/div>\s*/i, '');
+  return html.replace(/<div class="toolbar">[\s\S]*?(?=<div class="page-wrapper">)/i, '');
+}
+
+function stripPageBreakMarkers(html: string): string {
+  return html.replace(/<div class="page-break"[\s\S]*?<\/div>\s*/gi, '');
 }
 
 function stripExternalFonts(html: string): string {
@@ -38,8 +42,9 @@ function injectPrintFieldStyles(html: string): string {
   padding: 0 2px;
 }
 @media print {
-  .page-wrapper { padding-top: 0 !important; }
+  .page-wrapper { padding: 0 !important; }
 }
+.page-wrapper { padding: 0 !important; }
 `;
   return html.replace('</style>', `${css}\n</style>`);
 }
@@ -63,6 +68,7 @@ export async function renderLoanDocumentHtml(merge: LoanDocumentMergeInput): Pro
   let html = await readFile(templatePath, 'utf8');
 
   html = stripToolbar(html);
+  html = stripPageBreakMarkers(html);
   html = stripExternalFonts(html);
   html = stripClientScripts(html);
   html = injectPrintFieldStyles(html);
@@ -72,5 +78,22 @@ export async function renderLoanDocumentHtml(merge: LoanDocumentMergeInput): Pro
     html = fillInputById(html, id, value);
   }
 
+  if (fields.lender_dsc_serial) {
+    html = html.replace('class="lender-dsc-stamp-wrap hidden"', 'class="lender-dsc-stamp-wrap"');
+  }
+
+  html = await injectLenderDscLogo(html);
+
   return html;
+}
+
+async function injectLenderDscLogo(html: string): Promise<string> {
+  try {
+    const logoPath = path.join(process.cwd(), 'assets', 'loan-documents', LENDER_LOGO_FILE);
+    const logoBytes = await readFile(logoPath);
+    const dataUri = `data:image/png;base64,${logoBytes.toString('base64')}`;
+    return html.replaceAll('__LENDER_DSC_LOGO_SRC__', dataUri);
+  } catch {
+    return html.replaceAll('__LENDER_DSC_LOGO_SRC__', '');
+  }
 }

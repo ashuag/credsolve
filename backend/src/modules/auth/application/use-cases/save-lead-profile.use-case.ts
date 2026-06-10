@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -19,6 +20,7 @@ const OCCUPATION_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
   Object.values(OCCUPATION).map(({ key, name }) => [key, name]),
 );
 import { PanVerificationService } from '../../../../common/vendor/pan-verification.service';
+import { SmsService } from '../../../../common/sms/sms.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
@@ -34,11 +36,14 @@ function parseDobUtc(dob: string): Date {
 
 @Injectable()
 export class SaveLeadProfileUseCase {
+  private readonly logger = new Logger(SaveLeadProfileUseCase.name);
+
   constructor(
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
     private readonly prisma: PrismaService,
     private readonly panVerification: PanVerificationService,
+    private readonly sms: SmsService,
   ) {}
 
   async execute(req: Request, dto: SaveLeadProfileDto): Promise<{ success: true; leadUuid: string } | { success: false; rejected: true }> {
@@ -126,6 +131,9 @@ export class SaveLeadProfileUseCase {
               l.lead_status_note = 'pan not verified, failed in initial check'
           WHERE l.id = ${leadRow.id}
         `;
+        void this.sms.sendRejectionSms(customer.mobileNumber, leadRow.id).catch((err) => {
+          this.logger.error('Failed to send rejection SMS', err instanceof Error ? err.stack : err);
+        });
         return { success: false, rejected: true };
       }
 

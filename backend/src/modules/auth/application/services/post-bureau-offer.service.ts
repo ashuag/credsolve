@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PostBreCheckService } from '../../../../common/bre/post-bre-check.service';
 import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
+import { SmsService } from '../../../../common/sms/sms.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { ApplicationRepository } from '../../infrastructure/repositories/application.repository';
 import { CheckLoanEligibilityUseCase } from '../use-cases/check-loan-eligibility.use-case';
@@ -25,6 +26,7 @@ export class PostBureauOfferService {
     private readonly checkLoanEligibility: CheckLoanEligibilityUseCase,
     private readonly applications: ApplicationRepository,
     private readonly prisma: PrismaService,
+    private readonly sms: SmsService,
   ) {}
 
   /**
@@ -186,5 +188,16 @@ export class PostBureauOfferService {
         },
       });
     });
+
+    const customer = await this.prisma.client.customer.findUnique({
+      where: { id: params.customerId },
+      select: { mobileNumber: true },
+    });
+    const mobile = customer?.mobileNumber?.trim();
+    if (mobile) {
+      void this.sms.sendRejectionSms(mobile, params.leadId).catch((err) => {
+        this.logger.error('Failed to send rejection SMS', err instanceof Error ? err.stack : err);
+      });
+    }
   }
 }

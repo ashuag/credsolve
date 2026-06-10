@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
+import { SMS_TEMPLATE_ID } from '../../../../common/constants/sms.constants';
 import { OTP_TYPE } from '../../../../common/constants/otp.constants';
 import { isLeadEmailVerifiedForPortal } from '../../../../common/mappers/customer-portal-profile.mapper';
 import { SendOtpDto } from '../dto/send-otp.dto';
@@ -57,6 +58,7 @@ export class SendLoanDocumentsOtpUseCase {
       { type: OTP_TYPE.MOBILE, value: customer.mobileNumber } as SendOtpDto,
       readClientIp(req),
       session,
+      { smsTemplateId: SMS_TEMPLATE_ID.ESIGN_OTP, leadId: lead.id },
     );
     return {
       requestId: out.requestId,

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import {useRouter} from 'next/navigation';
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {CustomerJourneyGuard} from '@/components/auth/customer-journey-guard';
 import {useCustomerSession} from '@/components/providers/customer-session-provider';
 import {Spinner} from '@/components/ui/spinner';
@@ -160,9 +160,10 @@ function ErrorState({ error }: { error: string }) {
 
 export default function PreApprovedLoanPage() {
   const router = useRouter();
-  const { loading: sessionLoading, session } = useCustomerSession();
+  const { loading: sessionLoading, session, refresh } = useCustomerSession();
   const [amountInr, setAmountInr] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const sessionExpiredHandledRef = useRef(false);
 
   useEffect(() => {
     if (sessionLoading) return;
@@ -196,6 +197,9 @@ export default function PreApprovedLoanPage() {
         }
 
         if (e instanceof ApiRequestError && e.statusCode === 401) {
+          if (sessionExpiredHandledRef.current) return;
+          sessionExpiredHandledRef.current = true;
+          await refresh();
           router.replace('/apply-for-loan');
           return;
         }
@@ -212,7 +216,7 @@ export default function PreApprovedLoanPage() {
     return () => {
       cancelled = true;
     };
-  }, [sessionLoading, session, router]);
+  }, [sessionLoading, session, router, refresh]);
 
   let content;
 

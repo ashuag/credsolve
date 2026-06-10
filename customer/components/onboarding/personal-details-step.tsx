@@ -142,7 +142,7 @@ export function PersonalDetailsStep(
       dob: p.dob ?? prev.dob, panNumber: p.panNumber ?? prev.panNumber,
       occupation: (p.occupation as Fields['occupation']) || prev.occupation,
       addressLine1: p.addressLine1 ?? prev.addressLine1, addressLine2: p.addressLine2 ?? prev.addressLine2,
-      currentCity: p.currentCity ?? prev.currentCity, currentCityId: null,
+      currentCity: p.currentCity ?? prev.currentCity ?? '', currentCityId: null,
       pincode: p.pincode ?? prev.pincode, monthlyIncome: p.monthlyIncome ?? prev.monthlyIncome,
       annualTurnover: p.annualTurnover ?? prev.annualTurnover, annualProfit: p.annualProfit ?? prev.annualProfit,
       creditConsentAccepted: p.creditConsentAccepted ?? prev.creditConsentAccepted,
@@ -166,10 +166,26 @@ export function PersonalDetailsStep(
     fetchPincodeLookup(fields.pincode)
       .then((res) => {
         if (!active) return;
-        if (res) { lastPincodeRef.current = fields.pincode; setFields((p) => ({ ...p, currentCity: res.cityName, currentCityId: res.cityId })); setCityFromPincode(true); setErrors((p) => ({ ...p, pincode: undefined, currentCity: undefined })); }
-        else { lastPincodeRef.current = null; setCityFromPincode(false); setErrors((p) => ({ ...p, pincode: 'We could not find this pincode. Please enter a valid 6-digit pincode.' })); }
+        if (res) {
+          lastPincodeRef.current = fields.pincode;
+          setFields((p) => ({ ...p, currentCity: res.cityName ?? '', currentCityId: res.cityId }));
+          setCityFromPincode(true);
+          setErrors((p) => ({ ...p, pincode: undefined, currentCity: undefined }));
+        } else {
+          lastPincodeRef.current = fields.pincode;
+          setCityFromPincode(false);
+          setFields((p) => ({ ...p, currentCity: '', currentCityId: null }));
+          setErrors((p) => ({ ...p, pincode: undefined, currentCity: undefined }));
+        }
       })
-      .catch(() => { if (active) { lastPincodeRef.current = null; setCityFromPincode(false); } })
+      .catch(() => {
+        if (active) {
+          lastPincodeRef.current = fields.pincode;
+          setCityFromPincode(false);
+          setFields((p) => ({ ...p, currentCity: '', currentCityId: null }));
+          setErrors((p) => ({ ...p, pincode: undefined, currentCity: undefined }));
+        }
+      })
       .finally(() => { if (active) setIsLookingUpPincode(false); });
     return () => { active = false; };
   }, [fields.pincode]);
@@ -210,7 +226,7 @@ export function PersonalDetailsStep(
 
   const handleCityChange = useCallback((next: CityInputChange) => {
     setCityFromPincode(false); lastPincodeRef.current = null;
-    setFields((f) => ({ ...f, currentCity: next.label, currentCityId: next.cityId }));
+    setFields((f) => ({ ...f, currentCity: next.label ?? '', currentCityId: next.cityId }));
     setErrors((e) => ({ ...e, currentCity: undefined }));
   }, []);
 

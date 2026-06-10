@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -28,9 +29,14 @@ const CustomerSessionContext = createContext<CustomerSessionContextValue | undef
 export function CustomerSessionProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<CustomerSessionResponse | null>(null);
+  /** Only the first `/auth/me` fetch toggles `loading`; later refreshes update `session` silently. */
+  const isInitialLoadRef = useRef(true);
 
   const refresh = useCallback(async (): Promise<CustomerSessionResponse> => {
-    setLoading(true);
+    const isInitialLoad = isInitialLoadRef.current;
+    if (isInitialLoad) {
+      setLoading(true);
+    }
     try {
       const next = await fetchCustomerSession({ force: true });
       setSession(next);
@@ -40,7 +46,10 @@ export function CustomerSessionProvider({ children }: { children: ReactNode }) {
       setSession(fallback);
       return fallback;
     } finally {
-      setLoading(false);
+      if (isInitialLoad) {
+        isInitialLoadRef.current = false;
+        setLoading(false);
+      }
     }
   }, []);
 

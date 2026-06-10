@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, Res, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { LosAuthGuard } from './auth/los-auth.guard';
@@ -79,5 +79,21 @@ export class LosDataController {
   @ApiOperation({ summary: 'Fetch LOS masters for filters/lookups' })
   masters() {
     return this.losMaster.getMasters();
+  }
+
+  @Get('applications/:applicationUuid/loan-documents/:docType')
+  @ApiOperation({ summary: 'Stream a generated loan document PDF (LOS auth)' })
+  async applicationLoanDocument(
+    @Param('applicationUuid') applicationUuid: string,
+    @Param('docType') docType: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    await this.losApplication.serveApplicationLoanDocument(applicationUuid, docType, res);
+  }
+
+  @Post('applications/:applicationUuid/loan-documents/generate')
+  @ApiOperation({ summary: 'Generate (or regenerate) loan document PDFs for an application (LOS auth)' })
+  generateLoanDocuments(@Param('applicationUuid') applicationUuid: string) {
+    return this.losApplication.generateLoanDocuments(applicationUuid);
   }
 }

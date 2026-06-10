@@ -58,7 +58,6 @@ export type AadhaarLeadIdentityMatchResult =
 
 /**
  * Compares lead profile (PAN / personal details) with Aadhaar vendor `data.name` / `data.dob`.
- * When Aadhaar identity fields are missing, returns matched (vendor incomplete — handled elsewhere).
  */
 export function compareAadhaarToLeadProfile(input: {
   leadFullName: string | null;
@@ -67,8 +66,19 @@ export function compareAadhaarToLeadProfile(input: {
 }): AadhaarLeadIdentityMatchResult {
   const aadhaar = extractAadhaarIdentityFromVendor(input.vendor);
 
-  if (!aadhaar.fullName || !aadhaar.dateOfBirth) {
-    return { matched: true };
+  if (!aadhaar.fullName) {
+    return {
+      matched: false,
+      reason: 'missing_aadhaar_name',
+      message: 'Name was not returned from Aadhaar. KYC cannot be completed.',
+    };
+  }
+  if (!aadhaar.dateOfBirth) {
+    return {
+      matched: false,
+      reason: 'missing_aadhaar_dob',
+      message: 'Date of birth was not returned from Aadhaar. KYC cannot be completed.',
+    };
   }
 
   const leadName = input.leadFullName?.trim() ?? '';

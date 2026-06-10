@@ -43,3 +43,16 @@ model CreditLimitTier {
 
   @@map("credit_limit_tier")
 }
+
+model SmsTemplate {
+  id          Int      @id @default(autoincrement()) @db.SmallInt
+  templateId  String   @unique @map("template_id") @db.VarChar(40)
+  bearerToken String   @map("bearer_token") @db.VarChar(255)
+  message     String   @db.VarChar(500)
+  product     String   @db.VarChar(50)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("sms_template")
+}

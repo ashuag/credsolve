@@ -297,7 +297,6 @@ export function CibilReportViewer({ payload }: { payload: LosApplicationCibilRep
   const sections = useMemo(
     () => [
       { id: 'cibil-score', label: 'Score & insights' },
-      { id: 'cibil-preapproved', label: 'Pre-approved offer' },
       { id: 'cibil-accounts-summary', label: 'Accounts summary' },
       { id: 'cibil-profile', label: 'Consumer profile' },
       { id: 'cibil-tradelines', label: 'Tradelines' },
@@ -411,36 +410,6 @@ export function CibilReportViewer({ payload }: { payload: LosApplicationCibilRep
           />
         </ReportSection>
 
-        {report.preApprovedInsight ? (
-          <ReportSection
-            id="cibil-preapproved"
-            title="Pre-approved offer (exposure tier)"
-            description="Derived from max open unsecured exposure — same logic as production eligibility."
-            defaultOpen
-          >
-            <DetailGrid
-              rows={[
-                {
-                  label: 'Pre-approved amount',
-                  value: formatInr(report.preApprovedInsight.preApprovedAmountInr),
-                },
-                { label: 'Tier band', value: report.preApprovedInsight.tierBandLabel ?? '—' },
-                {
-                  label: 'Max open unsecured exposure',
-                  value: formatInr(report.exposureInsight.maxOpenUnsecuredExposureInr),
-                },
-                {
-                  label: 'Driving tradeline',
-                  value:
-                    report.exposureInsight.drivingCreditor && report.exposureInsight.drivingAccountType
-                      ? `${report.exposureInsight.drivingCreditor} (${report.exposureInsight.drivingAccountType})`
-                      : '—',
-                },
-                { label: 'Detail', value: report.preApprovedInsight.detail },
-              ]}
-            />
-          </ReportSection>
-        ) : null}
 
         <ReportSection
           id="cibil-accounts-summary"

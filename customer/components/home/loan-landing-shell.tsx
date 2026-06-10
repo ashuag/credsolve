@@ -27,6 +27,8 @@ export type LoanLandingShellProps = {
   mobileStepLabel?: string;
   /** Mobile app bar: called when the back arrow is tapped. If omitted, back arrow is hidden. */
   mobileOnBack?: () => void;
+  /** Use full right-panel width (e.g. embedded PDF viewer) instead of the default 480px form column. */
+  fullBleedPanel?: boolean;
 };
 
 /* ── Mobile progress bar driven by journey context ──────────────────────── */
@@ -53,6 +55,7 @@ export function LoanLandingShell({
   showSpeedometer = true,
   mobileStepLabel,
   mobileOnBack,
+  fullBleedPanel = false,
 }: LoanLandingShellProps) {
   const defaultTitle = (
     <>Fast. Secure. <span className="text-transparent bg-clip-text bg-gradient-to-br from-[#1fa2ff] to-[#1496f3] drop-shadow-[0_0_12px_rgba(20,150,243,0.3)]">Instant.</span></>
@@ -68,7 +71,12 @@ export function LoanLandingShell({
   const featureList = leftFeatures ?? DEFAULT_FEATURES;
 
   return (
-    <div className="flex w-full min-h-0 min-w-0 flex-col overflow-x-hidden">
+    <div
+      className={[
+        'flex w-full min-w-0 flex-col overflow-x-hidden',
+        fullBleedPanel ? 'h-full min-h-0 flex-1 overflow-hidden' : 'min-h-0',
+      ].join(' ')}
+    >
       {/* ── Mobile app bar (hidden on lg+) ────────────────────────────────── */}
       <header className="lg:hidden sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-[0_1px_0_rgba(18,36,79,0.06)]">
         <div className="flex h-14 items-center justify-between px-4">
@@ -123,15 +131,15 @@ export function LoanLandingShell({
 
       {/* ── Main shell (desktop: card, mobile: full-screen) ───────────────── */}
       <div className={[
-        // Mobile: full-screen white, no rounded card
         'w-full flex flex-col bg-white lg:mx-auto',
-        // Desktop: premium split-panel card
-        'lg:max-w-[1240px] lg:flex-row lg:rounded-[2.5rem] lg:shadow-[0_24px_80px_rgba(23,44,113,0.12),0_8px_32px_rgba(23,44,113,0.06)] lg:overflow-hidden lg:border lg:border-slate-100 lg:relative lg:z-10 lg:animate-fade-in-up',
+        fullBleedPanel
+          ? 'min-h-0 flex-1 overflow-hidden lg:max-w-[1240px] lg:flex-row lg:rounded-[2.5rem] lg:border lg:border-slate-100 lg:relative lg:z-10 lg:shadow-[0_24px_80px_rgba(23,44,113,0.12),0_8px_32px_rgba(23,44,113,0.06)] lg:animate-fade-in-up'
+          : 'lg:max-w-[1240px] lg:flex-row lg:rounded-[2.5rem] lg:shadow-[0_24px_80px_rgba(23,44,113,0.12),0_8px_32px_rgba(23,44,113,0.06)] lg:overflow-hidden lg:border lg:border-slate-100 lg:relative lg:z-10 lg:animate-fade-in-up',
       ].join(' ')}>
 
         {/* ── Left panel (desktop only) ── */}
         {/* `overflow-x-hidden` alone makes `overflow-y` compute to `auto` (CSS overflow pairing), which shows a vertical scrollbar on this rail when content is a few px taller than the column. */}
-        <div className="w-full lg:w-5/12 hidden lg:flex min-h-0 flex-col relative bg-[#0a1628] overflow-hidden">
+        <div className="relative hidden min-h-0 w-full flex-col overflow-hidden bg-[#0a1628] lg:flex lg:w-5/12">
 
           {/* Background Mesh */}
           <div className="absolute inset-0 stats-mesh opacity-90 pointer-events-none" />
@@ -199,14 +207,21 @@ export function LoanLandingShell({
         {/* ── Right panel: journey form ── */}
         {/* Mobile: flex-1, overflow-y-auto, flush padding, pb safe-area */}
         {/* Desktop: overflow-y-auto with generous padding + centred max-width */}
-        <div className={[
-          'flex-1 min-w-0 flex flex-col bg-white',
-          // Mobile
-          'overflow-y-auto px-5 pt-6 pb-[max(24px,env(safe-area-inset-bottom))]',
-          // Desktop override
-          'lg:justify-start lg:overflow-y-auto lg:p-10 lg:py-10 lg:px-14',
-        ].join(' ')}>
-          <div className="w-full lg:max-w-[480px] lg:mx-auto">
+        <div
+          className={[
+            'flex min-h-0 min-w-0 flex-1 flex-col bg-white',
+            fullBleedPanel
+              ? 'overflow-hidden px-5 pt-4 pb-[max(16px,env(safe-area-inset-bottom))] lg:p-8 lg:py-6'
+              : 'overflow-y-auto px-5 pt-6 pb-[max(24px,env(safe-area-inset-bottom))] lg:justify-start lg:overflow-y-auto lg:p-10 lg:py-10 lg:px-14',
+          ].join(' ')}
+        >
+          <div
+            className={
+              fullBleedPanel
+                ? 'flex min-h-0 w-full flex-1 flex-col'
+                : 'w-full lg:mx-auto lg:max-w-[480px]'
+            }
+          >
             {journeyPanel}
           </div>
         </div>

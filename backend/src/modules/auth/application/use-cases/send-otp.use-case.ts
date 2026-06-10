@@ -8,13 +8,25 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { EmailService } from '../../../../common/email/email.service';
+import { SmsService } from '../../../../common/sms/sms.service';
+import {
+  shouldDeliverSmsViaApi,
+  shouldFallbackToDebugOtpOnEmailFailure,
+  shouldIncludeDebugOtpEmail,
+  shouldIncludeDebugOtpMobile,
+  shouldSkipEmailOtpDelivery,
+} from '../../../../common/sms/sms-delivery.util';
 import type { SendOtpDto } from '../dto/send-otp.dto';
+import type { SendOtpOptions } from '../contracts/send-otp-options.contract';
 import type { SendOtpResult } from '../contracts/send-otp-result.contract';
 import { OTP_TYPE } from '../../../../common/constants/otp.constants';
+import { SMS_TEMPLATE_ID } from '../../../../common/constants/sms.constants';
 import { OtpCodeGenerator } from '../../infrastructure/crypto/otp-code.generator';
 import { isValidEmail, maskEmail, normalizeEmail } from '../../infrastructure/utils/email.util';
 import { isValidIndianMobile, maskMobile, normalizeMobile } from '../../infrastructure/utils/mobile.util';
 import type { CustomerSessionPayload } from '../contracts/customer-session-payload.contract';
+import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
+import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { OtpRequestRepository } from '../../infrastructure/repositories/otp-request.repository';
 import { OtpTypeRepository } from '../../infrastructure/repositories/otp-type.repository';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
@@ -28,10 +40,18 @@ export class SendOtpUseCase {
     private readonly otpRequests: OtpRequestRepository,
     private readonly settingsRepository: SettingsRepository,
     private readonly otpCodeGenerator: OtpCodeGenerator,
-    private readonly emailService: EmailService
+    private readonly emailService: EmailService,
+    private readonly smsService: SmsService,
+    private readonly customers: CustomerRepository,
+    private readonly leads: LeadRepository,
   ) {}
 
-  async execute(dto: SendOtpDto, ip: string | undefined, customerSession?: CustomerSessionPayload): Promise<SendOtpResult> {
+  async execute(
+    dto: SendOtpDto,
+    ip: string | undefined,
+    customerSession?: CustomerSessionPayload,
+    options?: SendOtpOptions,
+  ): Promise<SendOtpResult> {
     if (dto.type === OTP_TYPE.EMAIL && !customerSession) {
       throw new UnauthorizedException('Sign in with mobile OTP before requesting an email code.');
     }
@@ -73,33 +93,68 @@ export class SendOtpUseCase {
       utmContent: dto.utmContent ?? null,
     });
 
-    const emailOtpInlineOnly = (process.env.EMAIL_OTP_INLINE_ONLY ?? '').trim().toLowerCase() === 'true';
-    const includeDebugOtpEmailFlag = (process.env.INCLUDE_DEBUG_OTP_EMAIL ?? '').trim().toLowerCase() === 'true';
+    const emailConfigured = this.emailService.isConfigured();
+    let emailDeliveryFailed = false;
 
     if (dto.type === OTP_TYPE.EMAIL) {
-      if (emailOtpInlineOnly) {
-        this.logger.log(`[otp] EMAIL_OTP_INLINE_ONLY: skipping SMTP; returning debugOtp in API for ${masked} request=${row.uuid}`);
-      } else if (this.emailService.isConfigured()) {
+      if (shouldSkipEmailOtpDelivery()) {
+        this.logger.log(
+          `[otp] EMAIL_OTP_INLINE_ONLY (dev/local): skipping email API; returning debugOtp in API for ${masked} request=${row.uuid}`,
+        );
+      } else if (emailConfigured) {
         try {
-          await this.emailService.sendOtpEmail(canonical, otpCode, expiresAt);
+          let leadId: bigint | null = null;
+          if (customerSession) {
+            const customer = await this.customers.findByUuid(undefined, customerSession.sub);
+            if (customer) {
+              const lead = await this.leads.findActiveByCustomerId(customer.id);
+              leadId = lead?.id ?? null;
+            }
+          }
+          await this.emailService.sendOtpEmail(canonical, otpCode, expiresAt, { leadId });
         } catch (error) {
+          emailDeliveryFailed = true;
           const endpoint = this.emailService.smtpEndpointLabel();
           this.logger.error(`Failed to send OTP email to ${masked}`, error instanceof Error ? error.stack : error);
           if (endpoint) {
             this.logger.error(
-              `[SendOtpUseCase] SMTP ${endpoint} unreachable from this host (timeout/refused). ` +
-                'Check: (1) outbound port from this VPS, (2) mail server firewall allows this server public IP, ' +
-                '(3) set SMTP_FAMILY=4 if IPv6 to the mail host hangs, (4) try port 587+STARTTLS if 465 is blocked.',
+              `[SendOtpUseCase] Email ${endpoint} unreachable or rejected. ` +
+                'Check Zeptomail/SMTP credentials, verified sender domain, and spam folder.',
             );
           }
-          await this.otpRequests.deleteById(undefined, row.id);
-          throw new InternalServerErrorException('Could not send verification email. Please try again.');
+          if (shouldFallbackToDebugOtpOnEmailFailure()) {
+            this.logger.warn(
+              `[otp] Email delivery failed in local-like env; returning debugOtp for ${masked} request=${row.uuid}`,
+            );
+          } else {
+            await this.otpRequests.deleteById(undefined, row.id);
+            throw new InternalServerErrorException('Could not send verification email. Please try again.');
+          }
         }
       } else {
         this.logger.warn(
-          `[otp] SMTP not configured; email not sent. to=${masked} request=${row.uuid} — response includes debugOtp for manual entry (set SMTP or EMAIL_OTP_INLINE_ONLY as needed).`,
+          `[otp] Email not configured; email not sent. to=${masked} request=${row.uuid} — response includes debugOtp for manual entry (set EMAIL_* or EMAIL_OTP_INLINE_ONLY as needed).`,
         );
       }
+    }
+
+    if (dto.type === OTP_TYPE.MOBILE && shouldDeliverSmsViaApi()) {
+      try {
+        await this.smsService.sendOtpSms(
+          canonical,
+          otpCode,
+          options?.leadId ?? null,
+          options?.smsTemplateId ?? SMS_TEMPLATE_ID.LOGIN_OTP,
+        );
+      } catch (error) {
+        this.logger.error(`Failed to send OTP SMS to ${masked}`, error instanceof Error ? error.stack : error);
+        await this.otpRequests.deleteById(undefined, row.id);
+        throw new InternalServerErrorException('Could not send verification SMS. Please try again.');
+      }
+    } else if (dto.type === OTP_TYPE.MOBILE) {
+      this.logger.log(
+        `[otp] SMS delivery skipped for local-like env; returning debugOtp for ${masked} request=${row.uuid}`,
+      );
     }
 
     const isDev = (process.env.NODE_ENV ?? 'development').toLowerCase() !== 'production';
@@ -110,14 +165,11 @@ export class SendOtpUseCase {
 
     const resendAvailableAt = new Date(now + settings.otpResendCooldownSeconds * 1000);
 
-    const includeDebugOtpMobile = isDev && process.env.INCLUDE_DEBUG_OTP !== 'false';
+    const includeDebugOtpMobile = dto.type === OTP_TYPE.MOBILE && shouldIncludeDebugOtpMobile();
     /** Same UX as mobile `debugOtp`: show code in the app when email is not (or must not be) delivered out-of-band. */
     const includeDebugOtpEmail =
       dto.type === OTP_TYPE.EMAIL &&
-      (emailOtpInlineOnly ||
-        includeDebugOtpMobile ||
-        includeDebugOtpEmailFlag ||
-        !this.emailService.isConfigured());
+      (shouldIncludeDebugOtpEmail(emailConfigured) || emailDeliveryFailed);
 
     return {
       requestId: row.uuid,
