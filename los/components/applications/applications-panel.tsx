@@ -45,9 +45,13 @@ function getInitials(name: string | null | undefined) {
     : name.trim().slice(0, 2).toUpperCase();
 }
 
-const AVATAR_COLORS = [
-  ['#1496f3','#0e7cd1'],['#6366f1','#4f46e5'],['#0d9488','#0f766e'],
-  ['#f59e0b','#d97706'],['#8b5cf6','#7c3aed'],['#ec4899','#db2777'],
+const AVATAR_COLORS: [string, string][] = [
+  ['#1496f3', '#0e7cd1'],
+  ['#6366f1', '#4f46e5'],
+  ['#0d9488', '#0f766e'],
+  ['#f59e0b', '#d97706'],
+  ['#8b5cf6', '#7c3aed'],
+  ['#ec4899', '#db2777'],
 ];
 function avatarColor(name: string): [string, string] {
   let h = 0;

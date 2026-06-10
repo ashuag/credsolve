@@ -821,6 +821,8 @@ export function MasterDetailPanel({ master }: { master: MasterSlug }) {
         return masters?.genders ?? [];
       case 'banks':
         return masters?.banks ?? [];
+      default:
+        return [];
     }
   }, [master, masters]);
 
