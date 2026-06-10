@@ -51,16 +51,30 @@ Optional (not used by `node-signpdf` today): `CERSAI_INSTITUTION_CODE`, `CRESAI_
 
 Spaces: see `backend/.env.example` (`STORAGE_DRIVER=spaces`, `SPACES_ENDPOINT`, `SPACES_KEY_PREFIX=local`).
 
-## Chromium / Puppeteer (production)
+## Chromium / Puppeteer (staging / production)
 
-Install Chromium and dependencies on the backend host, or set `PUPPETEER_EXECUTABLE_PATH`.
+Loan PDFs require a Chromium/Chrome binary. The backend auto-detects common paths (`/usr/bin/chromium`, `/usr/bin/chromium-browser`, …). If none exist, Puppeteer falls back to its bundled browser (installed via `npm ci` unless `PUPPETEER_SKIP_DOWNLOAD=true`).
 
-Debian/Ubuntu example:
+**Staging checklist**
+
+1. Install Chromium and fonts on the backend host:
 
 ```bash
-sudo apt-get install -y chromium-browser fonts-liberation
-export PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+sudo apt-get update
+sudo apt-get install -y chromium fonts-liberation fonts-noto-core ca-certificates
 ```
+
+2. Set the path only if auto-detect fails (Debian Bookworm uses `/usr/bin/chromium`, not `chromium-browser`):
+
+```env
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+```
+
+3. Avoid pointing at a non-existent path — a bad `PUPPETEER_EXECUTABLE_PATH` prevents Puppeteer from launching.
+
+4. If using `PUPPETEER_SKIP_DOWNLOAD=true`, you **must** install system Chromium; bundled Chromium is not downloaded.
+
+5. Restart the backend after changing env vars, then trigger a loan-document preview/acceptance flow and check logs for `Using Chromium at …` or Puppeteer launch errors.
 
 ## Local preview
 

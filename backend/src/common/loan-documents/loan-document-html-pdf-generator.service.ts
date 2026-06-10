@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { PDFDocument } from 'pdf-lib';
 import puppeteer from 'puppeteer';
+import { resolvePuppeteerExecutablePath } from '../utils/puppeteer-executable.util';
 import { renderLoanDocumentHtml } from './loan-document-html-render.util';
 import type { LoanDocumentMergeInput } from './loan-document.types';
 
@@ -23,7 +24,16 @@ export class LoanDocumentHtmlPdfGeneratorService {
   }
 
   private async htmlToPdfBuffer(html: string): Promise<Buffer> {
-    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH?.trim() || undefined;
+    const configuredPath = process.env.PUPPETEER_EXECUTABLE_PATH?.trim();
+    const executablePath = resolvePuppeteerExecutablePath();
+    if (configuredPath && !executablePath) {
+      this.logger.warn(
+        `PUPPETEER_EXECUTABLE_PATH is set to "${configuredPath}" but the binary is missing or not executable; falling back to Puppeteer bundled Chromium.`,
+      );
+    } else if (executablePath) {
+      this.logger.debug(`Using Chromium at ${executablePath}`);
+    }
+
     const browser = await puppeteer.launch({
       headless: true,
       executablePath,
