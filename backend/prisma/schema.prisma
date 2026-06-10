@@ -8,7 +8,7 @@
 //   models/enums.prisma         — shared enums
 //   models/config.prisma        — Setting, EligibilityCriteria, CreditLimitTier
 //   models/masters.prisma       — small reference tables (Gender, Bank, statuses, …)
-//   models/geography.prisma     — State, City, Pincode, NegativeState/City/Pincode
+//   models/geography.prisma     — State, City, Pincode (negative flags on each master)
 //   models/otp.prisma           — OtpRequest
 //   models/customer.prisma      — Customer + KYC
 //   models/lead.prisma          — Lead + LeadDetail + UTMs + VendorApiLog (+ BureauReport in bureau-report.prisma)

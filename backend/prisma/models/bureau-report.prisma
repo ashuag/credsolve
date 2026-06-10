@@ -1,22 +1,22 @@
 model BureauReport {
-  id                BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid              String   @unique @default(uuid()) @db.Char(36)
-  customerId        BigInt   @map("customer_id") @db.UnsignedBigInt
-  leadId            BigInt   @map("lead_id") @db.UnsignedBigInt
+  id                    BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                  String   @unique @default(uuid()) @db.Char(36)
+  customerId            BigInt   @map("customer_id") @db.UnsignedBigInt
+  leadId                BigInt   @map("lead_id") @db.UnsignedBigInt
   /// Bureau / credit score when present (e.g. `Borrower.CreditScore.riskScore`). Column name `cibil_score` is legacy.
-  cibilScore        Int?     @map("cibil_score")
+  cibilScore            Int?     @map("cibil_score")
   /// Consumer report URL (`data.htmlUrl`) when returned by the vendor.
-  htmlUrl           String?  @map("html_url") @db.Text
+  htmlUrl               String?  @map("html_url") @db.Text
   /// Object key: `customer/{uuid}/bureau-reports/{bureau_report_uuid}/cibil-summary-report.pdf`
-  reportPdfRelativePath String? @map("report_pdf_relative_path") @db.VarChar(512)
-  vendorRequestId   String?  @map("vendor_request_id") @db.VarChar(64)
-  serviceStatusCode Int?     @map("service_status_code") @db.SmallInt
+  reportPdfRelativePath String?  @map("report_pdf_relative_path") @db.VarChar(512)
+  vendorRequestId       String?  @map("vendor_request_id") @db.VarChar(64)
+  serviceStatusCode     Int?     @map("service_status_code") @db.SmallInt
   /// e.g. `GetCustomerAssetsResponse.ResponseStatus`
-  responseStatus    String?  @map("response_status") @db.VarChar(64)
+  responseStatus        String?  @map("response_status") @db.VarChar(64)
   /// Full parsed vendor JSON envelope (bounded by DB / app limits).
-  rawPayload        Json?    @map("raw_payload")
-  dummyFetched      Boolean? @map("dummy_fetched") @default(false)
-  createdAt         DateTime @default(now()) @map("created_at")
+  rawPayload            Json?    @map("raw_payload")
+  dummyFetched          Boolean? @default(false) @map("dummy_fetched")
+  createdAt             DateTime @default(now()) @map("created_at")
 
   customer Customer @relation(fields: [customerId], references: [id])
   lead     Lead     @relation(fields: [leadId], references: [id])

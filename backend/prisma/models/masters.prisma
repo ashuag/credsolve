@@ -46,10 +46,10 @@ model Bank {
 }
 
 model ReasonForLoan {
-  id                 Int                  @id @default(autoincrement()) @db.SmallInt
-  name               String               @unique @db.VarChar(50)
-  isActive           Boolean              @default(true) @map("is_active")
-  createdAt          DateTime             @default(now()) @map("created_at")
+  id                Int                 @id @default(autoincrement()) @db.SmallInt
+  name              String              @unique @db.VarChar(50)
+  isActive          Boolean             @default(true) @map("is_active")
+  createdAt         DateTime            @default(now()) @map("created_at")
   applicationDetail ApplicationDetail[]
 
   @@map("reason_for_loan")
@@ -88,33 +88,33 @@ model KycDocument {
 }
 
 model LeadSource {
-  id       Int            @id @default(autoincrement())
-  name     String         @unique @db.VarChar(50)
-  type     LeadSourceType
-  isActive Boolean        @default(true) @map("is_active")
-  leads    Lead[]
+  id         Int            @id @default(autoincrement())
+  name       String         @unique @db.VarChar(50)
+  type       LeadSourceType
+  isActive   Boolean        @default(true) @map("is_active")
+  leads      Lead[]
   sourceUtms SourceUtm[]
 
   @@map("lead_source")
 }
 
 model SourceUtm {
-  id           Int       @id @default(autoincrement()) @db.SmallInt
-  leadSourceId Int       @map("lead_source_id")
-  utmSource    String?   @map("utm_source") @db.VarChar(100)
-  utmCampaign  String?   @map("utm_campaign") @db.VarChar(100)
-  utmTerm      String?   @map("utm_term") @db.VarChar(100)
-  utmMedium    String?   @map("utm_medium") @db.VarChar(100)
-  utmContent   String?   @map("utm_content") @db.VarChar(100)
-  createdBy    BigInt?   @map("created_by") @db.UnsignedBigInt
-  createdAt    DateTime  @default(now()) @map("created_at")
-  isActive     Boolean   @default(true) @map("is_active")
-  updatedBy    BigInt?   @map("updated_by") @db.UnsignedBigInt
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  id           Int      @id @default(autoincrement()) @db.SmallInt
+  leadSourceId Int      @map("lead_source_id")
+  utmSource    String?  @map("utm_source") @db.VarChar(100)
+  utmCampaign  String?  @map("utm_campaign") @db.VarChar(100)
+  utmTerm      String?  @map("utm_term") @db.VarChar(100)
+  utmMedium    String?  @map("utm_medium") @db.VarChar(100)
+  utmContent   String?  @map("utm_content") @db.VarChar(100)
+  createdBy    BigInt?  @map("created_by") @db.UnsignedBigInt
+  createdAt    DateTime @default(now()) @map("created_at")
+  isActive     Boolean  @default(true) @map("is_active")
+  updatedBy    BigInt?  @map("updated_by") @db.UnsignedBigInt
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  leadSource      LeadSource @relation(fields: [leadSourceId], references: [id])
-  createdByUser   User?      @relation("SourceUtmCreatedBy", fields: [createdBy], references: [id])
-  updatedByUser   User?      @relation("SourceUtmUpdatedBy", fields: [updatedBy], references: [id])
+  leadSource    LeadSource @relation(fields: [leadSourceId], references: [id])
+  createdByUser User?      @relation("SourceUtmCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?      @relation("SourceUtmUpdatedBy", fields: [updatedBy], references: [id])
 
   @@index([leadSourceId])
   @@map("source_utm")

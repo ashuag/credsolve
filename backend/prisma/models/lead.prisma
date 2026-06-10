@@ -1,23 +1,23 @@
 model Lead {
-  id                    BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid                  String    @unique @default(uuid()) @db.Char(36)
-  customerId            BigInt    @map("customer_id") @db.UnsignedBigInt
-  leadStatusId          Int       @default(1) @map("lead_status_id") @db.SmallInt
-  leadStatusNote        String?   @map("lead_status_note") @db.VarChar(256) 
-  rejectionReasonId     Int?      @map("rejection_reason_id") @db.SmallInt
-  sourceId              Int?      @map("source_id")
-  panNumber               String?   @map("pan_number") @db.Char(10)
-  panVerified             Int       @default(0) @map("pan_verified") @db.SmallInt
-  panVerifiedAt           DateTime? @map("pan_verified_at")
-  panValidationAttempts   Int       @default(0) @map("pan_validation_attempts") @db.SmallInt
-  digilockerAadhaarDownloadAttempts Int @default(0) @map("digilocker_aadhaar_download_attempts") @db.SmallInt
-  bureauFetched         Int       @default(0) @map("bureau_fetched") @db.SmallInt
-  bureauFetchedAt       DateTime? @map("bureau_fetched_at")
-  bureauFetchedNote     String?   @map("bureau_fetched_note") @db.VarChar(500)
-  isActive              Boolean   @default(true) @map("is_active")
-  expiresAt             DateTime? @map("expires_at")
-  createdAt             DateTime  @default(now()) @map("created_at")
-  updatedAt             DateTime  @updatedAt @map("updated_at")
+  id                                BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                              String    @unique @default(uuid()) @db.Char(36)
+  customerId                        BigInt    @map("customer_id") @db.UnsignedBigInt
+  leadStatusId                      Int       @default(1) @map("lead_status_id") @db.SmallInt
+  leadStatusNote                    String?   @map("lead_status_note") @db.VarChar(256)
+  rejectionReasonId                 Int?      @map("rejection_reason_id") @db.SmallInt
+  sourceId                          Int?      @map("source_id")
+  panNumber                         String?   @map("pan_number") @db.Char(10)
+  panVerified                       Int       @default(0) @map("pan_verified") @db.SmallInt
+  panVerifiedAt                     DateTime? @map("pan_verified_at")
+  panValidationAttempts             Int       @default(0) @map("pan_validation_attempts") @db.SmallInt
+  digilockerAadhaarDownloadAttempts Int       @default(0) @map("digilocker_aadhaar_download_attempts") @db.SmallInt
+  bureauFetched                     Int       @default(0) @map("bureau_fetched") @db.SmallInt
+  bureauFetchedAt                   DateTime? @map("bureau_fetched_at")
+  bureauFetchedNote                 String?   @map("bureau_fetched_note") @db.VarChar(500)
+  isActive                          Boolean   @default(true) @map("is_active")
+  expiresAt                         DateTime? @map("expires_at")
+  createdAt                         DateTime  @default(now()) @map("created_at")
+  updatedAt                         DateTime  @updatedAt @map("updated_at")
 
   customer        Customer         @relation(fields: [customerId], references: [id])
   leadStatus      LeadStatus       @relation(fields: [leadStatusId], references: [id])

@@ -6,18 +6,18 @@
 // rules during lead origination.
 
 model State {
-  id                    Int       @id @default(autoincrement())
-  name                  String    @unique @db.VarChar(100)
-  code                  String    @unique @db.VarChar(5)
-  isActive              Boolean   @default(true) @map("is_active")
-  isNegative            Boolean   @default(false) @map("is_negative")
-  negativeReason        String?   @db.VarChar(500) @map("negative_reason")
-  negativeAddedByUserId BigInt?   @db.UnsignedBigInt @map("negative_added_by_user_id")
-  negativeAddedAt       DateTime? @map("negative_added_at")
-  negativeRemovedByUserId BigInt? @db.UnsignedBigInt @map("negative_removed_by_user_id")
-  negativeRemovedAt     DateTime? @map("negative_removed_at")
-  createdAt             DateTime  @default(now()) @map("created_at")
-  cities                City[]
+  id                      Int       @id @default(autoincrement())
+  name                    String    @unique @db.VarChar(100)
+  code                    String    @unique @db.VarChar(5)
+  isActive                Boolean   @default(true) @map("is_active")
+  isNegative              Boolean   @default(false) @map("is_negative")
+  negativeReason          String?   @map("negative_reason") @db.VarChar(500)
+  negativeAddedByUserId   BigInt?   @map("negative_added_by_user_id") @db.UnsignedBigInt
+  negativeAddedAt         DateTime? @map("negative_added_at")
+  negativeRemovedByUserId BigInt?   @map("negative_removed_by_user_id") @db.UnsignedBigInt
+  negativeRemovedAt       DateTime? @map("negative_removed_at")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  cities                  City[]
 
   negativeAddedBy   User? @relation("StateNegativeAddedBy", fields: [negativeAddedByUserId], references: [id])
   negativeRemovedBy User? @relation("StateNegativeRemovedBy", fields: [negativeRemovedByUserId], references: [id])
@@ -26,19 +26,19 @@ model State {
 }
 
 model City {
-  id                    Int       @id @default(autoincrement())
-  name                  String    @db.VarChar(100)
-  stateId               Int       @map("state_id")
+  id                      Int       @id @default(autoincrement())
+  name                    String    @db.VarChar(100)
+  stateId                 Int       @map("state_id")
   /// Legacy id from generic city export (row 1..N); used for pincode bulk import joins.
-  sourceCityId          Int?      @unique @map("source_city_id")
-  isActive              Boolean   @default(true) @map("is_active")
-  isNegative            Boolean   @default(false) @map("is_negative")
-  negativeReason        String?   @db.VarChar(500) @map("negative_reason")
-  negativeAddedByUserId BigInt?   @db.UnsignedBigInt @map("negative_added_by_user_id")
-  negativeAddedAt       DateTime? @map("negative_added_at")
-  negativeRemovedByUserId BigInt? @db.UnsignedBigInt @map("negative_removed_by_user_id")
-  negativeRemovedAt     DateTime? @map("negative_removed_at")
-  createdAt             DateTime  @default(now()) @map("created_at")
+  sourceCityId            Int?      @unique @map("source_city_id")
+  isActive                Boolean   @default(true) @map("is_active")
+  isNegative              Boolean   @default(false) @map("is_negative")
+  negativeReason          String?   @map("negative_reason") @db.VarChar(500)
+  negativeAddedByUserId   BigInt?   @map("negative_added_by_user_id") @db.UnsignedBigInt
+  negativeAddedAt         DateTime? @map("negative_added_at")
+  negativeRemovedByUserId BigInt?   @map("negative_removed_by_user_id") @db.UnsignedBigInt
+  negativeRemovedAt       DateTime? @map("negative_removed_at")
+  createdAt               DateTime  @default(now()) @map("created_at")
 
   state       State        @relation(fields: [stateId], references: [id])
   leadDetails LeadDetail[]
@@ -54,17 +54,17 @@ model City {
 
 /// Indian postal pincode master (6-digit code → city).
 model Pincode {
-  id                    Int       @id @default(autoincrement())
-  code                  String    @unique @db.Char(6)
-  cityId                Int       @map("city_id")
-  isActive              Boolean   @default(true) @map("is_active")
-  isNegative            Boolean   @default(false) @map("is_negative")
-  negativeReason        String?   @db.VarChar(500) @map("negative_reason")
-  negativeAddedByUserId BigInt?   @db.UnsignedBigInt @map("negative_added_by_user_id")
-  negativeAddedAt       DateTime? @map("negative_added_at")
-  negativeRemovedByUserId BigInt? @db.UnsignedBigInt @map("negative_removed_by_user_id")
-  negativeRemovedAt     DateTime? @map("negative_removed_at")
-  createdAt             DateTime  @default(now()) @map("created_at")
+  id                      Int       @id @default(autoincrement())
+  code                    String    @unique @db.Char(6)
+  cityId                  Int       @map("city_id")
+  isActive                Boolean   @default(true) @map("is_active")
+  isNegative              Boolean   @default(false) @map("is_negative")
+  negativeReason          String?   @map("negative_reason") @db.VarChar(500)
+  negativeAddedByUserId   BigInt?   @map("negative_added_by_user_id") @db.UnsignedBigInt
+  negativeAddedAt         DateTime? @map("negative_added_at")
+  negativeRemovedByUserId BigInt?   @map("negative_removed_by_user_id") @db.UnsignedBigInt
+  negativeRemovedAt       DateTime? @map("negative_removed_at")
+  createdAt               DateTime  @default(now()) @map("created_at")
 
   city City @relation(fields: [cityId], references: [id], onDelete: Restrict)
 
