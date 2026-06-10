@@ -1,7 +1,7 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { Request } from 'express';
-import { APPLICATION_KYC_STATUS } from '../../../../common/constants/application.constants';
+import { isApplicationFaceStepComplete } from '../../../../common/kyc/application-kyc-guard.util';
 import { KycCompletionService } from '../../../../common/kyc/kyc-completion.service';
 import { LivenessVendorService } from '../../../../common/vendor/liveness-vendor.service';
 import {
@@ -40,6 +40,8 @@ export type RunKycLivenessResult = {
 
 @Injectable()
 export class RunKycLivenessUseCase {
+  private readonly logger = new Logger(RunKycLivenessUseCase.name);
+
   constructor(
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
@@ -79,7 +81,7 @@ export class RunKycLivenessUseCase {
       throw new BadRequestException('No application found for this lead.');
     }
 
-    if (application.kycStatus === APPLICATION_KYC_STATUS.COMPLETED) {
+    if (isApplicationFaceStepComplete(application)) {
       return {
         configured: true,
         ok: true,
@@ -104,9 +106,16 @@ export class RunKycLivenessUseCase {
       };
     }
 
+    const applicationFresh = await this.prisma.client.application.findUnique({
+      where: { id: application.id },
+      select: { updatedAt: true },
+    });
+    const photoVersion = applicationFresh?.updatedAt?.getTime() ?? Date.now();
+
     const selfieUrlResult = await resolveKycLivenessSelfiePublicUrl(this.kycFiles, {
       applicationUuid: application.uuid,
       selfieRelativePath: application.selfieRelativePath.trim(),
+      photoVersion,
     });
     if (!selfieUrlResult.ok) {
       return {
@@ -120,10 +129,13 @@ export class RunKycLivenessUseCase {
       };
     }
 
-    const out = await this.liveness.postLivenessCheck(
-      { input: { consent: true, url: selfieUrlResult.url } },
-      lead.id,
+    const selfieRelativePath = application.selfieRelativePath.trim();
+    const livenessInput = { input: { consent: true, url: selfieUrlResult.url } };
+    this.logger.log(
+      `Tenacio liveness selfiePath=${selfieRelativePath} input=${JSON.stringify(livenessInput)}`,
     );
+
+    const out = await this.liveness.postLivenessCheck(livenessInput, lead.id, selfieRelativePath);
 
     if (!out.configured) {
       const vendor = out.vendorBody ?? null;

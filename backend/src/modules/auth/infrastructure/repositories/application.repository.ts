@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { Prisma, type EmailVerificationType } from '@prisma/client';
-import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
+import { APPLICATION_KYC_STATUS, APPLICATION_STATUS } from '../../../../common/constants/application.constants';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import type { DbClient } from './db.client';
 
@@ -96,6 +96,8 @@ export class ApplicationRepository {
         livenessDoneAt: null,
         livenessCheckedAt: null,
         livenessVendorJson: Prisma.JsonNull,
+        kycStatus: APPLICATION_KYC_STATUS.NOT_DONE,
+        kycCompletedAt: null,
       },
     });
   }

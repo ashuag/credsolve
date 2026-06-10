@@ -61,6 +61,8 @@ export type CustomerKycFaceProgressSnapshot = {
   digilockerAadhaarPhotoUrl: string | null;
   /** Path fragment for `GET {API}/auth/kyc/selfie-photo` when a selfie file exists. */
   kycSelfiePhotoUrl: string | null;
+  /** Changes when a new selfie is saved — use as `?v=` cache buster on photo URLs. */
+  selfieUpdatedAt: string | null;
   /** Failed DigiLocker Aadhaar download attempts for the active lead. */
   digilockerAadhaarDownloadAttempts: number;
   digilockerAadhaarDownloadMaxAttempts: number;

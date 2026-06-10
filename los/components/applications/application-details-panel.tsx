@@ -5,7 +5,13 @@ import { ApplicationOverviewCibilSection } from '@/components/applications/appli
 import { CustomerJourneyTimeline } from '@/components/shared/customer-journey-timeline';
 import { WorkspaceRecordHeader } from '@/components/shared/workspace-record-header';
 import { buildApplicationJourney } from '@/lib/customer-journey';
-import { generateApplicationLoanDocuments, fetchApplicationLoanDocumentBlob, getApplicationDetails, fetchLosAuthenticatedBlob, type LosApplicationDetails } from '@/lib/api';
+import {
+  generateApplicationLoanDocuments,
+  fetchApplicationLoanDocumentBlob,
+  getApplicationDetails,
+  resolveLosKycPhotoSrc,
+  type LosApplicationDetails,
+} from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 
@@ -110,57 +116,22 @@ function MonoValue({ children, copyLabel }: { children: string; copyLabel: strin
   );
 }
 
-function AuthenticatedKycPhoto({
+function KycPhoto({
   token,
-  path,
+  url,
   label,
   emptyLabel,
+  photoVersion,
   compact = false,
 }: {
   token: string;
-  path: string;
+  url: string | null;
   label: string;
   emptyLabel: string;
+  photoVersion?: string | number | null;
   compact?: boolean;
 }) {
-  const [src, setSrc] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!path.trim()) {
-      setLoading(false);
-      setError(null);
-      setSrc(null);
-      return;
-    }
-
-    let objectUrl: string | null = null;
-    let cancelled = false;
-
-    setLoading(true);
-    setError(null);
-    setSrc(null);
-
-    void fetchLosAuthenticatedBlob(token, path, `Failed to load ${label.toLowerCase()}.`)
-      .then((blob) => {
-        if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
-        setSrc(objectUrl);
-      })
-      .catch((loadError) => {
-        if (cancelled) return;
-        setError(loadError instanceof Error ? loadError.message : `Failed to load ${label.toLowerCase()}.`);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [token, path, label]);
+  const src = resolveLosKycPhotoSrc(url, token, photoVersion);
 
   if (compact) {
     return (
@@ -169,11 +140,7 @@ function AuthenticatedKycPhoto({
           {label}
         </figcaption>
         <div className="flex h-[132px] items-center justify-center bg-[rgba(248,250,255,0.9)] p-1.5">
-          {loading ? (
-            <span className="text-[0.68rem] font-semibold text-brand-muted">…</span>
-          ) : error ? (
-            <span className="px-1 text-center text-[0.62rem] font-semibold leading-tight text-[#8d3434]">Unavailable</span>
-          ) : src ? (
+          {src ? (
             <img src={src} alt={label} className="h-full w-full rounded-[8px] object-cover" />
           ) : (
             <span className="px-1 text-center text-[0.62rem] font-semibold leading-tight text-brand-muted">{emptyLabel}</span>
@@ -189,11 +156,7 @@ function AuthenticatedKycPhoto({
         {label}
       </figcaption>
       <div className="flex min-h-[220px] items-center justify-center p-3">
-        {loading ? (
-          <span className="text-[0.84rem] font-semibold text-brand-muted">Loading photo…</span>
-        ) : error ? (
-          <span className="px-3 text-center text-[0.82rem] font-semibold text-[#8d3434]">{error}</span>
-        ) : src ? (
+        {src ? (
           <img src={src} alt={label} className="max-h-[320px] w-full rounded-[10px] object-contain" />
         ) : (
           <span className="text-[0.84rem] font-semibold text-brand-muted">{emptyLabel}</span>
@@ -399,9 +362,10 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
           authToken ? (
             <div className="flex gap-2">
               {row.kycPhotos.aadhaarPhotoUrl ? (
-                <AuthenticatedKycPhoto
+                <KycPhoto
                   token={authToken}
-                  path={row.kycPhotos.aadhaarPhotoUrl}
+                  url={row.kycPhotos.aadhaarPhotoUrl}
+                  photoVersion={row.updatedAt}
                   label="Aadhaar"
                   emptyLabel="Not available"
                   compact
@@ -417,9 +381,10 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
                 </figure>
               )}
               {row.kycPhotos.selfieUrl ? (
-                <AuthenticatedKycPhoto
+                <KycPhoto
                   token={authToken}
-                  path={row.kycPhotos.selfieUrl}
+                  url={row.kycPhotos.selfieUrl}
+                  photoVersion={row.updatedAt}
                   label="Selfie"
                   emptyLabel="Not captured"
                   compact

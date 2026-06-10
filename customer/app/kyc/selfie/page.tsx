@@ -42,6 +42,8 @@ export default function KycSelfiePage() {
   const [cameraReady, setCameraReady] = useState(false);
   /** Open webcam only while capturing; not after a saved selfie (avoids permission prompts on refresh / return visits). */
   const [retakeSelfie, setRetakeSelfie] = useState(false);
+  /** Shown immediately after capture so the UI does not flash the previous cached selfie. */
+  const [pendingSelfiePreview, setPendingSelfiePreview] = useState<string | null>(null);
 
   const navigatingRef = useRef(false);
 
@@ -51,7 +53,11 @@ export default function KycSelfiePage() {
       ? `${getApiUrl()}${kyc.digilockerAadhaarPhotoUrl}`
       : null;
   const selfieHref =
-    kyc?.kycSelfiePhotoUrl && session?.authenticated === true ? `${getApiUrl()}${kyc.kycSelfiePhotoUrl}` : null;
+    kyc?.kycSelfiePhotoUrl && session?.authenticated === true
+      ? `${getApiUrl()}${kyc.kycSelfiePhotoUrl}${
+          kyc.selfieUpdatedAt ? `?v=${encodeURIComponent(kyc.selfieUpdatedAt)}` : ''
+        }`
+      : null;
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -176,6 +182,7 @@ export default function KycSelfiePage() {
     setBusyLabel('Saving selfie…');
     try {
       const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+      setPendingSelfiePreview(dataUrl);
       const file = dataUrlToFile(dataUrl, 'selfie.jpg');
       const out = await postKycSelfie(file);
       if (!out?.success) {
@@ -186,6 +193,7 @@ export default function KycSelfiePage() {
       stopCamera();
 
       const refreshed = await refresh();
+      setPendingSelfiePreview(null);
       if (!refreshed.authenticated) return;
 
       const livenessRequired = refreshed.kycFaceProgress?.livenessRequired !== false;
@@ -200,6 +208,7 @@ export default function KycSelfiePage() {
 
       await continueToNextStep();
     } catch (e) {
+      setPendingSelfiePreview(null);
       setError(e instanceof Error ? e.message : 'Selfie upload failed.');
     } finally {
       setBusy(false);
@@ -280,11 +289,15 @@ export default function KycSelfiePage() {
             </dl>
           ) : null}
 
-          {selfieHref ? (
+          {(pendingSelfiePreview ?? selfieHref) && !retakeSelfie ? (
             <div className="rounded-2xl border border-[rgba(18,36,79,0.12)] p-3 bg-white/90">
               <p className="m-0 mb-2 text-sm font-semibold text-brand-navy">Your saved selfie</p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={selfieHref} alt="Your selfie" className="w-full max-h-56 object-contain rounded-xl" />
+              <img
+                src={pendingSelfiePreview ?? selfieHref!}
+                alt="Your selfie"
+                className="w-full max-h-56 object-contain rounded-xl"
+              />
             </div>
           ) : null}
 

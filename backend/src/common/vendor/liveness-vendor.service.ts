@@ -38,6 +38,7 @@ export class LivenessVendorService {
   async postLivenessCheck(
     body: TenacioLivenessBody,
     leadId: bigint | null,
+    selfieStoragePath?: string | null,
   ): Promise<VendorCallResult> {
     const auth = this.resolveAuth();
     if (!auth) {
@@ -69,6 +70,19 @@ export class LivenessVendorService {
 
     const auditName = (process.env.TENACIO_LIVENESS_AUDIT_SERVICE ?? 'liveness').trim().slice(0, 120);
 
+    const livenessInput = {
+      input: {
+        consent: body.input.consent,
+        url: selfieUrl,
+      },
+    };
+    const storagePath = selfieStoragePath?.trim();
+    this.logger.log(
+      storagePath
+        ? `Tenacio liveness POST input (selfiePath=${storagePath}): ${JSON.stringify(livenessInput)}`
+        : `Tenacio liveness POST input: ${JSON.stringify(livenessInput)}`,
+    );
+
     const providerName = (process.env.TENACIO_PROVIDER ?? 'Tenacio').trim();
     const result = await this.vendorApi.request<unknown, TenacioLivenessBody>({
       providerName,
@@ -78,12 +92,7 @@ export class LivenessVendorService {
         ? { absoluteUrl: picked.resolved.absoluteUrl }
         : { baseUrl: picked.resolved.baseUrl, path: picked.resolved.path }),
       headers: this.headers(auth.clientId, auth.apiKey, workflowId),
-      body: {
-        input: {
-          consent: body.input.consent,
-          url: selfieUrl,
-        },
-      },
+      body: livenessInput,
       leadId,
       redactRequest: (b) => {
         const input = b?.input as Record<string, unknown> | undefined;

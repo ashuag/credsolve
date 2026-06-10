@@ -11,9 +11,16 @@ export class LosAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<RequestWithLosUser>();
     const authHeader = req.header('authorization') ?? '';
-    const [scheme, token] = authHeader.split(' ');
+    const [scheme, bearer] = authHeader.split(' ');
+    const queryToken = req.query.access_token;
+    const token =
+      scheme?.toLowerCase() === 'bearer' && bearer
+        ? bearer
+        : req.method === 'GET' && typeof queryToken === 'string' && queryToken.trim()
+          ? queryToken.trim()
+          : '';
 
-    if (scheme?.toLowerCase() !== 'bearer' || !token) {
+    if (!token) {
       throw new UnauthorizedException('Missing LOS bearer token');
     }
 

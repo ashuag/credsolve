@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { BureauReportPdfService } from '../../../common/cibil/bureau-report-pdf.service';
 import { isDigilockerAadhaarCaptureComplete } from '../../../common/kyc/aadhaar-vendor-parse.util';
 import { extractProfileFromDigilockerFormJson } from '../../../common/kyc/digilocker-form-profile.util';
+import { appendPhotoCacheBuster } from '../../../common/kyc/kyc-photo-url.util';
 import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { LoanDocumentApplicationService } from '../../auth/application/services/loan-document-application.service';
@@ -262,6 +263,16 @@ export class LosApplicationService {
       bureauReportPdfUrl = pdfResult?.publicUrl ?? null;
     }
 
+    const selfieRelativePath = application.selfieRelativePath?.trim() || null;
+    const aadhaarPhotoRelativePath = application.aadhaarPhotoRelativePath?.trim() || null;
+    const photoVersion = application.updatedAt.getTime();
+    const [selfiePublicUrl, aadhaarPublicUrl] = await Promise.all([
+      selfieRelativePath ? this.kycFiles.resolvePublicReadUrl(selfieRelativePath) : Promise.resolve(null),
+      aadhaarPhotoRelativePath ? this.kycFiles.resolvePublicReadUrl(aadhaarPhotoRelativePath) : Promise.resolve(null),
+    ]);
+    const bust = (url: string | null) =>
+      url && /^https?:\/\//i.test(url) ? appendPhotoCacheBuster(url, photoVersion) : url;
+
     return {
       uuid: application.uuid,
       customerUuid: application.customer.uuid,
@@ -277,12 +288,14 @@ export class LosApplicationService {
       livenessPassed: application.livenessPassed,
       livenessCheckedAt: application.livenessCheckedAt?.toISOString() ?? null,
       kycPhotos: {
-        selfieUrl: application.selfieRelativePath?.trim()
-          ? `/applications/${application.uuid}/kyc/selfie-photo`
-          : null,
-        aadhaarPhotoUrl: application.aadhaarPhotoRelativePath?.trim()
-          ? `/applications/${application.uuid}/kyc/aadhaar-photo`
-          : null,
+        selfiePath: selfieRelativePath,
+        aadhaarPhotoPath: aadhaarPhotoRelativePath,
+        selfieUrl:
+          bust(selfiePublicUrl) ??
+          (selfieRelativePath ? `/applications/${application.uuid}/kyc/selfie-photo` : null),
+        aadhaarPhotoUrl:
+          bust(aadhaarPublicUrl) ??
+          (aadhaarPhotoRelativePath ? `/applications/${application.uuid}/kyc/aadhaar-photo` : null),
       },
       preApprovedLoanAmount: application.preApprovedLoanAmount?.toString() ?? null,
       createdAt: application.createdAt.toISOString(),
@@ -452,7 +465,7 @@ export class LosApplicationService {
     const title = this.loanDocs.documentTitle(docType);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${title}.pdf"`);
-    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     res.send(buf);
   }
 
@@ -461,7 +474,7 @@ export class LosApplicationService {
     const lower = relativePath.toLowerCase();
     const mime = lower.endsWith('.png') ? 'image/png' : 'image/jpeg';
     res.setHeader('Content-Type', mime);
-    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     res.send(buf);
   }
 

@@ -43,7 +43,7 @@ export class ServeKycSelfiePhotoUseCase {
     const lower = rel.toLowerCase();
     const mime = lower.endsWith('.png') ? 'image/png' : 'image/jpeg';
     res.setHeader('Content-Type', mime);
-    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     res.send(buf);
   }
 }

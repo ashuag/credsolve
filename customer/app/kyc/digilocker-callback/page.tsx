@@ -1,14 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { usePathname, useRouter, useSearchParams, type ReadonlyURLSearchParams } from 'next/navigation';
 import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { KycJourneyLeftPanel } from '@/components/kyc/kyc-journey-left-panel';
 import styles from '@/components/kyc/kyc-hub-flow.module.css';
 import { JourneyProgressProvider } from '@/components/journey/journey-progress-context';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
-import { AlertBanner } from '@/components/ui/alert-banner';
 import { Spinner } from '@/components/ui/spinner';
 import {
   clearDigilockerSessionTokenFromStorage,
@@ -111,7 +110,7 @@ function CallbackStatusCard({
   children,
 }: {
   variant?: 'default' | 'error';
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div
@@ -138,7 +137,20 @@ function DigilockerCallbackContent() {
   const [retryBusy, setRetryBusy] = useState(false);
   const [continueHref, setContinueHref] = useState('/kyc');
   const sessionTokenRef = useRef('');
-  const autoRunStartedRef = useRef(false);
+  const runDownloadRef = useRef<() => Promise<void>>(async () => {});
+  const refreshRef = useRef(refresh);
+  const resolveSessionTokenRef = useRef<() => Promise<string>>(async () => '');
+
+  // Persist OAuth return token before the URL cleanup effect strips query params.
+  if (typeof window !== 'undefined') {
+    const fromQuery = readTokenFromSearchParams(searchParams);
+    if (fromQuery) {
+      persistDigilockerSessionTokenForCallback(fromQuery);
+      if (!sessionTokenRef.current) {
+        sessionTokenRef.current = fromQuery;
+      }
+    }
+  }
 
   const loanSelection = session?.authenticated === true ? session.loanSelection : null;
   const { progressPct, activeStepIndex } = useMemo(
@@ -252,25 +264,29 @@ function DigilockerCallbackContent() {
         return;
       }
 
-      clearDigilockerSessionTokenFromStorage();
-      const next = await refresh();
-      const href =
-        next.authenticated === true && next.lead
-          ? getPostDigilockerAadhaarContinuePath(next)
-          : '/apply-for-loan';
-      setContinueHref(href);
-      setStatus('done');
-      setMessage(
-        next.authenticated === true && next.journey.kycCompleted
-          ? 'KYC completed. Your Aadhaar details were verified and saved.'
-          : 'Aadhaar details were saved. Continue to the next step.',
-      );
+        clearDigilockerSessionTokenFromStorage();
+        const next = await refresh();
+        const href =
+          next.authenticated === true && next.lead
+            ? getPostDigilockerAadhaarContinuePath(next)
+            : '/apply-for-loan';
+        setContinueHref(href);
+        setStatus('done');
+        setMessage(
+          href.startsWith('/kyc/selfie')
+            ? 'Aadhaar details were saved. Next, take a selfie to finish identity verification.'
+            : 'Aadhaar details were saved. Continue to the next step.',
+        );
     } catch (e) {
       setStatus('error');
       setFailureKind('retryable');
       setError(e instanceof Error ? e.message : 'Something went wrong.');
     }
   }, [applyAttemptCounts, handleTerminalFailure, refresh, session]);
+
+  runDownloadRef.current = runDownload;
+  refreshRef.current = refresh;
+  resolveSessionTokenRef.current = resolveSessionToken;
 
   const handleRetryDigilocker = useCallback(async () => {
     setRetryBusy(true);
@@ -296,13 +312,10 @@ function DigilockerCallbackContent() {
   }, [pathname, router, searchParams]);
 
   useEffect(() => {
-    if (autoRunStartedRef.current) return;
-    autoRunStartedRef.current = true;
-
     let cancelled = false;
 
     void (async () => {
-      const currentSession = await refresh();
+      const currentSession = await refreshRef.current();
       if (cancelled) return;
 
       const kyc = currentSession.authenticated === true ? currentSession.kycFaceProgress : null;
@@ -320,8 +333,8 @@ function DigilockerCallbackContent() {
         setContinueHref(href);
         setStatus('done');
         setMessage(
-          currentSession.journey.kycCompleted
-            ? 'KYC completed. Your Aadhaar details were verified and saved.'
+          href.startsWith('/kyc/selfie')
+            ? 'Aadhaar details were saved. Next, take a selfie to finish identity verification.'
             : 'Aadhaar details were saved. Continue to the next step.',
         );
         return;
@@ -343,7 +356,7 @@ function DigilockerCallbackContent() {
         return;
       }
 
-      const token = (await resolveSessionToken()).trim();
+      const token = (await resolveSessionTokenRef.current()).trim();
       if (cancelled) return;
 
       sessionTokenRef.current = token;
@@ -356,13 +369,14 @@ function DigilockerCallbackContent() {
         return;
       }
 
-      await runDownload();
+      await runDownloadRef.current();
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [refresh, resolveSessionToken, runDownload, router]);
+    // Run once on mount; callbacks are read from refs so session updates don't cancel the flow.
+  }, [router]);
 
   const attemptsRemaining = Math.max(0, attemptsAllowed - attemptsUsed);
   const canRetry =
@@ -453,96 +467,7 @@ function DigilockerCallbackContent() {
                   </Link>
                 </div>
               </>
-            ) : failureKind === 'retryable' && canRetry ? (
-              <>
-                <span className={`${styles.eyebrow} ${styles.reveal} ${styles.d1}`}>KYC</span>
-                <h1 className={`${styles.rightTitle} ${styles.reveal} ${styles.d1}`}>DigiLocker</h1>
-                <p className={`${styles.lede} ${styles.reveal} ${styles.d2}`}>{retryGuidanceMessage(attemptsRemaining)}</p>
-
-                <div className={`${styles.notice} ${styles.reveal} ${styles.d3}`}>
-                  <span className={styles.noticeIc}>!</span>
-                  <div>
-                    <h5>Allow Aadhaar download in DigiLocker</h5>
-                    <p>
-                      On the DigiLocker consent screen, you <strong>must tap &ldquo;Allow&rdquo;</strong> so we can
-                      download your Aadhaar. If permission is denied, KYC cannot be completed.
-                    </p>
-                  </div>
-                </div>
-
-                {error ? (
-                  <div className={`${styles.errorBanner} ${styles.reveal} ${styles.d3}`}>
-                    <AlertBanner variant="error">{error}</AlertBanner>
-                  </div>
-                ) : null}
-
-                <button
-                  type="button"
-                  className={`${styles.cta} ${styles.reveal} ${styles.d4}`}
-                  disabled={retryBusy}
-                  onClick={() => void handleRetryDigilocker()}
-                >
-                  {retryBusy ? (
-                    <>
-                      <Spinner size={18} />
-                      Opening DigiLocker…
-                    </>
-                  ) : (
-                    <>
-                      Try again with DigiLocker
-                      <ArrowRightIcon />
-                    </>
-                  )}
-                </button>
-
-                <div className={`${styles.back} ${styles.reveal} ${styles.d5}`}>
-                  <Link href="/kyc" className={styles.backBtn}>
-                    <ArrowLeftIcon />
-                    Back to KYC
-                  </Link>
-                </div>
-              </>
-            ) : (
-              <>
-                <span className={`${styles.eyebrow} ${styles.reveal} ${styles.d1}`}>KYC</span>
-                <h1 className={`${styles.rightTitle} ${styles.reveal} ${styles.d1}`}>DigiLocker</h1>
-                <div className={`${styles.errorBanner} ${styles.reveal} ${styles.d2}`}>
-                  <AlertBanner variant="error">{error}</AlertBanner>
-                </div>
-                {failureKind === 'retryable' && attemptsRemaining <= 0 ? (
-                  <p className={`${styles.lede} ${styles.reveal} ${styles.d3}`}>
-                    Maximum download attempts reached. We could not complete your KYC.
-                  </p>
-                ) : null}
-                <div className={`${styles.back} ${styles.reveal} ${styles.d4}`}>
-                  {failureKind === 'missing_token' ? (
-                    <button
-                      type="button"
-                      className={`${styles.cta} ${styles.reveal}`}
-                      disabled={retryBusy}
-                      onClick={() => void handleRetryDigilocker()}
-                    >
-                      {retryBusy ? (
-                        <>
-                          <Spinner size={18} />
-                          Opening DigiLocker…
-                        </>
-                      ) : (
-                        <>
-                          Open DigiLocker
-                          <ArrowRightIcon />
-                        </>
-                      )}
-                    </button>
-                  ) : (
-                    <Link href="/kyc" className={styles.backBtn}>
-                      <ArrowLeftIcon />
-                      Back to KYC
-                    </Link>
-                  )}
-                </div>
-              </>
-            )}
+            ) : null}
           </section>
         </div>
       </div>

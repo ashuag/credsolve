@@ -2,7 +2,12 @@ import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/
 import type { Request } from 'express';
 import type { UploadedFileLike } from '../../../../common/types/uploaded-file';
 import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
-import { assertApplicationKycNotCompleted } from '../../../../common/kyc/application-kyc-guard.util';
+import { KycCompletionService } from '../../../../common/kyc/kyc-completion.service';
+import { isKycLivenessOutboundSkipped } from '../../../../common/kyc/kyc-liveness-env.util';
+import {
+  assertApplicationFaceStepNotComplete,
+} from '../../../../common/kyc/application-kyc-guard.util';
+import { APPLICATION_KYC_STATUS } from '../../../../common/constants/application.constants';
 import { assertActiveApplicationLoanDocumentsAccepted } from '../../../../common/loan-documents/application-loan-documents-guard.util';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
@@ -18,6 +23,7 @@ export class SaveKycSelfieUseCase {
     private readonly leads: LeadRepository,
     private readonly applications: ApplicationRepository,
     private readonly kycFiles: KycFilesService,
+    private readonly kycCompletion: KycCompletionService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -54,11 +60,48 @@ export class SaveKycSelfieUseCase {
       leadId: lead.id,
       customerId: customer.id,
     });
-    assertApplicationKycNotCompleted(application.kycStatus);
+    assertApplicationFaceStepNotComplete({
+      kycStatus: application.kycStatus,
+      selfieRelativePath: application.selfieRelativePath,
+      livenessPassed: application.livenessPassed,
+      digilockerAadhaarFormJson: application.digilockerAadhaarFormJson,
+    });
+
+    // Recover applications marked COMPLETED after Aadhaar-only (before selfie was required).
+    if (
+      application.kycStatus === APPLICATION_KYC_STATUS.COMPLETED &&
+      !application.selfieRelativePath?.trim()
+    ) {
+      await this.prisma.client.application.update({
+        where: { id: application.id },
+        data: {
+          kycStatus: APPLICATION_KYC_STATUS.NOT_DONE,
+          kycCompletedAt: null,
+        },
+      });
+    }
 
     const rel = this.kycFiles.selfieRelativePath(customer.uuid, application.uuid);
     await this.kycFiles.writeBytes(rel, file.buffer);
     await this.applications.updateSelfiePath({ applicationId: application.id, selfieRelativePath: rel });
+
+    if (isKycLivenessOutboundSkipped()) {
+      const snapshot = await this.prisma.client.application.findUnique({
+        where: { id: application.id },
+        select: {
+          digilockerAadhaarFormJson: true,
+          aadhaarPhotoRelativePath: true,
+        },
+      });
+      await this.kycCompletion.completeFromDigilockerAadhaar({
+        applicationId: application.id,
+        customerId: customer.id,
+        digilockerAadhaarFormJson: snapshot?.digilockerAadhaarFormJson ?? null,
+        aadhaarPhotoRelativePath: snapshot?.aadhaarPhotoRelativePath ?? null,
+        selfieRelativePath: rel,
+        verifiedAt: new Date(),
+      });
+    }
 
     return { success: true, selfieRelativePath: rel };
   }

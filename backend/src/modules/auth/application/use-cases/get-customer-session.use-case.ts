@@ -145,6 +145,7 @@ export class GetCustomerSessionUseCase {
         ? this.prisma.client.application.findUnique({
             where: { id: application.id },
             select: {
+              updatedAt: true,
               details: {
                 select: {
                   loanAmount: true,
@@ -228,10 +229,11 @@ export class GetCustomerSessionUseCase {
     );
 
     const kycCompleted = Boolean(
-      application?.kycStatus === APPLICATION_KYC_STATUS.COMPLETED ||
-        (latestCustomerKyc &&
-          (latestCustomerKyc.kycVerifiedAt != null || kycDocsCount >= 3)) ||
-        faceStepCompleteForJourney,
+      faceStepCompleteForJourney ||
+        (application?.kycStatus === APPLICATION_KYC_STATUS.COMPLETED &&
+          hasDigilockerForm &&
+          hasSavedSelfie) ||
+        (latestCustomerKyc && kycDocsCount >= 3),
     );
 
     const leadReferences = leadReferenceRows.map((row) => ({
@@ -277,6 +279,10 @@ export class GetCustomerSessionUseCase {
               ? '/auth/kyc/digilocker-aadhaar-photo'
               : null,
             kycSelfiePhotoUrl: application.selfieRelativePath?.trim() ? '/auth/kyc/selfie-photo' : null,
+            selfieUpdatedAt:
+              application.selfieRelativePath?.trim() && applicationExtras?.updatedAt
+                ? applicationExtras.updatedAt.toISOString()
+                : null,
             digilockerAadhaarDownloadAttempts,
             digilockerAadhaarDownloadMaxAttempts: DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS,
           }

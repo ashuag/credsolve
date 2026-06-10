@@ -214,6 +214,9 @@ export async function initDigilockerSession(
   return res;
 }
 
+/** Tenacio Aadhaar download can be slow; allow more time than default POST timeout. */
+const DIGILOCKER_DOWNLOAD_TIMEOUT_MS = 45_000;
+
 export async function downloadDigilockerAadhaar(
   payload: DownloadAadhaarDigilockerPayload,
 ): Promise<DownloadAadhaarDigilockerResponse> {
@@ -224,6 +227,7 @@ export async function downloadDigilockerAadhaar(
       consent: payload.consent !== false,
     },
     'Unable to download Aadhaar from DigiLocker.',
+    { timeoutMs: DIGILOCKER_DOWNLOAD_TIMEOUT_MS },
   );
   if (!res) {
     throw new Error('Empty response from Aadhaar download.');

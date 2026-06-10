@@ -24,17 +24,19 @@ export class KycCompletionService {
         where: { id: params.applicationId },
         select: { kycStatus: true },
       });
-      if (!app || app.kycStatus === APPLICATION_KYC_STATUS.COMPLETED) {
+      if (!app) {
         return;
       }
 
-      await tx.application.update({
-        where: { id: params.applicationId },
-        data: {
-          kycStatus: APPLICATION_KYC_STATUS.COMPLETED,
-          kycCompletedAt: params.verifiedAt,
-        },
-      });
+      if (app.kycStatus !== APPLICATION_KYC_STATUS.COMPLETED) {
+        await tx.application.update({
+          where: { id: params.applicationId },
+          data: {
+            kycStatus: APPLICATION_KYC_STATUS.COMPLETED,
+            kycCompletedAt: params.verifiedAt,
+          },
+        });
+      }
 
       let customerKyc = await tx.customerKyc.findFirst({
         where: { customerId: params.customerId },

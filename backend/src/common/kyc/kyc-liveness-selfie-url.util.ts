@@ -1,4 +1,5 @@
 import type { KycFilesService } from './kyc-files.service';
+import { appendPhotoCacheBuster } from './kyc-photo-url.util';
 import { createKycLivenessSelfieAccessToken } from './kyc-liveness-selfie-token.util';
 
 export type KycLivenessSelfieUrlResult =
@@ -36,10 +37,14 @@ function trimBase(base: string): string {
 function signedVendorSelfieUrl(
   backendBase: string,
   applicationUuid: string,
+  photoVersion?: string | number,
 ): KycLivenessSelfieUrlResult {
   try {
     const token = createKycLivenessSelfieAccessToken(applicationUuid);
-    const url = `${backendBase}/api/vendor/kyc/liveness-selfie?token=${encodeURIComponent(token)}`;
+    let url = `${backendBase}/api/vendor/kyc/liveness-selfie?token=${encodeURIComponent(token)}`;
+    if (photoVersion != null && String(photoVersion).trim()) {
+      url = appendPhotoCacheBuster(url, photoVersion);
+    }
     if (!isPubliclyReachableHttpUrl(url)) {
       return {
         ok: false,
@@ -68,8 +73,14 @@ export async function resolveKycLivenessSelfiePublicUrl(
   params: {
     applicationUuid: string;
     selfieRelativePath: string;
+    /** Bust CDN/browser cache when the JPEG at a fixed object key was replaced. */
+    photoVersion?: string | number;
   },
 ): Promise<KycLivenessSelfieUrlResult> {
+  const withVersion = (url: string): string =>
+    params.photoVersion != null && String(params.photoVersion).trim()
+      ? appendPhotoCacheBuster(url, params.photoVersion)
+      : url;
   const rel = params.selfieRelativePath.trim().replace(/^\/+/, '');
   if (!rel) {
     return { ok: false, error: 'Selfie path is missing.' };
@@ -78,7 +89,7 @@ export async function resolveKycLivenessSelfiePublicUrl(
   for (const envName of ['KYC_LIVENESS_SELFIE_PUBLIC_BASE_URL', 'STORAGE_BASE_URL'] as const) {
     const base = trimBase(process.env[envName] ?? '');
     if (!base) continue;
-    const candidate = `${base}/${rel}`;
+    const candidate = withVersion(`${base}/${rel}`);
     if (isPubliclyReachableHttpUrl(candidate)) {
       return { ok: true, url: candidate };
     }
@@ -87,7 +98,7 @@ export async function resolveKycLivenessSelfiePublicUrl(
   try {
     const spacesUrl = await kycFiles.resolvePublicReadUrl(rel);
     if (spacesUrl && isPubliclyReachableHttpUrl(spacesUrl)) {
-      return { ok: true, url: spacesUrl };
+      return { ok: true, url: withVersion(spacesUrl) };
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -96,7 +107,7 @@ export async function resolveKycLivenessSelfiePublicUrl(
 
   const backendBase = trimBase(process.env.BACKEND_PUBLIC_BASE_URL ?? '');
   if (backendBase) {
-    return signedVendorSelfieUrl(backendBase, params.applicationUuid);
+    return signedVendorSelfieUrl(backendBase, params.applicationUuid, params.photoVersion);
   }
 
   return {

@@ -118,6 +118,10 @@ export type LosApplicationDetails = {
   livenessPassed: boolean;
   livenessCheckedAt: string | null;
   kycPhotos: {
+    /** Storage object key, e.g. `customer/{uuid}/photos/selfie/{app}.jpg`. */
+    selfiePath: string | null;
+    aadhaarPhotoPath: string | null;
+    /** Full HTTPS CDN/presigned URL when public storage is configured; otherwise LOS stream path. */
     selfieUrl: string | null;
     aadhaarPhotoUrl: string | null;
   };
@@ -221,6 +225,25 @@ export async function getApplicationDetails(token: string, applicationUuid: stri
     `/applications/${encodeURIComponent(applicationUuid)}`,
     'Failed to fetch application details',
   );
+}
+
+/** Absolute CDN/presigned URL, or LOS API path with `access_token` for `<img src>`. */
+export function resolveLosKycPhotoSrc(
+  url: string | null | undefined,
+  token: string,
+  photoVersion?: string | number | null,
+): string | null {
+  const raw = url?.trim();
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const base = clientApiUrl().replace(/\/+$/, '');
+  const path = raw.startsWith('/') ? raw : `/${raw}`;
+  const params = new URLSearchParams();
+  params.set('access_token', token);
+  if (photoVersion != null && String(photoVersion).trim()) {
+    params.set('v', String(photoVersion));
+  }
+  return `${base}${path}?${params.toString()}`;
 }
 
 export async function fetchLosAuthenticatedBlob(token: string, path: string, fallbackMessage: string): Promise<Blob> {

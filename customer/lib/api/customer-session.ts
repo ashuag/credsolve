@@ -56,6 +56,7 @@ export type CustomerKycFaceProgress = {
   digilockerAadhaarPhotoUrl: string | null;
   /** Cookie-auth `GET …/auth/kyc/selfie-photo` when a selfie exists. */
   kycSelfiePhotoUrl?: string | null;
+  selfieUpdatedAt?: string | null;
   digilockerAadhaarDownloadAttempts?: number;
   digilockerAadhaarDownloadMaxAttempts?: number;
 };
@@ -161,8 +162,6 @@ export function getCustomerJourneyResumePath(
   const kyc = session.kycFaceProgress;
   const livenessNeeded = kyc?.livenessRequired !== false;
   if (
-    !journey.kycCompleted &&
-    kyc?.applicationKycStatus !== 1 &&
     kyc?.digilockerAadhaarCaptured &&
     (!kyc.selfieCaptured || (livenessNeeded && !kyc.livenessPassed))
   ) {
@@ -203,23 +202,15 @@ export function getCustomerPostAuthResumePath(
 export function getPostDigilockerAadhaarContinuePath(
   session: Extract<CustomerSessionResponse, { authenticated: true }>
 ): string {
-  if (session.journey.kycCompleted) {
-    return getCustomerJourneyResumePath(session);
-  }
   const kyc = session.kycFaceProgress;
   const livenessNeeded = kyc?.livenessRequired !== false;
   if (
-    kyc?.applicationKycStatus !== 1 &&
     kyc?.digilockerAadhaarCaptured &&
     (!kyc.selfieCaptured || (livenessNeeded && !kyc.livenessPassed))
   ) {
     return '/kyc/selfie';
   }
-  const resume = getCustomerJourneyResumePath(session);
-  if (resume === '/bank-details') {
-    return '/kyc';
-  }
-  return resume;
+  return getCustomerJourneyResumePath(session);
 }
 
 /** Back navigation from the KYC hub (avoid `getCustomerJourneyResumePath` looping to `/kyc`). */
