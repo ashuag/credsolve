@@ -3,6 +3,7 @@
 import { type ReactNode } from 'react';
 import { CustomerJourneyTimeline } from '@/components/shared/customer-journey-timeline';
 import { LosStatusPill, losStatusPillStyles } from '@/components/shared/los-status-pill';
+import { isWorkspaceRecordRejected } from '@/lib/workspace-alert';
 import type { JourneyStep } from '@/lib/customer-journey';
 
 function getInitials(name: string): string {
@@ -30,13 +31,15 @@ function Chip({ label, value }: { label: string; value: ReactNode }) {
 
 export function WorkspaceRecordHeader({
   eyebrow, title, mobile, email, statusCode, statusLabel, sourceLabel,
-  rejectionReason, note, secondaryNote, createdAt, updatedAt,
+  rejectionReason, alertText, createdAt, updatedAt,
   createdLabel = 'Created', updatedLabel = 'Updated',
   quickStats, journeyTitle, journeySubtitle, journeySteps, trailing,
 }: {
   eyebrow: string; title: string; mobile: string; email?: string | null;
   statusCode: string; statusLabel: string; sourceLabel: string;
-  rejectionReason?: string | null; note?: string | null; secondaryNote?: string | null;
+  rejectionReason?: string | null;
+  /** Pre-filtered failure/warning text (see `buildWorkspaceAlertText`). */
+  alertText?: string | null;
   createdAt: string; updatedAt: string; createdLabel?: string; updatedLabel?: string;
   quickStats?: Array<{ label: string; value: ReactNode }>;
   journeyTitle?: string; journeySubtitle?: string; journeySteps?: JourneyStep[];
@@ -44,8 +47,8 @@ export function WorkspaceRecordHeader({
 }) {
   const accent = statusAccentColor(statusCode);
   const pillStyle = losStatusPillStyles(statusCode);
-  const isRejected = statusCode.toUpperCase().includes('REJECT') || Boolean(rejectionReason);
-  const alertText = [rejectionReason, note, secondaryNote ? `Bureau: ${secondaryNote}` : null].filter(Boolean).join(' · ');
+  const isRejected = isWorkspaceRecordRejected(statusCode, rejectionReason);
+  const bannerText = alertText?.trim() || null;
 
   return (
     <header
@@ -94,7 +97,7 @@ export function WorkspaceRecordHeader({
       </div>
 
       {/* Alert */}
-      {alertText ? (
+      {bannerText ? (
         <div
           className="mx-4 mb-3 flex items-start gap-2 rounded-[8px] border px-3 py-2 text-[0.78rem] leading-snug"
           style={isRejected
@@ -104,7 +107,7 @@ export function WorkspaceRecordHeader({
           <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="mt-0.5 shrink-0" aria-hidden>
             <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" strokeLinecap="round" />
           </svg>
-          <span>{alertText}</span>
+          <span>{bannerText}</span>
         </div>
       ) : null}
 

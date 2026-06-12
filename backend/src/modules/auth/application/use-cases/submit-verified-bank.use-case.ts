@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
+import { SmsService } from '../../../../common/sms/sms.service';
 import { BankTenacioVendorService } from '../../../../common/vendor/bank-tenacio-vendor.service';
 import {
   isTenacioVendorBusinessSuccess,
@@ -22,11 +23,14 @@ export type SubmitVerifiedBankResult = {
 
 @Injectable()
 export class SubmitVerifiedBankUseCase {
+  private readonly logger = new Logger(SubmitVerifiedBankUseCase.name);
+
   constructor(
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
     private readonly bankVendor: BankTenacioVendorService,
     private readonly prisma: PrismaService,
+    private readonly sms: SmsService,
   ) {}
 
   async execute(req: Request, dto: SubmitVerifiedBankDto): Promise<SubmitVerifiedBankResult> {
@@ -162,6 +166,10 @@ export class SubmitVerifiedBankUseCase {
         where: { id: application.id },
         data: { applicationStatusId: inReview.id },
       });
+    });
+
+    void this.sms.sendUnderReviewSms(customer.mobileNumber, lead.id).catch((err) => {
+      this.logger.error('Failed to send under-review SMS', err instanceof Error ? err.stack : err);
     });
 
     return {

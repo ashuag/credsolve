@@ -271,7 +271,9 @@ export class PanVerificationService {
       dobMatch &&
       category === 'Individual';
 
-    const note = `panStatus=${panStatus}, nameMatch=${nameMatch}, dobMatch=${dobMatch}, category=${category}`;
+    const note = isVerified
+      ? null
+      : `panStatus=${panStatus}, nameMatch=${nameMatch}, dobMatch=${dobMatch}, category=${category}`;
 
     return {
       panVerifiedStatus: isVerified ? PAN_VERIFIED.VERIFIED : PAN_VERIFIED.NOT_VERIFIED,

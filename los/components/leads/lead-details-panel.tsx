@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { WorkspaceRecordHeader } from '@/components/shared/workspace-record-header';
 import { LosStatusPill } from '@/components/shared/los-status-pill';
 import { buildLeadIntakeJourney } from '@/lib/customer-journey';
+import { buildWorkspaceAlertText } from '@/lib/workspace-alert';
 import { getLeadDetails, type LosLeadDetails } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
@@ -252,6 +253,14 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
   const displayName = lead.profile?.fullName?.trim() || 'Lead (name pending)';
   const profile = lead.profile;
   const journeySteps = buildLeadIntakeJourney(lead);
+  const alertText = buildWorkspaceAlertText({
+    statusCode: lead.statusCode,
+    rejectionReason: lead.rejectionReason?.label,
+    leadStatusNote: lead.leadStatusNote,
+    bureauFetchedNote: lead.bureauFetchedNote,
+    panVerified: lead.panVerified,
+    bureauFetched: lead.bureauFetched,
+  });
 
   return (
     <div className="grid gap-4 pb-2">
@@ -281,8 +290,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
         statusLabel={lead.statusLabel}
         sourceLabel={sourceSummary(lead)}
         rejectionReason={lead.rejectionReason?.label}
-        note={lead.leadStatusNote}
-        secondaryNote={lead.bureauFetchedNote}
+        alertText={alertText}
         createdAt={formatDateTime(lead.createdAt)}
         updatedAt={formatDateTime(lead.updatedAt)}
         quickStats={[

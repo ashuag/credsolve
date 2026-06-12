@@ -704,9 +704,12 @@ export class VerifyPanUseCase {
         panVerifiedAt: vendorWasContacted ? new Date() : null,
         ...(vendorWasContacted
           ? {
-              leadStatusNote: note?.trim()
-                ? note.trim().slice(0, 256)
-                : null,
+              leadStatusNote:
+                status === PAN_VERIFIED.VERIFIED
+                  ? null
+                  : note?.trim()
+                    ? note.trim().slice(0, 256)
+                    : null,
             }
           : {}),
       },

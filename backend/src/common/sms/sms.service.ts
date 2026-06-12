@@ -39,7 +39,16 @@ export class SmsService {
 
   /** Loan / application rejection SMS (Transactional product template). */
   async sendRejectionSms(mobile: string, leadId?: bigint | null): Promise<void> {
-    await this.sendProductSms(mobile, SMS_PRODUCT.TRANSACTIONAL, leadId);
+    await this.sendProductSms(mobile, SMS_PRODUCT.TRANSACTIONAL, leadId, undefined, {
+      templateId: SMS_TEMPLATE_ID.REJECTION,
+    });
+  }
+
+  /** Application under-review SMS after journey completion (Transactional product template). */
+  async sendUnderReviewSms(mobile: string, leadId?: bigint | null): Promise<void> {
+    await this.sendProductSms(mobile, SMS_PRODUCT.TRANSACTIONAL, leadId, undefined, {
+      templateId: SMS_TEMPLATE_ID.UNDER_REVIEW,
+    });
   }
 
   private async sendProductSms(
