@@ -2,6 +2,7 @@
 export const DEVELOPER_TOOL_LINKS = [
   { href: '/developer-tools/pre-bre-check', label: 'Pre BRE Check' },
   { href: '/developer-tools/post-bureau-check', label: 'Post BRE Check' },
+  { href: '/developer-tools/post-bre-html', label: 'Post BRE thru HTML' },
   { href: '/developer-tools/cibil-report-download', label: 'Bureau Report Generate' },
   { href: '/developer-tools/post-bre-rules', label: 'Post BRE Rules' },
 ] as const;

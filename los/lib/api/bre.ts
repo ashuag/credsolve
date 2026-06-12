@@ -258,6 +258,34 @@ export async function runPostBureauBreCheck(
   );
 }
 
+export type CibilHtmlConversionMeta = {
+  convertedFromHtml: string;
+  convertedAt: string;
+  accountCount: number;
+  inquiryCount: number;
+};
+
+export type PostBreFromHtmlResult = PostBreDryRunResult & {
+  bureauPayload: Record<string, unknown>;
+  conversion: CibilHtmlConversionMeta | null;
+};
+
+export async function runPostBureauBreCheckFromHtml(
+  token: string,
+  body: { html: string; filename?: string; isExistingCustomer: boolean },
+): Promise<PostBreFromHtmlResult> {
+  return authorizedLosRequest<PostBreFromHtmlResult>(
+    token,
+    '/bre/post-bureau-check-html',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    'Unable to run post-BRE check from HTML.',
+  );
+}
+
 function filenameFromContentDisposition(header: string | null): string | null {
   if (!header) return null;
   const match = /filename\*?=(?:UTF-8''|")?([^";\n]+)"?/i.exec(header);

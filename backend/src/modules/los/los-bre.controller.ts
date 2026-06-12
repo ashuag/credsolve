@@ -3,6 +3,7 @@ import { ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { loadBreSettings } from '../../common/bre/bre-settings.loader';
 import { BureauReportPdfService } from '../../common/cibil/bureau-report-pdf.service';
+import { convertCibilHtmlToVendorJson } from '../../common/cibil/cibil-html-to-json.parser';
 import { extractCibilReportData } from '../../common/cibil/cibil-report-data.extractor';
 import { PostBreCheckService } from '../../common/bre/post-bre-check.service';
 import { PreApprovedOfferDryRunService } from '../../common/bre/pre-approved-offer-dry-run.service';
@@ -10,6 +11,7 @@ import { PreBreCheckService } from '../../common/bre/pre-bre-check.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LosAuthGuard } from './auth/los-auth.guard';
 import { PostBureauBreCheckDto } from './dto/post-bureau-bre-check.dto';
+import { PostBureauBreCheckFromHtmlDto } from './dto/post-bureau-bre-check-from-html.dto';
 import { PreApprovedOfferCheckDto } from './dto/pre-approved-offer-check.dto';
 import { PreBreCheckDto } from './dto/pre-bre-check.dto';
 
@@ -74,6 +76,36 @@ export class LosBreController {
       rawPayload: body.bureauPayload,
       isExistingCustomer: body.isExistingCustomer ?? false,
     });
+  }
+
+  @Post('post-bureau-check-html')
+  @ApiOperation({
+    summary: 'Convert CIBIL HTML to bureau JSON and dry-run all post-BRE rules',
+  })
+  async postBureauCheckFromHtml(@Body() body: PostBureauBreCheckFromHtmlDto) {
+    const trimmed = body.html.trim();
+    if (!/<html[\s>]/i.test(trimmed) && !/<body[\s>]/i.test(trimmed)) {
+      throw new BadRequestException('Upload must be an HTML bureau report (expected <html> or <body>).');
+    }
+
+    let bureauPayload: Record<string, unknown>;
+    try {
+      bureauPayload = convertCibilHtmlToVendorJson(trimmed, body.filename ?? 'upload.html');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'CIBIL HTML parsing failed.';
+      throw new BadRequestException(message);
+    }
+
+    const result = await this.postBreCheck.evaluateFromBureauPayload({
+      rawPayload: bureauPayload,
+      isExistingCustomer: body.isExistingCustomer ?? false,
+    });
+
+    return {
+      ...result,
+      bureauPayload,
+      conversion: bureauPayload._meta ?? null,
+    };
   }
 
   @Post('cibil-report-download')
