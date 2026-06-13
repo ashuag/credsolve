@@ -3,6 +3,7 @@
 import { ApplicationCibilReportTab } from '@/components/applications/application-cibil-report-tab';
 import { cx } from '@/components/eligibility/eligibility-ui';
 import { fetchApplicationLoanDocumentBlob, type LosApplicationDetails } from '@/lib/api';
+import { formatPersonName } from '@/lib/format-person-name';
 import { type ReactNode, useState } from 'react';
 
 type OverviewTab = 'profile' | 'cibil' | 'loan' | 'references' | 'kyc' | 'bank';
@@ -93,7 +94,7 @@ function CustomerProfilePanel({ row }: { row: LosApplicationDetails }) {
   return (
     <DetailGrid
       rows={[
-        { label: 'Name', value: profile.fullName?.trim() || '—' },
+        { label: 'Name', value: formatPersonName(profile.fullName) },
         { label: 'Date of birth', value: dobWithAge(profile.dateOfBirth) },
         { label: 'PAN card', value: pan },
         { label: 'Gender', value: profile.gender ?? '—' },
@@ -205,7 +206,7 @@ function ReferenceDetailsPanel({ row }: { row: LosApplicationDetails }) {
           </p>
           <DetailGrid
             rows={[
-              { label: 'Name', value: ref.fullName },
+              { label: 'Name', value: formatPersonName(ref.fullName) },
               { label: 'Mobile', value: ref.mobileNumber },
               { label: 'Relation', value: ref.relation },
             ]}
@@ -226,7 +227,7 @@ function KycDetailPanel({ row }: { row: LosApplicationDetails }) {
         { label: 'KYC fetched at', value: formatDateTime(row.kycCompletedAt) },
         { label: 'Liveness passed', value: row.livenessPassed ? 'Yes' : 'No' },
         { label: 'Liveness checked at', value: formatDateTime(row.livenessCheckedAt) },
-        { label: 'Aadhaar name', value: aadhaar?.fullName ?? '—' },
+        { label: 'Aadhaar name', value: formatPersonName(aadhaar?.fullName) },
         { label: 'Aadhaar DOB', value: dobWithAge(aadhaar?.dateOfBirth) },
         { label: 'Aadhaar gender', value: aadhaar?.gender ?? '—' },
         { label: 'Aadhaar number', value: aadhaar?.maskedAadhaar ?? '—' },

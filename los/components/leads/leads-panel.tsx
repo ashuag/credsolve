@@ -3,6 +3,7 @@
 import { getNewLeads, type LosLead } from '@/lib/api';
 import { getMasters } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
+import { formatPersonName } from '@/lib/format-person-name';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -314,7 +315,7 @@ export function LeadsPanel() {
                       </td>
                     </tr>
                   ) : paginated.map((lead, idx) => {
-                    const name  = lead.fullName?.trim() || '—';
+                    const name  = formatPersonName(lead.fullName);
                     const inits = getInitials(lead.fullName);
                     const [c1, c2] = avatarColor(name);
                     return (

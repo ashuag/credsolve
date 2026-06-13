@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { WorkspaceRecordHeader } from '@/components/shared/workspace-record-header';
 import { LosStatusPill } from '@/components/shared/los-status-pill';
 import { buildLeadIntakeJourney } from '@/lib/customer-journey';
+import { formatPersonName } from '@/lib/format-person-name';
 import { buildWorkspaceAlertText } from '@/lib/workspace-alert';
 import { getLeadDetails, type LosLeadDetails } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
@@ -250,7 +251,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
     );
   }
 
-  const displayName = lead.profile?.fullName?.trim() || 'Lead (name pending)';
+  const displayName = formatPersonName(lead.profile?.fullName, 'Lead (name pending)');
   const profile = lead.profile;
   const journeySteps = buildLeadIntakeJourney(lead);
   const alertText = buildWorkspaceAlertText({
@@ -309,7 +310,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
               <div className="grid gap-x-6 gap-y-0 sm:grid-cols-2">
                 <DetailGrid
                   rows={[
-                    { label: 'Full name', value: profile.fullName ?? '—' },
+                    { label: 'Full name', value: formatPersonName(profile.fullName) },
                     { label: 'Date of birth', value: formatDateOnly(profile.dateOfBirth ?? undefined) },
                     { label: 'Age', value: ageFromDateOfBirth(profile.dateOfBirth ?? undefined) },
                     { label: 'PAN', value: profile.panNumber ?? '—' },

@@ -2,6 +2,7 @@
 
 import { getApplications, getMasters, type LosApplication } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
+import { formatPersonName } from '@/lib/format-person-name';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -285,7 +286,7 @@ export function ApplicationsPanel() {
                       </td>
                     </tr>
                   ) : paginated.map((app, idx) => {
-                    const name  = app.fullName?.trim() || 'Details pending';
+                    const name  = formatPersonName(app.fullName, 'Details pending');
                     const inits = getInitials(app.fullName);
                     const [c1, c2] = avatarColor(name);
                     return (

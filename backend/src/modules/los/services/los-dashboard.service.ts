@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { APPLICATION_STATUS } from '../../../common/constants/application.constants';
 import { LEAD_STATUS } from '../../../common/constants/lead.constants';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { formatLosPersonName } from '../format-los-person-name';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -353,7 +354,7 @@ export class LosDashboardService {
     const approvalRatePercent = decided > 0 ? Math.round((approvedCount / decided) * 100) : null;
 
     const recentActivity = (recentApplications as DashboardRecentApplication[]).map((app) => {
-      const name = app.lead.leadDetail?.fullName?.trim() || 'Borrower';
+      const name = formatLosPersonName(app.lead.leadDetail?.fullName) ?? 'BORROWER';
       const mobile = app.customer.mobileNumber;
       const tail = mobile.length >= 4 ? mobile.slice(-4) : mobile;
       const statusLabel = displayName(app.applicationStatus.name, app.applicationStatus.displayName);

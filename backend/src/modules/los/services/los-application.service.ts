@@ -7,6 +7,7 @@ import { extractProfileFromDigilockerFormJson } from '../../../common/kyc/digilo
 import { appendPhotoCacheBuster } from '../../../common/kyc/kyc-photo-url.util';
 import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { formatLosPersonName } from '../format-los-person-name';
 import { LoanDocumentApplicationService } from '../../auth/application/services/loan-document-application.service';
 import { LOAN_DOCUMENT_TYPE, type LoanDocumentType } from '../../../common/constants/loan-document.constants';
 
@@ -75,7 +76,7 @@ function buildLosAadhaarDetail(formJson: unknown): {
   const address = addressParts.length > 0 ? [...new Set(addressParts)].join(', ') : null;
 
   return {
-    fullName: identity.fullName,
+    fullName: formatLosPersonName(identity.fullName),
     dateOfBirth: formatAadhaarDob(identity.dateOfBirth),
     gender,
     address,
@@ -175,7 +176,7 @@ export class LosApplicationService {
         leadUuid: application.lead.uuid,
         mobileNumber: application.customer.mobileNumber,
         email: application.email,
-        fullName: application.lead.leadDetail?.fullName ?? null,
+        fullName: formatLosPersonName(application.lead.leadDetail?.fullName),
         cibilScore: application.eligibility?.cibilScore ?? null,
         eligibleLoanAmount,
         selectedLoanAmount: details?.loanAmount?.toString() ?? null,
@@ -311,7 +312,7 @@ export class LosApplicationService {
         bureauFetched: lead.bureauFetched,
         profile: detail
           ? {
-              fullName: detail.fullName,
+              fullName: formatLosPersonName(detail.fullName),
               dateOfBirth: detail.dateOfBirth ? detail.dateOfBirth.toISOString().slice(0, 10) : null,
               panNumber: lead.panNumber,
               pincode: detail.pincode,
@@ -332,7 +333,7 @@ export class LosApplicationService {
       referencesCount: lead.leadReferences.length,
       references: lead.leadReferences.map((ref) => ({
         referenceIndex: ref.referenceIndex,
-        fullName: ref.fullName,
+        fullName: formatLosPersonName(ref.fullName) ?? ref.fullName,
         mobileNumber: ref.mobileNumber,
         relation: ref.relation.name,
       })),

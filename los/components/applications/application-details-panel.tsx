@@ -5,6 +5,7 @@ import { ApplicationOverviewCibilSection } from '@/components/applications/appli
 import { CustomerJourneyTimeline } from '@/components/shared/customer-journey-timeline';
 import { WorkspaceRecordHeader } from '@/components/shared/workspace-record-header';
 import { buildApplicationJourney } from '@/lib/customer-journey';
+import { formatPersonName } from '@/lib/format-person-name';
 import {
   generateApplicationLoanDocuments,
   fetchApplicationLoanDocumentBlob,
@@ -311,7 +312,7 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
   }
 
   const profile = row.lead.profile;
-  const displayName = profile?.fullName?.trim() || 'Applicant (name pending)';
+  const displayName = formatPersonName(profile?.fullName, 'Applicant (name pending)');
   const authToken = getToken();
   const journeySteps = buildApplicationJourney(row);
 

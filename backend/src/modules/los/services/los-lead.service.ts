@@ -3,6 +3,7 @@ import { BUREAU_FETCHED } from '../../../common/constants/bureau-fetch.constants
 import { LEAD_STATUS } from '../../../common/constants/lead.constants';
 import { PAN_VERIFIED } from '../../../common/constants/pan-verification.constants';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { formatLosPersonName } from '../format-los-person-name';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -96,7 +97,7 @@ export class LosLeadService {
       return {
         uuid: lead.uuid,
         customerUuid: lead.customer.uuid,
-        fullName: detail?.fullName?.trim() || null,
+        fullName: formatLosPersonName(detail?.fullName),
         panNumber: lead.panNumber?.trim().toUpperCase() || null,
         mobileNumber: lead.customer.mobileNumber,
         email: lead.applications[0]?.email ?? null,
@@ -194,7 +195,7 @@ export class LosLeadService {
       updatedAt: lead.updatedAt.toISOString(),
       profile: detail
         ? {
-            fullName: detail.fullName,
+            fullName: formatLosPersonName(detail.fullName),
             dateOfBirth: detail.dateOfBirth ? detail.dateOfBirth.toISOString().slice(0, 10) : null,
             panNumber: lead.panNumber,
             pincode: detail.pincode,

@@ -1,4 +1,5 @@
 import type { LosApplicationDetails, LosLeadDetails } from '@/lib/api';
+import { formatPersonName } from '@/lib/format-person-name';
 
 export type JourneyStepState = 'done' | 'active' | 'pending' | 'failed';
 
@@ -64,7 +65,17 @@ export function buildLeadIntakeJourney(lead: LosLeadDetails): JourneyStep[] {
 
   const steps: JourneyStep[] = [
     step('sign-in', 'Mobile OTP', true, false, lead.mobileNumber),
-    step('profile', 'Profile', profileDone, false, profileDone ? lead.profile?.fullName ?? undefined : 'Pending'),
+    step(
+      'profile',
+      'Profile',
+      profileDone,
+      false,
+      profileDone && lead.profile?.fullName?.trim()
+        ? formatPersonName(lead.profile.fullName)
+        : profileDone
+          ? undefined
+          : 'Pending',
+    ),
     step('pan', 'PAN verify', panDone, panFailed, lead.panVerifiedLabel),
     step('bureau', 'Bureau / BRE', bureauDone, bureauFailed, lead.bureauFetchedLabel),
     step(
