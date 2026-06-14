@@ -28,7 +28,7 @@ export class LoanDocumentHtmlPdfGeneratorService {
     const executablePath = resolvePuppeteerExecutablePath();
     if (configuredPath && !executablePath) {
       this.logger.warn(
-        `PUPPETEER_EXECUTABLE_PATH is set to "${configuredPath}" but the binary is missing or not executable; falling back to Puppeteer bundled Chromium.`,
+        `PUPPETEER_EXECUTABLE_PATH is set to "${configuredPath}" but the binary is missing, not executable, or is a Snap wrapper (use /usr/bin/chromium); falling back to Puppeteer bundled Chromium.`,
       );
     } else if (executablePath) {
       this.logger.debug(`Using Chromium at ${executablePath}`);
@@ -37,7 +37,13 @@ export class LoanDocumentHtmlPdfGeneratorService {
     const browser = await puppeteer.launch({
       headless: true,
       executablePath,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      timeout: 60_000,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+      ],
     });
     try {
       const page = await browser.newPage();

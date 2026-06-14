@@ -70,6 +70,8 @@ sudo apt-get install -y chromium fonts-liberation fonts-noto-core ca-certificate
 PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ```
 
+   **Do not** use `/usr/bin/chromium-browser` on Ubuntu — it is a Snap wrapper and fails under PM2/systemd (`not a snap cgroup for tag snap.chromium.chromium`).
+
 3. Avoid pointing at a non-existent path — a bad `PUPPETEER_EXECUTABLE_PATH` prevents Puppeteer from launching.
 
 4. If using `PUPPETEER_SKIP_DOWNLOAD=true`, you **must** install system Chromium; bundled Chromium is not downloaded.
