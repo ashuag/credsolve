@@ -11,16 +11,12 @@ const PREFERRED_CHROMIUM_PATHS = [
 const FALLBACK_CHROMIUM_PATHS = ['/usr/bin/chromium-browser', '/snap/bin/chromium'];
 
 export const CHROMIUM_INSTALL_HINT = `
-Loan PDF preview needs Chromium. On this server, run once:
+Loan PDF preview needs a real Chrome/Chromium binary. On Ubuntu 24.04+ run:
 
   cd backend
   npm run loan-docs:setup-chromium
 
-Or manually:
-
-  sudo apt-get update
-  sudo apt-get install -y chromium fonts-liberation fonts-noto-core ca-certificates
-  echo 'PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium' >> backend/.env
+This installs Google Chrome (.deb) and runtime libraries. Ubuntu apt "chromium" is Snap-only.
 
 See backend/assets/loan-documents/README.md
 `.trim();
@@ -55,9 +51,8 @@ function pickFirstUsable(paths) {
 
 export function resolveChromiumPath() {
   const configured = process.env.PUPPETEER_EXECUTABLE_PATH?.trim();
-  if (configured) {
-    if (isExecutable(configured) && !isUnusableChromiumBinary(configured)) return configured;
-    return undefined;
+  if (configured && isExecutable(configured) && !isUnusableChromiumBinary(configured)) {
+    return configured;
   }
   return pickFirstUsable(PREFERRED_CHROMIUM_PATHS) ?? pickFirstUsable(FALLBACK_CHROMIUM_PATHS);
 }
@@ -79,9 +74,9 @@ export async function launchPuppeteerBrowser(puppeteer, backendRoot) {
   const configuredPath = process.env.PUPPETEER_EXECUTABLE_PATH?.trim();
   const executablePath = resolveChromiumPath();
 
-  if (configuredPath && !executablePath) {
+  if (configuredPath && configuredPath !== executablePath) {
     console.warn(
-      `PUPPETEER_EXECUTABLE_PATH="${configuredPath}" is missing, not executable, or is a Snap wrapper.`,
+      `PUPPETEER_EXECUTABLE_PATH="${configuredPath}" is missing, not executable, or is a Snap wrapper; using ${executablePath ?? 'Puppeteer bundled Chrome'}.`,
     );
   } else if (executablePath) {
     console.log(`Using Chromium at ${executablePath}`);

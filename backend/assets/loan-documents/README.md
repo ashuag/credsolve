@@ -57,26 +57,34 @@ Loan PDFs require a Chromium/Chrome binary. The backend auto-detects common path
 
 **Staging checklist**
 
-1. Install Chromium and fonts on the backend host:
+1. Run the setup script (installs Google Chrome + libraries on Ubuntu 24.04+):
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y chromium fonts-liberation fonts-noto-core ca-certificates
+cd backend && npm run loan-docs:setup-chromium
 ```
 
-2. Set the path only if auto-detect fails (Debian Bookworm uses `/usr/bin/chromium`, not `chromium-browser`):
+Or manually install Google Chrome (avoid Snap-only `chromium-browser` on Ubuntu):
+
+```bash
+wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/google-chrome.deb
+sudo apt-get install -y /tmp/google-chrome.deb || { sudo apt-get install -f -y; sudo apt-get install -y /tmp/google-chrome.deb; }
+```
+
+2. Point Puppeteer at the real binary:
 
 ```env
-PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 ```
 
-   **Do not** use `/usr/bin/chromium-browser` on Ubuntu — it is a Snap wrapper and fails under PM2/systemd (`not a snap cgroup for tag snap.chromium.chromium`).
+   On Debian Bookworm with a native package: `/usr/bin/chromium` also works.
 
-3. Avoid pointing at a non-existent path — a bad `PUPPETEER_EXECUTABLE_PATH` prevents Puppeteer from launching.
+3. **Do not** use `/usr/bin/chromium-browser` on Ubuntu — it is a Snap wrapper and fails under PM2/systemd (`not a snap cgroup for tag snap.chromium.chromium`).
 
-4. If using `PUPPETEER_SKIP_DOWNLOAD=true`, you **must** install system Chromium; bundled Chromium is not downloaded.
+4. Avoid pointing at a non-existent path — a bad `PUPPETEER_EXECUTABLE_PATH` prevents Puppeteer from auto-detecting a working browser.
 
-5. Restart the backend after changing env vars, then trigger a loan-document preview/acceptance flow and check logs for `Using Chromium at …` or Puppeteer launch errors.
+5. If using `PUPPETEER_SKIP_DOWNLOAD=true`, you **must** install system Chrome/Chromium; bundled Chromium is not downloaded.
+
+6. Restart the backend after changing env vars, then trigger a loan-document preview/acceptance flow and check logs for `Using Chromium at …` or Puppeteer launch errors.
 
 ## Local preview
 
@@ -87,7 +95,7 @@ npm run loan-docs:preview-pdf
 # → storage/local/preview/loan-document-preview.pdf
 ```
 
-On a **minimal Linux VPS**, bundled Puppeteer Chrome fails with `libatk-1.0.so.0`. One-time setup:
+On a **minimal Linux VPS** (Ubuntu 24.04+), `apt install chromium` is usually a **Snap wrapper**, not `/usr/bin/chromium`. Use the setup script — it installs **Google Chrome** and runtime libraries:
 
 ```bash
 cd backend
@@ -95,10 +103,10 @@ npm run loan-docs:setup-chromium
 npm run loan-docs:preview-pdf
 ```
 
-You should see `Using Chromium at /usr/bin/chromium`. Set the same in `.env` for the running backend:
+You should see `Using Chromium at /usr/bin/google-chrome-stable`. Set the same in `.env` for the running backend:
 
 ```env
-PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 ```
 
 ## Editing the template

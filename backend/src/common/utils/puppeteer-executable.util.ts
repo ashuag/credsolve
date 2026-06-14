@@ -45,9 +45,8 @@ function pickFirstUsable(paths: readonly string[]): string | undefined {
  */
 export function resolvePuppeteerExecutablePath(): string | undefined {
   const configured = process.env.PUPPETEER_EXECUTABLE_PATH?.trim();
-  if (configured) {
-    if (isExecutable(configured) && !isUnusableChromiumBinary(configured)) return configured;
-    return undefined;
+  if (configured && isExecutable(configured) && !isUnusableChromiumBinary(configured)) {
+    return configured;
   }
 
   return pickFirstUsable(PREFERRED_CHROMIUM_PATHS) ?? pickFirstUsable(FALLBACK_CHROMIUM_PATHS);
