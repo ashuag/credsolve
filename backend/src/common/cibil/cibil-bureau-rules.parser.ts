@@ -108,6 +108,15 @@ function normalizeTuefStatusCode(raw: unknown): string | null {
   return s.toUpperCase();
 }
 
+function isCreditFacilityStatusNode(node: unknown): boolean {
+  const rec = asRecord(node);
+  if (!rec) return false;
+  const abbr = String(rec.abbreviation ?? rec.Abbreviation ?? '')
+    .trim()
+    .toLowerCase();
+  return abbr === 'creditfacilitystatus';
+}
+
 /** TUEF Tag 33 — Written-off and Settled Status on TrueLink tradelines. */
 function readWrittenOffSettledStatusCode(lineRec: Record<string, unknown>): string | null {
   const direct =
@@ -118,10 +127,14 @@ function readWrittenOffSettledStatusCode(lineRec: Record<string, unknown>): stri
   const fromDirect = normalizeTuefStatusCode(direct);
   if (fromDirect) return fromDirect;
 
-  const fromSymbol =
-    normalizeTuefStatusCode(readSymbol(lineRec.WrittenOffSettled)) ??
-    normalizeTuefStatusCode(readSymbol(lineRec.AccountCondition));
-  return fromSymbol;
+  const fromWrittenOffSettled = normalizeTuefStatusCode(readSymbol(lineRec.WrittenOffSettled));
+  if (fromWrittenOffSettled) return fromWrittenOffSettled;
+
+  // TrueLink maps Credit Facility Status onto AccountCondition (abbreviation
+  // creditFacilityStatus). That is not TUEF Tag 33 write-off / settled status.
+  if (isCreditFacilityStatusNode(lineRec.AccountCondition)) return null;
+
+  return normalizeTuefStatusCode(readSymbol(lineRec.AccountCondition));
 }
 
 function readGrantedWrittenOffSettledStatusCode(lineRec: Record<string, unknown>): string | null {

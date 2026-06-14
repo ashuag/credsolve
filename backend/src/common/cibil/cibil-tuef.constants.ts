@@ -41,14 +41,16 @@ export const TUEF_RESTRUCTURED_STATUS_LABELS: Record<string, string> = {
   '11': 'Restructured due to Natural Calamity',
 };
 
-/** TUEF Tag 33 — non-restructure written-off / settled / sold statuses (post-BRE adverse tradeline). */
+/**
+ * TUEF Tag 33 — non-restructure written-off / settled statuses (post-BRE adverse tradeline).
+ * Codes 05 (Account Sold) and 07 (Account Purchased) are portfolio-transfer markers and are
+ * excluded — they are not write-offs on their own (see 06/08/09 for combined adverse states).
+ */
 export const TUEF_ADVERSE_WRITTEN_OFF_SETTLED_STATUS_CODES = new Set([
   '02', // Written-off
   '03', // Settled
   '04', // Post (WO) Settled
-  '05', // Account Sold
   '06', // Written Off and Account Sold
-  '07', // Account Purchased
   '08', // Account Purchased and Written Off
   '09', // Account Purchased and Settled
 ]);
