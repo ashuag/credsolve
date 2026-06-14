@@ -22,6 +22,7 @@
     "cibil:html-to-json": "node scripts/convert-cibil-html-to-json.mjs",
     "cibil:preview-pdf": "npm run build && node scripts/preview-cibil-report-pdf.mjs",
     "loan-docs:preview-pdf": "npm run build && node scripts/preview-loan-document-pdf.mjs",
+    "loan-docs:setup-chromium": "bash scripts/setup-chromium-staging.sh",
     "nest": "nest"
   },
   "dependencies": {

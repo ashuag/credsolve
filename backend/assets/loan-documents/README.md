@@ -87,6 +87,20 @@ npm run loan-docs:preview-pdf
 # → storage/local/preview/loan-document-preview.pdf
 ```
 
+On a **minimal Linux VPS**, bundled Puppeteer Chrome fails with `libatk-1.0.so.0`. One-time setup:
+
+```bash
+cd backend
+npm run loan-docs:setup-chromium
+npm run loan-docs:preview-pdf
+```
+
+You should see `Using Chromium at /usr/bin/chromium`. Set the same in `.env` for the running backend:
+
+```env
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+```
+
 ## Editing the template
 
 After changing `MoneyCash_Loan_Document.html`, update field IDs in `loan-document-html-field-map.util.ts` if new inputs are added. Regenerate a preview PDF and spot-check pagination.
