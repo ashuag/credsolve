@@ -10,6 +10,7 @@ import {
 } from '../../../../common/kyc/aadhaar-vendor-parse.util';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
+import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import type { SubmitVerifiedBankDto } from '../dto/submit-verified-bank.dto';
 
@@ -19,6 +20,9 @@ export type SubmitVerifiedBankResult = {
   applicationStatus: string | null;
   message?: string;
   vendor: unknown | null;
+  attemptsUsed: number;
+  attemptsAllowed: number;
+  retryLimitReached: boolean;
 };
 
 @Injectable()
@@ -31,6 +35,7 @@ export class SubmitVerifiedBankUseCase {
     private readonly bankVendor: BankTenacioVendorService,
     private readonly prisma: PrismaService,
     private readonly sms: SmsService,
+    private readonly settings: SettingsRepository,
   ) {}
 
   async execute(req: Request, dto: SubmitVerifiedBankDto): Promise<SubmitVerifiedBankResult> {
@@ -68,8 +73,37 @@ export class SubmitVerifiedBankUseCase {
     }
 
     const accountNumber = dto.accountNumber.replace(/\D/g, '');
+    const confirmAccountNumber = dto.confirmAccountNumber.replace(/\D/g, '');
+    if (accountNumber !== confirmAccountNumber) {
+      throw new BadRequestException('Account number and confirmation do not match.');
+    }
     const ifsc = dto.ifscCode.trim().toUpperCase();
     const verifiedBankName = dto.verifiedBankName?.trim() ?? '';
+
+    const attemptsAllowed = await this.settings.loadPennyDropRetryCount();
+    const applicationRow = await this.prisma.client.application.findFirst({
+      where: { leadId: lead.id },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, pennyDropAttempts: true },
+    });
+    if (!applicationRow) {
+      throw new BadRequestException('Create application details before bank details.');
+    }
+
+    const attemptsUsed = applicationRow.pennyDropAttempts;
+    if (attemptsUsed >= attemptsAllowed) {
+      return {
+        success: false,
+        pennyDropOk: false,
+        applicationStatus: null,
+        message:
+          'You have reached the maximum number of bank verification attempts. Please contact support to continue.',
+        vendor: null,
+        attemptsUsed,
+        attemptsAllowed,
+        retryLimitReached: true,
+      };
+    }
 
     const pennyOut = await this.bankVendor.postPennyDrop(
       {
@@ -91,6 +125,9 @@ export class SubmitVerifiedBankUseCase {
         applicationStatus: null,
         message: pennyOut.skipReason ?? 'Bank verification is not configured.',
         vendor: pennyOut.vendorBody ?? null,
+        attemptsUsed,
+        attemptsAllowed,
+        retryLimitReached: false,
       };
     }
 
@@ -98,14 +135,26 @@ export class SubmitVerifiedBankUseCase {
     const pennyOk = pennyOut.ok && isTenacioVendorBusinessSuccess(vendor);
 
     if (!pennyOk) {
+      const nextAttemptsUsed = attemptsUsed + 1;
+      await this.prisma.client.application.update({
+        where: { id: applicationRow.id },
+        data: { pennyDropAttempts: nextAttemptsUsed },
+      });
+      const retryLimitReached = nextAttemptsUsed >= attemptsAllowed;
+      const baseMessage =
+        pickTenacioVendorErrorMessage(vendor) ??
+        `Bank verification failed (HTTP ${pennyOut.httpStatus ?? 'n/a'}).`;
       return {
         success: false,
         pennyDropOk: false,
         applicationStatus: null,
-        message:
-          pickTenacioVendorErrorMessage(vendor) ??
-          `Bank verification failed (HTTP ${pennyOut.httpStatus ?? 'n/a'}).`,
+        message: retryLimitReached
+          ? `${baseMessage} You have reached the maximum number of verification attempts. Please contact support.`
+          : baseMessage,
         vendor,
+        attemptsUsed: nextAttemptsUsed,
+        attemptsAllowed,
+        retryLimitReached,
       };
     }
 
@@ -177,6 +226,9 @@ export class SubmitVerifiedBankUseCase {
       pennyDropOk: true,
       applicationStatus: statusAfter,
       vendor,
+      attemptsUsed,
+      attemptsAllowed,
+      retryLimitReached: false,
     };
   }
 }

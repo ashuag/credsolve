@@ -49,6 +49,9 @@ los/public/image
 backend/storage/customer/
 backend/storage/kyc-files/
 
+## Puppeteer browser cache (Docker dev + optional local npm install)
+backend/.cache/
+
 ## Digital signing certificates (never commit private PFX/keys)
 backend/storage/digital-signin/
 *.pfx

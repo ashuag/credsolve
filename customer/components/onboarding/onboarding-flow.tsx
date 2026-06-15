@@ -21,7 +21,7 @@ import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { LoanSummaryLeftRail } from '@/components/loan/loan-summary-left-rail';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 
-// Flow: mobile → profile → pre-BRE/PAN/CIBIL → pre-approved → loan selection → references → email → loan docs + OTP → KYC → bank
+// Flow: mobile → profile → pre-BRE/PAN/CIBIL → pre-approved → loan selection → email → loan docs + OTP → KYC → bank → references
 type OnboardingStep = 'details' | 'email' | 'email-otp';
 
 export type OnboardingFlowVariant = 'full' | 'email-only';
@@ -49,8 +49,6 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
   const [emailOtpRequest, setEmailOtpRequest] = useState<SendEmailOtpResponse | null>(null);
   const [detailsSection, setDetailsSection] = useState<PersonalDetailsSection>('profile');
   const [detailsNotice, setDetailsNotice] = useState<string | null>(null);
-  /** One forced session reload when `/email-verify` still sees references incomplete (stale `/auth/me`). */
-  const [referencesRecheckDone, setReferencesRecheckDone] = useState(false);
 
   useEffect(() => {
     if (loading || !session) return;
@@ -85,22 +83,13 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
         router.replace('/pre-approved-loan');
         return;
       }
-      if (!session.journey.referencesCompleted) {
-        if (!referencesRecheckDone) {
-          setReferencesRecheckDone(true);
-          void refresh();
-          return;
-        }
-        router.replace('/references');
-        return;
-      }
       if (!hasResolved) {
         const requestedMode = new URLSearchParams(window.location.search).get('mode');
         const initialMode: CustomerOnboardingMode = requestedMode === 'login' ? 'login' : 'register';
         setEmailMode(initialMode);
         setEmail(storedEmail);
         // Always show email entry first in email-only flow:
-        // references -> email screen -> email OTP -> sanction letter.
+        // loan selection -> email screen -> email OTP -> sanction letter.
         setStep('email');
         setHasResolved(true);
       }
@@ -121,9 +110,6 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
 
       if (!detailsCompleted) {
         setStep('details');
-      } else if (loanSelectionCompleted && !session.journey.referencesCompleted) {
-        router.replace('/references');
-        return;
       } else if (loanSelectionCompleted && !emailVerified) {
         router.replace(
           requestedMode === 'login' ? CUSTOMER_EMAIL_VERIFY_PATH : CUSTOMER_EMAIL_JOURNEY_PATH,
@@ -134,7 +120,7 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
       }
       setHasResolved(true);
     }
-  }, [loading, session, router, hasResolved, variant, referencesRecheckDone, refresh]);
+  }, [loading, session, router, hasResolved, variant, refresh]);
 
   useEffect(() => {
     if (!journeyProgress) return;
@@ -239,7 +225,7 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
     }
     if (step === 'email') {
       if (variant === 'email-only') {
-        router.push('/references');
+        router.push('/loan-selection');
       } else if (portalSession.journey.loanSelectionCompleted) {
         router.push('/loan-selection');
       } else {

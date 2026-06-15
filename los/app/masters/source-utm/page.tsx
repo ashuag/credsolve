@@ -4,8 +4,8 @@ import { SourceUtmPanel } from '@/components/masters/source-utm-panel';
 export default function SourceUtmPage() {
   return (
     <CrmShell
-      title="Source & UTM"
-      subtitle="View UTM listing with source mapping, and manage activation or edits."
+      title="Sources & UTMs"
+      subtitle="View all lead sources and UTM tag configurations in one place."
     >
       <SourceUtmPanel mode="list" />
     </CrmShell>

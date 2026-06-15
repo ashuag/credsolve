@@ -57,6 +57,7 @@ export function useOtpInput(onInteract?: () => void): UseOtpInputReturn {
 
   function clear() {
     setDigits(Array.from({ length: OTP_LENGTH }, () => ''));
+    inputRefs.current[0]?.focus();
   }
 
   return { digits, inputRefs, updateDigit, handleKeyDown, handlePaste, clear, joined: digits.join('') };

@@ -119,5 +119,10 @@ export const SettingKey = {
         key: 'PAN_VALIDATION_ATTEMPTS',
         default: '2',
         description: 'Number of attempts allowed for PAN validation BEFORE HITTING THE pan nsdl api',
-    }
+    },
+    PENNY_DROP_RETRY_COUNT: {
+        key: 'PENNY_DROP_RETRY_COUNT',
+        default: '2',
+        description: 'Maximum penny-drop bank verification attempts per application before further tries are blocked',
+    },
 } as const;

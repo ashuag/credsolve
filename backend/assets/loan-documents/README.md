@@ -51,11 +51,28 @@ Optional (not used by `node-signpdf` today): `CERSAI_INSTITUTION_CODE`, `CRESAI_
 
 Spaces: see `backend/.env.example` (`STORAGE_DRIVER=spaces`, `SPACES_ENDPOINT`, `SPACES_KEY_PREFIX=local`).
 
-## Chromium / Puppeteer (staging / production)
+## Chromium / Puppeteer (staging / production / Docker)
 
-Loan PDFs require a Chromium/Chrome binary. The backend auto-detects common paths (`/usr/bin/chromium`, `/usr/bin/chromium-browser`, …). If none exist, Puppeteer falls back to its bundled browser (installed via `npm ci` unless `PUPPETEER_SKIP_DOWNLOAD=true`).
+Loan PDFs require a Chromium/Chrome binary. The backend auto-detects common paths (`/usr/bin/chromium`, `/usr/bin/google-chrome-stable`, …). If none exist, Puppeteer falls back to its bundled browser (installed via `npm ci` / `postinstall` unless `PUPPETEER_SKIP_DOWNLOAD=true`).
 
-**Staging checklist**
+### Docker (local dev)
+
+The `backend` service in `docker-compose.yml` sets:
+
+```env
+PUPPETEER_CACHE_DIR=/workspace/backend/.cache/puppeteer
+```
+
+On container start, `docker/entrypoint-dev.sh` kicks off a **background** install (runtime libraries + bundled Chrome) so the API listens on port 4001 immediately. First boot may take 1–2 minutes before loan PDF generation works; progress is logged to `backend/.cache/puppeteer-setup.log`.
+
+Check readiness:
+
+```bash
+docker compose exec backend node scripts/ensure-puppeteer-chrome.mjs --check && echo ready
+docker compose exec backend tail -f .cache/puppeteer-setup.log
+```
+
+### VPS / staging checklist
 
 1. Run the setup script (installs Google Chrome + libraries on Ubuntu 24.04+):
 

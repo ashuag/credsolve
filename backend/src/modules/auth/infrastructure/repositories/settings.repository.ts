@@ -454,4 +454,16 @@ export class SettingsRepository {
       sessionRotateOnUse,
     };
   }
+
+  /** Max penny-drop verification attempts per application (default 2). */
+  async loadPennyDropRetryCount(): Promise<number> {
+    const row = await this.prisma.client.setting.findFirst({
+      where: { key: SettingKey.PENNY_DROP_RETRY_COUNT.key, isActive: true },
+      select: { value: true },
+    });
+    const n = row ? Number.parseInt(row.value.trim(), 10) : NaN;
+    return Number.isFinite(n) && n > 0
+      ? n
+      : Number.parseInt(SettingKey.PENNY_DROP_RETRY_COUNT.default, 10);
+  }
 }

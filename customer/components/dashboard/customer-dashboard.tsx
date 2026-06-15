@@ -33,9 +33,9 @@ const ALL_STEPS: Array<{ key: string; label: string; shortLabel: string }> = [
   { key: 'mobile', label: 'Mobile verified', shortLabel: 'Mobile' },
   { key: 'details', label: 'Personal details', shortLabel: 'Details' },
   { key: 'loan', label: 'Loan selection', shortLabel: 'Loan' },
-  { key: 'references', label: 'References', shortLabel: 'Refs' },
   { key: 'kyc', label: 'KYC documents', shortLabel: 'KYC' },
   { key: 'bank', label: 'Bank details', shortLabel: 'Bank' },
+  { key: 'references', label: 'References', shortLabel: 'Refs' },
 ];
 
 function buildJourneySteps(

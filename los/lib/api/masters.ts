@@ -73,6 +73,7 @@ export type LosEligibilityCriterion = {
   key: string;
   label: string;
   value: string;
+  breType: 'PRE_BRE' | 'POST_BRE' | string;
   description: string | null;
   isActive: boolean;
 };

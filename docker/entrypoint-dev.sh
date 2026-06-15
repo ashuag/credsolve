@@ -43,6 +43,18 @@ if [ -f "$APP_DIR/prisma.config.ts" ] && grep -q '"prisma:generate"' "$APP_DIR/p
   npm run prisma:generate
 fi
 
+# Backend loan-document PDFs need Chrome/Chromium + runtime libraries (Docker slim images lack both).
+# Do not block API startup — download/install runs in the background on first boot.
+if grep -q '"puppeteer"' "$APP_DIR/package.json" 2>/dev/null; then
+  if [ -f "$APP_DIR/scripts/ensure-puppeteer-chrome.mjs" ] \
+    && node "$APP_DIR/scripts/ensure-puppeteer-chrome.mjs" --check >/dev/null 2>&1; then
+    : # Chrome already available
+  elif [ -f "$APP_DIR/scripts/setup-puppeteer-docker.sh" ]; then
+    echo "Puppeteer Chrome not ready — installing in background (API starting now; see backend/.cache/puppeteer-setup.log)..."
+    sh "$APP_DIR/scripts/setup-puppeteer-docker.sh" "$APP_DIR" &
+  fi
+fi
+
 if [ "$LOCK_ACQUIRED" -eq 1 ]; then
   rmdir "$LOCKDIR" 2>/dev/null || true
   trap - EXIT INT TERM

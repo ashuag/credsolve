@@ -27,8 +27,10 @@ services:
     # Nest must listen on all interfaces so other containers (customer, los) can reach `backend:4001`.
     environment:
       HOST: "0.0.0.0"
-      # Dev: use Puppeteer's bundled Chromium from `npm ci` (no apt-get on every start).
-      # Staging/prod: install system Chromium and set PUPPETEER_EXECUTABLE_PATH — see
+      # Persist Puppeteer Chrome inside the bind-mounted backend tree (not ephemeral /root/.cache).
+      PUPPETEER_CACHE_DIR: /workspace/backend/.cache/puppeteer
+      # Dev: bundled Chrome from postinstall/entrypoint. Staging/prod VPS: system Chrome via
+      # npm run loan-docs:setup-chromium and PUPPETEER_EXECUTABLE_PATH — see
       # backend/assets/loan-documents/README.md.
     ports:
       - "4001:4001"

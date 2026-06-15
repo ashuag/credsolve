@@ -286,7 +286,7 @@ export class AuthController {
   @UseGuards(RequiredCustomerSessionGuard)
   @RateLimitByRoute('save-lead-references')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Save two personal references before bank details' })
+  @ApiOperation({ summary: 'Save two personal references after bank details' })
   saveLeadReferencesRoute(@Req() req: Request, @Body() body: SaveLeadReferencesDto) {
     return this.saveLeadReferencesFlow.execute(req, body);
   }

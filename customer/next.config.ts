@@ -39,7 +39,8 @@ const securityHeaders: { key: string; value: string }[] = [
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   {
     key: 'Permissions-Policy',
-    value: 'camera=(), microphone=(), geolocation=(), payment=()',
+    // KYC selfie capture needs camera on this origin; keep mic/geo/payment disabled.
+    value: 'camera=(self), microphone=(), geolocation=(), payment=()',
   },
 ];
 

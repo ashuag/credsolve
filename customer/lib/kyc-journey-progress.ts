@@ -1,7 +1,7 @@
 import type { CustomerSessionResponse } from '@/lib/api/customer-session';
 import { isCustomerPortalSignedIn } from '@/lib/api/customer-session';
 
-export const KYC_JOURNEY_STEPS = ['PROFILE', 'APPLY', 'REFS', 'EMAIL', 'LETTER', 'KYC', 'BANK'] as const;
+export const KYC_JOURNEY_STEPS = ['PROFILE', 'APPLY', 'EMAIL', 'LETTER', 'KYC', 'BANK', 'REFS'] as const;
 
 export function milestonesCompleted(session: CustomerSessionResponse | null | undefined): number {
   if (!session || session.authenticated !== true) return 0;
@@ -10,11 +10,11 @@ export function milestonesCompleted(session: CustomerSessionResponse | null | un
   let m = 1;
   if (j.detailsCompleted) m++;
   if (j.loanSelectionCompleted) m++;
-  if (j.referencesCompleted) m++;
   if (emailVerified) m++;
   if (j.loanDocumentsCompleted) m++;
   if (j.kycCompleted) m++;
   if (j.bankDetailsCompleted) m++;
+  if (j.referencesCompleted) m++;
   return Math.min(KYC_JOURNEY_STEPS.length, m);
 }
 

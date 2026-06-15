@@ -10,6 +10,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { getApiUrl } from '@/lib/api-url';
 import { getCustomerJourneyResumePath } from '@/lib/api/customer-session';
 import { pickLivenessFailureUserMessage, postKycLiveness, postKycSelfie } from '@/lib/api/kyc-face';
+import { openUserCamera, openUserCameraErrorMessage } from '@/lib/media/open-user-camera';
 
 function dataUrlToFile(dataUrl: string, name: string): File {
   const [head, b64] = dataUrl.split(',');
@@ -85,31 +86,25 @@ export default function KycSelfiePage() {
       };
     }
 
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-      return () => {
-        cancelled = true;
-      };
-    }
-
     (async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 720 } },
-          audio: false,
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play().catch(() => undefined);
-        }
-        setCameraReady(true);
-      } catch {
-        if (!cancelled) setError('Could not access the camera. Allow camera permission and try again.');
+      const result = await openUserCamera();
+      if (cancelled) {
+        if (result.ok) result.stream.getTracks().forEach((t) => t.stop());
+        return;
       }
+      if (!result.ok) {
+        setError(openUserCameraErrorMessage(result.reason));
+        return;
+      }
+
+      const { stream } = result;
+      streamRef.current = stream;
+      const video = videoRef.current;
+      if (video) {
+        video.srcObject = stream;
+        await video.play().catch(() => undefined);
+      }
+      setCameraReady(true);
     })();
 
     return () => {
@@ -303,7 +298,7 @@ export default function KycSelfiePage() {
 
           {needsWebcamStream ? (
             <div className="rounded-2xl overflow-hidden border border-[rgba(18,36,79,0.12)] bg-black aspect-[4/3] max-h-[360px]">
-              <video ref={videoRef} className="h-full w-full object-cover" playsInline muted />
+              <video ref={videoRef} className="h-full w-full object-cover" autoPlay playsInline muted />
             </div>
           ) : null}
           <canvas ref={canvasRef} className="hidden" />

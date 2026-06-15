@@ -2,24 +2,54 @@
 
 import { ApplicationCibilReportTab } from '@/components/applications/application-cibil-report-tab';
 import { cx } from '@/components/eligibility/eligibility-ui';
-import { fetchApplicationLoanDocumentBlob, type LosApplicationDetails } from '@/lib/api';
+import { fetchApplicationLoanDocumentBlob, generateApplicationLoanDocuments, getApplicationCibilReport, type CibilReportData, type LosApplicationDetails } from '@/lib/api';
 import { formatPersonName } from '@/lib/format-person-name';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
 
-type OverviewTab = 'profile' | 'cibil' | 'loan' | 'references' | 'kyc' | 'bank';
+type OverviewTab = 'profile' | 'cibil' | 'loan' | 'kyc' | 'bank' | 'references' | 'sources';
 
-function DetailGrid({ rows }: { rows: Array<{ label: string; value: ReactNode }> }) {
+function DetailGrid({
+  rows,
+  columns = 1,
+}: {
+  rows: Array<{ label: string; value: ReactNode }>;
+  columns?: 1 | 2 | 3;
+}) {
+  if (columns === 1) {
+    return (
+      <dl className="m-0 divide-y divide-[rgba(23,44,113,0.06)]">
+        {rows.map((row, idx) => (
+          <div key={`${row.label}-${idx}`} className="flex items-baseline gap-3 py-1.5 first:pt-0 last:pb-0">
+            <dt className="w-[148px] flex-shrink-0 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-brand-muted leading-tight">
+              {row.label}
+            </dt>
+            <dd className="m-0 min-w-0 flex-1 text-[0.84rem] font-semibold text-brand-text leading-snug">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+    );
+  }
+
+  const gridClass = columns === 3 ? 'sm:grid-cols-2 xl:grid-cols-3' : 'sm:grid-cols-2';
+
   return (
-    <dl className="m-0 divide-y divide-[rgba(23,44,113,0.06)]">
+    <dl className={`m-0 grid gap-2 ${gridClass}`}>
       {rows.map((row, idx) => (
-        <div key={`${row.label}-${idx}`} className="flex items-baseline gap-3 py-1.5 first:pt-0 last:pb-0">
-          <dt className="w-[148px] flex-shrink-0 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-brand-muted leading-tight">
-            {row.label}
-          </dt>
-          <dd className="m-0 min-w-0 flex-1 text-[0.84rem] font-semibold text-brand-text leading-snug">{row.value}</dd>
+        <div
+          key={`${row.label}-${idx}`}
+          className="rounded-[8px] border border-[rgba(23,44,113,0.07)] bg-[rgba(255,255,255,0.72)] px-3 py-2"
+        >
+          <dt className="text-[0.62rem] font-bold uppercase tracking-[0.08em] text-brand-muted leading-tight">{row.label}</dt>
+          <dd className="m-0 mt-1 break-words text-[0.84rem] font-semibold text-brand-text leading-snug">{row.value}</dd>
         </div>
       ))}
     </dl>
+  );
+}
+
+function ProfileSubheading({ children }: { children: ReactNode }) {
+  return (
+    <p className="m-0 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">{children}</p>
   );
 }
 
@@ -81,35 +111,129 @@ function dobWithAge(dateOfBirth: string | null | undefined) {
   return age ? `${formatted} (${age})` : formatted;
 }
 
-function CustomerProfilePanel({ row }: { row: LosApplicationDetails }) {
-  const profile = row.lead.profile;
-  const pan = profile?.panNumber?.trim() || row.lead.panNumber?.trim() || '—';
-  const address = [profile?.addressLine1, profile?.addressLine2].filter(Boolean).join(', ') || '—';
-  const location = [profile?.city, profile?.state, profile?.pincode].filter(Boolean).join(', ') || '—';
-
-  if (!profile) {
-    return <p className="m-0 text-[0.88rem] text-brand-muted">No lead profile is linked to this application yet.</p>;
-  }
-
+function ProfileSection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <DetailGrid
-      rows={[
-        { label: 'Name', value: formatPersonName(profile.fullName) },
-        { label: 'Date of birth', value: dobWithAge(profile.dateOfBirth) },
-        { label: 'PAN card', value: pan },
-        { label: 'Gender', value: profile.gender ?? '—' },
-        { label: 'Occupation', value: profile.occupation ?? '—' },
-        { label: 'Salary', value: formatInr(profile.netMonthlyIncome) },
-        { label: 'Annual profit', value: formatInr(profile.annualProfit) },
-        { label: 'Annual turnover', value: formatInr(profile.annualTurnover) },
-        { label: 'Address', value: address },
-        { label: 'City, state, PIN', value: location },
-      ]}
-    />
+    <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)]">
+      <div className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
+        <span className="text-[0.82rem] font-extrabold text-brand-navy">{title}</span>
+      </div>
+      <div className="px-3 py-2.5">{children}</div>
+    </div>
   );
 }
 
-function LoanDetailsPanel({
+function CibilPersonalDetailsBlock({
+  bureauReportAvailable,
+  cibilLoading,
+  cibilError,
+  cibilReport,
+}: {
+  bureauReportAvailable: boolean;
+  cibilLoading: boolean;
+  cibilError: string | null;
+  cibilReport: CibilReportData | null;
+}) {
+  if (!bureauReportAvailable) {
+    return <p className="m-0 text-[0.84rem] text-brand-muted">No CIBIL report available yet.</p>;
+  }
+
+  if (cibilLoading) {
+    return <p className="m-0 text-[0.84rem] text-brand-muted">Loading CIBIL details…</p>;
+  }
+
+  if (cibilError) {
+    return <p className="m-0 text-[0.84rem] text-[#8d3434]">{cibilError}</p>;
+  }
+
+  if (!cibilReport) {
+    return <p className="m-0 text-[0.84rem] text-brand-muted">CIBIL details are not available.</p>;
+  }
+
+  const phoneRows =
+    cibilReport.phones.length > 0
+      ? cibilReport.phones.map((phone, index) => ({
+          label: cibilReport.phones.length > 1 ? `${phone.type || 'Phone'} ${index + 1}` : phone.type || 'Mobile number',
+          value: phone.number,
+        }))
+      : cibilReport.primaryMobile
+        ? [{ label: 'Mobile number', value: cibilReport.primaryMobile }]
+        : [];
+
+  const emailRows = cibilReport.emails.map((email, index) => ({
+    label: cibilReport.emails.length > 1 ? `Email ${index + 1}` : 'Email',
+    value: email,
+  }));
+
+  const identifierRows = cibilReport.identifiers.map((identifier) => ({
+    label: identifier.type,
+    value: identifier.number,
+  }));
+
+  const hasContact = phoneRows.length > 0 || emailRows.length > 0;
+
+  if (!hasContact) {
+    return <p className="m-0 text-[0.84rem] text-brand-muted">No contact details found on the CIBIL report.</p>;
+  }
+
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {phoneRows.length > 0 ? (
+        <div className="min-w-0">
+          <ProfileSubheading>Mobile numbers</ProfileSubheading>
+          <div className="mt-2">
+            <DetailGrid rows={phoneRows} columns={1} />
+          </div>
+        </div>
+      ) : null}
+      {emailRows.length > 0 ? (
+        <div className="min-w-0">
+          <ProfileSubheading>Email IDs</ProfileSubheading>
+          <div className="mt-2">
+            <DetailGrid rows={emailRows} columns={1} />
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CibilGovernmentIdsBlock({
+  bureauReportAvailable,
+  cibilLoading,
+  cibilError,
+  cibilReport,
+}: {
+  bureauReportAvailable: boolean;
+  cibilLoading: boolean;
+  cibilError: string | null;
+  cibilReport: CibilReportData | null;
+}) {
+  if (!bureauReportAvailable) {
+    return <p className="m-0 text-[0.84rem] text-brand-muted">Available after CIBIL report is pulled.</p>;
+  }
+
+  if (cibilLoading) {
+    return <p className="m-0 text-[0.84rem] text-brand-muted">Loading government IDs…</p>;
+  }
+
+  if (cibilError) {
+    return <p className="m-0 text-[0.84rem] text-[#8d3434]">{cibilError}</p>;
+  }
+
+  const identifierRows =
+    cibilReport?.identifiers.map((identifier) => ({
+      label: identifier.type,
+      value: identifier.number,
+    })) ?? [];
+
+  if (identifierRows.length === 0) {
+    return <p className="m-0 text-[0.84rem] text-brand-muted">No government IDs found on the CIBIL report.</p>;
+  }
+
+  return <DetailGrid rows={identifierRows} columns={3} />;
+}
+
+function CustomerProfilePanel({
   row,
   applicationUuid,
   authToken,
@@ -118,74 +242,319 @@ function LoanDetailsPanel({
   applicationUuid: string;
   authToken: string | null;
 }) {
-  const [openingDoc, setOpeningDoc] = useState(false);
-  const [openError, setOpenError] = useState<string | null>(null);
-  const details = row.details;
-  const sanctionAccepted = Boolean(row.loanDocuments.acceptedAt);
+  const profile = row.lead.profile;
+  const aadhaar = row.aadhaarDetail;
+  const pan = profile?.panNumber?.trim() || row.lead.panNumber?.trim() || '—';
+  const [cibilReport, setCibilReport] = useState<CibilReportData | null>(null);
+  const [cibilLoading, setCibilLoading] = useState(false);
+  const [cibilError, setCibilError] = useState<string | null>(null);
 
-  const handleDownloadSanctionLetter = async () => {
-    if (!authToken || !row.loanDocuments.keyFactReady) return;
-    setOpeningDoc(true);
+  const loadCibilDetails = useCallback(async () => {
+    if (!authToken || !row.bureauReport) {
+      setCibilReport(null);
+      setCibilError(null);
+      setCibilLoading(false);
+      return;
+    }
+
+    setCibilLoading(true);
+    setCibilError(null);
+    try {
+      const payload = await getApplicationCibilReport(authToken, applicationUuid);
+      setCibilReport(payload.report);
+    } catch (error) {
+      setCibilReport(null);
+      setCibilError(error instanceof Error ? error.message : 'Failed to load CIBIL details.');
+    } finally {
+      setCibilLoading(false);
+    }
+  }, [applicationUuid, authToken, row.bureauReport]);
+
+  useEffect(() => {
+    void loadCibilDetails();
+  }, [loadCibilDetails]);
+
+  if (!profile) {
+    return <p className="m-0 text-[0.88rem] text-brand-muted">No lead profile is linked to this application yet.</p>;
+  }
+
+  const hasAadhaar =
+    aadhaar &&
+    (aadhaar.fullName?.trim() ||
+      aadhaar.dateOfBirth ||
+      aadhaar.gender?.trim() ||
+      aadhaar.maskedAadhaar?.trim() ||
+      aadhaar.address?.trim());
+
+  return (
+    <div className="grid gap-4">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ProfileSection title="Personal details">
+          <DetailGrid
+            columns={2}
+            rows={[
+              { label: 'Name', value: formatPersonName(profile.fullName) },
+              { label: 'Date of birth', value: dobWithAge(profile.dateOfBirth) },
+              { label: 'Gender', value: profile.gender ?? '—' },
+              { label: 'PAN card', value: pan },
+            ]}
+          />
+          <div className="mt-3 border-t border-[rgba(23,44,113,0.06)] pt-3">
+            <ProfileSubheading>Aadhaar details (DigiLocker)</ProfileSubheading>
+            {hasAadhaar ? (
+              <div className="mt-2">
+                <DetailGrid
+                  columns={2}
+                  rows={[
+                    { label: 'Aadhaar name', value: formatPersonName(aadhaar?.fullName) },
+                    { label: 'Aadhaar DOB', value: dobWithAge(aadhaar?.dateOfBirth) },
+                    { label: 'Aadhaar gender', value: aadhaar?.gender ?? '—' },
+                    { label: 'Aadhaar number', value: aadhaar?.maskedAadhaar ?? '—' },
+                    { label: 'Aadhaar address', value: aadhaar?.address ?? '—' },
+                  ]}
+                />
+              </div>
+            ) : (
+              <p className="m-0 mt-2 text-[0.84rem] text-brand-muted">Not fetched from DigiLocker yet.</p>
+            )}
+          </div>
+          <div className="mt-3 border-t border-[rgba(23,44,113,0.06)] pt-3">
+            <ProfileSubheading>Government IDs (CIBIL)</ProfileSubheading>
+            <div className="mt-2">
+              <CibilGovernmentIdsBlock
+                bureauReportAvailable={Boolean(row.bureauReport)}
+                cibilLoading={cibilLoading}
+                cibilError={cibilError}
+                cibilReport={cibilReport}
+              />
+            </div>
+          </div>
+        </ProfileSection>
+
+        <div className="grid gap-4">
+          <ProfileSection title="Employment details">
+            <DetailGrid
+              columns={2}
+              rows={[
+                { label: 'Occupation', value: profile.occupation ?? '—' },
+                { label: 'Salary', value: formatInr(profile.netMonthlyIncome) },
+                { label: 'Annual turnover', value: formatInr(profile.annualTurnover) },
+                { label: 'Annual profit', value: formatInr(profile.annualProfit) },
+              ]}
+            />
+          </ProfileSection>
+
+          <ProfileSection title="Address">
+            <DetailGrid
+              columns={2}
+              rows={[
+                { label: 'Address line 1', value: profile.addressLine1 ?? '—' },
+                { label: 'Address line 2', value: profile.addressLine2 ?? '—' },
+                { label: 'City', value: profile.city ?? '—' },
+                { label: 'State', value: profile.state ?? '—' },
+                { label: 'Pincode', value: profile.pincode ?? '—' },
+              ]}
+            />
+          </ProfileSection>
+        </div>
+      </div>
+
+      <ProfileSection title="CIBIL details">
+        <CibilPersonalDetailsBlock
+          bureauReportAvailable={Boolean(row.bureauReport)}
+          cibilLoading={cibilLoading}
+          cibilError={cibilError}
+          cibilReport={cibilReport}
+        />
+      </ProfileSection>
+    </div>
+  );
+}
+
+function LoanDocumentCard({
+  label,
+  ready,
+  esigned,
+  docType,
+  applicationUuid,
+  token,
+}: {
+  label: string;
+  ready: boolean;
+  esigned: boolean;
+  docType: 'key-fact';
+  applicationUuid: string;
+  token: string | null;
+}) {
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState<string | null>(null);
+
+  const handleView = async () => {
+    if (!token) return;
+    setOpening(true);
     setOpenError(null);
     try {
-      const blob = await fetchApplicationLoanDocumentBlob(authToken, applicationUuid, 'key-fact');
+      const blob = await fetchApplicationLoanDocumentBlob(token, applicationUuid, docType);
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank', 'noopener');
       window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
     } catch (e) {
-      setOpenError(e instanceof Error ? e.message : 'Failed to open sanction letter.');
+      setOpenError(e instanceof Error ? e.message : 'Failed to open document.');
     } finally {
-      setOpeningDoc(false);
+      setOpening(false);
     }
   };
+
+  return (
+    <div className="rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)] px-3 py-2.5">
+      <span className="block text-[0.78rem] font-extrabold text-brand-navy">{label}</span>
+      {ready ? (
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <span className="text-[0.72rem] font-bold text-[#14523a]">Ready</span>
+          {esigned ? (
+            <span className="inline-flex items-center gap-0.5 rounded-[5px] border border-[rgba(29,157,112,0.3)] bg-[rgba(29,157,112,0.08)] px-1.5 py-0.5 text-[0.65rem] font-extrabold text-[#14523a]">
+              ✓ E-Signed
+            </span>
+          ) : (
+            <span className="inline-flex items-center rounded-[5px] border border-[rgba(180,100,0,0.25)] bg-[rgba(255,160,0,0.08)] px-1.5 py-0.5 text-[0.65rem] font-extrabold text-[#7a4800]">
+              Not E-Signed
+            </span>
+          )}
+          <button
+            type="button"
+            disabled={opening || !token}
+            onClick={() => void handleView()}
+            className="inline-flex items-center gap-1 rounded-[6px] border border-[rgba(20,150,243,0.28)] bg-[rgba(20,150,243,0.07)] px-2 py-0.5 text-[0.68rem] font-bold text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 hover:bg-[rgba(20,150,243,0.13)]"
+          >
+            {opening ? 'Opening…' : 'View PDF'}
+          </button>
+          {openError ? <span className="text-[0.68rem] font-semibold text-[#8d3434]">{openError}</span> : null}
+        </div>
+      ) : (
+        <span className="mt-0.5 block text-[0.72rem] font-bold text-brand-muted">Not generated yet</span>
+      )}
+    </div>
+  );
+}
+
+function LoanDetailsPanel({
+  row,
+  applicationUuid,
+  authToken,
+  onDataChange,
+}: {
+  row: LosApplicationDetails;
+  applicationUuid: string;
+  authToken: string | null;
+  onDataChange?: () => void;
+}) {
+  const [generatingDocs, setGeneratingDocs] = useState(false);
+  const [docsActionResult, setDocsActionResult] = useState<string | null>(null);
+  const details = row.details;
+  const sanctionAccepted = Boolean(row.loanDocuments.acceptedAt);
 
   if (!details) {
     return <p className="m-0 text-[0.88rem] text-brand-muted">No loan selection has been saved yet.</p>;
   }
 
   return (
-    <DetailGrid
-      rows={[
-        { label: 'Pre-approved amount', value: formatInr(row.preApprovedLoanAmount) },
-        { label: 'Selected loan amount', value: formatInr(details.loanAmount) },
-        {
-          label: 'Tenure',
-          value: details.loanTenure != null ? `${details.loanTenure} days` : '—',
-        },
-        { label: 'Repay date', value: formatDateOnly(details.loanMaturityDate) },
-        { label: 'ROI %', value: details.interestRate != null ? `${details.interestRate}%` : '—' },
-        { label: 'ROI amount', value: formatInr(details.interestAmount) },
-        { label: 'Processing fee %', value: details.processingFee != null ? `${details.processingFee}%` : '—' },
-        { label: 'Processing fee amount', value: formatInr(details.processingFeeAmount) },
-        { label: 'GST %', value: details.gstPercent != null ? `${details.gstPercent}%` : '—' },
-        { label: 'GST amount', value: formatInr(details.gstAmount) },
-        { label: 'Disbursed amount', value: formatInr(details.disbursedAmount) },
-        { label: 'Repay amount', value: formatInr(details.repaymentAmount) },
-        { label: 'Sanction letter accepted', value: sanctionAccepted ? 'Yes' : 'No' },
-        {
-          label: 'Download sanction letter',
-          value: row.loanDocuments.keyFactReady ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                disabled={openingDoc || !authToken}
-                onClick={() => void handleDownloadSanctionLetter()}
-                className="inline-flex items-center gap-1 rounded-[6px] border border-[rgba(20,150,243,0.28)] bg-[rgba(20,150,243,0.07)] px-2 py-0.5 text-[0.72rem] font-bold text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 hover:bg-[rgba(20,150,243,0.13)]"
-              >
-                {openingDoc ? 'Opening…' : 'View PDF'}
-              </button>
-              {row.loanDocuments.keyFactEsigned ? (
-                <span className="text-[0.68rem] font-bold text-[#14523a]">E-signed</span>
-              ) : null}
-              {openError ? <span className="text-[0.68rem] font-semibold text-[#8d3434]">{openError}</span> : null}
+    <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4">
+        <ProfileSection title="Loan amounts">
+          <DetailGrid
+            columns={2}
+            rows={[
+              { label: 'Pre-approved amount', value: formatInr(row.preApprovedLoanAmount) },
+              { label: 'Selected loan amount', value: formatInr(details.loanAmount) },
+              {
+                label: 'Tenure',
+                value: details.loanTenure != null ? `${details.loanTenure} days` : '—',
+              },
+              { label: 'Repay date', value: formatDateOnly(details.loanMaturityDate) },
+              { label: 'Disbursed amount', value: formatInr(details.disbursedAmount) },
+              { label: 'Repay amount', value: formatInr(details.repaymentAmount) },
+            ]}
+          />
+        </ProfileSection>
+
+        <ProfileSection title="Interest & fees">
+          <DetailGrid
+            columns={2}
+            rows={[
+              { label: 'ROI %', value: details.interestRate != null ? `${details.interestRate}%` : '—' },
+              { label: 'ROI amount', value: formatInr(details.interestAmount) },
+              { label: 'Processing fee %', value: details.processingFee != null ? `${details.processingFee}%` : '—' },
+              { label: 'Processing fee amount', value: formatInr(details.processingFeeAmount) },
+              { label: 'GST %', value: details.gstPercent != null ? `${details.gstPercent}%` : '—' },
+              { label: 'GST amount', value: formatInr(details.gstAmount) },
+            ]}
+          />
+        </ProfileSection>
+
+        <ProfileSection title="Sanction letter">
+          <DetailGrid
+            columns={2}
+            rows={[
+              { label: 'Sanction letter accepted', value: sanctionAccepted ? 'Yes' : 'No' },
+              { label: 'Sanction letter accepted at', value: formatDateTime(row.loanDocuments.acceptedAt) },
+            ]}
+          />
+        </ProfileSection>
+      </div>
+
+      <ProfileSection title="Loan documents">
+        <ProfileSubheading>Generate sanction letter</ProfileSubheading>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            disabled={generatingDocs || !authToken}
+            onClick={async () => {
+              if (!authToken) return;
+              setGeneratingDocs(true);
+              setDocsActionResult(null);
+              try {
+                const result = await generateApplicationLoanDocuments(authToken, applicationUuid);
+                setDocsActionResult(`Generated: ${result.generated.join(', ')}`);
+                onDataChange?.();
+              } catch (e) {
+                setDocsActionResult(e instanceof Error ? e.message : 'Failed to generate documents.');
+              } finally {
+                setGeneratingDocs(false);
+              }
+            }}
+            className="inline-flex min-h-[38px] cursor-pointer items-center gap-2 rounded-[10px] border border-[rgba(23,44,113,0.18)] bg-[rgba(23,44,113,0.06)] px-4 text-[0.82rem] font-bold text-brand-navy disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {generatingDocs ? 'Generating…' : 'Generate PDFs'}
+          </button>
+          {row.lead.profile?.fullName && row.details?.loanAmount ? null : (
+            <span className="text-[0.78rem] text-[#b45309]">Loan selection must be complete before generating.</span>
+          )}
+          {docsActionResult ? (
+            <span
+              className={`text-[0.78rem] font-semibold ${docsActionResult.startsWith('Generated') ? 'text-[#14523a]' : 'text-[#8d3434]'}`}
+            >
+              {docsActionResult}
+            </span>
+          ) : null}
+        </div>
+        <div className="mt-3 grid gap-2">
+          <LoanDocumentCard
+            label="Sanction letter cum KFS"
+            ready={row.loanDocuments.keyFactReady}
+            esigned={row.loanDocuments.keyFactEsigned}
+            docType="key-fact"
+            applicationUuid={applicationUuid}
+            token={authToken}
+          />
+          {row.loanDocuments.acceptedAt ? (
+            <div className="rounded-[10px] border border-[rgba(29,157,112,0.2)] bg-[rgba(29,157,112,0.06)] px-3 py-2.5">
+              <span className="block text-[0.72rem] font-extrabold text-brand-muted">Accepted by customer</span>
+              <span className="block text-[0.78rem] font-bold text-[#14523a]">{formatDateTime(row.loanDocuments.acceptedAt)}</span>
             </div>
-          ) : (
-            'Not generated yet'
-          ),
-        },
-        { label: 'Sanction letter accepted at', value: formatDateTime(row.loanDocuments.acceptedAt) },
-      ]}
-    />
+          ) : null}
+        </div>
+      </ProfileSection>
+    </div>
   );
 }
 
@@ -218,22 +587,122 @@ function ReferenceDetailsPanel({ row }: { row: LosApplicationDetails }) {
 }
 
 function KycDetailPanel({ row }: { row: LosApplicationDetails }) {
-  const aadhaar = row.aadhaarDetail;
+  return (
+    <div className="grid gap-4">
+      <DetailGrid
+        rows={[
+          { label: 'KYC status', value: `${row.kycStatusLabel} (${row.kycStatus})` },
+          { label: 'KYC fetched at', value: formatDateTime(row.kycCompletedAt) },
+          { label: 'Liveness passed', value: row.livenessPassed ? 'Yes' : 'No' },
+          { label: 'Liveness checked at', value: formatDateTime(row.livenessCheckedAt) },
+        ]}
+      />
+
+      {row.agreement ? (
+        <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)]">
+          <div className="flex items-center gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
+            <span className="text-[0.58rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">Agreement</span>
+            <span className="w-px h-3 bg-[rgba(23,44,113,0.1)]" aria-hidden />
+            <span className="text-[0.82rem] font-extrabold text-brand-navy">E-sign & legal</span>
+          </div>
+          <div className="px-3 py-2.5">
+            <DetailGrid
+              rows={[
+                { label: 'Document', value: row.agreement.documentName ?? '—' },
+                { label: 'Signed at', value: formatDateTime(row.agreement.signedAt ?? undefined) },
+                { label: 'IP address', value: row.agreement.ipAddress ?? '—' },
+              ]}
+            />
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function leadSourceSummary(sourceName: string | null | undefined, sourceType: string | null | undefined): string {
+  if (!sourceName) return 'Unattributed';
+  return sourceType ? `${sourceName} · ${sourceType}` : sourceName;
+}
+
+function formatLeadSourceType(type: string | null | undefined) {
+  if (!type) return '—';
+  return type
+    .toLowerCase()
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function SourcesUtmPanel({ row }: { row: LosApplicationDetails }) {
+  const utms = row.lead.utms ?? [];
 
   return (
-    <DetailGrid
-      rows={[
-        { label: 'KYC status', value: `${row.kycStatusLabel} (${row.kycStatus})` },
-        { label: 'KYC fetched at', value: formatDateTime(row.kycCompletedAt) },
-        { label: 'Liveness passed', value: row.livenessPassed ? 'Yes' : 'No' },
-        { label: 'Liveness checked at', value: formatDateTime(row.livenessCheckedAt) },
-        { label: 'Aadhaar name', value: formatPersonName(aadhaar?.fullName) },
-        { label: 'Aadhaar DOB', value: dobWithAge(aadhaar?.dateOfBirth) },
-        { label: 'Aadhaar gender', value: aadhaar?.gender ?? '—' },
-        { label: 'Aadhaar number', value: aadhaar?.maskedAadhaar ?? '—' },
-        { label: 'Aadhaar address', value: aadhaar?.address ?? '—' },
-      ]}
-    />
+    <div className="grid gap-4">
+      <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)]">
+        <div className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
+          <span className="text-[0.82rem] font-extrabold text-brand-navy">Lead source</span>
+        </div>
+        <div className="px-3 py-2.5">
+          <DetailGrid
+            rows={[
+              { label: 'Source name', value: row.lead.sourceName ?? 'Unattributed' },
+              { label: 'Source type', value: formatLeadSourceType(row.lead.sourceType) },
+              { label: 'Attribution', value: leadSourceSummary(row.lead.sourceName, row.lead.sourceType) },
+            ]}
+          />
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)]">
+        <div className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
+          <span className="text-[0.82rem] font-extrabold text-brand-navy">UTM tags</span>
+          <span className="ml-2 text-[0.76rem] font-semibold text-brand-muted">
+            {utms.length} capture{utms.length === 1 ? '' : 's'}
+          </span>
+        </div>
+        {utms.length === 0 ? (
+          <p className="m-0 px-3 py-4 text-[0.88rem] text-brand-muted">No UTM parameters captured for this lead.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-[0.84rem]">
+              <thead>
+                <tr className="bg-[rgba(23,44,113,0.04)]">
+                  {['Captured at', 'Source', 'Medium', 'Campaign', 'Term', 'Content'].map((label) => (
+                    <th
+                      key={label}
+                      className="border-b border-[rgba(23,44,113,0.08)] px-3 py-2 text-left text-[0.68rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted"
+                    >
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {utms.map((utm, index) => (
+                  <tr key={`${utm.capturedAt}-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-[rgba(248,250,255,0.55)]'}>
+                    <td className="border-b border-[rgba(23,44,113,0.04)] px-3 py-2.5 font-semibold text-brand-text whitespace-nowrap">
+                      {formatDateTime(utm.capturedAt)}
+                    </td>
+                    {[utm.source, utm.medium, utm.campaign, utm.term, utm.content].map((value, cellIndex) => (
+                      <td key={cellIndex} className="border-b border-[rgba(23,44,113,0.04)] px-3 py-2.5">
+                        {value ? (
+                          <span className="inline-block rounded-[6px] bg-[rgba(59,130,246,0.08)] px-2 py-0.5 font-semibold text-[0.81rem] text-[#1e40af]">
+                            {value}
+                          </span>
+                        ) : (
+                          <span className="text-brand-muted">—</span>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -270,15 +739,15 @@ export function ApplicationOverviewCibilSection({
   onReportCreated?: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<OverviewTab>('profile');
-  const cibilScore = row.bureauReport?.cibilScore ?? row.eligibility?.cibilScore;
 
   const tabs: Array<{ id: OverviewTab; label: string }> = [
-    { id: 'profile', label: 'Customer profile' },
+    { id: 'profile', label: 'Personal details' },
     { id: 'cibil', label: 'CIBIL report' },
     { id: 'loan', label: 'Loan details' },
-    { id: 'references', label: 'Reference details' },
     { id: 'kyc', label: 'KYC detail' },
     { id: 'bank', label: 'Bank details' },
+    { id: 'references', label: 'Reference details' },
+    { id: 'sources', label: 'Sources & UTMs' },
   ];
 
   return (
@@ -286,20 +755,6 @@ export function ApplicationOverviewCibilSection({
       className="overflow-hidden rounded-[12px] border border-[rgba(23,44,113,0.09)]"
       style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,246,255,0.95))' }}
     >
-      <div className="flex flex-wrap items-center gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.7)] px-4 py-2.5">
-        <span className="inline-flex min-h-[36px] items-center rounded-[10px] bg-brand-navy px-4 text-[0.84rem] font-extrabold text-white shadow-sm">
-          Overview
-        </span>
-        <span className="text-[0.8rem] font-bold text-brand-muted">
-          CIBIL report
-          {cibilScore != null ? (
-            <span className="ml-1.5 inline-flex rounded-full bg-[rgba(20,150,243,0.12)] px-1.5 py-0.5 text-[0.62rem] font-extrabold text-brand-blue">
-              {cibilScore}
-            </span>
-          ) : null}
-        </span>
-      </div>
-
       <nav
         className="flex flex-wrap gap-1 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.45)] p-1.5"
         aria-label="Application overview sections"
@@ -323,16 +778,24 @@ export function ApplicationOverviewCibilSection({
       </nav>
 
       <div className={activeTab === 'cibil' ? 'p-2' : 'px-4 py-3'}>
-        {activeTab === 'profile' ? <CustomerProfilePanel row={row} /> : null}
+        {activeTab === 'profile' ? (
+          <CustomerProfilePanel row={row} applicationUuid={applicationUuid} authToken={authToken} />
+        ) : null}
         {activeTab === 'cibil' ? (
           <ApplicationCibilReportTab applicationUuid={applicationUuid} onReportCreated={onReportCreated} />
         ) : null}
         {activeTab === 'loan' ? (
-          <LoanDetailsPanel row={row} applicationUuid={applicationUuid} authToken={authToken} />
+          <LoanDetailsPanel
+            row={row}
+            applicationUuid={applicationUuid}
+            authToken={authToken}
+            onDataChange={onReportCreated}
+          />
         ) : null}
-        {activeTab === 'references' ? <ReferenceDetailsPanel row={row} /> : null}
         {activeTab === 'kyc' ? <KycDetailPanel row={row} /> : null}
         {activeTab === 'bank' ? <BankDetailsPanel row={row} /> : null}
+        {activeTab === 'references' ? <ReferenceDetailsPanel row={row} /> : null}
+        {activeTab === 'sources' ? <SourcesUtmPanel row={row} /> : null}
       </div>
     </section>
   );

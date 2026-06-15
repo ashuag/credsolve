@@ -99,7 +99,11 @@ function ProfileCriterionModal({
   );
 }
 
-export function ProfileEligibilityPanel() {
+export function ProfileEligibilityPanel({
+  breType,
+}: {
+  breType?: 'PRE_BRE' | 'POST_BRE';
+} = {}) {
   const [criteria, setCriteria] = useState<LosEligibilityCriterion[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -162,7 +166,8 @@ export function ProfileEligibilityPanel() {
 
   const filteredCriteria = useMemo(() => {
     const term = search.trim().toLowerCase();
-    const filtered = criteria.filter((item) => (
+    const scoped = breType ? criteria.filter((item) => item.breType === breType) : criteria;
+    const filtered = scoped.filter((item) => (
       term === ''
       || item.key.toLowerCase().includes(term)
       || item.label.toLowerCase().includes(term)
@@ -171,13 +176,36 @@ export function ProfileEligibilityPanel() {
     ));
 
     return applyStatusFilter(filtered, statusFilter);
-  }, [criteria, search, statusFilter]);
+  }, [breType, criteria, search, statusFilter]);
 
   const summary = useMemo(() => {
-    const total = criteria.length;
-    const active = criteria.filter((item) => item.isActive).length;
+    const scoped = breType ? criteria.filter((item) => item.breType === breType) : criteria;
+    const total = scoped.length;
+    const active = scoped.filter((item) => item.isActive).length;
     return { total, active, inactive: total - active };
-  }, [criteria]);
+  }, [breType, criteria]);
+
+  const pageCopy =
+    breType === 'POST_BRE'
+      ? {
+          title: 'Post BRE',
+          description:
+            'Manage post-bureau eligibility thresholds used after CIBIL pull, including score floors, DPD windows, enquiry limits, and tradeline rules.',
+          loading: 'Loading post-BRE criteria...',
+        }
+      : breType === 'PRE_BRE'
+        ? {
+            title: 'Pre BRE',
+            description:
+              'Manage pre-bureau eligibility rules applied before CIBIL pull, including age, occupation, gender, and negative serviceability enforcement.',
+            loading: 'Loading pre-BRE criteria...',
+          }
+        : {
+            title: 'Profile Eligibility Check',
+            description:
+              'Manage profile-level eligibility rules used during screening, including stored threshold values and whether each rule is currently enforced.',
+            loading: 'Loading profile eligibility criteria...',
+          };
 
   return (
     <>
@@ -196,12 +224,12 @@ export function ProfileEligibilityPanel() {
           </div>
         ) : loading ? (
           <div className="rounded-[12px] border border-[rgba(23,44,113,0.08)] bg-[rgba(255,255,255,0.9)] p-8 text-center text-[0.88rem] text-brand-muted">
-            Loading profile eligibility criteria...
+            {pageCopy.loading}
           </div>
         ) : (
           <PageShell
-            title="Profile Eligibility Check"
-            description="Manage profile-level eligibility rules used during screening, including stored threshold values and whether each rule is currently enforced."
+            title={pageCopy.title}
+            description={pageCopy.description}
             search={search}
             onSearchChange={setSearch}
             searchPlaceholder="Search rules, labels, keys, values..."

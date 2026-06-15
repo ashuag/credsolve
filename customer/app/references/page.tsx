@@ -165,7 +165,7 @@ export default function ReferencesPage() {
       if (refresh) {
         await refresh();
       }
-      router.push('/email-verify');
+      router.push('/thank-you');
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : 'Unable to save references. Please try again.');
     } finally {
@@ -180,7 +180,7 @@ export default function ReferencesPage() {
           Personal <span className="text-brand-blue">References</span>
         </h2>
         <p className="m-0 text-[0.88rem] text-slate-600 leading-relaxed">
-          Add two people we can contact. Next you will verify your email, then review and accept the loan agreement.
+          Add two people we can contact. This is the final step before we submit your application for review.
         </p>
       </div>
 
@@ -249,7 +249,7 @@ export default function ReferencesPage() {
         ))}
 
         <button type="submit" className="mc-btn-primary w-full" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving…' : 'Continue to email verification'}
+          {isSubmitting ? 'Saving…' : 'Submit application'}
         </button>
       </form>
 
@@ -258,7 +258,7 @@ export default function ReferencesPage() {
           eyebrow="References"
           title="Saving your references"
           description="We are storing your reference contacts securely."
-          steps={['Validating numbers', 'Saving references', 'Opening email verification']}
+          steps={['Validating numbers', 'Saving references', 'Completing your application']}
         />
       ) : null}
     </section>
@@ -274,9 +274,9 @@ export default function ReferencesPage() {
             Almost <span className="text-[#60a5fa]">there</span>
           </>
         }
-        leftDescription="Two references, then email verification, then your sanction letter and loan agreement."
+        leftDescription="Two references are the last step after bank verification. Then your application is complete."
         mobileStepLabel="References"
-        mobileOnBack={() => router.push('/loan-selection')}
+        mobileOnBack={() => router.push('/bank-details')}
       />
     </CustomerJourneyGuard>
   );

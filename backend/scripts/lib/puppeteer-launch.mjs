@@ -102,11 +102,12 @@ export async function launchPuppeteerBrowser(puppeteer, backendRoot) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (
-      message.includes('shared libraries')
+      message.includes('Could not find Chrome')
+      || message.includes('shared libraries')
       || message.includes('Failed to launch the browser process')
       || message.includes('Code: 127')
     ) {
-      throw new Error(`${message}\n\n${CHROMIUM_INSTALL_HINT}`);
+      throw new Error(`${message}\n\n${CHROMIUM_INSTALL_HINT}\n\nOr run: node scripts/ensure-puppeteer-chrome.mjs`);
     }
     throw err;
   }

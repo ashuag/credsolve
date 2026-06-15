@@ -71,6 +71,7 @@ export default function BankDetailsPage() {
   const { session, refresh } = useCustomerSession();
 
   const [accountNumber, setAccountNumber] = useState('');
+  const [confirmAccountNumber, setConfirmAccountNumber] = useState('');
   const [ifscCode, setIfscCode] = useState('');
   const [ifscTouched, setIfscTouched] = useState(false);
 
@@ -81,9 +82,33 @@ export default function BankDetailsPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [verificationProgress, setVerificationProgress] = useState<{
+    attemptsUsed: number;
+    attemptsAllowed: number;
+    retryLimitReached: boolean;
+  } | null>(null);
 
   const accountHolderDisplay =
     session?.authenticated === true ? (session.profile?.fullName?.trim() ?? '') : '';
+
+  const normalizedAccount = accountNumber.replace(/\D/g, '');
+  const normalizedConfirmAccount = confirmAccountNumber.replace(/\D/g, '');
+  const accountsMatch =
+    normalizedAccount.length >= 9 &&
+    normalizedConfirmAccount.length >= 9 &&
+    normalizedAccount === normalizedConfirmAccount;
+  const accountMismatch =
+    normalizedConfirmAccount.length >= 9 && normalizedAccount !== normalizedConfirmAccount;
+
+  useEffect(() => {
+    if (session?.authenticated !== true) return;
+    setVerificationProgress(session.bankVerificationProgress ?? null);
+  }, [session]);
+
+  const retryLimitReached = verificationProgress?.retryLimitReached === true;
+  const attemptsRemaining = verificationProgress
+    ? Math.max(0, verificationProgress.attemptsAllowed - verificationProgress.attemptsUsed)
+    : null;
 
   const normalizedIfsc = ifscCode.trim().toUpperCase();
   const ifscValidationError = getIfscValidationError(ifscCode, {
@@ -145,8 +170,10 @@ export default function BankDetailsPage() {
   const ifscFieldMessageIsError = Boolean(ifscValidationError || ifscLookup === 'error');
 
   const canSubmit =
+    !retryLimitReached &&
     accountHolderDisplay.length >= 2 &&
-    /^\d{9,18}$/.test(accountNumber.replace(/\D/g, '')) &&
+    accountsMatch &&
+    /^\d{9,18}$/.test(normalizedAccount) &&
     isValidIfscCode(normalizedIfsc) &&
     ifscLookup === 'ok' &&
     ifscDetails !== null;
@@ -167,7 +194,7 @@ export default function BankDetailsPage() {
         setError(ifscLookupNote);
         return;
       }
-      setError('Enter a valid account number and IFSC, wait for branch details to load, and ensure your name is on file.');
+      setError('Enter a valid account number and confirmation, wait for branch details to load, and ensure your name is on file.');
       return;
     }
     setConfirmOpen(true);
@@ -180,7 +207,8 @@ export default function BankDetailsPage() {
       const bankName =
         ifscDetails && typeof ifscDetails.bankName === 'string' ? ifscDetails.bankName.trim() : undefined;
       const res = await submitVerifiedBankDetails({
-        accountNumber: accountNumber.replace(/\D/g, ''),
+        accountNumber: normalizedAccount,
+        confirmAccountNumber: normalizedConfirmAccount,
         ifscCode: ifscCode.trim().toUpperCase(),
         verifiedBankName: bankName,
       });
@@ -188,13 +216,18 @@ export default function BankDetailsPage() {
         setError('Empty response from bank verification.');
         return;
       }
+      setVerificationProgress({
+        attemptsUsed: res.attemptsUsed,
+        attemptsAllowed: res.attemptsAllowed,
+        retryLimitReached: res.retryLimitReached,
+      });
       if (!res.success || !res.pennyDropOk) {
         setError(res.message ?? 'Bank verification did not succeed. Please check your details.');
         return;
       }
       setConfirmOpen(false);
       await refresh();
-      router.replace('/thank-you');
+      router.replace('/references');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Verification failed.');
     } finally {
@@ -246,59 +279,101 @@ export default function BankDetailsPage() {
                 Account number
               </label>
               <input
-                className="w-full h-[52px] rounded-xl border border-slate-200 bg-white px-4 text-[0.95rem] font-bold text-brand-navy focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
-                type="text"
+                className="w-full h-[52px] rounded-xl border border-slate-200 bg-white px-4 text-[0.95rem] font-bold text-brand-navy focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all tracking-widest"
+                type="password"
                 placeholder="9-18 digit number"
                 value={accountNumber}
                 onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 18))}
                 inputMode="numeric"
+                autoComplete="off"
+                disabled={retryLimitReached}
               />
             </div>
             <div>
               <label className="block text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">
-                IFSC code
+                Confirm account number
               </label>
               <input
                 className={[
-                  'w-full h-[52px] rounded-xl border bg-white px-4 text-[0.95rem] font-bold text-brand-navy focus:ring-2 outline-none transition-all uppercase',
-                  ifscFieldMessageIsError
+                  'w-full h-[52px] rounded-xl border bg-white px-4 text-[0.95rem] font-bold text-brand-navy focus:ring-2 outline-none transition-all',
+                  accountMismatch
                     ? 'border-red-300 focus:ring-red-200'
                     : 'border-slate-200 focus:ring-brand-blue/20',
                 ].join(' ')}
                 type="text"
-                placeholder="HDFC0001234"
-                value={ifscCode}
-                maxLength={IFSC_CODE_LENGTH}
-                onChange={(e) => {
-                  setIfscTouched(false);
-                  setIfscCode(normalizeIfscInput(e.target.value));
-                }}
-                onBlur={() => setIfscTouched(true)}
-                autoComplete="off"
-                spellCheck={false}
-                aria-invalid={ifscFieldMessageIsError}
-                aria-describedby="ifsc-field-help"
+                placeholder="Re-enter account number"
+                value={confirmAccountNumber}
+                onChange={(e) => setConfirmAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 18))}
+                inputMode="numeric"
+                disabled={retryLimitReached}
               />
-              {ifscLookup === 'loading' ? (
-                <p className="mt-1.5 ml-1 text-[0.75rem] text-slate-500">Looking up IFSC…</p>
-              ) : null}
-              {ifscFieldMessage ? (
-                <p
-                  className={[
-                    'mt-1.5 ml-1 text-[0.75rem] font-semibold',
-                    ifscFieldMessageIsError ? 'text-red-600' : 'text-slate-500',
-                  ].join(' ')}
-                >
-                  {ifscFieldMessage}
+              {accountMismatch ? (
+                <p className="mt-1.5 ml-1 text-[0.75rem] font-semibold text-red-600">
+                  Account numbers do not match.
                 </p>
-              ) : null}
-              {ifscLookup === 'ok' && ifscDetails ? (
-                <p className="mt-1.5 ml-1 text-[0.75rem] font-semibold text-emerald-600">IFSC verified — branch details loaded.</p>
               ) : null}
             </div>
           </div>
 
+          <div>
+            <label className="block text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">
+              IFSC code
+            </label>
+            <input
+              className={[
+                'w-full h-[52px] rounded-xl border bg-white px-4 text-[0.95rem] font-bold text-brand-navy focus:ring-2 outline-none transition-all uppercase',
+                ifscFieldMessageIsError
+                  ? 'border-red-300 focus:ring-red-200'
+                  : 'border-slate-200 focus:ring-brand-blue/20',
+              ].join(' ')}
+              type="text"
+              placeholder="HDFC0001234"
+              value={ifscCode}
+              maxLength={IFSC_CODE_LENGTH}
+              onChange={(e) => {
+                setIfscTouched(false);
+                setIfscCode(normalizeIfscInput(e.target.value));
+              }}
+              onBlur={() => setIfscTouched(true)}
+              autoComplete="off"
+              spellCheck={false}
+              aria-invalid={ifscFieldMessageIsError}
+              aria-describedby="ifsc-field-help"
+              disabled={retryLimitReached}
+            />
+            {ifscLookup === 'loading' ? (
+              <p className="mt-1.5 ml-1 text-[0.75rem] text-slate-500">Looking up IFSC…</p>
+            ) : null}
+            {ifscFieldMessage ? (
+              <p
+                className={[
+                  'mt-1.5 ml-1 text-[0.75rem] font-semibold',
+                  ifscFieldMessageIsError ? 'text-red-600' : 'text-slate-500',
+                ].join(' ')}
+              >
+                {ifscFieldMessage}
+              </p>
+            ) : null}
+            {ifscLookup === 'ok' && ifscDetails ? (
+              <p className="mt-1.5 ml-1 text-[0.75rem] font-semibold text-emerald-600">IFSC verified — branch details loaded.</p>
+            ) : null}
+          </div>
+
           {ifscLookup === 'ok' && ifscDetails ? <IfscDetailPanel details={ifscDetails} /> : null}
+
+          {attemptsRemaining !== null && !retryLimitReached ? (
+            <p className="m-0 text-[0.8rem] text-slate-500">
+              Bank verification attempts remaining: <strong>{attemptsRemaining}</strong> of{' '}
+              {verificationProgress?.attemptsAllowed ?? attemptsRemaining}
+            </p>
+          ) : null}
+
+          {retryLimitReached ? (
+            <div className="p-3 rounded-lg bg-amber-50 border border-amber-100 text-amber-900 text-[0.85rem] font-semibold leading-relaxed">
+              You have used all bank verification attempts. Please contact support — you cannot proceed until your
+              account is verified.
+            </div>
+          ) : null}
 
           {error ? (
             <div className="p-3 rounded-lg bg-red-50 border border-red-100 flex items-center gap-2 text-red-600 text-[0.85rem] font-bold">
@@ -346,7 +421,7 @@ export default function BankDetailsPage() {
                 <span className="font-semibold">Account holder:</span> {accountHolderDisplay || '—'}
               </li>
               <li>
-                <span className="font-semibold">Account number:</span> {accountNumber.replace(/\D/g, '') || '—'}
+                <span className="font-semibold">Account number:</span> {normalizedAccount || '—'}
               </li>
               <li>
                 <span className="font-semibold">IFSC:</span> {ifscCode.trim().toUpperCase() || '—'}

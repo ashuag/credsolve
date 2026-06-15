@@ -12,6 +12,7 @@ import {
   type LoanCalculationSettingsResponse,
 } from '@/lib/api/eligibility';
 import { saveLoanSelection } from '@/lib/api/lead';
+import { CUSTOMER_EMAIL_JOURNEY_PATH } from '@/lib/api/customer-session';
 import { CUSTOMER_LOAN_PURPOSE_OPTIONS } from '@/lib/loan-reasons';
 import { computeFixedRepaymentDate } from '@/lib/repayment-date';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
@@ -172,7 +173,7 @@ export default function LoanSelectionPage() {
         loanPurpose,
       });
       await refresh();
-      router.push('/references');
+      router.push(CUSTOMER_EMAIL_JOURNEY_PATH);
     } catch (e) {
       setSettingsError(e instanceof Error ? e.message : 'Unable to save loan selection.');
       setIsSaving(false);

@@ -10,11 +10,11 @@ import { isLoanDocumentsJourneyComplete } from '@/lib/loan-documents-journey';
 type JourneyStage =
   | 'details'
   | 'preApproved'
-  | 'references'
   | 'email'
   | 'loanDocuments'
   | 'kyc'
   | 'bankDetails'
+  | 'references'
   | 'done';
 
 function stageFromSession(session: ReturnType<typeof useCustomerSession>['session']): JourneyStage {
@@ -22,11 +22,11 @@ function stageFromSession(session: ReturnType<typeof useCustomerSession>['sessio
   const j = session.journey;
   if (!j.detailsCompleted) return 'details';
   if (!j.loanSelectionCompleted) return 'preApproved';
-  if (!j.referencesCompleted) return 'references';
   if (!session.lead.emailVerified) return 'email';
   if (!isLoanDocumentsJourneyComplete(session)) return 'loanDocuments';
   if (!j.kycCompleted) return 'kyc';
   if (!j.bankDetailsCompleted) return 'bankDetails';
+  if (!j.referencesCompleted) return 'references';
   return 'done';
 }
 
@@ -79,10 +79,10 @@ function isPathAllowedForStage(stage: JourneyStage, path: string): boolean {
       return path.startsWith('/email-verify') || path.startsWith('/onboarding');
     case 'loanDocuments':
       return path === '/loan-documents';
-    case 'references':
-      return path === '/references' || path === '/loan-selection';
     case 'bankDetails':
       return path === '/bank-details';
+    case 'references':
+      return path === '/references';
     case 'done':
       return true;
   }

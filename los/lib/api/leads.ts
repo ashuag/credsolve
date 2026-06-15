@@ -134,6 +134,14 @@ export type LosApplicationDetails = {
     statusLabel: string;
     sourceName: string | null;
     sourceType: string | null;
+    utms: Array<{
+      capturedAt: string;
+      source: string | null;
+      medium: string | null;
+      campaign: string | null;
+      term: string | null;
+      content: string | null;
+    }>;
     panNumber: string | null;
     panVerified: number;
     bureauFetched: number;

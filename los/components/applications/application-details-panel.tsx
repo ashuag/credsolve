@@ -7,14 +7,12 @@ import { WorkspaceRecordHeader } from '@/components/shared/workspace-record-head
 import { buildApplicationJourney } from '@/lib/customer-journey';
 import { formatPersonName } from '@/lib/format-person-name';
 import {
-  generateApplicationLoanDocuments,
-  fetchApplicationLoanDocumentBlob,
   getApplicationDetails,
   resolveLosKycPhotoSrc,
   type LosApplicationDetails,
 } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
-import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -43,42 +41,18 @@ function leadSourceSummary(sourceName: string | null | undefined, sourceType: st
   return sourceType ? `${sourceName} · ${sourceType}` : sourceName;
 }
 
-function SectionCard({
-  eyebrow,
-  title,
-  children,
-}: {
-  eyebrow: string;
-  title: string;
-  description?: string; // kept for API compat, ignored
-  children: ReactNode;
-}) {
-  return (
-    <section
-      className="overflow-hidden rounded-[12px] border border-[rgba(23,44,113,0.09)]"
-      style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,246,255,0.95))' }}
-    >
-      <div className="flex items-center gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.7)] px-4 py-2.5">
-        <span className="text-[0.6rem] font-extrabold uppercase tracking-[0.14em]" style={{ color: 'rgba(94,103,130,0.6)' }}>{eyebrow}</span>
-        <span className="w-px h-3 bg-[rgba(23,44,113,0.1)]" aria-hidden />
-        <h2 className="m-0 text-[0.88rem] font-extrabold tracking-[-0.01em] text-brand-navy">{title}</h2>
-      </div>
-      <div className="px-4 py-3">{children}</div>
-    </section>
-  );
+function formatHeaderInr(value: string | null | undefined): string {
+  if (value == null || value === '') return '—';
+  const n = Number(value);
+  if (Number.isNaN(n)) return value;
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
 }
 
-function DetailGrid({ rows }: { rows: Array<{ label: string; value: ReactNode }> }) {
-  return (
-    <dl className="m-0 divide-y divide-[rgba(23,44,113,0.06)]">
-      {rows.map((row, idx) => (
-        <div key={`${row.label}-${idx}`} className="flex items-baseline gap-3 py-1.5 first:pt-0 last:pb-0">
-          <dt className="w-[140px] flex-shrink-0 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-brand-muted leading-tight">{row.label}</dt>
-          <dd className="m-0 min-w-0 flex-1 text-[0.84rem] font-semibold text-brand-text leading-snug">{row.value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
+function cibilScoreClassName(score: number | null | undefined): string {
+  if (score == null) return 'text-brand-muted';
+  if (score >= 750) return 'text-[#14523a]';
+  if (score >= 650) return 'text-[#7a4800]';
+  return 'text-[#8d3434]';
 }
 
 function CopyIdButton({ value, label }: { value: string; label: string }) {
@@ -108,11 +82,39 @@ function CopyIdButton({ value, label }: { value: string; label: string }) {
   );
 }
 
-function MonoValue({ children, copyLabel }: { children: string; copyLabel: string }) {
+function HeaderRecordIds({
+  applicationUuid,
+  leadUuid,
+  customerUuid,
+}: {
+  applicationUuid: string;
+  leadUuid: string;
+  customerUuid: string;
+}) {
+  const rows = [
+    { label: 'Application', value: applicationUuid, copyLabel: 'Application UUID' },
+    { label: 'Lead', value: leadUuid, copyLabel: 'Lead UUID' },
+    { label: 'Customer', value: customerUuid, copyLabel: 'Customer UUID' },
+  ];
+
   return (
-    <div className="flex flex-wrap items-start justify-between gap-2">
-      <code className="break-all text-[0.8rem] font-semibold leading-snug text-brand-navy">{children}</code>
-      <CopyIdButton value={children} label={copyLabel} />
+    <div className="min-w-0 rounded-[10px] border border-[rgba(23,44,113,0.09)] bg-[rgba(248,250,255,0.6)] px-3 py-2.5">
+      <p className="m-0 mb-2 text-[0.58rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">Record IDs</p>
+      <dl className="m-0 grid gap-2 sm:grid-cols-3">
+        {rows.map((row) => (
+          <div key={row.label} className="min-w-0 rounded-[8px] border border-[rgba(23,44,113,0.06)] bg-white px-2.5 py-2">
+            <dt className="text-[0.58rem] font-extrabold uppercase tracking-[0.1em]" style={{ color: 'rgba(94,103,130,0.65)' }}>
+              {row.label}
+            </dt>
+            <dd className="m-0 mt-1 flex items-start gap-1">
+              <code className="min-w-0 flex-1 truncate text-[0.68rem] font-semibold text-brand-navy" title={row.value}>
+                {row.value}
+              </code>
+              <CopyIdButton value={row.value} label={row.copyLabel} />
+            </dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }
@@ -167,80 +169,10 @@ function KycPhoto({
   );
 }
 
-function LoanDocumentCard({
-  label,
-  ready,
-  esigned,
-  docType,
-  applicationUuid,
-  token,
-}: {
-  label: string;
-  ready: boolean;
-  esigned: boolean;
-  docType: 'key-fact';
-  applicationUuid: string;
-  token: string | null;
-}) {
-  const [opening, setOpening] = useState(false);
-  const [openError, setOpenError] = useState<string | null>(null);
-
-  const handleView = async () => {
-    if (!token) return;
-    setOpening(true);
-    setOpenError(null);
-    try {
-      const blob = await fetchApplicationLoanDocumentBlob(token, applicationUuid, docType);
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener');
-      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
-    } catch (e) {
-      setOpenError(e instanceof Error ? e.message : 'Failed to open document.');
-    } finally {
-      setOpening(false);
-    }
-  };
-
-  return (
-    <div className="rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)] px-3 py-2.5">
-      <span className="block text-[0.78rem] font-extrabold text-brand-navy">{label}</span>
-      {ready ? (
-        <div className="mt-1 flex flex-wrap items-center gap-2">
-          <span className="text-[0.72rem] font-bold text-[#14523a]">Ready</span>
-          {esigned ? (
-            <span className="inline-flex items-center gap-0.5 rounded-[5px] border border-[rgba(29,157,112,0.3)] bg-[rgba(29,157,112,0.08)] px-1.5 py-0.5 text-[0.65rem] font-extrabold text-[#14523a]">
-              ✓ E-Signed
-            </span>
-          ) : (
-            <span className="inline-flex items-center rounded-[5px] border border-[rgba(180,100,0,0.25)] bg-[rgba(255,160,0,0.08)] px-1.5 py-0.5 text-[0.65rem] font-extrabold text-[#7a4800]">
-              Not E-Signed
-            </span>
-          )}
-          <button
-            type="button"
-            disabled={opening || !token}
-            onClick={() => void handleView()}
-            className="inline-flex items-center gap-1 rounded-[6px] border border-[rgba(20,150,243,0.28)] bg-[rgba(20,150,243,0.07)] px-2 py-0.5 text-[0.68rem] font-bold text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 hover:bg-[rgba(20,150,243,0.13)]"
-          >
-            {opening ? 'Opening…' : 'View PDF'}
-          </button>
-          {openError ? (
-            <span className="text-[0.68rem] font-semibold text-[#8d3434]">{openError}</span>
-          ) : null}
-        </div>
-      ) : (
-        <span className="block mt-0.5 text-[0.72rem] font-bold text-brand-muted">Not generated yet</span>
-      )}
-    </div>
-  );
-}
-
 export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: string }) {
   const [row, setRow] = useState<LosApplicationDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [generatingDocs, setGeneratingDocs] = useState(false);
-  const [docsActionResult, setDocsActionResult] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -315,6 +247,8 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
   const displayName = formatPersonName(profile?.fullName, 'Applicant (name pending)');
   const authToken = getToken();
   const journeySteps = buildApplicationJourney(row);
+  const cibilScore = row.bureauReport?.cibilScore ?? row.eligibility?.cibilScore ?? null;
+  const loanAmount = row.details?.loanAmount ?? row.preApprovedLoanAmount;
 
   return (
     <div className="grid gap-4 pb-2">
@@ -354,11 +288,44 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
         updatedAt={formatDateTime(row.updatedAt)}
         createdLabel="Opened"
         updatedLabel="Updated"
+        highlights={[
+          {
+            label: 'CIBIL score',
+            value: cibilScore ?? '—',
+            valueClassName: cibilScoreClassName(cibilScore),
+            accent:
+              cibilScore == null
+                ? undefined
+                : cibilScore >= 750
+                  ? '#22c55e'
+                  : cibilScore >= 650
+                    ? '#f59e0b'
+                    : '#ef4444',
+          },
+          {
+            label: 'Loan amount',
+            value: formatHeaderInr(loanAmount),
+            valueClassName: 'text-brand-navy',
+            accent: '#1496f3',
+          },
+          {
+            label: 'KYC',
+            value: row.kycStatusLabel,
+            valueClassName: 'text-brand-navy',
+            accent: '#6366f1',
+          },
+        ]}
         quickStats={[
           { label: 'Lead', value: row.lead.statusLabel },
-          { label: 'CIBIL', value: row.bureauReport?.cibilScore ?? row.eligibility?.cibilScore ?? '—' },
-          { label: 'KYC', value: row.kycStatusLabel },
+          { label: 'Email verified', value: formatDateTime(row.emailVerifiedAt ?? undefined) },
         ]}
+        recordIds={
+          <HeaderRecordIds
+            applicationUuid={row.uuid}
+            leadUuid={row.leadUuid}
+            customerUuid={row.customerUuid}
+          />
+        }
         trailing={
           authToken ? (
             <div className="flex gap-2">
@@ -413,107 +380,12 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
         authToken={authToken}
         onReportCreated={() => void load()}
       />
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <SectionCard eyebrow="Identifiers" title="Record IDs">
-          <DetailGrid
-            rows={[
-              { label: 'Application UUID', value: <MonoValue copyLabel="Application UUID">{row.uuid}</MonoValue> },
-              { label: 'Lead UUID', value: <MonoValue copyLabel="Lead UUID">{row.leadUuid}</MonoValue> },
-              { label: 'Customer UUID', value: <MonoValue copyLabel="Customer UUID">{row.customerUuid}</MonoValue> },
-              { label: 'Lead source', value: leadSourceSummary(row.lead.sourceName, row.lead.sourceType) },
-              { label: 'Email', value: row.email ?? '—' },
-              { label: 'Email verified at', value: formatDateTime(row.emailVerifiedAt ?? undefined) },
-            ]}
-          />
-        </SectionCard>
-
-        <SectionCard
-          eyebrow="Loan documents"
-          title="Generate sanction letter"
-        >
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              disabled={generatingDocs}
-              onClick={async () => {
-                const token = getToken();
-                if (!token) return;
-                setGeneratingDocs(true);
-                setDocsActionResult(null);
-                try {
-                  const result = await generateApplicationLoanDocuments(token, applicationUuid);
-                  setDocsActionResult(`Generated: ${result.generated.join(', ')}`);
-                  void load();
-                } catch (e) {
-                  setDocsActionResult(e instanceof Error ? e.message : 'Failed to generate documents.');
-                } finally {
-                  setGeneratingDocs(false);
-                }
-              }}
-              className="inline-flex min-h-[38px] cursor-pointer items-center gap-2 rounded-[10px] border border-[rgba(23,44,113,0.18)] bg-[rgba(23,44,113,0.06)] px-4 text-[0.82rem] font-bold text-brand-navy disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {generatingDocs ? 'Generating…' : 'Generate PDFs'}
-            </button>
-            {row.lead.profile?.fullName && row.details?.loanAmount ? null : (
-              <span className="text-[0.78rem] text-[#b45309]">
-                Loan selection must be complete before generating.
-              </span>
-            )}
-            {docsActionResult && (
-              <span className={`text-[0.78rem] font-semibold ${docsActionResult.startsWith('Generated') ? 'text-[#14523a]' : 'text-[#8d3434]'}`}>
-                {docsActionResult}
-              </span>
-            )}
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {(
-              [
-                {
-                  label: 'Sanction letter cum KFS',
-                  ready: row.loanDocuments.keyFactReady,
-                  esigned: row.loanDocuments.keyFactEsigned,
-                  docType: 'key-fact' as const,
-                },
-              ]
-            ).map((doc) => (
-              <LoanDocumentCard
-                key={doc.label}
-                label={doc.label}
-                ready={doc.ready}
-                esigned={doc.esigned}
-                docType={doc.docType}
-                applicationUuid={applicationUuid}
-                token={authToken}
-              />
-            ))}
-            {row.loanDocuments.acceptedAt && (
-              <div className="rounded-[10px] border border-[rgba(29,157,112,0.2)] bg-[rgba(29,157,112,0.06)] px-3 py-2.5 sm:col-span-2">
-                <span className="block text-[0.72rem] font-extrabold text-brand-muted">Accepted by customer</span>
-                <span className="block text-[0.78rem] font-bold text-[#14523a]">{formatDateTime(row.loanDocuments.acceptedAt)}</span>
-              </div>
-            )}
-          </div>
-        </SectionCard>
-
-        {row.agreement ? (
-          <SectionCard eyebrow="Agreement" title="E-sign & legal">
-            <DetailGrid
-              rows={[
-                { label: 'Document', value: row.agreement.documentName ?? '—' },
-                { label: 'Signed at', value: formatDateTime(row.agreement.signedAt ?? undefined) },
-                { label: 'IP address', value: row.agreement.ipAddress ?? '—' },
-              ]}
-            />
-          </SectionCard>
-        ) : null}
-      </div>
         </div>
 
         <aside className="min-w-0 lg:order-last">
           <CustomerJourneyTimeline
             title="Application progress"
-            subtitle="Intake through KYC and bank details"
+            subtitle="Intake through KYC, bank details, and references"
             steps={journeySteps}
             orientation="vertical"
           />

@@ -62,13 +62,13 @@ export function OtpVerificationForm({
 
   async function handleResendOtp() {
     if (!isValidCustomerMobile(currentMobile) || resendCountdown > 0) return;
+    otp.clear();
     setIsResending(true);
     setError('');
     setStatus('');
     try {
       const nextRequest = await sendCustomerOtp(currentMobile);
       setOtpRequest(nextRequest);
-      otp.clear();
       setStatus('A fresh OTP has been sent to your mobile number.');
       otp.inputRefs.current[0]?.focus();
     } catch (err) {

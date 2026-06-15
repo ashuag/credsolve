@@ -152,6 +152,7 @@ export class SaveLoanSelectionUseCase {
           livenessDoneAt: null,
           kycStatus: 0,
           kycCompletedAt: null,
+          pennyDropAttempts: 0,
         },
       });
 

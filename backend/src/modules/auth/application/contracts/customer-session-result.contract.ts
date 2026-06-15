@@ -37,7 +37,7 @@ export type CustomerPortalJourneySnapshot = {
   loanDocumentsCompleted: boolean;
   /** Customer has completed KYC (documents uploaded / verified). */
   kycCompleted: boolean;
-  /** Two personal references saved before bank details. */
+  /** Two personal references saved after bank details. */
   referencesCompleted: boolean;
   /** Customer has provided bank details (disbursement details). */
   bankDetailsCompleted: boolean;
@@ -84,6 +84,13 @@ export type CustomerLeadReferenceSnapshot = {
   relationId: number;
 };
 
+/** Penny-drop verification attempts for the active application (bank-details step). */
+export type CustomerBankVerificationProgressSnapshot = {
+  attemptsUsed: number;
+  attemptsAllowed: number;
+  retryLimitReached: boolean;
+};
+
 export type CustomerSessionResult =
   | {
       authenticated: true;
@@ -98,5 +105,7 @@ export type CustomerSessionResult =
       leadReferences: CustomerLeadReferenceSnapshot[];
       /** Active application DigiLocker / selfie / liveness state; `null` without an application row. */
       kycFaceProgress: CustomerKycFaceProgressSnapshot | null;
+      /** Penny-drop attempt counters while bank details are pending; `null` when not applicable. */
+      bankVerificationProgress: CustomerBankVerificationProgressSnapshot | null;
     }
   | { authenticated: false };

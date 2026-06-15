@@ -66,6 +66,7 @@ export class GetCustomerSessionUseCase {
       loanSelection: null,
       leadReferences: [],
       kycFaceProgress: null,
+      bankVerificationProgress: null,
     };
 
     let leadRow = await this.leads.findActiveByCustomerId(customer.id);
@@ -146,6 +147,7 @@ export class GetCustomerSessionUseCase {
             where: { id: application.id },
             select: {
               updatedAt: true,
+              pennyDropAttempts: true,
               details: {
                 select: {
                   loanAmount: true,
@@ -288,6 +290,17 @@ export class GetCustomerSessionUseCase {
           }
         : null;
 
+    const pennyDropRetryCount = await this.settings.loadPennyDropRetryCount();
+    const pennyDropAttempts = applicationExtras?.pennyDropAttempts ?? 0;
+    const bankVerificationProgress =
+      application && kycCompleted && !bankDetailsCompleted
+        ? {
+            attemptsUsed: pennyDropAttempts,
+            attemptsAllowed: pennyDropRetryCount,
+            retryLimitReached: pennyDropAttempts >= pennyDropRetryCount,
+          }
+        : null;
+
     return {
       authenticated: true,
       customerId: customer.uuid,
@@ -311,6 +324,7 @@ export class GetCustomerSessionUseCase {
       loanSelection,
       leadReferences,
       kycFaceProgress,
+      bankVerificationProgress,
     };
   }
 

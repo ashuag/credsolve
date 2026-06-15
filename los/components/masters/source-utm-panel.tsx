@@ -3,7 +3,9 @@
 import {
   createSourceUtm,
   getMasters,
+  LOS_LEAD_SOURCE_TYPES,
   type LosLeadSourceMaster,
+  type LosLeadSourceType,
   type LosSourceUtmMaster,
   updateSourceUtm,
 } from '@/lib/api/masters';
@@ -22,6 +24,14 @@ const UTM_COLS: { key: keyof LosSourceUtmMaster; label: string }[] = [
   { key: 'utmTerm',        label: 'Term' },
   { key: 'utmContent',     label: 'Content' },
 ];
+
+function formatLeadSourceType(type: LosLeadSourceType) {
+  return type
+    .toLowerCase()
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
 
 export function SourceUtmPanel({
   mode = 'list',
@@ -43,6 +53,7 @@ export function SourceUtmPanel({
   const [formContent,  setFormContent]  = useState('');
 
   // list filters + pagination
+  const [sourceFilters, setSourceFilters] = useState<Record<string, string>>({});
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [page,     setPage]    = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -125,6 +136,19 @@ export function SourceUtmPanel({
   }
 
   // ── filtered + paginated rows ─────────────────────────────────────────────
+  const filteredSources = useMemo(() => {
+    return leadSources.filter((row) => {
+      const nameFilter = (sourceFilters.name ?? '').toLowerCase().trim();
+      const typeFilter = (sourceFilters.type ?? '').toLowerCase().trim();
+      const statusFilter = sourceFilters.isActive ?? '';
+      if (nameFilter && !row.name.toLowerCase().includes(nameFilter)) return false;
+      if (typeFilter && !row.type.toLowerCase().includes(typeFilter) && !formatLeadSourceType(row.type).toLowerCase().includes(typeFilter)) return false;
+      if (statusFilter === 'true' && !row.isActive) return false;
+      if (statusFilter === 'false' && row.isActive) return false;
+      return true;
+    });
+  }, [leadSources, sourceFilters]);
+
   const filtered = useMemo(() => {
     return sourceUtms.filter((row) =>
       UTM_COLS.every(({ key }) => {
@@ -248,13 +272,96 @@ export function SourceUtmPanel({
 
       {/* ── LIST ──────────────────────────────────────────────────────────── */}
       {mode === 'list' && (
+        <>
+        <section className="overflow-hidden rounded-[18px] border border-[rgba(23,44,113,0.1)] bg-white shadow-[0_2px_16px_rgba(23,44,113,0.07)]">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[linear-gradient(135deg,rgba(23,44,113,0.05),rgba(59,130,246,0.04))] px-5 py-4">
+            <div>
+              <h2 className="m-0 text-[1.05rem] font-extrabold text-brand-navy">Lead Sources</h2>
+              <p className="m-0 mt-0.5 text-[0.81rem] text-brand-muted">
+                {filteredSources.length} of {leadSources.length} source{leadSources.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+            <Link href="/masters/lead-sources" className="inline-flex min-h-[38px] items-center justify-center rounded-[8px] border border-[rgba(23,44,113,0.14)] px-4 text-[0.84rem] font-bold text-brand-navy no-underline hover:bg-[rgba(235,242,255,0.8)]">
+              Manage sources
+            </Link>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-[0.85rem]">
+              <thead>
+                <tr className="bg-[rgba(23,44,113,0.04)]">
+                  {['Name', 'Type', 'Status'].map((label) => (
+                    <th key={label} className="border-b border-[rgba(23,44,113,0.08)] px-4 py-[10px] text-left text-[0.7rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+                <tr className="bg-[rgba(248,250,255,0.9)]">
+                  <td className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2">
+                    <input
+                      value={sourceFilters.name ?? ''}
+                      onChange={(e) => setSourceFilters((prev) => ({ ...prev, name: e.target.value }))}
+                      placeholder="Filter…"
+                      className="w-full rounded-[7px] border border-[rgba(23,44,113,0.14)] bg-white px-2.5 py-1.5 text-[0.78rem] text-brand-text placeholder-brand-muted outline-none focus:border-[rgba(23,44,113,0.4)]"
+                    />
+                  </td>
+                  <td className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2">
+                    <select
+                      value={sourceFilters.type ?? ''}
+                      onChange={(e) => setSourceFilters((prev) => ({ ...prev, type: e.target.value }))}
+                      className="w-full rounded-[7px] border border-[rgba(23,44,113,0.14)] bg-white px-2 py-1.5 text-[0.78rem] text-brand-text outline-none focus:border-[rgba(23,44,113,0.4)]"
+                    >
+                      <option value="">All types</option>
+                      {LOS_LEAD_SOURCE_TYPES.map((type) => (
+                        <option key={type} value={type}>{formatLeadSourceType(type)}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2">
+                    <select
+                      value={sourceFilters.isActive ?? ''}
+                      onChange={(e) => setSourceFilters((prev) => ({ ...prev, isActive: e.target.value }))}
+                      className="w-full rounded-[7px] border border-[rgba(23,44,113,0.14)] bg-white px-2 py-1.5 text-[0.78rem] text-brand-text outline-none focus:border-[rgba(23,44,113,0.4)]"
+                    >
+                      <option value="">All</option>
+                      <option value="true">Active</option>
+                      <option value="false">Inactive</option>
+                    </select>
+                  </td>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredSources.map((row, i) => (
+                  <tr key={row.id} className={`${i % 2 === 0 ? 'bg-white' : 'bg-[rgba(248,250,255,0.55)]'} transition-colors hover:bg-[rgba(235,242,255,0.7)]`}>
+                    <td className="border-b border-[rgba(23,44,113,0.04)] px-4 py-3 font-bold text-brand-navy">{row.name}</td>
+                    <td className="border-b border-[rgba(23,44,113,0.04)] px-4 py-3 text-brand-muted">{formatLeadSourceType(row.type)}</td>
+                    <td className="border-b border-[rgba(23,44,113,0.04)] px-4 py-3">
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[0.74rem] font-bold ${row.isActive ? 'bg-[rgba(34,197,94,0.1)] text-[#15803d]' : 'bg-[rgba(156,163,175,0.15)] text-[#6b7280]'}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${row.isActive ? 'bg-[#22c55e]' : 'bg-[#9ca3af]'}`} />
+                        {row.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {filteredSources.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-4 py-10 text-center text-[0.88rem] text-brand-muted">
+                      {Object.values(sourceFilters).some(Boolean) ? 'No sources match your filters.' : 'No lead sources found.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <section className="overflow-hidden rounded-[18px] border border-[rgba(23,44,113,0.1)] bg-white shadow-[0_2px_16px_rgba(23,44,113,0.07)]">
           {/* header */}
           <div className="flex flex-wrap items-center justify-between gap-3 bg-[linear-gradient(135deg,rgba(23,44,113,0.05),rgba(59,130,246,0.04))] px-5 py-4">
             <div>
-              <h2 className="m-0 text-[1.05rem] font-extrabold text-brand-navy">Source UTM Configurations</h2>
+              <h2 className="m-0 text-[1.05rem] font-extrabold text-brand-navy">UTM Configurations</h2>
               <p className="m-0 mt-0.5 text-[0.81rem] text-brand-muted">
-                {filtered.length} of {sourceUtms.length} record{sourceUtms.length !== 1 ? 's' : ''}
+                {filtered.length} of {sourceUtms.length} UTM record{sourceUtms.length !== 1 ? 's' : ''}
               </p>
             </div>
             <Link href="/masters/source-utm/create" className="los-btn-primary no-underline">
@@ -483,6 +590,7 @@ export function SourceUtmPanel({
             </div>
           </div>
         </section>
+        </>
       )}
     </div>
   );

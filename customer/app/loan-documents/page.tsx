@@ -93,12 +93,15 @@ export default function LoanDocumentsPage() {
 
   async function handleResendOtp() {
     if (resendCountdown > 0 || isSendingOtp) return;
+    otp.clear();
     setIsSendingOtp(true);
     setOtpError('');
+    setOtpStatus('');
     try {
       const req = await sendLoanDocumentsOtp();
       setOtpRequest(req);
       setOtpStatus(req.debugOtp ? `Development OTP: ${req.debugOtp}` : 'A new code has been sent.');
+      otp.inputRefs.current[0]?.focus();
     } catch (e) {
       setOtpError(e instanceof Error ? e.message : 'Unable to resend OTP.');
     } finally {

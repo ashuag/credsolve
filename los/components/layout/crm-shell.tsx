@@ -96,6 +96,8 @@ const navGroups: { section: string; color: string; items: NavItem[] }[] = [
     section: 'BRE',
     color: '#1496f3',
     items: [
+      { href: '/eligibility-criteria/pre-bre', label: 'Pre BRE', icon: 'eligibility' },
+      { href: '/eligibility-criteria/post-bre', label: 'Post BRE', icon: 'eligibility' },
       { href: '/eligibility-criteria/credit-limit-eligibility-check', label: 'Credit Limit Tier', icon: 'eligibility' },
       { href: '/eligibility-criteria/negative-pincode', label: 'Negative Pincode', icon: 'eligibility' },
       { href: '/eligibility-criteria/negative-city', label: 'Negative City', icon: 'eligibility' },
@@ -157,6 +159,8 @@ const BREADCRUMBS: Record<string, string> = {
   '/eligibility-criteria/negative-pincode': 'Negative Pincode',
   '/eligibility-criteria/negative-city': 'Negative City',
   '/eligibility-criteria/negative-state': 'Negative State',
+  '/eligibility-criteria/pre-bre': 'Pre BRE',
+  '/eligibility-criteria/post-bre': 'Post BRE',
   '/developer-tools': 'Developer Tool',
   '/developer-tools/pre-bre-check': 'Pre BRE Check',
   '/developer-tools/post-bureau-check': 'Post BRE Check',
@@ -203,6 +207,25 @@ function breadcrumbLabel(pathname: string): string {
   if (/^\/applications\/[^/]+$/.test(pathname)) return 'Application detail';
   const seg = pathname.replace(/^\//, '').split('/')[0];
   return seg ? seg.charAt(0).toUpperCase() + seg.slice(1) : 'Home';
+}
+
+type BreadcrumbItem = { label: string; href?: string };
+
+/** Segments after the fixed "Home" link. */
+function breadcrumbTrail(pathname: string): BreadcrumbItem[] {
+  if (/^\/applications\/[^/]+$/.test(pathname)) {
+    return [
+      { label: 'Applications', href: '/applications' },
+      { label: 'Application detail' },
+    ];
+  }
+  if (/^\/leads\/[^/]+$/.test(pathname)) {
+    return [
+      { label: 'Leads', href: '/leads' },
+      { label: 'Lead detail' },
+    ];
+  }
+  return [{ label: breadcrumbLabel(pathname) }];
 }
 
 function canStartTrackedNavigation(event: ReactMouseEvent<HTMLDivElement>, anchor: HTMLAnchorElement) {
@@ -356,7 +379,7 @@ export function CrmShell({
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
   const notificationRef = useRef<HTMLDivElement | null>(null);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
-  const crumb = breadcrumbLabel(pathname);
+  const breadcrumbItems = breadcrumbTrail(pathname);
 
   // Load session + sidebar mode from localStorage on mount
   useEffect(() => {
@@ -738,9 +761,29 @@ export function CrmShell({
               )}
 
               <nav className="flex items-center gap-1.5 min-w-0 text-[0.84rem]" aria-label="Breadcrumb">
-                <Link href="/dashboard" className="font-semibold text-brand-muted hover:text-brand-navy transition-colors">Home</Link>
-                <span className="text-[rgba(94,103,130,0.5)]" aria-hidden>/</span>
-                <span className="font-bold text-brand-navy truncate">{crumb}</span>
+                <Link href="/dashboard" className="font-semibold text-brand-muted hover:text-brand-navy transition-colors shrink-0">
+                  Home
+                </Link>
+                {breadcrumbItems.map((item, index) => {
+                  const isLast = index === breadcrumbItems.length - 1;
+                  return (
+                    <span key={`${item.label}-${index}`} className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[rgba(94,103,130,0.5)] shrink-0" aria-hidden>
+                        /
+                      </span>
+                      {item.href && !isLast ? (
+                        <Link
+                          href={item.href}
+                          className="font-semibold text-brand-muted hover:text-brand-navy transition-colors truncate"
+                        >
+                          {item.label}
+                        </Link>
+                      ) : (
+                        <span className="font-bold text-brand-navy truncate">{item.label}</span>
+                      )}
+                    </span>
+                  );
+                })}
               </nav>
             </div>
 

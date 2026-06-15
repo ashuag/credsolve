@@ -72,20 +72,6 @@ export class SaveLeadReferencesUseCase {
     }
 
     await this.prisma.client.$transaction(async (tx) => {
-      // Saving references is the checkpoint before email verification.
-      // Reset email so the email-verify step is always required after this point.
-      await tx.application.updateMany({
-        where: { leadId: leadRow.id, customerId: customer.id },
-        data: {
-          email: null,
-          emailVerifiedAt: null,
-          emailVerificationType: null,
-          loanDocumentsAcceptedAt: null,
-          keyFactPdfRelativePath: null,
-          loanAgreementPdfRelativePath: null,
-        },
-      });
-
       await Promise.all(
         refs.map((ref) =>
           tx.leadReference.upsert({

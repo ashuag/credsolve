@@ -78,13 +78,13 @@ export function EmailOtpStep({
 
   async function handleResend() {
     if (!email || resendCountdown > 0 || isBootstrapping) return;
+    otp.clear();
     setIsResending(true);
     setError('');
     setStatus('');
     try {
       const next = await sendEmailOtp(email);
       onOtpRequestChange(next);
-      otp.clear();
       setStatus(next.debugOtp ? 'A fresh verification code is shown below.' : 'A fresh OTP has been sent to your email.');
       otp.inputRefs.current[0]?.focus();
     } catch (err) {

@@ -61,6 +61,12 @@ export type CustomerKycFaceProgress = {
   digilockerAadhaarDownloadMaxAttempts?: number;
 };
 
+export type CustomerBankVerificationProgress = {
+  attemptsUsed: number;
+  attemptsAllowed: number;
+  retryLimitReached: boolean;
+};
+
 export type CustomerSessionResponse =
   | {
       authenticated: true;
@@ -79,10 +85,11 @@ export type CustomerSessionResponse =
       loanSelection: CustomerLoanSelectionSnapshot | null;
       leadReferences: CustomerLeadReferenceSnapshot[];
       kycFaceProgress: CustomerKycFaceProgress | null;
+      bankVerificationProgress: CustomerBankVerificationProgress | null;
     }
   | { authenticated: false };
 
-/** Email entry + OTP during the loan journey (after references). */
+/** Email entry + OTP during the loan journey (after loan selection). */
 export const CUSTOMER_EMAIL_JOURNEY_PATH = '/email-verify';
 
 /** Returning-user login via email (`?mode=login`). */
@@ -90,7 +97,7 @@ export const CUSTOMER_EMAIL_VERIFY_PATH = '/email-verify?mode=login';
 
 /**
  * Next route after successful email OTP in an active loan application.
- * Order: references → email → email OTP → loan agreement → KYC → bank.
+ * Order: email → email OTP → loan agreement → KYC → bank → references.
  */
 export function getPostEmailVerificationPath(
   session: CustomerSessionResponse | null | undefined,
@@ -155,7 +162,6 @@ export function getCustomerJourneyResumePath(
   const journey = session.journey;
   if (!journey.detailsCompleted) return '/onboarding?mode=login';
   if (!journey.loanSelectionCompleted) return '/pre-approved-loan';
-  if (!journey.referencesCompleted) return '/references';
   if (!session.lead.emailVerified) return CUSTOMER_EMAIL_JOURNEY_PATH;
   if (!isLoanDocumentsJourneyComplete(session)) return '/loan-documents';
 
@@ -170,6 +176,7 @@ export function getCustomerJourneyResumePath(
 
   if (!journey.kycCompleted) return '/kyc';
   if (!journey.bankDetailsCompleted) return '/bank-details';
+  if (!journey.referencesCompleted) return '/references';
   return '/thank-you';
 }
 
@@ -219,7 +226,6 @@ export function getKycHubBackPath(session: Extract<CustomerSessionResponse, { au
   const emailVerified = session.lead?.emailVerified ?? false;
   if (!j.detailsCompleted) return '/apply-for-loan';
   if (!j.loanSelectionCompleted) return '/pre-approved-loan';
-  if (!j.referencesCompleted) return '/references';
   if (!emailVerified) return CUSTOMER_EMAIL_JOURNEY_PATH;
   if (!isLoanDocumentsJourneyComplete(session)) return '/loan-documents';
   return CUSTOMER_EMAIL_JOURNEY_PATH;
@@ -229,7 +235,7 @@ export function getKycHubBackPath(session: Extract<CustomerSessionResponse, { au
 let sessionRequest: Promise<CustomerSessionResponse> | null = null;
 
 export type FetchCustomerSessionOptions = {
-  /** When true, always hits `/auth/me` (e.g. after saving references before email verify). */
+  /** When true, always hits `/auth/me` (e.g. after saving references before thank-you). */
   force?: boolean;
 };
 

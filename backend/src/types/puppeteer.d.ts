@@ -10,7 +10,8 @@ declare module 'puppeteer' {
   }
 
   export function launch(options?: Record<string, unknown>): Promise<Browser>;
+  export function executablePath(): string;
 
-  const puppeteer: { launch: typeof launch };
+  const puppeteer: { launch: typeof launch; executablePath: typeof executablePath };
   export default puppeteer;
 }

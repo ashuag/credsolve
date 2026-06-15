@@ -90,7 +90,7 @@ export function buildLeadIntakeJourney(lead: LosLeadDetails): JourneyStep[] {
   return markActiveStep(steps);
 }
 
-/** Full customer journey on an application workspace. */
+/** Full customer journey on an application workspace (matches customer portal order). */
 export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep[] {
   const profile = row.lead.profile;
   const rejected =
@@ -111,11 +111,11 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
     step('profile', 'Profile', profileDone, false),
     step('credit', 'PAN & bureau', panDone && bureauDone, rejected && !bureauDone, row.bureauReport?.cibilScore != null ? `CIBIL ${row.bureauReport.cibilScore}` : undefined),
     step('loan', 'Loan offer', loanDone, false, row.details?.loanAmount ? `₹${row.details.loanAmount}` : undefined),
-    step('refs', 'References', refsDone, false, refsDone ? `${row.referencesCount} saved` : undefined),
     step('email', 'Email OTP', emailDone, false),
     step('letter', 'Sanction letter', docsDone, false, row.loanDocuments.acceptedAt ? 'Accepted' : undefined),
     step('kyc', 'KYC & liveness', kycDone, kycFailed, row.kycStatusLabel),
     step('bank', 'Bank details', bankDone, false),
+    step('refs', 'References', refsDone, false, refsDone ? `${row.referencesCount} saved` : undefined),
   ];
 
   return markActiveStep(steps);

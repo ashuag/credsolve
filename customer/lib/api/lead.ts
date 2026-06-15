@@ -256,10 +256,14 @@ export type SubmitVerifiedBankResponse = {
   applicationStatus: string | null;
   message?: string;
   vendor?: unknown;
+  attemptsUsed: number;
+  attemptsAllowed: number;
+  retryLimitReached: boolean;
 };
 
 export async function submitVerifiedBankDetails(payload: {
   accountNumber: string;
+  confirmAccountNumber: string;
   ifscCode: string;
   verifiedBankName?: string;
 }): Promise<SubmitVerifiedBankResponse | null> {
@@ -267,6 +271,7 @@ export async function submitVerifiedBankDetails(payload: {
     '/applications/bank/submit-verified',
     {
       accountNumber: payload.accountNumber.replace(/\D/g, ''),
+      confirmAccountNumber: payload.confirmAccountNumber.replace(/\D/g, ''),
       ifscCode: payload.ifscCode.trim().toUpperCase(),
       ...(payload.verifiedBankName?.trim()
         ? { verifiedBankName: payload.verifiedBankName.trim() }

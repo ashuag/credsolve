@@ -34,6 +34,7 @@ model Application {
   /// `customer/{uuid}/loan-documents/{app_uuid}/loan-agreement.pdf`
   loanAgreementPdfRelativePath String?                @map("loan_agreement_pdf_relative_path") @db.VarChar(512)
   loanDocumentsAcceptedAt      DateTime?              @map("loan_documents_accepted_at")
+  pennyDropAttempts            Int                    @default(0) @map("penny_drop_attempts") @db.SmallInt
   createdAt                    DateTime               @default(now()) @map("created_at")
   updatedAt                    DateTime               @updatedAt @map("updated_at")
 

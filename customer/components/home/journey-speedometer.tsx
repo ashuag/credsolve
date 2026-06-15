@@ -6,10 +6,10 @@ import { useJourneyProgressOptional } from '@/components/journey/journey-progres
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { isCustomerPortalSignedIn } from '@/lib/api/customer-session';
 
-const JOURNEY_STEPS = ['Profile', 'Apply', 'Refs', 'Email', 'Letter', 'KYC', 'Bank'] as const;
+const JOURNEY_STEPS = ['Profile', 'Apply', 'Email', 'Letter', 'KYC', 'Bank', 'Refs'] as const;
 
 /**
- * Milestones: mobile OTP → profile → loan → references → email → sanction letter → KYC → bank.
+ * Milestones: mobile OTP → profile → loan → email → sanction letter → KYC → bank → references.
  */
 function milestonesCompleted(session: ReturnType<typeof useCustomerSession>['session']): number {
   if (!session || session.authenticated !== true) return 0;
@@ -18,11 +18,11 @@ function milestonesCompleted(session: ReturnType<typeof useCustomerSession>['ses
   let m = 1;
   if (j.detailsCompleted) m++;
   if (j.loanSelectionCompleted) m++;
-  if (j.referencesCompleted) m++;
   if (emailVerified) m++;
   if (j.loanDocumentsCompleted) m++;
   if (j.kycCompleted) m++;
   if (j.bankDetailsCompleted) m++;
+  if (j.referencesCompleted) m++;
   return Math.min(JOURNEY_STEPS.length, m);
 }
 
@@ -39,17 +39,17 @@ function stepIndexFromMilestones(m: number): number {
 
 /**
  * Order matters: first match wins. Labels always match `JOURNEY_STEPS[stepIndex]`.
- * Journey: profile → loan → references → email → sanction letter → KYC → bank.
+ * Journey: profile → loan → email → sanction letter → KYC → bank → references.
  */
 function getStepIndexFromPathname(pathname: string): number {
   const p = pathname || '';
   const last = JOURNEY_STEPS.length - 1;
   if (p.includes('/thank-you-interest') || p.includes('/thank-you')) return last;
-  if (p.includes('/bank-details')) return last;
-  if (p.includes('/kyc')) return 5;
-  if (p.includes('/loan-documents')) return 4;
-  if (p.includes('/email-verify')) return 3;
-  if (p.includes('/references')) return 2;
+  if (p.includes('/references')) return last;
+  if (p.includes('/bank-details')) return 5;
+  if (p.includes('/kyc')) return 4;
+  if (p.includes('/loan-documents')) return 3;
+  if (p.includes('/email-verify')) return 2;
   if (p.includes('/pre-approved-loan') || p.includes('/loan-selection') || p.includes('/loan-offer')) {
     return 1;
   }

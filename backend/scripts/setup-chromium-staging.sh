@@ -99,8 +99,9 @@ if BROWSER_PATH="$(pick_browser)"; then
   "$BROWSER_PATH" --version || true
   set_env_browser_path "$BROWSER_PATH"
 else
-  echo "==> No system Chrome/Chromium binary found; using Puppeteer bundled Chrome with runtime libraries."
+  echo "==> No system Chrome/Chromium binary found; ensuring Puppeteer bundled Chrome."
   clear_env_browser_path
+  node "$ROOT/scripts/ensure-puppeteer-chrome.mjs" || true
 fi
 
 echo ""
