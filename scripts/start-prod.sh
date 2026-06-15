@@ -67,6 +67,7 @@ check_pm2_app() {
   local app_name="$1"
   local restarts_before="$2"
   local has_issue=0
+  local has_warning=0
 
   log "Checking PM2: ${app_name}"
 
@@ -94,29 +95,53 @@ check_pm2_app() {
     warn "${app_name}: uptime too low (${uptime_ms}ms < ${MIN_UPTIME_MS}ms) — may still be crashing"
     has_issue=1
   else
-    ok "${app_name}: healthy"
+    ok "${app_name}: process healthy"
   fi
 
-  echo ""
-  log "Recent stderr for ${app_name} (last ${PM2_LOG_LINES} lines):"
-  local err_log
-  err_log="$(pm2 logs "$app_name" --err --lines "$PM2_LOG_LINES" --nostream 2>&1 || true)"
-  if [[ -n "$err_log" ]]; then
-    printf '%s\n' "$err_log"
-  else
-    echo "(no stderr output)"
-  fi
+  local out_tail err_tail
+  out_tail="$(pm2 logs "$app_name" --out --lines 25 --nostream 2>/dev/null | grep -E '^\d+\|' | tail -10 || true)"
+  err_tail="$(pm2 logs "$app_name" --err --lines 25 --nostream 2>/dev/null | grep -E '^\d+\|' | tail -10 || true)"
 
-  if printf '%s\n' "$err_log" | grep -qiE '(error|exception|fatal|ECONNREFUSED|ENOMEM|EADDRINUSE|cannot find module|prisma.*failed)'; then
-    warn "${app_name}: possible errors in recent stderr (see above)"
-    has_issue=1
+  case "$app_name" in
+    moneycash-api)
+      if printf '%s\n' "$out_tail" | grep -qE 'Nest application successfully started|listening on http'; then
+        ok "${app_name}: boot confirmed (API listening)"
+      else
+        warn "${app_name}: no recent boot success line in stdout"
+        has_issue=1
+      fi
+      ;;
+    moneycash-los|moneycash-app)
+      if printf '%s\n' "$out_tail" | grep -q 'Ready in'; then
+        ok "${app_name}: boot confirmed (Next.js ready)"
+      else
+        warn "${app_name}: no recent Ready line in stdout"
+        has_issue=1
+      fi
+      ;;
+  esac
+
+  if [[ -n "$err_tail" ]]; then
+    if printf '%s\n' "$err_tail" | grep -qiE '(MODULE_NOT_FOUND|Cannot find module|pool timeout|pool is ending|EADDRINUSE|ENOMEM|no executable was found)'; then
+      warn "${app_name}: recent stderr issues (last 10 lines):"
+      printf '%s\n' "$err_tail"
+      if printf '%s\n' "$err_tail" | grep -qiE '(MODULE_NOT_FOUND|Cannot find module|pool timeout|pool is ending|EADDRINUSE|ENOMEM)'; then
+        has_issue=1
+      else
+        has_warning=1
+      fi
+    fi
   fi
 
   if [[ "$has_issue" -ne 0 ]]; then
     echo ""
-    log "Recent stdout for ${app_name} (last ${PM2_LOG_LINES} lines):"
-    pm2 logs "$app_name" --out --lines "$PM2_LOG_LINES" --nostream 2>/dev/null || true
+    log "Recent stdout for ${app_name} (last 25 lines):"
+    pm2 logs "$app_name" --out --lines 25 --nostream 2>/dev/null || true
     return 1
+  fi
+
+  if [[ "$has_warning" -ne 0 ]]; then
+    warn "${app_name}: running with non-fatal warnings (e.g. Chromium path for PDFs)"
   fi
 
   return 0
@@ -154,6 +179,14 @@ main() {
   run_step "Backend: npm install" bash -c "cd '$ROOT/backend' && npm install"
 
   run_step "Backend: Chromium / PDF runtime setup" bash -c "cd '$ROOT/backend' && npm run loan-docs:setup-chromium"
+
+  if [[ -f "$ROOT/backend/.env" ]]; then
+    browser_path="$(grep -E '^PUPPETEER_EXECUTABLE_PATH=' "$ROOT/backend/.env" | cut -d= -f2- | tr -d '\"' || true)"
+    if [[ -n "$browser_path" && ! -x "$browser_path" ]]; then
+      warn "PUPPETEER_EXECUTABLE_PATH=$browser_path is not executable — PDF generation may fail"
+      warn "Run: cd backend && sudo npm run loan-docs:setup-chromium"
+    fi
+  fi
 
   run_step "Backend: ensure Puppeteer Chrome binary" bash -c "cd '$ROOT/backend' && node scripts/ensure-puppeteer-chrome.mjs"
 

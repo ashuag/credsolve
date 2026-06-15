@@ -247,6 +247,17 @@ export default function KycSelfiePage() {
     );
   }
 
+  const livenessRetryNeeded =
+    kyc?.selfieCaptured === true &&
+    kyc.livenessRequired !== false &&
+    kyc.livenessPassed !== true;
+
+  function handleRetakeSelfie() {
+    setError('');
+    setPendingSelfiePreview(null);
+    setRetakeSelfie(true);
+  }
+
   const form = kyc?.digilockerAadhaarForm;
   const entries = shallowStringEntries(form);
 
@@ -316,14 +327,11 @@ export default function KycSelfiePage() {
             </div>
           ) : null}
 
-          {selfieAlreadySaved && !retakeSelfie ? (
+          {selfieAlreadySaved && !retakeSelfie && !livenessRetryNeeded ? (
             <button
               type="button"
               className="text-sm font-semibold text-[#1496f3] underline-offset-2 hover:underline bg-transparent border-0 p-0 cursor-pointer text-left"
-              onClick={() => {
-                setError('');
-                setRetakeSelfie(true);
-              }}
+              onClick={handleRetakeSelfie}
             >
               Replace selfie (opens camera)
             </button>
@@ -340,14 +348,30 @@ export default function KycSelfiePage() {
             </button>
           ) : null}
 
-          {kyc?.selfieCaptured && kyc.livenessRequired !== false && !kyc.livenessPassed ? (
-            <div className="grid gap-2">
+          {livenessRetryNeeded && !retakeSelfie ? (
+            <div className="grid gap-3 rounded-2xl border border-[rgba(18,36,79,0.12)] bg-white/90 p-4">
               <p className="m-0 text-sm text-brand-muted">
-                Selfie saved. Face liveness did not pass or was not completed — try again to continue.
+                Selfie saved. Face liveness did not pass or was not completed — retry with the same photo, or take a
+                new selfie and try again.
               </p>
-              <button type="button" disabled={busy} onClick={() => void handleLiveness()} className="mc-btn-primary">
-                {busy ? busyLabel || 'Please wait…' : 'Retry liveness check'}
-              </button>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void handleLiveness()}
+                  className="mc-btn-primary"
+                >
+                  {busy ? busyLabel || 'Please wait…' : 'Retry liveness check'}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={handleRetakeSelfie}
+                  className="mc-btn-secondary bg-[rgba(20,150,243,0.08)] text-brand-navy"
+                >
+                  Take selfie again
+                </button>
+              </div>
             </div>
           ) : null}
         </div>
