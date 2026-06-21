@@ -16,3 +16,6 @@ export * from './sms-templates';
 export * from './negative-lists';
 export * from './bre';
 export * from './cibil-report';
+export * from './kyc-selfie-face-check';
+export * from './kyc-tenacio-checks';
+export * from './reject-record';

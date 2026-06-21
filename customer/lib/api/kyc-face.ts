@@ -13,6 +13,15 @@ export type PostKycLivenessResponse = {
   vendor: unknown;
   livenessPassed: boolean;
   vendorErrorMessage?: string;
+  faceValidationPassed?: boolean;
+  faceValidationMessage?: string;
+  faceMatchPassed?: boolean;
+  faceMatchMessage?: string;
+  authenticityPassed?: boolean;
+  authenticityMessage?: string;
+  deepfakeDetected?: boolean | null;
+  suggestRetrySelfie?: boolean;
+  bestComputedConfidence?: number | null;
 };
 
 function isRec(v: unknown): v is Record<string, unknown> {
@@ -67,6 +76,9 @@ function extractVendorFailureLine(vendor: unknown, depth = 0): string | undefine
 
 export function pickLivenessFailureUserMessage(out: PostKycLivenessResponse): string {
   return (
+    out.authenticityMessage?.trim() ||
+    out.faceValidationMessage?.trim() ||
+    out.faceMatchMessage?.trim() ||
     out.vendorErrorMessage?.trim() ||
     extractVendorFailureLine(out.vendor) ||
     'Liveness check did not pass. You can try again.'

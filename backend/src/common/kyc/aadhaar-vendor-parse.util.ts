@@ -199,6 +199,151 @@ export function extractLivenessIsLive(vendor: unknown): boolean | null {
  * Returns `true` when the Tenacio response signals that multiple faces were detected.
  * Searches `output`, `data`, and root; treats absent field as `null`.
  */
+function parseOcclusionFlag(value: unknown): boolean | null {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const lower = value.trim().toLowerCase();
+    if (['y', 'yes', 'true', '1', 'detected', 'occluded'].includes(lower)) return true;
+    if (['n', 'no', 'false', '0', 'none', 'clear'].includes(lower)) return false;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    if (value > 0) return true;
+    if (value === 0) return false;
+  }
+  return null;
+}
+
+/**
+ * Returns `true` when the Tenacio liveness response signals face occlusion / coverage.
+ * Searches `output`, `data`, and root; treats absent field as `null`.
+ */
+export function extractLivenessFaceOccluded(vendor: unknown): boolean | null {
+  if (!isRecord(vendor)) return null;
+
+  const candidates = [vendor.output, vendor.data, vendor];
+
+  for (const obj of candidates) {
+    if (!isRecord(obj)) continue;
+    for (const key of [
+      'faceOccluded',
+      'face_occluded',
+      'faceOcclusion',
+      'face_occlusion',
+      'occlusionDetected',
+      'occlusion_detected',
+      'faceOcclusionResult',
+      'face_occlusion_result',
+      'faceOcclusionDetected',
+      'face_occlusion_detected',
+    ] as const) {
+      const parsed = parseOcclusionFlag(obj[key]);
+      if (parsed !== null) return parsed;
+    }
+  }
+
+  return null;
+}
+
+function extractNumericScore(vendor: unknown, keys: string[]): number | null {
+  if (!isRecord(vendor)) return null;
+  const candidates = [vendor.output, vendor.data, vendor];
+  for (const obj of candidates) {
+    if (!isRecord(obj)) continue;
+    for (const key of keys) {
+      const v = obj[key];
+      if (typeof v === 'number' && Number.isFinite(v)) return v;
+      if (typeof v === 'string') {
+        const n = parseFloat(v);
+        if (Number.isFinite(n)) return n;
+      }
+    }
+  }
+  return null;
+}
+
+function extractBooleanFlag(vendor: unknown, keys: string[]): boolean | null {
+  if (!isRecord(vendor)) return null;
+  const candidates = [vendor.output, vendor.data, vendor];
+  for (const obj of candidates) {
+    if (!isRecord(obj)) continue;
+    for (const key of keys) {
+      const v = obj[key];
+      if (typeof v === 'boolean') return v;
+      if (typeof v === 'string') {
+        const lower = v.trim().toLowerCase();
+        if (['true', 'yes', 'y', '1', 'match', 'matched', 'live', 'real', 'authentic'].includes(lower)) {
+          return true;
+        }
+        if (['false', 'no', 'n', '0', 'mismatch', 'not_match', 'deepfake', 'fake', 'synthetic'].includes(lower)) {
+          return false;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/** Face match similarity / confidence score from Tenacio (0–1 or 0–100). */
+export function extractFaceMatchScore(vendor: unknown): number | null {
+  return extractNumericScore(vendor, [
+    'faceMatchScore',
+    'face_match_score',
+    'matchScore',
+    'match_score',
+    'similarityScore',
+    'similarity_score',
+    'confidence',
+    'score',
+  ]);
+}
+
+/** `true` when vendor confirms the two faces match (when field is present). */
+export function extractFaceMatchPassed(vendor: unknown): boolean | null {
+  return extractBooleanFlag(vendor, [
+    'faceMatch',
+    'face_match',
+    'isMatch',
+    'is_match',
+    'matched',
+    'match',
+    'matchResult',
+    'match_result',
+  ]);
+}
+
+/** `true` when vendor flags the image as deepfake / synthetic. */
+export function extractDeepfakeDetected(vendor: unknown): boolean | null {
+  const deepfake = extractBooleanFlag(vendor, [
+    'isDeepfake',
+    'is_deepfake',
+    'deepfakeDetected',
+    'deepfake_detected',
+    'syntheticDetected',
+    'synthetic_detected',
+    'isSynthetic',
+    'is_synthetic',
+  ]);
+  if (deepfake !== null) return deepfake;
+
+  const authentic = extractBooleanFlag(vendor, ['isAuthentic', 'is_authentic', 'authentic', 'isReal', 'is_real']);
+  if (authentic !== null) return !authentic;
+
+  return null;
+}
+
+/** Deepfake / authenticity score when provided (higher = more likely real). */
+export function extractDeepfakeScore(vendor: unknown): number | null {
+  return extractNumericScore(vendor, [
+    'authenticityScore',
+    'authenticity_score',
+    'deepfakeScore',
+    'deepfake_score',
+    'realScore',
+    'real_score',
+    'score',
+  ]);
+}
+
 export function extractLivenessMultipleFacesDetected(vendor: unknown): boolean | null {
   if (!isRecord(vendor)) return null;
 

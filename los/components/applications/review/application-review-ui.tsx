@@ -1,0 +1,269 @@
+'use client';
+
+import type { ReactNode } from 'react';
+import { useState } from 'react';
+import type { KycMatchVerdict } from '@/lib/kyc-field-match';
+
+export function ReviewCard({
+  icon,
+  title,
+  right,
+  children,
+  iconTone,
+}: {
+  icon: ReactNode;
+  title: string;
+  right?: ReactNode;
+  children: ReactNode;
+  iconTone?: 'ok' | 'warn' | 'default';
+}) {
+  const iconStyle =
+    iconTone === 'ok'
+      ? { background: 'var(--ok-bg)', color: 'var(--ok)' }
+      : iconTone === 'warn'
+        ? { background: 'var(--warn-bg)', color: 'var(--warn)' }
+        : undefined;
+
+  return (
+    <section className="card">
+      <div className="card-h">
+        <span className="ico" style={iconStyle}>
+          {icon}
+        </span>
+        <h3>{title}</h3>
+        {right ? <div className="right">{right}</div> : null}
+      </div>
+      <div className="card-b">{children}</div>
+    </section>
+  );
+}
+
+export function ReviewField({
+  label,
+  value,
+  sub,
+  tone,
+  badge,
+  badgeInValue = false,
+}: {
+  label: string;
+  value: ReactNode;
+  sub?: ReactNode;
+  tone?: 'flag' | 'accent';
+  badge?: ReactNode;
+  badgeInValue?: boolean;
+}) {
+  const isEmpty = value === '—' || value === null || value === undefined || value === '';
+  const valueNode = isEmpty ? '—' : value;
+
+  return (
+    <div className={`field${tone ? ` ${tone}` : ''}`}>
+      <div className="lab">{label}</div>
+      <div className={`val${isEmpty ? ' empty' : ''}`}>
+        {badgeInValue && badge ? (
+          <span className="val-inline">
+            {valueNode}
+            {badge}
+          </span>
+        ) : (
+          valueNode
+        )}
+      </div>
+      {!badgeInValue && badge ? <div className="field-badge-row">{badge}</div> : null}
+      {sub ? <div className="sub">{sub}</div> : null}
+    </div>
+  );
+}
+
+export function ReviewPill({
+  children,
+  tone = 'info',
+}: {
+  children: ReactNode;
+  tone?: 'ok' | 'warn' | 'info';
+}) {
+  return (
+    <span className={`pill pill-${tone}`}>
+      <span className="pdot" />
+      {children}
+    </span>
+  );
+}
+
+export function ReviewSectionLabel({ children, first }: { children: ReactNode; first?: boolean }) {
+  return <div className={`sec-label${first ? ' first' : ''}`}>{children}</div>;
+}
+
+export function ReviewMatchBadge({
+  verdict,
+  score,
+}: {
+  verdict: KycMatchVerdict;
+  score?: number;
+}) {
+  const label =
+    verdict === 'partial' && score != null
+      ? `Partial (${score}%)`
+      : verdict === 'match'
+        ? 'Match'
+        : verdict === 'mismatch'
+          ? 'Mismatch'
+          : 'N/A';
+
+  return <span className={`match-badge ${verdict}`}>{label}</span>;
+}
+
+export function MaskedSecret({
+  value,
+  mask,
+  mono = true,
+}: {
+  value: string;
+  mask: string;
+  mono?: boolean;
+}) {
+  const [revealed, setRevealed] = useState(false);
+  if (!value?.trim()) return <span className="val empty">—</span>;
+
+  return (
+    <span className={`secret${mono ? ' mono' : ''}`}>
+      <span>{revealed ? value : mask}</span>
+      <button
+        type="button"
+        className="eye"
+        aria-label={revealed ? 'Hide' : 'Reveal'}
+        onClick={() => setRevealed((v) => !v)}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+          <circle cx="12" cy="12" r="2.5" />
+        </svg>
+      </button>
+    </span>
+  );
+}
+
+export function CopyUuidButton({ value, label }: { value: string; label: string }) {
+  const [done, setDone] = useState(false);
+
+  return (
+    <button
+      type="button"
+      className={`copy${done ? ' done' : ''}`}
+      aria-label={`Copy ${label}`}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setDone(true);
+          window.setTimeout(() => setDone(false), 1400);
+        } catch {
+          /* ignore */
+        }
+      }}
+    >
+      {done ? (
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+      ) : (
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+          <rect x="9" y="9" width="11" height="11" rx="2" />
+          <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
+export function ReviewEmptyState({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="empty-state">
+      <div className="es-t">{title}</div>
+      <div className="es-s">{subtitle}</div>
+    </div>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+      <path d="M21 3v5h-5" />
+      <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+      <path d="M3 21v-5h5" />
+    </svg>
+  );
+}
+
+function RejectIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M15 9l-6 6M9 9l6 6" />
+    </svg>
+  );
+}
+
+function RequestDocsIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6M12 18v-6M9 15h6" />
+    </svg>
+  );
+}
+
+function ApproveIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
+export function ApplicationReviewToolbar({
+  onRefresh,
+  onReject,
+  rejectDisabled = false,
+}: {
+  onRefresh: () => void;
+  onReject?: () => void;
+  rejectDisabled?: boolean;
+}) {
+  return (
+    <div className="ar-actions-right">
+      <button
+        type="button"
+        className="navbtn navbtn-icon navbtn-reject"
+        disabled={rejectDisabled || !onReject}
+        onClick={onReject}
+        aria-label="Reject application"
+        title="Reject application"
+      >
+        <RejectIcon />
+      </button>
+      <button
+        type="button"
+        className="navbtn navbtn-icon navbtn-request"
+        disabled
+        aria-label="Request documents"
+        title="Request documents (coming soon)"
+      >
+        <RequestDocsIcon />
+      </button>
+      <button
+        type="button"
+        className="navbtn navbtn-icon navbtn-approve"
+        disabled
+        aria-label="Approve and continue"
+        title="Approve and continue (coming soon)"
+      >
+        <ApproveIcon />
+      </button>
+      <button type="button" className="navbtn btn-primary" onClick={onRefresh} aria-label="Refresh data" title="Refresh data">
+        <RefreshIcon />
+        Refresh data
+      </button>
+    </div>
+  );
+}

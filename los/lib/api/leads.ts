@@ -86,7 +86,9 @@ export type LosLeadDetails = {
     state: string | null;
     stateCode: string | null;
     gender: string | null;
+    genderKey: string | null;
     occupation: string | null;
+    occupationKey: string | null;
     netMonthlyIncome: string | null;
     annualTurnover: string | null;
     annualProfit: string | null;
@@ -103,6 +105,32 @@ export type LosLeadDetails = {
   }>;
 };
 
+export type LosSelfieFaceValidation = {
+  passed: boolean;
+  checkedAt: string | null;
+  bestComputedConfidence: number | null;
+  topDetectionScore: number | null;
+  reason: string | null;
+  laplacianVariance: number | null;
+  minLaplacianVarianceRequired: number;
+  blurPassed: boolean | null;
+  confidenceBreakdown: {
+    detection: number;
+    faceSize: number;
+    landmarkAlignment: number;
+    featureSpacing: number;
+    computed: number;
+  } | null;
+};
+
+export type LosLivenessSummary = {
+  passed: boolean;
+  checkedAt: string | null;
+  vendorScore: number | null;
+  isLive: boolean | null;
+  vendorStatus: string | null;
+};
+
 export type LosApplicationDetails = {
   uuid: string;
   customerUuid: string;
@@ -117,6 +145,8 @@ export type LosApplicationDetails = {
   kycCompletedAt: string | null;
   livenessPassed: boolean;
   livenessCheckedAt: string | null;
+  selfieFaceValidation: LosSelfieFaceValidation | null;
+  livenessSummary: LosLivenessSummary | null;
   kycPhotos: {
     /** Storage object key, e.g. `customer/{uuid}/photos/selfie/{app}.jpg`. */
     selfiePath: string | null;

@@ -1,5 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { LOAN_DOCUMENT_PDF_FILES, LOAN_DOCUMENT_TYPE, type LoanDocumentType } from '../constants/loan-document.constants';
+import {
+  LOAN_DOCUMENT_PDF_FILES,
+  LOAN_DOCUMENT_TYPE,
+  LENDER_SIGNING_NAME,
+  type LoanDocumentType,
+} from '../constants/loan-document.constants';
 import { LoanDocumentDigitalSignerService } from './loan-document-digital-signer.service';
 import { LoanDocumentHtmlPdfGeneratorService } from './loan-document-html-pdf-generator.service';
 import type { LoanDocumentMergeInput } from './loan-document.types';
@@ -27,17 +32,23 @@ export class LoanDocumentGeneratorService {
     }
 
     let preparedMerge = merge;
-    if (digitallySign && this.signer.isConfigured()) {
-      try {
-        const certMeta = await this.signer.readCertificateMetadata();
-        preparedMerge = {
-          ...merge,
-          lenderDscSignerName: this.signer.resolveSigningName(),
-          lenderDscSignedAt: merge.lenderDscSignedAt ?? new Date(),
-          lenderDscSerial: certMeta.serialNumber,
-        };
-      } catch {
-        // Signing step will log and fall back; still produce the acceptance PDF without a DSC block.
+    if (digitallySign) {
+      const signedAt = merge.lenderDscSignedAt ?? merge.acceptanceSignedAt ?? new Date();
+      preparedMerge = {
+        ...merge,
+        lenderDscSignerName: this.signer.isConfigured()
+          ? this.signer.resolveSigningName()
+          : merge.lenderDscSignerName?.trim() || LENDER_SIGNING_NAME,
+        lenderDscSignedAt: signedAt,
+      };
+
+      if (this.signer.isConfigured()) {
+        try {
+          const certMeta = await this.signer.readCertificateMetadata();
+          preparedMerge = { ...preparedMerge, lenderDscSerial: certMeta.serialNumber };
+        } catch {
+          // Signing step will log and fall back; still produce the acceptance PDF without a DSC block.
+        }
       }
     }
 
@@ -45,7 +56,7 @@ export class LoanDocumentGeneratorService {
     if (!digitallySign) {
       return { pdf, esigned: false };
     }
-    const htmlStampRendered = Boolean(preparedMerge.lenderDscSerial?.trim());
+    const htmlStampRendered = Boolean(preparedMerge.lenderDscSignedAt);
     return this.signer.sign(pdf, { drawVisualStamp: !htmlStampRendered });
   }
 

@@ -78,8 +78,14 @@ export async function renderLoanDocumentHtml(merge: LoanDocumentMergeInput): Pro
     html = fillInputById(html, id, value);
   }
 
-  if (fields.lender_dsc_serial) {
+  if (fields.lender_dsc_date || fields.lender_dsc_serial) {
     html = html.replace('class="lender-dsc-stamp-wrap hidden"', 'class="lender-dsc-stamp-wrap"');
+
+    if (!fields.lender_dsc_serial) {
+      html = html.replace(/<div class="lender-dsc-line">DSC Serial:[\s\S]*?<\/div>\s*/i, '');
+      html = html.replace('<div class="lender-dsc-legal">Valid under the IT Act, 2000</div>', '');
+      html = html.replace('Digitally signed by', 'Authorized by');
+    }
   }
 
   html = await injectLenderDscLogo(html);

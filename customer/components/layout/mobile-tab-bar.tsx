@@ -63,7 +63,7 @@ export function MobileTabBar() {
   const pathname = usePathname();
   const { session } = useCustomerSession();
   const signedIn = isCustomerPortalSignedIn(session);
-  const accountHref = signedIn ? '/dashboard' : '/my-account';
+  const accountHref = '/my-account';
 
   const tabs: Tab[] = [
     { href: '/', label: 'Home', Icon: HomeIcon, exact: true },

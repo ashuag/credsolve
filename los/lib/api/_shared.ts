@@ -3,7 +3,7 @@
  * `@/lib/api` — keep these private to the api/ folder so consumers of
  * the public surface can't reach into transport plumbing.
  */
-import { getLosClientApiBase, getLosServerApiBase } from '../api-env';
+import { buildLosApiUrl, getLosClientApiBase, getLosServerApiBase } from '../api-env';
 import { LOS_COOKIE_NAME, LOS_STORAGE_KEY } from '../auth';
 
 export const API_URL = getLosServerApiBase();
@@ -19,6 +19,10 @@ export function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit): 
 
 export function clientApiUrl() {
   return getLosClientApiBase();
+}
+
+export function resolveLosClientApiUrl(path: string): string {
+  return buildLosApiUrl(getLosClientApiBase(), path);
 }
 
 export async function parseJsonResponse(response: Response) {
@@ -80,7 +84,7 @@ export async function cachedAuthorizedLosGet<T>(
   }
 
   const request = (async () => {
-    const response = await fetchWithTimeout(`${clientApiUrl()}${path}`, {
+    const response = await fetchWithTimeout(resolveLosClientApiUrl(path), {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
     });
@@ -120,7 +124,7 @@ export async function authorizedLosRequest<T>(
   fallbackMessage: string,
 ): Promise<T> {
   const method = (init.method ?? 'GET').toUpperCase();
-  const response = await fetchWithTimeout(`${clientApiUrl()}${path}`, {
+  const response = await fetchWithTimeout(resolveLosClientApiUrl(path), {
     ...init,
     headers: {
       ...(init.headers ?? {}),

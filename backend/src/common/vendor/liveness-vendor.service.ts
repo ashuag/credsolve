@@ -35,6 +35,16 @@ export class LivenessVendorService {
 
   constructor(private readonly vendorApi: VendorApiService) {}
 
+  isLivenessConfigured(): boolean {
+    const auth = this.resolveAuth();
+    if (!auth) return false;
+    if (!(process.env.TENACIO_LIVENESS_WORKFLOW_ID ?? '').trim()) return false;
+    const fullUrl = (process.env.TENACIO_LIVENESS_URL ?? '').trim();
+    const baseUrl = (process.env.VENDOR_HOST ?? '').trim();
+    const serviceSlug = (process.env.TENACIO_LIVENESS_SERVICE ?? '').trim();
+    return Boolean(fullUrl || (baseUrl && serviceSlug));
+  }
+
   async postLivenessCheck(
     body: TenacioLivenessBody,
     leadId: bigint | null,

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { WorkspaceRecordHeader } from '@/components/shared/workspace-record-header';
 import { LosStatusPill } from '@/components/shared/los-status-pill';
+import { canRejectLeadStatus, RejectRecordModal } from '@/components/shared/reject-record-modal';
 import { buildLeadIntakeJourney } from '@/lib/customer-journey';
 import { formatPersonName } from '@/lib/format-person-name';
 import { buildWorkspaceAlertText } from '@/lib/workspace-alert';
@@ -177,6 +178,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
   const [lead, setLead] = useState<LosLeadDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rejectOpen, setRejectOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -277,10 +279,31 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
           </svg>
           Back to leads
         </Link>
-        <button type="button" onClick={() => void load()} className="los-btn-primary min-h-[38px] px-4 text-[0.82rem]">
-          Refresh data
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => void load()} className="los-btn-primary min-h-[38px] px-4 text-[0.82rem]">
+            Refresh data
+          </button>
+          {canRejectLeadStatus(lead.statusCode) ? (
+            <button
+              type="button"
+              onClick={() => setRejectOpen(true)}
+              className="min-h-[38px] rounded-[8px] border border-[rgba(239,68,68,0.35)] bg-white px-4 text-[0.82rem] font-bold text-[#dc2626] hover:bg-[rgba(254,242,242,0.9)]"
+            >
+              Reject lead
+            </button>
+          ) : null}
+        </div>
       </div>
+
+      <RejectRecordModal
+        open={rejectOpen}
+        token={getToken()}
+        recordType="lead"
+        recordUuid={lead.uuid}
+        recordLabel={displayName}
+        onClose={() => setRejectOpen(false)}
+        onSuccess={() => void load()}
+      />
 
       <WorkspaceRecordHeader
         eyebrow="Loan pipeline"

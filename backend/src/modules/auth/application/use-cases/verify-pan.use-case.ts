@@ -20,6 +20,12 @@ const OCCUPATION_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
   Object.values(OCCUPATION).map(({ key, name }) => [key, name]),
 );
 import { resolveLeadCityId } from '../../../../common/utils/resolve-lead-city-id.util';
+import {
+  assertPincodeMatchesCity,
+  throwIfLeadIntakeInvalid,
+  validateAddressLine1,
+  validateOccupationIncome,
+} from '../../../../common/validation/lead-intake.validation';
 import { SmsService } from '../../../../common/sms/sms.service';
 import { parseTenacioBureauVendorBody } from '../../../../common/vendor/tenacio-bureau-payload.mapper';
 import { BureauFetchService } from '../../../../common/vendor/bureau-fetch.service';
@@ -401,10 +407,18 @@ export class VerifyPanUseCase {
   }> {
     const { genderId, occupationId } = await this.resolveGenderOccupationIds(dto);
     const { netMonthlyIncome, annualTurnover, annualProfit } = this.buildIncomeFields(dto);
+    throwIfLeadIntakeInvalid(
+      validateOccupationIncome(dto.occupation, {
+        monthlyIncome: netMonthlyIncome?.toNumber() ?? null,
+        annualTurnover: annualTurnover?.toNumber() ?? null,
+        annualProfit: annualProfit?.toNumber() ?? null,
+      }),
+    );
 
     const hasAddressInRequest = Boolean(dto.addressLine1?.trim() && dto.pincode?.trim() && dto.currentCity?.trim());
 
     if (hasAddressInRequest) {
+      throwIfLeadIntakeInvalid(validateAddressLine1(dto.addressLine1!));
       const cityId = await resolveLeadCityId(this.prisma.client, {
         currentCityId: dto.currentCityId ?? null,
         currentCity: dto.currentCity!.trim(),
@@ -414,6 +428,8 @@ export class VerifyPanUseCase {
           'Could not resolve your city. Pick a city from the suggestions list and try again.',
         );
       }
+
+      await assertPincodeMatchesCity(this.prisma.client, dto.pincode!.trim(), cityId);
 
       return {
         fullName: dto.fullName.trim(),

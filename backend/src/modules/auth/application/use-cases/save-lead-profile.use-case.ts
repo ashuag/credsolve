@@ -12,6 +12,7 @@ import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { REJECTION_REASON } from '../../../../common/constants/rejection-reason.constants';
 import { SettingKey } from '../../../../common/constants/setting.constants';
 import { parseOptionalInrAmount } from '../../../../common/utils/parse-inr-amount';
+import { throwIfLeadIntakeInvalid, validateOccupationIncome } from '../../../../common/validation/lead-intake.validation';
 
 const GENDER_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
   Object.values(GENDER).map(({ key, name }) => [key, name]),
@@ -79,6 +80,14 @@ export class SaveLeadProfileUseCase {
     if (!gender || !occupation) {
       throw new BadRequestException('Gender or occupation is not available in the system.');
     }
+
+    throwIfLeadIntakeInvalid(
+      validateOccupationIncome(dto.occupation, {
+        monthlyIncome: parseOptionalInrAmount(dto.monthlyIncome)?.toNumber() ?? null,
+        annualTurnover: parseOptionalInrAmount(dto.annualTurnover)?.toNumber() ?? null,
+        annualProfit: parseOptionalInrAmount(dto.annualProfit)?.toNumber() ?? null,
+      }),
+    );
 
     const dateOfBirth = parseDobUtc(dto.dob);
     const netMonthlyIncome = parseOptionalInrAmount(dto.monthlyIncome);

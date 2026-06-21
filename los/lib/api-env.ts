@@ -5,7 +5,10 @@
  * Accept either `.../api/los` or the common mistake `.../api` so callers resolve to `/api/los/auth/login`, not `/api/auth/login`.
  */
 export function normalizeLosApiBase(raw: string): string {
-  const u = raw.trim().replace(/\/$/, '');
+  let u = raw.trim().replace(/\/+$/, '');
+  // Common misconfigurations
+  u = u.replace(/\/api\/backend$/i, '/api/los');
+  u = u.replace(/\/api\/los\/los$/i, '/api/los');
   if (u.endsWith('/api/los')) {
     return u;
   }
@@ -13,6 +16,19 @@ export function normalizeLosApiBase(raw: string): string {
     return `${u}/los`;
   }
   return u;
+}
+
+/**
+ * Join a LOS API base (`.../api/los`) with a route (`/bre/...` or `/developer-tools/...`).
+ * Drops a redundant `/los` prefix on `path` so callers do not produce `/api/los/los/...`.
+ */
+export function buildLosApiUrl(base: string, path: string): string {
+  const normalizedBase = normalizeLosApiBase(base);
+  let route = path.startsWith('/') ? path : `/${path}`;
+  if (normalizedBase.endsWith('/api/los') && route.startsWith('/los/')) {
+    route = route.slice(4);
+  }
+  return `${normalizedBase}${route}`;
 }
 
 export function getLosServerApiBase(): string {

@@ -23,6 +23,10 @@ model Application {
   aadhaarPhotoRelativePath     String?                @map("aadhaar_photo_relative_path") @db.VarChar(512)
   /// `customer/{customer_uuid}/photos/selfie/{application_uuid}.jpg`
   selfieRelativePath           String?                @map("selfie_relative_path") @db.VarChar(512)
+  /// On-server TensorFlow face check snapshot (computed confidence, breakdown, etc.).
+  selfieFaceValidationJson     Json?                  @map("selfie_face_validation_json")
+  selfieFaceValidationPassed   Boolean                @default(false) @map("selfie_face_validation_passed")
+  selfieFaceValidationCheckedAt DateTime?             @map("selfie_face_validation_checked_at")
   livenessVendorJson           Json?                  @map("liveness_vendor_json")
   livenessCheckedAt            DateTime?              @map("liveness_checked_at")
   livenessPassed               Boolean                @default(false) @map("liveness_passed")

@@ -45,6 +45,7 @@ export default function KycSelfiePage() {
   const [retakeSelfie, setRetakeSelfie] = useState(false);
   /** Shown immediately after capture so the UI does not flash the previous cached selfie. */
   const [pendingSelfiePreview, setPendingSelfiePreview] = useState<string | null>(null);
+  const [suggestRetake, setSuggestRetake] = useState(false);
 
   const navigatingRef = useRef(false);
 
@@ -143,6 +144,12 @@ export default function KycSelfiePage() {
       setError(out.skipReason ?? 'Liveness is not configured on the server.');
       return false;
     }
+    if (out.suggestRetrySelfie || out.faceValidationPassed === false || out.faceMatchPassed === false || out.authenticityPassed === false) {
+      setSuggestRetake(true);
+      setRetakeSelfie(true);
+      setPendingSelfiePreview(null);
+      stopCamera();
+    }
     if (!out.livenessPassed) {
       setError(pickLivenessFailureUserMessage(out));
       await refresh();
@@ -184,6 +191,7 @@ export default function KycSelfiePage() {
         setError('Selfie upload did not complete.');
         return;
       }
+      setSuggestRetake(false);
       setRetakeSelfie(false);
       stopCamera();
 
@@ -191,20 +199,19 @@ export default function KycSelfiePage() {
       setPendingSelfiePreview(null);
       if (!refreshed.authenticated) return;
 
-      const livenessRequired = refreshed.kycFaceProgress?.livenessRequired !== false;
-      if (!livenessRequired) {
-        await continueToNextStep();
-        return;
-      }
-
-      setBusyLabel('Running face liveness check…');
+      const livenessLabel =
+        refreshed.kycFaceProgress?.livenessRequired !== false
+          ? 'Running local face checks, then Tenacio liveness…'
+          : 'Running local face checks…';
+      setBusyLabel(livenessLabel);
       const passed = await runLivenessCheck();
       if (!passed) return;
 
       await continueToNextStep();
     } catch (e) {
       setPendingSelfiePreview(null);
-      setError(e instanceof Error ? e.message : 'Selfie upload failed.');
+      const msg = e instanceof Error ? e.message : 'Selfie upload failed.';
+      setError(msg);
     } finally {
       setBusy(false);
       setBusyLabel('');
@@ -214,7 +221,7 @@ export default function KycSelfiePage() {
   async function handleLiveness() {
     setError('');
     setBusy(true);
-    setBusyLabel('Running face liveness check…');
+    setBusyLabel('Running local face checks, then Tenacio liveness…');
     try {
       const passed = await runLivenessCheck();
       if (!passed) return;
@@ -255,6 +262,7 @@ export default function KycSelfiePage() {
   function handleRetakeSelfie() {
     setError('');
     setPendingSelfiePreview(null);
+    setSuggestRetake(false);
     setRetakeSelfie(true);
   }
 
@@ -268,13 +276,20 @@ export default function KycSelfiePage() {
           <header>
             <p className="m-0 text-[0.7rem] font-[800] uppercase tracking-[0.14em] text-[#1496f3]">KYC</p>
             <h1 className="mt-2 text-brand-navy text-2xl font-[900] tracking-tight">Selfie &amp; liveness</h1>
-            <p className="m-0 text-brand-muted text-[0.95rem] leading-relaxed">
-              We compare your selfie with your DigiLocker Aadhaar photo. Use a well-lit area; remove hats or
-              sunglasses.
+            <p className="m-0 text-[0.95rem] leading-relaxed text-brand-muted">
+              Capture your selfie, then we run on-server face validation and Aadhaar face match. We then screen for
+              AI/synthetic media (Tenacio deepfake) and verify liveness (Tenacio). Use a well-lit area and capture a
+              live photo from your camera — uploaded or AI images may be rejected.
             </p>
           </header>
 
           {error ? <AlertBanner variant="error">{error}</AlertBanner> : null}
+          {suggestRetake && !busy ? (
+            <AlertBanner variant="error">
+              Your selfie did not pass our on-server checks (face validation or Aadhaar match). Take a new photo with
+              your full face visible, then we will run liveness again.
+            </AlertBanner>
+          ) : null}
 
           {photoHref ? (
             <div className="rounded-2xl border border-[rgba(18,36,79,0.12)] p-3 bg-white/90">

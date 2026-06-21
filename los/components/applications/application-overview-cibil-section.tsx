@@ -1,9 +1,30 @@
 'use client';
 
 import { ApplicationCibilReportTab } from '@/components/applications/application-cibil-report-tab';
+import { KycComparedValue } from '@/components/applications/kyc-field-match-badge';
 import { cx } from '@/components/eligibility/eligibility-ui';
-import { fetchApplicationLoanDocumentBlob, generateApplicationLoanDocuments, getApplicationCibilReport, type CibilReportData, type LosApplicationDetails } from '@/lib/api';
+import { usesAnnualFinancialMetric, usesMonthlyIncomeMetric, resolveOccupationKey } from '@/lib/customer-details';
+import {
+  compareGenders,
+  compareIsoDates,
+  comparePan,
+  computeNameMatchScore,
+  dedupeCibilPhones,
+  extractCibilPan,
+  formatAadhaarNumberDisplay,
+  formatDobWithAge,
+  nameMatchVerdict,
+  normalizeAadhaarGender,
+} from '@/lib/kyc-field-match';
+import { formatConfidencePercent, formatLivenessSummary, formatSelfieFaceValidationSummary, formatLaplacianVariance } from '@/lib/kyc-selfie-validation-display';
 import { formatPersonName } from '@/lib/format-person-name';
+import {
+  fetchApplicationLoanDocumentBlob,
+  generateApplicationLoanDocuments,
+  getApplicationCibilReport,
+  type CibilReportData,
+  type LosApplicationDetails,
+} from '@/lib/api';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 
 type OverviewTab = 'profile' | 'cibil' | 'loan' | 'kyc' | 'bank' | 'references' | 'sources';
@@ -71,32 +92,6 @@ function formatDateOnly(iso: string | null | undefined) {
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function ageFromDateOfBirth(iso: string | null | undefined) {
-  if (!iso) return null;
-  const dob = new Date(`${iso}T12:00:00`);
-  if (Number.isNaN(dob.getTime())) return null;
-
-  const now = new Date();
-  if (now < dob) return null;
-
-  let years = now.getFullYear() - dob.getFullYear();
-  let months = now.getMonth() - dob.getMonth();
-  let days = now.getDate() - dob.getDate();
-
-  if (days < 0) {
-    months -= 1;
-    const prevMonthDays = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
-    days += prevMonthDays;
-  }
-
-  if (months < 0) {
-    years -= 1;
-    months += 12;
-  }
-
-  return `${years} yrs, ${months} months, ${days} days`;
-}
-
 function formatInr(value: string | null | undefined): string {
   if (value == null || value === '') return '—';
   const n = Number(value);
@@ -104,11 +99,22 @@ function formatInr(value: string | null | undefined): string {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
 }
 
-function dobWithAge(dateOfBirth: string | null | undefined) {
-  const formatted = formatDateOnly(dateOfBirth);
-  const age = ageFromDateOfBirth(dateOfBirth);
-  if (formatted === '—') return '—';
-  return age ? `${formatted} (${age})` : formatted;
+function buildEmploymentRows(profile: NonNullable<LosApplicationDetails['lead']['profile']>) {
+  const occupationKey = resolveOccupationKey(profile.occupationKey, profile.occupation);
+  const rows: Array<{ label: string; value: ReactNode }> = [
+    { label: 'Occupation', value: profile.occupation ?? '—' },
+  ];
+
+  if (usesMonthlyIncomeMetric(occupationKey)) {
+    rows.push({ label: 'Monthly salary', value: formatInr(profile.netMonthlyIncome) });
+  } else if (usesAnnualFinancialMetric(occupationKey)) {
+    rows.push(
+      { label: 'Annual turnover', value: formatInr(profile.annualTurnover) },
+      { label: 'Annual profit', value: formatInr(profile.annualProfit) },
+    );
+  }
+
+  return rows;
 }
 
 function ProfileSection({ title, children }: { title: string; children: ReactNode }) {
@@ -151,8 +157,8 @@ function CibilPersonalDetailsBlock({
 
   const phoneRows =
     cibilReport.phones.length > 0
-      ? cibilReport.phones.map((phone, index) => ({
-          label: cibilReport.phones.length > 1 ? `${phone.type || 'Phone'} ${index + 1}` : phone.type || 'Mobile number',
+      ? dedupeCibilPhones(cibilReport.phones).map((phone) => ({
+          label: phone.label,
           value: phone.number,
         }))
       : cibilReport.primaryMobile
@@ -202,11 +208,13 @@ function CibilGovernmentIdsBlock({
   cibilLoading,
   cibilError,
   cibilReport,
+  profilePan,
 }: {
   bureauReportAvailable: boolean;
   cibilLoading: boolean;
   cibilError: string | null;
   cibilReport: CibilReportData | null;
+  profilePan?: string | null;
 }) {
   if (!bureauReportAvailable) {
     return <p className="m-0 text-[0.84rem] text-brand-muted">Available after CIBIL report is pulled.</p>;
@@ -221,13 +229,25 @@ function CibilGovernmentIdsBlock({
   }
 
   const identifierRows =
-    cibilReport?.identifiers.map((identifier) => ({
-      label: identifier.type,
-      value: identifier.number,
-    })) ?? [];
+    cibilReport?.identifiers
+      .filter((identifier) => {
+        const bureauPan = extractCibilPan([identifier]);
+        if (!bureauPan || !profilePan) return true;
+        return bureauPan !== profilePan.trim().toUpperCase();
+      })
+      .map((identifier) => ({
+        label: identifier.type,
+        value: identifier.number,
+      })) ?? [];
 
   if (identifierRows.length === 0) {
-    return <p className="m-0 text-[0.84rem] text-brand-muted">No government IDs found on the CIBIL report.</p>;
+    return (
+      <p className="m-0 text-[0.84rem] text-brand-muted">
+        {profilePan?.trim()
+          ? 'No additional government IDs on the CIBIL report (PAN shown above).'
+          : 'No government IDs found on the CIBIL report.'}
+      </p>
+    );
   }
 
   return <DetailGrid rows={identifierRows} columns={3} />;
@@ -286,6 +306,19 @@ function CustomerProfilePanel({
       aadhaar.maskedAadhaar?.trim() ||
       aadhaar.address?.trim());
 
+  const bureauPan = cibilReport ? extractCibilPan(cibilReport.identifiers) : null;
+  const profileNameScore = computeNameMatchScore(profile.fullName, aadhaar?.fullName);
+  const profileNameVerdict = nameMatchVerdict(profileNameScore, Boolean(profile.fullName?.trim() && aadhaar?.fullName?.trim()));
+  const profileDobVerdict = compareIsoDates(profile.dateOfBirth, aadhaar?.dateOfBirth);
+  const profileGenderVerdict = compareGenders(profile.gender, aadhaar?.gender);
+  const panBureauVerdict = comparePan(pan, bureauPan);
+  const cibilNameScore = computeNameMatchScore(profile.fullName, cibilReport?.consumerName);
+  const cibilNameVerdict = nameMatchVerdict(
+    cibilNameScore,
+    Boolean(profile.fullName?.trim() && cibilReport?.consumerName?.trim()),
+  );
+  const cibilDobVerdict = compareIsoDates(profile.dateOfBirth, cibilReport?.dateOfBirth);
+
   return (
     <div className="grid gap-4">
       <div className="grid gap-4 lg:grid-cols-2">
@@ -293,10 +326,47 @@ function CustomerProfilePanel({
           <DetailGrid
             columns={2}
             rows={[
-              { label: 'Name', value: formatPersonName(profile.fullName) },
-              { label: 'Date of birth', value: dobWithAge(profile.dateOfBirth) },
-              { label: 'Gender', value: profile.gender ?? '—' },
-              { label: 'PAN card', value: pan },
+              {
+                label: 'Name',
+                value: (
+                  <KycComparedValue
+                    value={formatPersonName(profile.fullName)}
+                    verdict={profileNameVerdict}
+                    score={profileNameScore}
+                    compareLabel="Aadhaar"
+                  />
+                ),
+              },
+              {
+                label: 'Date of birth',
+                value: (
+                  <KycComparedValue
+                    value={formatDobWithAge(profile.dateOfBirth)}
+                    verdict={profileDobVerdict}
+                    compareLabel="Aadhaar"
+                  />
+                ),
+              },
+              {
+                label: 'Gender',
+                value: (
+                  <KycComparedValue
+                    value={profile.gender ?? '—'}
+                    verdict={profileGenderVerdict}
+                    compareLabel="Aadhaar"
+                  />
+                ),
+              },
+              {
+                label: 'PAN card',
+                value: (
+                  <KycComparedValue
+                    value={pan}
+                    verdict={panBureauVerdict}
+                    compareLabel="CIBIL"
+                  />
+                ),
+              },
             ]}
           />
           <div className="mt-3 border-t border-[rgba(23,44,113,0.06)] pt-3">
@@ -307,9 +377,12 @@ function CustomerProfilePanel({
                   columns={2}
                   rows={[
                     { label: 'Aadhaar name', value: formatPersonName(aadhaar?.fullName) },
-                    { label: 'Aadhaar DOB', value: dobWithAge(aadhaar?.dateOfBirth) },
-                    { label: 'Aadhaar gender', value: aadhaar?.gender ?? '—' },
-                    { label: 'Aadhaar number', value: aadhaar?.maskedAadhaar ?? '—' },
+                    { label: 'Aadhaar DOB', value: formatDobWithAge(aadhaar?.dateOfBirth) },
+                    { label: 'Aadhaar gender', value: normalizeAadhaarGender(aadhaar?.gender) ?? '—' },
+                    {
+                      label: 'Aadhaar number',
+                      value: formatAadhaarNumberDisplay(aadhaar?.maskedAadhaar, true),
+                    },
                     { label: 'Aadhaar address', value: aadhaar?.address ?? '—' },
                   ]}
                 />
@@ -318,14 +391,48 @@ function CustomerProfilePanel({
               <p className="m-0 mt-2 text-[0.84rem] text-brand-muted">Not fetched from DigiLocker yet.</p>
             )}
           </div>
+          {cibilReport ? (
+            <div className="mt-3 border-t border-[rgba(23,44,113,0.06)] pt-3">
+              <ProfileSubheading>CIBIL identity match</ProfileSubheading>
+              <div className="mt-2">
+                <DetailGrid
+                  columns={2}
+                  rows={[
+                    {
+                      label: 'Bureau name',
+                      value: (
+                        <KycComparedValue
+                          value={formatPersonName(cibilReport.consumerName)}
+                          verdict={cibilNameVerdict}
+                          score={cibilNameScore}
+                          compareLabel="Profile"
+                        />
+                      ),
+                    },
+                    {
+                      label: 'Bureau DOB',
+                      value: (
+                        <KycComparedValue
+                          value={formatDobWithAge(cibilReport.dateOfBirth)}
+                          verdict={cibilDobVerdict}
+                          compareLabel="Profile"
+                        />
+                      ),
+                    },
+                  ]}
+                />
+              </div>
+            </div>
+          ) : null}
           <div className="mt-3 border-t border-[rgba(23,44,113,0.06)] pt-3">
-            <ProfileSubheading>Government IDs (CIBIL)</ProfileSubheading>
+            <ProfileSubheading>Other government IDs (CIBIL)</ProfileSubheading>
             <div className="mt-2">
               <CibilGovernmentIdsBlock
                 bureauReportAvailable={Boolean(row.bureauReport)}
                 cibilLoading={cibilLoading}
                 cibilError={cibilError}
                 cibilReport={cibilReport}
+                profilePan={pan !== '—' ? pan : null}
               />
             </div>
           </div>
@@ -333,15 +440,7 @@ function CustomerProfilePanel({
 
         <div className="grid gap-4">
           <ProfileSection title="Employment details">
-            <DetailGrid
-              columns={2}
-              rows={[
-                { label: 'Occupation', value: profile.occupation ?? '—' },
-                { label: 'Salary', value: formatInr(profile.netMonthlyIncome) },
-                { label: 'Annual turnover', value: formatInr(profile.annualTurnover) },
-                { label: 'Annual profit', value: formatInr(profile.annualProfit) },
-              ]}
-            />
+            <DetailGrid columns={2} rows={buildEmploymentRows(profile)} />
           </ProfileSection>
 
           <ProfileSection title="Address">
@@ -593,6 +692,22 @@ function KycDetailPanel({ row }: { row: LosApplicationDetails }) {
         rows={[
           { label: 'KYC status', value: `${row.kycStatusLabel} (${row.kycStatus})` },
           { label: 'KYC fetched at', value: formatDateTime(row.kycCompletedAt) },
+          {
+            label: 'Face validation (on-server)',
+            value: formatSelfieFaceValidationSummary(row),
+          },
+          {
+            label: 'Computed confidence',
+            value: formatConfidencePercent(row.selfieFaceValidation?.bestComputedConfidence),
+          },
+          {
+            label: 'Face sharpness (Laplacian)',
+            value:
+              row.selfieFaceValidation?.laplacianVariance != null
+                ? `${formatLaplacianVariance(row.selfieFaceValidation.laplacianVariance)} (min ${formatLaplacianVariance(row.selfieFaceValidation.minLaplacianVarianceRequired)})`
+                : '—',
+          },
+          { label: 'Liveness (Tenacio)', value: formatLivenessSummary(row) },
           { label: 'Liveness passed', value: row.livenessPassed ? 'Yes' : 'No' },
           { label: 'Liveness checked at', value: formatDateTime(row.livenessCheckedAt) },
         ]}

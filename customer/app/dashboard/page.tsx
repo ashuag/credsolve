@@ -6,6 +6,8 @@ export const metadata: Metadata = {
   description: 'View your MoneyCash loans, repayment schedule, applications in progress, and history.',
 };
 
+import { redirect } from 'next/navigation';
+
 export default function DashboardPage() {
-  return <CustomerDashboard />;
+  redirect('/my-account');
 }

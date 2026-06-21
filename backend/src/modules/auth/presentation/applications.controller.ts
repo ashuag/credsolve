@@ -83,7 +83,11 @@ export class ApplicationsController {
       limits: { fileSize: 6 * 1024 * 1024 },
     }),
   )
-  @ApiOperation({ summary: 'Store customer selfie JPEG for the active application (webcam / camera)' })
+  @ApiOperation({
+    summary: 'Store customer selfie JPEG for the active application (webcam / camera)',
+    description:
+      'Validates that exactly one unobstructed face is visible (eyes, nose, mouth) before storing. Set KYC_SELFIE_FACE_VALIDATION_DISABLED=true to skip in local dev.',
+  })
   @ApiOkResponse({ description: 'Selfie stored under customer UUID / selfie / application UUID' })
   kycSelfieRoute(@Req() req: Request, @UploadedFile() selfie: UploadedFileLike | undefined) {
     return this.saveKycSelfie.execute(req, selfie);
@@ -94,7 +98,7 @@ export class ApplicationsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Run Tenacio liveness on the stored selfie URL (`input.url`) when outbound is enabled (VENDOR_HOST + TENACIO_LIVENESS_SERVICE or TENACIO_LIVENESS_URL). Selfie URL is public storage or a short-lived signed GET /api/vendor/kyc/liveness-selfie. No vendor HTTP when KYC_LIVENESS_PAUSED, TENACIO_LIVENESS_DISABLED, or POST target is not configured.',
+      'Run MoneyCash local KYC checks (selfie face validation, Aadhaar face match, authenticity), then Tenacio liveness on the stored selfie URL when outbound is enabled. No vendor HTTP when KYC_LIVENESS_PAUSED, TENACIO_LIVENESS_DISABLED, or POST target is not configured.',
   })
   @ApiOkResponse({ description: 'Vendor outcome; updates application when HTTP call completes' })
   kycLivenessRoute(@Req() req: Request) {

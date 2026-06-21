@@ -157,7 +157,11 @@ export function buildLoanDocumentHtmlFieldValues(input: LoanDocumentMergeInput):
       input.acceptanceSignedAt != null ? formatAcceptanceTimestamp(input.acceptanceSignedAt) : '',
     lender_dsc_signer: input.lenderDscSignerName?.trim() || LENDER_NAME,
     lender_dsc_date:
-      input.lenderDscSignedAt != null ? formatAcceptanceTimestamp(input.lenderDscSignedAt) : '',
+      input.lenderDscSignedAt != null
+        ? formatAcceptanceTimestamp(input.lenderDscSignedAt)
+        : input.acceptanceSignedAt != null
+          ? formatAcceptanceTimestamp(input.acceptanceSignedAt)
+          : '',
     lender_dsc_serial: input.lenderDscSerial?.trim() ?? '',
   };
 

@@ -1,11 +1,13 @@
-import { Controller, Get, Param, Post, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Res, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { LosAuthGuard } from './auth/los-auth.guard';
+import { RejectWorkspaceRecordDto } from './dto/reject-workspace-record.dto';
 import { LosLeadService } from './services/los-lead.service';
 import { LosApplicationService } from './services/los-application.service';
 import { LosDashboardService } from './services/los-dashboard.service';
 import { LosMasterService } from './services/los-master.service';
+import { LosRejectionService } from './services/los-rejection.service';
 @ApiTags('LOS Data')
 @Controller('los')
 @UseGuards(LosAuthGuard)
@@ -15,6 +17,7 @@ export class LosDataController {
     private readonly losApplication: LosApplicationService,
     private readonly losDashboard: LosDashboardService,
     private readonly losMaster: LosMasterService,
+    private readonly losRejection: LosRejectionService,
   ) {}
 
   @Get('dashboard/crm')
@@ -41,6 +44,12 @@ export class LosDataController {
   @ApiOperation({ summary: 'Get application details by application uuid' })
   applicationByUuid(@Param('applicationUuid') applicationUuid: string) {
     return this.losApplication.getApplicationDetails(applicationUuid);
+  }
+
+  @Post('applications/:applicationUuid/reject')
+  @ApiOperation({ summary: 'Reject an application with reason and ops note (LOS auth)' })
+  rejectApplication(@Param('applicationUuid') applicationUuid: string, @Body() body: RejectWorkspaceRecordDto) {
+    return this.losRejection.rejectApplication(applicationUuid, body);
   }
 
   @Get('applications/:applicationUuid/kyc/selfie-photo')
@@ -73,6 +82,12 @@ export class LosDataController {
   @ApiOperation({ summary: 'Get lead details by lead uuid' })
   leadByUuid(@Param('leadUuid') leadUuid: string) {
     return this.losLead.getLeadDetails(leadUuid);
+  }
+
+  @Post('leads/:leadUuid/reject')
+  @ApiOperation({ summary: 'Reject a lead with reason and ops note (LOS auth)' })
+  rejectLead(@Param('leadUuid') leadUuid: string, @Body() body: RejectWorkspaceRecordDto) {
+    return this.losRejection.rejectLead(leadUuid, body);
   }
 
   @Get('masters')
