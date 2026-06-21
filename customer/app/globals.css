@@ -2,13 +2,21 @@
 @import "tailwindcss";
 
 @layer base {
+  :root {
+    --brand-blue: #2388e5;
+    --brand-blue-light: #4db3ff;
+    --brand-navy: #1c347d;
+    --brand-gold: #f4b400;
+    --brand-text: #1c347d;
+  }
+
   html {
     font-family: var(--font-inter), 'Segoe UI', system-ui, sans-serif;
     background:
-      radial-gradient(circle at top left, rgba(255, 197, 25, 0.24), transparent 26rem),
-      radial-gradient(circle at top right, rgba(20, 150, 243, 0.2), transparent 24rem),
+      radial-gradient(circle at top left, rgba(244, 180, 0, 0.22), transparent 26rem),
+      radial-gradient(circle at top right, rgba(35, 136, 229, 0.18), transparent 24rem),
       linear-gradient(180deg, #fffdf8 0%, #eef5ff 52%, #f6f9ff 100%);
-    color: #12244f;
+    color: var(--brand-text);
     /* Momentum scrolling on iOS */
     -webkit-overflow-scrolling: touch;
     /* Prevent bounce/overscroll showing white gaps */
@@ -466,15 +474,15 @@
 .hero-mesh {
   background:
     radial-gradient(ellipse 80% 60% at 80% 0%, rgba(255, 255, 255, 0.15) 0%, transparent 70%),
-    radial-gradient(ellipse 60% 50% at 0% 100%, rgba(255, 197, 25, 0.2) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 60% at 50% 50%, rgba(20, 150, 243, 0.4) 0%, transparent 70%),
-    linear-gradient(160deg, #1fa2ff 0%, #1496f3 50%, #0c84d9 100%);
+    radial-gradient(ellipse 60% 50% at 0% 100%, rgba(244, 180, 0, 0.2) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 50% 50%, rgba(35, 136, 229, 0.4) 0%, transparent 70%),
+    linear-gradient(160deg, #4DB3FF 0%, #2388E5 50%, #1C347D 100%);
 }
 
 .stats-mesh {
   background:
-    radial-gradient(ellipse 60% 80% at 20% 50%, rgba(20, 150, 243, 0.18) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 60% at 80% 50%, rgba(255, 197, 25, 0.1) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 80% at 20% 50%, rgba(35, 136, 229, 0.18) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 80% 50%, rgba(244, 180, 0, 0.1) 0%, transparent 60%),
     linear-gradient(180deg, #0a1628 0%, #0e1e3a 100%);
 }
 
@@ -492,7 +500,7 @@
 }
 
 .text-grad-gold {
-  background: linear-gradient(135deg, #ffc519 0%, #ffdb6b 50%, #f0af00 100%);
+  background: linear-gradient(135deg, #f4b400 0%, #ffdb6b 50%, #e5a800 100%);
   background-size: 200% auto;
   background-clip: text;
   -webkit-background-clip: text;
@@ -501,7 +509,7 @@
 }
 
 .text-grad-blue {
-  background: linear-gradient(135deg, #1496f3 0%, #60c3ff 50%, #1496f3 100%);
+  background: linear-gradient(135deg, #2388e5 0%, #4db3ff 50%, #2388e5 100%);
   background-size: 200% auto;
   background-clip: text;
   -webkit-background-clip: text;

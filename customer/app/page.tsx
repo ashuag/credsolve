@@ -9,20 +9,22 @@ import {TestimonialsSection} from '@/components/landing/TestimonialsSection';
 import {CTASection} from '@/components/landing/CTASection';
 import {LandingFooter} from '@/components/landing/LandingFooter';
 
+import {BRAND_TAGLINE, MAX_LOAN_DISPLAY} from '@/lib/brand';
+
 export const metadata: Metadata = {
-  title: 'MoneyCash | Instant Loans up to ₹50,000 — Approved in 2 Minutes',
+  title: `MoneyCash | Instant Loans up to ${MAX_LOAN_DISPLAY} — Approved in 2 Minutes`,
   description:
-    'Apply for instant short-term digital loans up to ₹50,000. 100% paperless, RBI registered NBFC. Approved in 2 minutes, money in your bank in 10 minutes.',
+    `Apply for instant short-term digital loans up to ${MAX_LOAN_DISPLAY}. 100% paperless. Approved in 2 minutes, money in your bank in 10 minutes.`,
   openGraph: {
-    title: 'MoneyCash | Instant Digital Loans up to ₹50,000',
-    description: 'Quick, secure, paperless digital loans. RBI registered. No hidden charges.',
+    title: `MoneyCash | Instant Digital Loans up to ${MAX_LOAN_DISPLAY}`,
+    description: `${BRAND_TAGLINE}. Quick, secure, paperless digital loans. No hidden charges.`,
     type: 'website',
   },
 };
 
 export default function CustomerLandingPage() {
   return (
-    <div className="flex min-h-screen flex-col selection:bg-[#ffc519]/30">
+    <div className="flex min-h-screen flex-col selection:bg-brand-gold/30">
       <Suspense fallback={<div className="min-h-screen bg-[#fffdf8]" aria-hidden />}>
         <LandingNavbar />
 
@@ -30,7 +32,7 @@ export default function CustomerLandingPage() {
           {/* Hero — dark navy, animated phone illustration */}
           <HeroSection />
 
-          {/* 5 short-term loan products up to ₹50K */}
+          {/* 5 short-term loan products up to ₹30K */}
           <LoanProducts />
 
           {/* Animated stats on dark background */}

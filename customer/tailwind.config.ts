@@ -11,12 +11,13 @@ const config: Config = {
         sans: ['var(--font-inter)', 'Segoe UI', 'system-ui', 'sans-serif'],
       },
       colors: {
-        'brand-blue': '#1496f3',
-        'brand-navy': '#172c71',
-        'brand-gold': '#ffc519',
-        'brand-gold-deep': '#f0af00',
-        'brand-text': '#12244f',
-        'brand-muted': '#5e6782'
+        'brand-blue': '#2388E5',
+        'brand-blue-light': '#4DB3FF',
+        'brand-navy': '#1C347D',
+        'brand-gold': '#F4B400',
+        'brand-gold-deep': '#E5A800',
+        'brand-text': '#1C347D',
+        'brand-muted': '#5e6782',
       },
       screens: {
         nav: '920px'

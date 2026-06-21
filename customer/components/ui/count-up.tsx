@@ -10,6 +10,8 @@ type CountUpProps = {
   duration?: number;
   /** Locale used for grouping. Defaults to en-IN. */
   locale?: string;
+  /** Number of decimal places to display. Defaults to 0 (integer). */
+  decimals?: number;
   className?: string;
 };
 
@@ -23,6 +25,7 @@ export function CountUp({
   suffix = '',
   duration = 1800,
   locale = 'en-IN',
+  decimals = 0,
   className = 'tabular-nums',
 }: CountUpProps) {
   const [val, setVal] = useState(0);
@@ -41,7 +44,8 @@ export function CountUp({
         const t0 = performance.now();
         const tick = (t: number) => {
           const p = Math.min((t - t0) / duration, 1);
-          setVal(Math.round((1 - (1 - p) ** 3) * to));
+          const raw = (1 - (1 - p) ** 3) * to;
+          setVal(decimals > 0 ? Number(raw.toFixed(decimals)) : Math.round(raw));
           if (p < 1) rafId = requestAnimationFrame(tick);
         };
         rafId = requestAnimationFrame(tick);
@@ -54,12 +58,12 @@ export function CountUp({
       observer.disconnect();
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [to, duration]);
+  }, [to, duration, decimals]);
 
   return (
     <span ref={ref} className={className}>
       {prefix}
-      {val.toLocaleString(locale)}
+      {val.toLocaleString(locale, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}
       {suffix}
     </span>
   );

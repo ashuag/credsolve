@@ -2,80 +2,92 @@
 
 import { useScrollReveal } from '@/lib/hooks/use-scroll-reveal';
 import { CountUp } from '@/components/ui/count-up';
+import { RadialProgress } from '@/components/ui/radial-progress';
 
-const STATS = [
+type Stat = {
+  to: number;
+  prefix?: string;
+  suffix?: string;
+  decimals?: number;
+  /** Gauge fill 0–100. */
+  progress: number;
+  label: string;
+  desc: string;
+  color: string;
+  icon: React.ReactNode;
+};
+
+const STATS: Stat[] = [
   {
-    to: 50000,
-    prefix: '',
+    to: 5000,
     suffix: '+',
+    progress: 95,
     label: 'Happy Customers',
     desc: 'Across India trust us every month',
-    color: '#1496f3',
+    color: '#4DB3FF',
     icon: (
-      <svg viewBox="0 0 40 40" fill="none" className="h-10 w-10">
-        <circle cx="20" cy="20" r="20" fill="rgba(20,150,243,0.15)" />
-        <circle cx="16" cy="15" r="4" stroke="#1496f3" strokeWidth="2" />
-        <path d="M8 30c0-4.418 3.582-8 8-8" stroke="#1496f3" strokeWidth="2" strokeLinecap="round" />
-        <circle cx="26" cy="15" r="4" stroke="#60c3ff" strokeWidth="2" />
-        <path d="M24 22c4.418 0 8 3.582 8 8" stroke="#60c3ff" strokeWidth="2" strokeLinecap="round" />
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+        <circle cx="9" cy="8" r="3" />
+        <path d="M3 20c0-3.3 2.7-6 6-6" strokeLinecap="round" />
+        <circle cx="16" cy="9" r="2.5" />
+        <path d="M14 20c0-2.8 2.2-5 5-5" strokeLinecap="round" />
       </svg>
     ),
   },
   {
-    to: 500,
+    to: 50,
     prefix: '₹',
     suffix: 'Cr+',
+    progress: 90,
     label: 'Total Disbursed',
     desc: 'Loans disbursed to date',
-    color: '#ffc519',
+    color: '#F4B400',
     icon: (
-      <svg viewBox="0 0 40 40" fill="none" className="h-10 w-10">
-        <circle cx="20" cy="20" r="20" fill="rgba(255,197,25,0.12)" />
-        <circle cx="20" cy="20" r="10" stroke="#ffc519" strokeWidth="2" />
-        <text x="20" y="25" textAnchor="middle" fontSize="12" fontWeight="900" fill="#ffc519" fontFamily="system-ui">₹</text>
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+        <rect x="3" y="6" width="18" height="12" rx="2" />
+        <circle cx="12" cy="12" r="2.5" />
+        <path d="M7 9v6M17 9v6" strokeLinecap="round" />
       </svg>
     ),
   },
   {
     to: 2,
-    prefix: '',
     suffix: ' Min',
+    progress: 96,
     label: 'Approval Time',
     desc: 'Average loan sanction time',
-    color: '#10b981',
+    color: '#34d399',
     icon: (
-      <svg viewBox="0 0 40 40" fill="none" className="h-10 w-10">
-        <circle cx="20" cy="20" r="20" fill="rgba(16,185,129,0.12)" />
-        <circle cx="20" cy="20" r="10" stroke="#10b981" strokeWidth="2" />
-        <path d="M20 14v6l4 2.5" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+        <circle cx="12" cy="13" r="8" />
+        <path d="M12 9v4l2.5 2M9 2h6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },
   {
     to: 98,
-    prefix: '',
     suffix: '%',
+    progress: 98,
     label: 'Approval Rate',
     desc: 'First-time applicant success',
     color: '#f43f5e',
     icon: (
-      <svg viewBox="0 0 40 40" fill="none" className="h-10 w-10">
-        <circle cx="20" cy="20" r="20" fill="rgba(244,63,94,0.12)" />
-        <path d="M12 20l6 6 10-12" stroke="#f43f5e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
+        <path d="M5 13l4 4 10-11" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },
   {
-    to: 49,
-    prefix: '',
-    suffix: ' Rating',
-    label: '4.9 / 5 Stars',
-    desc: 'Average customer satisfaction',
-    color: '#8b5cf6',
+    to: 4.9,
+    suffix: '/5',
+    decimals: 1,
+    progress: 98,
+    label: 'Customer Rating',
+    desc: 'Average satisfaction score',
+    color: '#a78bfa',
     icon: (
-      <svg viewBox="0 0 40 40" fill="none" className="h-10 w-10">
-        <circle cx="20" cy="20" r="20" fill="rgba(139,92,246,0.12)" />
-        <path d="M20 10l2.6 7.9H31l-6.7 4.9 2.6 7.9-6.9-5-6.9 5 2.6-7.9L9 17.9h8.4L20 10z" fill="#8b5cf6" />
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden>
+        <path d="M12 3l2.6 6.3 6.8.5-5.2 4.4 1.7 6.6L12 17.8 6.1 21.3l1.7-6.6L2.6 9.8l6.8-.5z" />
       </svg>
     ),
   },
@@ -90,7 +102,8 @@ export function StatsSection() {
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.04]"
         style={{
-          backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
+          backgroundImage:
+            'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
           backgroundSize: '60px 60px',
         }}
       />
@@ -113,58 +126,56 @@ export function StatsSection() {
           </h2>
         </div>
 
-        {/* Stats grid */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        {/* Stats grid — radial gauge infographics */}
+        <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-5">
           {STATS.map((s, idx) => (
             <div
-              key={idx}
-              className={`reveal reveal-scale glass group flex flex-col items-center gap-3 rounded-[24px] p-4 sm:p-6 text-center transition-all duration-300 hover:-translate-y-2 hover:bg-white/10 stagger-${Math.min(idx + 1, 6)}`}
+              key={s.label}
+              className={`reveal reveal-scale glass group flex flex-col items-center gap-4 rounded-[24px] p-5 text-center transition-all duration-300 hover:-translate-y-2 hover:bg-white/10 sm:p-6 stagger-${Math.min(idx + 1, 6)}`}
             >
-              {/* Icon */}
-              <div className="transition-transform duration-300 group-hover:scale-110">
-                {s.icon}
-              </div>
-
-              {/* Counter */}
-              <div className="text-[2.4rem] font-[900] leading-none text-white" style={{ color: s.color }}>
-                <CountUp to={s.to} prefix={s.prefix} suffix={s.suffix} />
-              </div>
+              {/* Gauge */}
+              <RadialProgress value={s.progress} color={s.color} duration={1600 + idx * 120}>
+                <span
+                  className="flex h-7 w-7 items-center justify-center rounded-full"
+                  style={{ backgroundColor: `${s.color}22`, color: s.color }}
+                >
+                  {s.icon}
+                </span>
+                <span className="mt-1" style={{ color: s.color }}>
+                  <CountUp
+                    to={s.to}
+                    prefix={s.prefix}
+                    suffix={s.suffix}
+                    decimals={s.decimals}
+                    className="text-[1.35rem] font-[900] leading-none tabular-nums sm:text-[1.55rem]"
+                  />
+                </span>
+              </RadialProgress>
 
               {/* Label */}
               <div className="flex flex-col gap-1">
                 <div className="text-sm font-[800] text-white">{s.label}</div>
                 <div className="text-[0.65rem] font-[600] leading-snug text-white/40">{s.desc}</div>
               </div>
-
-              {/* Animated ring */}
-              <div className="relative flex items-center justify-center">
-                <div
-                  className="h-1 w-1 rounded-full animate-ring-pop opacity-60"
-                  style={{ backgroundColor: s.color }}
-                />
-              </div>
             </div>
           ))}
         </div>
 
-        {/* Trust badges strip */}
-        <div className="reveal mt-10 flex flex-wrap items-center justify-center gap-3 border-t border-white/8 pt-8 sm:mt-14 sm:gap-6 sm:pt-10 stagger-6">
+        {/* Trust badges */}
+        <div className="reveal mt-12 flex flex-wrap items-center justify-center gap-3 stagger-6">
           {[
-            'ISO 27001 Certified',
-            'DPDP Compliant',
+            'Advance Fraud Detection',
             'DigiLocker Integrated',
-            'Bank-Grade Security',
-            '99.9% Uptime SLA',
+            'Bank Verification',
+            'Secure Data Privacy',
           ].map((badge) => (
-            <div
+            <span
               key={badge}
-              className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[0.62rem] font-[700] uppercase tracking-[0.15em] text-white/40"
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[0.62rem] font-[800] uppercase tracking-[0.18em] text-white/55 backdrop-blur-sm transition-colors hover:bg-white/10 hover:text-white/75"
             >
-              <svg viewBox="0 0 12 12" className="h-2.5 w-2.5 shrink-0 text-green-400" fill="currentColor">
-                <circle cx="6" cy="6" r="6" />
-              </svg>
+              <span className="h-1.5 w-1.5 rounded-full bg-green-400" aria-hidden />
               {badge}
-            </div>
+            </span>
           ))}
         </div>
       </div>

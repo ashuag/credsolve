@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MobileEntryForm } from '@/components/forms/mobile-entry-form';
@@ -9,6 +8,7 @@ import { useCustomerSession } from '@/components/providers/customer-session-prov
 import { Spinner } from '@/components/ui/spinner';
 import type { SendOtpResponse } from '@/lib/api/auth';
 import { getCustomerJourneyResumePath, hasActiveLoanLead } from '@/lib/api/customer-session';
+import { BRAND_TAGLINE } from '@/lib/brand';
 
 export function LoanEntryPanel() {
   const router = useRouter();
@@ -122,24 +122,8 @@ export function LoanEntryPanel() {
              <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
              </svg>
-             Verified Financial Partners
+             {BRAND_TAGLINE}
            </div>
-        </div>
-        <div className="text-[0.75rem] text-center leading-relaxed text-slate-400">
-          Legal:{' '}
-          <Link
-            href="/terms-and-conditions"
-            className="font-bold text-blue-600 underline-offset-2 hover:text-blue-700 hover:underline"
-          >
-            Terms &amp; Conditions
-          </Link>
-          {' · '}
-          <Link
-            href="/privacy-policy"
-            className="font-bold text-blue-600 underline-offset-2 hover:text-blue-700 hover:underline"
-          >
-            Privacy Policy
-          </Link>
         </div>
       </div>
     </section>

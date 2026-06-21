@@ -15,7 +15,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
     title: {
-        default: 'Get Instant Loan Upto 50,000 | MoneyCash',
+        default: 'Get Instant Loan Up to ₹50,000 | MoneyCash',
         template: '%s | MoneyCash'
     },
     description: 'MoneyCash customer portal for secure OTP login, account access, payments, and loan application progress.',
@@ -41,7 +41,7 @@ export const viewport: Viewport = {
     width: 'device-width',
     initialScale: 1,
     viewportFit: 'cover',
-    themeColor: '#12244f',
+    themeColor: '#1C347D',
 };
 
 export default function RootLayout({children}: Readonly<{ children: ReactNode }>) {

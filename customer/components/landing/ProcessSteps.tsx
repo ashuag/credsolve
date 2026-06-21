@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { buildHrefWithSearch } from '@/lib/navigation';
@@ -12,16 +11,19 @@ const STEPS = [
     title: 'Enter Your Details',
     description: 'Fill in your mobile number, name, and loan requirement. Takes just 30 seconds.',
     badge: '30 Seconds',
-    badgeColor: '#1496f3',
-    glowColor: 'rgba(20,150,243,0.18)',
-    image: '/steps/step-details.png',
+    color: '#1496f3',
+    glow: 'rgba(20,150,243,0.22)',
+    hoverBorder: 'group-hover:border-[#1496f3]/30',
+    hoverGlow: 'group-hover:shadow-[0_20px_50px_rgba(20,150,243,0.15)]',
+    cardGlow: 'rgba(20,150,243,0.03)',
     icon: (
-      <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-16 w-16">
-        <rect width="64" height="64" rx="20" fill="rgba(20,150,243,0.1)" />
-        <rect x="20" y="12" width="24" height="40" rx="6" stroke="#1496f3" strokeWidth="2.5" />
-        <rect x="22" y="18" width="20" height="24" rx="3" fill="rgba(20,150,243,0.1)" />
-        <path d="M26 22h12M26 26h8M26 30h10M26 34h6" stroke="#1496f3" strokeWidth="2" strokeLinecap="round" />
-        <rect x="28" y="46" width="8" height="2" rx="1" fill="#1496f3" opacity="0.6" />
+      <svg viewBox="0 0 80 80" fill="none" className="h-[4.5rem] w-[4.5rem] sm:h-20 sm:w-20 transition-transform duration-500 group-hover:scale-110" aria-hidden>
+        <circle cx="40" cy="40" r="30" fill="rgba(20,150,243,0.06)" className="transition-all duration-500 group-hover:fill-[rgba(20,150,243,0.12)]" />
+        <rect x="24" y="10" width="32" height="56" rx="8" stroke="#1496f3" strokeWidth="3" className="transition-all duration-300 group-hover:stroke-[#2388e5]" />
+        <rect x="28" y="16" width="24" height="34" rx="3" fill="rgba(20,150,243,0.08)" />
+        <path d="M32 24h16M32 30h12M32 36h14" stroke="#1496f3" strokeWidth="2.5" strokeLinecap="round" className="origin-left transition-all duration-500 group-hover:scale-x-105" />
+        <circle cx="40" cy="58" r="2.5" fill="#1496f3" opacity="0.7" />
+        <circle cx="46" cy="30" r="2" fill="#2388e5" className="animate-pulse" />
       </svg>
     ),
   },
@@ -30,18 +32,22 @@ const STEPS = [
     title: 'Complete e-KYC',
     description: 'Verify identity with PAN & Aadhaar OTP. 100% paperless — no scanning, no uploads needed.',
     badge: '100% Paperless',
-    badgeColor: '#f59e0b',
-    glowColor: 'rgba(245,158,11,0.18)',
-    image: '/steps/step-ekyc.png',
+    color: '#f59e0b',
+    glow: 'rgba(245,158,11,0.22)',
+    hoverBorder: 'group-hover:border-[#f59e0b]/30',
+    hoverGlow: 'group-hover:shadow-[0_20px_50px_rgba(245,158,11,0.15)]',
+    cardGlow: 'rgba(245,158,11,0.03)',
     icon: (
-      <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-16 w-16">
-        <rect width="64" height="64" rx="20" fill="rgba(245,158,11,0.1)" />
-        <rect x="12" y="18" width="40" height="28" rx="6" stroke="#f59e0b" strokeWidth="2.5" />
-        <rect x="18" y="24" width="12" height="12" rx="4" fill="rgba(245,158,11,0.15)" stroke="#f59e0b" strokeWidth="1.5" />
-        <circle cx="24" cy="27" r="2.5" fill="#f59e0b" opacity="0.6" />
-        <path d="M34 26h12M34 30h8M34 34h10" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" />
-        <circle cx="46" cy="42" r="8" fill="#10b981" />
-        <path d="M43 42l2 2.5 4-4" stroke="white" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <svg viewBox="0 0 80 80" fill="none" className="h-[4.5rem] w-[4.5rem] sm:h-20 sm:w-20 transition-transform duration-500 group-hover:scale-110" aria-hidden>
+        <circle cx="36" cy="39" r="30" fill="rgba(245,158,11,0.06)" className="transition-all duration-500 group-hover:fill-[rgba(245,158,11,0.12)]" />
+        <rect x="12" y="22" width="48" height="34" rx="8" stroke="#f59e0b" strokeWidth="3" className="transition-all duration-300 group-hover:stroke-[#e5a800]" />
+        <rect x="18" y="28" width="14" height="14" rx="3" fill="rgba(245,158,11,0.15)" stroke="#f59e0b" strokeWidth="1.5" />
+        <circle cx="25" cy="33" r="2.5" fill="#f59e0b" />
+        <path d="M20 41a5 5 0 0 1 10 0" stroke="#f59e0b" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M38 29h16M38 35h10M38 41h14" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
+        <circle cx="58" cy="52" r="11" fill="#10b981" className="transition-transform duration-300 group-hover:scale-110" />
+        <circle cx="58" cy="52" r="11" stroke="#10b981" strokeWidth="2" className="animate-ping" style={{ transformOrigin: '58px 52px' }} />
+        <path d="M54 52l3 3 6-7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },
@@ -50,19 +56,23 @@ const STEPS = [
     title: 'Get Instant Approval',
     description: 'Our AI engine evaluates your application instantly. Money in your bank account in under 10 minutes.',
     badge: 'Money in 10 Min',
-    badgeColor: '#10b981',
-    glowColor: 'rgba(16,185,129,0.18)',
-    image: '/steps/step-approval.png',
+    color: '#10b981',
+    glow: 'rgba(16,185,129,0.22)',
+    hoverBorder: 'group-hover:border-[#10b981]/30',
+    hoverGlow: 'group-hover:shadow-[0_20px_50px_rgba(16,185,129,0.15)]',
+    cardGlow: 'rgba(16,185,129,0.03)',
     icon: (
-      <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-16 w-16">
-        <rect width="64" height="64" rx="20" fill="rgba(16,185,129,0.1)" />
-        <rect x="16" y="28" width="32" height="20" rx="2" stroke="#10b981" strokeWidth="2.5" />
-        <rect x="20" y="30" width="4" height="16" rx="1" fill="rgba(16,185,129,0.2)" stroke="#10b981" strokeWidth="1.5" />
-        <rect x="30" y="30" width="4" height="16" rx="1" fill="rgba(16,185,129,0.2)" stroke="#10b981" strokeWidth="1.5" />
-        <rect x="40" y="30" width="4" height="16" rx="1" fill="rgba(16,185,129,0.2)" stroke="#10b981" strokeWidth="1.5" />
-        <path d="M12 28l20-12 20 12" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-        <rect x="14" y="46" width="36" height="3" rx="1.5" fill="#10b981" />
-        <path d="M30 10l-6 10h5l-1 8 7-10h-5l1-8z" fill="#ffc519" />
+      <svg viewBox="0 0 80 80" fill="none" className="h-[4.5rem] w-[4.5rem] sm:h-20 sm:w-20 transition-transform duration-500 group-hover:scale-110" aria-hidden>
+        <circle cx="40" cy="42" r="30" fill="rgba(16,185,129,0.06)" className="transition-all duration-500 group-hover:fill-[rgba(16,185,129,0.12)]" />
+        <path d="M14 38l26-16 26 16v22H14V38z" stroke="#10b981" strokeWidth="3" strokeLinejoin="round" className="transition-all duration-300 group-hover:stroke-[#059669]" />
+        <rect x="22" y="42" width="8" height="18" rx="2" fill="rgba(16,185,129,0.15)" stroke="#10b981" strokeWidth="2" />
+        <rect x="36" y="42" width="8" height="18" rx="2" fill="rgba(16,185,129,0.15)" stroke="#10b981" strokeWidth="2" />
+        <rect x="50" y="42" width="8" height="18" rx="2" fill="rgba(16,185,129,0.15)" stroke="#10b981" strokeWidth="2" />
+        <rect x="12" y="58" width="56" height="5" rx="2.5" fill="#10b981" />
+        <g className="animate-bounce" style={{ animationDuration: '3.5s' }}>
+          <path d="M42 6l-6 11h5l-1 9 8-12h-5l1-8z" fill="#f59e0b" className="transition-all duration-300 group-hover:fill-[#ffc519]" />
+          <path d="M42 6l-6 11h5l-1 9 8-12h-5l1-8z" stroke="#ffc519" strokeWidth="1.2" opacity="0.6" className="animate-ping" style={{ transformOrigin: '42px 16px' }} />
+        </g>
       </svg>
     ),
   },
@@ -74,149 +84,166 @@ export function ProcessSteps() {
   const sectionRef = useScrollReveal();
 
   return (
-    <section id="how-it-works" ref={sectionRef} className="relative overflow-hidden bg-[#f8faff] py-20 lg:py-28">
-      {/* Subtle centre glow */}
-      <div className="pointer-events-none absolute top-1/2 left-1/2 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1496f3]/4 blur-[120px]" />
-      {/* Dot grid */}
+    <section id="how-it-works" ref={sectionRef} className="relative overflow-hidden bg-[#f4f8fc] py-20 lg:py-28">
+      {/* Self-contained CSS Animations for Vector Flow Lines */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes lineDash {
+          to {
+            stroke-dashoffset: -40;
+          }
+        }
+        .animate-line-dash {
+          stroke-dasharray: 8, 12;
+          animation: lineDash 2s linear infinite;
+        }
+      `}} />
+
+      {/* Soft horizon glows and ambient colored blobs */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.02]"
-        style={{ backgroundImage: 'radial-gradient(#12244f 1px, transparent 1px)', backgroundSize: '32px 32px' }}
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(20,150,243,0.06),transparent_70%)]"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.015]"
+        style={{ backgroundImage: 'radial-gradient(#12244f 1px, transparent 1px)', backgroundSize: '28px 28px' }}
+        aria-hidden
       />
 
-      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      {/* Decorative Blur Blobs */}
+      <div className="pointer-events-none absolute -top-40 -left-40 h-[380px] w-[380px] rounded-full bg-[#1496f3]/5 blur-[100px] animate-blob" />
+      <div className="pointer-events-none absolute top-1/2 left-1/3 h-[300px] w-[300px] rounded-full bg-[#f59e0b]/4 blur-[100px] animate-blob animation-delay-2000" />
+      <div className="pointer-events-none absolute -bottom-40 -right-40 h-[380px] w-[380px] rounded-full bg-[#10b981]/5 blur-[100px] animate-blob animation-delay-4000" />
 
+      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mb-12 text-center lg:mb-20">
-          <div className="reveal mb-5 inline-flex items-center gap-2.5 rounded-full bg-[#10b981]/10 px-5 py-2.5 shadow-[0_4px_20px_rgba(16,185,129,0.1)]">
-            <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-[#10b981]" fill="currentColor">
-              <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
-            </svg>
-            <span className="text-[0.65rem] font-[900] uppercase tracking-[0.24em] text-[#10b981]">
-              Get Money in 3 Simple Steps
+        <div className="mb-16 text-center lg:mb-24">
+          <div className="reveal mx-auto mb-5 inline-flex items-center gap-2.5 rounded-full bg-[#1496f3]/10 px-5 py-2.5 shadow-[0_4px_20px_rgba(20,150,243,0.06)]">
+            <span className="flex h-2 w-2 animate-pulse rounded-full bg-[#1496f3]" />
+            <span className="text-[0.65rem] font-black uppercase tracking-[0.24em] text-[#1496f3]">
+              Simple 3-Step Process
             </span>
           </div>
-          <h2 className="reveal text-[clamp(2rem,4.5vw,3.2rem)] font-[900] tracking-tight text-[#12244f] stagger-1">
+          <h2 className="reveal text-[clamp(2.15rem,4.5vw,3.4rem)] font-[900] leading-tight tracking-tight text-brand-navy">
             From Application to{' '}
-            <span className="bg-[linear-gradient(135deg,#10b981,#059669)] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#10b981] via-[#059669] to-[#1496f3] bg-clip-text text-transparent">
               Bank Account.
             </span>
           </h2>
-          <p className="reveal mx-auto mt-4 max-w-xl text-base font-[600] text-[#12244f]/50 stagger-2">
+          <p className="reveal mx-auto mt-5 max-w-xl text-base font-[600] text-brand-muted stagger-1">
             100% digital process. No branch visits. No physical documents. Ever.
           </p>
         </div>
 
-        {/* Steps — open, box-free layout */}
-        <div className="relative grid grid-cols-1 gap-10 sm:gap-12 lg:grid-cols-3 lg:gap-8">
-
-          {/* Dashed connector (desktop only) */}
-          <div className="pointer-events-none absolute top-[7.5rem] left-[calc(16.6%+3rem)] right-[calc(16.6%+3rem)] hidden lg:block">
-            <svg width="100%" height="2" className="overflow-visible">
-              <line
-                x1="0" y1="1" x2="100%" y2="1"
-                stroke="url(#stepGrad)"
-                strokeWidth="2"
-                strokeDasharray="6 5"
+        {/* Steps container grid */}
+        <div className="relative">
+          {/* Connecting dashed vector path (Desktop only) */}
+          <div className="absolute top-[28%] left-[12%] right-[12%] hidden lg:block z-0 pointer-events-none">
+            <svg className="w-full h-24 overflow-visible" fill="none" viewBox="0 0 800 100" preserveAspectRatio="none">
+              <path
+                d="M 10 50 Q 200 -15 400 50 T 790 50"
+                stroke="url(#step-line-gradient)"
+                strokeWidth="3.5"
+                fill="none"
+                className="animate-line-dash"
+                opacity="0.65"
               />
               <defs>
-                <linearGradient id="stepGrad" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#1496f3" stopOpacity="0.5" />
-                  <stop offset="50%" stopColor="#f59e0b" stopOpacity="0.5" />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity="0.5" />
+                <linearGradient id="step-line-gradient" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#1496f3" />
+                  <stop offset="50%" stopColor="#f59e0b" />
+                  <stop offset="100%" stopColor="#10b981" />
                 </linearGradient>
               </defs>
             </svg>
           </div>
 
-          {/* Vertical connector (mobile only) */}
-          <div className="pointer-events-none absolute top-36 bottom-36 left-[2.25rem] w-px lg:hidden"
-            style={{ background: 'linear-gradient(to bottom, rgba(20,150,243,0.3), rgba(245,158,11,0.3), rgba(16,185,129,0.3))' }}
-          />
-
-          {STEPS.map((step, idx) => (
-            <div
-              key={idx}
-              className={`reveal group relative flex flex-row items-start gap-5 text-left lg:flex-col lg:items-center lg:gap-0 lg:text-center stagger-${idx + 1}`}
-            >
-              {/* Floating illustration circle */}
-              <div className="relative mb-0 shrink-0 lg:mb-8">
-                {/* Outer glow ring */}
+          {/* Grid of Steps */}
+          <div className="relative z-10 grid grid-cols-1 gap-14 sm:gap-16 lg:grid-cols-3 lg:gap-10">
+            {STEPS.map((step, idx) => (
+              <div
+                key={step.number}
+                className={`reveal group relative flex flex-col items-center text-center stagger-${idx + 1}`}
+              >
+                {/* Process Card */}
                 <div
-                  className="absolute -inset-4 rounded-full opacity-0 blur-xl transition-opacity duration-500 group-hover:opacity-100"
-                  style={{ background: `radial-gradient(circle, ${step.glowColor}, transparent 70%)` }}
-                />
-
-                {/* Image / icon container — NO border box, just a soft circle background */}
-                <div
-                  className="relative flex h-20 w-20 items-center justify-center rounded-full transition-transform duration-500 ease-out group-hover:scale-105 group-hover:-translate-y-2 lg:h-36 lg:w-36"
-                  style={{ background: `radial-gradient(circle at 50% 50%, ${step.glowColor}, rgba(248,250,255,0.4) 75%)` }}
+                  className={`relative w-full flex flex-col items-center bg-white/75 backdrop-blur-md border border-white/80 rounded-[2rem] p-8 pb-9 shadow-[0_12px_36px_rgba(18,36,79,0.03)] transition-all duration-500 hover:-translate-y-2.5 ${step.hoverBorder} ${step.hoverGlow}`}
+                  style={{
+                    background: `radial-gradient(circle at top right, ${step.cardGlow}, transparent 55%), linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.85))`
+                  }}
                 >
-                  <div className="relative h-14 w-14 lg:h-28 lg:w-28">
-                    <Image
-                      src={step.image}
-                      alt={step.title}
-                      fill
-                      className="object-contain drop-shadow-xl"
-                      sizes="(max-width: 1024px) 56px, 112px"
-                      onError={(e) => {
-                        // fallback to SVG icon if image not yet copied
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
+                  {/* Glassmorphic step number badge overlapping top border */}
+                  <div
+                    className="absolute -top-5 left-1/2 -translate-x-1/2 flex h-10 w-10 items-center justify-center rounded-full text-xs font-[900] text-white shadow-lg border border-white/40"
+                    style={{
+                      backgroundColor: step.color,
+                      boxShadow: `0 6px 20px ${step.glow}`,
+                    }}
+                  >
+                    {step.number}
+                  </div>
+
+                  {/* Icon Cluster container with hover glow */}
+                  <div className="relative mt-4 mb-6">
+                    {/* Radial Glow */}
+                    <div
+                      className="absolute -inset-8 rounded-full opacity-0 blur-2xl transition-all duration-500 group-hover:opacity-100"
+                      style={{ background: `radial-gradient(circle, ${step.glow}, transparent 70%)` }}
+                      aria-hidden
                     />
-                    {/* SVG fallback shown underneath */}
-                    <div className="absolute inset-0 flex items-center justify-center opacity-30">
+                    {/* Circle Backdrop */}
+                    <div
+                      className="relative flex h-32 w-32 items-center justify-center rounded-full border border-white/60 bg-white/40 shadow-inner transition-transform duration-500 group-hover:scale-105"
+                      style={{ background: `radial-gradient(circle at 50% 45%, ${step.glow}, rgba(255,255,255,0.2) 75%)` }}
+                    >
                       {step.icon}
                     </div>
                   </div>
-                </div>
 
-                {/* Step number — floating chip above circle */}
-                <div
-                  className="absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center rounded-xl text-[0.6rem] font-[900] text-white shadow-lg lg:h-8 lg:w-8 lg:text-[0.65rem]"
-                  style={{ backgroundColor: step.badgeColor, boxShadow: `0 4px 12px ${step.glowColor}` }}
-                >
-                  {step.number}
-                </div>
-              </div>
+                  {/* Text Contents */}
+                  <h3 className="mb-3.5 text-xl font-[900] tracking-tight text-brand-navy transition-colors duration-300">
+                    {step.title}
+                  </h3>
+                  <p className="mb-6 max-w-[260px] text-[0.88rem] font-[600] leading-relaxed text-brand-muted">
+                    {step.description}
+                  </p>
 
-              {/* Text */}
-              <div className="flex-1 pt-1 lg:flex-none lg:text-center">
-                <h3 className="mb-1.5 text-lg font-[900] tracking-tight text-[#12244f] lg:mb-2 lg:text-xl">{step.title}</h3>
-                <p className="mb-4 text-sm font-[600] leading-relaxed text-[#12244f]/50 lg:mb-5 lg:max-w-[260px]">
-                  {step.description}
-                </p>
-
-                {/* Badge pill */}
-                <div
-                  className="inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 text-xs font-[800] uppercase tracking-[0.12em] lg:px-4 lg:py-2 lg:tracking-[0.14em]"
-                  style={{
-                    borderColor: `${step.badgeColor}30`,
-                    color: step.badgeColor,
-                    backgroundColor: `${step.badgeColor}08`,
-                  }}
-                >
-                  <span className="flex h-1.5 w-1.5 rounded-full animate-pulse" style={{ backgroundColor: step.badgeColor }} />
-                  {step.badge}
+                  {/* Pill Badge */}
+                  <span
+                    className="mt-auto inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[0.68rem] font-[800] uppercase tracking-[0.14em] shadow-sm transition-all duration-300 group-hover:scale-105"
+                    style={{
+                      borderColor: `${step.color}25`,
+                      color: step.color,
+                      backgroundColor: `${step.color}08`,
+                      boxShadow: `0 4px 12px ${step.color}05`,
+                    }}
+                  >
+                    <span
+                      className="h-1.5 w-1.5 rounded-full"
+                      style={{ backgroundColor: step.color }}
+                      aria-hidden
+                    />
+                    {step.badge}
+                  </span>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
-        {/* CTA */}
-        <div className="reveal mt-20 flex flex-col items-center gap-5 text-center stagger-4">
+        {/* CTA Button */}
+        <div className="reveal mt-16 flex justify-center lg:mt-24 stagger-4">
           <Link
             href={applyHref}
-            className="group inline-flex items-center gap-3 rounded-2xl bg-[#12244f] px-12 py-5 text-lg font-[900] text-[#ffc519] shadow-[0_16px_40px_rgba(18,36,79,0.22)] transition-all hover:-translate-y-1 hover:shadow-[0_24px_56px_rgba(18,36,79,0.3)]"
+            className="group relative overflow-hidden inline-flex items-center gap-3 rounded-2xl bg-gradient-to-r from-brand-navy to-[#12244f] px-10 py-4 text-base font-[900] text-brand-gold shadow-[0_16px_40px_rgba(18,36,79,0.22)] transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-[0_24px_56px_rgba(18,36,79,0.32)] active:scale-95 sm:px-12 sm:py-5 sm:text-lg"
           >
-            Start Your Application
-            <svg viewBox="0 0 20 20" className="h-5 w-5 transition-transform group-hover:translate-x-1" fill="currentColor">
+            {/* Sheen animation sweep overlay */}
+            <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-[sheenPass_1.8s_ease-in-out_infinite]" />
+
+            <span className="relative z-10">Start Your Application</span>
+            <svg viewBox="0 0 20 20" className="relative z-10 h-5 w-5 transition-transform duration-300 group-hover:translate-x-1.5" fill="currentColor" aria-hidden>
               <path d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" />
             </svg>
           </Link>
-          <p className="text-xs font-[700] text-[#12244f]/35">
-            No credit score required to check eligibility · Takes 30 seconds
-          </p>
         </div>
       </div>
     </section>

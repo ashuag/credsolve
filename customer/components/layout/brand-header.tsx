@@ -36,10 +36,11 @@ export function BrandHeader() {
         <Link href="/" className="inline-flex h-full items-center shrink-0 transition-transform duration-200 hover:scale-[1.02]" aria-label="MoneyCash home">
           <Image
             src="/images/moneycash-logo.png"
-            alt="MoneyCash Instant Digital Loans"
-            width={670}
-            height={761}
-            sizes="(max-width: 640px) 56px, 64px"
+            alt="MoneyCash — Instant Digital Loans"
+            width={949}
+            height={430}
+            sizes="(max-width: 640px) 150px, 175px"
+            quality={95}
             priority
             className="block h-14 w-auto object-contain sm:h-16"
           />

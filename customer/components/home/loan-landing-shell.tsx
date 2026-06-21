@@ -105,9 +105,11 @@ export function LoanLandingShell({
             <Image
               src="/images/moneycash-logo.png"
               alt="MoneyCash"
-              width={120}
-              height={40}
-              className="h-8 w-auto object-contain"
+              width={949}
+              height={430}
+              sizes="110px"
+              quality={95}
+              className="h-10 w-auto object-contain"
               priority
             />
           </Link>
