@@ -98,8 +98,12 @@ async function injectLenderDscLogo(html: string): Promise<string> {
     const logoPath = path.join(process.cwd(), 'assets', 'loan-documents', LENDER_LOGO_FILE);
     const logoBytes = await readFile(logoPath);
     const dataUri = `data:image/png;base64,${logoBytes.toString('base64')}`;
-    return html.replaceAll('__LENDER_DSC_LOGO_SRC__', dataUri);
+    return html
+      .replaceAll('__LENDER_DSC_LOGO_SRC__', dataUri)
+      .replaceAll('__LENDER_LOGO_SRC__', dataUri);
   } catch {
-    return html.replaceAll('__LENDER_DSC_LOGO_SRC__', '');
+    return html
+      .replaceAll('__LENDER_DSC_LOGO_SRC__', '')
+      .replaceAll('__LENDER_LOGO_SRC__', '');
   }
 }

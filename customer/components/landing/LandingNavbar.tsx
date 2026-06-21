@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CustomerAccountMenu } from '@/components/layout/customer-account-menu';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { logoutCustomer } from '@/lib/api/auth';
@@ -13,6 +13,7 @@ import {
   isCustomerPortalSignedIn,
 } from '@/lib/api/customer-session';
 import { buildHrefWithSearch } from '@/lib/navigation';
+import { BRAND_TAGLINE, MAX_LOAN_DISPLAY } from '@/lib/brand';
 
 const NAV_LINKS = [
   { label: 'Home', href: '/', active: true },
@@ -22,9 +23,10 @@ const NAV_LINKS = [
 ];
 
 const ANNOUNCEMENTS = [
-  '⚡  Instant Digital Loans up to ₹50,000',
+  `⚡  Instant Digital Loans up to ${MAX_LOAN_DISPLAY}`,
   '🔒  100% Secure • Paperless • Quick Approval',
   '✅  Approval in 2 Minutes — No Branch Visit',
+  BRAND_TAGLINE,
 ];
 
 export function LandingNavbar() {
@@ -35,6 +37,14 @@ export function LandingNavbar() {
   const applyHref = buildHrefWithSearch('/apply-for-loan', searchParams);
   const accountHref = buildHrefWithSearch('/my-account', searchParams);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const signedIn = isCustomerPortalSignedIn(session);
   const showGuestChrome = !signedIn && (session === null || session.authenticated === false);
@@ -54,31 +64,51 @@ export function LandingNavbar() {
   }
 
   const sheetLinkClass =
-    'rounded-xl px-4 py-3 text-sm font-[700] text-[#12244f]/80 hover:bg-[#f8f9fc] hover:text-[#12244f] transition-colors';
+    'rounded-xl px-4 py-3 text-sm font-[700] text-[#12244f]/75 hover:bg-[#12244f]/5 hover:text-[#12244f] transition-colors';
 
   return (
     <header className="sticky top-0 z-50 w-full">
-      <div className="relative overflow-hidden bg-[#1496f3] py-2">
-        <div className="flex animate-marquee-scroll whitespace-nowrap">
+      <div className="group relative overflow-hidden bg-[linear-gradient(90deg,#1c347d_0%,#2388e5_50%,#1c347d_100%)] py-2 shadow-[inset_0_-1px_0_rgba(255,255,255,0.12)]">
+        <div
+          className="flex animate-marquee-scroll whitespace-nowrap [animation-play-state:running] group-hover:[animation-play-state:paused]"
+          style={{
+            maskImage: 'linear-gradient(to right, transparent, #000 6%, #000 94%, transparent)',
+            WebkitMaskImage: 'linear-gradient(to right, transparent, #000 6%, #000 94%, transparent)',
+          }}
+        >
           {[...ANNOUNCEMENTS, ...ANNOUNCEMENTS].map((text, i) => (
-            <span key={i} className="mx-12 shrink-0 text-[0.7rem] font-[800] uppercase tracking-[0.18em] text-white">
+            <span key={i} className="flex shrink-0 items-center text-[0.7rem] font-[800] uppercase tracking-[0.18em] text-white/95">
+              <span className="mx-6 h-1 w-1 shrink-0 rounded-full bg-[#ffc519]" aria-hidden="true" />
               {text}
             </span>
           ))}
         </div>
       </div>
 
-      <nav className="border-b border-[rgba(18,36,79,0.06)] bg-white/92 backdrop-blur-xl">
-        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-3 px-4 sm:h-20 sm:px-6 lg:px-8">
+      <nav
+        className={`border-b bg-white transition-[box-shadow,border-color] duration-300 ${
+          scrolled
+            ? 'border-[#12244f]/8 shadow-[0_8px_30px_rgba(18,36,79,0.06)]'
+            : 'border-[#12244f]/8'
+        }`}
+      >
+        <div
+          className={`mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 transition-[height] duration-300 sm:px-6 lg:px-8 ${
+            scrolled ? 'h-16 sm:h-[4.5rem]' : 'h-20 sm:h-24'
+          }`}
+        >
           <Link href="/" className="inline-flex h-full items-center shrink-0 transition-transform duration-200 hover:scale-[1.03]">
             <Image
               src="/images/moneycash-logo.png"
-              alt="MoneyCash Instant Digital Loans"
-              width={670}
-              height={761}
-              sizes="(max-width: 640px) 56px, 64px"
+              alt="MoneyCash — Instant Digital Loans"
+              width={949}
+              height={430}
+              sizes="(max-width: 640px) 170px, 200px"
+              quality={95}
               priority
-              className="block h-14 w-auto object-contain sm:h-16"
+              className={`block w-auto object-contain transition-[height] duration-300 ${
+                scrolled ? 'h-12 sm:h-14' : 'h-16 sm:h-[4.75rem]'
+              }`}
             />
           </Link>
 
@@ -87,24 +117,33 @@ export function LandingNavbar() {
               <Link
                 key={link.label}
                 href={link.href}
-                className={`relative px-4 py-2 text-sm font-[700] transition-colors ${
-                  link.active ? 'text-[#1496f3]' : 'text-[#12244f]/60 hover:text-[#1496f3]'
+                className={`group relative rounded-lg px-3.5 py-2 text-[0.95rem] font-[600] tracking-[-0.01em] transition-colors ${
+                  link.active
+                    ? 'text-[#1496f3]'
+                    : 'text-[#12244f]/70 hover:bg-[#12244f]/5 hover:text-[#12244f]'
                 }`}
               >
                 {link.label}
-                {link.active && <span className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-[#1496f3]" />}
+                <span
+                  className={`absolute -bottom-0.5 left-1/2 h-0.5 -translate-x-1/2 rounded-full bg-[#1496f3] transition-all duration-300 ${
+                    link.active ? 'w-5' : 'w-0 group-hover:w-5'
+                  }`}
+                />
               </Link>
             ))}
           </div>
 
           <div className="flex shrink-0 items-center gap-2 md:gap-3">
             {showGuestChrome && (
-              <Link
-                href={loginHref}
-                className="hidden text-sm font-[700] text-[#12244f]/70 transition-colors hover:text-[#1496f3] md:block"
-              >
-                Log in
-              </Link>
+              <>
+                <span className="mx-1 hidden h-6 w-px bg-[#12244f]/15 md:block" aria-hidden="true" />
+                <Link
+                  href={loginHref}
+                  className="hidden rounded-lg px-3 py-2 text-[0.95rem] font-[600] text-[#1c347d]/75 transition-colors hover:text-[#1496f3] md:block"
+                >
+                  Log in
+                </Link>
+              </>
             )}
 
             {signedIn ? (
@@ -113,7 +152,7 @@ export function LandingNavbar() {
               showGuestApplyCta && (
                 <Link
                   href={applyHref}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#12244f] px-4 py-2.5 text-sm font-[900] text-[#ffc519] shadow-[0_8px_24px_rgba(18,36,79,0.2)] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(18,36,79,0.28)] md:px-5"
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-navy to-[#12244f] px-4 py-2.5 text-sm font-[900] text-[#ffc519] shadow-[0_8px_24px_rgba(18,36,79,0.12)] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(18,36,79,0.22)] md:px-5"
                 >
                   <span className="hidden sm:inline">Apply Now</span>
                   <span className="sm:hidden">Apply</span>
@@ -126,7 +165,7 @@ export function LandingNavbar() {
 
             <button
               type="button"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[rgba(18,36,79,0.1)] md:hidden"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#12244f]/15 text-[#12244f] md:hidden"
               onClick={() => setMenuOpen((v) => !v)}
               aria-expanded={menuOpen}
               aria-label="Toggle menu"
@@ -143,21 +182,21 @@ export function LandingNavbar() {
         </div>
 
         {menuOpen && (
-          <div className="border-t border-[rgba(18,36,79,0.06)] bg-white px-4 py-4 md:hidden">
+          <div className="border-t border-[#12244f]/10 bg-white/98 px-4 py-4 backdrop-blur-xl md:hidden">
             <div className="flex flex-col gap-1">
               {NAV_LINKS.map((link) => (
                 <Link
                   key={link.label}
                   href={link.href}
                   className={`rounded-xl px-4 py-3 text-sm font-[700] transition-colors ${
-                    link.active ? 'bg-[#eef5ff] text-[#1496f3]' : 'text-[#12244f]/60 hover:bg-[#f8f9fc] hover:text-[#12244f]'
+                    link.active ? 'bg-[#12244f]/5 text-[#1496f3]' : 'text-[#12244f]/65 hover:bg-[#12244f]/5 hover:text-[#12244f]'
                   }`}
                   onClick={() => setMenuOpen(false)}
                 >
                   {link.label}
                 </Link>
               ))}
-              <div className="mt-2 flex flex-col gap-2 border-t border-[rgba(18,36,79,0.06)] pt-2">
+              <div className="mt-2 flex flex-col gap-2 border-t border-[#12244f]/10 pt-2">
                 {signedIn ? (
                   <>
                     <Link href={accountHref} className={sheetLinkClass} onClick={() => setMenuOpen(false)}>
@@ -178,7 +217,7 @@ export function LandingNavbar() {
                     {showGuestApplyCta && (
                       <Link
                         href={applyHref}
-                        className="rounded-xl bg-[#12244f] px-4 py-3 text-center text-sm font-[900] text-[#ffc519]"
+                        className="rounded-xl bg-gradient-to-r from-brand-navy to-[#12244f] px-4 py-3 text-center text-sm font-[900] text-[#ffc519]"
                         onClick={() => setMenuOpen(false)}
                       >
                         Apply Now →

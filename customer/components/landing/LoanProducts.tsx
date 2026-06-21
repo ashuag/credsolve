@@ -85,9 +85,6 @@ export function LoanProducts() {
               Your Life.
             </span>
           </h2>
-          <p className="reveal mx-auto mt-4 max-w-2xl text-base font-semibold leading-relaxed text-[#12244f]/50 stagger-2">
-            From same-day micro loans to structured EMI plans — transparent rates, zero hidden charges.
-          </p>
         </div>
 
         {/* Cards */}
@@ -154,7 +151,7 @@ export function LoanProducts() {
         </div>
 
         <p className="reveal mt-10 text-center text-[0.65rem] font-semibold text-[#12244f]/30 stagger-6">
-          *T&amp;C Apply | Interest rates may vary based on credit profile | All loans subject to RBI guidelines and credit appraisal
+          *T&amp;C Apply | Interest rates may vary based on credit profile | Subject to credit appraisal
         </p>
       </div>
     </section>

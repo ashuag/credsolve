@@ -36,9 +36,9 @@ const REVIEWS = [
     initials: 'AK',
     avatarColor: '#8b5cf6',
     rating: 5,
-    title: 'Education fee loan sorted in same day',
-    body: "My daughter's school fees were due and I was short by ₹40,000. Applied on MoneyCash at 9 AM and had the money before lunch. Paying it back in 6 easy EMIs at just 12% — the lowest rate I found anywhere.",
-    loan: 'Education Fee — ₹40,000',
+    title: "Education fee loan sorted in same day",
+    body: "My daughter's school fees were due and I was short by ₹30,000. Applied on MoneyCash at 9 AM and had the money before lunch. Paying it back in 6 easy EMIs at just 12% — the lowest rate I found anywhere.",
+    loan: 'Education Fee — ₹30,000',
     loanColor: '#8b5cf6',
     date: 'January 2026',
     verified: true,
@@ -50,8 +50,8 @@ const REVIEWS = [
     avatarColor: '#f43f5e',
     rating: 5,
     title: 'Medical emergency handled stress-free',
-    body: 'My father was hospitalised suddenly and I needed ₹50,000 immediately. The medical emergency loan was approved instantly, zero processing fee, and the money was in my account before I even reached the hospital.',
-    loan: 'Medical Emergency — ₹50,000',
+    body: 'My father was hospitalised suddenly and I needed ₹30,000 immediately. The medical emergency loan was approved instantly, zero processing fee, and the money was in my account before I even reached the hospital.',
+    loan: 'Medical Emergency — ₹30,000',
     loanColor: '#f43f5e',
     date: 'March 2026',
     verified: true,
@@ -103,14 +103,14 @@ function StarRating({count}: {count: number}) {
 
 function TestimonialCard({r}: {r: (typeof REVIEWS)[number]}) {
   return (
-    <article className="relative flex h-full flex-col gap-5 rounded-[24px] border border-[rgba(18,36,79,0.07)] bg-white p-6 shadow-[0_8px_32px_rgba(18,36,79,0.05)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_48px_rgba(18,36,79,0.1)]">
+    <article className="relative flex h-full flex-col gap-5 rounded-[28px] border border-white/60 bg-white/80 backdrop-blur-md p-6 shadow-[0_12px_40px_rgba(18,36,79,0.03)] transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_24px_60px_rgba(18,36,79,0.1)]">
       {/* Big decorative quote mark */}
-      <div className="absolute right-5 top-4 select-none text-5xl font-[900] leading-none text-[#12244f]/4">&ldquo;</div>
+      <div className="absolute right-5 top-4 select-none text-5xl font-[900] leading-none text-[#12244f]/5">&ldquo;</div>
 
       <div className="flex items-center justify-between">
         <StarRating count={r.rating} />
         {r.verified && (
-          <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[0.58rem] font-[800] uppercase tracking-[0.14em] text-emerald-600 border border-emerald-100">
+          <div className="flex items-center gap-1.5 rounded-full bg-[#10b981]/8 px-2.5 py-1 text-[0.58rem] font-[800] uppercase tracking-[0.14em] text-[#059669] border border-[#10b981]/15">
             <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="currentColor" aria-hidden>
               <path d="M10.07 3.47a.75.75 0 00-1.07 0L5 7.47l-1.96-2a.75.75 0 10-1.08 1.06l2.5 2.5a.75.75 0 001.08 0l4.53-4.5a.75.75 0 000-1.06z" />
             </svg>
@@ -120,11 +120,15 @@ function TestimonialCard({r}: {r: (typeof REVIEWS)[number]}) {
       </div>
 
       <h3 className="text-[0.95rem] font-[800] text-[#12244f] leading-snug">&ldquo;{r.title}&rdquo;</h3>
-      <p className="text-[0.82rem] font-[500] leading-relaxed text-[#12244f]/55 flex-1">{r.body}</p>
+      <p className="text-[0.82rem] font-[500] leading-relaxed text-[#12244f]/60 flex-1">{r.body}</p>
 
       <div
-        className="inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.6rem] font-[800] uppercase tracking-[0.12em] text-white"
-        style={{backgroundColor: r.loanColor}}
+        className="inline-flex w-fit items-center gap-1.5 rounded-full border px-3 py-1.5 text-[0.6rem] font-[800] uppercase tracking-[0.12em]"
+        style={{
+          borderColor: `${r.loanColor}25`,
+          color: r.loanColor,
+          backgroundColor: `${r.loanColor}12`
+        }}
       >
         <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="currentColor" aria-hidden>
           <path d="M6 1l1.236 3.8h4l-3.236 2.35 1.236 3.8L6 8.6l-3.236 2.35 1.236-3.8L.764 4.8h4z" />
@@ -143,7 +147,7 @@ function TestimonialCard({r}: {r: (typeof REVIEWS)[number]}) {
         </div>
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="truncate text-sm font-[800] text-[#12244f]">{r.name}</span>
-          <span className="text-[0.62rem] font-[600] text-[#12244f]/40">
+          <span className="text-[0.62rem] font-[600] text-[#12244f]/50">
             {r.city} · {r.date}
           </span>
         </div>
@@ -200,7 +204,7 @@ export function TestimonialsSection() {
     <section
       id="testimonials"
       ref={sectionRef}
-      className="relative overflow-hidden bg-white py-20 lg:py-28"
+      className="relative overflow-hidden bg-transparent py-20 lg:py-28"
       aria-labelledby="testimonials-heading"
     >
       {/* Backgrounds */}
@@ -216,17 +220,17 @@ export function TestimonialsSection() {
 
         {/* Header */}
         <div className="mb-12 text-center lg:mb-14">
-          <div className="reveal mb-5 inline-flex items-center gap-2.5 rounded-full bg-[#ffc519]/10 px-5 py-2.5 shadow-[0_4px_16px_rgba(245,158,11,0.1)]">
-            <span className="text-[0.65rem] font-[900] uppercase tracking-[0.24em] text-[#f59e0b]">Real customers, real stories</span>
+          <div className="reveal mb-5 inline-flex items-center gap-2.5 rounded-full bg-[#f59e0b]/8 px-5 py-2.5 border border-[#f59e0b]/15 shadow-sm">
+            <span className="text-[0.65rem] font-[900] uppercase tracking-[0.24em] text-[#e5a800]">Real customers, real stories</span>
           </div>
           <h2 id="testimonials-heading" className="reveal text-[clamp(2rem,4.5vw,3.2rem)] font-[900] tracking-tight text-[#12244f] stagger-1">
             Loved by Borrowers{' '}
-            <span className="bg-[linear-gradient(135deg,#1496f3,#1c347d)] bg-clip-text text-transparent">Across India</span>
+            <span className="bg-gradient-to-r from-[#1496f3] to-brand-navy bg-clip-text text-transparent">Across India</span>
           </h2>
           <div className="reveal mt-5 flex items-center justify-center gap-3 stagger-2">
             <StarRating count={5} />
             <span className="text-sm font-[800] text-[#12244f]">4.9 / 5</span>
-            <span className="text-sm font-[600] text-[#12244f]/40">from 12,400+ reviews</span>
+            <span className="text-sm font-[600] text-[#12244f]/60">from 12,400+ reviews</span>
           </div>
         </div>
 
@@ -276,7 +280,7 @@ export function TestimonialsSection() {
           <button
             type="button"
             onClick={() => go(-1)}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[rgba(18,36,79,0.1)] bg-white text-[#12244f] shadow-sm transition hover:border-[#1496f3]/40 hover:bg-[#f0f7ff] hover:text-[#1496f3]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#12244f]/10 bg-white/80 backdrop-blur-sm text-[#12244f] shadow-sm transition hover:border-[#1496f3]/30 hover:bg-white hover:shadow-md hover:text-[#1496f3]"
             aria-label="Previous testimonial"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
@@ -302,7 +306,7 @@ export function TestimonialsSection() {
           <button
             type="button"
             onClick={() => go(1)}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[rgba(18,36,79,0.1)] bg-white text-[#12244f] shadow-sm transition hover:border-[#1496f3]/40 hover:bg-[#f0f7ff] hover:text-[#1496f3]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#12244f]/10 bg-white/80 backdrop-blur-sm text-[#12244f] shadow-sm transition hover:border-[#1496f3]/30 hover:bg-white hover:shadow-md hover:text-[#1496f3]"
             aria-label="Next testimonial"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
@@ -312,8 +316,8 @@ export function TestimonialsSection() {
         </div>
 
         <div className="reveal mt-10 text-center stagger-6">
-          <p className="text-sm font-[600] text-[#12244f]/40">
-            Join 50,000+ happy customers.{' '}
+          <p className="text-sm font-[600] text-[#12244f]/50">
+            Join 5,000+ happy customers.{' '}
             <span className="font-[800] text-[#1496f3]">Start your loan journey today →</span>
           </p>
         </div>
