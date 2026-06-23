@@ -5,6 +5,7 @@ import type { Request } from 'express';
 import type { UploadedFileLike } from '../../../common/types/uploaded-file';
 import { RateLimitByRoute } from '../../../common/rate-limit/rate-limit-route.decorator';
 import { RedisIpRateLimitGuard } from '../../../common/rate-limit/redis-ip-rate-limit.guard';
+import { VpnBlockGuard } from '../../../common/ip-reputation/vpn-block.guard';
 import { LookupIfscDto } from '../application/dto/lookup-ifsc.dto';
 import { SubmitVerifiedBankDto } from '../application/dto/submit-verified-bank.dto';
 import { SaveBankDetailsDto } from '../application/dto/save-bank-details.dto';
@@ -22,7 +23,7 @@ import { RequiredCustomerSessionGuard } from './guards/required-customer-session
 
 @ApiTags('applications')
 @Controller('applications')
-@UseGuards(RedisIpRateLimitGuard, RequiredCustomerSessionGuard)
+@UseGuards(RedisIpRateLimitGuard, VpnBlockGuard, RequiredCustomerSessionGuard)
 export class ApplicationsController {
   constructor(
     private readonly submitProfessionalApplication: SubmitProfessionalApplicationUseCase,

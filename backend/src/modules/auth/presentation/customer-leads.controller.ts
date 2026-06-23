@@ -3,6 +3,7 @@ import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { RateLimitByRoute } from '../../../common/rate-limit/rate-limit-route.decorator';
 import { RedisIpRateLimitGuard } from '../../../common/rate-limit/redis-ip-rate-limit.guard';
+import { VpnBlockGuard } from '../../../common/ip-reputation/vpn-block.guard';
 import { SaveLeadDetailsDto } from '../application/dto/save-lead-details.dto';
 import { SaveLeadProfileDto } from '../application/dto/save-lead-profile.dto';
 import { SyncLeadEmailDto } from '../application/dto/sync-lead-email.dto';
@@ -14,7 +15,7 @@ import { RequiredCustomerSessionGuard } from './guards/required-customer-session
 
 @ApiTags('leads')
 @Controller('leads')
-@UseGuards(RedisIpRateLimitGuard, RequiredCustomerSessionGuard)
+@UseGuards(RedisIpRateLimitGuard, VpnBlockGuard, RequiredCustomerSessionGuard)
 export class CustomerLeadsController {
   constructor(
     private readonly syncLeadEmailFromGoogle: SyncLeadEmailFromGoogleTokenUseCase,

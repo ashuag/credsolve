@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { StorageModule } from './common/storage/storage.module';
 import { RedisModule } from './common/redis/redis.module';
+import { IpReputationModule } from './common/ip-reputation/ip-reputation.module';
 import { SmsModule } from './common/sms/sms.module';
 import { VendorApiModule } from './common/vendor/vendor-api.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -27,6 +28,7 @@ import { PrismaModule } from './prisma/prisma.module';
     PrismaModule,
     StorageModule,
     RedisModule,
+    IpReputationModule,
     SmsModule,
     VendorApiModule,
     AuthModule,

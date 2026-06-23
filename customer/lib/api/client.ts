@@ -59,6 +59,18 @@ export class ApiClientError extends ApiRequestError {
 const TIMEOUT_USER_MESSAGE = 'The request took too long. Please check your connection and try again.';
 const NETWORK_USER_MESSAGE = "Couldn't reach the server. Please check your connection and try again.";
 
+/** Backend error code returned (HTTP 403) when a VPN/proxy IP is detected. */
+export const VPN_DETECTED_ERROR_CODE = 'VPN_DETECTED';
+
+/** True when the API rejected the request because the caller is on a VPN/proxy. */
+export function isVpnBlockedError(err: unknown): boolean {
+  if (!(err instanceof ApiRequestError) || err.statusCode !== 403) {
+    return false;
+  }
+  const body = err.body as { code?: string } | null;
+  return body?.code === VPN_DETECTED_ERROR_CODE;
+}
+
 function classifyFetchError(err: unknown): ApiClientError {
   // AbortSignal.timeout(...) throws DOMException('TimeoutError') on Firefox/Chrome.
   if (typeof DOMException !== 'undefined' && err instanceof DOMException) {

@@ -70,8 +70,7 @@ export class VerifyOtpUseCase {
 
     const given = dto.otpCode.trim().padStart(settings.otpLength, '0');
     if (!safeEqualOtp(request.otpCode, given)) {
-      await this.otpRequests.incrementAttempts(undefined, request.id);
-      throw new BadRequestException('Incorrect OTP. Please try again.');
+      await this.registerFailedAttempt(request, settings);
     }
 
     const verifiedAt = new Date();
@@ -191,8 +190,7 @@ export class VerifyOtpUseCase {
 
     const given = dto.otpCode.trim().padStart(settings.otpLength, '0');
     if (!safeEqualOtp(request.otpCode, given)) {
-      await this.otpRequests.incrementAttempts(undefined, request.id);
-      throw new BadRequestException('Incorrect OTP. Please try again.');
+      await this.registerFailedAttempt(request, settings);
     }
 
     const verifiedAt = new Date();
@@ -290,13 +288,38 @@ export class VerifyOtpUseCase {
 
   private assertOtpWindow(
     request: { expiresAt: Date; attemptCount: number },
-    settings: { otpMaxAttempts: number }
+    settings: { otpMaxAttempts: number; otpResendCooldownSeconds: number }
   ) {
     if (request.expiresAt.getTime() <= Date.now()) {
       throw new BadRequestException('This OTP has expired. Request a new code.');
     }
     if (request.attemptCount >= settings.otpMaxAttempts) {
-      throw new BadRequestException('Too many incorrect attempts. Request a new OTP.');
+      throw new BadRequestException(
+        `Too many incorrect attempts. Please wait ${settings.otpResendCooldownSeconds} seconds before requesting a new OTP.`
+      );
     }
+  }
+
+  /**
+   * Record a wrong-OTP attempt. Once `otpMaxAttempts` is reached without a successful
+   * verification, further verification is blocked; the matching `send-otp` cooldown then
+   * prevents a fresh OTP from being requested for `otpResendCooldownSeconds`.
+   */
+  private async registerFailedAttempt(
+    request: { id: number; attemptCount: number },
+    settings: { otpMaxAttempts: number; otpResendCooldownSeconds: number }
+  ): Promise<never> {
+    const updated = await this.otpRequests.incrementAttempts(undefined, request.id);
+
+    if (updated.attemptCount >= settings.otpMaxAttempts) {
+      throw new BadRequestException(
+        `Too many incorrect attempts. Please wait ${settings.otpResendCooldownSeconds} seconds before requesting a new OTP.`
+      );
+    }
+
+    const remainingAttempts = settings.otpMaxAttempts - updated.attemptCount;
+    throw new BadRequestException(
+      `Incorrect OTP. You have ${remainingAttempts} attempt${remainingAttempts === 1 ? '' : 's'} left.`
+    );
   }
 }

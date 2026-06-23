@@ -3,6 +3,7 @@ import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { RateLimitByRoute } from '../../../common/rate-limit/rate-limit-route.decorator';
 import { RedisIpRateLimitGuard } from '../../../common/rate-limit/redis-ip-rate-limit.guard';
+import { VpnBlockGuard } from '../../../common/ip-reputation/vpn-block.guard';
 import { SaveLeadDetailsDto } from '../application/dto/save-lead-details.dto';
 import { SaveLeadProfileDto } from '../application/dto/save-lead-profile.dto';
 import { SendOtpDto } from '../application/dto/send-otp.dto';
@@ -48,7 +49,7 @@ function readClientIp(req: Request): string | undefined {
 
 @ApiTags('auth')
 @Controller('auth')
-@UseGuards(RedisIpRateLimitGuard, OptionalCustomerSessionGuard)
+@UseGuards(RedisIpRateLimitGuard, VpnBlockGuard, OptionalCustomerSessionGuard)
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
