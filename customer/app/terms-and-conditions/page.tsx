@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 
 export default function TermsAndConditionsPage() {
   return (
-    <LegalPageShell variant="terms">
+    <LegalPageShell pageLabel="Terms & Conditions">
       <TermsDocument />
     </LegalPageShell>
   );

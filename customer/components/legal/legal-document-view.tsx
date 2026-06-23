@@ -1,10 +1,11 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import type { LegalDocumentContent } from '@/lib/legal-content';
 
-function linkifyParagraph(text: string) {
+function linkifyParagraph(text: string): ReactNode {
   const parts: Array<{ type: 'text' | 'link'; value: string; href?: string }> = [];
   const pattern =
-    /(\/privacy-policy|\/terms-and-conditions|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|https?:\/\/[^\s]+)/gi;
+    /(\/[a-z-]+|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|https?:\/\/[^\s]+|www\.[^\s]+)/gi;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
@@ -17,6 +18,8 @@ function linkifyParagraph(text: string) {
       parts.push({ type: 'link', value: token, href: token });
     } else if (token.includes('@')) {
       parts.push({ type: 'link', value: token, href: `mailto:${token}` });
+    } else if (token.startsWith('www.')) {
+      parts.push({ type: 'link', value: token, href: `https://${token}` });
     } else {
       parts.push({ type: 'link', value: token, href: token });
     }
@@ -54,23 +57,53 @@ function linkifyParagraph(text: string) {
   });
 }
 
+type Block =
+  | { type: 'subhead'; text: string }
+  | { type: 'list'; items: string[] }
+  | { type: 'para'; text: string };
+
+/** Group flat paragraph strings into renderable blocks (sub-headings, bullet lists, paragraphs). */
+function toBlocks(paragraphs: string[]): Block[] {
+  const blocks: Block[] = [];
+  let list: string[] | null = null;
+
+  const flushList = () => {
+    if (list) {
+      blocks.push({ type: 'list', items: list });
+      list = null;
+    }
+  };
+
+  for (const raw of paragraphs) {
+    if (raw.startsWith('- ')) {
+      (list ??= []).push(raw.slice(2));
+      continue;
+    }
+    flushList();
+    if (raw.startsWith('## ')) {
+      blocks.push({ type: 'subhead', text: raw.slice(3) });
+    } else {
+      blocks.push({ type: 'para', text: raw });
+    }
+  }
+  flushList();
+  return blocks;
+}
+
 function paragraphClassName(text: string): string {
+  if (text.endsWith(':')) return 'legal-leadin';
   if (/^[a-z]\.\s/i.test(text)) return 'legal-subclause';
   if (/^\d+\.\d+/.test(text)) return 'legal-subclause';
-  if (/^[A-Z][a-z].{0,80};$/.test(text) || /^To /.test(text)) return 'legal-list-item';
   return '';
 }
+
+const isNumbered = (id: string) => /^\d+$/.test(id);
 
 type LegalDocumentViewProps = {
   document: LegalDocumentContent;
 };
 
 export function LegalDocumentView({ document }: LegalDocumentViewProps) {
-  const sister =
-    document.kind === 'terms'
-      ? { href: '/privacy-policy', label: 'Privacy Policy' }
-      : { href: '/terms-and-conditions', label: 'Terms & Conditions' };
-
   return (
     <div className="legal-layout">
       <aside className="legal-toc hidden lg:block" aria-label="Table of contents">
@@ -78,7 +111,7 @@ export function LegalDocumentView({ document }: LegalDocumentViewProps) {
         <nav className="legal-toc-nav">
           {document.sections.map((section) => (
             <a key={section.id} href={`#section-${section.id}`} className="legal-toc-link">
-              <span className="legal-toc-num">{section.id}.</span>
+              {isNumbered(section.id) ? <span className="legal-toc-num">{section.id}.</span> : null}
               <span>{section.title}</span>
             </a>
           ))}
@@ -88,7 +121,7 @@ export function LegalDocumentView({ document }: LegalDocumentViewProps) {
       <article className="legal-doc">
         <header className="legal-hero">
           <div className="legal-hero-top">
-            <div className="mc-chip">{document.kind === 'terms' ? 'Legal' : 'Privacy'}</div>
+            <div className="mc-chip">{document.eyebrow}</div>
             <p className="legal-updated">Last updated {document.generatedAt}</p>
           </div>
           <h1 className="legal-title">{document.title}</h1>
@@ -127,7 +160,7 @@ export function LegalDocumentView({ document }: LegalDocumentViewProps) {
 
           <div className="legal-related">
             <span>Related:</span>
-            <Link href={sister.href}>{sister.label}</Link>
+            <Link href="/policies">View all policies</Link>
           </div>
         </header>
 
@@ -137,7 +170,7 @@ export function LegalDocumentView({ document }: LegalDocumentViewProps) {
             <nav className="legal-toc-nav">
               {document.sections.map((section) => (
                 <a key={section.id} href={`#section-${section.id}`} className="legal-toc-link">
-                  <span className="legal-toc-num">{section.id}.</span>
+                  {isNumbered(section.id) ? <span className="legal-toc-num">{section.id}.</span> : null}
                   <span>{section.title}</span>
                 </a>
               ))}
@@ -148,15 +181,33 @@ export function LegalDocumentView({ document }: LegalDocumentViewProps) {
         {document.sections.map((section) => (
           <section key={section.id} id={`section-${section.id}`} className="legal-section">
             <h2 className="legal-section-title">
-              <span className="legal-section-num">{section.id}</span>
+              {isNumbered(section.id) ? <span className="legal-section-num">{section.id}</span> : null}
               {section.title}
             </h2>
             <div className="legal-section-body">
-              {section.paragraphs.map((paragraph, index) => (
-                <p key={index} className={paragraphClassName(paragraph)}>
-                  {linkifyParagraph(paragraph)}
-                </p>
-              ))}
+              {toBlocks(section.paragraphs).map((block, index) => {
+                if (block.type === 'subhead') {
+                  return (
+                    <h3 key={index} className="legal-subhead">
+                      {linkifyParagraph(block.text)}
+                    </h3>
+                  );
+                }
+                if (block.type === 'list') {
+                  return (
+                    <ul key={index} className="legal-list">
+                      {block.items.map((item, itemIndex) => (
+                        <li key={itemIndex}>{linkifyParagraph(item)}</li>
+                      ))}
+                    </ul>
+                  );
+                }
+                return (
+                  <p key={index} className={paragraphClassName(block.text)}>
+                    {linkifyParagraph(block.text)}
+                  </p>
+                );
+              })}
             </div>
           </section>
         ))}
@@ -164,7 +215,8 @@ export function LegalDocumentView({ document }: LegalDocumentViewProps) {
         <footer className="legal-footer">
           <p>
             Questions about this document? Write to{' '}
-            <a href={`mailto:${document.contactEmail}`}>{document.contactEmail}</a>.
+            <a href={`mailto:${document.contactEmail}`}>{document.contactEmail}</a>. Browse all our{' '}
+            <Link href="/policies">policies &amp; disclosures</Link>.
           </p>
         </footer>
       </article>

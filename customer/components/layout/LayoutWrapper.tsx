@@ -5,6 +5,19 @@ import { ReactNode, Suspense } from 'react';
 import { BrandHeader } from '@/components/layout/brand-header';
 import { MobileTabBar } from '@/components/layout/mobile-tab-bar';
 
+/** Self-contained legal/policy routes that render their own header via LegalPageShell. */
+const SELF_CONTAINED_LEGAL_ROUTES = new Set([
+  '/policies',
+  '/about-us',
+  '/terms-and-conditions',
+  '/privacy-policy',
+  '/fair-practices-code',
+  '/grievance-redressal-policy',
+  '/kyc-aml-policy',
+  '/corporate-governance-policy',
+  '/information-security-policy',
+]);
+
 export function LayoutWrapper({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? '';
   const isLandingPage = pathname === '/';
@@ -13,6 +26,11 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
   const isOnboardingLayout = pathname === '/onboarding' || pathname === '/email-verify';
   const isLoanDocumentsPage = pathname === '/loan-documents';
   const isKycHubPage = pathname === '/kyc';
+  const isLegalPage = SELF_CONTAINED_LEGAL_ROUTES.has(pathname);
+
+  if (isLegalPage) {
+    return <>{children}</>;
+  }
 
   if (isLandingPage || isApplyPage || isAccountLoginPage || isKycHubPage) {
     if (isKycHubPage) {

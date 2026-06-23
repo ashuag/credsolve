@@ -43,18 +43,19 @@ const LOAN_LINKS = [
 
 const COMPANY_LINKS = [
   { label: 'How It Works', href: '#how-it-works' },
-  { label: 'About Us', href: '#' },
+  { label: 'About Us', href: '/about-us' },
   { label: 'Contact Us', href: '#contact' },
-  { label: 'FAQs', href: '#' },
-  { label: 'Privacy Policy', href: '#' },
-  { label: 'Terms & Conditions', href: '#' },
+  { label: 'Privacy Policy', href: '/privacy-policy' },
+  { label: 'Terms & Conditions', href: '/terms-and-conditions' },
+  { label: 'All Policies', href: '/policies' },
 ];
 
 const SUPPORT_LINKS = [
-  { label: 'Help Center', href: '#' },
-  { label: 'Grievance Redressal', href: '#' },
-  { label: 'Loan Status', href: '#' },
-  { label: 'Repayment Portal', href: '#' },
+  { label: 'Grievance Redressal', href: '/grievance-redressal-policy' },
+  { label: 'Fair Practices Code', href: '/fair-practices-code' },
+  { label: 'KYC & AML Policy', href: '/kyc-aml-policy' },
+  { label: 'Corporate Governance', href: '/corporate-governance-policy' },
+  { label: 'Information Security', href: '/information-security-policy' },
 ];
 
 
@@ -140,15 +141,18 @@ export function LandingFooter() {
         <div className="grid gap-12 lg:grid-cols-12 lg:gap-10">
           {/* Brand column */}
           <div className="reveal flex flex-col gap-6 lg:col-span-5">
-            <Link href="/" className="inline-flex shrink-0 transition-transform duration-200 hover:scale-[1.03]">
+            <Link
+              href="/"
+              className="inline-flex w-fit shrink-0 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_8px_24px_rgba(0,0,0,0.25)] transition-transform duration-200 hover:scale-[1.03]"
+            >
               <Image
                 src="/images/moneycash-logo.png"
                 alt="MoneyCash — Instant Digital Loans"
-                width={949}
-                height={430}
+                width={957}
+                height={379}
                 sizes="(max-width: 640px) 160px, 190px"
                 quality={95}
-                className="block h-16 w-auto object-contain sm:h-[4.5rem]"
+                className="block h-14 w-auto object-contain sm:h-16"
               />
             </Link>
 
@@ -188,6 +192,21 @@ export function LandingFooter() {
                   <div className="truncate text-sm font-[800] text-white">contact@moneycash.in</div>
                 </div>
               </a>
+
+              <div className="group flex items-start gap-3 rounded-2xl border border-white/6 bg-white/3 p-4 transition-all hover:border-brand-blue/25 hover:bg-brand-blue/8 sm:col-span-2">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-blue/15 transition-colors group-hover:bg-brand-blue/25">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4 text-brand-blue-light" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[0.58rem] font-[800] uppercase tracking-[0.14em] text-white/25">Registered Address</div>
+                  <address className="mt-0.5 text-sm font-[700] not-italic leading-relaxed text-white/85">
+                    E-2748 Gaur Siddhartham, Siddharth Vihar, Ghaziabad City, Ghaziabad, Ghaziabad- 201009, Uttar Pradesh
+                  </address>
+                </div>
+              </div>
             </div>
 
             {/* Social */}

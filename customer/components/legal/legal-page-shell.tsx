@@ -1,58 +1,42 @@
-import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { Suspense, type ReactNode } from 'react';
+import { LandingNavbar } from '@/components/landing/LandingNavbar';
+import { LandingFooter } from '@/components/landing/LandingFooter';
 
 type LegalPageShellProps = {
   children: ReactNode;
-  variant: 'terms' | 'privacy';
+  /**
+   * Retained for backward compatibility with existing call sites. The shared
+   * landing header no longer renders a per-page label, so this is unused.
+   */
+  pageLabel?: string;
 };
 
-export function LegalPageShell({ children, variant }: LegalPageShellProps) {
-  const sisterHref = variant === 'terms' ? '/privacy-policy' : '/terms-and-conditions';
-  const sisterLabel = variant === 'terms' ? 'Privacy Policy' : 'Terms & Conditions';
-  const pageLabel = variant === 'terms' ? 'Terms & Conditions' : 'Privacy Policy';
-
+export function LegalPageShell({ children }: LegalPageShellProps) {
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-[#f7f9fc]">
+    <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-[#f7f9fc]">
       <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
         <div className="absolute -left-24 top-0 h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(20,150,243,0.14),transparent_68%)]" />
         <div className="absolute -right-20 top-32 h-[380px] w-[380px] rounded-full bg-[radial-gradient(circle,rgba(255,197,25,0.16),transparent_70%)]" />
       </div>
 
-      <header className="sticky top-0 z-20 border-b border-[rgba(18,36,79,0.08)] bg-[rgba(255,253,248,0.92)] backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <div className="min-w-0">
-            <Link
-              href="/"
-              className="text-[1.05rem] font-black tracking-tight text-brand-navy transition hover:text-brand-blue"
-            >
-              Money<span className="text-brand-blue">Cash</span>
-            </Link>
-            <p className="mt-0.5 text-xs font-semibold uppercase tracking-[0.16em] text-brand-muted">{pageLabel}</p>
-          </div>
-          <nav className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-            <Link
-              href="/apply-for-loan"
-              className="rounded-full border border-[rgba(18,36,79,0.1)] bg-white px-3.5 py-2 text-xs font-bold uppercase tracking-wider text-brand-navy shadow-sm transition hover:border-brand-blue/30 hover:text-brand-blue sm:px-4"
-            >
-              Apply
-            </Link>
-            <Link
-              href={sisterHref}
-              className="rounded-full border border-transparent px-3.5 py-2 text-xs font-bold uppercase tracking-wider text-brand-muted transition hover:bg-white/80 hover:text-brand-navy sm:px-4"
-            >
-              {sisterLabel}
-            </Link>
-            <Link
-              href="/"
-              className="rounded-full bg-gradient-to-r from-[#1496f3] to-[#0d7dd8] px-3.5 py-2 text-xs font-black uppercase tracking-wider text-white shadow-[0_8px_20px_rgba(20,150,243,0.35)] transition hover:opacity-95 sm:px-4"
-            >
-              Home
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <Suspense
+        fallback={
+          <header
+            className="sticky top-0 z-50 min-h-[112px] w-full border-b border-[#12244f]/8 bg-white"
+            aria-hidden
+          />
+        }
+      >
+        <LandingNavbar />
+      </Suspense>
 
-      <main className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6 sm:pb-24 sm:pt-10">{children}</main>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-8 sm:px-6 sm:pb-24 sm:pt-10">
+        {children}
+      </main>
+
+      <Suspense fallback={null}>
+        <LandingFooter />
+      </Suspense>
     </div>
   );
 }

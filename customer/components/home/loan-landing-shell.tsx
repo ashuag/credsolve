@@ -105,8 +105,8 @@ export function LoanLandingShell({
             <Image
               src="/images/moneycash-logo.png"
               alt="MoneyCash"
-              width={949}
-              height={430}
+              width={957}
+              height={379}
               sizes="110px"
               quality={95}
               className="h-10 w-auto object-contain"

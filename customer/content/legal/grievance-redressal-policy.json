@@ -1,0 +1,244 @@
+{
+  "slug": "grievance-redressal-policy",
+  "eyebrow": "Grievance",
+  "navLabel": "Grievance Redressal Policy",
+  "title": "Grievance Redressal Policy",
+  "description": "How MoneyCash receives, handles, and escalates customer complaints in a fair, time-bound, and transparent manner.",
+  "registeredOffice": "CREDSOLVE Technologies Private Limited, Flat No. E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh — 201009",
+  "contactEmail": "grievance@moneycash.in",
+  "grievanceOfficer": {
+    "name": "Grievance Officer",
+    "email": "grievance@moneycash.in",
+    "phone": "+91-8826370278"
+  },
+  "sections": [
+    {
+      "id": "1",
+      "title": "Purpose",
+      "paragraphs": [
+        "MoneyCash is committed to providing a transparent, efficient, and customer-centric grievance redressal mechanism to address complaints, concerns, and disputes raised by customers.",
+        "This Grievance Redressal Policy has been established in accordance with:",
+        "- Reserve Bank of India (RBI) Digital Lending Guidelines",
+        "- RBI Fair Practices Code Guidelines",
+        "- RBI Integrated Ombudsman Scheme, 2021",
+        "- Information Technology Act, 2000",
+        "- Digital Personal Data Protection Act, 2023",
+        "- Applicable laws governing financial services and customer protection",
+        "The objective of this policy is to ensure that customer grievances are handled fairly, promptly, and efficiently while maintaining transparency and accountability throughout the resolution process."
+      ]
+    },
+    {
+      "id": "2",
+      "title": "Scope",
+      "paragraphs": [
+        "This Policy applies to:",
+        "- All customers of MoneyCash",
+        "- Loan applicants",
+        "- Borrowers serviced through MoneyCash",
+        "- Prospective customers",
+        "- Customer representatives",
+        "- Complaints relating to services provided by MoneyCash as a Lending Service Provider (LSP)",
+        "This policy covers complaints relating to:",
+        "- Loan application processing",
+        "- Customer onboarding",
+        "- KYC verification",
+        "- Technical issues",
+        "- Loan servicing",
+        "- Customer support",
+        "- Data privacy concerns",
+        "- Fraud-related complaints",
+        "- Collection and recovery practices",
+        "- Charges and fees",
+        "- Service quality"
+      ]
+    },
+    {
+      "id": "3",
+      "title": "Guiding Principles",
+      "paragraphs": [
+        "MoneyCash shall ensure that:",
+        "- Complaints are handled fairly and impartially.",
+        "- Customers are treated with respect and dignity.",
+        "- Complaints are resolved within defined timelines.",
+        "- Escalation channels are clearly communicated.",
+        "- Customers are informed of complaint status.",
+        "- No customer shall face discrimination or retaliation for filing a complaint."
+      ]
+    },
+    {
+      "id": "4",
+      "title": "Definition of Grievance",
+      "paragraphs": [
+        "A grievance refers to any dissatisfaction, concern, complaint, dispute, or objection expressed by a customer regarding:",
+        "- Products or services offered through MoneyCash",
+        "- Customer service interactions",
+        "- Loan processing activities",
+        "- Charges or fees",
+        "- Collection practices",
+        "- Privacy and data protection",
+        "- Any act or omission by MoneyCash or its authorized representatives"
+      ]
+    },
+    {
+      "id": "5",
+      "title": "Channels for Lodging Complaints",
+      "paragraphs": [
+        "Customers may submit grievances through any of the following channels:",
+        "Email: grievance@moneycash.in",
+        "Customer Support: support@moneycash.in",
+        "Phone: +91-8826370278",
+        "Website: www.moneycash.in",
+        "Written Communication: MoneyCash, E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh — 201009"
+      ]
+    },
+    {
+      "id": "6",
+      "title": "Information Required for Complaint Registration",
+      "paragraphs": [
+        "To facilitate timely resolution, customers should provide:",
+        "- Full Name",
+        "- Registered Mobile Number",
+        "- Email Address",
+        "- Loan Application Number or Loan Account Number",
+        "- Description of Complaint",
+        "- Supporting Documents (if applicable)",
+        "- Customers may also authorize representatives to raise complaints on their behalf."
+      ]
+    },
+    {
+      "id": "7",
+      "title": "Complaint Handling Process",
+      "paragraphs": [
+        "## Step 1 – Complaint Acknowledgement",
+        "Upon receipt of a complaint:",
+        "- A unique complaint reference number shall be generated.",
+        "- An acknowledgement shall be sent to the customer.",
+        "Acknowledgement Timeline:",
+        "- Within 48 Hours of Complaint Receipt",
+        "## Step 2 – Investigation",
+        "MoneyCash shall:",
+        "- Review complaint details.",
+        "- Gather relevant records.",
+        "- Coordinate with internal teams.",
+        "- Engage the lending partner where necessary.",
+        "- Investigate the issue objectively.",
+        "Additional information may be requested from the customer where required.",
+        "## Step 3 – Resolution",
+        "A final response shall be communicated to the customer containing:",
+        "- Findings of the investigation",
+        "- Corrective actions taken",
+        "- Resolution offered",
+        "- Escalation options available"
+      ]
+    },
+    {
+      "id": "8",
+      "title": "Resolution Timelines & Escalation Matrix",
+      "paragraphs": [
+        "Level 1: Customers can raise a complaint by creating a support ticket by going to www.moneycash.in Our support team will respond during business hours, which are Monday to Friday, 10:00 AM to 6:00 PM.",
+        "Level 2: In the event that the complaint remains pending at Level 1 for a period of more than 5 working days, or if the customer is not satisfied with the outcome of Level 1 resolution, the customer can mail on: support@moneycash.in",
+        "Level 3: In the event that the complaint remains pending at Level 2 for a period of more than 5 working days, or if the customer is not satisfied with the outcome of Level 2 resolution, the customer can contact grievance@moneycash.in",
+        "Level 4: In the event that the complaint remains pending at Level 3 for a period of more than 5 working days, or if the customer is not satisfied with the outcome of Level 3 resolution, the customer can contact the Regional Office of the Reserve Bank of India (or via RBI’s website www.rbi.org.in)."
+      ]
+    },
+    {
+      "id": "9",
+      "title": "Collection and Recovery Complaints",
+      "paragraphs": [
+        "Complaints relating to collection activities shall receive priority handling.",
+        "MoneyCash strictly prohibits:",
+        "- Harassment",
+        "- Threatening behavior",
+        "- Abusive language",
+        "- Coercive recovery methods",
+        "- Public disclosure of borrower information",
+        "Any complaint regarding recovery misconduct shall be investigated immediately.",
+        "Appropriate disciplinary action shall be taken where misconduct is established."
+      ]
+    },
+    {
+      "id": "10",
+      "title": "Data Privacy and Information Security Complaints",
+      "paragraphs": [
+        "Customers may raise grievances relating to:",
+        "- Unauthorized use of personal information",
+        "- Data breaches",
+        "- Consent withdrawal requests",
+        "- Privacy rights requests",
+        "- Incorrect personal information",
+        "Such complaints shall be coordinated with the Data Protection and Information Security teams for resolution."
+      ]
+    },
+    {
+      "id": "11",
+      "title": "Fraud Reporting",
+      "paragraphs": [
+        "Customers may report:",
+        "- Identity theft",
+        "- Unauthorized transactions",
+        "- Account takeover attempts",
+        "- Fraudulent loan applications",
+        "- Fraud-related complaints shall be treated as high priority and investigated immediately."
+      ]
+    },
+    {
+      "id": "12",
+      "title": "Record Retention",
+      "paragraphs": [
+        "MoneyCash shall maintain records of:",
+        "- Complaints received",
+        "- Investigation details",
+        "- Corrective actions",
+        "- Communications with customers",
+        "- Escalation history",
+        "Complaint records shall be retained in accordance with applicable legal and regulatory requirements."
+      ]
+    },
+    {
+      "id": "13",
+      "title": "Monitoring and Reporting",
+      "paragraphs": [
+        "The Compliance Team shall periodically review:",
+        "- Complaint volumes",
+        "- Resolution timelines",
+        "- Root causes",
+        "- Customer satisfaction levels",
+        "- Regulatory compliance",
+        "- Management shall receive periodic reports to ensure continuous improvement in customer service."
+      ]
+    },
+    {
+      "id": "14",
+      "title": "Customer Awareness",
+      "paragraphs": [
+        "This Grievance Redressal Policy shall be:",
+        "- Published on the MoneyCash website",
+        "- Available within the mobile application",
+        "- Shared upon customer request",
+        "- Included in customer onboarding communications",
+        "Contact details of the Grievance Officer and escalation channels shall be prominently displayed."
+      ]
+    },
+    {
+      "id": "15",
+      "title": "Policy Review",
+      "paragraphs": [
+        "This Policy shall be reviewed annually or earlier if required due to:",
+        "- Regulatory changes",
+        "- RBI directives",
+        "- Changes in business operations",
+        "- Internal governance requirements"
+      ]
+    },
+    {
+      "id": "16",
+      "title": "Regulatory Disclosure",
+      "paragraphs": [
+        "MoneyCash acts solely as a Lending Service Provider (LSP) and facilitates loan origination and servicing on behalf of regulated lending institutions, including Aasra Inforcorp NBFC Ltd.",
+        "Loan approval, sanction, disbursement, and credit decisions remain the sole responsibility of the lending partner.",
+        "Customers retain the right to escalate unresolved complaints directly to the lending partner and subsequently to the RBI Integrated Ombudsman Scheme, where applicable."
+      ]
+    }
+  ],
+  "generatedAt": "2026-06-23"
+}

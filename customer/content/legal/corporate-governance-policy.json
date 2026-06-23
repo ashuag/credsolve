@@ -1,0 +1,358 @@
+{
+  "slug": "corporate-governance-policy",
+  "eyebrow": "Governance",
+  "navLabel": "Corporate Governance Policy",
+  "title": "Corporate Governance Policy",
+  "description": "The governance framework, responsibilities, and controls that guide ethical business conduct and regulatory compliance at MoneyCash.",
+  "registeredOffice": "CREDSOLVE Technologies Private Limited, Flat No. E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh — 201009",
+  "contactEmail": "compliance@moneycash.in",
+  "sections": [
+    {
+      "id": "1",
+      "title": "Purpose",
+      "paragraphs": [
+        "This Corporate Governance Policy establishes the governance framework for MoneyCash and sets out the principles, responsibilities, and controls necessary to ensure ethical business conduct, regulatory compliance, accountability, transparency, and effective risk management.",
+        "MoneyCash is committed to maintaining the highest standards of corporate governance while providing digital lending support services on behalf of regulated lending institutions.",
+        "This Policy aims to:",
+        "- Promote responsible business conduct.",
+        "- Ensure regulatory compliance.",
+        "- Protect customer interests.",
+        "- Maintain transparency and accountability.",
+        "- Support ethical decision-making.",
+        "- Strengthen risk management and internal controls.",
+        "- Foster stakeholder confidence."
+      ]
+    },
+    {
+      "id": "2",
+      "title": "Scope",
+      "paragraphs": [
+        "This Policy applies to:",
+        "- Directors",
+        "- Senior Management",
+        "- Employees",
+        "- Consultants",
+        "- Contractors",
+        "- Business Partners",
+        "- Service Providers",
+        "- Vendors supporting MoneyCash operations"
+      ]
+    },
+    {
+      "id": "3",
+      "title": "Governance Principles",
+      "paragraphs": [
+        "MoneyCash shall operate in accordance with the following governance principles:",
+        "- Integrity",
+        "- Conduct all business activities honestly, ethically, and responsibly.",
+        "- Transparency",
+        "- Provide accurate and timely information to stakeholders and regulatory authorities.",
+        "- Accountability",
+        "- Ensure that responsibilities and decision-making authority are clearly defined.",
+        "- Fairness",
+        "- Treat customers, employees, partners, and stakeholders fairly and without discrimination.",
+        "- Compliance",
+        "- Adhere to all applicable laws, regulations, RBI guidelines, and contractual obligations.",
+        "- Customer Protection",
+        "- Place customer interests at the center of business operations.",
+        "- Risk Awareness",
+        "- Identify, assess, monitor, and manage risks effectively."
+      ]
+    },
+    {
+      "id": "4",
+      "title": "Governance Structure",
+      "paragraphs": [
+        "## Board of Directors",
+        "The Board shall provide strategic oversight and governance for MoneyCash.",
+        "The Board shall be responsible for:",
+        "- Approving business strategy.",
+        "- Approving major policies.",
+        "- Monitoring compliance.",
+        "- Reviewing risk exposure.",
+        "- Ensuring ethical business conduct.",
+        "- Protecting stakeholder interests.",
+        "- Overseeing financial management.",
+        "- The Board shall periodically review governance effectiveness.",
+        "- Executive Management",
+        "Senior Management shall be responsible for:",
+        "- Implementing Board-approved strategies.",
+        "- Managing day-to-day operations.",
+        "- Maintaining internal controls.",
+        "- Ensuring regulatory compliance.",
+        "- Monitoring operational risks.",
+        "- Promoting ethical conduct.",
+        "- Compliance Function",
+        "The Compliance Function shall:",
+        "- Monitor regulatory developments.",
+        "- Ensure adherence to RBI Digital Lending Guidelines.",
+        "- Coordinate compliance reviews.",
+        "- Support audits and inspections.",
+        "- Maintain compliance records.",
+        "- Report compliance issues to management."
+      ]
+    },
+    {
+      "id": "5",
+      "title": "Relationship with Lending Partners",
+      "paragraphs": [
+        "MoneyCash operates as a Lending Service Provider (LSP) and shall:",
+        "- Act within the scope of agreements executed with lending partners.",
+        "- Support customer onboarding and servicing activities.",
+        "- Follow policies and procedures prescribed by lending partners.",
+        "- Comply with RBI Digital Lending Guidelines.",
+        "- Cooperate during audits and regulatory reviews.",
+        "MoneyCash shall not:",
+        "- Independently sanction loans.",
+        "- Undertake lending activities in its own name.",
+        "- Represent itself as a bank or NBFC.",
+        "- Make credit decisions unless expressly authorized under applicable regulations.",
+        "- All lending decisions remain the sole responsibility of the lending partner."
+      ]
+    },
+    {
+      "id": "6",
+      "title": "Ethical Business Conduct",
+      "paragraphs": [
+        "MoneyCash is committed to conducting business ethically and professionally.",
+        "All personnel shall:",
+        "- Act honestly and fairly.",
+        "- Avoid misleading representations.",
+        "- Respect customer rights.",
+        "- Protect confidential information.",
+        "- Avoid conflicts of interest.",
+        "- Comply with applicable laws and policies.",
+        "- Fraudulent, deceptive, or unethical conduct shall not be tolerated."
+      ]
+    },
+    {
+      "id": "7",
+      "title": "Conflict of Interest",
+      "paragraphs": [
+        "Employees and management shall avoid situations that may create actual, potential, or perceived conflicts of interest.",
+        "Examples include:",
+        "- Personal financial interests in vendors.",
+        "- Undisclosed business relationships.",
+        "- Acceptance of inappropriate gifts or benefits.",
+        "- Decisions that compromise impartiality.",
+        "- Any conflict of interest must be disclosed promptly to management.",
+        "- Appropriate mitigation measures shall be implemented."
+      ]
+    },
+    {
+      "id": "8",
+      "title": "Customer Protection and Fair Treatment",
+      "paragraphs": [
+        "MoneyCash shall ensure:",
+        "- Transparent communication.",
+        "- Fair treatment of customers.",
+        "- Responsible lending support practices.",
+        "- Effective grievance handling.",
+        "- Respectful recovery interactions.",
+        "- Protection of customer data.",
+        "- Customer interests shall be considered in all business decisions."
+      ]
+    },
+    {
+      "id": "9",
+      "title": "Regulatory Compliance",
+      "paragraphs": [
+        "MoneyCash shall maintain compliance with:",
+        "- RBI Digital Lending Guidelines",
+        "- RBI Fair Practices Code requirements",
+        "- KYC Directions",
+        "- Prevention of Money Laundering Act (PMLA)",
+        "- Information Technology Act, 2000",
+        "- Digital Personal Data Protection Act, 2023",
+        "- Consumer Protection laws",
+        "- Applicable contractual obligations",
+        "- Regulatory compliance shall be monitored on an ongoing basis."
+      ]
+    },
+    {
+      "id": "10",
+      "title": "Risk Management Framework",
+      "paragraphs": [
+        "MoneyCash shall maintain a risk management framework covering:",
+        "- Operational Risk",
+        "- Risks arising from people, processes, systems, and external events.",
+        "- Information Security Risk",
+        "- Cybersecurity threats and data protection risks.",
+        "- Compliance Risk",
+        "- Failure to comply with applicable laws and regulations.",
+        "- Reputational Risk",
+        "- Events that may adversely impact public trust and confidence.",
+        "- Vendor Risk",
+        "- Risks arising from third-party service providers.",
+        "- Fraud Risk",
+        "- Customer fraud, identity theft, internal fraud, and financial crime.",
+        "- Risk assessments shall be conducted periodically."
+      ]
+    },
+    {
+      "id": "11",
+      "title": "Internal Controls",
+      "paragraphs": [
+        "MoneyCash shall establish and maintain internal controls designed to:",
+        "- Protect assets and information.",
+        "- Ensure reliable reporting.",
+        "- Prevent fraud.",
+        "- Ensure policy compliance.",
+        "- Support operational effectiveness.",
+        "Controls may include:",
+        "- Segregation of duties.",
+        "- Approval workflows.",
+        "- Access controls.",
+        "- Audit trails.",
+        "- Monitoring mechanisms."
+      ]
+    },
+    {
+      "id": "12",
+      "title": "Information Security Governance",
+      "paragraphs": [
+        "MoneyCash shall maintain an Information Security Framework that includes:",
+        "- Data Protection Controls",
+        "- Access Management",
+        "- Cybersecurity Monitoring",
+        "- Vulnerability Management",
+        "- Incident Response Procedures",
+        "- Business Continuity Measures",
+        "- Customer information shall be protected throughout its lifecycle."
+      ]
+    },
+    {
+      "id": "13",
+      "title": "Audit and Compliance Reviews",
+      "paragraphs": [
+        "Periodic audits may be conducted to evaluate:",
+        "- Regulatory compliance",
+        "- Information security controls",
+        "- Operational effectiveness",
+        "- Vendor management",
+        "- Risk management practices",
+        "- Management shall address audit findings promptly.",
+        "- Corrective actions shall be tracked to closure."
+      ]
+    },
+    {
+      "id": "14",
+      "title": "Vendor and Third-Party Governance",
+      "paragraphs": [
+        "MoneyCash shall exercise due diligence before engaging third-party service providers.",
+        "Vendor assessments may consider:",
+        "- Financial stability",
+        "- Regulatory compliance",
+        "- Information security practices",
+        "- Service capabilities",
+        "- Reputation",
+        "- Appropriate contractual safeguards shall be maintained."
+      ]
+    },
+    {
+      "id": "15",
+      "title": "Whistleblower Mechanism",
+      "paragraphs": [
+        "MoneyCash encourages employees and stakeholders to report:",
+        "- Fraud",
+        "- Corruption",
+        "- Regulatory violations",
+        "- Unethical conduct",
+        "- Conflicts of interest",
+        "- Information security breaches",
+        "- Reports may be made confidentially without fear of retaliation.",
+        "- All reports shall be investigated appropriately."
+      ]
+    },
+    {
+      "id": "16",
+      "title": "Anti-Bribery and Anti-Corruption",
+      "paragraphs": [
+        "MoneyCash prohibits:",
+        "- Bribery",
+        "- Kickbacks",
+        "- Improper payments",
+        "- Facilitation payments",
+        "- Corrupt business practices",
+        "- Employees shall comply with all applicable anti-corruption laws.",
+        "- Any suspected violation must be reported immediately."
+      ]
+    },
+    {
+      "id": "17",
+      "title": "Business Continuity and Resilience",
+      "paragraphs": [
+        "MoneyCash shall maintain plans to ensure continuity of critical operations during:",
+        "- Natural disasters",
+        "- Cybersecurity incidents",
+        "- Technology failures",
+        "- Service disruptions",
+        "- Pandemic events",
+        "- Periodic testing of business continuity arrangements shall be conducted."
+      ]
+    },
+    {
+      "id": "18",
+      "title": "Training and Awareness",
+      "paragraphs": [
+        "Employees shall receive periodic training covering:",
+        "- Regulatory compliance",
+        "- Information security",
+        "- Data privacy",
+        "- AML/KYC obligations",
+        "- Customer protection",
+        "- Ethical conduct",
+        "- Training records shall be maintained."
+      ]
+    },
+    {
+      "id": "19",
+      "title": "Reporting and Oversight",
+      "paragraphs": [
+        "Management shall periodically review:",
+        "- Compliance performance",
+        "- Customer complaints",
+        "- Risk assessments",
+        "- Audit findings",
+        "- Security incidents",
+        "- Vendor performance",
+        "Material issues shall be escalated to senior management and the Board as appropriate."
+      ]
+    },
+    {
+      "id": "20",
+      "title": "Policy Review",
+      "paragraphs": [
+        "This Policy shall be reviewed annually or earlier if required due to:",
+        "- Regulatory changes",
+        "- RBI directives",
+        "- Changes in business operations",
+        "- Emerging risks",
+        "- Internal governance requirements"
+      ]
+    },
+    {
+      "id": "21",
+      "title": "Regulatory Disclosure",
+      "paragraphs": [
+        "MoneyCash operates as a Lending Service Provider (LSP) and facilitates digital lending services on behalf of regulated lending institutions, including Aasra Inforcorp NBFC Ltd.",
+        "MoneyCash does not independently lend funds, undertake credit underwriting, or make lending decisions.",
+        "All loan sanctions, disbursements, underwriting decisions, and regulatory lending obligations remain the responsibility of the lending partner."
+      ]
+    },
+    {
+      "id": "22",
+      "title": "Contact Information",
+      "paragraphs": [
+        "## Compliance Officer",
+        "Email: compliance@moneycash.in",
+        "## Grievance Officer",
+        "Email: grievance@moneycash.in",
+        "## Customer Support",
+        "Email: support@moneycash.in",
+        "Website: www.moneycash.in"
+      ]
+    }
+  ],
+  "generatedAt": "2026-06-23"
+}

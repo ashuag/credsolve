@@ -1,0 +1,346 @@
+{
+  "slug": "kyc-aml-policy",
+  "eyebrow": "Compliance",
+  "navLabel": "KYC & AML Policy",
+  "title": "KYC & AML Policy",
+  "description": "MoneyCash's framework for customer identification, due diligence, fraud prevention, and anti-money-laundering controls.",
+  "registeredOffice": "CREDSOLVE Technologies Private Limited, Flat No. E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh — 201009",
+  "contactEmail": "compliance@moneycash.in",
+  "sections": [
+    {
+      "id": "1",
+      "title": "Purpose",
+      "paragraphs": [
+        "This Know Your Customer (\"KYC\") and Anti-Money Laundering (\"AML\") Policy establishes the framework adopted by MoneyCash for customer identification, verification, due diligence, fraud prevention, anti-money laundering controls, and regulatory compliance.",
+        "The objective of this Policy is to:",
+        "Prevent MoneyCash from being used for money laundering, terrorist financing, fraud, identity theft, or other unlawful activities.",
+        "Ensure compliance with applicable laws and regulations.",
+        "Support lending partners in conducting customer due diligence.",
+        "Establish a risk-based approach to customer onboarding and monitoring.",
+        "MoneyCash acts as a Lending Service Provider (\"LSP\") and conducts customer onboarding, identity verification, and related activities on behalf of regulated lending institutions including Aasra Inforcorp NBFC Ltd."
+      ]
+    },
+    {
+      "id": "2",
+      "title": "Regulatory Framework",
+      "paragraphs": [
+        "This Policy is based on the requirements of:",
+        "- Prevention of Money Laundering Act, 2002 (PMLA)",
+        "- Prevention of Money Laundering Rules, 2005",
+        "- RBI Master Direction – Know Your Customer (KYC) Directions, 2016 (as amended)",
+        "- RBI Digital Lending Guidelines",
+        "- Information Technology Act, 2000",
+        "- Digital Personal Data Protection Act, 2023",
+        "- Financial Intelligence Unit – India (FIU-IND) Guidelines",
+        "- Applicable Government Notifications and Circulars"
+      ]
+    },
+    {
+      "id": "3",
+      "title": "Scope",
+      "paragraphs": [
+        "This Policy applies to:",
+        "- All customers and applicants using MoneyCash services.",
+        "- Employees, consultants, and contractors.",
+        "- Customer onboarding teams.",
+        "- Operations personnel.",
+        "- Compliance personnel.",
+        "- Technology partners supporting KYC verification.",
+        "- Third-party service providers engaged by MoneyCash."
+      ]
+    },
+    {
+      "id": "4",
+      "title": "Definitions",
+      "paragraphs": [
+        "## Customer",
+        "Any individual applying for or availing loan products through the MoneyCash platform.",
+        "## KYC",
+        "The process of identifying and verifying the identity of a customer.",
+        "## Customer Due Diligence (CDD)",
+        "Measures undertaken to verify customer identity, assess risks, and understand the nature of the customer's activities.",
+        "## AML",
+        "Measures designed to prevent money laundering, terrorist financing, fraud, and financial crimes.",
+        "## PEP",
+        "Politically Exposed Person as defined under applicable regulations.",
+        "## Suspicious Transaction",
+        "Any transaction that appears unusual, inconsistent, or indicative of criminal activity."
+      ]
+    },
+    {
+      "id": "5",
+      "title": "KYC Principles",
+      "paragraphs": [
+        "MoneyCash shall ensure that:",
+        "- Every customer is properly identified and verified.",
+        "- KYC is completed prior to loan disbursement.",
+        "- Customer information is accurate and current.",
+        "- Risk-based due diligence is performed.",
+        "- Customer records are maintained securely.",
+        "- Regulatory requirements are fully complied with."
+      ]
+    },
+    {
+      "id": "6",
+      "title": "Customer Identification Program (CIP)",
+      "paragraphs": [
+        "Before facilitating any loan application, MoneyCash shall collect and verify customer identity information.",
+        "Information collected may include:",
+        "- Full Name",
+        "- Date of Birth",
+        "- Gender",
+        "- Mobile Number",
+        "- Email Address",
+        "- Residential Address",
+        "- Photograph / Selfie",
+        "- PAN Number",
+        "- Aadhaar Information (where legally permitted)",
+        "- Other officially valid documents (OVDs)"
+      ]
+    },
+    {
+      "id": "7",
+      "title": "Officially Valid Documents (OVDs)",
+      "paragraphs": [
+        "Acceptable identity and address documents may include:",
+        "- Aadhaar Card (subject to applicable law)",
+        "- PAN Card",
+        "- Passport",
+        "- Driving License",
+        "- Voter ID Card",
+        "- NREGA Job Card",
+        "- Any other document permitted under RBI KYC Directions"
+      ]
+    },
+    {
+      "id": "8",
+      "title": "KYC Verification Methods",
+      "paragraphs": [
+        "MoneyCash may facilitate KYC verification using one or more of the following methods:",
+        "- Digital KYC",
+        "- PAN Verification",
+        "- Aadhaar-based Verification (where legally permitted)",
+        "- OTP-based Authentication",
+        "- Document Verification",
+        "- Selfie Verification",
+        "- CKYC Verification",
+        "- Customer information may be verified through the Central KYC Registry (CKYCR).",
+        "- Video KYC (V-CIP)",
+        "Where required by the lending partner, Video-based Customer Identification Process (V-CIP) may be conducted in accordance with RBI regulations.",
+        "## Third-Party Verification",
+        "Verification may be conducted through authorized KYC service providers approved by the lending partner."
+      ]
+    },
+    {
+      "id": "9",
+      "title": "Customer Due Diligence (CDD)",
+      "paragraphs": [
+        "MoneyCash shall facilitate Customer Due Diligence prior to loan disbursement.",
+        "CDD may include:",
+        "- Identity verification",
+        "- Address verification",
+        "- Mobile number verification",
+        "- Bank account verification",
+        "- Employment verification",
+        "- Income assessment",
+        "- Credit bureau verification",
+        "- Fraud screening",
+        "- Loan processing shall not proceed until required due diligence is completed."
+      ]
+    },
+    {
+      "id": "10",
+      "title": "Enhanced Due Diligence (EDD)",
+      "paragraphs": [
+        "Enhanced Due Diligence may be performed for customers classified as higher risk.",
+        "Examples include:",
+        "- Politically Exposed Persons (PEPs)",
+        "- High-risk occupations",
+        "- High-value transactions",
+        "- Unusual customer behaviour",
+        "- Customers from high-risk jurisdictions",
+        "- Cases flagged by fraud detection systems",
+        "- Additional documentation or verification may be requested before processing."
+      ]
+    },
+    {
+      "id": "11",
+      "title": "AML Monitoring Framework",
+      "paragraphs": [
+        "MoneyCash shall maintain systems and controls designed to identify suspicious activities.",
+        "Monitoring activities may include:",
+        "- Identity fraud detection",
+        "- Duplicate account detection",
+        "- Synthetic identity checks",
+        "- Device intelligence analysis",
+        "- Credit bureau validation",
+        "- Bank account verification",
+        "- Transaction pattern analysis",
+        "- Sanctions screening"
+      ]
+    },
+    {
+      "id": "12",
+      "title": "Sanctions Screening",
+      "paragraphs": [
+        "Customers may be screened against:",
+        "- United Nations Sanctions Lists",
+        "- Government Blacklists",
+        "- Regulatory Watchlists",
+        "- Internal Fraud Databases",
+        "Applications associated with sanctioned individuals or entities may be declined and reported where required."
+      ]
+    },
+    {
+      "id": "13",
+      "title": "Politically Exposed Persons (PEP)",
+      "paragraphs": [
+        "PEPs may be identified through screening tools and due diligence procedures.",
+        "Additional checks may include:",
+        "- Source of funds verification",
+        "- Enhanced identity verification",
+        "- Management review and approval",
+        "- Higher monitoring standards may apply to PEP relationships."
+      ]
+    },
+    {
+      "id": "14",
+      "title": "Suspicious Activity Monitoring",
+      "paragraphs": [
+        "MoneyCash shall monitor and investigate indicators of suspicious activity including:",
+        "- Identity inconsistencies",
+        "- Forged documents",
+        "- Multiple applications using similar information",
+        "- Mismatched bank accounts",
+        "- Unusual transaction patterns",
+        "- Attempts to evade verification controls",
+        "- Fraudulent repayment activity",
+        "Where suspicious activity is identified, appropriate action may be taken including suspension, rejection, escalation, or reporting."
+      ]
+    },
+    {
+      "id": "15",
+      "title": "Fraud Prevention Controls",
+      "paragraphs": [
+        "MoneyCash may utilize:",
+        "- Device Fingerprinting",
+        "- IP Monitoring",
+        "- Geo-location Validation",
+        "- OTP Verification",
+        "- Biometric Matching",
+        "- Selfie Verification",
+        "- Behavioral Analytics",
+        "- Fraud Detection Engines",
+        "- to prevent fraudulent activity."
+      ]
+    },
+    {
+      "id": "16",
+      "title": "Record Retention",
+      "paragraphs": [
+        "Customer records shall be retained in accordance with applicable legal and regulatory requirements.",
+        "Records may include:",
+        "- KYC Documents",
+        "- Verification Records",
+        "- Customer Consents",
+        "- Loan Application Data",
+        "- Communication Records",
+        "- Fraud Investigation Records",
+        "Such records shall be retained for the period prescribed under PMLA, RBI regulations, and other applicable laws."
+      ]
+    },
+    {
+      "id": "17",
+      "title": "Data Protection and Confidentiality",
+      "paragraphs": [
+        "Customer information shall be protected through appropriate technical and organizational safeguards.",
+        "Measures may include:",
+        "- Encryption",
+        "- Access Controls",
+        "- Role-Based Permissions",
+        "- Audit Logs",
+        "- Data Loss Prevention Controls",
+        "Information shall only be shared on a need-to-know basis with:",
+        "- Lending Partners",
+        "- Credit Bureaus",
+        "- KYC Service Providers",
+        "- Regulatory Authorities",
+        "- Law Enforcement Agencies (where legally required)"
+      ]
+    },
+    {
+      "id": "18",
+      "title": "Employee Responsibilities",
+      "paragraphs": [
+        "Employees shall:",
+        "- Follow KYC procedures.",
+        "- Report suspicious activities.",
+        "- Protect customer information.",
+        "- Complete AML and compliance training.",
+        "- Escalate fraud indicators immediately.",
+        "- Failure to comply with this Policy may result in disciplinary action."
+      ]
+    },
+    {
+      "id": "19",
+      "title": "Compliance Oversight",
+      "paragraphs": [
+        "The Compliance Officer shall oversee:",
+        "- KYC compliance monitoring.",
+        "- AML controls.",
+        "- Fraud prevention activities.",
+        "- Regulatory reporting.",
+        "- Policy reviews.",
+        "- Employee awareness programs.",
+        "- Periodic audits and reviews shall be conducted to ensure effectiveness of controls."
+      ]
+    },
+    {
+      "id": "20",
+      "title": "Customer Consent",
+      "paragraphs": [
+        "Prior to conducting KYC verification, MoneyCash shall obtain customer consent for:",
+        "- Identity verification.",
+        "- Credit bureau enquiries.",
+        "- Data processing.",
+        "- Information sharing with lending partners.",
+        "- Regulatory compliance activities.",
+        "- All consent records shall be maintained in accordance with applicable laws."
+      ]
+    },
+    {
+      "id": "21",
+      "title": "Policy Review",
+      "paragraphs": [
+        "This Policy shall be reviewed annually or earlier if required due to:",
+        "- Regulatory changes",
+        "- RBI circulars",
+        "- FIU-IND requirements",
+        "- Changes in business operations",
+        "- Emerging financial crime risks"
+      ]
+    },
+    {
+      "id": "22",
+      "title": "Regulatory Disclosure",
+      "paragraphs": [
+        "MoneyCash acts solely as a Lending Service Provider (LSP) and facilitates customer onboarding, KYC verification, and loan servicing activities on behalf of regulated lending institutions including Aasra Inforcorp NBFC Ltd.",
+        "Final KYC acceptance, customer onboarding approval, loan sanction, disbursement, and regulatory compliance obligations remain the responsibility of the lending partner in accordance with applicable laws and regulations."
+      ]
+    },
+    {
+      "id": "23",
+      "title": "Contact Information",
+      "paragraphs": [
+        "## Compliance Officer",
+        "Email: compliance@moneycash.in",
+        "## Customer Support",
+        "Email: support@moneycash.in",
+        "## Grievance Officer",
+        "Email: grievance@moneycash.in",
+        "Website: www.moneycash.in"
+      ]
+    }
+  ],
+  "generatedAt": "2026-06-23"
+}

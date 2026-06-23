@@ -14,11 +14,13 @@ import {
 } from '@/lib/api/customer-session';
 import { buildHrefWithSearch } from '@/lib/navigation';
 import { BRAND_TAGLINE, MAX_LOAN_DISPLAY } from '@/lib/brand';
+import { LEGAL_NAV_ITEMS } from '@/lib/legal-content';
 
 const NAV_LINKS = [
   { label: 'Home', href: '/', active: true },
   { label: 'How It Works', href: '#how-it-works' },
   { label: 'Loans', href: '#loans' },
+  { label: 'About Us', href: '/about-us' },
   { label: 'Contact', href: '#contact' },
 ];
 
@@ -101,8 +103,8 @@ export function LandingNavbar() {
             <Image
               src="/images/moneycash-logo.png"
               alt="MoneyCash — Instant Digital Loans"
-              width={949}
-              height={430}
+              width={957}
+              height={379}
               sizes="(max-width: 640px) 170px, 200px"
               quality={95}
               priority
@@ -131,6 +133,33 @@ export function LandingNavbar() {
                 />
               </Link>
             ))}
+
+            <div className="group relative">
+              <button
+                type="button"
+                className="group relative inline-flex items-center gap-1 rounded-lg px-3.5 py-2 text-[0.95rem] font-[600] tracking-[-0.01em] text-[#12244f]/70 transition-colors hover:bg-[#12244f]/5 hover:text-[#12244f] group-focus-within:text-[#12244f]"
+                aria-haspopup="true"
+              >
+                Legal
+                <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 transition-transform duration-200 group-hover:rotate-180" fill="currentColor" aria-hidden>
+                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                </svg>
+              </button>
+
+              <div className="invisible absolute right-0 top-full z-50 w-[19rem] pt-2 opacity-0 transition-[opacity,visibility] duration-200 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+                <div className="overflow-hidden rounded-2xl border border-[#12244f]/10 bg-white p-2 shadow-[0_20px_50px_rgba(18,36,79,0.18)]">
+                  {LEGAL_NAV_ITEMS.map((item) => (
+                    <Link
+                      key={item.slug}
+                      href={item.href}
+                      className="block rounded-xl px-3 py-2 text-sm font-[600] text-[#12244f]/75 transition-colors hover:bg-[#12244f]/5 hover:text-[#1496f3]"
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="flex shrink-0 items-center gap-2 md:gap-3">
@@ -196,6 +225,23 @@ export function LandingNavbar() {
                   {link.label}
                 </Link>
               ))}
+
+              <div className="mt-2 border-t border-[#12244f]/10 pt-2">
+                <p className="px-4 pb-1 text-[0.62rem] font-[900] uppercase tracking-[0.18em] text-[#12244f]/40">
+                  Legal &amp; Policies
+                </p>
+                {LEGAL_NAV_ITEMS.map((item) => (
+                  <Link
+                    key={item.slug}
+                    href={item.href}
+                    className="block rounded-xl px-4 py-2.5 text-sm font-[600] text-[#12244f]/65 transition-colors hover:bg-[#12244f]/5 hover:text-[#12244f]"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+
               <div className="mt-2 flex flex-col gap-2 border-t border-[#12244f]/10 pt-2">
                 {signedIn ? (
                   <>

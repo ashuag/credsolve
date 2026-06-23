@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPolicyPage() {
   return (
-    <LegalPageShell variant="privacy">
+    <LegalPageShell pageLabel="Privacy Policy">
       <PrivacyDocument />
     </LegalPageShell>
   );

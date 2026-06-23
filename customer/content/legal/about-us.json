@@ -1,0 +1,74 @@
+{
+  "slug": "about-us",
+  "eyebrow": "Company",
+  "navLabel": "About Us",
+  "title": "About MoneyCash",
+  "description": "Empowering financial access through technology — fast access, a transparent process, and responsible lending.",
+  "registeredOffice": "CREDSOLVE Technologies Private Limited, Flat No. E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh — 201009",
+  "contactEmail": "support@moneycash.in",
+  "sections": [
+    {
+      "id": "who-we-are",
+      "title": "Who We Are",
+      "paragraphs": [
+        "MoneyCash is a digital lending platform developed and operated by CredSolve Technologies Private Limited, a technology company focused on building secure, scalable, and customer-centric financial technology solutions.",
+        "Founded by experienced industry professionals with decades of leadership experience across global technology, financial services, customer operations, cloud platforms, and digital transformation, MoneyCash was created with a simple vision: to make access to short-term credit faster, simpler, and more transparent for everyday consumers."
+      ]
+    },
+    {
+      "id": "leadership",
+      "title": "Built by Industry Leaders",
+      "paragraphs": [
+        "MoneyCash is backed by the leadership team of CredSolve Technologies, bringing together more than 40 years of combined experience across:",
+        "- Banking & Financial Services",
+        "- Digital Lending",
+        "- Information Technology",
+        "- Cloud Operations",
+        "- Risk & Compliance",
+        "- Customer Experience Management",
+        "- Cybersecurity",
+        "- Enterprise Service Management",
+        "The founding team has successfully led large-scale technology and operations functions for global organizations and understands the importance of balancing innovation with trust, security, and regulatory compliance.",
+        "This experience has been instrumental in designing a lending platform that prioritizes customer convenience while maintaining high standards of governance and responsible lending practices."
+      ]
+    },
+    {
+      "id": "mission",
+      "title": "Our Mission",
+      "paragraphs": [
+        "To leverage technology to create a simple, secure, and transparent borrowing experience that helps individuals access credit responsibly and efficiently."
+      ]
+    },
+    {
+      "id": "vision",
+      "title": "Our Vision",
+      "paragraphs": [
+        "To become one of India's most trusted digital lending platforms by combining innovation, customer-centricity, regulatory compliance, and operational excellence."
+      ]
+    },
+    {
+      "id": "technology",
+      "title": "Technology-Driven, Customer-Focused",
+      "paragraphs": [
+        "MoneyCash has been built using modern technology architecture designed to deliver:",
+        "- Secure Digital Onboarding",
+        "- Real-Time Verification",
+        "- Automated Loan Processing",
+        "- Secure Payment Integrations",
+        "- Data Protection & Privacy Controls",
+        "- Scalable Cloud Infrastructure",
+        "Our technology-first approach allows us to continuously improve customer experience while maintaining operational efficiency and security."
+      ]
+    },
+    {
+      "id": "regulatory",
+      "title": "Regulatory Framework",
+      "paragraphs": [
+        "MoneyCash operates as a technology platform and Lending Service Provider (LSP), facilitating digital lending services on behalf of regulated financial institutions and lending partners.",
+        "We are committed to adhering to applicable regulatory requirements, including RBI Digital Lending Guidelines, customer protection standards, data privacy obligations, and information security best practices.",
+        "Fast Access. Transparent Process. Responsible Lending."
+      ]
+    }
+  ],
+  "generatedAt": "2026-06-23"
+}

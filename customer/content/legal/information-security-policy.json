@@ -1,0 +1,438 @@
+{
+  "slug": "information-security-policy",
+  "eyebrow": "Security",
+  "navLabel": "Information Security Policy",
+  "title": "Information Security & Cybersecurity Policy",
+  "description": "How MoneyCash protects the confidentiality, integrity, availability, and privacy of customer and business information assets.",
+  "registeredOffice": "CREDSOLVE Technologies Private Limited, Flat No. E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh — 201009",
+  "contactEmail": "security@moneycash.in",
+  "sections": [
+    {
+      "id": "1",
+      "title": "Purpose",
+      "paragraphs": [
+        "The purpose of this Information Security & Cybersecurity Policy (\"Policy\") is to establish a framework for protecting the confidentiality, integrity, availability, privacy, and security of information assets managed by MoneyCash.",
+        "As a digital lending platform handling customer information, KYC documents, financial data, and lending-related transactions, MoneyCash is committed to implementing appropriate administrative, technical, and physical safeguards to protect information assets from unauthorized access, disclosure, modification, destruction, misuse, or cyber threats."
+      ]
+    },
+    {
+      "id": "2",
+      "title": "Objectives",
+      "paragraphs": [
+        "This Policy aims to:",
+        "- Protect customer information and confidential business data.",
+        "- Ensure compliance with regulatory requirements.",
+        "- Reduce cybersecurity risks.",
+        "- Prevent unauthorized access and data breaches.",
+        "- Ensure business continuity and operational resilience.",
+        "- Promote a culture of security awareness.",
+        "- Support secure digital lending operations."
+      ]
+    },
+    {
+      "id": "3",
+      "title": "Scope",
+      "paragraphs": [
+        "This Policy applies to:",
+        "- All employees",
+        "- Directors",
+        "- Contractors",
+        "- Consultants",
+        "- Temporary staff",
+        "- Service providers",
+        "- Third-party vendors",
+        "- Cloud service providers",
+        "- Technology partners",
+        "and covers:",
+        "- Applications",
+        "- Infrastructure",
+        "- Networks",
+        "- Endpoints",
+        "- Databases",
+        "- Cloud platforms",
+        "- Customer information",
+        "- Operational information"
+      ]
+    },
+    {
+      "id": "4",
+      "title": "Regulatory Compliance",
+      "paragraphs": [
+        "MoneyCash shall maintain compliance with applicable laws, regulations, and industry standards, including:",
+        "- RBI Digital Lending Guidelines",
+        "- RBI Outsourcing Guidelines",
+        "- Information Technology Act, 2000",
+        "- Digital Personal Data Protection Act, 2023",
+        "- CERT-In Directions",
+        "- Prevention of Money Laundering Act (PMLA)",
+        "- Applicable cybersecurity advisories",
+        "- ISO/IEC 27001 Information Security Standards",
+        "- OWASP Secure Development Guidelines"
+      ]
+    },
+    {
+      "id": "5",
+      "title": "Information Security Principles",
+      "paragraphs": [
+        "MoneyCash shall manage information security based on the following principles:",
+        "- Confidentiality",
+        "- Information shall only be accessible to authorized individuals.",
+        "- Integrity",
+        "- Information shall remain accurate, complete, and protected from unauthorized modification.",
+        "- Availability",
+        "- Information and systems shall remain available to authorized users when required.",
+        "- Privacy",
+        "Personal data shall be collected, processed, stored, and shared only for legitimate business purposes and in accordance with applicable laws.",
+        "## Accountability",
+        "Users shall be accountable for activities performed using their credentials."
+      ]
+    },
+    {
+      "id": "6",
+      "title": "Governance and Responsibilities",
+      "paragraphs": [
+        "## Board of Directors",
+        "The Board shall:",
+        "- Approve information security policies.",
+        "- Review cybersecurity risks.",
+        "- Monitor security governance.",
+        "- Ensure adequate resources are allocated.",
+        "- Management",
+        "Management shall:",
+        "- Implement security controls.",
+        "- Monitor security risks.",
+        "- Ensure policy compliance.",
+        "- Oversee incident management.",
+        "- Information Security Officer",
+        "The Information Security Officer shall:",
+        "- Manage security operations.",
+        "- Conduct risk assessments.",
+        "- Monitor threats and vulnerabilities.",
+        "- Coordinate incident response.",
+        "- Ensure compliance with security requirements.",
+        "- Employees",
+        "Employees shall:",
+        "- Protect company and customer information.",
+        "- Follow security procedures.",
+        "- Report security incidents immediately.",
+        "- Complete mandatory security awareness training."
+      ]
+    },
+    {
+      "id": "7",
+      "title": "Information Asset Management",
+      "paragraphs": [
+        "MoneyCash shall maintain an inventory of information assets including:",
+        "- Customer data",
+        "- KYC documents",
+        "- Loan records",
+        "- Databases",
+        "- Servers",
+        "- End-user devices",
+        "- Cloud resources",
+        "- Source code repositories",
+        "Assets shall be classified as:",
+        "- Public",
+        "- Internal",
+        "- Confidential",
+        "- Restricted",
+        "- Protection measures shall be based on classification levels."
+      ]
+    },
+    {
+      "id": "8",
+      "title": "Access Control Policy",
+      "paragraphs": [
+        "Access to systems and information shall be granted based on:",
+        "- Least Privilege Principle",
+        "- Users shall receive only the minimum access necessary.",
+        "- Need-to-Know Principle",
+        "- Access shall be restricted to authorized personnel with legitimate business requirements.",
+        "- Role-Based Access Control (RBAC)",
+        "- Access shall be assigned according to job responsibilities.",
+        "- Multi-Factor Authentication (MFA)",
+        "MFA shall be enabled for:",
+        "- Administrative accounts",
+        "- Remote access",
+        "- Cloud services",
+        "- Critical applications",
+        "- User access shall be reviewed periodically."
+      ]
+    },
+    {
+      "id": "9",
+      "title": "Data Protection",
+      "paragraphs": [
+        "MoneyCash shall implement controls to protect customer and business information.",
+        "## Data Encryption",
+        "Sensitive information shall be encrypted:",
+        "- At Rest",
+        "- In Transit",
+        "- using industry-standard encryption protocols.",
+        "- Secure Storage",
+        "- Customer information shall be stored in secure environments with appropriate access controls.",
+        "- Data Masking",
+        "- Sensitive information shall be masked where feasible.",
+        "- Data Minimization",
+        "- Only information necessary for legitimate business purposes shall be collected and retained."
+      ]
+    },
+    {
+      "id": "10",
+      "title": "Application Security",
+      "paragraphs": [
+        "All applications shall be developed and maintained using secure development practices.",
+        "Security measures may include:",
+        "- Secure Coding Standards",
+        "- Code Reviews",
+        "- Vulnerability Assessments",
+        "- Penetration Testing",
+        "- API Security Reviews",
+        "- Security Testing Prior to Production Deployment",
+        "- OWASP Top 10 security risks shall be considered during development."
+      ]
+    },
+    {
+      "id": "11",
+      "title": "Network Security",
+      "paragraphs": [
+        "MoneyCash shall maintain layered network security controls including:",
+        "- Firewalls",
+        "- Intrusion Detection Systems (IDS)",
+        "- Intrusion Prevention Systems (IPS)",
+        "- Secure VPN Access",
+        "- Network Segmentation",
+        "- Security Monitoring",
+        "- Network configurations shall be reviewed periodically."
+      ]
+    },
+    {
+      "id": "12",
+      "title": "Endpoint Security",
+      "paragraphs": [
+        "All corporate endpoints shall be protected through:",
+        "- Antivirus / Anti-Malware Solutions",
+        "- Endpoint Detection and Response (EDR)",
+        "- Device Encryption",
+        "- Patch Management",
+        "- Secure Configuration Standards",
+        "- Unauthorized software installations shall be prohibited."
+      ]
+    },
+    {
+      "id": "13",
+      "title": "Cloud Security",
+      "paragraphs": [
+        "Cloud environments shall be configured securely and monitored regularly.",
+        "Security measures may include:",
+        "- Identity and Access Management (IAM)",
+        "- Security Logging",
+        "- Encryption",
+        "- Vulnerability Scanning",
+        "- Backup Controls",
+        "- Continuous Monitoring",
+        "- Cloud providers shall undergo appropriate due diligence prior to engagement."
+      ]
+    },
+    {
+      "id": "14",
+      "title": "Vulnerability Management",
+      "paragraphs": [
+        "MoneyCash shall maintain a vulnerability management program.",
+        "Activities may include:",
+        "- Vulnerability Scanning",
+        "- Security Assessments",
+        "- Penetration Testing",
+        "- Patch Management",
+        "- Remediation Tracking",
+        "- Critical vulnerabilities shall be prioritized for immediate remediation."
+      ]
+    },
+    {
+      "id": "15",
+      "title": "Security Monitoring and Logging",
+      "paragraphs": [
+        "Security events shall be monitored and logged.",
+        "Logs may include:",
+        "- User Access Activity",
+        "- Authentication Events",
+        "- Administrative Actions",
+        "- Application Events",
+        "- Security Alerts",
+        "- Logs shall be retained and protected from unauthorized modification."
+      ]
+    },
+    {
+      "id": "16",
+      "title": "Incident Response Management",
+      "paragraphs": [
+        "MoneyCash shall maintain an Incident Response Plan to address cybersecurity incidents.",
+        "Examples include:",
+        "- Unauthorized Access",
+        "- Malware Infections",
+        "- Data Breaches",
+        "- Phishing Attacks",
+        "- Denial-of-Service Attacks",
+        "- Insider Threats",
+        "Incident management shall include:",
+        "- Detection",
+        "- Containment",
+        "- Investigation",
+        "- Remediation",
+        "- Recovery",
+        "- Post-Incident Review",
+        "- Material incidents shall be reported to stakeholders and regulators where required."
+      ]
+    },
+    {
+      "id": "17",
+      "title": "Data Breach Management",
+      "paragraphs": [
+        "In the event of a data breach, MoneyCash shall:",
+        "- Assess impact and severity.",
+        "- Contain the incident.",
+        "- Preserve evidence.",
+        "- Notify affected stakeholders where required.",
+        "- Implement corrective actions.",
+        "- Conduct root cause analysis."
+      ]
+    },
+    {
+      "id": "18",
+      "title": "Vendor and Third-Party Security",
+      "paragraphs": [
+        "Third-party service providers shall be evaluated for:",
+        "- Information security practices",
+        "- Regulatory compliance",
+        "- Data protection controls",
+        "- Incident management capabilities",
+        "- Contracts shall include appropriate security and confidentiality obligations."
+      ]
+    },
+    {
+      "id": "19",
+      "title": "Business Continuity and Disaster Recovery",
+      "paragraphs": [
+        "MoneyCash shall maintain Business Continuity and Disaster Recovery plans to ensure resilience.",
+        "The plans shall address:",
+        "- System Failures",
+        "- Cyber Incidents",
+        "- Cloud Outages",
+        "- Data Loss Events",
+        "- Natural Disasters",
+        "- Periodic testing shall be conducted."
+      ]
+    },
+    {
+      "id": "20",
+      "title": "Security Awareness and Training",
+      "paragraphs": [
+        "All personnel shall receive periodic training covering:",
+        "- Information Security",
+        "- Cybersecurity Threats",
+        "- Phishing Awareness",
+        "- Data Protection",
+        "- Password Security",
+        "- Incident Reporting",
+        "- Training completion records shall be maintained."
+      ]
+    },
+    {
+      "id": "21",
+      "title": "Acceptable Use Requirements",
+      "paragraphs": [
+        "Users shall not:",
+        "- Share credentials.",
+        "- Circumvent security controls.",
+        "- Install unauthorized software.",
+        "- Access unauthorized systems.",
+        "- Transfer confidential information without authorization.",
+        "- Violations may result in disciplinary action."
+      ]
+    },
+    {
+      "id": "22",
+      "title": "Audit and Compliance",
+      "paragraphs": [
+        "MoneyCash shall periodically conduct:",
+        "- Internal Security Reviews",
+        "- Vulnerability Assessments",
+        "- Penetration Tests",
+        "- Compliance Audits",
+        "- Vendor Security Reviews",
+        "- Management shall review findings and ensure timely remediation."
+      ]
+    },
+    {
+      "id": "23",
+      "title": "Information Retention and Disposal",
+      "paragraphs": [
+        "Information shall be retained in accordance with:",
+        "- Regulatory Requirements",
+        "- Business Requirements",
+        "- Contractual Obligations",
+        "When no longer required, information shall be securely deleted or destroyed using approved methods."
+      ]
+    },
+    {
+      "id": "24",
+      "title": "Policy Exceptions",
+      "paragraphs": [
+        "Any exception to this Policy must:",
+        "- Be documented.",
+        "- Be risk assessed.",
+        "- Receive management approval.",
+        "- Include compensating controls where applicable."
+      ]
+    },
+    {
+      "id": "25",
+      "title": "Policy Violations",
+      "paragraphs": [
+        "Failure to comply with this Policy may result in:",
+        "- Access Revocation",
+        "- Disciplinary Action",
+        "- Contract Termination",
+        "- Legal Action",
+        "- Regulatory Reporting",
+        "- depending on the severity of the violation."
+      ]
+    },
+    {
+      "id": "26",
+      "title": "Policy Review",
+      "paragraphs": [
+        "This Policy shall be reviewed annually or whenever required due to:",
+        "- Regulatory changes",
+        "- Emerging cyber threats",
+        "- Technology changes",
+        "- Business changes",
+        "- Security incidents"
+      ]
+    },
+    {
+      "id": "27",
+      "title": "Regulatory Disclosure",
+      "paragraphs": [
+        "MoneyCash operates as a Lending Service Provider (LSP) and processes customer information on behalf of regulated lending institutions including Aasra Fincorp Pvt. Ltd.",
+        "MoneyCash is committed to implementing appropriate technical and organizational measures to safeguard customer information and maintain compliance with applicable cybersecurity, privacy, and digital lending regulations."
+      ]
+    },
+    {
+      "id": "28",
+      "title": "Contact Information",
+      "paragraphs": [
+        "## Information Security Officer",
+        "Email: security@moneycash.in",
+        "## Compliance Officer",
+        "Email: compliance@moneycash.in",
+        "## Grievance Officer",
+        "Email: grievance@moneycash.in",
+        "## Customer Support",
+        "Email: support@moneycash.in",
+        "Website: www.moneycash.in"
+      ]
+    }
+  ],
+  "generatedAt": "2026-06-23"
+}

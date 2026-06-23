@@ -1,0 +1,280 @@
+{
+  "slug": "fair-practices-code",
+  "eyebrow": "Fair Practices",
+  "navLabel": "Fair Practices Code",
+  "title": "Fair Practices Code",
+  "description": "The principles and standards that govern how MoneyCash treats customers fairly, transparently, and responsibly across the loan lifecycle.",
+  "registeredOffice": "CREDSOLVE Technologies Private Limited, Flat No. E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh — 201009",
+  "contactEmail": "grievance@moneycash.in",
+  "grievanceOfficer": {
+    "name": "Grievance Officer",
+    "email": "grievance@moneycash.in",
+    "phone": "+91-8826370278"
+  },
+  "sections": [
+    {
+      "id": "1",
+      "title": "Purpose",
+      "paragraphs": [
+        "MoneyCash is committed to conducting its business in a fair, transparent, ethical, and customer-centric manner. This Fair Practices Code (\"FPC\") establishes the principles and standards that govern interactions with customers throughout the loan lifecycle.",
+        "This Code has been developed in accordance with the Fair Practices Code guidelines issued by the Reserve Bank of India (RBI), Digital Lending Guidelines, and applicable laws governing lending and financial services.",
+        "MoneyCash operates as a Lending Service Provider (\"LSP\") and facilitates lending services on behalf of regulated lending partners, including Aasra Fincorp Pvt. Ltd. All loan approvals, sanction decisions, disbursements, and collections are undertaken by the lending partner."
+      ]
+    },
+    {
+      "id": "2",
+      "title": "Scope",
+      "paragraphs": [
+        "This Policy applies to:",
+        "- All employees of MoneyCash",
+        "- Directors and management personnel",
+        "- Contract staff and consultants",
+        "- Customer service representatives",
+        "- Sales and marketing personnel",
+        "- Collection and recovery personnel",
+        "- Third-party service providers engaged by MoneyCash"
+      ]
+    },
+    {
+      "id": "3",
+      "title": "Guiding Principles",
+      "paragraphs": [
+        "MoneyCash shall conduct its operations based on the following principles:",
+        "- Fair treatment of customers",
+        "- Transparency in all customer dealings",
+        "- Ethical lending practices",
+        "- Responsible customer communication",
+        "- Protection of customer information",
+        "- Compliance with applicable laws and regulations",
+        "- Prevention of unfair business practices"
+      ]
+    },
+    {
+      "id": "4",
+      "title": "Transparency in Lending",
+      "paragraphs": [
+        "MoneyCash shall ensure that customers receive complete and accurate information regarding loan products before accepting any loan offer.",
+        "The following information shall be disclosed clearly:",
+        "- Loan amount",
+        "- Loan tenure",
+        "- Annual Percentage Rate (APR)",
+        "- Interest rate",
+        "- Processing fees",
+        "- GST and applicable taxes",
+        "- Penal charges, if any",
+        "- Repayment obligations",
+        "- Total cost of borrowing",
+        "- Foreclosure and prepayment charges, if applicable",
+        "- Cooling-off / look-up period",
+        "- Grievance redressal mechanism",
+        "All disclosures shall be provided through a Key Fact Statement (KFS), loan agreement, website, mobile application, or other approved communication channels.",
+        "No hidden charges shall be imposed on customers."
+      ]
+    },
+    {
+      "id": "5",
+      "title": "Loan Application Process",
+      "paragraphs": [
+        "MoneyCash shall assist customers in submitting loan applications through digital channels.",
+        "Customers shall be informed of:",
+        "- Eligibility criteria",
+        "- Required documentation",
+        "- Loan processing steps",
+        "- Expected turnaround time",
+        "- Loan approval process",
+        "- Submission of an application does not guarantee loan approval.",
+        "Loan approval remains solely at the discretion of the lending partner based on its credit assessment policies."
+      ]
+    },
+    {
+      "id": "6",
+      "title": "Fair and Responsible Lending",
+      "paragraphs": [
+        "MoneyCash shall support responsible lending practices by ensuring that:",
+        "- Customer information is accurately captured.",
+        "- Credit assessments are conducted by the lending partner using objective criteria.",
+        "- Customers are not encouraged to borrow beyond their repayment capacity.",
+        "- Misleading sales practices are prohibited.",
+        "- Loan products are explained clearly before acceptance.",
+        "- MoneyCash shall not engage in predatory lending practices."
+      ]
+    },
+    {
+      "id": "7",
+      "title": "Customer Consent",
+      "paragraphs": [
+        "Explicit customer consent shall be obtained before:",
+        "- Collection of personal information",
+        "- KYC verification",
+        "- Credit bureau inquiries",
+        "- Loan application processing",
+        "- Sharing information with lending partners",
+        "- Electronic communications",
+        "- Consent records shall be maintained in accordance with regulatory requirements."
+      ]
+    },
+    {
+      "id": "8",
+      "title": "Digital Lending Compliance",
+      "paragraphs": [
+        "MoneyCash shall comply with RBI Digital Lending Guidelines and ensure:",
+        "- Clear disclosure of the lending partner's identity.",
+        "- Disclosure that MoneyCash acts only as a Lending Service Provider.",
+        "- Display of all fees and charges before loan acceptance.",
+        "- Explicit customer consent for data collection and processing.",
+        "- No unauthorized access to customer device data.",
+        "MoneyCash shall not access:",
+        "- Contact lists",
+        "- Call logs",
+        "- SMS messages",
+        "- Photo galleries",
+        "- Audio or video files",
+        "- except where expressly permitted by law and with customer consent."
+      ]
+    },
+    {
+      "id": "9",
+      "title": "Customer Communication",
+      "paragraphs": [
+        "All communication with customers shall be:",
+        "- Professional",
+        "- Respectful",
+        "- Accurate",
+        "- Non-misleading",
+        "- Easy to understand",
+        "Customers shall receive notifications regarding:",
+        "- Loan application status",
+        "- Loan approval or rejection",
+        "- Loan disbursement",
+        "- Repayment schedules",
+        "- Due dates",
+        "- Delays or defaults",
+        "Communication may be made through:",
+        "- Mobile application",
+        "- SMS",
+        "- Email",
+        "- Phone calls",
+        "- WhatsApp (where consented)"
+      ]
+    },
+    {
+      "id": "10",
+      "title": "Confidentiality and Data Protection",
+      "paragraphs": [
+        "MoneyCash shall maintain the confidentiality and security of customer information.",
+        "Customer information shall be used only for:",
+        "- Loan processing",
+        "- Regulatory compliance",
+        "- Fraud prevention",
+        "- Customer support",
+        "- Servicing activities",
+        "- Customer information shall not be sold or shared with unauthorized parties.",
+        "Appropriate technical and organizational security controls shall be implemented to protect customer data."
+      ]
+    },
+    {
+      "id": "11",
+      "title": "Recovery and Collection Practices",
+      "paragraphs": [
+        "MoneyCash and its authorized collection partners shall conduct recovery activities in a fair and lawful manner.",
+        "The following practices are strictly prohibited:",
+        "- Harassment",
+        "- Intimidation",
+        "- Threats",
+        "- Abusive language",
+        "- Misrepresentation",
+        "- Contacting unrelated persons",
+        "- Public disclosure of customer information",
+        "Recovery personnel shall:",
+        "- Identify themselves properly",
+        "- Explain the purpose of communication",
+        "- Respect customer privacy",
+        "- Follow applicable laws and RBI guidelines",
+        "Collection activities shall only be conducted during permitted hours as prescribed by law."
+      ]
+    },
+    {
+      "id": "12",
+      "title": "Fair Marketing Practices",
+      "paragraphs": [
+        "All advertisements, promotional materials, and marketing communications shall:",
+        "- Be truthful and accurate",
+        "- Avoid misleading claims",
+        "- Clearly disclose applicable terms and conditions",
+        "- Avoid unrealistic promises regarding loan approvals",
+        "Marketing materials shall clearly identify MoneyCash as a Lending Service Provider and disclose the lending partner where applicable."
+      ]
+    },
+    {
+      "id": "13",
+      "title": "Customer Grievance Redressal",
+      "paragraphs": [
+        "MoneyCash shall maintain an effective grievance redressal mechanism for customer complaints.",
+        "Customers may submit complaints through:",
+        "- Email",
+        "- Customer support helpline",
+        "- Website support portal",
+        "Complaint handling timelines:",
+        "Level 1: Customers can raise a complaint by creating a support ticket by going to www.moneycash.in Our support team will respond during business hours, which are Monday to Friday, 10:00 AM to 6:00 PM.",
+        "Level 2: In the event that the complaint remains pending at Level 1 for a period of more than 5 working days, or if the customer is not satisfied with the outcome of Level 1 resolution, the customer can mail on: support@moneycash.in",
+        "Level 3: In the event that the complaint remains pending at Level 2 for a period of more than 5 working days, or if the customer is not satisfied with the outcome of Level 2 resolution, the customer can contact grievance@moneycash.in",
+        "Level 4: In the event that the complaint remains pending at Level 3 for a period of more than 5 working days, or if the customer is not satisfied with the outcome of Level 3 resolution, the customer can contact the Regional Office of the Reserve Bank of India (or via RBI’s website www.rbi.org.in):"
+      ]
+    },
+    {
+      "id": "14",
+      "title": "Employee Conduct",
+      "paragraphs": [
+        "Employees shall:",
+        "- Act with integrity and professionalism.",
+        "- Treat customers fairly and respectfully.",
+        "- Maintain confidentiality of customer information.",
+        "- Avoid conflicts of interest.",
+        "- Comply with all applicable laws and internal policies.",
+        "- Any violation of this Code may result in disciplinary action."
+      ]
+    },
+    {
+      "id": "15",
+      "title": "Monitoring and Compliance",
+      "paragraphs": [
+        "MoneyCash shall periodically review compliance with this Fair Practices Code through:",
+        "- Internal audits",
+        "- Compliance reviews",
+        "- Management oversight",
+        "- Regulatory assessments",
+        "- Corrective actions shall be implemented wherever deficiencies are identified."
+      ]
+    },
+    {
+      "id": "16",
+      "title": "Policy Review",
+      "paragraphs": [
+        "This Fair Practices Code shall be reviewed at least annually or whenever required due to:",
+        "- Regulatory changes",
+        "- Business model changes",
+        "- RBI directives",
+        "- Internal governance requirements"
+      ]
+    },
+    {
+      "id": "17",
+      "title": "Contact Information",
+      "paragraphs": [
+        "## Grievance Officer",
+        "Email: grievance@moneycash.in",
+        "## Customer Support",
+        "Email: support@moneycash.in",
+        "Website: www.moneycash.in"
+      ]
+    },
+    {
+      "id": "18",
+      "title": "Regulatory Disclosure",
+      "paragraphs": [
+        "MoneyCash is a Lending Service Provider (\"LSP\") and does not itself provide loans. All loan approvals, credit decisions, disbursements, and recoveries are undertaken by Aasra Inforcorp NBFC Ltd. or other regulated lending partners in accordance with applicable laws and regulations."
+      ]
+    }
+  ],
+  "generatedAt": "2026-06-23"
+}

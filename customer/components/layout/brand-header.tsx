@@ -37,8 +37,8 @@ export function BrandHeader() {
           <Image
             src="/images/moneycash-logo.png"
             alt="MoneyCash — Instant Digital Loans"
-            width={949}
-            height={430}
+            width={957}
+            height={379}
             sizes="(max-width: 640px) 150px, 175px"
             quality={95}
             priority
