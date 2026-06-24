@@ -77,7 +77,10 @@ export interface CustomerLeadPolicySettings {
 function authOtpCacheTtlMs(): number {
   const raw = process.env.AUTH_OTP_SETTINGS_CACHE_TTL_MS?.trim();
   const parsed = raw ? Number.parseInt(raw, 10) : NaN;
-  if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 600_000) return parsed;
+  
+  if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 600_000) 
+    return parsed;
+  
   return 30_000;
 }
 
@@ -239,13 +242,11 @@ export class SettingsRepository {
   async loadAuthOtpSettings(): Promise<AuthOtpSettings> {
     const ttl = authOtpCacheTtlMs();
     const now = Date.now();
-
+    
     if (ttl > 0 && this.authOtpCache && this.authOtpCache.expiresAt > now) {
       return this.authOtpCache.value;
     }
 
-    // Coalesce concurrent reloads so a thundering herd of expired-cache
-    // requests doesn't stampede the DB.
     if (this.authOtpInflight) {
       return this.authOtpInflight;
     }

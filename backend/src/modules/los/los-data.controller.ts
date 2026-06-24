@@ -5,6 +5,7 @@ import { LosAuthGuard } from './auth/los-auth.guard';
 import { RejectWorkspaceRecordDto } from './dto/reject-workspace-record.dto';
 import { LosLeadService } from './services/los-lead.service';
 import { LosApplicationService } from './services/los-application.service';
+import { LosCustomerService } from './services/los-customer.service';
 import { LosDashboardService } from './services/los-dashboard.service';
 import { LosMasterService } from './services/los-master.service';
 import { LosRejectionService } from './services/los-rejection.service';
@@ -15,6 +16,7 @@ export class LosDataController {
   constructor(
     private readonly losLead: LosLeadService,
     private readonly losApplication: LosApplicationService,
+    private readonly losCustomer: LosCustomerService,
     private readonly losDashboard: LosDashboardService,
     private readonly losMaster: LosMasterService,
     private readonly losRejection: LosRejectionService,
@@ -76,6 +78,18 @@ export class LosDataController {
   })
   applicationCibilReport(@Param('applicationUuid') applicationUuid: string) {
     return this.losApplication.getApplicationCibilReport(applicationUuid);
+  }
+
+  @Get('customers')
+  @ApiOperation({ summary: 'List customers for LOS customer management' })
+  customers() {
+    return this.losCustomer.listCustomers();
+  }
+
+  @Get('customers/:customerUuid')
+  @ApiOperation({ summary: 'Get customer details with leads and applications' })
+  customerByUuid(@Param('customerUuid') customerUuid: string) {
+    return this.losCustomer.getCustomerDetails(customerUuid);
   }
 
   @Get('leads/:leadUuid')

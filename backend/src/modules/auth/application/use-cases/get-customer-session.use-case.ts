@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Request } from 'express';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
+import { getRejectedUntilIso } from '../../../../common/lead/lead-reapply-policy.util';
 import {
   APPLICATION_KYC_STATUS,
   APPLICATION_STATUS,
@@ -101,16 +102,9 @@ export class GetCustomerSessionUseCase {
     let rejectedUntil: string | null = null;
     if (statusName === LEAD_STATUS.REJECTED || statusName === LEAD_STATUS.BLACKLISTED) {
       const leadPolicy = await this.settings.loadCustomerLeadPolicySettings();
-      const cooldownDays =
-        statusName === LEAD_STATUS.BLACKLISTED
-          ? leadPolicy.blacklistDurationDays
-          : leadPolicy.reapplyAfterRejectedDays;
-      const cooldownMs = cooldownDays * 24 * 60 * 60 * 1000;
-      const canReapplyAt = new Date(leadRow.updatedAt.getTime() + cooldownMs);
+      rejectedUntil = getRejectedUntilIso(leadRow, leadPolicy);
 
-      if (canReapplyAt.getTime() > Date.now()) {
-        rejectedUntil = canReapplyAt.toISOString();
-      } else {
+      if (!rejectedUntil) {
         await this.leads.deactivate(leadRow.id);
         return noLeadResult;
       }

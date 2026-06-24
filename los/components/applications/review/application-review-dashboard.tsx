@@ -15,7 +15,9 @@ import {
 import { ApplicationReviewHero } from '@/components/applications/review/application-review-hero';
 import { ApplicationReviewToolbar, CopyUuidButton } from '@/components/applications/review/application-review-ui';
 import { canRejectApplicationStatus, RejectRecordModal } from '@/components/shared/reject-record-modal';
+import { LosStatusPill } from '@/components/shared/los-status-pill';
 import { buildReviewFlags } from '@/lib/application-review-flags';
+import { isApplicationRecordRejected } from '@/lib/application-workspace-status';
 import {
   formatReviewDateTime,
   truncateUuid,
@@ -49,6 +51,7 @@ export function ApplicationReviewDashboard({
   const loanAmount = row.details?.loanAmount ?? row.preApprovedLoanAmount;
   const journeySteps = buildApplicationJourney(row);
   const progressPct = journeyProgressPercent(journeySteps);
+  const isRejected = isApplicationRecordRejected(row);
   const flags = useMemo(() => buildReviewFlags(row, bureauPan), [row, bureauPan]);
 
   const loadBureauPan = useCallback(async () => {
@@ -133,16 +136,22 @@ export function ApplicationReviewDashboard({
           <div className="rec-label">Record IDs</div>
           <div className="id-grid">
             {[
-              { label: 'Application', value: row.uuid },
-              { label: 'Lead', value: row.leadUuid },
-              { label: 'Customer', value: row.customerUuid },
+              { label: 'Application', value: row.uuid, href: null },
+              { label: 'Lead', value: row.leadUuid, href: `/leads/${row.leadUuid}` },
+              { label: 'Customer', value: row.customerUuid, href: `/customers/${row.customerUuid}` },
             ].map((item) => (
               <div key={item.label} className="idbox">
                 <div className="ik">{item.label}</div>
                 <div className="iv">
-                  <span className="uuid" title={item.value}>
-                    {truncateUuid(item.value)}
-                  </span>
+                  {item.href ? (
+                    <Link href={item.href} className="uuid uuid-link" title={item.value}>
+                      {truncateUuid(item.value)}
+                    </Link>
+                  ) : (
+                    <span className="uuid" title={item.value}>
+                      {truncateUuid(item.value)}
+                    </span>
+                  )}
                   <CopyUuidButton value={item.value} label={item.label} />
                 </div>
               </div>
@@ -166,9 +175,15 @@ export function ApplicationReviewDashboard({
             </div>
             <div className="meta">
               <div className="mk">Lead</div>
-              <div className={`mv${row.lead.statusCode.toUpperCase() === 'CONVERTED' ? ' conv' : ''}`}>
-                {row.lead.statusCode.toUpperCase() === 'CONVERTED' ? '● ' : ''}
-                {row.lead.statusLabel}
+              <div className={`mv lead-status${row.lead.statusCode.toUpperCase().includes('REJECT') ? ' rejected' : row.lead.statusCode.toUpperCase() === 'CONVERTED' ? ' conv' : ''}`}>
+                {row.lead.statusCode.toUpperCase().includes('REJECT') ? (
+                  <LosStatusPill code={row.lead.statusCode} label={row.lead.statusLabel} />
+                ) : (
+                  <>
+                    {row.lead.statusCode.toUpperCase() === 'CONVERTED' ? '● ' : ''}
+                    {row.lead.statusLabel}
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -216,35 +231,47 @@ export function ApplicationReviewDashboard({
         </div>
 
         <aside className="rail">
-          <section className="card progress-card">
+          <section className={`card progress-card${isRejected ? ' is-rejected' : ''}`}>
             <div className="pc-top">
               <div className="pc-h">
                 <h3>Application progress</h3>
-                <span className="pc-pct">{progressPct}%</span>
+                <span className={`pc-pct${isRejected ? ' rejected' : ''}`}>{isRejected ? 'Rejected' : `${progressPct}%`}</span>
               </div>
-              <div className="pc-sub">Intake through KYC, bank details, and references</div>
+              <div className="pc-sub">
+                {isRejected ? 'This application will not move forward in the pipeline' : 'Intake through KYC, bank details, and references'}
+              </div>
               <div className="pbar">
-                <i style={{ width: `${progressPct}%` }} />
+                <i style={{ width: isRejected ? '100%' : `${progressPct}%` }} className={isRejected ? 'rejected' : undefined} />
               </div>
             </div>
             <div className="steps">
               {journeySteps.map((step) => {
                 const stepClass =
-                  step.state === 'done' ? 'done' : step.state === 'active' ? 'cur' : 'todo';
+                  step.state === 'done'
+                    ? 'done'
+                    : step.state === 'failed'
+                      ? 'fail'
+                      : step.state === 'active'
+                        ? 'cur'
+                        : 'todo';
                 return (
                   <div key={step.id} className={`step ${stepClass}`}>
-                    <div className="node">{step.state === 'done' ? '✓' : ''}</div>
+                    <div className="node">
+                      {step.state === 'done' ? '✓' : step.state === 'failed' ? '✕' : ''}
+                    </div>
                     <div>
                       <div className="stt">{step.label}</div>
                       {step.detail ? (
                         <div className="ssub">
                           <span
                             className={`chip${
-                              step.state === 'done'
-                                ? step.detail.toLowerCase().includes('cibil') || step.detail.startsWith('₹')
-                                  ? ' info mono'
-                                  : ' ok'
-                                : ''
+                              step.state === 'failed'
+                                ? ' bad'
+                                : step.state === 'done'
+                                  ? step.detail.toLowerCase().includes('cibil') || step.detail.startsWith('₹')
+                                    ? ' info mono'
+                                    : ' ok'
+                                  : ''
                             }`}
                           >
                             {step.detail}
@@ -259,15 +286,15 @@ export function ApplicationReviewDashboard({
           </section>
 
           {flags.length > 0 ? (
-            <section className="card">
+            <section className={`card${isRejected ? ' flags-rejected' : ''}`}>
               <div className="card-h">
-                <span className="ico" style={{ background: 'var(--warn-bg)', color: 'var(--warn)' }}>
+                <span className="ico" style={{ background: isRejected ? 'var(--bad-bg)' : 'var(--warn-bg)', color: isRejected ? 'var(--bad)' : 'var(--warn)' }}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
                     <path d="M12 9v4M12 17h.01" />
                     <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
                   </svg>
                 </span>
-                <h3 style={{ color: 'var(--warn)' }}>
+                <h3 style={{ color: isRejected ? 'var(--bad)' : 'var(--warn)' }}>
                   Review flags <span style={{ color: 'var(--ink-3)', fontWeight: 600, fontSize: 12 }}>({flags.length})</span>
                 </h3>
               </div>

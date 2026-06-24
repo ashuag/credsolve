@@ -1,6 +1,20 @@
 'use client';
 
 import {
+  DataTableColumnFilter,
+  DataTableColumnHeader,
+  DataTablePagination,
+  LOS_TABLE_PAGE_SIZE,
+  hasActiveColumnFilters,
+  isoDateKey,
+  isoDateTimestamp,
+  paginateItems,
+  sortItems,
+  useColumnTableState,
+  type ColumnFilters,
+  type SortState,
+} from '@/components/ui/data-table';
+import {
   addNegativeCity,
   addNegativePincode,
   addNegativeState,
@@ -17,14 +31,24 @@ import {
 } from '@/lib/api';
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  applyStatusFilter,
-  cx,
   getLosToken,
   IconButton,
-  type StatusFilter,
   StatusPill,
   SummaryCards,
 } from './eligibility-ui';
+
+type AuditColumnKey = 'primary' | 'status' | 'added' | 'addedBy' | 'removed' | 'removedBy';
+
+type AuditUser = { fullName: string; email: string } | null;
+
+type AuditListItem = {
+  id: number;
+  isActive: boolean;
+  addedAt: string;
+  addedBy: AuditUser;
+  removedAt: string | null;
+  removedBy: AuditUser;
+};
 
 function formatDateTime(iso: string | null) {
   if (!iso) return '—';
@@ -37,51 +61,286 @@ function formatDateTime(iso: string | null) {
   });
 }
 
-function formatUserLabel(user: { fullName: string; email: string } | null) {
+function formatUserLabel(user: AuditUser) {
   if (!user) return '—';
   return user.fullName?.trim() || user.email;
 }
 
-function AuditCells({
-  addedAt,
-  addedBy,
-  removedAt,
-  removedBy,
+function getAuditSortValue(item: AuditListItem, key: AuditColumnKey, primaryText: string): string | number | null {
+  switch (key) {
+    case 'primary':
+      return primaryText.toLowerCase();
+    case 'status':
+      return item.isActive ? 'active' : 'inactive';
+    case 'added':
+      return isoDateTimestamp(item.addedAt);
+    case 'addedBy':
+      return formatUserLabel(item.addedBy).toLowerCase();
+    case 'removed':
+      return isoDateTimestamp(item.removedAt);
+    case 'removedBy':
+      return formatUserLabel(item.removedBy).toLowerCase();
+    default:
+      return null;
+  }
+}
+
+function matchesAuditFilters(
+  item: AuditListItem,
+  filters: ColumnFilters,
+  primaryText: string,
+): boolean {
+  for (const [key, rawValue] of Object.entries(filters)) {
+    const raw = rawValue?.trim() ?? '';
+    if (!raw) continue;
+
+    if (key === 'status') {
+      const active = item.isActive;
+      if (raw === 'active' && !active) return false;
+      if (raw === 'inactive' && active) return false;
+      continue;
+    }
+
+    if (key === 'added') {
+      if (isoDateKey(item.addedAt) !== raw) return false;
+      continue;
+    }
+
+    if (key === 'removed') {
+      if (isoDateKey(item.removedAt) !== raw) return false;
+      continue;
+    }
+
+    if (key === 'addedBy') {
+      if (!formatUserLabel(item.addedBy).toLowerCase().includes(raw.toLowerCase())) return false;
+      continue;
+    }
+
+    if (key === 'removedBy') {
+      if (!formatUserLabel(item.removedBy).toLowerCase().includes(raw.toLowerCase())) return false;
+      continue;
+    }
+
+    if (key === 'primary' && !primaryText.toLowerCase().includes(raw.toLowerCase())) return false;
+  }
+
+  return true;
+}
+
+function AuditDataTable<T extends AuditListItem>({
+  primaryLabel,
+  primaryPlaceholder,
+  items,
+  emptyMessage,
+  entityLabel,
+  getPrimaryText,
+  renderPrimaryCell,
+  renderActionCell,
 }: {
-  addedAt: string;
-  addedBy: { fullName: string; email: string } | null;
-  removedAt: string | null;
-  removedBy: { fullName: string; email: string } | null;
+  primaryLabel: string;
+  primaryPlaceholder: string;
+  items: T[];
+  emptyMessage: string;
+  entityLabel: string;
+  getPrimaryText: (item: T) => string;
+  renderPrimaryCell: (item: T) => ReactNode;
+  renderActionCell: (item: T) => ReactNode;
 }) {
+  const {
+    columnFilters,
+    sort,
+    currentPage,
+    setCurrentPage,
+    setColumnFilter,
+    clearColumnFilters,
+    toggleSort,
+  } = useColumnTableState([items.length]);
+
+  const filtered = useMemo(
+    () => sortItems(
+      items.filter((item) => matchesAuditFilters(item, columnFilters, getPrimaryText(item))),
+      sort as SortState<AuditColumnKey>,
+      (item, key) => getAuditSortValue(item, key, getPrimaryText(item)),
+    ),
+    [items, columnFilters, sort, getPrimaryText],
+  );
+
+  const { paginated, safePage, totalPages, rangeStart, rangeEnd, count } = paginateItems(
+    filtered,
+    currentPage,
+    LOS_TABLE_PAGE_SIZE,
+  );
+
+  const hasFilters = hasActiveColumnFilters(columnFilters) || sort != null;
+
   return (
-    <>
-      <td className="px-3 py-2.5 text-[0.78rem] text-brand-muted whitespace-nowrap">{formatDateTime(addedAt)}</td>
-      <td className="px-3 py-2.5 text-[0.78rem] text-brand-navy">{formatUserLabel(addedBy)}</td>
-      <td className="px-3 py-2.5 text-[0.78rem] text-brand-muted whitespace-nowrap">{formatDateTime(removedAt)}</td>
-      <td className="px-3 py-2.5 text-[0.78rem] text-brand-navy">{formatUserLabel(removedBy)}</td>
-    </>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex flex-wrap items-center gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.72)] px-4 py-2.5">
+        <p className="m-0 min-w-[180px] flex-1 text-[0.76rem] text-brand-muted">
+          Click a column title to sort. Use the search boxes below each column to filter.
+        </p>
+        {hasFilters ? (
+          <button
+            type="button"
+            onClick={clearColumnFilters}
+            className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+          >
+            Clear filters
+          </button>
+        ) : null}
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-auto">
+        <table className="w-full min-w-[760px] border-collapse text-left">
+          <thead className="sticky top-0 z-[1] bg-[rgba(248,250,255,0.96)] align-top">
+            <tr className="border-b border-[rgba(23,44,113,0.07)]">
+              <th className="px-3 py-2 align-top">
+                <DataTableColumnHeader
+                  label={primaryLabel}
+                  sortKey="primary"
+                  sort={sort as SortState<AuditColumnKey>}
+                  onSort={toggleSort}
+                >
+                  <DataTableColumnFilter
+                    value={columnFilters.primary ?? ''}
+                    onChange={(value) => setColumnFilter('primary', value)}
+                    placeholder={primaryPlaceholder}
+                  />
+                </DataTableColumnHeader>
+              </th>
+              <th className="px-3 py-2 align-top">
+                <DataTableColumnHeader
+                  label="Status"
+                  sortKey="status"
+                  sort={sort as SortState<AuditColumnKey>}
+                  onSort={toggleSort}
+                >
+                  <DataTableColumnFilter
+                    type="select"
+                    value={columnFilters.status ?? ''}
+                    onChange={(value) => setColumnFilter('status', value)}
+                    options={[
+                      { value: 'active', label: 'Active' },
+                      { value: 'inactive', label: 'Inactive' },
+                    ]}
+                  />
+                </DataTableColumnHeader>
+              </th>
+              <th className="px-3 py-2 align-top">
+                <DataTableColumnHeader
+                  label="Added"
+                  sortKey="added"
+                  sort={sort as SortState<AuditColumnKey>}
+                  onSort={toggleSort}
+                >
+                  <DataTableColumnFilter
+                    type="date"
+                    value={columnFilters.added ?? ''}
+                    onChange={(value) => setColumnFilter('added', value)}
+                  />
+                </DataTableColumnHeader>
+              </th>
+              <th className="px-3 py-2 align-top">
+                <DataTableColumnHeader
+                  label="Added by"
+                  sortKey="addedBy"
+                  sort={sort as SortState<AuditColumnKey>}
+                  onSort={toggleSort}
+                >
+                  <DataTableColumnFilter
+                    value={columnFilters.addedBy ?? ''}
+                    onChange={(value) => setColumnFilter('addedBy', value)}
+                    placeholder="Search user…"
+                  />
+                </DataTableColumnHeader>
+              </th>
+              <th className="px-3 py-2 align-top">
+                <DataTableColumnHeader
+                  label="Removed"
+                  sortKey="removed"
+                  sort={sort as SortState<AuditColumnKey>}
+                  onSort={toggleSort}
+                >
+                  <DataTableColumnFilter
+                    type="date"
+                    value={columnFilters.removed ?? ''}
+                    onChange={(value) => setColumnFilter('removed', value)}
+                  />
+                </DataTableColumnHeader>
+              </th>
+              <th className="px-3 py-2 align-top">
+                <DataTableColumnHeader
+                  label="Removed by"
+                  sortKey="removedBy"
+                  sort={sort as SortState<AuditColumnKey>}
+                  onSort={toggleSort}
+                >
+                  <DataTableColumnFilter
+                    value={columnFilters.removedBy ?? ''}
+                    onChange={(value) => setColumnFilter('removedBy', value)}
+                    placeholder="Search user…"
+                  />
+                </DataTableColumnHeader>
+              </th>
+              <th className="px-3 py-2 text-right align-top">
+                <DataTableColumnHeader
+                  label="Action"
+                  sortKey="primary"
+                  sort={sort as SortState<AuditColumnKey>}
+                  onSort={toggleSort}
+                  sortable={false}
+                />
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {paginated.map((item) => (
+              <tr key={item.id} className="border-t border-[rgba(23,44,113,0.06)]">
+                <td className="px-3 py-2.5">{renderPrimaryCell(item)}</td>
+                <td className="px-3 py-2.5">
+                  <StatusPill isActive={item.isActive} />
+                </td>
+                <td className="px-3 py-2.5 text-[0.78rem] whitespace-nowrap text-brand-muted">{formatDateTime(item.addedAt)}</td>
+                <td className="px-3 py-2.5 text-[0.78rem] text-brand-navy">{formatUserLabel(item.addedBy)}</td>
+                <td className="px-3 py-2.5 text-[0.78rem] whitespace-nowrap text-brand-muted">{formatDateTime(item.removedAt)}</td>
+                <td className="px-3 py-2.5 text-[0.78rem] text-brand-navy">{formatUserLabel(item.removedBy)}</td>
+                <td className="px-3 py-2.5 text-right">{renderActionCell(item)}</td>
+              </tr>
+            ))}
+            {paginated.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-3 py-8 text-center text-[0.84rem] text-brand-muted">
+                  {hasFilters ? 'No rows match your filters or sort.' : emptyMessage}
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+
+      <DataTablePagination
+        page={safePage}
+        total={totalPages}
+        start={rangeStart}
+        end={rangeEnd}
+        count={count}
+        entityLabel={entityLabel}
+        onPrev={() => setCurrentPage(Math.max(1, safePage - 1))}
+        onNext={() => setCurrentPage(Math.min(totalPages, safePage + 1))}
+      />
+    </div>
   );
 }
 
 function ListPanelShell({
   title,
   description,
-  search,
-  onSearchChange,
-  searchPlaceholder,
-  statusFilter,
-  onStatusFilterChange,
   summary,
   addForm,
   children,
 }: {
   title: string;
   description: string;
-  search: string;
-  onSearchChange: (value: string) => void;
-  searchPlaceholder: string;
-  statusFilter: StatusFilter;
-  onStatusFilterChange: (value: StatusFilter) => void;
   summary: { total: number; active: number; inactive: number };
   addForm: ReactNode;
   children: ReactNode;
@@ -98,36 +357,37 @@ function ListPanelShell({
 
       <div className="border-b border-[rgba(23,44,113,0.07)] px-4 py-3">{addForm}</div>
 
-      <div className="grid gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.72)] px-4 py-3">
+      <div className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.72)] px-4 py-3">
         <SummaryCards total={summary.total} active={summary.active} inactive={summary.inactive} />
-        <input
-          type="search"
-          placeholder={searchPlaceholder}
-          value={search}
-          onChange={(event) => onSearchChange(event.target.value)}
-          className="los-input"
-        />
-        <div className="flex flex-wrap gap-2">
-          {(['all', 'active', 'inactive'] as const).map((filter) => (
-            <button
-              key={filter}
-              type="button"
-              onClick={() => onStatusFilterChange(filter)}
-              className={cx(
-                'min-h-[30px] cursor-pointer rounded-full border px-3 py-1 text-[0.74rem] font-bold capitalize transition-colors',
-                statusFilter === filter
-                  ? 'border-[rgba(20,150,243,0.28)] bg-[rgba(20,150,243,0.1)] text-brand-blue'
-                  : 'border-[rgba(23,44,113,0.1)] bg-[rgba(255,255,255,0.85)] text-brand-muted',
-              )}
-            >
-              {filter}
-            </button>
-          ))}
-        </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
     </section>
+  );
+}
+
+function RemoveActionButton({
+  item,
+  busyId,
+  onRemove,
+}: {
+  item: AuditListItem;
+  busyId: number | null;
+  onRemove: (id: number) => void;
+}) {
+  if (!item.isActive) return null;
+
+  return (
+    <IconButton
+      title="Remove from list"
+      tone="danger"
+      disabled={busyId === item.id}
+      onClick={() => void onRemove(item.id)}
+    >
+      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+        <path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      </svg>
+    </IconButton>
   );
 }
 
@@ -142,25 +402,21 @@ function PincodePanel({
   onAdd: (pincode: string, reason: string) => Promise<void>;
   onRemove: (id: number) => Promise<void>;
 }) {
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [pincode, setPincode] = useState('');
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const filtered = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    const byStatus = applyStatusFilter(items, statusFilter);
-    if (!needle) return byStatus;
-    return byStatus.filter((item) => item.pincode.includes(needle) || (item.reason ?? '').toLowerCase().includes(needle));
-  }, [items, search, statusFilter]);
 
   const summary = useMemo(() => ({
     total: items.length,
     active: items.filter((item) => item.isActive).length,
     inactive: items.filter((item) => !item.isActive).length,
   }), [items]);
+
+  const getPrimaryText = useCallback(
+    (item: LosNegativePincode) => `${item.pincode} ${item.reason ?? ''}`.trim(),
+    [],
+  );
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -186,11 +442,6 @@ function PincodePanel({
     <ListPanelShell
       title="Negative Pincode"
       description="Blocklisted pincodes stop origination when the enforce rule is on."
-      search={search}
-      onSearchChange={setSearch}
-      searchPlaceholder="Search pincode or reason"
-      statusFilter={statusFilter}
-      onStatusFilterChange={setStatusFilter}
       summary={summary}
       addForm={(
         <form className="grid gap-2" onSubmit={handleSubmit}>
@@ -219,49 +470,21 @@ function PincodePanel({
         </form>
       )}
     >
-      <table className="w-full min-w-[640px] border-collapse text-left">
-        <thead className="sticky top-0 z-[1] bg-[rgba(248,250,255,0.96)] text-[0.72rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted">
-          <tr>
-            <th className="px-3 py-2">Pincode</th>
-            <th className="px-3 py-2">Status</th>
-            <th className="px-3 py-2">Added</th>
-            <th className="px-3 py-2">Added by</th>
-            <th className="px-3 py-2">Removed</th>
-            <th className="px-3 py-2">Removed by</th>
-            <th className="px-3 py-2 text-right">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map((item) => (
-            <tr key={item.id} className="border-t border-[rgba(23,44,113,0.06)]">
-              <td className="px-3 py-2.5 font-bold text-brand-navy">{item.pincode}</td>
-              <td className="px-3 py-2.5"><StatusPill isActive={item.isActive} /></td>
-              <AuditCells addedAt={item.addedAt} addedBy={item.addedBy} removedAt={item.removedAt} removedBy={item.removedBy} />
-              <td className="px-3 py-2.5 text-right">
-                {item.isActive ? (
-                  <IconButton
-                    title="Remove from list"
-                    tone="danger"
-                    disabled={busyId === item.id}
-                    onClick={() => void onRemove(item.id)}
-                  >
-                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
-                      <path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                    </svg>
-                  </IconButton>
-                ) : null}
-              </td>
-            </tr>
-          ))}
-          {filtered.length === 0 ? (
-            <tr>
-              <td colSpan={7} className="px-3 py-8 text-center text-[0.84rem] text-brand-muted">
-                No pincodes match this filter.
-              </td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
+      <AuditDataTable
+        primaryLabel="Pincode"
+        primaryPlaceholder="Search pincode or reason…"
+        items={items}
+        emptyMessage="No pincodes in this list."
+        entityLabel="pincodes"
+        getPrimaryText={getPrimaryText}
+        renderPrimaryCell={(item) => (
+          <div>
+            <strong className="block text-brand-navy">{item.pincode}</strong>
+            {item.reason ? <span className="text-[0.76rem] text-brand-muted">{item.reason}</span> : null}
+          </div>
+        )}
+        renderActionCell={(item) => <RemoveActionButton item={item} busyId={busyId} onRemove={onRemove} />}
+      />
     </ListPanelShell>
   );
 }
@@ -279,8 +502,6 @@ function CityPanel({
   onAdd: (cityId: number, reason: string) => Promise<void>;
   onRemove: (id: number) => Promise<void>;
 }) {
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [cityId, setCityId] = useState('');
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
@@ -291,23 +512,16 @@ function CityPanel({
     [cities],
   );
 
-  const filtered = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    const byStatus = applyStatusFilter(items, statusFilter);
-    if (!needle) return byStatus;
-    return byStatus.filter((item) => (
-      item.cityName.toLowerCase().includes(needle)
-      || item.stateName.toLowerCase().includes(needle)
-      || item.stateCode.toLowerCase().includes(needle)
-      || (item.reason ?? '').toLowerCase().includes(needle)
-    ));
-  }, [items, search, statusFilter]);
-
   const summary = useMemo(() => ({
     total: items.length,
     active: items.filter((item) => item.isActive).length,
     inactive: items.filter((item) => !item.isActive).length,
   }), [items]);
+
+  const getPrimaryText = useCallback(
+    (item: LosNegativeCity) => `${item.cityName} ${item.stateName} ${item.stateCode} ${item.reason ?? ''}`.trim(),
+    [],
+  );
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -333,11 +547,6 @@ function CityPanel({
     <ListPanelShell
       title="Negative City"
       description="Blocked cities reject origination when the enforce rule is on."
-      search={search}
-      onSearchChange={setSearch}
-      searchPlaceholder="Search city, state, or reason"
-      statusFilter={statusFilter}
-      onStatusFilterChange={setStatusFilter}
       summary={summary}
       addForm={(
         <form className="grid gap-2" onSubmit={handleSubmit}>
@@ -365,52 +574,22 @@ function CityPanel({
         </form>
       )}
     >
-      <table className="w-full min-w-[720px] border-collapse text-left">
-        <thead className="sticky top-0 z-[1] bg-[rgba(248,250,255,0.96)] text-[0.72rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted">
-          <tr>
-            <th className="px-3 py-2">City</th>
-            <th className="px-3 py-2">Status</th>
-            <th className="px-3 py-2">Added</th>
-            <th className="px-3 py-2">Added by</th>
-            <th className="px-3 py-2">Removed</th>
-            <th className="px-3 py-2">Removed by</th>
-            <th className="px-3 py-2 text-right">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map((item) => (
-            <tr key={item.id} className="border-t border-[rgba(23,44,113,0.06)]">
-              <td className="px-3 py-2.5">
-                <strong className="block text-brand-navy">{item.cityName}</strong>
-                <span className="text-[0.76rem] text-brand-muted">{item.stateName} ({item.stateCode})</span>
-              </td>
-              <td className="px-3 py-2.5"><StatusPill isActive={item.isActive} /></td>
-              <AuditCells addedAt={item.addedAt} addedBy={item.addedBy} removedAt={item.removedAt} removedBy={item.removedBy} />
-              <td className="px-3 py-2.5 text-right">
-                {item.isActive ? (
-                  <IconButton
-                    title="Remove from list"
-                    tone="danger"
-                    disabled={busyId === item.id}
-                    onClick={() => void onRemove(item.id)}
-                  >
-                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
-                      <path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                    </svg>
-                  </IconButton>
-                ) : null}
-              </td>
-            </tr>
-          ))}
-          {filtered.length === 0 ? (
-            <tr>
-              <td colSpan={7} className="px-3 py-8 text-center text-[0.84rem] text-brand-muted">
-                No cities match this filter.
-              </td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
+      <AuditDataTable
+        primaryLabel="City"
+        primaryPlaceholder="Search city, state, or reason…"
+        items={items}
+        emptyMessage="No cities in this list."
+        entityLabel="cities"
+        getPrimaryText={getPrimaryText}
+        renderPrimaryCell={(item) => (
+          <div>
+            <strong className="block text-brand-navy">{item.cityName}</strong>
+            <span className="text-[0.76rem] text-brand-muted">{item.stateName} ({item.stateCode})</span>
+            {item.reason ? <span className="mt-0.5 block text-[0.76rem] text-brand-muted">{item.reason}</span> : null}
+          </div>
+        )}
+        renderActionCell={(item) => <RemoveActionButton item={item} busyId={busyId} onRemove={onRemove} />}
+      />
     </ListPanelShell>
   );
 }
@@ -428,8 +607,6 @@ function StatePanel({
   onAdd: (stateId: number, reason: string) => Promise<void>;
   onRemove: (id: number) => Promise<void>;
 }) {
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [stateId, setStateId] = useState('');
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
@@ -440,22 +617,16 @@ function StatePanel({
     [states],
   );
 
-  const filtered = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    const byStatus = applyStatusFilter(items, statusFilter);
-    if (!needle) return byStatus;
-    return byStatus.filter((item) => (
-      item.stateName.toLowerCase().includes(needle)
-      || item.stateCode.toLowerCase().includes(needle)
-      || (item.reason ?? '').toLowerCase().includes(needle)
-    ));
-  }, [items, search, statusFilter]);
-
   const summary = useMemo(() => ({
     total: items.length,
     active: items.filter((item) => item.isActive).length,
     inactive: items.filter((item) => !item.isActive).length,
   }), [items]);
+
+  const getPrimaryText = useCallback(
+    (item: LosNegativeState) => `${item.stateName} ${item.stateCode} ${item.reason ?? ''}`.trim(),
+    [],
+  );
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -481,11 +652,6 @@ function StatePanel({
     <ListPanelShell
       title="Negative State"
       description="Blocked states reject origination when the enforce rule is on."
-      search={search}
-      onSearchChange={setSearch}
-      searchPlaceholder="Search state or reason"
-      statusFilter={statusFilter}
-      onStatusFilterChange={setStatusFilter}
       summary={summary}
       addForm={(
         <form className="grid gap-2" onSubmit={handleSubmit}>
@@ -513,52 +679,22 @@ function StatePanel({
         </form>
       )}
     >
-      <table className="w-full min-w-[680px] border-collapse text-left">
-        <thead className="sticky top-0 z-[1] bg-[rgba(248,250,255,0.96)] text-[0.72rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted">
-          <tr>
-            <th className="px-3 py-2">State</th>
-            <th className="px-3 py-2">Status</th>
-            <th className="px-3 py-2">Added</th>
-            <th className="px-3 py-2">Added by</th>
-            <th className="px-3 py-2">Removed</th>
-            <th className="px-3 py-2">Removed by</th>
-            <th className="px-3 py-2 text-right">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map((item) => (
-            <tr key={item.id} className="border-t border-[rgba(23,44,113,0.06)]">
-              <td className="px-3 py-2.5">
-                <strong className="block text-brand-navy">{item.stateName}</strong>
-                <span className="text-[0.76rem] text-brand-muted">{item.stateCode}</span>
-              </td>
-              <td className="px-3 py-2.5"><StatusPill isActive={item.isActive} /></td>
-              <AuditCells addedAt={item.addedAt} addedBy={item.addedBy} removedAt={item.removedAt} removedBy={item.removedBy} />
-              <td className="px-3 py-2.5 text-right">
-                {item.isActive ? (
-                  <IconButton
-                    title="Remove from list"
-                    tone="danger"
-                    disabled={busyId === item.id}
-                    onClick={() => void onRemove(item.id)}
-                  >
-                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
-                      <path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                    </svg>
-                  </IconButton>
-                ) : null}
-              </td>
-            </tr>
-          ))}
-          {filtered.length === 0 ? (
-            <tr>
-              <td colSpan={7} className="px-3 py-8 text-center text-[0.84rem] text-brand-muted">
-                No states match this filter.
-              </td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
+      <AuditDataTable
+        primaryLabel="State"
+        primaryPlaceholder="Search state or reason…"
+        items={items}
+        emptyMessage="No states in this list."
+        entityLabel="states"
+        getPrimaryText={getPrimaryText}
+        renderPrimaryCell={(item) => (
+          <div>
+            <strong className="block text-brand-navy">{item.stateName}</strong>
+            <span className="text-[0.76rem] text-brand-muted">{item.stateCode}</span>
+            {item.reason ? <span className="mt-0.5 block text-[0.76rem] text-brand-muted">{item.reason}</span> : null}
+          </div>
+        )}
+        renderActionCell={(item) => <RemoveActionButton item={item} busyId={busyId} onRemove={onRemove} />}
+      />
     </ListPanelShell>
   );
 }

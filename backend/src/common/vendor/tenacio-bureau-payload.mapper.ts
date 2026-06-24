@@ -9,6 +9,13 @@ export type ParsedTenacioBureauFields = {
   responseStatus: string | null;
 };
 
+export type ParsedTenacioBureauEnvelope = {
+  status: string | null;
+  serviceStatusCode: number | null;
+  serviceErrorMessage: string | null;
+  requestId: string | null;
+};
+
 function asRecord(v: unknown): Record<string, unknown> | null {
   return v !== null && typeof v === 'object' ? (v as Record<string, unknown>) : null;
 }
@@ -24,6 +31,76 @@ export function isCibilNewToCreditScore(
   score: number | null | undefined,
 ): boolean {
   return score == null || Number.isNaN(score) || [-1, 0, 1].includes(score);
+}
+
+function parseServiceStatusCode(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
+  const n = Number.parseInt(String(v).trim(), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Reads Tenacio bureau envelope fields (`serviceStatusCode`, `serviceError`, `status`). */
+export function parseTenacioBureauEnvelope(body: unknown): ParsedTenacioBureauEnvelope {
+  const root = asRecord(body);
+  if (!root) {
+    return {
+      status: null,
+      serviceStatusCode: null,
+      serviceErrorMessage: null,
+      requestId: null,
+    };
+  }
+
+  const serviceError = asRecord(root.serviceError);
+  const message =
+    typeof serviceError?.message === 'string' && serviceError.message.trim()
+      ? serviceError.message.trim()
+      : null;
+
+  return {
+    status: typeof root.status === 'string' ? root.status.trim().toLowerCase() : null,
+    serviceStatusCode: parseServiceStatusCode(root.serviceStatusCode),
+    serviceErrorMessage: message,
+    requestId: typeof root.requestId === 'string' ? root.requestId : null,
+  };
+}
+
+/** True when Tenacio returned a 4xx `serviceStatusCode` (identity / no-hit / validation errors). */
+export function isTenacioBureauClientError(serviceStatusCode: number | null | undefined): boolean {
+  return serviceStatusCode != null && serviceStatusCode >= 400 && serviceStatusCode < 500;
+}
+
+export function isTenacioBureauServerError(serviceStatusCode: number | null | undefined): boolean {
+  return serviceStatusCode != null && serviceStatusCode >= 500;
+}
+
+/**
+ * Whether the bureau soft-pull payload represents a successful report (not an error envelope).
+ * HTTP may still be 200 when `serviceStatusCode` is 422.
+ */
+export function isTenacioBureauSuccessPayload(body: unknown): boolean {
+  const envelope = parseTenacioBureauEnvelope(body);
+  if (envelope.status === 'error') return false;
+  if (isTenacioBureauClientError(envelope.serviceStatusCode)) return false;
+  if (isTenacioBureauServerError(envelope.serviceStatusCode)) return false;
+  if (envelope.serviceStatusCode != null && envelope.serviceStatusCode !== 200) return false;
+
+  const parsed = parseTenacioBureauVendorBody(body);
+  if (parsed.bureauScore != null) return true;
+  if (parsed.responseStatus?.toLowerCase() === 'success') return true;
+
+  const root = asRecord(body);
+  const data = root ? asRecord(root.data) : null;
+  return data?.cibilData != null;
+}
+
+export function tenacioBureauFailureNote(body: unknown, httpStatus: number | null): string {
+  const envelope = parseTenacioBureauEnvelope(body);
+  const parts: string[] = [];
+  if (httpStatus != null) parts.push(`http=${httpStatus}`);
+  if (envelope.serviceStatusCode != null) parts.push(`service=${envelope.serviceStatusCode}`);
+  if (envelope.serviceErrorMessage) parts.push(envelope.serviceErrorMessage);
+  return parts.join(' | ').slice(0, 500) || 'Bureau soft-pull failed';
 }
 
 /** Walk `GetCustomerAssetsSuccess.Asset` (object or first element of array). */

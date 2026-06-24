@@ -30,6 +30,7 @@ type NavIcon =
   | 'dashboard'
   | 'leads'
   | 'applications'
+  | 'customers'
   | 'agents'
   | 'roles'
   | 'masters'
@@ -55,6 +56,7 @@ const navGroups: { section: string; color: string; items: NavItem[] }[] = [
     items: [
       { href: '/leads', label: 'Leads', icon: 'leads' },
       { href: '/applications', label: 'Applications', icon: 'applications' },
+      { href: '/customers', label: 'Customers', icon: 'customers' },
     ],
   },
   {
@@ -149,6 +151,7 @@ const BREADCRUMBS: Record<string, string> = {
   '/dashboard': 'LOS Dashboard',
   '/leads': 'Lead Management',
   '/applications': 'Application Management',
+  '/customers': 'Customer Management',
   '/partners': 'Partners',
   '/agents': 'Agent Management',
   '/roles': 'Role Management',
@@ -208,6 +211,7 @@ function breadcrumbLabel(pathname: string): string {
   if (BREADCRUMBS[pathname]) return BREADCRUMBS[pathname];
   if (/^\/leads\/[^/]+$/.test(pathname)) return 'Lead detail';
   if (/^\/applications\/[^/]+$/.test(pathname)) return 'Application detail';
+  if (/^\/customers\/[^/]+$/.test(pathname)) return 'Customer detail';
   const seg = pathname.replace(/^\//, '').split('/')[0];
   return seg ? seg.charAt(0).toUpperCase() + seg.slice(1) : 'Home';
 }
@@ -226,6 +230,12 @@ function breadcrumbTrail(pathname: string): BreadcrumbItem[] {
     return [
       { label: 'Leads', href: '/leads' },
       { label: 'Lead detail' },
+    ];
+  }
+  if (/^\/customers\/[^/]+$/.test(pathname)) {
+    return [
+      { label: 'Customers', href: '/customers' },
+      { label: 'Customer detail' },
     ];
   }
   return [{ label: breadcrumbLabel(pathname) }];
@@ -301,6 +311,9 @@ function IcLeads(p: SvgProps) {
 function IcApplications(p: SvgProps) {
   return <Icon {...p}><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="m9 12 2 2 4-4" /></Icon>;
 }
+function IcCustomers(p: SvgProps) {
+  return <Icon {...p}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></Icon>;
+}
 function IcAgents(p: SvgProps) {
   return <Icon {...p}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></Icon>;
 }
@@ -331,6 +344,7 @@ function NavIconSvg({ name, size = 18 }: { name: NavIcon; size?: number }) {
     case 'dashboard':    return <IcDashboard {...p} />;
     case 'leads':        return <IcLeads {...p} />;
     case 'applications': return <IcApplications {...p} />;
+    case 'customers':    return <IcCustomers {...p} />;
     case 'agents':       return <IcAgents {...p} />;
     case 'roles':        return <IcRoles {...p} />;
     case 'masters':      return <IcMasters {...p} />;

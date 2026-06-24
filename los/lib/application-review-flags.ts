@@ -1,4 +1,5 @@
 import type { LosApplicationDetails } from '@/lib/api';
+import { buildApplicationWorkspaceAlertText, isApplicationRecordRejected, applicationRejectionHeadline } from '@/lib/application-workspace-status';
 import { parseInrNumber } from '@/lib/application-review-format';
 import {
   compareGenders,
@@ -17,6 +18,15 @@ export type ReviewFlag = {
 
 export function buildReviewFlags(row: LosApplicationDetails, bureauPan?: string | null): ReviewFlag[] {
   const flags: ReviewFlag[] = [];
+
+  if (isApplicationRecordRejected(row)) {
+    flags.push({
+      icon: '✕',
+      title: applicationRejectionHeadline(row),
+      detail: buildApplicationWorkspaceAlertText(row) ?? 'This application has been rejected and cannot proceed.',
+    });
+  }
+
   const profile = row.lead.profile;
   const details = row.details;
   const bank = row.disbursement;

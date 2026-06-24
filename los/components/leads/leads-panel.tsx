@@ -1,5 +1,6 @@
 'use client';
 
+import { DataTablePagination, LOS_TABLE_PAGE_SIZE, paginateItems } from '@/components/ui/data-table';
 import { getNewLeads, type LosLead } from '@/lib/api';
 import { getMasters } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
@@ -97,7 +98,7 @@ const LEAD_TABLE_COLUMNS: ReadonlyArray<{ key: string; label: string }> = [
   { key: 'created',          label: 'Date'            },
 ];
 
-const LEADS_PAGE_SIZE = 20;
+const LEADS_PAGE_SIZE = LOS_TABLE_PAGE_SIZE;
 type ColumnFilters = Partial<Record<(typeof LEAD_TABLE_COLUMNS)[number]['key'], string>>;
 
 function getLeadText(lead: LosLead, key: string): string {
@@ -150,30 +151,6 @@ function StatCard({ label, value, sub, color }: { label: string; value: number |
   );
 }
 
-function Pagination({ page, total, start, end, count, onPrev, onNext }: {
-  page: number; total: number; start: number; end: number; count: number;
-  onPrev: () => void; onNext: () => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.6)]">
-      <span className="text-[0.78rem] text-brand-muted">
-        {count === 0 ? 'No leads found' : `${start}–${end} of ${count} leads`}
-      </span>
-      <div className="flex items-center gap-2">
-        <button type="button" onClick={onPrev} disabled={page <= 1}
-          className="min-h-[32px] px-3 rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent text-[0.8rem] font-bold text-brand-text cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[rgba(20,150,243,0.05)] transition-colors">
-          ← Prev
-        </button>
-        <span className="text-[0.78rem] font-bold text-brand-muted">{page} / {total}</span>
-        <button type="button" onClick={onNext} disabled={page >= total}
-          className="min-h-[32px] px-3 rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent text-[0.8rem] font-bold text-brand-text cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[rgba(20,150,243,0.05)] transition-colors">
-          Next →
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export function LeadsPanel() {
   const [leads,            setLeads]            = useState<LosLead[]>([]);
   const [loading,          setLoading]          = useState(true);
@@ -210,12 +187,11 @@ export function LeadsPanel() {
   if (panFilter)    colFilters['pan-verified']  = panFilter;
 
   const filtered    = leads.filter((l) => leadMatchesFilters(l, colFilters, search));
-  const totalPages  = Math.max(1, Math.ceil(filtered.length / LEADS_PAGE_SIZE));
-  const safePage    = Math.min(currentPage, totalPages);
-  const pageStart   = (safePage - 1) * LEADS_PAGE_SIZE;
-  const paginated   = filtered.slice(pageStart, pageStart + LEADS_PAGE_SIZE);
-  const rangeStart  = filtered.length === 0 ? 0 : pageStart + 1;
-  const rangeEnd    = Math.min(pageStart + LEADS_PAGE_SIZE, filtered.length);
+  const { paginated, safePage, totalPages, rangeStart, rangeEnd, count } = paginateItems(
+    filtered,
+    currentPage,
+    LEADS_PAGE_SIZE,
+  );
 
   // Stat counts
   const verified    = leads.filter((l) => l.panVerified === 1).length;
@@ -384,9 +360,10 @@ export function LeadsPanel() {
                 </tbody>
               </table>
             </div>
-            <Pagination
+            <DataTablePagination
               page={safePage} total={totalPages}
-              start={rangeStart} end={rangeEnd} count={filtered.length}
+              start={rangeStart} end={rangeEnd} count={count}
+              entityLabel="leads"
               onPrev={() => setCurrentPage(Math.max(1, safePage - 1))}
               onNext={() => setCurrentPage(Math.min(totalPages, safePage + 1))}
             />

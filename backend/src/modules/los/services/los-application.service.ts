@@ -139,7 +139,15 @@ export class LosApplicationService {
       orderBy: { createdAt: 'desc' },
       include: {
         customer: { select: { uuid: true, mobileNumber: true } },
-        lead: { select: { uuid: true, leadDetail: { select: { fullName: true } } } },
+        lead: {
+          select: {
+            uuid: true,
+            leadStatusNote: true,
+            leadDetail: { select: { fullName: true } },
+            leadStatus: { select: { name: true, displayName: true } },
+            rejectionReason: { select: { name: true } },
+          },
+        },
         applicationStatus: { select: { name: true, displayName: true } },
         details: {
           select: {
@@ -194,6 +202,18 @@ export class LosApplicationService {
         ),
         statusCode: application.applicationStatus.name,
         statusLabel: displayName(application.applicationStatus.name, application.applicationStatus.displayName),
+        leadStatusCode: application.lead.leadStatus.name,
+        leadStatusLabel: displayName(application.lead.leadStatus.name, application.lead.leadStatus.displayName),
+        leadRejectionReason: application.lead.rejectionReason
+          ? {
+              code: application.lead.rejectionReason.name,
+              label: application.lead.rejectionReason.name.replace(/_/g, ' '),
+            }
+          : null,
+        leadStatusNote: application.lead.leadStatusNote?.trim() || null,
+        kycStatus: application.kycStatus,
+        kycStatusLabel: applicationKycStatusLabel(application.kycStatus),
+        kycCompleted: application.kycStatus === 1,
         createdAt: application.createdAt.toISOString(),
         updatedAt: application.updatedAt.toISOString(),
       };
@@ -208,6 +228,7 @@ export class LosApplicationService {
         lead: {
           include: {
             leadStatus: { select: { name: true, displayName: true } },
+            rejectionReason: { select: { name: true } },
             source: { select: { name: true, type: true } },
             leadReferences: {
               orderBy: { referenceIndex: 'asc' },
@@ -318,6 +339,14 @@ export class LosApplicationService {
         uuid: lead.uuid,
         statusCode: lead.leadStatus.name,
         statusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
+        leadStatusNote: lead.leadStatusNote?.trim() || null,
+        bureauFetchedNote: lead.bureauFetchedNote?.trim() || null,
+        rejectionReason: lead.rejectionReason
+          ? {
+              code: lead.rejectionReason.name,
+              label: lead.rejectionReason.name.replace(/_/g, ' '),
+            }
+          : null,
         sourceName: lead.source?.name ?? null,
         sourceType: lead.source?.type ?? null,
         utms: lead.leadUtms.map((utm) => ({

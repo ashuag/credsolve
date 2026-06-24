@@ -104,7 +104,11 @@ export class AuthController {
       },
     },
   })
-  async verifyOtpRoute(@Body() body: VerifyOtpDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+  async verifyOtpRoute(
+    @Body() body: VerifyOtpDto, 
+    @Req() req: Request, 
+    @Res({ passthrough: true }) res: Response
+  ) {
     const out = await this.verifyOtpFlow.execute(body, req.customerSession, {
       ip: readClientIp(req),
       userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,

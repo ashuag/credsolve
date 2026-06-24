@@ -295,6 +295,76 @@
   flex: none;
 }
 
+.app-review .ar-hero.is-rejected {
+  border-color: rgba(231, 95, 95, 0.35);
+  box-shadow: 0 0 0 1px rgba(231, 95, 95, 0.08), var(--shadow);
+}
+
+.app-review .ar-hero.is-rejected::before {
+  content: '';
+  display: block;
+  height: 3px;
+  background: linear-gradient(90deg, #ef4444, rgba(239, 68, 68, 0.35));
+}
+
+.app-review .ar-hero .ah-name-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-review .ar-hero .ah-stage-pill.rejected {
+  background: rgba(231, 95, 95, 0.14);
+  border-color: rgba(231, 95, 95, 0.28);
+  color: #8d3434;
+}
+
+.app-review .ar-hero .ah-stage-pill.rejected::before {
+  background: #ef4444;
+}
+
+.app-review .ar-rejection-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 24px 20px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(231, 95, 95, 0.28);
+  background: rgba(254, 242, 242, 0.92);
+  color: #8d3434;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.app-review .ar-rejection-banner strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 13px;
+}
+
+.app-review .ar-rejection-banner span {
+  color: #991b1b;
+  font-weight: 600;
+}
+
+.app-review .meta .mv.lead-status.rejected {
+  margin-top: 4px;
+}
+
+.app-review .progress-card.is-rejected {
+  border-color: rgba(231, 95, 95, 0.28);
+}
+
+.app-review .progress-card.is-rejected .pc-pct.rejected {
+  color: #dc2626;
+}
+
+.app-review .pbar i.rejected {
+  background: linear-gradient(90deg, #ef4444, #f87171);
+}
+
 .app-review .apphead {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -560,6 +630,15 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
+}
+
+.app-review .idbox .uuid-link {
+  color: var(--blue);
+  text-decoration: none;
+}
+
+.app-review .idbox .uuid-link:hover {
+  text-decoration: underline;
 }
 
 .app-review .copy {
@@ -1297,6 +1376,26 @@
 .app-review .step.todo::before,
 .app-review .step.cur::before {
   background: var(--line);
+}
+
+.app-review .step.fail::before {
+  background: rgba(239, 68, 68, 0.35);
+}
+
+.app-review .step.fail .node {
+  background: #ef4444;
+  color: #fff;
+  border: none;
+}
+
+.app-review .step.fail .stt {
+  color: #991b1b;
+}
+
+.app-review .chip.bad {
+  background: rgba(254, 242, 242, 0.95);
+  color: #991b1b;
+  border-color: rgba(239, 68, 68, 0.28);
 }
 
 .app-review .step:last-child::before {

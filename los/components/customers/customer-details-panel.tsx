@@ -3,11 +3,8 @@
 import Link from 'next/link';
 import { WorkspaceRecordHeader } from '@/components/shared/workspace-record-header';
 import { LosStatusPill } from '@/components/shared/los-status-pill';
-import { canRejectLeadStatus, RejectRecordModal } from '@/components/shared/reject-record-modal';
-import { buildLeadIntakeJourney } from '@/lib/customer-journey';
 import { formatPersonName } from '@/lib/format-person-name';
-import { buildWorkspaceAlertText } from '@/lib/workspace-alert';
-import { getLeadDetails, type LosLeadDetails } from '@/lib/api';
+import { getCustomerDetails, type LosCustomerDetails } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 
@@ -40,32 +37,6 @@ function formatDateOnly(iso: string | null | undefined) {
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function ageFromDateOfBirth(iso: string | null | undefined) {
-  if (!iso) return '—';
-  const dob = new Date(`${iso}T12:00:00`);
-  if (Number.isNaN(dob.getTime())) return '—';
-
-  const now = new Date();
-  if (now < dob) return '—';
-
-  let years = now.getFullYear() - dob.getFullYear();
-  let months = now.getMonth() - dob.getMonth();
-  let days = now.getDate() - dob.getDate();
-
-  if (days < 0) {
-    months -= 1;
-    const prevMonthDays = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
-    days += prevMonthDays;
-  }
-
-  if (months < 0) {
-    years -= 1;
-    months += 12;
-  }
-
-  return `${years} yrs, ${months} months, ${days} days`;
-}
-
 function formatInr(value: string | null | undefined): string {
   if (value == null || value === '') return '—';
   const n = Number(value);
@@ -73,18 +44,9 @@ function formatInr(value: string | null | undefined): string {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
 }
 
-function sourceSummary(lead: LosLeadDetails) {
-  if (lead.sourceName) {
-    return lead.sourceType ? `${lead.sourceName} · ${lead.sourceType}` : lead.sourceName;
-  }
-  const u = lead.utm;
-  if (u?.source) return u.medium ? `${u.source} · ${u.medium}` : u.source;
-  return 'Unattributed';
-}
-
 function SectionCard({
   eyebrow, title, children,
-}: { eyebrow: string; title: string; description?: string; children: ReactNode }) {
+}: { eyebrow: string; title: string; children: ReactNode }) {
   return (
     <section
       className="overflow-hidden rounded-[12px] border border-[rgba(23,44,113,0.09)]"
@@ -149,36 +111,14 @@ function MonoValue({ children, copyLabel }: { children: string; copyLabel: strin
   );
 }
 
-function UtmGrid({ utm }: { utm: NonNullable<LosLeadDetails['utm']> }) {
-  const cells = [
-    { k: 'Source', v: utm.source },
-    { k: 'Medium', v: utm.medium },
-    { k: 'Campaign', v: utm.campaign },
-    { k: 'Term', v: utm.term },
-    { k: 'Content', v: utm.content },
-  ].filter((x) => x.v);
-  if (cells.length === 0) return <p className="m-0 text-[0.88rem] text-brand-muted">No UTM parameters captured for this lead.</p>;
-
-  return (
-    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-      {cells.map((cell) => (
-        <div
-          key={cell.k}
-          className="rounded-[12px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)] px-3 py-2.5"
-        >
-          <span className="block text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">{cell.k}</span>
-          <span className="mt-0.5 block text-[0.88rem] font-bold text-brand-text">{cell.v}</span>
-        </div>
-      ))}
-    </div>
-  );
+function activeLead(customer: LosCustomerDetails) {
+  return customer.leads.find((lead) => lead.isActive) ?? customer.leads[0] ?? null;
 }
 
-export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
-  const [lead, setLead] = useState<LosLeadDetails | null>(null);
+export function CustomerDetailsPanel({ customerUuid }: { customerUuid: string }) {
+  const [customer, setCustomer] = useState<LosCustomerDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rejectOpen, setRejectOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -191,14 +131,14 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
     }
 
     try {
-      const data = await getLeadDetails(token, leadUuid);
-      setLead(data);
+      const data = await getCustomerDetails(token, customerUuid);
+      setCustomer(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load lead details.');
+      setError(e instanceof Error ? e.message : 'Failed to load customer details.');
     } finally {
       setLoading(false);
     }
-  }, [leadUuid]);
+  }, [customerUuid]);
 
   useEffect(() => {
     void load();
@@ -223,14 +163,14 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
   if (error) {
     return (
       <div className="los-card border border-[rgba(231,95,95,0.28)] bg-[rgba(255,241,241,0.88)] p-6 text-[0.92rem] text-[#8d3434]">
-        <strong className="font-extrabold">Unable to load this lead.</strong>
+        <strong className="font-extrabold">Unable to load this customer.</strong>
         <p className="m-0 mt-2 leading-relaxed">{error}</p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link
-            href="/leads"
+            href="/customers"
             className="inline-flex min-h-[38px] items-center gap-2 rounded-full border border-[rgba(23,44,113,0.14)] bg-[rgba(255,255,255,0.9)] px-4 text-[0.82rem] font-bold text-brand-navy no-underline"
           >
-            Back to leads
+            Back to customers
           </Link>
           <button type="button" onClick={() => void load()} className="los-btn-primary min-h-[38px] px-4">
             Retry
@@ -240,118 +180,118 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
     );
   }
 
-  if (!lead) {
+  if (!customer) {
     return (
       <div className="los-card p-6 text-[0.9rem] text-brand-muted">
-        Lead not found.
-        <div className="mt-3">
-          <Link href="/leads" className="font-bold text-brand-blue no-underline hover:underline">
-            Return to lead queue
-          </Link>
-        </div>
+        Customer not found.
       </div>
     );
   }
 
-  const displayName = formatPersonName(lead.profile?.fullName, 'Lead (name pending)');
-  const profile = lead.profile;
-  const journeySteps = buildLeadIntakeJourney(lead);
-  const alertText = buildWorkspaceAlertText({
-    statusCode: lead.statusCode,
-    rejectionReason: lead.rejectionReason?.label,
-    leadStatusNote: lead.leadStatusNote,
-    bureauFetchedNote: lead.bureauFetchedNote,
-    panVerified: lead.panVerified,
-    bureauFetched: lead.bureauFetched,
-  });
+  const profile = customer.profile;
+  const displayName = formatPersonName(profile?.fullName, 'Customer (name pending)');
+  const currentLead = activeLead(customer);
+  const latestApplication = customer.applications[0] ?? null;
 
   return (
     <div className="grid gap-4 pb-2">
-      {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
-          href="/leads"
+          href="/customers"
           className="inline-flex min-h-[38px] items-center gap-2 rounded-full border border-[rgba(23,44,113,0.12)] bg-[rgba(255,255,255,0.88)] px-4 text-[0.82rem] font-bold text-brand-navy no-underline shadow-sm transition-colors hover:border-[rgba(20,150,243,0.28)]"
         >
           <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M19 12H5" />
             <path d="m12 19-7-7 7-7" />
           </svg>
-          Back to leads
+          Back to customers
         </Link>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href={`/customers/${lead.customerUuid}`}
-            className="inline-flex min-h-[38px] items-center rounded-full border border-[rgba(23,44,113,0.14)] bg-white px-4 text-[0.82rem] font-bold text-brand-navy no-underline hover:border-[rgba(20,150,243,0.28)]"
-          >
-            Customer profile
-          </Link>
-          <button type="button" onClick={() => void load()} className="los-btn-primary min-h-[38px] px-4 text-[0.82rem]">
-            Refresh data
-          </button>
-          {canRejectLeadStatus(lead.statusCode) ? (
-            <button
-              type="button"
-              onClick={() => setRejectOpen(true)}
-              className="min-h-[38px] rounded-[8px] border border-[rgba(239,68,68,0.35)] bg-white px-4 text-[0.82rem] font-bold text-[#dc2626] hover:bg-[rgba(254,242,242,0.9)]"
-            >
-              Reject lead
-            </button>
-          ) : null}
-        </div>
+        <button type="button" onClick={() => void load()} className="los-btn-primary min-h-[38px] px-4 text-[0.82rem]">
+          Refresh data
+        </button>
       </div>
 
-      <RejectRecordModal
-        open={rejectOpen}
-        token={getToken()}
-        recordType="lead"
-        recordUuid={lead.uuid}
-        recordLabel={displayName}
-        onClose={() => setRejectOpen(false)}
-        onSuccess={() => void load()}
-      />
-
       <WorkspaceRecordHeader
-        eyebrow="Loan pipeline"
+        eyebrow="Customer profile"
         title={displayName}
-        mobile={lead.mobileNumber}
-        email={lead.email}
-        statusCode={lead.statusCode}
-        statusLabel={lead.statusLabel}
-        sourceLabel={sourceSummary(lead)}
-        rejectionReason={lead.rejectionReason?.label}
-        alertText={alertText}
-        createdAt={formatDateTime(lead.createdAt)}
-        updatedAt={formatDateTime(lead.updatedAt)}
+        mobile={customer.mobileNumber}
+        email={latestApplication?.email ?? null}
+        statusCode={currentLead?.statusCode ?? 'REGISTERED'}
+        statusLabel={currentLead?.statusLabel ?? 'Registered'}
+        sourceLabel={currentLead?.sourceName ?? 'Customer account'}
+        rejectionReason={currentLead?.rejectionReason?.label}
+        alertText={
+          customer.isBlacklisted
+            ? 'This customer is blacklisted and cannot proceed with a new application.'
+            : currentLead?.leadStatusNote ?? undefined
+        }
+        createdAt={formatDateTime(customer.createdAt)}
+        updatedAt={formatDateTime(customer.updatedAt)}
         quickStats={[
-          { label: 'PAN', value: lead.panVerifiedLabel ?? '—' },
-          { label: 'Bureau', value: lead.bureauFetchedLabel ?? '—' },
+          { label: 'Leads', value: String(customer.leads.length) },
+          { label: 'Applications', value: String(customer.applications.length) },
+          { label: 'KYC', value: customer.kycVerifiedAt ? 'Verified' : 'Pending' },
         ]}
-        journeyTitle="Intake progress"
-        journeySubtitle="Steps before an application is created"
-        journeySteps={journeySteps}
+        journeyTitle="Account overview"
+        journeySubtitle="Customer identity across leads and loan applications"
+        journeySteps={[
+          {
+            id: 'registered',
+            label: 'Registered',
+            state: 'done',
+            detail: formatDateOnly(customer.createdAt),
+          },
+          {
+            id: 'lead',
+            label: 'Lead intake',
+            state: customer.leads.length > 0 ? 'done' : 'pending',
+            detail: customer.leads.length > 0 ? `${customer.leads.length} lead(s)` : undefined,
+          },
+          {
+            id: 'application',
+            label: 'Application',
+            state: customer.applications.length > 0 ? 'done' : 'pending',
+            detail: customer.applications.length > 0 ? `${customer.applications.length} app(s)` : undefined,
+          },
+        ]}
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="grid gap-4 lg:col-span-2">
-          <SectionCard eyebrow="Borrower profile" title="Onboarding snapshot" description="Captured during customer onboarding.">
-            {profile ? (
-              <div className="grid gap-x-6 gap-y-0 sm:grid-cols-2">
+          <SectionCard eyebrow="Identity" title="Customer information">
+            <div className="grid gap-x-6 gap-y-0 sm:grid-cols-2">
+              <DetailGrid
+                rows={[
+                  { label: 'Customer UUID', value: <MonoValue copyLabel="Customer UUID">{customer.uuid}</MonoValue> },
+                  { label: 'Mobile', value: customer.mobileNumber },
+                  { label: 'Registered', value: formatDateTime(customer.createdAt) },
+                  { label: 'Last updated', value: formatDateTime(customer.updatedAt) },
+                  { label: 'Blacklisted', value: customer.isBlacklisted ? 'Yes' : 'No' },
+                  { label: 'KYC verified', value: formatDateTime(customer.kycVerifiedAt) },
+                ]}
+              />
+              {profile ? (
                 <DetailGrid
                   rows={[
                     { label: 'Full name', value: formatPersonName(profile.fullName) },
                     { label: 'Date of birth', value: formatDateOnly(profile.dateOfBirth ?? undefined) },
-                    { label: 'Age', value: ageFromDateOfBirth(profile.dateOfBirth ?? undefined) },
                     { label: 'PAN', value: profile.panNumber ?? '—' },
-                    { label: 'PAN status', value: lead.panVerifiedLabel ?? '—' },
-                    { label: 'Bureau', value: lead.bureauFetchedLabel ?? '—' },
                     { label: 'Gender', value: profile.gender ?? '—' },
                     { label: 'Occupation', value: profile.occupation ?? '—' },
+                    { label: 'City', value: profile.city ?? '—' },
                   ]}
                 />
+              ) : (
+                <p className="m-0 text-[0.88rem] text-brand-muted">No profile captured yet.</p>
+              )}
+            </div>
+          </SectionCard>
+
+          {profile ? (
+            <SectionCard eyebrow="Profile" title="Latest onboarding snapshot">
+              <div className="grid gap-x-6 gap-y-0 sm:grid-cols-2">
                 <DetailGrid
                   rows={[
-                    { label: 'City', value: profile.city ?? '—' },
                     { label: 'State', value: profile.state ?? '—' },
                     { label: 'PIN', value: profile.pincode ?? '—' },
                     {
@@ -363,30 +303,81 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
                   ]}
                 />
               </div>
-            ) : (
-              <p className="m-0 text-[0.88rem] text-brand-muted">No profile saved yet.</p>
-            )}
-          </SectionCard>
+            </SectionCard>
+          ) : null}
         </div>
 
         <div className="grid gap-4 content-start">
-          <SectionCard eyebrow="Attribution" title="Source & campaign" description="How this lead entered the funnel.">
-            <DetailGrid rows={[{ label: 'Lead source', value: sourceSummary(lead) }]} />
-            {lead.utm ? <div className="mt-3"><UtmGrid utm={lead.utm} /></div> : null}
+          <SectionCard eyebrow="Summary" title="Pipeline counts">
+            <DetailGrid
+              rows={[
+                { label: 'Total leads', value: String(customer.leads.length) },
+                { label: 'Active leads', value: String(customer.leads.filter((l) => l.isActive).length) },
+                { label: 'Applications', value: String(customer.applications.length) },
+                {
+                  label: 'Latest lead status',
+                  value: currentLead ? (
+                    <LosStatusPill code={currentLead.statusCode} label={currentLead.statusLabel} />
+                  ) : (
+                    '—'
+                  ),
+                },
+              ]}
+            />
           </SectionCard>
-
-          {lead.applications.length === 0 ? (
-            <div className="rounded-[14px] border border-dashed border-[rgba(23,44,113,0.14)] bg-[rgba(248,250,255,0.5)] px-4 py-5 text-center text-[0.84rem] text-brand-muted">
-              No application yet — customer is still in lead intake.
-            </div>
-          ) : null}
         </div>
       </div>
 
-      {lead.applications.length > 0 ? (
-        <SectionCard eyebrow="Applications" title="Linked loan applications" description="Open an application for loan terms, bureau, KYC, and disbursement.">
+      <SectionCard eyebrow="Leads" title="Lead history">
+        {customer.leads.length === 0 ? (
+          <p className="m-0 text-[0.88rem] text-brand-muted">No leads for this customer yet.</p>
+        ) : (
           <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2 lg:grid-cols-3">
-            {lead.applications.map((application) => (
+            {customer.leads.map((lead) => (
+              <li key={lead.uuid}>
+                <article className="flex h-full flex-col rounded-[14px] border border-[rgba(23,44,113,0.1)] bg-white p-3.5 shadow-sm">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="text-[0.65rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">Lead</span>
+                      <p className="m-0 mt-1 font-mono text-[0.72rem] font-bold text-brand-navy">{lead.uuid.slice(0, 8)}…</p>
+                    </div>
+                    <LosStatusPill code={lead.statusCode} label={lead.statusLabel} />
+                  </div>
+                  <dl className="m-0 mt-3 grid gap-1.5 border-t border-[rgba(23,44,113,0.06)] pt-2.5 text-[0.8rem]">
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-brand-muted">Active</dt>
+                      <dd className="m-0 font-bold text-brand-navy">{lead.isActive ? 'Yes' : 'No'}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-brand-muted">Applications</dt>
+                      <dd className="m-0 font-bold text-brand-navy">{lead.applicationCount}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2 text-[0.75rem] text-brand-muted">
+                      <dt>Opened</dt>
+                      <dd className="m-0">{formatDateTime(lead.createdAt)}</dd>
+                    </div>
+                  </dl>
+                  <div className="mt-auto flex justify-end gap-2 pt-3">
+                    <Link
+                      href={`/leads/${lead.uuid}`}
+                      className="inline-flex min-h-[34px] items-center rounded-full bg-brand-navy px-3.5 text-[0.75rem] font-extrabold text-white no-underline"
+                    >
+                      Open lead
+                    </Link>
+                  </div>
+                </article>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SectionCard>
+
+      <SectionCard eyebrow="Applications" title="Loan applications">
+        {customer.applications.length === 0 ? (
+          <p className="m-0 text-[0.88rem] text-brand-muted">No applications yet.</p>
+        ) : (
+          <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2 lg:grid-cols-3">
+            {customer.applications.map((application) => (
               <li key={application.uuid}>
                 <article className="flex h-full flex-col rounded-[14px] border border-[rgba(23,44,113,0.1)] bg-white p-3.5 shadow-sm">
                   <div className="flex flex-wrap items-start justify-between gap-2">
@@ -401,12 +392,22 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
                       <dt className="text-brand-muted">Amount</dt>
                       <dd className="m-0 font-bold text-brand-navy">{formatInr(application.loanAmount)}</dd>
                     </div>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-brand-muted">KYC</dt>
+                      <dd className="m-0 font-bold text-brand-navy">{application.kycStatusLabel}</dd>
+                    </div>
                     <div className="flex justify-between gap-2 text-[0.75rem] text-brand-muted">
                       <dt>Opened</dt>
                       <dd className="m-0">{formatDateTime(application.createdAt)}</dd>
                     </div>
                   </dl>
-                  <div className="mt-auto flex justify-end gap-2 pt-3">
+                  <div className="mt-auto flex flex-wrap justify-end gap-2 pt-3">
+                    <Link
+                      href={`/leads/${application.leadUuid}`}
+                      className="inline-flex min-h-[34px] items-center rounded-full border border-[rgba(23,44,113,0.14)] bg-white px-3.5 text-[0.75rem] font-extrabold text-brand-navy no-underline"
+                    >
+                      Lead
+                    </Link>
                     <Link
                       href={`/applications/${application.uuid}`}
                       className="inline-flex min-h-[34px] items-center rounded-full bg-brand-navy px-3.5 text-[0.75rem] font-extrabold text-white no-underline"
@@ -418,8 +419,8 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
               </li>
             ))}
           </ul>
-        </SectionCard>
-      ) : null}
+        )}
+      </SectionCard>
     </div>
   );
 }

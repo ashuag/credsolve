@@ -57,6 +57,7 @@ export class SendOtpUseCase {
     }
 
     const settings = await this.settingsRepository.loadAuthOtpSettings();
+    this.logger.log('settings', settings);
     const otpType = await this.otpTypes.findActiveByName(undefined, dto.type);
     if (!otpType) {
       throw new BadRequestException('This OTP channel is not available.');

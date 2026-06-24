@@ -10,6 +10,7 @@ export * from './partners';
 export * from './roles';
 export * from './users';
 export * from './leads';
+export * from './customers';
 export * from './invitations';
 export * from './masters';
 export * from './sms-templates';

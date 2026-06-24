@@ -2,7 +2,6 @@ import type { createPrismaClient } from '../prisma-client';
 
 const OTP_PRODUCT = 'OTP';
 const TRANSACTIONAL_PRODUCT = 'Transactional';
-
 const LOGIN_OTP_TEMPLATE_ID = '1007367040598516340';
 const ESIGN_OTP_TEMPLATE_ID = '1007997896537338264';
 const TRANSACTIONAL_TEMPLATE_ID = '1007442260135588994';

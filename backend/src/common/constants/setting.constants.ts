@@ -93,22 +93,22 @@ export const SettingKey = {
     PAN_VERIFICATION_ENABLED: {
         key: 'PAN_VERIFICATION_ENABLED',
         default: '1',
-        description:  'Need to check Pan is verified or not',
+        description: 'Need to check Pan is verified or not',
     },
     REAPPLY_AFTER_REJECTED: {
         key: 'REAPPLY_AFTER_REJECTED',
         default: '90',
-        description:  'Days after which lead can be re-applied after rejection',
+        description: 'Days after which lead can be re-applied after rejection',
     },
     BLACKLIST_REJECTION_THRESHOLD: {
         key: 'BLACKLIST_REJECTION_THRESHOLD',
         default: '2',
-        description:  'Max consecutive rejection count',
+        description: 'Max consecutive rejection count',
     },
     BLACKLIST_DURATION_DAYS: {
         key: 'BLACKLIST_DURATION_DAYS',
         default: '90',
-        description:  'Days after which lead can be re-applied after consecutive rejection',
+        description: 'Days after which lead can be re-applied after consecutive rejection',
     },
     MIN_LIVENESS_API_SCORE: {
         key: 'MIN_LIVENESS_API_SCORE',
@@ -124,5 +124,5 @@ export const SettingKey = {
         key: 'PENNY_DROP_RETRY_COUNT',
         default: '2',
         description: 'Maximum penny-drop bank verification attempts per application before further tries are blocked',
-    },
+    }
 } as const;

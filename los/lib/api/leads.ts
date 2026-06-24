@@ -43,6 +43,13 @@ export type LosApplication = {
   bankDetails: string | null;
   statusCode: string;
   statusLabel: string;
+  leadStatusCode: string;
+  leadStatusLabel: string;
+  leadRejectionReason: { code: string; label: string } | null;
+  leadStatusNote: string | null;
+  kycStatus: number;
+  kycStatusLabel: string;
+  kycCompleted: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -162,6 +169,9 @@ export type LosApplicationDetails = {
     uuid: string;
     statusCode: string;
     statusLabel: string;
+    leadStatusNote: string | null;
+    bureauFetchedNote: string | null;
+    rejectionReason: { code: string; label: string } | null;
     sourceName: string | null;
     sourceType: string | null;
     utms: Array<{
