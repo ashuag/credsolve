@@ -30,6 +30,7 @@ if (isProductionRuntime) {
 }
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   poweredByHeader: false,
   compiler: {
     removeConsole: isProductionRuntime ? { exclude: ['error', 'warn'] } : false,

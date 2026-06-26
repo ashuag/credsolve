@@ -64,6 +64,7 @@ if (!/^https?:\/\//i.test(apiProxyTarget)) {
 }
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   poweredByHeader: false,
   compiler: {
     // Smaller client bundles in production; keep error/warn for debugging.
