@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { VendorHttpMethod } from '../constants/vendor-http-method.constants';
+import { isVendorApi5xxFailure } from './vendor-api-error.util';
+import { VendorInternalErrorService } from './vendor-internal-error.service';
 
 /** Default per-request timeout. Long enough for most KYC vendors, short enough that hung calls don't pile up. */
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -122,7 +124,10 @@ export type VendorApiCallResult<TResponse> = {
 export class VendorApiService {
   private readonly logger = new Logger(VendorApiService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly internalError: VendorInternalErrorService,
+  ) {}
 
   async request<TResponse = unknown, TBody = unknown>(
     opts: VendorApiCallOptions<TBody>,
@@ -218,6 +223,24 @@ export class VendorApiService {
       requestedAt,
       respondedAt,
     });
+
+    if (opts.leadId != null && isVendorApi5xxFailure({ httpStatus, body: parsedResponse })) {
+      void this.internalError
+        .handleVendor5xx({
+          leadId: opts.leadId,
+          providerName: opts.providerName,
+          serviceName: opts.serviceName,
+          httpStatus,
+          body: parsedResponse,
+          transportError: error?.message,
+        })
+        .catch((err) => {
+          const message = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `INTERNAL_ERROR escalation failed (${opts.providerName}/${opts.serviceName}, leadId=${opts.leadId?.toString()}): ${message}`,
+          );
+        });
+    }
 
     return {
       ok,

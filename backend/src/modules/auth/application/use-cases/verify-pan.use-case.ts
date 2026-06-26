@@ -38,7 +38,7 @@ const BUREAU_THANK_YOU_MESSAGE =
   'Thank you for your interest. Unfortunately, we are unable to proceed with your application at this time.';
 
 /** Outcome of an attempted Tenacio bureau soft-pull (customer journey). */
-type BureauSoftPullOutcome = 'skipped' | 'success' | 'failed' | 'post_bre_failed';
+type BureauSoftPullOutcome = 'skipped' | 'success' | 'failed' | 'post_bre_failed' | 'ntc';
 
 /** `lead_detail` shape after upsert (BRE + response fields). */
 const leadDetailUpsertSelect = {
@@ -343,6 +343,19 @@ export class VerifyPanUseCase {
           panUpper,
           fullNameTrimmed,
         );
+        if (bureauOutcome === 'ntc') {
+          await this.rejectLead(
+            leadRow.id,
+            'New to credit: bureau holds no matching credit record for this customer.',
+            REJECTION_REASON.NEW_TO_CREDIT,
+          );
+          this.fireRejectionSms(customer.mobileNumber, leadRow.id);
+          return {
+            success: true,
+            rejected: true,
+            message: BUREAU_THANK_YOU_MESSAGE,
+          };
+        }
         if (bureauOutcome === 'failed') {
           await this.rejectLead(
             leadRow.id,
@@ -535,6 +548,25 @@ export class VerifyPanUseCase {
     }
 
     const now = new Date();
+
+    // Bureau processed the request but holds no matching credit record for this
+    // identity (e.g. serviceStatusCode 422 "Authentication required"). Treat the
+    // customer as New-To-Credit; the caller rejects the lead with NEW_TO_CREDIT.
+    if (out.isNewToCredit) {
+      await this.leads.updateLead({
+        where: { id: leadId },
+        data: {
+          bureauFetched: BUREAU_FETCHED.FAILED,
+          bureauFetchedAt: now,
+          bureauFetchedNote: `NTC: ${out.serviceErrorMessage ?? 'bureau has no matching credit record'}`.slice(0, 500),
+        },
+      });
+      this.logger.warn(
+        `Bureau soft-pull NTC (leadId=${leadId}): ${out.serviceErrorMessage ?? 'authentication required / no bureau record'}`,
+      );
+      return 'ntc';
+    }
+
     if (out.httpStatus === 200) {
       await this.leads.updateLead({
         where: { id: leadId },

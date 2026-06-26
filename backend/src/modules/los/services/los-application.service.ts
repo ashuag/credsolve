@@ -306,6 +306,9 @@ export class LosApplicationService {
         uuid: lead.uuid,
         statusCode: lead.leadStatus.name,
         statusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
+        leadStatusNote: lead.leadStatusNote?.trim() || null,
+        bureauFetchedNote: lead.bureauFetchedNote?.trim() || null,
+        bureauFetched: lead.bureauFetched,
         sourceName: lead.source?.name ?? null,
         sourceType: lead.source?.type ?? null,
         utms: lead.leadUtms.map((utm) => ({
@@ -318,7 +321,6 @@ export class LosApplicationService {
         })),
         panNumber: lead.panNumber,
         panVerified: lead.panVerified,
-        bureauFetched: lead.bureauFetched,
         profile: detail
           ? {
               fullName: formatLosPersonName(detail.fullName),

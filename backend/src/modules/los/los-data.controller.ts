@@ -1,7 +1,8 @@
-import { Controller, Get, Param, Post, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Res, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { LosAuthGuard } from './auth/los-auth.guard';
+import { RejectLeadDto } from './dto/reject-lead.dto';
 import { LosLeadService } from './services/los-lead.service';
 import { LosApplicationService } from './services/los-application.service';
 import { LosDashboardService } from './services/los-dashboard.service';
@@ -73,6 +74,15 @@ export class LosDataController {
   @ApiOperation({ summary: 'Get lead details by lead uuid' })
   leadByUuid(@Param('leadUuid') leadUuid: string) {
     return this.losLead.getLeadDetails(leadUuid);
+  }
+
+  @Post('leads/:leadUuid/reject')
+  @ApiOperation({ summary: 'Reject a lead with a rejection reason and optional note' })
+  rejectLead(@Param('leadUuid') leadUuid: string, @Body() body: RejectLeadDto) {
+    return this.losLead.rejectLead(leadUuid, {
+      rejectionReasonId: body.rejectionReasonId,
+      note: body.note,
+    });
   }
 
   @Get('masters')

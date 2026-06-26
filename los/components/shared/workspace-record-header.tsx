@@ -3,7 +3,7 @@
 import { type ReactNode } from 'react';
 import { CustomerJourneyTimeline } from '@/components/shared/customer-journey-timeline';
 import { LosStatusPill, losStatusPillStyles } from '@/components/shared/los-status-pill';
-import { isWorkspaceRecordRejected } from '@/lib/workspace-alert';
+import { isWorkspaceRecordRejected, isWorkspaceRecordInternalError } from '@/lib/workspace-alert';
 import type { JourneyStep } from '@/lib/customer-journey';
 
 function getInitials(name: string): string {
@@ -17,6 +17,7 @@ function statusAccentColor(code: string): string {
   if (c.includes('REJECT') || c.includes('FAIL') || c.includes('DECLIN')) return '#ef4444';
   if (c === 'CONVERTED' || c.includes('APPROV') || c.includes('DISBURS')) return '#10b981';
   if (c === 'NEW' || c === 'IN_PROGRESS' || c === 'DRAFT') return '#1496f3';
+  if (c === 'INTERNAL_ERROR' || c === 'IN_REVIEW') return '#f59e0b';
   return '#6366f1';
 }
 
@@ -82,6 +83,7 @@ export function WorkspaceRecordHeader({
   const accent = statusAccentColor(statusCode);
   const pillStyle = losStatusPillStyles(statusCode);
   const isRejected = isWorkspaceRecordRejected(statusCode, rejectionReason);
+  const isInternalError = isWorkspaceRecordInternalError(statusCode);
   const bannerText = alertText?.trim() || null;
 
   return (
@@ -160,6 +162,8 @@ export function WorkspaceRecordHeader({
           className="mx-4 mb-3 flex items-start gap-2 rounded-[8px] border px-3 py-2 text-[0.78rem] leading-snug"
           style={isRejected
             ? { borderColor: `${pillStyle.text}33`, backgroundColor: pillStyle.bg, color: pillStyle.text }
+            : isInternalError
+              ? { borderColor: 'rgba(245,158,11,0.35)', backgroundColor: 'rgba(255,251,235,0.95)', color: '#92400e' }
             : { borderColor: 'rgba(245,158,11,0.3)', backgroundColor: 'rgba(255,251,235,0.9)', color: '#92400e' }}
         >
           <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="mt-0.5 shrink-0" aria-hidden>

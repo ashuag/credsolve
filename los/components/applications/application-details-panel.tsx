@@ -12,6 +12,7 @@ import {
   type LosApplicationDetails,
 } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
+import { buildWorkspaceAlertText } from '@/lib/workspace-alert';
 import { useCallback, useEffect, useState } from 'react';
 
 function getToken(): string | null {
@@ -249,6 +250,19 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
   const journeySteps = buildApplicationJourney(row);
   const cibilScore = row.bureauReport?.cibilScore ?? row.eligibility?.cibilScore ?? null;
   const loanAmount = row.details?.loanAmount ?? row.preApprovedLoanAmount;
+  const alertText = buildWorkspaceAlertText({
+    statusCode: row.statusCode,
+    leadStatusNote: row.lead.leadStatusNote,
+    bureauFetchedNote: row.lead.bureauFetchedNote,
+    panVerified: row.lead.panVerified,
+    bureauFetched: row.lead.bureauFetched,
+  }) ?? buildWorkspaceAlertText({
+    statusCode: row.lead.statusCode,
+    leadStatusNote: row.lead.leadStatusNote,
+    bureauFetchedNote: row.lead.bureauFetchedNote,
+    panVerified: row.lead.panVerified,
+    bureauFetched: row.lead.bureauFetched,
+  });
 
   return (
     <div className="grid gap-4 pb-2">
@@ -284,6 +298,7 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
         statusCode={row.statusCode}
         statusLabel={row.statusLabel}
         sourceLabel={leadSourceSummary(row.lead.sourceName, row.lead.sourceType)}
+        alertText={alertText}
         createdAt={formatDateTime(row.createdAt)}
         updatedAt={formatDateTime(row.updatedAt)}
         createdLabel="Opened"

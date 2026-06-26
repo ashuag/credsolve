@@ -7,6 +7,8 @@ export const LEAD_STATUS = {
   REJECTED: 'REJECTED',
   /** Too many consecutive rejections — locked out for BLACKLIST_DURATION_DAYS. */
   BLACKLISTED: 'BLACKLISTED',
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+  EXPIRED: 'EXPIRED',
 } as const;
 
 export type LeadStatus = (typeof LEAD_STATUS)[keyof typeof LEAD_STATUS];

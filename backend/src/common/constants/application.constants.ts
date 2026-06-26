@@ -8,6 +8,7 @@ export const APPLICATION_STATUS = {
   CANCELLED: 'CANCELLED',
   ACTIVE: 'ACTIVE',
   EXPIRED: 'EXPIRED',
+  INTERNAL_ERROR: 'INTERNAL_ERROR'
 } as const;
 
 export type ApplicationStatus = (typeof APPLICATION_STATUS)[keyof typeof APPLICATION_STATUS];

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { SmsTemplate } from '@prisma/client';
 import { VendorApiService } from '../vendor/vendor-api.service';
@@ -36,6 +36,10 @@ export type SmsVendorSendResult = {
 export class SmsVendorService {
   constructor(
     private readonly config: ConfigService,
+    // `forwardRef` breaks the SMS<->Vendor module cycle:
+    // VendorApiService -> VendorInternalErrorService -> SmsService ->
+    // SmsVendorService -> VendorApiService.
+    @Inject(forwardRef(() => VendorApiService))
     private readonly vendorApi: VendorApiService,
   ) {}
 

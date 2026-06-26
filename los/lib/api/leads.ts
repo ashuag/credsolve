@@ -132,6 +132,9 @@ export type LosApplicationDetails = {
     uuid: string;
     statusCode: string;
     statusLabel: string;
+    leadStatusNote: string | null;
+    bureauFetchedNote: string | null;
+    bureauFetched: number;
     sourceName: string | null;
     sourceType: string | null;
     utms: Array<{
@@ -144,7 +147,6 @@ export type LosApplicationDetails = {
     }>;
     panNumber: string | null;
     panVerified: number;
-    bureauFetched: number;
     profile: LosLeadDetails['profile'];
   };
   referencesCount: number;
@@ -232,6 +234,23 @@ export async function getApplicationDetails(token: string, applicationUuid: stri
     token,
     `/applications/${encodeURIComponent(applicationUuid)}`,
     'Failed to fetch application details',
+  );
+}
+
+export async function rejectLead(
+  token: string,
+  leadUuid: string,
+  data: { rejectionReasonId: number; note?: string },
+): Promise<LosLeadDetails> {
+  return authorizedLosRequest<LosLeadDetails>(
+    token,
+    `/leads/${encodeURIComponent(leadUuid)}/reject`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    },
+    'Failed to reject lead',
   );
 }
 

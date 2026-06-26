@@ -27,16 +27,22 @@ export function buildWorkspaceAlertText(input: WorkspaceAlertInput): string | nu
   const rejection = input.rejectionReason?.trim();
   const note = input.leadStatusNote?.trim();
   const bureauNote = input.bureauFetchedNote?.trim();
-  const isRejected = input.statusCode.toUpperCase().includes('REJECT');
+  const status = input.statusCode.toUpperCase();
+  const isRejected = status.includes('REJECT');
+  const isInternalError = status === 'INTERNAL_ERROR';
 
   if (rejection) parts.push(rejection);
+
+  if (isInternalError && note) {
+    parts.push(note);
+  }
 
   const panFailed =
     input.panVerified === PAN_VERIFIED.NOT_VERIFIED ||
     input.panVerified === PAN_VERIFIED.API_FAILURE ||
     input.panVerified === PAN_VERIFIED.API_DISABLED;
 
-  if (note && (panFailed || isRejected)) {
+  if (note && !isInternalError && (panFailed || isRejected)) {
     parts.push(note);
   }
 
@@ -46,6 +52,10 @@ export function buildWorkspaceAlertText(input: WorkspaceAlertInput): string | nu
 
   const unique = [...new Set(parts)];
   return unique.length > 0 ? unique.join(' · ') : null;
+}
+
+export function isWorkspaceRecordInternalError(statusCode: string): boolean {
+  return statusCode.toUpperCase() === 'INTERNAL_ERROR';
 }
 
 export function isWorkspaceRecordRejected(statusCode: string, rejectionReason?: string | null): boolean {

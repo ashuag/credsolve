@@ -5,6 +5,7 @@ import { DigilockerVendorService } from './digilocker-vendor.service';
 import { LivenessVendorService } from './liveness-vendor.service';
 import { PanVerificationService } from './pan-verification.service';
 import { VendorApiService } from './vendor-api.service';
+import { VendorInternalErrorService } from './vendor-internal-error.service';
 
 /**
  * Generic 3rd-party API caller with audit logging.
@@ -17,7 +18,23 @@ import { VendorApiService } from './vendor-api.service';
  */
 @Global()
 @Module({
-  providers: [VendorApiService, PanVerificationService, BureauFetchService, DigilockerVendorService, LivenessVendorService, BankTenacioVendorService],
-  exports: [VendorApiService, PanVerificationService, BureauFetchService, DigilockerVendorService, LivenessVendorService, BankTenacioVendorService],
+  providers: [
+    VendorApiService,
+    VendorInternalErrorService,
+    PanVerificationService,
+    BureauFetchService,
+    DigilockerVendorService,
+    LivenessVendorService,
+    BankTenacioVendorService,
+  ],
+  exports: [
+    VendorApiService,
+    VendorInternalErrorService,
+    PanVerificationService,
+    BureauFetchService,
+    DigilockerVendorService,
+    LivenessVendorService,
+    BankTenacioVendorService,
+  ],
 })
 export class VendorApiModule {}

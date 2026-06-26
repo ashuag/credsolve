@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { BUREAU_FETCHED } from '../../../common/constants/bureau-fetch.constants';
 import { LEAD_STATUS } from '../../../common/constants/lead.constants';
 import { PAN_VERIFIED } from '../../../common/constants/pan-verification.constants';
@@ -222,5 +222,56 @@ export class LosLeadService {
         updatedAt: application.updatedAt.toISOString(),
       })),
     };
+  }
+
+  async rejectLead(leadUuid: string, input: { rejectionReasonId: number; note?: string | null }) {
+    const lead = await this.prisma.client.lead.findUnique({
+      where: { uuid: leadUuid },
+      select: { id: true, leadStatus: { select: { name: true } } },
+    });
+
+    if (!lead) {
+      throw new NotFoundException('Lead not found');
+    }
+
+    const currentStatus = lead.leadStatus.name;
+    if (currentStatus === LEAD_STATUS.REJECTED) {
+      throw new ConflictException('This lead has already been rejected.');
+    }
+    if (currentStatus === LEAD_STATUS.CONVERTED) {
+      throw new BadRequestException('A converted lead cannot be rejected.');
+    }
+
+    const [rejectedStatus, rejectionReason] = await Promise.all([
+      this.prisma.client.leadStatus.findUnique({
+        where: { name: LEAD_STATUS.REJECTED },
+        select: { id: true },
+      }),
+      this.prisma.client.rejectionReason.findUnique({
+        where: { id: input.rejectionReasonId },
+        select: { id: true, isActive: true },
+      }),
+    ]);
+
+    if (!rejectedStatus) {
+      throw new NotFoundException('Rejected lead status is not configured.');
+    }
+    if (!rejectionReason) {
+      throw new NotFoundException('Rejection reason not found.');
+    }
+    if (!rejectionReason.isActive) {
+      throw new BadRequestException('Selected rejection reason is inactive.');
+    }
+
+    await this.prisma.client.lead.update({
+      where: { id: lead.id },
+      data: {
+        leadStatusId: rejectedStatus.id,
+        rejectionReasonId: rejectionReason.id,
+        leadStatusNote: input.note?.trim() || null,
+      },
+    });
+
+    return this.getLeadDetails(leadUuid);
   }
 }

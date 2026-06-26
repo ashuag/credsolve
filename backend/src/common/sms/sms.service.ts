@@ -51,6 +51,13 @@ export class SmsService {
     });
   }
 
+  /** Customer SMS when a vendor API returns HTTP / business 5XX (technical issue template). */
+  async sendInternalErrorSms(mobile: string, leadId?: bigint | null): Promise<void> {
+    await this.sendProductSms(mobile, SMS_PRODUCT.TRANSACTIONAL, leadId, undefined, {
+      templateId: SMS_TEMPLATE_ID.INTERNAL_ERROR,
+    });
+  }
+
   private async sendProductSms(
     mobile: string,
     product: SmsProduct,

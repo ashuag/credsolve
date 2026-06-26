@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { readBureauFetchMode } from '../constants/bureau-fetch-settings.util';
 import { PrismaService } from '../../prisma/prisma.service';
+import { extractVendorServiceError } from './vendor-api-error.util';
 import { TENACIO_BUREAU_MOCK_VENDOR_BODY } from './tenacio-bureau-mock.fixture';
 import { VendorApiService } from './vendor-api.service';
 
@@ -63,6 +64,16 @@ export class BureauFetchService {
     error?: Error;
     /** True when `BUREAU_FETCH_ENABLED=2` (mock fixture); persist on `bureau_report.dummy_fetched`. */
     dummyPayload: boolean;
+    /**
+     * True when the bureau processed the request but returned a client-side
+     * (4xx) service error — i.e. it has no matching credit record for this
+     * identity (e.g. `serviceStatusCode: 422`, "Authentication required.
+     * Please provide mobile number registered with bureau records."). The
+     * caller should treat such customers as New-To-Credit and reject the lead.
+     */
+    isNewToCredit: boolean;
+    /** Vendor `serviceError.message` when present (for audit notes). */
+    serviceErrorMessage: string | null;
   }> {
     const bureauMode = await readBureauFetchMode(this.prisma.client);
     if (bureauMode === 2) {
@@ -75,6 +86,8 @@ export class BureauFetchService {
         httpStatus: 200,
         vendorBody: structuredClone(TENACIO_BUREAU_MOCK_VENDOR_BODY),
         dummyPayload: true,
+        isNewToCredit: false,
+        serviceErrorMessage: null,
       };
     }
 
@@ -102,6 +115,8 @@ export class BureauFetchService {
         httpStatus: null,
         vendorBody: null,
         dummyPayload: false,
+        isNewToCredit: false,
+        serviceErrorMessage: null,
       };
     }
 
@@ -116,6 +131,8 @@ export class BureauFetchService {
         httpStatus: null,
         vendorBody: null,
         dummyPayload: false,
+        isNewToCredit: false,
+        serviceErrorMessage: null,
       };
     }
 
@@ -153,6 +170,23 @@ export class BureauFetchService {
       }),
     });
 
+    // A processed-but-failed bureau pull with a client-side (4xx) service status
+    // means the bureau holds no matching record for this identity → treat the
+    // customer as New-To-Credit. 5xx service codes are vendor outages and are
+    // handled as internal errors elsewhere, so they are excluded here.
+    const serviceError = extractVendorServiceError(result.body);
+    const isNewToCredit =
+      serviceError != null &&
+      (serviceError.serviceStatusCode == null || serviceError.serviceStatusCode < 500);
+
+    if (serviceError) {
+      this.logger.warn(
+        `Tenacio bureau service error (leadId=${leadId?.toString() ?? 'n/a'}): ` +
+          `serviceStatusCode=${serviceError.serviceStatusCode ?? 'n/a'} ntc=${isNewToCredit} ` +
+          `message=${serviceError.message ?? 'n/a'}`,
+      );
+    }
+
     return {
       configured: true,
       ok: result.ok,
@@ -160,6 +194,8 @@ export class BureauFetchService {
       vendorBody: result.body,
       error: result.error,
       dummyPayload: false,
+      isNewToCredit,
+      serviceErrorMessage: serviceError?.message ?? null,
     };
   }
 }

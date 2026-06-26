@@ -7,7 +7,7 @@ const LOGIN_OTP_TEMPLATE_ID = '1007367040598516340';
 const ESIGN_OTP_TEMPLATE_ID = '1007997896537338264';
 const TRANSACTIONAL_TEMPLATE_ID = '1007442260135588994';
 const UNDER_REVIEW_TEMPLATE_ID = '1007403812823956210';
-const TECHNICAL_ISSUE_MESSAGE_TEMPLATE_ID = '';
+const INTERNAL_ERROR_TEMPLATE_ID = '1007451652989283798';
 
 const OTP_MESSAGE =
   'Dear Customer, Your MoneyCash login OTP is <OTP>. Enter it to complete sign-in. Valid for 30 seconds. Do not share this code. Regards, MoneyCash';
@@ -22,7 +22,7 @@ const ESIGN_OTP_MESSAGE =
 
 const SHARED_BEARER_TOKEN = '2|0z2ssTUpIZyvSa06cj3VUzOI6QfynCLMMD6kWGG00b8b179d';
 
-const TECHNICAL_ISSUE_MESSAGE = 'Dear Customer, Thank you for your request. One of our representatives will contact you shortly for additional information. We appreciate your patience. Regards, MoneyCash'
+const TECHNICAL_ISSUE_MESSAGE = 'Dear Customer, Thank you for your request. One of our representatives will contact you shortly for additional information. We appreciate your patience. Regards, MoneyCash';
 
 export async function seedSmsTemplate(prisma: ReturnType<typeof createPrismaClient>) {
   await prisma.smsTemplate.upsert({
@@ -95,10 +95,10 @@ export async function seedSmsTemplate(prisma: ReturnType<typeof createPrismaClie
 
 
   await prisma.smsTemplate.upsert({
-    where: { templateId: TECHNICAL_ISSUE_MESSAGE_TEMPLATE_ID },
+    where: { templateId: INTERNAL_ERROR_TEMPLATE_ID },
     create: {
       product: TRANSACTIONAL_PRODUCT,
-      templateId: TECHNICAL_ISSUE_MESSAGE_TEMPLATE_ID,
+      templateId: INTERNAL_ERROR_TEMPLATE_ID,
       bearerToken: SHARED_BEARER_TOKEN,
       message: TECHNICAL_ISSUE_MESSAGE,
       isActive: true,
