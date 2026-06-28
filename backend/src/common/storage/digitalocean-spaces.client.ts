@@ -6,18 +6,22 @@ export type SpacesClientConfig = {
   bucket: string;
   accessKeyId: string;
   secretAccessKey: string;
+  /** Virtual-hosted-style hostname, e.g. `bucket.s3.ap-south-1.amazonaws.com`. */
+  host: string;
 };
+
+export type ObjectStorageProvider = 's3' | 'spaces';
 
 const EMPTY_PAYLOAD_HASH = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
 
 /**
- * Minimal S3-compatible client for DigitalOcean Spaces (no third-party SDK).
+ * Minimal S3-compatible client (AWS S3 or DigitalOcean Spaces, no third-party SDK).
  */
-export class DigitalOceanSpacesClient {
+export class S3CompatibleClient {
   constructor(private readonly config: SpacesClientConfig) {}
 
   private host(): string {
-    return `${this.config.bucket}.${this.config.region}.digitaloceanspaces.com`;
+    return this.config.host;
   }
 
   async putObject(key: string, body: Buffer, contentType: string, acl?: string): Promise<void> {
@@ -44,7 +48,7 @@ export class DigitalOceanSpacesClient {
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`Spaces PUT failed (${res.status}): ${text.slice(0, 500)}`);
+      throw new Error(`S3 PUT failed (${res.status}): ${text.slice(0, 500)}`);
     }
   }
 
@@ -62,7 +66,7 @@ export class DigitalOceanSpacesClient {
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`Spaces GET failed (${res.status}): ${text.slice(0, 500)}`);
+      throw new Error(`S3 GET failed (${res.status}): ${text.slice(0, 500)}`);
     }
     return Buffer.from(await res.arrayBuffer());
   }
@@ -82,7 +86,7 @@ export class DigitalOceanSpacesClient {
     if (res.status === 404) return false;
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`Spaces HEAD failed (${res.status}): ${text.slice(0, 500)}`);
+      throw new Error(`S3 HEAD failed (${res.status}): ${text.slice(0, 500)}`);
     }
     return true;
   }
@@ -180,6 +184,9 @@ function headerValue(headers: Record<string, string>, lowerName: string): string
   return (entry?.[1] ?? '').trim();
 }
 
+/** @deprecated Use `S3CompatibleClient`. */
+export const DigitalOceanSpacesClient = S3CompatibleClient;
+
 export function buildSpacesClientConfigFromEnv(): SpacesClientConfig | null {
   const bucket = (process.env.SPACES_BUCKET ?? '').trim();
   const accessKeyId = (process.env.SPACES_ACCESS_KEY_ID ?? '').trim();
@@ -189,7 +196,62 @@ export function buildSpacesClientConfigFromEnv(): SpacesClientConfig | null {
   if (!bucket || !accessKeyId || !secretAccessKey || !endpoint || !region) {
     return null;
   }
-  return { bucket, accessKeyId, secretAccessKey, endpoint, region };
+  return {
+    bucket,
+    accessKeyId,
+    secretAccessKey,
+    endpoint,
+    region,
+    host: `${bucket}.${region}.digitaloceanspaces.com`,
+  };
+}
+
+export function buildAwsS3ClientConfigFromEnv(): SpacesClientConfig | null {
+  const bucket = (process.env.S3_CUSTOMER_BUCKET ?? process.env.S3_BUCKET ?? '').trim();
+  const accessKeyId = (process.env.AWS_ACCESS_KEY_ID ?? '').trim();
+  const secretAccessKey = (process.env.AWS_SECRET_ACCESS_KEY ?? '').trim();
+  const region = (process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? '').trim();
+  if (!bucket || !accessKeyId || !secretAccessKey || !region) {
+    return null;
+  }
+  const endpoint = normalizeS3Endpoint(process.env.S3_ENDPOINT ?? '');
+  const host = endpoint ? hostFromEndpoint(endpoint) : `${bucket}.s3.${region}.amazonaws.com`;
+  return {
+    bucket,
+    accessKeyId,
+    secretAccessKey,
+    endpoint: endpoint || `https://${host}`,
+    region,
+    host,
+  };
+}
+
+export function buildObjectStorageClientConfigFromEnv(): {
+  config: SpacesClientConfig;
+  provider: ObjectStorageProvider;
+} | null {
+  const driver = (process.env.STORAGE_DRIVER ?? '').trim().toLowerCase();
+  if (driver === 's3' || driver === 'aws') {
+    const config = buildAwsS3ClientConfigFromEnv();
+    return config ? { config, provider: 's3' } : null;
+  }
+  if (driver === 'spaces' || driver === '') {
+    const config = buildSpacesClientConfigFromEnv();
+    return config ? { config, provider: 'spaces' } : null;
+  }
+  return null;
+}
+
+export function normalizeS3Endpoint(raw: string): string {
+  return normalizeSpacesEndpoint(raw);
+}
+
+function hostFromEndpoint(endpoint: string): string {
+  try {
+    return new URL(endpoint).hostname;
+  } catch {
+    return '';
+  }
 }
 
 export function normalizeSpacesEndpoint(raw: string): string {

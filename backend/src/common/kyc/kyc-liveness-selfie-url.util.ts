@@ -64,8 +64,8 @@ function signedVendorSelfieUrl(
  *
  * Priority:
  * 1. `KYC_LIVENESS_SELFIE_PUBLIC_BASE_URL` + relative selfie path (if public)
- * 2. `STORAGE_BASE_URL` + relative path (if public)
- * 3. DigitalOcean Spaces presigned URL (when `SPACES_*` is configured)
+ * 2. `S3_URL` or `STORAGE_BASE_URL` + relative path (if public)
+ * 3. S3/Spaces presigned URL (when object storage is configured)
  * 4. `BACKEND_PUBLIC_BASE_URL` + signed `GET /api/vendor/kyc/liveness-selfie?token=…`
  */
 export async function resolveKycLivenessSelfiePublicUrl(
@@ -86,7 +86,7 @@ export async function resolveKycLivenessSelfiePublicUrl(
     return { ok: false, error: 'Selfie path is missing.' };
   }
 
-  for (const envName of ['KYC_LIVENESS_SELFIE_PUBLIC_BASE_URL', 'STORAGE_BASE_URL'] as const) {
+  for (const envName of ['KYC_LIVENESS_SELFIE_PUBLIC_BASE_URL', 'S3_URL', 'STORAGE_BASE_URL'] as const) {
     const base = trimBase(process.env[envName] ?? '');
     if (!base) continue;
     const candidate = withVersion(`${base}/${rel}`);
@@ -114,7 +114,7 @@ export async function resolveKycLivenessSelfiePublicUrl(
     ok: false,
     error:
       'Set BACKEND_PUBLIC_BASE_URL to your public API origin (e.g. https://api.moneycash.in) so Tenacio can download the selfie. ' +
-      'Or configure DigitalOcean Spaces (SPACES_*) / STORAGE_BASE_URL for a public or presigned object URL.',
+      'Or configure object storage (STORAGE_DRIVER=s3 or spaces) / S3_URL for a public or presigned object URL.',
   };
 }
 

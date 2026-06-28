@@ -1,17 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { resolveSpacesKeyPrefix } from '../storage/spaces-key-prefix.util';
+import { resolveStorageKeyPrefix } from '../storage/spaces-key-prefix.util';
+import { resolveStoragePublicBaseUrl } from '../storage/spaces-public-read.util';
 import {
   normalizeObjectKey,
   SpacesObjectStorageService,
-  usesSpacesStorage,
+  usesRemoteObjectStorage,
 } from '../storage/spaces-object-storage.service';
 
 /**
  * Customer file storage (KYC photos, loan PDFs).
  *
- * When DigitalOcean Spaces is configured (`SPACES_*`), objects are stored in your Spaces bucket.
+ * When object storage is configured (`STORAGE_DRIVER=s3` or `spaces`), objects are stored in S3/Spaces.
  * Otherwise files are written under `KYC_FILES_ROOT` or `<cwd>/storage` for local development.
  *
  * Object keys (stored in DB) always use this layout:
@@ -26,17 +27,22 @@ import {
 export class KycFilesService {
   constructor(private readonly spaces: SpacesObjectStorageService) {}
 
-  usesSpaces(): boolean {
-    return usesSpacesStorage() && this.spaces.isConfigured();
+  usesObjectStorage(): boolean {
+    return usesRemoteObjectStorage() && this.spaces.isConfigured();
   }
 
-  /** Local disk root; mirrors Spaces prefix (`storage/local/customer/…`) when using shared bucket layout. */
+  /** @deprecated Use `usesObjectStorage`. */
+  usesSpaces(): boolean {
+    return this.usesObjectStorage();
+  }
+
+  /** Local disk root; mirrors storage prefix (`storage/local/customer/…`) when using shared bucket layout. */
   rootDir(): string {
     const raw = (process.env.KYC_FILES_ROOT ?? '').trim();
     if (raw) return path.resolve(raw);
     const base = path.join(process.cwd(), 'storage');
-    if (usesSpacesStorage()) {
-      return path.join(base, resolveSpacesKeyPrefix());
+    if (usesRemoteObjectStorage()) {
+      return path.join(base, resolveStorageKeyPrefix());
     }
     return base;
   }
@@ -48,7 +54,7 @@ export class KycFilesService {
 
   async writeBytes(relativePath: string, data: Buffer): Promise<void> {
     const key = normalizeObjectKey(relativePath);
-    if (this.usesSpaces()) {
+    if (this.usesObjectStorage()) {
       await this.spaces.putObject(key, data);
       return;
     }
@@ -59,7 +65,7 @@ export class KycFilesService {
 
   async readBytes(relativePath: string): Promise<Buffer> {
     const key = normalizeObjectKey(relativePath);
-    if (this.usesSpaces()) {
+    if (this.usesObjectStorage()) {
       return this.spaces.getObject(key);
     }
     return readFile(this.absolutePath(key));
@@ -67,7 +73,7 @@ export class KycFilesService {
 
   async exists(relativePath: string): Promise<boolean> {
     const key = normalizeObjectKey(relativePath);
-    if (this.usesSpaces()) {
+    if (this.usesObjectStorage()) {
       return this.spaces.exists(key);
     }
     try {
@@ -81,21 +87,21 @@ export class KycFilesService {
   /** Permanent public CDN URL, e.g. `https://mcashin.sgp1.cdn.digitaloceanspaces.com/local/customer/…` */
   publicReadUrl(relativePath: string): string | null {
     const key = normalizeObjectKey(relativePath);
-    if (this.usesSpaces()) {
+    if (this.usesObjectStorage()) {
       return this.spaces.publicObjectUrl(key);
     }
-    const base = (process.env.STORAGE_BASE_URL ?? '').trim().replace(/\/+$/, '');
+    const base = resolveStoragePublicBaseUrl();
     if (!base) return null;
     return `${base}/${key}`;
   }
 
   /**
-   * HTTPS URL Tenacio (or a browser) can fetch. With public Spaces, uses `STORAGE_BASE_URL` only.
+   * HTTPS URL Tenacio (or a browser) can fetch. With public object storage, uses `S3_URL` / `STORAGE_BASE_URL`.
    */
   async resolvePublicReadUrl(relativePath: string, expiresInSeconds?: number): Promise<string | null> {
     const publicUrl = this.publicReadUrl(relativePath);
     if (publicUrl) return publicUrl;
-    if (this.usesSpaces()) {
+    if (this.usesObjectStorage()) {
       return this.spaces.presignedGetUrl(relativePath, expiresInSeconds);
     }
     return null;

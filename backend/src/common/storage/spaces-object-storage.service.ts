@@ -1,48 +1,57 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
-  buildSpacesClientConfigFromEnv,
-  DigitalOceanSpacesClient,
+  buildObjectStorageClientConfigFromEnv,
+  S3CompatibleClient,
   inferRegionFromEndpoint,
   normalizeSpacesEndpoint,
 } from './digitalocean-spaces.client';
-import { resolveSpacesKeyPrefix, toPrefixedObjectKey } from './spaces-key-prefix.util';
-import { resolveSpacesObjectAcl, spacesUsesPublicRead } from './spaces-public-read.util';
+import { resolveStorageKeyPrefix, toPrefixedObjectKey } from './spaces-key-prefix.util';
+import {
+  resolveObjectStorageAcl,
+  objectStorageUsesPublicRead,
+  resolveStoragePublicBaseUrl,
+} from './spaces-public-read.util';
 
 /**
- * DigitalOcean Spaces object storage (S3-compatible API, native HTTP client).
- * Configure via `SPACES_*` env vars — data stays in your DO bucket, not AWS.
+ * S3-compatible object storage (AWS S3 or DigitalOcean Spaces, native HTTP client).
+ * Configure via `STORAGE_DRIVER=s3` + `AWS_*` / `S3_*`, or `STORAGE_DRIVER=spaces` + `SPACES_*`.
  */
 @Injectable()
 export class SpacesObjectStorageService {
   private readonly logger = new Logger(SpacesObjectStorageService.name);
-  private readonly client: DigitalOceanSpacesClient | null;
+  private readonly client: S3CompatibleClient | null;
   private readonly bucket: string;
   private readonly keyPrefix: string;
   private readonly presignedExpiresSec: number;
 
   constructor() {
-    const config = buildSpacesClientConfigFromEnv();
-    if (!config) {
+    const built = buildObjectStorageClientConfigFromEnv();
+    if (!built) {
       this.client = null;
       this.bucket = '';
       this.keyPrefix = '';
       this.presignedExpiresSec = 3600;
-      warnIfSpacesExpectedButMissing();
+      warnIfRemoteStorageExpectedButMissing();
       return;
     }
 
+    const { config, provider } = built;
     this.bucket = config.bucket;
-    this.keyPrefix = resolveSpacesKeyPrefix();
-    this.presignedExpiresSec = parsePositiveInt(process.env.SPACES_PRESIGNED_EXPIRES_SEC, 3600);
-    this.client = new DigitalOceanSpacesClient(config);
+    this.keyPrefix = resolveStorageKeyPrefix();
+    this.presignedExpiresSec = parsePositiveInt(
+      process.env.S3_PRESIGNED_EXPIRES_SEC ?? process.env.SPACES_PRESIGNED_EXPIRES_SEC,
+      3600,
+    );
+    this.client = new S3CompatibleClient(config);
 
+    const label = provider === 's3' ? 'AWS S3' : 'DigitalOcean Spaces';
     this.logger.log(
-      `DigitalOcean Spaces: bucket=${config.bucket} prefix=${this.keyPrefix}/ region=${config.region} publicRead=${spacesUsesPublicRead()}`,
+      `${label}: bucket=${config.bucket} prefix=${this.keyPrefix}/ region=${config.region} publicRead=${objectStorageUsesPublicRead()}`,
     );
   }
 
   usesPublicRead(): boolean {
-    return spacesUsesPublicRead();
+    return objectStorageUsesPublicRead();
   }
 
   /** Prefix folder inside the bucket, e.g. `local`, `staging`, `prod`. */
@@ -62,14 +71,13 @@ export class SpacesObjectStorageService {
     return this.bucket || null;
   }
 
-  /** Public CDN / bucket origin base (no trailing slash). */
+  /** Public CDN / bucket origin base (no trailing slash). Uses `S3_URL` or `STORAGE_BASE_URL`. */
   publicBaseUrl(): string | null {
-    const base = (process.env.STORAGE_BASE_URL ?? '').trim().replace(/\/+$/, '');
-    return base || null;
+    return resolveStoragePublicBaseUrl();
   }
 
   publicObjectUrl(relativePath: string): string | null {
-    if (!spacesUsesPublicRead()) return null;
+    if (!objectStorageUsesPublicRead()) return null;
     const base = this.publicBaseUrl();
     if (!base) return null;
     const rel = normalizeObjectKey(relativePath);
@@ -79,7 +87,7 @@ export class SpacesObjectStorageService {
   async putObject(relativePath: string, body: Buffer, contentType?: string): Promise<void> {
     const client = this.requireClient();
     const Key = this.toStorageKey(relativePath);
-    await client.putObject(Key, body, contentType ?? contentTypeForKey(Key), resolveSpacesObjectAcl());
+    await client.putObject(Key, body, contentType ?? contentTypeForKey(Key), resolveObjectStorageAcl());
   }
 
   async getObject(relativePath: string): Promise<Buffer> {
@@ -93,10 +101,10 @@ export class SpacesObjectStorageService {
   }
 
   async presignedGetUrl(relativePath: string, expiresInSeconds?: number): Promise<string> {
-    if (spacesUsesPublicRead()) {
+    if (objectStorageUsesPublicRead()) {
       const publicUrl = this.publicObjectUrl(relativePath);
       if (publicUrl) return publicUrl;
-      throw new Error('STORAGE_BASE_URL is required when SPACES_PUBLIC_READ is enabled.');
+      throw new Error('S3_URL or STORAGE_BASE_URL is required when object storage public read is enabled.');
     }
     const client = this.requireClient();
     return client.presignedGetUrl(
@@ -105,21 +113,28 @@ export class SpacesObjectStorageService {
     );
   }
 
-  private requireClient(): DigitalOceanSpacesClient {
+  private requireClient(): S3CompatibleClient {
     if (!this.client) {
       throw new Error(
-        'DigitalOcean Spaces is not configured. Set SPACES_BUCKET, SPACES_ACCESS_KEY_ID, SPACES_SECRET_ACCESS_KEY, SPACES_ENDPOINT, and SPACES_REGION.',
+        'Object storage is not configured. Set STORAGE_DRIVER=s3 with AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, and S3_CUSTOMER_BUCKET, or STORAGE_DRIVER=spaces with SPACES_* vars.',
       );
     }
     return this.client;
   }
 }
 
-export function usesSpacesStorage(): boolean {
+export function usesRemoteObjectStorage(): boolean {
   const driver = (process.env.STORAGE_DRIVER ?? '').trim().toLowerCase();
   if (driver === 'local') return false;
-  if (driver === 'spaces') return true;
-  return Boolean((process.env.SPACES_BUCKET ?? '').trim());
+  if (driver === 's3' || driver === 'aws' || driver === 'spaces') return true;
+  return Boolean(
+    (process.env.S3_CUSTOMER_BUCKET ?? process.env.S3_BUCKET ?? process.env.SPACES_BUCKET ?? '').trim(),
+  );
+}
+
+/** @deprecated Use `usesRemoteObjectStorage`. */
+export function usesSpacesStorage(): boolean {
+  return usesRemoteObjectStorage();
 }
 
 export function normalizeObjectKey(relativePath: string): string {
@@ -130,10 +145,16 @@ export function normalizeObjectKey(relativePath: string): string {
   return key;
 }
 
-function warnIfSpacesExpectedButMissing(): void {
+function warnIfRemoteStorageExpectedButMissing(): void {
   const driver = (process.env.STORAGE_DRIVER ?? '').trim().toLowerCase();
-  if (driver !== 'spaces') return;
+  if (driver !== 'spaces' && driver !== 's3' && driver !== 'aws') return;
   const logger = new Logger(SpacesObjectStorageService.name);
+  if (driver === 's3' || driver === 'aws') {
+    logger.warn(
+      'STORAGE_DRIVER=s3 but AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_REGION / S3_CUSTOMER_BUCKET are incomplete. Falling back to local disk.',
+    );
+    return;
+  }
   logger.warn(
     'STORAGE_DRIVER=spaces but SPACES_BUCKET / SPACES_ACCESS_KEY_ID / SPACES_SECRET_ACCESS_KEY / SPACES_ENDPOINT are incomplete. Falling back to local disk.',
   );
