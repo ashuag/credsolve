@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import {
   buildObjectStorageClientConfigFromEnv,
   S3CompatibleClient,
@@ -7,9 +7,10 @@ import {
 } from './digitalocean-spaces.client';
 import { resolveStorageKeyPrefix, toPrefixedObjectKey } from './spaces-key-prefix.util';
 import {
-  resolveObjectStorageAcl,
   objectStorageUsesPublicRead,
+  resolveObjectStorageAcl,
   resolveStoragePublicBaseUrl,
+  buildStoragePublicObjectUrl,
 } from './spaces-public-read.util';
 
 /**
@@ -17,12 +18,13 @@ import {
  * Configure via `STORAGE_DRIVER=s3` + `AWS_*` / `S3_*`, or `STORAGE_DRIVER=spaces` + `SPACES_*`.
  */
 @Injectable()
-export class SpacesObjectStorageService {
+export class SpacesObjectStorageService implements OnModuleInit {
   private readonly logger = new Logger(SpacesObjectStorageService.name);
   private readonly client: S3CompatibleClient | null;
   private readonly bucket: string;
   private readonly keyPrefix: string;
   private readonly presignedExpiresSec: number;
+  private readonly usesInstanceIamRole: boolean;
 
   constructor() {
     const built = buildObjectStorageClientConfigFromEnv();
@@ -31,6 +33,7 @@ export class SpacesObjectStorageService {
       this.bucket = '';
       this.keyPrefix = '';
       this.presignedExpiresSec = 3600;
+      this.usesInstanceIamRole = false;
       warnIfRemoteStorageExpectedButMissing();
       return;
     }
@@ -42,12 +45,30 @@ export class SpacesObjectStorageService {
       process.env.S3_PRESIGNED_EXPIRES_SEC ?? process.env.SPACES_PRESIGNED_EXPIRES_SEC,
       3600,
     );
+    this.usesInstanceIamRole = provider === 's3' && Boolean(config.getCredentials);
     this.client = new S3CompatibleClient(config);
 
     const label = provider === 's3' ? 'AWS S3' : 'DigitalOcean Spaces';
+    const authMode =
+      provider === 's3'
+        ? this.usesInstanceIamRole
+          ? 'auth=ec2-iam-role'
+          : 'auth=env-keys'
+        : 'auth=env-keys';
     this.logger.log(
-      `${label}: bucket=${config.bucket} prefix=${this.keyPrefix}/ region=${config.region} publicRead=${objectStorageUsesPublicRead()}`,
+      `${label}: bucket=${config.bucket} prefix=${this.keyPrefix}/ region=${config.region} ${authMode} publicRead=${objectStorageUsesPublicRead()}`,
     );
+  }
+
+  async onModuleInit(): Promise<void> {
+    if (!this.client || !this.usesInstanceIamRole) return;
+    try {
+      await this.client.verifyCredentials();
+      this.logger.log('AWS S3: EC2 instance IAM role credentials resolved successfully.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`AWS S3: instance IAM credentials unavailable at startup — ${message}`);
+    }
   }
 
   usesPublicRead(): boolean {
@@ -78,10 +99,7 @@ export class SpacesObjectStorageService {
 
   publicObjectUrl(relativePath: string): string | null {
     if (!objectStorageUsesPublicRead()) return null;
-    const base = this.publicBaseUrl();
-    if (!base) return null;
-    const rel = normalizeObjectKey(relativePath);
-    return `${base}/${rel}`;
+    return buildStoragePublicObjectUrl(relativePath, this.publicBaseUrl());
   }
 
   async putObject(relativePath: string, body: Buffer, contentType?: string): Promise<void> {
@@ -92,12 +110,37 @@ export class SpacesObjectStorageService {
 
   async getObject(relativePath: string): Promise<Buffer> {
     const client = this.requireClient();
-    return client.getObject(this.toStorageKey(relativePath));
+    return this.getObjectWithLegacyFallback(client, relativePath);
   }
 
   async exists(relativePath: string): Promise<boolean> {
     const client = this.requireClient();
-    return client.headObject(this.toStorageKey(relativePath));
+    return this.existsWithLegacyFallback(client, relativePath);
+  }
+
+  /** Try prefixed key first, then unprefixed (objects uploaded before `SPACES_KEY_PREFIX`). */
+  private async getObjectWithLegacyFallback(
+    client: S3CompatibleClient,
+    relativePath: string,
+  ): Promise<Buffer> {
+    const prefixedKey = this.toStorageKey(relativePath);
+    try {
+      return await client.getObject(prefixedKey);
+    } catch (err) {
+      if (!isNoSuchKeyError(err) || !this.keyPrefix) throw err;
+      const legacyKey = normalizeObjectKey(relativePath);
+      if (legacyKey === prefixedKey) throw err;
+      return client.getObject(legacyKey);
+    }
+  }
+
+  private async existsWithLegacyFallback(client: S3CompatibleClient, relativePath: string): Promise<boolean> {
+    const prefixedKey = this.toStorageKey(relativePath);
+    if (await client.headObject(prefixedKey)) return true;
+    if (!this.keyPrefix) return false;
+    const legacyKey = normalizeObjectKey(relativePath);
+    if (legacyKey === prefixedKey) return false;
+    return client.headObject(legacyKey);
   }
 
   async presignedGetUrl(relativePath: string, expiresInSeconds?: number): Promise<string> {
@@ -116,7 +159,7 @@ export class SpacesObjectStorageService {
   private requireClient(): S3CompatibleClient {
     if (!this.client) {
       throw new Error(
-        'Object storage is not configured. Set STORAGE_DRIVER=s3 with AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, and S3_CUSTOMER_BUCKET, or STORAGE_DRIVER=spaces with SPACES_* vars.',
+        'Object storage is not configured. Set STORAGE_DRIVER=s3 with AWS_REGION and S3_CUSTOMER_BUCKET (EC2 IAM role or AWS_ACCESS_KEY_ID), or STORAGE_DRIVER=spaces with SPACES_* vars.',
       );
     }
     return this.client;
@@ -151,7 +194,7 @@ function warnIfRemoteStorageExpectedButMissing(): void {
   const logger = new Logger(SpacesObjectStorageService.name);
   if (driver === 's3' || driver === 'aws') {
     logger.warn(
-      'STORAGE_DRIVER=s3 but AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_REGION / S3_CUSTOMER_BUCKET are incomplete. Falling back to local disk.',
+      'STORAGE_DRIVER=s3 but AWS_REGION / S3_CUSTOMER_BUCKET are incomplete. Falling back to local disk.',
     );
     return;
   }
@@ -171,6 +214,11 @@ function contentTypeForKey(key: string): string {
 function parsePositiveInt(raw: string | undefined, fallback: number): number {
   const n = Number.parseInt(raw ?? '', 10);
   return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function isNoSuchKeyError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes('NoSuchKey') || msg.includes('S3 GET failed (404)') || msg.includes('S3 HEAD failed (404)');
 }
 
 export { inferRegionFromEndpoint, normalizeSpacesEndpoint };

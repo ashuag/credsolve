@@ -1,5 +1,6 @@
 import type { KycFilesService } from './kyc-files.service';
 import { isPubliclyReachableHttpUrl } from './kyc-liveness-selfie-url.util';
+import { buildStoragePublicObjectUrl } from '../storage/spaces-public-read.util';
 
 export type KycPublicObjectUrlResult =
   | { ok: true; url: string }
@@ -21,10 +22,13 @@ export async function resolveKycPublicObjectUrl(
     return { ok: false, error: 'Object path is missing.' };
   }
 
-  for (const envName of ['KYC_LIVENESS_SELFIE_PUBLIC_BASE_URL', 'STORAGE_BASE_URL'] as const) {
+  for (const envName of ['KYC_LIVENESS_SELFIE_PUBLIC_BASE_URL', 'S3_URL', 'STORAGE_BASE_URL'] as const) {
     const base = trimBase(process.env[envName] ?? '');
     if (!base) continue;
-    const candidate = `${base}/${rel}`;
+    const candidate =
+      envName === 'KYC_LIVENESS_SELFIE_PUBLIC_BASE_URL'
+        ? `${base}/${rel}`
+        : (buildStoragePublicObjectUrl(rel, base) ?? `${base}/${rel}`);
     if (isPubliclyReachableHttpUrl(candidate)) {
       return { ok: true, url: candidate };
     }
@@ -43,7 +47,7 @@ export async function resolveKycPublicObjectUrl(
   return {
     ok: false,
     error:
-      'Configure a public object URL (STORAGE_BASE_URL / DigitalOcean Spaces) so Tenacio can download the image.',
+      'Configure a public object URL (S3_URL / STORAGE_BASE_URL) or object storage presigned URLs so Tenacio can download the image.',
   };
 }
 

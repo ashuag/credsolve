@@ -1,13 +1,19 @@
 import { createHash, createHmac } from 'node:crypto';
+import { resolveAwsSigningCredentials, type AwsSigningCredentials } from './aws-instance-credentials.util';
+
+export type { AwsSigningCredentials };
 
 export type SpacesClientConfig = {
   endpoint: string;
   region: string;
   bucket: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-  /** Virtual-hosted-style hostname, e.g. `bucket.s3.ap-south-1.amazonaws.com`. */
   host: string;
+  /** Static credentials (Spaces or local dev). Omit when `getCredentials` is set. */
+  accessKeyId?: string;
+  secretAccessKey?: string;
+  sessionToken?: string;
+  /** EC2/ECS IAM role — used when static keys are not in env. */
+  getCredentials?: () => Promise<AwsSigningCredentials>;
 };
 
 export type ObjectStorageProvider = 's3' | 'spaces';
@@ -35,11 +41,13 @@ export class S3CompatibleClient {
     if (acl?.trim()) {
       headers['x-amz-acl'] = acl.trim();
     }
+    const creds = await this.resolveCredentials();
     const signed = this.signRequest({
       method: 'PUT',
       path,
       headers,
       payloadHash,
+      credentials: creds,
     });
     const res = await fetch(`https://${this.host()}${path}`, {
       method: 'PUT',
@@ -54,11 +62,13 @@ export class S3CompatibleClient {
 
   async getObject(key: string): Promise<Buffer> {
     const path = `/${encodeObjectKey(key)}`;
+    const creds = await this.resolveCredentials();
     const signed = this.signRequest({
       method: 'GET',
       path,
       headers: { host: this.host() },
       payloadHash: EMPTY_PAYLOAD_HASH,
+      credentials: creds,
     });
     const res = await fetch(`https://${this.host()}${path}`, {
       method: 'GET',
@@ -73,11 +83,13 @@ export class S3CompatibleClient {
 
   async headObject(key: string): Promise<boolean> {
     const path = `/${encodeObjectKey(key)}`;
+    const creds = await this.resolveCredentials();
     const signed = this.signRequest({
       method: 'HEAD',
       path,
       headers: { host: this.host() },
       payloadHash: EMPTY_PAYLOAD_HASH,
+      credentials: creds,
     });
     const res = await fetch(`https://${this.host()}${path}`, {
       method: 'HEAD',
@@ -91,7 +103,8 @@ export class S3CompatibleClient {
     return true;
   }
 
-  presignedGetUrl(key: string, expiresInSeconds: number): string {
+  async presignedGetUrl(key: string, expiresInSeconds: number): Promise<string> {
+    const creds = await this.resolveCredentials();
     const now = new Date();
     const amzDate = toAmzDate(now);
     const dateStamp = amzDate.slice(0, 8);
@@ -101,11 +114,14 @@ export class S3CompatibleClient {
 
     const query: Record<string, string> = {
       'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
-      'X-Amz-Credential': `${this.config.accessKeyId}/${credentialScope}`,
+      'X-Amz-Credential': `${creds.accessKeyId}/${credentialScope}`,
       'X-Amz-Date': amzDate,
       'X-Amz-Expires': String(expiresInSeconds),
       'X-Amz-SignedHeaders': 'host',
     };
+    if (creds.sessionToken) {
+      query['X-Amz-Security-Token'] = creds.sessionToken;
+    }
 
     const canonicalQuery = Object.keys(query)
       .sort()
@@ -125,10 +141,31 @@ export class S3CompatibleClient {
       sha256Hex(canonicalRequest),
     ].join('\n');
 
-    const signingKey = getSigningKey(this.config.secretAccessKey, dateStamp, this.config.region, 's3');
+    const signingKey = getSigningKey(creds.secretAccessKey, dateStamp, this.config.region, 's3');
     const signature = hmacHex(signingKey, stringToSign);
 
     return `https://${host}${path}?${canonicalQuery}&X-Amz-Signature=${signature}`;
+  }
+
+  private async resolveCredentials(): Promise<AwsSigningCredentials> {
+    if (this.config.getCredentials) {
+      return this.config.getCredentials();
+    }
+    const accessKeyId = this.config.accessKeyId?.trim();
+    const secretAccessKey = this.config.secretAccessKey?.trim();
+    if (!accessKeyId || !secretAccessKey) {
+      throw new Error('S3 credentials are not configured.');
+    }
+    return {
+      accessKeyId,
+      secretAccessKey,
+      sessionToken: this.config.sessionToken?.trim() || undefined,
+    };
+  }
+
+  /** Startup probe for EC2 IAM role credentials. */
+  async verifyCredentials(): Promise<void> {
+    await this.resolveCredentials();
   }
 
   private signRequest(params: {
@@ -136,6 +173,7 @@ export class S3CompatibleClient {
     path: string;
     headers: Record<string, string>;
     payloadHash: string;
+    credentials: AwsSigningCredentials;
   }): Record<string, string> {
     const now = new Date();
     const amzDate = toAmzDate(now);
@@ -147,6 +185,9 @@ export class S3CompatibleClient {
       'x-amz-date': amzDate,
       'x-amz-content-sha256': params.payloadHash,
     };
+    if (params.credentials.sessionToken) {
+      headers['x-amz-security-token'] = params.credentials.sessionToken;
+    }
 
     const sortedNames = Object.keys(headers)
       .map((k) => k.toLowerCase())
@@ -171,9 +212,9 @@ export class S3CompatibleClient {
       sha256Hex(canonicalRequest),
     ].join('\n');
 
-    const signingKey = getSigningKey(this.config.secretAccessKey, dateStamp, this.config.region, 's3');
+    const signingKey = getSigningKey(params.credentials.secretAccessKey, dateStamp, this.config.region, 's3');
     const signature = hmacHex(signingKey, stringToSign);
-    const authorization = `AWS4-HMAC-SHA256 Credential=${this.config.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+    const authorization = `AWS4-HMAC-SHA256 Credential=${params.credentials.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
     return { ...headers, Authorization: authorization };
   }
@@ -208,21 +249,33 @@ export function buildSpacesClientConfigFromEnv(): SpacesClientConfig | null {
 
 export function buildAwsS3ClientConfigFromEnv(): SpacesClientConfig | null {
   const bucket = (process.env.S3_CUSTOMER_BUCKET ?? process.env.S3_BUCKET ?? '').trim();
-  const accessKeyId = (process.env.AWS_ACCESS_KEY_ID ?? '').trim();
-  const secretAccessKey = (process.env.AWS_SECRET_ACCESS_KEY ?? '').trim();
   const region = (process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? '').trim();
-  if (!bucket || !accessKeyId || !secretAccessKey || !region) {
+  if (!bucket || !region) {
     return null;
   }
   const endpoint = normalizeS3Endpoint(process.env.S3_ENDPOINT ?? '');
   const host = endpoint ? hostFromEndpoint(endpoint) : `${bucket}.s3.${region}.amazonaws.com`;
-  return {
+  const base = {
     bucket,
-    accessKeyId,
-    secretAccessKey,
-    endpoint: endpoint || `https://${host}`,
     region,
+    endpoint: endpoint || `https://${host}`,
     host,
+  };
+
+  const accessKeyId = (process.env.AWS_ACCESS_KEY_ID ?? '').trim();
+  const secretAccessKey = (process.env.AWS_SECRET_ACCESS_KEY ?? '').trim();
+  if (accessKeyId && secretAccessKey) {
+    return {
+      ...base,
+      accessKeyId,
+      secretAccessKey,
+      sessionToken: (process.env.AWS_SESSION_TOKEN ?? '').trim() || undefined,
+    };
+  }
+
+  return {
+    ...base,
+    getCredentials: resolveAwsSigningCredentials,
   };
 }
 

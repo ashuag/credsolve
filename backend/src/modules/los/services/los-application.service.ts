@@ -17,6 +17,51 @@ function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
 }
 
+const loanDocumentApplicationSelect = {
+  id: true,
+  uuid: true,
+  email: true,
+  emailVerificationType: true,
+  loanDocumentsAcceptedAt: true,
+  keyFactPdfRelativePath: true,
+  keyFactEsigned: true,
+  loanAgreementPdfRelativePath: true,
+  agreement: {
+    select: {
+      ipAddress: true,
+      signedAt: true,
+    },
+  },
+  details: {
+    select: {
+      loanAmount: true,
+      loanTenure: true,
+      loanMaturityDate: true,
+      interestRate: true,
+      interestAmount: true,
+      processingFee: true,
+      processingFeeAmount: true,
+      gstAmount: true,
+      reasonForLoan: { select: { name: true } },
+    },
+  },
+  customer: { select: { id: true, uuid: true, mobileNumber: true } },
+  lead: {
+    select: {
+      panNumber: true,
+      leadDetail: {
+        select: {
+          fullName: true,
+          addressLine1: true,
+          addressLine2: true,
+          pincode: true,
+          city: { select: { name: true } },
+        },
+      },
+    },
+  },
+} as const;
+
 function sumDecimalAmounts(parts: Array<Prisma.Decimal | null | undefined>): string | null {
   let total = 0;
   let any = false;
@@ -507,14 +552,48 @@ export class LosApplicationService {
 
     const application = await this.prisma.client.application.findUnique({
       where: { uuid: applicationUuid },
-      select: { keyFactPdfRelativePath: true, loanAgreementPdfRelativePath: true },
+      select: loanDocumentApplicationSelect,
     });
     if (!application) throw new NotFoundException('Application not found.');
 
-    const rel = this.loanDocs.relativePathForType(docType, application)?.trim() ?? null;
-    if (!rel) throw new NotFoundException('This document has not been generated yet.');
+    const existing = this.loanDocs.relativePathForType(docType, application);
+    const canGenerate = Boolean(application.details?.loanAmount && application.details?.loanTenure);
 
-    const buf = await this.kycFiles.readBytes(rel);
+    let rel: string;
+    if (canGenerate) {
+      const merge = this.loanDocs.buildMergeInput({
+        customer: application.customer,
+        lead: application.lead,
+        application,
+      });
+      rel = await this.loanDocs.ensurePdf(
+        docType,
+        application.customer.uuid,
+        application.uuid,
+        application.id,
+        merge,
+        existing,
+        false,
+        application.loanDocumentsAcceptedAt != null,
+      );
+    } else {
+      rel = existing?.trim() ?? '';
+      if (!rel) throw new NotFoundException('This document has not been generated yet.');
+      if (!(await this.kycFiles.exists(rel))) {
+        throw new NotFoundException('Document file is missing from storage. Complete loan selection and regenerate.');
+      }
+    }
+
+    let buf: Buffer;
+    try {
+      buf = await this.kycFiles.readBytes(rel);
+    } catch (err) {
+      if (isStorageObjectMissing(err)) {
+        throw new NotFoundException('Document file is missing from storage. Regenerate it from the application review panel.');
+      }
+      throw err;
+    }
+
     const title = this.loanDocs.documentTitle(docType);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${title}.pdf"`);
@@ -583,50 +662,7 @@ export class LosApplicationService {
   async generateLoanDocuments(applicationUuid: string) {
     const application = await this.prisma.client.application.findUnique({
       where: { uuid: applicationUuid },
-      select: {
-        id: true,
-        uuid: true,
-        email: true,
-        emailVerificationType: true,
-        loanDocumentsAcceptedAt: true,
-        keyFactPdfRelativePath: true,
-        keyFactEsigned: true,
-        loanAgreementPdfRelativePath: true,
-        agreement: {
-          select: {
-            ipAddress: true,
-            signedAt: true,
-          },
-        },
-        details: {
-          select: {
-            loanAmount: true,
-            loanTenure: true,
-            loanMaturityDate: true,
-            interestRate: true,
-            interestAmount: true,
-            processingFee: true,
-            processingFeeAmount: true,
-            gstAmount: true,
-            reasonForLoan: { select: { name: true } },
-          },
-        },
-        customer: { select: { id: true, uuid: true, mobileNumber: true } },
-        lead: {
-          select: {
-            panNumber: true,
-            leadDetail: {
-              select: {
-                fullName: true,
-                addressLine1: true,
-                addressLine2: true,
-                pincode: true,
-                city: { select: { name: true } },
-              },
-            },
-          },
-        },
-      },
+      select: loanDocumentApplicationSelect,
     });
 
     if (!application) throw new NotFoundException(`Application ${applicationUuid} not found`);
@@ -656,4 +692,9 @@ export class LosApplicationService {
 
     return { applicationUuid, generated };
   }
+}
+
+function isStorageObjectMissing(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes('NoSuchKey') || msg.includes('S3 GET failed (404)') || msg.includes('S3 HEAD failed (404)');
 }

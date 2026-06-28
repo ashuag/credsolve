@@ -1,6 +1,7 @@
 import type { KycFilesService } from './kyc-files.service';
 import { appendPhotoCacheBuster } from './kyc-photo-url.util';
 import { createKycLivenessSelfieAccessToken } from './kyc-liveness-selfie-token.util';
+import { buildStoragePublicObjectUrl } from '../storage/spaces-public-read.util';
 
 export type KycLivenessSelfieUrlResult =
   | { ok: true; url: string }
@@ -89,7 +90,11 @@ export async function resolveKycLivenessSelfiePublicUrl(
   for (const envName of ['KYC_LIVENESS_SELFIE_PUBLIC_BASE_URL', 'S3_URL', 'STORAGE_BASE_URL'] as const) {
     const base = trimBase(process.env[envName] ?? '');
     if (!base) continue;
-    const candidate = withVersion(`${base}/${rel}`);
+    const candidate = withVersion(
+      envName === 'KYC_LIVENESS_SELFIE_PUBLIC_BASE_URL'
+        ? `${base}/${rel}`
+        : (buildStoragePublicObjectUrl(rel, base) ?? `${base}/${rel}`),
+    );
     if (isPubliclyReachableHttpUrl(candidate)) {
       return { ok: true, url: candidate };
     }
