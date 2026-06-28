@@ -91,6 +91,9 @@ export class ApplicationRepository {
       where: { id: params.applicationId },
       data: {
         selfieRelativePath: params.selfieRelativePath,
+        selfieFaceValidationJson: Prisma.JsonNull,
+        selfieFaceValidationPassed: false,
+        selfieFaceValidationCheckedAt: null,
         livenessPassed: false,
         livenessDone: false,
         livenessDoneAt: null,
@@ -98,6 +101,25 @@ export class ApplicationRepository {
         livenessVendorJson: Prisma.JsonNull,
         kycStatus: APPLICATION_KYC_STATUS.NOT_DONE,
         kycCompletedAt: null,
+      },
+    });
+  }
+
+  async updateSelfieFaceValidation(
+    params: {
+      applicationId: bigint;
+      selfieFaceValidationJson: Prisma.InputJsonValue;
+      passed: boolean;
+      checkedAt: Date;
+    },
+    tx?: DbClient,
+  ) {
+    return this.db(tx).application.update({
+      where: { id: params.applicationId },
+      data: {
+        selfieFaceValidationJson: params.selfieFaceValidationJson,
+        selfieFaceValidationPassed: params.passed,
+        selfieFaceValidationCheckedAt: params.checkedAt,
       },
     });
   }

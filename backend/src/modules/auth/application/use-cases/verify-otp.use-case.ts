@@ -10,6 +10,7 @@ import type { VerifyOtpDto } from '../dto/verify-otp.dto';
 import type { VerifyOtpResult } from '../contracts/verify-otp-result.contract';
 import type { CustomerSessionPayload } from '../contracts/customer-session-payload.contract';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
+import { canReapplyAfterRejection } from '../../../../common/lead/lead-reapply-policy.util';
 import { OTP_TYPE } from '../../../../common/constants/otp.constants';
 import { CustomerSessionService } from '../../infrastructure/session/customer-session.service';
 import { safeEqualOtp } from '../../infrastructure/crypto/otp-compare.util';
@@ -55,7 +56,10 @@ export class VerifyOtpUseCase {
     return this.verifyEmail(dto, customerSession);
   }
 
-  private async verifyMobile(dto: VerifyOtpDto, meta?: VerifyOtpSessionMeta): Promise<VerifyOtpResult> {
+  private async verifyMobile(
+    dto: VerifyOtpDto, 
+    meta?: VerifyOtpSessionMeta
+  ): Promise<VerifyOtpResult> {
     const settings = await this.settingsRepository.loadAuthOtpSettings();
     const otpType = await this.otpTypes.findActiveByName(undefined, OTP_TYPE.MOBILE);
     if (!otpType) {
@@ -70,8 +74,7 @@ export class VerifyOtpUseCase {
 
     const given = dto.otpCode.trim().padStart(settings.otpLength, '0');
     if (!safeEqualOtp(request.otpCode, given)) {
-      await this.otpRequests.incrementAttempts(undefined, request.id);
-      throw new BadRequestException('Incorrect OTP. Please try again.');
+      await this.registerFailedAttempt(request, settings);
     }
 
     const verifiedAt = new Date();
@@ -94,6 +97,19 @@ export class VerifyOtpUseCase {
       leadExpireAt.setUTCDate(leadExpireAt.getUTCDate() + settings.leadExpireDays);
 
       let recentLead = await this.leads.findActiveByCustomerId(cust.id, tx);
+
+      if (recentLead) {
+        const statusName = recentLead.leadStatus.name;
+        if (statusName === LEAD_STATUS.REJECTED || statusName === LEAD_STATUS.BLACKLISTED) {
+          if (canReapplyAfterRejection(recentLead, leadPolicy)) {
+            await this.leads.deactivate(recentLead.id, tx);
+            recentLead = null;
+          }
+        } else if (this.shouldDeactivateForNewApplication(recentLead)) {
+          await this.leads.deactivate(recentLead.id, tx);
+          recentLead = null;
+        }
+      }
 
       if (!recentLead) {
         recentLead = await this.leads.createForCustomer(
@@ -191,8 +207,7 @@ export class VerifyOtpUseCase {
 
     const given = dto.otpCode.trim().padStart(settings.otpLength, '0');
     if (!safeEqualOtp(request.otpCode, given)) {
-      await this.otpRequests.incrementAttempts(undefined, request.id);
-      throw new BadRequestException('Incorrect OTP. Please try again.');
+      await this.registerFailedAttempt(request, settings);
     }
 
     const verifiedAt = new Date();
@@ -223,10 +238,9 @@ export class VerifyOtpUseCase {
     };
   }
 
-  /** Old REJECTED / BLACKLISTED / CONVERTED leads should be deactivated to make room for a new one. */
-  private shouldDeactivate(lead: { leadStatus: { name: string } }): boolean {
-    const s = lead.leadStatus.name;
-    return s === LEAD_STATUS.REJECTED || s === LEAD_STATUS.BLACKLISTED || s === LEAD_STATUS.CONVERTED;
+  /** Old CONVERTED leads should be deactivated to make room for a new application. */
+  private shouldDeactivateForNewApplication(lead: { leadStatus: { name: string } }): boolean {
+    return lead.leadStatus.name === LEAD_STATUS.CONVERTED;
   }
 
   /**
@@ -290,13 +304,38 @@ export class VerifyOtpUseCase {
 
   private assertOtpWindow(
     request: { expiresAt: Date; attemptCount: number },
-    settings: { otpMaxAttempts: number }
+    settings: { otpMaxAttempts: number; otpResendCooldownSeconds: number }
   ) {
     if (request.expiresAt.getTime() <= Date.now()) {
       throw new BadRequestException('This OTP has expired. Request a new code.');
     }
     if (request.attemptCount >= settings.otpMaxAttempts) {
-      throw new BadRequestException('Too many incorrect attempts. Request a new OTP.');
+      throw new BadRequestException(
+        `Too many incorrect attempts. Please wait ${settings.otpResendCooldownSeconds} seconds before requesting a new OTP.`
+      );
     }
+  }
+
+  /**
+   * Record a wrong-OTP attempt. Once `otpMaxAttempts` is reached without a successful
+   * verification, further verification is blocked; the matching `send-otp` cooldown then
+   * prevents a fresh OTP from being requested for `otpResendCooldownSeconds`.
+   */
+  private async registerFailedAttempt(
+    request: { id: number; attemptCount: number },
+    settings: { otpMaxAttempts: number; otpResendCooldownSeconds: number }
+  ): Promise<never> {
+    const updated = await this.otpRequests.incrementAttempts(undefined, request.id);
+
+    if (updated.attemptCount >= settings.otpMaxAttempts) {
+      throw new BadRequestException(
+        `Too many incorrect attempts. Please wait ${settings.otpResendCooldownSeconds} seconds before requesting a new OTP.`
+      );
+    }
+
+    const remainingAttempts = settings.otpMaxAttempts - updated.attemptCount;
+    throw new BadRequestException(
+      `Incorrect OTP. You have ${remainingAttempts} attempt${remainingAttempts === 1 ? '' : 's'} left.`
+    );
   }
 }

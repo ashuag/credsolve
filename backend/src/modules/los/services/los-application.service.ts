@@ -5,6 +5,8 @@ import { BureauReportPdfService } from '../../../common/cibil/bureau-report-pdf.
 import { isDigilockerAadhaarCaptureComplete } from '../../../common/kyc/aadhaar-vendor-parse.util';
 import { extractProfileFromDigilockerFormJson } from '../../../common/kyc/digilocker-form-profile.util';
 import { appendPhotoCacheBuster } from '../../../common/kyc/kyc-photo-url.util';
+import { buildLivenessVendorSummary } from '../../../common/kyc/kyc-liveness-summary.util';
+import { parsePersistedSelfieFaceValidation } from '../../../common/kyc/kyc-selfie-face-inspection-persist.util';
 import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
@@ -137,7 +139,15 @@ export class LosApplicationService {
       orderBy: { createdAt: 'desc' },
       include: {
         customer: { select: { uuid: true, mobileNumber: true } },
-        lead: { select: { uuid: true, leadDetail: { select: { fullName: true } } } },
+        lead: {
+          select: {
+            uuid: true,
+            leadStatusNote: true,
+            leadDetail: { select: { fullName: true } },
+            leadStatus: { select: { name: true, displayName: true } },
+            rejectionReason: { select: { name: true } },
+          },
+        },
         applicationStatus: { select: { name: true, displayName: true } },
         details: {
           select: {
@@ -192,6 +202,18 @@ export class LosApplicationService {
         ),
         statusCode: application.applicationStatus.name,
         statusLabel: displayName(application.applicationStatus.name, application.applicationStatus.displayName),
+        leadStatusCode: application.lead.leadStatus.name,
+        leadStatusLabel: displayName(application.lead.leadStatus.name, application.lead.leadStatus.displayName),
+        leadRejectionReason: application.lead.rejectionReason
+          ? {
+              code: application.lead.rejectionReason.name,
+              label: application.lead.rejectionReason.name.replace(/_/g, ' '),
+            }
+          : null,
+        leadStatusNote: application.lead.leadStatusNote?.trim() || null,
+        kycStatus: application.kycStatus,
+        kycStatusLabel: applicationKycStatusLabel(application.kycStatus),
+        kycCompleted: application.kycStatus === 1,
         createdAt: application.createdAt.toISOString(),
         updatedAt: application.updatedAt.toISOString(),
       };
@@ -206,6 +228,7 @@ export class LosApplicationService {
         lead: {
           include: {
             leadStatus: { select: { name: true, displayName: true } },
+            rejectionReason: { select: { name: true } },
             source: { select: { name: true, type: true } },
             leadReferences: {
               orderBy: { referenceIndex: 'asc' },
@@ -219,8 +242,8 @@ export class LosApplicationService {
             leadDetail: {
               include: {
                 city: { select: { name: true, state: { select: { name: true, code: true } } } },
-                gender: { select: { name: true } },
-                occupation: { select: { name: true } },
+                gender: { select: { name: true, key: true } },
+                occupation: { select: { name: true, key: true } },
               },
             },
             leadUtms: { orderBy: { createdAt: 'desc' } },
@@ -289,6 +312,16 @@ export class LosApplicationService {
       kycCompletedAt: application.kycCompletedAt?.toISOString() ?? null,
       livenessPassed: application.livenessPassed,
       livenessCheckedAt: application.livenessCheckedAt?.toISOString() ?? null,
+      selfieFaceValidation: parsePersistedSelfieFaceValidation(
+        application.selfieFaceValidationJson,
+        application.selfieFaceValidationPassed,
+        application.selfieFaceValidationCheckedAt,
+      ),
+      livenessSummary: buildLivenessVendorSummary({
+        passed: application.livenessPassed,
+        checkedAt: application.livenessCheckedAt,
+        vendor: application.livenessVendorJson,
+      }),
       kycPhotos: {
         selfiePath: selfieRelativePath,
         aadhaarPhotoPath: aadhaarPhotoRelativePath,
@@ -309,6 +342,12 @@ export class LosApplicationService {
         leadStatusNote: lead.leadStatusNote?.trim() || null,
         bureauFetchedNote: lead.bureauFetchedNote?.trim() || null,
         bureauFetched: lead.bureauFetched,
+        rejectionReason: lead.rejectionReason
+          ? {
+              code: lead.rejectionReason.name,
+              label: lead.rejectionReason.name.replace(/_/g, ' '),
+            }
+          : null,
         sourceName: lead.source?.name ?? null,
         sourceType: lead.source?.type ?? null,
         utms: lead.leadUtms.map((utm) => ({
@@ -333,7 +372,9 @@ export class LosApplicationService {
               state: detail.city?.state?.name ?? null,
               stateCode: detail.city?.state?.code ?? null,
               gender: detail.gender?.name ?? null,
+              genderKey: detail.gender?.key ?? null,
               occupation: detail.occupation?.name ?? null,
+              occupationKey: detail.occupation?.key ?? null,
               netMonthlyIncome: detail.netMonthlyIncome?.toString() ?? null,
               annualTurnover: detail.annualTurnover?.toString() ?? null,
               annualProfit: detail.annualProfit?.toString() ?? null,

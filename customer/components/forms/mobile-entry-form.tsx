@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import { sendCustomerOtp, type SendOtpResponse } from '@/lib/api/auth';
+import { isVpnBlockedError } from '@/lib/api/client';
 import { isValidCustomerMobile, normalizeCustomerMobile } from '@/lib/mobile';
 
 const MOBILE_ERROR = 'Please enter a valid mobile number.';
@@ -10,6 +11,7 @@ const MOBILE_ERROR = 'Please enter a valid mobile number.';
 export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOtpResponse) => void }) {
   const [mobileNumber, setMobileNumber] = useState('');
   const [error, setError] = useState('');
+  const [vpnBlocked, setVpnBlocked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -34,12 +36,14 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
 
     setIsSubmitting(true);
     setError('');
+    setVpnBlocked(false);
 
     try {
       const otpRequest = await sendCustomerOtp(normalizedMobile);
 
       onSuccess?.(otpRequest);
     } catch (submissionError) {
+      setVpnBlocked(isVpnBlockedError(submissionError));
       setError(submissionError instanceof Error ? submissionError.message : 'Unable to send OTP right now. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -101,7 +105,24 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
       <span id="mobile-help-sr" className="sr-only">
         We send a one-time 6-digit code by SMS to verify your mobile number.
       </span>
-      {error ? (
+      {error && vpnBlocked ? (
+        <div
+          id="mobile-error"
+          role="alert"
+          className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-[0.88rem] leading-[1.5] text-amber-900"
+        >
+          <svg className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+            <path d="M12 9v4m0 4h.01M10.29 3.86l-8.18 14A2 2 0 003.83 21h16.34a2 2 0 001.72-3.14l-8.18-14a2 2 0 00-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <div>
+            <p className="m-0 font-bold">VPN / proxy detected</p>
+            <p className="m-0 mt-0.5">{error}</p>
+            <p className="m-0 mt-1.5 text-[0.78rem] font-semibold text-amber-700">
+              Turn off your VPN or proxy app, then tap Get OTP again.
+            </p>
+          </div>
+        </div>
+      ) : error ? (
         <div id="mobile-error" className="text-[0.9rem] leading-[1.55] text-[#b2372d]">
           {error}
         </div>

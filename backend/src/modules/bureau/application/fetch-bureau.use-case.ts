@@ -7,7 +7,12 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { BureauFetchService } from '../../../common/vendor/bureau-fetch.service';
-import { parseTenacioBureauVendorBody } from '../../../common/vendor/tenacio-bureau-payload.mapper';
+import {
+  isTenacioBureauClientError,
+  isTenacioBureauSuccessPayload,
+  parseTenacioBureauEnvelope,
+  parseTenacioBureauVendorBody,
+} from '../../../common/vendor/tenacio-bureau-payload.mapper';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { BureauReportPdfService } from '../../../common/cibil/bureau-report-pdf.service';
 import { BureauReportRepository } from '../../auth/infrastructure/repositories/bureau-report.repository';
@@ -50,7 +55,7 @@ export class FetchBureauUseCase {
       };
     }
 
-    if (out.ok && leadId != null) {
+    if (out.ok && leadId != null && out.vendorBody != null && isTenacioBureauSuccessPayload(out.vendorBody)) {
       const lead = await this.prisma.client.lead.findUnique({
         where: { id: leadId },
         select: { customerId: true, customer: { select: { uuid: true } } },
@@ -80,11 +85,18 @@ export class FetchBureauUseCase {
       }
     }
 
+    const envelope = out.vendorBody != null ? parseTenacioBureauEnvelope(out.vendorBody) : null;
+    const bureauClientError =
+      envelope != null && isTenacioBureauClientError(envelope.serviceStatusCode);
+
     return {
-      success: out.ok,
+      success: out.ok && !bureauClientError && (out.vendorBody == null || isTenacioBureauSuccessPayload(out.vendorBody)),
       configured: true,
       leadId: leadId?.toString() ?? null,
       httpStatus: out.httpStatus,
+      serviceStatusCode: envelope?.serviceStatusCode ?? null,
+      serviceErrorMessage: envelope?.serviceErrorMessage ?? null,
+      bureauClientError,
       vendor: out.vendorBody,
       transportError: out.error?.message ?? null,
     };

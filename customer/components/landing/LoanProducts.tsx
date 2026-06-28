@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { buildHrefWithSearch } from '@/lib/navigation';
+import { resolveLandingLoanPurpose } from '@/lib/loan-purpose-selection';
 import { useScrollReveal } from '@/lib/hooks/use-scroll-reveal';
 
 const LOAN_TYPES = [
@@ -53,9 +54,20 @@ const LOAN_TYPES = [
   },
 ];
 
+function buildApplyHref(
+  searchParams: ReturnType<typeof useSearchParams>,
+  loanProductId: string,
+) {
+  const loanPurpose = resolveLandingLoanPurpose(loanProductId);
+  return buildHrefWithSearch(
+    '/apply-for-loan',
+    searchParams,
+    loanPurpose ? { loanPurpose } : undefined,
+  );
+}
+
 export function LoanProducts() {
   const searchParams = useSearchParams();
-  const applyHref = buildHrefWithSearch('/apply-for-loan', searchParams);
   const sectionRef = useScrollReveal();
 
   return (
@@ -89,7 +101,10 @@ export function LoanProducts() {
 
         {/* Cards */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
-          {LOAN_TYPES.map((loan, idx) => (
+          {LOAN_TYPES.map((loan, idx) => {
+            const applyHref = buildApplyHref(searchParams, loan.id);
+
+            return (
             <div
               key={loan.id}
               className={`reveal group flex flex-col overflow-hidden rounded-3xl border shadow-[0_4px_24px_rgba(18,36,79,0.06)] transition-all duration-300 hover:-translate-y-2.5 hover:shadow-[0_20px_48px_rgba(18,36,79,0.14)] stagger-${Math.min(idx + 1, 6)}`}
@@ -147,7 +162,8 @@ export function LoanProducts() {
                 </Link>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         <p className="reveal mt-10 text-center text-[0.65rem] font-semibold text-[#12244f]/30 stagger-6">

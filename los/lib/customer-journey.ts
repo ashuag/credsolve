@@ -93,8 +93,9 @@ export function buildLeadIntakeJourney(lead: LosLeadDetails): JourneyStep[] {
 /** Full customer journey on an application workspace (matches customer portal order). */
 export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep[] {
   const profile = row.lead.profile;
-  const rejected =
-    row.statusCode.toUpperCase().includes('REJECT') || row.lead.statusCode.toUpperCase() === 'REJECTED';
+  const leadRejected = row.lead.statusCode.toUpperCase() === 'REJECTED';
+  const appRejected = row.statusCode.toUpperCase().includes('REJECT');
+  const rejected = appRejected || leadRejected;
   const kycFailed = row.statusCode.toUpperCase() === 'KYC_FAILED' || row.kycStatus === 2;
 
   const profileDone = Boolean(profile?.fullName?.trim());
@@ -107,6 +108,11 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
   const kycDone = row.kycStatus === KYC_COMPLETED && row.kycCompletedAt != null;
   const bankDone = Boolean(row.disbursement?.accountNumber || row.disbursement?.disbursedAt);
 
+  const rejectionDetail =
+    row.lead.rejectionReason?.label ??
+    row.lead.leadStatusNote?.trim() ??
+    (leadRejected ? row.lead.statusLabel : appRejected ? row.statusLabel : undefined);
+
   const steps: JourneyStep[] = [
     step('profile', 'Profile', profileDone, false),
     step('credit', 'PAN & bureau', panDone && bureauDone, rejected && !bureauDone, row.bureauReport?.cibilScore != null ? `CIBIL ${row.bureauReport.cibilScore}` : undefined),
@@ -117,6 +123,12 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
     step('bank', 'Bank details', bankDone, false),
     step('refs', 'References', refsDone, false, refsDone ? `${row.referencesCount} saved` : undefined),
   ];
+
+  if (rejected || kycFailed) {
+    const label = kycFailed && !rejected ? 'KYC failed' : leadRejected ? 'Lead rejected' : 'Application rejected';
+    steps.push(step('outcome', label, false, true, rejectionDetail));
+    return steps;
+  }
 
   return markActiveStep(steps);
 }

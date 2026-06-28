@@ -57,6 +57,7 @@ export class SendOtpUseCase {
     }
 
     const settings = await this.settingsRepository.loadAuthOtpSettings();
+    this.logger.log('settings', settings);
     const otpType = await this.otpTypes.findActiveByName(undefined, dto.type);
     if (!otpType) {
       throw new BadRequestException('This OTP channel is not available.');
@@ -69,8 +70,12 @@ export class SendOtpUseCase {
     if (latest) {
       const nextAllowed = latest.lastSentAt.getTime() + settings.otpResendCooldownSeconds * 1000;
       if (now < nextAllowed) {
+        const remainingSeconds = Math.ceil((nextAllowed - now) / 1000);
+        const attemptsExhausted = latest.attemptCount >= settings.otpMaxAttempts;
         throw new HttpException(
-          `Please wait ${settings.otpResendCooldownSeconds} seconds before requesting another OTP.`,
+          attemptsExhausted
+            ? `Too many incorrect attempts. Please wait ${remainingSeconds} seconds before requesting a new OTP.`
+            : `Please wait ${remainingSeconds} seconds before requesting another OTP.`,
           HttpStatus.TOO_MANY_REQUESTS
         );
       }

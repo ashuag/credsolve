@@ -3,6 +3,7 @@ import { BureauFetchService } from './bureau-fetch.service';
 import { BankTenacioVendorService } from './bank-tenacio-vendor.service';
 import { DigilockerVendorService } from './digilocker-vendor.service';
 import { LivenessVendorService } from './liveness-vendor.service';
+import { KycTenacioVendorService } from './kyc-tenacio-vendor.service';
 import { PanVerificationService } from './pan-verification.service';
 import { VendorApiService } from './vendor-api.service';
 import { VendorInternalErrorService } from './vendor-internal-error.service';
@@ -26,6 +27,7 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
     DigilockerVendorService,
     LivenessVendorService,
     BankTenacioVendorService,
+    KycTenacioVendorService,
   ],
   exports: [
     VendorApiService,
@@ -35,6 +37,7 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
     DigilockerVendorService,
     LivenessVendorService,
     BankTenacioVendorService,
+    KycTenacioVendorService,
   ],
 })
 export class VendorApiModule {}

@@ -20,8 +20,20 @@ const OCCUPATION_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
   Object.values(OCCUPATION).map(({ key, name }) => [key, name]),
 );
 import { resolveLeadCityId } from '../../../../common/utils/resolve-lead-city-id.util';
+import {
+  assertPincodeMatchesCity,
+  throwIfLeadIntakeInvalid,
+  validateAddressLine1,
+  validateOccupationIncome,
+} from '../../../../common/validation/lead-intake.validation';
 import { SmsService } from '../../../../common/sms/sms.service';
-import { parseTenacioBureauVendorBody } from '../../../../common/vendor/tenacio-bureau-payload.mapper';
+import {
+  isTenacioBureauClientError,
+  isTenacioBureauSuccessPayload,
+  parseTenacioBureauEnvelope,
+  parseTenacioBureauVendorBody,
+  tenacioBureauFailureNote,
+} from '../../../../common/vendor/tenacio-bureau-payload.mapper';
 import { BureauFetchService } from '../../../../common/vendor/bureau-fetch.service';
 import { PanVerificationService, type PanVerificationResult } from '../../../../common/vendor/pan-verification.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
@@ -37,8 +49,13 @@ const INDIAN_MOBILE = /^[6-9]\d{9}$/;
 const BUREAU_THANK_YOU_MESSAGE =
   'Thank you for your interest. Unfortunately, we are unable to proceed with your application at this time.';
 
-/** Outcome of an attempted Tenacio bureau soft-pull (customer journey). */
-type BureauSoftPullOutcome = 'skipped' | 'success' | 'failed' | 'post_bre_failed' | 'ntc';
+type BureauSoftPullOutcome =
+  | 'skipped'
+  | 'success'
+  | 'failed'
+  | 'post_bre_failed'
+  | 'ntc'
+  | 'bureau_identity_failed';
 
 /** `lead_detail` shape after upsert (BRE + response fields). */
 const leadDetailUpsertSelect = {
@@ -195,7 +212,32 @@ export class VerifyPanUseCase {
     const leadDetailPayload = await this.buildLeadInputRequest(leadRow.id, dto);
     const fullNameTrimmed = leadDetailPayload.fullName;
 
-    const [[detailRaw, leadPanRaw], [panVerificationEnabled, breSettings]] = await Promise.all([
+    const [cityRow, panVerificationEnabled, breSettings] = await Promise.all([
+      this.prisma.client.city.findUnique({
+        where: { id: leadDetailPayload.cityId },
+        select: { id: true, name: true, stateId: true, state: { select: { code: true } } },
+      }),
+      this.settings.isPanVerificationEnabled(),
+      this.settings.loadBreSettings(),
+    ]);
+
+    const preBreResult = await this.preBreCheck.run(
+      {
+        dateOfBirth: leadDetailPayload.dateOfBirth,
+        genderId: leadDetailPayload.genderId,
+        occupationId: leadDetailPayload.occupationId,
+        genderDisplay: GENDER_KEY_TO_NAME[dto.gender] ?? dto.gender,
+        occupationDisplay: OCCUPATION_KEY_TO_NAME[dto.occupation] ?? dto.occupation,
+        pincode: leadDetailPayload.pincode,
+        cityId: cityRow?.id ?? null,
+        stateId: cityRow?.stateId ?? null,
+        cityName: cityRow?.name ?? null,
+        stateCode: cityRow?.state?.code ?? null,
+      },
+      breSettings,
+    );
+
+    const [[detailRaw, leadPanRaw]] = await Promise.all([
       Promise.all([
         this.leads.upsertLeadDetail({
           where: { leadId: leadRow.id },
@@ -209,30 +251,15 @@ export class VerifyPanUseCase {
           select: leadPanSelect,
         }),
       ]),
-      Promise.all([this.settings.isPanVerificationEnabled(), this.settings.loadBreSettings()]),
     ]);
 
     const detail = detailRaw as unknown as LeadDetailBreRow;
     const leadPan = leadPanRaw as LeadPanVerificationRow;
 
-    const preBreResult = await this.preBreCheck.run(
-      {
-        dateOfBirth: detail.dateOfBirth,
-        genderId: detail.genderId,
-        occupationId: detail.occupationId,
-        genderDisplay: GENDER_KEY_TO_NAME[dto.gender] ?? dto.gender,
-        occupationDisplay: OCCUPATION_KEY_TO_NAME[dto.occupation] ?? dto.occupation,
-        pincode: detail.pincode,
-        cityId: detail.city?.id ?? null,
-        stateId: detail.city?.stateId ?? null,
-        cityName: detail.city?.name ?? null,
-        stateCode: detail.city?.state?.code ?? null,
-      },
-      breSettings,
-    );
-
-
     if (!preBreResult.passed) {
+      this.logger.log(
+        `Pre-BRE rejected lead ${leadRow.id.toString()} before PAN checks: ${preBreResult.rejectionReasonCode ?? 'unknown'}`,
+      );
       await this.rejectLead(leadRow.id, preBreResult.rejectReason ?? 'BRE check failed', preBreResult.rejectionReasonCode);
       this.fireRejectionSms(customer.mobileNumber, leadRow.id);
       return {
@@ -259,9 +286,31 @@ export class VerifyPanUseCase {
       priorPanNorm.length === 10 &&
       priorPanNorm === panUpper;
 
+    const structCheck = this.panVerification.validatePanStructure(panUpper, fullNameTrimmed);
+    if (!structCheck.valid) {
+      this.logger.warn(
+        `PAN structural validation failed (leadId=${leadRow.id.toString()}) after pre-BRE: ${structCheck.note}`,
+      );
+      await this.updatePanStatus(leadRow.id, PAN_VERIFIED.NOT_VERIFIED, structCheck.note);
+      return this.handlePanVerificationFailure(
+        leadRow.id,
+        customer.mobileNumber,
+        dto,
+        {
+          panVerifiedStatus: PAN_VERIFIED.NOT_VERIFIED,
+          nameMatch: false,
+          dobMatch: false,
+          panStatus: 'invalid',
+          category: null,
+          vendorRequestId: null,
+          note: structCheck.note,
+        },
+      );
+    }
+
     const verification: PanVerificationResult = alreadyVerifiedSamePan
       ? VERIFIED_VENDOR_SKIPPED
-      : await this.panVerification.verify({
+      : await this.panVerification.verifyWithVendor({
           leadId: leadRow.id,
           panNumber: panUpper,
           fullName: fullNameTrimmed,
@@ -274,7 +323,7 @@ export class VerifyPanUseCase {
       );
     } else {
       this.logger.debug(
-        `PAN verification result: status=${verification.panVerifiedStatus}, panStatus=${verification.panStatus}, nameMatch=${verification.nameMatch}, dobMatch=${verification.dobMatch}`,
+        `PAN vendor result (leadId=${leadRow.id.toString()}): status=${verification.panVerifiedStatus}, panStatus=${verification.panStatus}, nameMatch=${verification.nameMatch}, dobMatch=${verification.dobMatch}`,
       );
     }
 
@@ -290,40 +339,12 @@ export class VerifyPanUseCase {
       verification.panVerifiedStatus === PAN_VERIFIED.API_FAILURE;
 
     if (shouldRejectForPan) {
-      const maxAttempts = await this.loadPanValidationMaxAttempts();
-      const panAttemptRows = await this.prisma.client.$queryRaw<Array<{ pan_validation_attempts: number }>>`
-        SELECT \`pan_validation_attempts\` FROM \`lead\` WHERE \`id\` = ${leadRow.id} LIMIT 1
-      `;
-      const attemptsUsed = Number(panAttemptRows[0]?.pan_validation_attempts ?? 0) + 1;
-
-      await this.prisma.client.$executeRaw`
-        UPDATE \`lead\` SET \`pan_validation_attempts\` = ${attemptsUsed} WHERE \`id\` = ${leadRow.id}
-      `;
-
-      if (attemptsUsed < maxAttempts) {
-        this.logger.log(
-          `Lead ${leadRow.id.toString()} PAN verification failed (attempt ${attemptsUsed}/${maxAttempts}) — retry allowed.`,
-        );
-        return {
-          success: true,
-          rejected: false,
-          attemptsUsed,
-          attemptsAllowed: maxAttempts,
-          message: `PAN verification failed. You have ${maxAttempts - attemptsUsed} attempt(s) remaining.`,
-        } as any;
-      }
-
-      await this.rejectLead(
+      return this.handlePanVerificationFailure(
         leadRow.id,
-        this.buildPanRejectLeadNote(dto, verification),
-        REJECTION_REASON.PAN_VERIFICATION_FAILED,
+        customer.mobileNumber,
+        dto,
+        verification,
       );
-      this.fireRejectionSms(customer.mobileNumber, leadRow.id);
-      return {
-        success: true,
-        rejected: true,
-        message: BUREAU_THANK_YOU_MESSAGE,
-      };
     }
 
     if (verification.panVerifiedStatus === PAN_VERIFIED.VERIFIED) {
@@ -362,6 +383,14 @@ export class VerifyPanUseCase {
             'Bureau soft-pull failed: credit bureau returned a non-200 response.',
             REJECTION_REASON.REJECTED_BY_CLIENTS,
           );
+          this.fireRejectionSms(customer.mobileNumber, leadRow.id);
+          return {
+            success: true,
+            rejected: true,
+            message: BUREAU_THANK_YOU_MESSAGE,
+          };
+        }
+        if (bureauOutcome === 'bureau_identity_failed') {
           this.fireRejectionSms(customer.mobileNumber, leadRow.id);
           return {
             success: true,
@@ -414,10 +443,18 @@ export class VerifyPanUseCase {
   }> {
     const { genderId, occupationId } = await this.resolveGenderOccupationIds(dto);
     const { netMonthlyIncome, annualTurnover, annualProfit } = this.buildIncomeFields(dto);
+    throwIfLeadIntakeInvalid(
+      validateOccupationIncome(dto.occupation, {
+        monthlyIncome: netMonthlyIncome?.toNumber() ?? null,
+        annualTurnover: annualTurnover?.toNumber() ?? null,
+        annualProfit: annualProfit?.toNumber() ?? null,
+      }),
+    );
 
     const hasAddressInRequest = Boolean(dto.addressLine1?.trim() && dto.pincode?.trim() && dto.currentCity?.trim());
 
     if (hasAddressInRequest) {
+      throwIfLeadIntakeInvalid(validateAddressLine1(dto.addressLine1!));
       const cityId = await resolveLeadCityId(this.prisma.client, {
         currentCityId: dto.currentCityId ?? null,
         currentCity: dto.currentCity!.trim(),
@@ -427,6 +464,8 @@ export class VerifyPanUseCase {
           'Could not resolve your city. Pick a city from the suggestions list and try again.',
         );
       }
+
+      await assertPincodeMatchesCity(this.prisma.client, dto.pincode!.trim(), cityId);
 
       return {
         fullName: dto.fullName.trim(),
@@ -474,6 +513,48 @@ export class VerifyPanUseCase {
       netMonthlyIncome,
       annualTurnover,
       annualProfit,
+    };
+  }
+
+  private async handlePanVerificationFailure(
+    leadId: bigint,
+    customerMobile: string,
+    dto: VerifyPanDto,
+    verification: PanVerificationResult,
+  ): Promise<VerifyPanResult> {
+    const maxAttempts = await this.loadPanValidationMaxAttempts();
+    const panAttemptRows = await this.prisma.client.$queryRaw<Array<{ pan_validation_attempts: number }>>`
+      SELECT \`pan_validation_attempts\` FROM \`lead\` WHERE \`id\` = ${leadId} LIMIT 1
+    `;
+    const attemptsUsed = Number(panAttemptRows[0]?.pan_validation_attempts ?? 0) + 1;
+
+    await this.prisma.client.$executeRaw`
+      UPDATE \`lead\` SET \`pan_validation_attempts\` = ${attemptsUsed} WHERE \`id\` = ${leadId}
+    `;
+
+    if (attemptsUsed < maxAttempts) {
+      this.logger.log(
+        `Lead ${leadId.toString()} PAN verification failed (attempt ${attemptsUsed}/${maxAttempts}) — retry allowed.`,
+      );
+      return {
+        success: true,
+        rejected: false,
+        attemptsUsed,
+        attemptsAllowed: maxAttempts,
+        message: `PAN verification failed. You have ${maxAttempts - attemptsUsed} attempt(s) remaining.`,
+      } as any;
+    }
+
+    await this.rejectLead(
+      leadId,
+      this.buildPanRejectLeadNote(dto, verification),
+      REJECTION_REASON.PAN_VERIFICATION_FAILED,
+    );
+    this.fireRejectionSms(customerMobile, leadId);
+    return {
+      success: true,
+      rejected: true,
+      message: BUREAU_THANK_YOU_MESSAGE,
     };
   }
 
@@ -567,7 +648,10 @@ export class VerifyPanUseCase {
       return 'ntc';
     }
 
-    if (out.httpStatus === 200) {
+    const bureauSucceeded =
+      out.httpStatus === 200 && out.vendorBody != null && isTenacioBureauSuccessPayload(out.vendorBody);
+
+    if (bureauSucceeded) {
       await this.leads.updateLead({
         where: { id: leadId },
         data: {
@@ -617,7 +701,31 @@ export class VerifyPanUseCase {
       return 'success';
     }
 
-    const note = `http=${out.httpStatus ?? 'n/a'} err=${out.error?.message ?? 'vendor'}`.slice(0, 500);
+    const envelopeNote = tenacioBureauFailureNote(out.vendorBody, out.httpStatus);
+    if (out.httpStatus === 200 && out.vendorBody != null) {
+      const envelope = parseTenacioBureauEnvelope(out.vendorBody);
+      if (isTenacioBureauClientError(envelope.serviceStatusCode)) {
+        const leadNote = (envelope.serviceErrorMessage ?? 'Bureau identity verification failed').slice(0, 256);
+        const bureauNote = envelopeNote.slice(0, 500);
+        await this.leads.updateLead({
+          where: { id: leadId },
+          data: {
+            bureauFetched: BUREAU_FETCHED.FAILED,
+            bureauFetchedAt: now,
+            bureauFetchedNote: bureauNote,
+          },
+        });
+        await this.rejectLead(leadId, leadNote, REJECTION_REASON.BUREAU_IDENTITY_MISMATCH);
+        this.logger.warn(
+          `Bureau soft-pull client error (leadId=${leadId.toString()}): service=${envelope.serviceStatusCode} ${leadNote}`,
+        );
+        return 'bureau_identity_failed';
+      }
+    }
+
+    const note = envelopeNote.includes('http=')
+      ? envelopeNote
+      : `http=${out.httpStatus ?? 'n/a'} err=${out.error?.message ?? 'vendor'}`.slice(0, 500);
     await this.leads.updateLead({
       where: { id: leadId },
       data: {

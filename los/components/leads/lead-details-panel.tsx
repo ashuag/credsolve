@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { WorkspaceRecordHeader } from '@/components/shared/workspace-record-header';
 import { LosStatusPill } from '@/components/shared/los-status-pill';
+import { canRejectLeadStatus, RejectRecordModal } from '@/components/shared/reject-record-modal';
 import { buildLeadIntakeJourney } from '@/lib/customer-journey';
 import { formatPersonName } from '@/lib/format-person-name';
 import { buildWorkspaceAlertText } from '@/lib/workspace-alert';
-import { getLeadDetails, getMasters, rejectLead, type LosLeadDetails, type LosNamedMaster } from '@/lib/api';
+import { getLeadDetails, type LosLeadDetails } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
-import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -173,192 +174,11 @@ function UtmGrid({ utm }: { utm: NonNullable<LosLeadDetails['utm']> }) {
   );
 }
 
-function RejectLeadModal({
-  leadUuid,
-  leadName,
-  onClose,
-  onRejected,
-}: {
-  leadUuid: string;
-  leadName: string;
-  onClose: () => void;
-  onRejected: () => void;
-}) {
-  const [reasons, setReasons] = useState<LosNamedMaster[]>([]);
-  const [reasonsLoading, setReasonsLoading] = useState(true);
-  const [reasonId, setReasonId] = useState('');
-  const [note, setNote] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose]);
-
-  useEffect(() => {
-    let active = true;
-    const token = getToken();
-    if (!token) {
-      setError('Session expired — please log in again.');
-      setReasonsLoading(false);
-      return;
-    }
-    void (async () => {
-      try {
-        const masters = await getMasters(token);
-        if (!active) return;
-        setReasons(masters.rejectionReasons.filter((r) => r.isActive));
-      } catch (e) {
-        if (!active) return;
-        setError(e instanceof Error ? e.message : 'Failed to load rejection reasons.');
-      } finally {
-        if (active) setReasonsLoading(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!reasonId) {
-      setError('Please select a rejection reason.');
-      return;
-    }
-    const token = getToken();
-    if (!token) {
-      setError('Session expired — please log in again.');
-      return;
-    }
-    setSubmitting(true);
-    setError(null);
-    try {
-      await rejectLead(token, leadUuid, {
-        rejectionReasonId: Number(reasonId),
-        note: note.trim() || undefined,
-      });
-      onRejected();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reject lead.');
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[rgba(10,28,66,0.4)] backdrop-blur-[4px]"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !submitting) onClose();
-      }}
-      role="dialog"
-      aria-modal
-      aria-label="Reject lead"
-    >
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-[440px] rounded-[20px] border border-[rgba(23,44,113,0.12)] shadow-[0_32px_64px_rgba(23,44,113,0.22)] p-6"
-        style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,244,244,0.96))' }}
-      >
-        <div className="mb-5 flex items-start justify-between gap-4">
-          <div>
-            <span className="mb-1 block text-[0.68rem] font-extrabold uppercase tracking-[0.16em] text-[#c0392b]">
-              Reject lead
-            </span>
-            <h2 className="m-0 text-[1.3rem] font-extrabold leading-[1.1] tracking-[-0.04em] text-brand-navy">
-              {leadName}
-            </h2>
-            <p className="m-0 mt-1.5 text-[0.8rem] leading-snug text-brand-muted">
-              This sets the lead status to <strong className="text-[#8d3434]">Rejected</strong>. This cannot be undone from here.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={submitting}
-            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[10px] border border-[rgba(23,44,113,0.12)] bg-[rgba(255,255,255,0.9)] text-brand-navy transition-transform hover:-translate-y-px disabled:opacity-50"
-            aria-label="Close"
-          >
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden>
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-
-        <label className="block">
-          <span className="mb-1.5 block text-[0.7rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-            Rejection reason <span className="text-[#c0392b]">*</span>
-          </span>
-          <select
-            value={reasonId}
-            onChange={(e) => setReasonId(e.target.value)}
-            disabled={reasonsLoading || submitting}
-            required
-            className="w-full rounded-[10px] border border-[rgba(23,44,113,0.16)] bg-white px-3 py-2.5 text-[0.86rem] font-semibold text-brand-navy outline-none focus:border-[rgba(20,150,243,0.5)] disabled:opacity-60"
-          >
-            <option value="">{reasonsLoading ? 'Loading reasons…' : 'Select a reason…'}</option>
-            {reasons.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name.replace(/_/g, ' ')}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="mt-4 block">
-          <span className="mb-1.5 block text-[0.7rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-            Note <span className="font-bold normal-case tracking-normal text-brand-muted">(optional)</span>
-          </span>
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            maxLength={256}
-            rows={3}
-            disabled={submitting}
-            placeholder="Add context for this rejection…"
-            className="w-full resize-none rounded-[10px] border border-[rgba(23,44,113,0.16)] bg-white px-3 py-2.5 text-[0.86rem] font-medium text-brand-navy outline-none focus:border-[rgba(20,150,243,0.5)] disabled:opacity-60"
-          />
-          <span className="mt-1 block text-right text-[0.66rem] font-semibold text-brand-muted">{note.length}/256</span>
-        </label>
-
-        {error ? (
-          <p className="m-0 mt-3 rounded-[8px] border border-[rgba(231,95,95,0.28)] bg-[rgba(255,241,241,0.9)] px-3 py-2 text-[0.78rem] font-semibold text-[#8d3434]">
-            {error}
-          </p>
-        ) : null}
-
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={submitting}
-            className="inline-flex min-h-[40px] items-center rounded-full border border-[rgba(23,44,113,0.14)] bg-white px-4 text-[0.82rem] font-bold text-brand-navy disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={submitting || reasonsLoading}
-            className="inline-flex min-h-[40px] items-center gap-2 rounded-full bg-[#c0392b] px-5 text-[0.82rem] font-extrabold text-white transition-colors hover:bg-[#a93226] disabled:opacity-60"
-          >
-            {submitting ? 'Rejecting…' : 'Reject lead'}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
 export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
   const [lead, setLead] = useState<LosLeadDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showReject, setShowReject] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -435,7 +255,6 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
 
   const displayName = formatPersonName(lead.profile?.fullName, 'Lead (name pending)');
   const profile = lead.profile;
-  const canReject = lead.statusCode !== 'REJECTED' && lead.statusCode !== 'CONVERTED';
   const journeySteps = buildLeadIntakeJourney(lead);
   const alertText = buildWorkspaceAlertText({
     statusCode: lead.statusCode,
@@ -460,37 +279,37 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
           </svg>
           Back to leads
         </Link>
-        <div className="flex flex-wrap gap-2">
-          {canReject ? (
-            <button
-              type="button"
-              onClick={() => setShowReject(true)}
-              className="inline-flex min-h-[38px] items-center gap-2 rounded-full border border-[rgba(192,57,43,0.3)] bg-[rgba(255,244,244,0.9)] px-4 text-[0.82rem] font-bold text-[#c0392b] shadow-sm transition-colors hover:border-[rgba(192,57,43,0.5)] hover:bg-[rgba(255,236,236,0.95)]"
-            >
-              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <circle cx="12" cy="12" r="10" />
-                <path d="m15 9-6 6M9 9l6 6" />
-              </svg>
-              Reject lead
-            </button>
-          ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/customers/${lead.customerUuid}`}
+            className="inline-flex min-h-[38px] items-center rounded-full border border-[rgba(23,44,113,0.14)] bg-white px-4 text-[0.82rem] font-bold text-brand-navy no-underline hover:border-[rgba(20,150,243,0.28)]"
+          >
+            Customer profile
+          </Link>
           <button type="button" onClick={() => void load()} className="los-btn-primary min-h-[38px] px-4 text-[0.82rem]">
             Refresh data
           </button>
+          {canRejectLeadStatus(lead.statusCode) ? (
+            <button
+              type="button"
+              onClick={() => setRejectOpen(true)}
+              className="min-h-[38px] rounded-[8px] border border-[rgba(239,68,68,0.35)] bg-white px-4 text-[0.82rem] font-bold text-[#dc2626] hover:bg-[rgba(254,242,242,0.9)]"
+            >
+              Reject lead
+            </button>
+          ) : null}
         </div>
       </div>
 
-      {showReject ? (
-        <RejectLeadModal
-          leadUuid={leadUuid}
-          leadName={displayName}
-          onClose={() => setShowReject(false)}
-          onRejected={() => {
-            setShowReject(false);
-            void load();
-          }}
-        />
-      ) : null}
+      <RejectRecordModal
+        open={rejectOpen}
+        token={getToken()}
+        recordType="lead"
+        recordUuid={lead.uuid}
+        recordLabel={displayName}
+        onClose={() => setRejectOpen(false)}
+        onSuccess={() => void load()}
+      />
 
       <WorkspaceRecordHeader
         eyebrow="Loan pipeline"

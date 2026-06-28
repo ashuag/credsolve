@@ -3,6 +3,7 @@ import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { RateLimitByRoute } from '../../../common/rate-limit/rate-limit-route.decorator';
 import { RedisIpRateLimitGuard } from '../../../common/rate-limit/redis-ip-rate-limit.guard';
+import { VpnBlockGuard } from '../../../common/ip-reputation/vpn-block.guard';
 import { SaveLeadDetailsDto } from '../application/dto/save-lead-details.dto';
 import { SaveLeadProfileDto } from '../application/dto/save-lead-profile.dto';
 import { SendOtpDto } from '../application/dto/send-otp.dto';
@@ -48,7 +49,7 @@ function readClientIp(req: Request): string | undefined {
 
 @ApiTags('auth')
 @Controller('auth')
-@UseGuards(RedisIpRateLimitGuard, OptionalCustomerSessionGuard)
+@UseGuards(RedisIpRateLimitGuard, VpnBlockGuard, OptionalCustomerSessionGuard)
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
@@ -103,7 +104,11 @@ export class AuthController {
       },
     },
   })
-  async verifyOtpRoute(@Body() body: VerifyOtpDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+  async verifyOtpRoute(
+    @Body() body: VerifyOtpDto, 
+    @Req() req: Request, 
+    @Res({ passthrough: true }) res: Response
+  ) {
     const out = await this.verifyOtpFlow.execute(body, req.customerSession, {
       ip: readClientIp(req),
       userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,

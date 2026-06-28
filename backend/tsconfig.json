@@ -10,9 +10,7 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "composite": true,
-    "declaration": true,
-    "tsBuildInfoFile": "/tmp/moneyCash-backend.tsbuildinfo",
+    "types": ["node"],
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "outDir": "./build"

@@ -43,7 +43,7 @@ export class SaveLeadDetailsDto {
 
   @ApiProperty()
   @IsString()
-  @MinLength(1)
+  @MinLength(5)
   @MaxLength(500)
   addressLine1!: string;
 

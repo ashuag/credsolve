@@ -14,6 +14,7 @@ import {
 import { saveLoanSelection } from '@/lib/api/lead';
 import { CUSTOMER_EMAIL_JOURNEY_PATH } from '@/lib/api/customer-session';
 import { CUSTOMER_LOAN_PURPOSE_OPTIONS } from '@/lib/loan-reasons';
+import { clearStoredLoanPurpose, readStoredLoanPurpose } from '@/lib/loan-purpose-selection';
 import { computeFixedRepaymentDate } from '@/lib/repayment-date';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { Spinner } from '@/components/ui/spinner';
@@ -122,6 +123,17 @@ export default function LoanSelectionPage() {
 
   const [loanPurpose, setLoanPurpose] = useState('');
   const [purposeError, setPurposeError] = useState<string | null>(null);
+  const hasInitializedPurpose = useRef(false);
+
+  useEffect(() => {
+    if (hasInitializedPurpose.current) return;
+
+    const storedPurpose = readStoredLoanPurpose();
+    if (storedPurpose) {
+      setLoanPurpose(storedPurpose);
+    }
+    hasInitializedPurpose.current = true;
+  }, []);
   const [selectedAmount, setSelectedAmount] = useState(DEFAULT_LOAN_SETTINGS.minLoanAmount);
   const hasInitializedAmount = useRef(false);
 
@@ -172,6 +184,7 @@ export default function LoanSelectionPage() {
         tenureEndDate: selectedEndDate,
         loanPurpose,
       });
+      clearStoredLoanPurpose();
       await refresh();
       router.push(CUSTOMER_EMAIL_JOURNEY_PATH);
     } catch (e) {

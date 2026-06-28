@@ -28,7 +28,7 @@ export class LeadRepository {
 
   findActiveByCustomerId(customerId: bigint, tx?: DbClient) {
     return this.db(tx).lead.findFirst({
-      where: { customerId },
+      where: { customerId, isActive: true },
       orderBy: { createdAt: 'desc' },
       include: {
         leadStatus: { select: { name: true } },

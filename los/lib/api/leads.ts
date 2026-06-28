@@ -43,6 +43,13 @@ export type LosApplication = {
   bankDetails: string | null;
   statusCode: string;
   statusLabel: string;
+  leadStatusCode: string;
+  leadStatusLabel: string;
+  leadRejectionReason: { code: string; label: string } | null;
+  leadStatusNote: string | null;
+  kycStatus: number;
+  kycStatusLabel: string;
+  kycCompleted: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -86,7 +93,9 @@ export type LosLeadDetails = {
     state: string | null;
     stateCode: string | null;
     gender: string | null;
+    genderKey: string | null;
     occupation: string | null;
+    occupationKey: string | null;
     netMonthlyIncome: string | null;
     annualTurnover: string | null;
     annualProfit: string | null;
@@ -103,6 +112,32 @@ export type LosLeadDetails = {
   }>;
 };
 
+export type LosSelfieFaceValidation = {
+  passed: boolean;
+  checkedAt: string | null;
+  bestComputedConfidence: number | null;
+  topDetectionScore: number | null;
+  reason: string | null;
+  laplacianVariance: number | null;
+  minLaplacianVarianceRequired: number;
+  blurPassed: boolean | null;
+  confidenceBreakdown: {
+    detection: number;
+    faceSize: number;
+    landmarkAlignment: number;
+    featureSpacing: number;
+    computed: number;
+  } | null;
+};
+
+export type LosLivenessSummary = {
+  passed: boolean;
+  checkedAt: string | null;
+  vendorScore: number | null;
+  isLive: boolean | null;
+  vendorStatus: string | null;
+};
+
 export type LosApplicationDetails = {
   uuid: string;
   customerUuid: string;
@@ -117,6 +152,8 @@ export type LosApplicationDetails = {
   kycCompletedAt: string | null;
   livenessPassed: boolean;
   livenessCheckedAt: string | null;
+  selfieFaceValidation: LosSelfieFaceValidation | null;
+  livenessSummary: LosLivenessSummary | null;
   kycPhotos: {
     /** Storage object key, e.g. `customer/{uuid}/photos/selfie/{app}.jpg`. */
     selfiePath: string | null;
@@ -135,6 +172,7 @@ export type LosApplicationDetails = {
     leadStatusNote: string | null;
     bureauFetchedNote: string | null;
     bureauFetched: number;
+    rejectionReason: { code: string; label: string } | null;
     sourceName: string | null;
     sourceType: string | null;
     utms: Array<{
@@ -234,23 +272,6 @@ export async function getApplicationDetails(token: string, applicationUuid: stri
     token,
     `/applications/${encodeURIComponent(applicationUuid)}`,
     'Failed to fetch application details',
-  );
-}
-
-export async function rejectLead(
-  token: string,
-  leadUuid: string,
-  data: { rejectionReasonId: number; note?: string },
-): Promise<LosLeadDetails> {
-  return authorizedLosRequest<LosLeadDetails>(
-    token,
-    `/leads/${encodeURIComponent(leadUuid)}/reject`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    },
-    'Failed to reject lead',
   );
 }
 

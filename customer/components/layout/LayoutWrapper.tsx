@@ -4,6 +4,8 @@ import { usePathname } from 'next/navigation';
 import { ReactNode, Suspense } from 'react';
 import { BrandHeader } from '@/components/layout/brand-header';
 import { MobileTabBar } from '@/components/layout/mobile-tab-bar';
+import { useCustomerSession } from '@/components/providers/customer-session-provider';
+import { isCustomerPortalSignedIn } from '@/lib/api/customer-session';
 
 /** Self-contained legal/policy routes that render their own header via LegalPageShell. */
 const SELF_CONTAINED_LEGAL_ROUTES = new Set([
@@ -20,6 +22,9 @@ const SELF_CONTAINED_LEGAL_ROUTES = new Set([
 
 export function LayoutWrapper({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? '';
+  const { session } = useCustomerSession();
+  const signedIn = isCustomerPortalSignedIn(session);
+
   const isLandingPage = pathname === '/';
   const isApplyPage = pathname === '/apply-for-loan';
   const isAccountLoginPage = pathname === '/my-account';
@@ -32,7 +37,7 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
-  if (isLandingPage || isApplyPage || isAccountLoginPage || isKycHubPage) {
+  if (isLandingPage || isApplyPage || (isAccountLoginPage && !signedIn) || isKycHubPage) {
     if (isKycHubPage) {
       return (
         <div className="flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden">

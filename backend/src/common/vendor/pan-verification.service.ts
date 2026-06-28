@@ -129,17 +129,6 @@ export class PanVerificationService {
   }
 
   async verify(input: PanVerificationInput): Promise<PanVerificationResult> {
-    const notChecked: PanVerificationResult = {
-      panVerifiedStatus: PAN_VERIFIED.NOT_CHECKED,
-      nameMatch: false,
-      dobMatch: false,
-      panStatus: null,
-      category: null,
-      vendorRequestId: null,
-      note: null,
-    };
-
-    // Structural PAN validation before calling the vendor
     const structCheck = this.validatePanStructure(input.panNumber, input.fullName);
     if (!structCheck.valid) {
       this.logger.warn(
@@ -155,6 +144,21 @@ export class PanVerificationService {
         note: structCheck.note,
       };
     }
+
+    return this.verifyWithVendor(input);
+  }
+
+  /** Calls Tenacio NSDL only — run `validatePanStructure` first when checks are ordered separately. */
+  async verifyWithVendor(input: PanVerificationInput): Promise<PanVerificationResult> {
+    const notChecked: PanVerificationResult = {
+      panVerifiedStatus: PAN_VERIFIED.NOT_CHECKED,
+      nameMatch: false,
+      dobMatch: false,
+      panStatus: null,
+      category: null,
+      vendorRequestId: null,
+      note: null,
+    };
 
     try {
       const baseUrl = (process.env.VENDOR_HOST ?? '').trim();

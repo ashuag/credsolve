@@ -20,7 +20,7 @@ import { fetchPincodeLookup } from '@/lib/api/lookup';
 import { usesAnnualFinancialMetric, usesMonthlyIncomeMetric } from '@/lib/customer-details';
 import { formatDateDisplay, formatDateIso, getAge, parseDobDisplay, parseIsoDate } from '@/lib/date-utils';
 import { useCustomerDetailLookups } from '@/lib/use-customer-detail-lookups';
-import { isValidPan, isValidPersonName, PERSON_NAME_VALIDATION_MESSAGE, PINCODE_REGEX, sanitizePersonNameInput } from '@/lib/validators';
+import { isValidPan, isValidPersonName, PERSON_NAME_VALIDATION_MESSAGE, PINCODE_REGEX, sanitizePersonNameInput, isValidAddressLine1, ADDRESS_LINE1_VALIDATION_MESSAGE, MIN_ANNUAL_TURNOVER, MIN_ANNUAL_PROFIT } from '@/lib/validators';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 import { ProfileFields } from './profile-fields';
 import { FinancialFields } from './financial-fields';
@@ -66,8 +66,8 @@ function profileCompletion(fields: Fields, dobDisplay: string): number {
   }
 
   if (occ && usesAnnualFinancialMetric(occ)) {
-    checks.push(Boolean(fields.annualTurnover && Number(fields.annualTurnover) > 0));
-    checks.push(Boolean(fields.annualProfit && Number(fields.annualProfit) > 0));
+    checks.push(Boolean(fields.annualTurnover && Number(fields.annualTurnover) >= MIN_ANNUAL_TURNOVER));
+    checks.push(Boolean(fields.annualProfit && Number(fields.annualProfit) >= MIN_ANNUAL_PROFIT));
   }
 
   return checks.filter((v) => Boolean(v)).length / checks.length;
@@ -77,7 +77,7 @@ function financialCompletion(fields: Fields): number {
   const s = [
     PINCODE_REGEX.test(fields.pincode),
     Boolean(fields.currentCity.trim()),
-    fields.addressLine1.trim().length >= 5,
+    fields.addressLine1.trim().length >= 5 && isValidAddressLine1(fields.addressLine1),
     fields.creditConsentAccepted
   ].filter((v) => Boolean(v)).length / 4;
 
@@ -245,10 +245,19 @@ export function PersonalDetailsStep(
     if (!fields.gender) err.gender = 'Please select your gender.';
     if (!isValidPan(fields.panNumber.trim())) err.panNumber = 'Please enter a valid 10-character PAN.';
     if (!fields.occupation) err.occupation = 'Please select your occupation.';
-    if (usesMonthlyIncome) { const m = fields.monthlyIncome.trim(); if (!m || !Number.isFinite(Number(m)) || Number(m) < 0) err.monthlyIncome = 'Please enter your monthly income (0 is allowed).'; }
+    if (usesMonthlyIncome) {
+      const m = fields.monthlyIncome.trim();
+      if (!m || !Number.isFinite(Number(m)) || Number(m) < 0) {
+        err.monthlyIncome = 'Please enter your monthly income (0 is allowed).';
+      }
+    }
     if (isSelfEmployed) {
-      if (!fields.annualTurnover || Number(fields.annualTurnover) <= 0) err.annualTurnover = 'Please enter your annual turnover.';
-      if (!fields.annualProfit || Number(fields.annualProfit) <= 0) err.annualProfit = 'Please enter your annual profit.';
+      if (!fields.annualTurnover || Number(fields.annualTurnover) < MIN_ANNUAL_TURNOVER) {
+        err.annualTurnover = `Please enter annual turnover of at least ₹${MIN_ANNUAL_TURNOVER.toLocaleString('en-IN')}.`;
+      }
+      if (!fields.annualProfit || Number(fields.annualProfit) < MIN_ANNUAL_PROFIT) {
+        err.annualProfit = `Please enter annual profit of at least ₹${MIN_ANNUAL_PROFIT.toLocaleString('en-IN')}.`;
+      }
     }
     return err;
   }
@@ -257,7 +266,9 @@ export function PersonalDetailsStep(
     const err: FieldError = {};
     if (!PINCODE_REGEX.test(fields.pincode)) err.pincode = 'Please enter a valid 6-digit pincode.';
     if (!fields.currentCity.trim()) err.currentCity = 'Please enter your current city.';
-    if (!fields.addressLine1.trim() || fields.addressLine1.trim().length < 5) err.addressLine1 = 'Please enter your address line 1.';
+    if (!fields.addressLine1.trim() || !isValidAddressLine1(fields.addressLine1)) {
+      err.addressLine1 = ADDRESS_LINE1_VALIDATION_MESSAGE;
+    }
     if (!fields.creditConsentAccepted) err.creditConsentAccepted = 'Please accept the consent declaration to continue.';
     return err;
   }

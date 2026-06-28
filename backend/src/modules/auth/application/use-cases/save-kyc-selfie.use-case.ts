@@ -2,8 +2,6 @@ import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/
 import type { Request } from 'express';
 import type { UploadedFileLike } from '../../../../common/types/uploaded-file';
 import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
-import { KycCompletionService } from '../../../../common/kyc/kyc-completion.service';
-import { isKycLivenessOutboundSkipped } from '../../../../common/kyc/kyc-liveness-env.util';
 import {
   assertApplicationFaceStepNotComplete,
 } from '../../../../common/kyc/application-kyc-guard.util';
@@ -23,11 +21,16 @@ export class SaveKycSelfieUseCase {
     private readonly leads: LeadRepository,
     private readonly applications: ApplicationRepository,
     private readonly kycFiles: KycFilesService,
-    private readonly kycCompletion: KycCompletionService,
     private readonly prisma: PrismaService,
   ) {}
 
-  async execute(req: Request, file: UploadedFileLike | undefined): Promise<{ success: true; selfieRelativePath: string }> {
+  async execute(
+    req: Request,
+    file: UploadedFileLike | undefined,
+  ): Promise<{
+    success: true;
+    selfieRelativePath: string;
+  }> {
     const session = req.customerSession;
     if (!session) {
       throw new UnauthorizedException('Sign in with mobile OTP before continuing.');
@@ -85,24 +88,9 @@ export class SaveKycSelfieUseCase {
     await this.kycFiles.writeBytes(rel, file.buffer);
     await this.applications.updateSelfiePath({ applicationId: application.id, selfieRelativePath: rel });
 
-    if (isKycLivenessOutboundSkipped()) {
-      const snapshot = await this.prisma.client.application.findUnique({
-        where: { id: application.id },
-        select: {
-          digilockerAadhaarFormJson: true,
-          aadhaarPhotoRelativePath: true,
-        },
-      });
-      await this.kycCompletion.completeFromDigilockerAadhaar({
-        applicationId: application.id,
-        customerId: customer.id,
-        digilockerAadhaarFormJson: snapshot?.digilockerAadhaarFormJson ?? null,
-        aadhaarPhotoRelativePath: snapshot?.aadhaarPhotoRelativePath ?? null,
-        selfieRelativePath: rel,
-        verifiedAt: new Date(),
-      });
-    }
-
-    return { success: true, selfieRelativePath: rel };
+    return {
+      success: true,
+      selfieRelativePath: rel,
+    };
   }
 }

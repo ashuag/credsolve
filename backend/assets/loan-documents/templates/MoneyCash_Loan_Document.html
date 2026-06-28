@@ -426,10 +426,24 @@ th.teal-hdr { background: var(--teal); }
   break-inside: avoid;
 }
 
+.doc-closing-block:has(.lender-dsc-stamp-wrap:not(.hidden)) {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px 24px;
+  margin-top: 20px;
+}
+
+.doc-closing-block:has(.lender-dsc-stamp-wrap:not(.hidden)) .sig-block {
+  margin-top: 0;
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
 .lender-dsc-stamp-wrap {
-  margin-top: 28px;
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .lender-dsc-stamp-wrap.hidden {

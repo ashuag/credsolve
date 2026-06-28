@@ -88,6 +88,7 @@ const nextConfig: NextConfig = {
     ];
   },
   images: {
+    qualities: [75, 95],
     remotePatterns: [
       // Unsplash — used for tour cover images on the invite page
       { protocol: 'https', hostname: 'images.unsplash.com' }

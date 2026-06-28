@@ -16,6 +16,12 @@ const OCCUPATION_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
   Object.values(OCCUPATION).map(({ key, name }) => [key, name]),
 );
 import { PrismaService } from '../../../../prisma/prisma.service';
+import {
+  assertPincodeMatchesCity,
+  throwIfLeadIntakeInvalid,
+  validateAddressLine1,
+  validateOccupationIncome,
+} from '../../../../common/validation/lead-intake.validation';
 import { resolveLeadCityId } from '../../../../common/utils/resolve-lead-city-id.util';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
@@ -77,6 +83,15 @@ export class SaveLeadDetailsUseCase {
       throw new BadRequestException('Gender or occupation is not available in the system.');
     }
 
+    throwIfLeadIntakeInvalid(validateAddressLine1(dto.addressLine1));
+    throwIfLeadIntakeInvalid(
+      validateOccupationIncome(dto.occupation, {
+        monthlyIncome: parseOptionalInrAmount(dto.monthlyIncome)?.toNumber() ?? null,
+        annualTurnover: parseOptionalInrAmount(dto.annualTurnover)?.toNumber() ?? null,
+        annualProfit: parseOptionalInrAmount(dto.annualProfit)?.toNumber() ?? null,
+      }),
+    );
+
     const cityId = await resolveLeadCityId(this.prisma.client, {
       currentCityId: dto.currentCityId ?? null,
       currentCity: dto.currentCity,
@@ -86,6 +101,8 @@ export class SaveLeadDetailsUseCase {
         'Could not resolve your city. Pick a city from the suggestions list and try again.',
       );
     }
+
+    await assertPincodeMatchesCity(this.prisma.client, dto.pincode, cityId);
 
     const dateOfBirth = parseDobUtc(dto.dob);
     const netMonthlyIncome = parseOptionalInrAmount(dto.monthlyIncome);

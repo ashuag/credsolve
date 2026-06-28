@@ -1,6 +1,14 @@
 /** 6-digit Indian pincode */
 export const PINCODE_REGEX = /^\d{6}$/;
 
+/** Minimum annual turnover for self-employed applicants (INR). */
+export const MIN_ANNUAL_TURNOVER = 120_000;
+
+/** Minimum annual profit for self-employed applicants (INR). */
+export const MIN_ANNUAL_PROFIT = 10_000;
+
+const ADDRESS_ALLOWED_PATTERN = /^[\p{L}\p{N} .,#\-/]+$/u;
+
 /** Basic email format check */
 export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -33,3 +41,13 @@ export function isValidPincode(value: string): boolean {
 export function isValidPan(value: string): boolean {
   return PAN_REGEX.test(value.toUpperCase());
 }
+
+export function isValidAddressLine1(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed.length < 5) return false;
+  if (!ADDRESS_ALLOWED_PATTERN.test(trimmed)) return false;
+  return /\d/.test(trimmed) || trimmed.length >= 10;
+}
+
+export const ADDRESS_LINE1_VALIDATION_MESSAGE =
+  'Enter a complete address (at least 10 characters or include a house/flat number).';
