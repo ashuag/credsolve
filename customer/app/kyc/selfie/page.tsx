@@ -8,7 +8,7 @@ import { useCustomerSession } from '@/components/providers/customer-session-prov
 import { AlertBanner } from '@/components/ui/alert-banner';
 import { Spinner } from '@/components/ui/spinner';
 import { getApiUrl } from '@/lib/api-url';
-import { getCustomerJourneyResumePath } from '@/lib/api/customer-session';
+import { getCustomerJourneyResumePath, type CustomerSessionResponse } from '@/lib/api/customer-session';
 import { pickLivenessFailureUserMessage, postKycLiveness, postKycSelfie } from '@/lib/api/kyc-face';
 import { openUserCamera, openUserCameraErrorMessage } from '@/lib/media/open-user-camera';
 
@@ -114,10 +114,10 @@ export default function KycSelfiePage() {
     };
   }, [needsWebcamStream, stopCamera]);
 
-  async function continueToNextStep() {
+  async function continueToNextStep(prefetched?: CustomerSessionResponse) {
     if (navigatingRef.current) return;
     navigatingRef.current = true;
-    const next = await refresh();
+    const next = prefetched ?? (await refresh());
     if (!next.authenticated) {
       navigatingRef.current = false;
       return;
@@ -144,7 +144,7 @@ export default function KycSelfiePage() {
       setError(out.skipReason ?? 'Liveness is not configured on the server.');
       return false;
     }
-    if (out.suggestRetrySelfie || out.faceValidationPassed === false || out.faceMatchPassed === false || out.authenticityPassed === false) {
+    if (out.suggestRetrySelfie || out.faceValidationPassed === false || out.faceMatchPassed === false) {
       setSuggestRetake(true);
       setRetakeSelfie(true);
       setPendingSelfiePreview(null);
@@ -152,7 +152,6 @@ export default function KycSelfiePage() {
     }
     if (!out.livenessPassed) {
       setError(pickLivenessFailureUserMessage(out));
-      await refresh();
       return false;
     }
     return true;
@@ -195,19 +194,20 @@ export default function KycSelfiePage() {
       setRetakeSelfie(false);
       stopCamera();
 
-      const refreshed = await refresh();
-      setPendingSelfiePreview(null);
-      if (!refreshed.authenticated) return;
-
-      const livenessLabel =
-        refreshed.kycFaceProgress?.livenessRequired !== false
-          ? 'Running local face checks, then Tenacio liveness…'
-          : 'Running local face checks…';
-      setBusyLabel(livenessLabel);
+      const livenessRequired =
+        session?.authenticated === true && session.kycFaceProgress?.livenessRequired !== false;
+      setBusyLabel(
+        livenessRequired
+          ? 'Running face checks, then Tenacio liveness & face match…'
+          : 'Running local face checks…',
+      );
       const passed = await runLivenessCheck();
+      const nextSession = await refresh();
+      setPendingSelfiePreview(null);
+      if (!nextSession.authenticated) return;
       if (!passed) return;
 
-      await continueToNextStep();
+      await continueToNextStep(nextSession);
     } catch (e) {
       setPendingSelfiePreview(null);
       const msg = e instanceof Error ? e.message : 'Selfie upload failed.';
@@ -221,11 +221,13 @@ export default function KycSelfiePage() {
   async function handleLiveness() {
     setError('');
     setBusy(true);
-    setBusyLabel('Running local face checks, then Tenacio liveness…');
+    setBusyLabel('Running face checks, then Tenacio liveness & face match…');
     try {
       const passed = await runLivenessCheck();
+      const nextSession = await refresh();
+      if (!nextSession.authenticated) return;
       if (!passed) return;
-      await continueToNextStep();
+      await continueToNextStep(nextSession);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Liveness request failed.');
     } finally {
@@ -276,11 +278,6 @@ export default function KycSelfiePage() {
           <header>
             <p className="m-0 text-[0.7rem] font-[800] uppercase tracking-[0.14em] text-[#1496f3]">KYC</p>
             <h1 className="mt-2 text-brand-navy text-2xl font-[900] tracking-tight">Selfie &amp; liveness</h1>
-            <p className="m-0 text-[0.95rem] leading-relaxed text-brand-muted">
-              Capture your selfie, then we run on-server face validation and Aadhaar face match. We then screen for
-              AI/synthetic media (Tenacio deepfake) and verify liveness (Tenacio). Use a well-lit area and capture a
-              live photo from your camera — uploaded or AI images may be rejected.
-            </p>
           </header>
 
           {error ? <AlertBanner variant="error">{error}</AlertBanner> : null}

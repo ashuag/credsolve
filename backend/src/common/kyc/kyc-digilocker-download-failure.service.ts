@@ -25,11 +25,12 @@ export class KycDigilockerDownloadFailureService {
     private readonly sms: SmsService,
   ) {}
 
-  async readAttemptsUsed(leadId: bigint): Promise<number> {
-    const rows = await this.prisma.client.$queryRaw<Array<{ digilocker_aadhaar_download_attempts: number }>>`
-      SELECT \`digilocker_aadhaar_download_attempts\` FROM \`lead\` WHERE \`id\` = ${leadId} LIMIT 1
-    `;
-    return Number(rows[0]?.digilocker_aadhaar_download_attempts ?? 0);
+  async readAttemptsUsed(applicationId: bigint): Promise<number> {
+    const row = await this.prisma.client.applicationKyc.findUnique({
+      where: { applicationId },
+      select: { digilockerAadhaarDownloadAttempts: true },
+    });
+    return row?.digilockerAadhaarDownloadAttempts ?? 0;
   }
 
   async recordFailureAndEscalate(params: {
@@ -38,11 +39,16 @@ export class KycDigilockerDownloadFailureService {
     customerMobile?: string;
   }): Promise<DigilockerDownloadFailureEscalation> {
     const max = DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS;
-    const attemptsUsed = (await this.readAttemptsUsed(params.leadId)) + 1;
+    const attemptsUsed = (await this.readAttemptsUsed(params.applicationId)) + 1;
 
-    await this.prisma.client.$executeRaw`
-      UPDATE \`lead\` SET \`digilocker_aadhaar_download_attempts\` = ${attemptsUsed} WHERE \`id\` = ${params.leadId}
-    `;
+    await this.prisma.client.applicationKyc.upsert({
+      where: { applicationId: params.applicationId },
+      create: {
+        applicationId: params.applicationId,
+        digilockerAadhaarDownloadAttempts: attemptsUsed,
+      },
+      update: { digilockerAadhaarDownloadAttempts: attemptsUsed },
+    });
 
     const terminalFailure = attemptsUsed >= max;
     if (terminalFailure) {
@@ -105,11 +111,19 @@ export class KycDigilockerDownloadFailureService {
         },
       });
 
+      await tx.applicationKyc.upsert({
+        where: { applicationId: params.applicationId },
+        create: {
+          applicationId: params.applicationId,
+          kycStatus: APPLICATION_KYC_STATUS.FAILED,
+        },
+        update: { kycStatus: APPLICATION_KYC_STATUS.FAILED },
+      });
       await tx.application.update({
         where: { id: params.applicationId },
         data: {
-          kycStatus: APPLICATION_KYC_STATUS.FAILED,
           ...(kycFailedAppStatus ? { applicationStatusId: kycFailedAppStatus.id } : {}),
+          ...(rejectionReason ? { rejectionReasonId: rejectionReason.id } : {}),
         },
       });
     });

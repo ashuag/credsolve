@@ -58,7 +58,11 @@ export class InitDigilockerUseCase {
       leadId: lead.id,
       customerId: customer.id,
     });
-    assertApplicationKycNotCompleted(application.kycStatus);
+    const appKyc = await this.prisma.client.applicationKyc.findUnique({
+      where: { applicationId: application.id },
+      select: { kycStatus: true },
+    });
+    assertApplicationKycNotCompleted(appKyc?.kycStatus);
     await assertActiveApplicationLoanDocumentsAccepted(this.prisma.client, {
       leadId: lead.id,
       customerId: customer.id,

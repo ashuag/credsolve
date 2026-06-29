@@ -237,18 +237,3 @@ export function buildLivenessExtraRows(result: LosTenacioDryRunResult) {
     },
   ];
 }
-
-export function buildDeepfakeExtraRows(result: LosTenacioDryRunResult) {
-  const s = result.summary;
-  return [
-    {
-      label: 'Deepfake detected',
-      value: formatBool(s.deepfakeDetected),
-      tone: s.deepfakeDetected === true ? ('bad' as const) : s.deepfakeDetected === false ? ('ok' as const) : undefined,
-    },
-    {
-      label: 'Authenticity score',
-      value: formatScore(s.authenticityScore),
-    },
-  ];
-}

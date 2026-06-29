@@ -62,6 +62,8 @@ export class LosLeadService {
         leadDetail: {
           select: {
             fullName: true,
+            panNumber: true,
+            panVerified: true,
             occupation: { select: { name: true } },
             city: { select: { name: true, state: { select: { code: true } } } },
           },
@@ -76,8 +78,7 @@ export class LosLeadService {
           orderBy: { createdAt: 'desc' },
           take: 1,
           select: {
-            email: true,
-            eligibility: { select: { cibilScore: true } },
+            details: { select: { emailId: true } },
           },
         },
       },
@@ -91,21 +92,20 @@ export class LosLeadService {
       const stateCode = detail?.city?.state?.code ?? null;
       const city =
         cityName != null ? (stateCode ? `${cityName}, ${stateCode}` : cityName) : null;
-      const cibilScore =
-        lead.bureauReports[0]?.cibilScore ?? lead.applications[0]?.eligibility?.cibilScore ?? null;
+      const cibilScore = lead.bureauReports[0]?.cibilScore ?? null;
 
       return {
         uuid: lead.uuid,
         customerUuid: lead.customer.uuid,
         fullName: formatLosPersonName(detail?.fullName),
-        panNumber: lead.panNumber?.trim().toUpperCase() || null,
+        panNumber: detail?.panNumber?.trim().toUpperCase() || null,
         mobileNumber: lead.customer.mobileNumber,
-        email: lead.applications[0]?.email ?? null,
+        email: lead.applications[0]?.details?.emailId ?? null,
         occupation: detail?.occupation?.name ?? null,
         city,
         cibilScore,
-        panVerified: lead.panVerified,
-        panVerifiedLabel: panVerifiedStatusLabel(lead.panVerified),
+        panVerified: detail?.panVerified ?? 0,
+        panVerifiedLabel: panVerifiedStatusLabel(detail?.panVerified ?? 0),
         rejectionReason: lead.rejectionReason
           ? {
               code: lead.rejectionReason.name,
@@ -145,7 +145,7 @@ export class LosLeadService {
         applications: {
           include: {
             applicationStatus: { select: { name: true, displayName: true } },
-            details: { select: { loanAmount: true, loanTenure: true } },
+            details: { select: { selectedLoanAmount: true, expectedRepaymentDays: true, emailId: true } },
           },
           orderBy: { createdAt: 'desc' },
         },
@@ -159,19 +159,19 @@ export class LosLeadService {
     const latestUtm = lead.leadUtms[0];
     const detail = lead.leadDetail;
     const noteTrimmed = lead.leadStatusNote?.trim() ?? null;
-    const bureauNoteTrimmed = lead.bureauFetchedNote?.trim() ?? null;
+    const bureauNoteTrimmed = detail?.bureauFetchedNote?.trim() ?? null;
 
     return {
       uuid: lead.uuid,
       customerUuid: lead.customer.uuid,
       mobileNumber: lead.customer.mobileNumber,
-      email: lead.applications[0]?.email ?? null,
+      email: lead.applications[0]?.details?.emailId ?? null,
       statusCode: lead.leadStatus.name,
       statusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
-      panVerified: lead.panVerified,
-      panVerifiedLabel: panVerifiedStatusLabel(lead.panVerified),
-      bureauFetched: lead.bureauFetched,
-      bureauFetchedLabel: bureauFetchedStatusLabel(lead.bureauFetched),
+      panVerified: detail?.panVerified ?? 0,
+      panVerifiedLabel: panVerifiedStatusLabel(detail?.panVerified ?? 0),
+      bureauFetched: detail?.bureauFetched ?? 0,
+      bureauFetchedLabel: bureauFetchedStatusLabel(detail?.bureauFetched ?? 0),
       leadStatusNote: noteTrimmed,
       bureauFetchedNote: bureauNoteTrimmed,
       rejectionReason: lead.rejectionReason
@@ -197,7 +197,7 @@ export class LosLeadService {
         ? {
             fullName: formatLosPersonName(detail.fullName),
             dateOfBirth: detail.dateOfBirth ? detail.dateOfBirth.toISOString().slice(0, 10) : null,
-            panNumber: lead.panNumber,
+            panNumber: detail.panNumber,
             pincode: detail.pincode,
             addressLine1: detail.addressLine1,
             addressLine2: detail.addressLine2,
@@ -216,8 +216,8 @@ export class LosLeadService {
         uuid: application.uuid,
         statusCode: application.applicationStatus.name,
         statusLabel: displayName(application.applicationStatus.name, application.applicationStatus.displayName),
-        loanAmount: application.details?.loanAmount?.toString() ?? null,
-        loanTenure: application.details?.loanTenure ?? null,
+        loanAmount: application.details?.selectedLoanAmount?.toString() ?? null,
+        loanTenure: application.details?.expectedRepaymentDays ?? null,
         createdAt: application.createdAt.toISOString(),
         updatedAt: application.updatedAt.toISOString(),
       })),

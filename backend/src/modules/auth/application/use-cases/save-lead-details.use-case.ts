@@ -131,6 +131,7 @@ export class SaveLeadDetailsUseCase {
         annualTurnover,
         annualProfit,
         cibilConsentAt: consentAt,
+        ...(panUpper ? { panNumber: panUpper } : {}),
       },
       update: {
         fullName: dto.fullName.trim(),
@@ -145,15 +146,9 @@ export class SaveLeadDetailsUseCase {
         annualTurnover,
         annualProfit,
         cibilConsentAt: consentAt,
+        ...(panUpper ? { panNumber: panUpper } : {}),
       },
     });
-
-    if (panUpper) {
-      await this.prisma.client.lead.update({
-        where: { id: leadRow.id },
-        data: { panNumber: panUpper },
-      });
-    }
 
     return { success: true, leadUuid: leadRow.uuid };
   }

@@ -2,8 +2,6 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { UploadedFileLike } from '../../../common/types/uploaded-file';
 import {
-  extractDeepfakeDetected,
-  extractDeepfakeScore,
   extractFaceMatchPassed,
   extractFaceMatchScore,
   extractLivenessFaceOccluded,
@@ -42,12 +40,6 @@ export type LosTenacioDryRunResult = {
 
 export type LosFaceMatchCheckResult = {
   local: KycFaceMatchInspection;
-  tenacio: LosTenacioDryRunResult | null;
-  businessOk: boolean;
-};
-
-export type LosDeepfakeCheckResult = {
-  local: KycSelfieFaceInspection;
   tenacio: LosTenacioDryRunResult | null;
   businessOk: boolean;
 };
@@ -223,77 +215,6 @@ export class LosKycDevToolsService {
     return { local, tenacio, businessOk };
   }
 
-  async runDeepfakeCheck(image: UploadedFileLike | undefined): Promise<LosDeepfakeCheckResult> {
-    this.assertJpeg(image, 'image');
-
-    const local = await this.selfieFaceValidation.inspectJpegBuffer(image!.buffer!);
-
-    let tenacio: LosTenacioDryRunResult | null = null;
-    if (!this.kycTenacio.isDeepfakeConfigured()) {
-      tenacio = {
-        configured: false,
-        skipReason: 'Tenacio deepfake is not enabled on this environment.',
-        ok: true,
-        httpStatus: null,
-        vendor: null,
-        businessOk: true,
-        summary: {},
-      };
-    } else if (!local.ok) {
-      tenacio = {
-        configured: false,
-        skipReason: 'Tenacio deepfake skipped because local selfie validation did not pass.',
-        ok: true,
-        httpStatus: null,
-        vendor: null,
-        businessOk: true,
-        summary: {},
-      };
-    } else {
-      const uploadId = randomUUID();
-      const imagePath = devToolUploadRelativePath(uploadId, 'image.jpg');
-      await this.kycFiles.writeBytes(imagePath, image!.buffer!);
-
-      const urlResult = await resolveKycPublicObjectUrl(this.kycFiles, imagePath);
-      if (!urlResult.ok) {
-        tenacio = {
-          configured: false,
-          skipReason: `Tenacio deepfake skipped — ${urlResult.error}`,
-          ok: true,
-          httpStatus: null,
-          vendor: null,
-          businessOk: local.ok,
-          summary: {},
-        };
-      } else {
-        const out = await this.kycTenacio.postDeepfakeCheck(
-          {
-            input: {
-              consent: true,
-              url: urlResult.url,
-            },
-          },
-          null,
-        );
-
-        tenacio = this.buildResult(out, (vendor) => {
-          const deepfakeDetected = extractDeepfakeDetected(vendor);
-          const authenticityScore = extractDeepfakeScore(vendor);
-          return {
-            deepfakeDetected,
-            authenticityScore,
-            imageStoredAs: imagePath,
-          };
-        });
-      }
-    }
-
-    const businessOk =
-      local.ok && (tenacio == null || !tenacio.configured || tenacio.businessOk);
-
-    return { local, tenacio, businessOk };
-  }
-
   private buildResult(
     out: {
       configured: boolean;
@@ -323,7 +244,6 @@ export class LosKycDevToolsService {
 
     let businessOk = vendorStatusOk;
     if (summary.matchPassed === false) businessOk = false;
-    if (summary.deepfakeDetected === true) businessOk = false;
     if (summary.isLive === false) businessOk = false;
     if (summary.multipleFacesDetected === true) businessOk = false;
     if (summary.faceOccluded === true) businessOk = false;

@@ -11,7 +11,12 @@ import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
 import { LoanDocumentApplicationService } from '../../auth/application/services/loan-document-application.service';
-import { LOAN_DOCUMENT_TYPE, type LoanDocumentType } from '../../../common/constants/loan-document.constants';
+import { LOAN_DOCUMENT_ACCEPTANCE_NAME, LOAN_DOCUMENT_TYPE, type LoanDocumentType } from '../../../common/constants/loan-document.constants';
+import {
+  computeFeeAmountsFromLoanDetail,
+  mapLosDisbursementApiView,
+  mapLosLoanDetailsFromStaging,
+} from '../../../common/loan/loan-disbursement-view.util';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -20,37 +25,31 @@ function displayName(name: string, custom: string | null): string {
 const loanDocumentApplicationSelect = {
   id: true,
   uuid: true,
-  email: true,
-  emailVerificationType: true,
-  loanDocumentsAcceptedAt: true,
-  keyFactPdfRelativePath: true,
-  keyFactEsigned: true,
-  loanAgreementPdfRelativePath: true,
-  agreement: {
-    select: {
-      ipAddress: true,
-      signedAt: true,
-    },
-  },
+  customerId: true,
   details: {
     select: {
-      loanAmount: true,
-      loanTenure: true,
-      loanMaturityDate: true,
+      emailId: true,
+      emailVerificationType: true,
+      loanDocumentsAcceptedAt: true,
+      loanDocumentsAcceptedIp: true,
+      keyFactPdfRelativePath: true,
+      keyFactEsigned: true,
+      loanAgreementPdfRelativePath: true,
+      selectedLoanAmount: true,
       interestRate: true,
-      interestAmount: true,
-      processingFee: true,
-      processingFeeAmount: true,
-      gstAmount: true,
+      processingFeePercentage: true,
+      gstPercentage: true,
+      expectedRepaymentDays: true,
+      expectedRepaymentDate: true,
       reasonForLoan: { select: { name: true } },
     },
   },
   customer: { select: { id: true, uuid: true, mobileNumber: true } },
   lead: {
     select: {
-      panNumber: true,
       leadDetail: {
         select: {
+          panNumber: true,
           fullName: true,
           addressLine1: true,
           addressLine2: true,
@@ -61,18 +60,6 @@ const loanDocumentApplicationSelect = {
     },
   },
 } as const;
-
-function sumDecimalAmounts(parts: Array<Prisma.Decimal | null | undefined>): string | null {
-  let total = 0;
-  let any = false;
-  for (const part of parts) {
-    if (part == null) continue;
-    any = true;
-    total += part.toNumber();
-  }
-  if (!any) return null;
-  return total.toFixed(2);
-}
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -131,16 +118,6 @@ function buildLosAadhaarDetail(formJson: unknown): {
   };
 }
 
-function deriveGstPercent(
-  processingFeeAmount: Prisma.Decimal | null | undefined,
-  gstAmount: Prisma.Decimal | null | undefined,
-): string | null {
-  if (processingFeeAmount == null || gstAmount == null) return null;
-  const fee = processingFeeAmount.toNumber();
-  if (fee <= 0) return null;
-  return ((gstAmount.toNumber() / fee) * 100).toFixed(2);
-}
-
 function maskBankDetails(bankName: string | null | undefined, accountNumber: string | null | undefined, ifscCode: string | null | undefined): string | null {
   const bank = bankName?.trim();
   const tail = accountNumber?.replace(/\D/g, '').slice(-4);
@@ -196,54 +173,63 @@ export class LosApplicationService {
         applicationStatus: { select: { name: true, displayName: true } },
         details: {
           select: {
-            loanAmount: true,
-            interestAmount: true,
-            processingFee: true,
-            processingFeeAmount: true,
-            gstAmount: true,
-            loanMaturityDate: true,
+            selectedLoanAmount: true,
+            processingFeePercentage: true,
+            gstPercentage: true,
+            expectedRepaymentDays: true,
+            expectedRepaymentDate: true,
+            bankAccountNumber: true,
+            ifscCode: true,
+            bankName: true,
+            interestRate: true,
+            emailId: true,
           },
         },
-        eligibility: { select: { cibilScore: true, approvedAmount: true } },
-        disbursement: { select: { bankName: true, accountNumber: true, ifscCode: true } },
+        kyc: { select: { kycStatus: true } },
+        loanAccount: {
+          select: {
+            totalRepaymentAmount: true,
+            loanMaturityDate: true,
+            disbursedAt: true,
+            principalAmount: true,
+            loanAccountNumber: true,
+          },
+        },
       },
       take: 500,
     });
 
     return applications.map((application) => {
-      const details = application.details;
-      const repaymentAmount = details
-        ? sumDecimalAmounts([
-            details.loanAmount,
-            details.interestAmount,
-            details.processingFeeAmount,
-            details.gstAmount,
-          ])
-        : null;
-      const eligibleLoanAmount =
-        application.eligibility?.approvedAmount?.toString()
-        ?? application.preApprovedLoanAmount?.toString()
-        ?? null;
+      const appDetails = application.details;
+      const loanAccount = application.loanAccount;
+      const fees = computeFeeAmountsFromLoanDetail(appDetails);
+      const kycStatus = application.kyc?.kycStatus ?? 0;
+      const repaymentAmount =
+        loanAccount?.totalRepaymentAmount?.toString()
+        ?? (fees.repaymentAmount != null ? fees.repaymentAmount.toFixed(2) : null);
+      const eligibleLoanAmount = application.preApprovedLoanAmount?.toString() ?? null;
 
       return {
         uuid: application.uuid,
         customerUuid: application.customer.uuid,
         leadUuid: application.lead.uuid,
         mobileNumber: application.customer.mobileNumber,
-        email: application.email,
+        email: appDetails?.emailId ?? null,
         fullName: formatLosPersonName(application.lead.leadDetail?.fullName),
-        cibilScore: application.eligibility?.cibilScore ?? null,
+        cibilScore: null,
         eligibleLoanAmount,
-        selectedLoanAmount: details?.loanAmount?.toString() ?? null,
-        repayDate: details?.loanMaturityDate?.toISOString().slice(0, 10) ?? null,
+        selectedLoanAmount: appDetails?.selectedLoanAmount?.toString() ?? null,
+        repayDate: loanAccount
+          ? loanAccount.loanMaturityDate.toISOString().slice(0, 10)
+          : appDetails?.expectedRepaymentDate?.toISOString().slice(0, 10) ?? null,
         repaymentAmount,
         emi: repaymentAmount,
-        processingFeePercent: details?.processingFee?.toString() ?? null,
-        processingFeeAmount: details?.processingFeeAmount?.toString() ?? null,
+        processingFeePercent: appDetails?.processingFeePercentage?.toString() ?? null,
+        processingFeeAmount: fees.processingFeeAmount != null ? fees.processingFeeAmount.toFixed(2) : null,
         bankDetails: maskBankDetails(
-          application.disbursement?.bankName,
-          application.disbursement?.accountNumber,
-          application.disbursement?.ifscCode,
+          appDetails?.bankName,
+          appDetails?.bankAccountNumber,
+          appDetails?.ifscCode,
         ),
         statusCode: application.applicationStatus.name,
         statusLabel: displayName(application.applicationStatus.name, application.applicationStatus.displayName),
@@ -256,9 +242,9 @@ export class LosApplicationService {
             }
           : null,
         leadStatusNote: application.lead.leadStatusNote?.trim() || null,
-        kycStatus: application.kycStatus,
-        kycStatusLabel: applicationKycStatusLabel(application.kycStatus),
-        kycCompleted: application.kycStatus === 1,
+        kycStatus,
+        kycStatusLabel: applicationKycStatusLabel(kycStatus),
+        kycCompleted: kycStatus === 1,
         createdAt: application.createdAt.toISOString(),
         updatedAt: application.updatedAt.toISOString(),
       };
@@ -275,15 +261,6 @@ export class LosApplicationService {
             leadStatus: { select: { name: true, displayName: true } },
             rejectionReason: { select: { name: true } },
             source: { select: { name: true, type: true } },
-            leadReferences: {
-              orderBy: { referenceIndex: 'asc' },
-              select: {
-                referenceIndex: true,
-                fullName: true,
-                mobileNumber: true,
-                relation: { select: { name: true } },
-              },
-            },
             leadDetail: {
               include: {
                 city: { select: { name: true, state: { select: { name: true, code: true } } } },
@@ -300,9 +277,17 @@ export class LosApplicationService {
             reasonForLoan: { select: { name: true } },
           },
         },
-        eligibility: true,
-        agreement: true,
-        disbursement: true,
+        kyc: true,
+        references: {
+          orderBy: { referenceIndex: 'asc' },
+          select: {
+            referenceIndex: true,
+            fullName: true,
+            mobileNumber: true,
+            relation: { select: { name: true } },
+          },
+        },
+        loanAccount: true,
       },
     });
 
@@ -330,11 +315,17 @@ export class LosApplicationService {
         leadId: application.leadId,
         customerUuid: application.customer.uuid,
       });
-      bureauReportPdfUrl = pdfResult?.publicUrl ?? null;
+      bureauReportPdfUrl = this.resolveBureauReportPdfUrl(application.uuid, pdfResult, true);
     }
 
-    const selfieRelativePath = application.selfieRelativePath?.trim() || null;
-    const aadhaarPhotoRelativePath = application.aadhaarPhotoRelativePath?.trim() || null;
+    const customerKyc = await this.prisma.client.customerKyc.findFirst({
+      where: { customerId: application.customerId },
+      orderBy: { createdAt: 'desc' },
+      select: { aadhaarData: true, aadhaarPhotoPath: true },
+    });
+
+    const selfieRelativePath = application.kyc?.livenessSelfiePath?.trim() || null;
+    const aadhaarPhotoRelativePath = customerKyc?.aadhaarPhotoPath?.trim() || null;
     const photoVersion = application.updatedAt.getTime();
     const [selfiePublicUrl, aadhaarPublicUrl] = await Promise.all([
       selfieRelativePath ? this.kycFiles.resolvePublicReadUrl(selfieRelativePath) : Promise.resolve(null),
@@ -348,24 +339,24 @@ export class LosApplicationService {
       customerUuid: application.customer.uuid,
       leadUuid: lead.uuid,
       mobileNumber: application.customer.mobileNumber,
-      email: application.email,
-      emailVerifiedAt: application.emailVerifiedAt?.toISOString() ?? null,
+      email: application.details?.emailId ?? null,
+      emailVerifiedAt: application.details?.emailVerifiedAt?.toISOString() ?? null,
       statusCode: application.applicationStatus.name,
       statusLabel: displayName(application.applicationStatus.name, application.applicationStatus.displayName),
-      kycStatus: application.kycStatus,
-      kycStatusLabel: applicationKycStatusLabel(application.kycStatus),
-      kycCompletedAt: application.kycCompletedAt?.toISOString() ?? null,
-      livenessPassed: application.livenessPassed,
-      livenessCheckedAt: application.livenessCheckedAt?.toISOString() ?? null,
+      kycStatus: application.kyc?.kycStatus ?? 0,
+      kycStatusLabel: applicationKycStatusLabel(application.kyc?.kycStatus ?? 0),
+      kycCompletedAt: application.kyc?.kycCompletedAt?.toISOString() ?? null,
+      livenessPassed: application.kyc?.livenessPassed ?? false,
+      livenessCheckedAt: application.kyc?.livenessCheckedAt?.toISOString() ?? null,
       selfieFaceValidation: parsePersistedSelfieFaceValidation(
-        application.selfieFaceValidationJson,
-        application.selfieFaceValidationPassed,
-        application.selfieFaceValidationCheckedAt,
+        application.kyc?.selfieFaceValidationJson,
+        application.kyc?.selfieFaceValidationPassed ?? false,
+        application.kyc?.faceMatchCheckedAt ?? null,
       ),
       livenessSummary: buildLivenessVendorSummary({
-        passed: application.livenessPassed,
-        checkedAt: application.livenessCheckedAt,
-        vendor: application.livenessVendorJson,
+        passed: application.kyc?.livenessPassed ?? false,
+        checkedAt: application.kyc?.livenessCheckedAt ?? null,
+        vendor: application.kyc?.livenessVendorJson,
       }),
       kycPhotos: {
         selfiePath: selfieRelativePath,
@@ -385,8 +376,8 @@ export class LosApplicationService {
         statusCode: lead.leadStatus.name,
         statusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
         leadStatusNote: lead.leadStatusNote?.trim() || null,
-        bureauFetchedNote: lead.bureauFetchedNote?.trim() || null,
-        bureauFetched: lead.bureauFetched,
+        bureauFetchedNote: detail?.bureauFetchedNote?.trim() || null,
+        bureauFetched: detail?.bureauFetched ?? 0,
         rejectionReason: lead.rejectionReason
           ? {
               code: lead.rejectionReason.name,
@@ -403,13 +394,13 @@ export class LosApplicationService {
           term: utm.utmTerm,
           content: utm.utmContent,
         })),
-        panNumber: lead.panNumber,
-        panVerified: lead.panVerified,
+        panNumber: detail?.panNumber ?? null,
+        panVerified: detail?.panVerified ?? 0,
         profile: detail
           ? {
               fullName: formatLosPersonName(detail.fullName),
               dateOfBirth: detail.dateOfBirth ? detail.dateOfBirth.toISOString().slice(0, 10) : null,
-              panNumber: lead.panNumber,
+              panNumber: detail.panNumber,
               pincode: detail.pincode,
               addressLine1: detail.addressLine1,
               addressLine2: detail.addressLine2,
@@ -427,56 +418,16 @@ export class LosApplicationService {
             }
           : null,
       },
-      referencesCount: lead.leadReferences.length,
-      references: lead.leadReferences.map((ref) => ({
+      referencesCount: application.references.length,
+      references: application.references.map((ref) => ({
         referenceIndex: ref.referenceIndex,
         fullName: formatLosPersonName(ref.fullName) ?? ref.fullName,
         mobileNumber: ref.mobileNumber,
         relation: ref.relation.name,
       })),
-      aadhaarDetail: buildLosAadhaarDetail(application.digilockerAadhaarFormJson),
+      aadhaarDetail: buildLosAadhaarDetail(customerKyc?.aadhaarData),
       details: application.details
-        ? (() => {
-            const details = application.details;
-            const repaymentAmount = sumDecimalAmounts([
-              details.loanAmount,
-              details.interestAmount,
-              details.processingFeeAmount,
-              details.gstAmount,
-            ]);
-            const disbursedAmount =
-              details.loanAmount != null
-                ? (
-                    details.loanAmount.toNumber()
-                    - (details.processingFeeAmount?.toNumber() ?? 0)
-                    - (details.gstAmount?.toNumber() ?? 0)
-                  ).toFixed(2)
-                : null;
-            return {
-              reasonForLoan: details.reasonForLoan?.name ?? null,
-              loanAmount: details.loanAmount?.toString() ?? null,
-              loanTenure: details.loanTenure,
-              interestRate: details.interestRate?.toString() ?? null,
-              interestAmount: details.interestAmount?.toString() ?? null,
-              processingFee: details.processingFee?.toString() ?? null,
-              processingFeeAmount: details.processingFeeAmount?.toString() ?? null,
-              gstPercent: deriveGstPercent(details.processingFeeAmount, details.gstAmount),
-              gstAmount: details.gstAmount?.toString() ?? null,
-              disbursedAmount,
-              repaymentAmount,
-              loanDisbursementDate: details.loanDisbursementDate?.toISOString().slice(0, 10) ?? null,
-              loanMaturityDate: details.loanMaturityDate?.toISOString().slice(0, 10) ?? null,
-            };
-          })()
-        : null,
-      eligibility: application.eligibility
-        ? {
-            isEligible: application.eligibility.isEligible,
-            approvedAmount: application.eligibility.approvedAmount?.toString() ?? null,
-            cibilScore: application.eligibility.cibilScore,
-            ineligibleReason: application.eligibility.ineligibleReason,
-            checkedAt: application.eligibility.checkedAt.toISOString(),
-          }
+        ? mapLosLoanDetailsFromStaging(application.details)
         : null,
       bureauReport: bureauReportRow
         ? {
@@ -487,28 +438,29 @@ export class LosApplicationService {
             fetchedAt: bureauReportRow.createdAt.toISOString(),
           }
         : null,
-      agreement: application.agreement
+      agreement: buildLoanAgreementView(application.details),
+      disbursement: mapLosDisbursementApiView(application.details, application.loanAccount),
+      loanAccount: application.loanAccount
         ? {
-            documentName: application.agreement.documentName,
-            signedAt: application.agreement.signedAt?.toISOString() ?? null,
-            ipAddress: application.agreement.ipAddress,
-          }
-        : null,
-      disbursement: application.disbursement
-        ? {
-            amount: application.disbursement.amount?.toString() ?? null,
-            accountNumber: application.disbursement.accountNumber,
-            ifscCode: application.disbursement.ifscCode,
-            bankName: application.disbursement.bankName,
-            utr: application.disbursement.utr,
-            disbursedAt: application.disbursement.disbursedAt?.toISOString() ?? null,
+            loanAccountNumber: application.loanAccount.loanAccountNumber,
+            principalAmount: application.loanAccount.principalAmount.toString(),
+            netDisbursedAmount: application.loanAccount.netDisbursedAmount.toString(),
+            interestRate: application.loanAccount.interestRate.toString(),
+            interestAmount: application.loanAccount.interestAmount.toString(),
+            totalRepaymentAmount: application.loanAccount.totalRepaymentAmount.toString(),
+            disbursedAt: application.loanAccount.disbursedAt.toISOString(),
+            loanMaturityDate: application.loanAccount.loanMaturityDate.toISOString().slice(0, 10),
+            utr: application.loanAccount.utr,
+            bankAccountNumber: application.loanAccount.bankAccountNumber,
+            ifscCode: application.loanAccount.ifscCode,
+            closedAt: application.loanAccount.closedAt?.toISOString() ?? null,
           }
         : null,
       loanDocuments: {
-        keyFactReady: !!application.keyFactPdfRelativePath?.trim(),
-        keyFactEsigned: application.keyFactEsigned ?? false,
-        loanAgreementReady: !!application.loanAgreementPdfRelativePath?.trim(),
-        acceptedAt: application.loanDocumentsAcceptedAt?.toISOString() ?? null,
+        keyFactReady: !!application.details?.keyFactPdfRelativePath?.trim(),
+        keyFactEsigned: application.details?.keyFactEsigned ?? false,
+        loanAgreementReady: !!application.details?.loanAgreementPdfRelativePath?.trim(),
+        acceptedAt: application.details?.loanDocumentsAcceptedAt?.toISOString() ?? null,
       },
     };
   }
@@ -516,12 +468,12 @@ export class LosApplicationService {
   async serveApplicationSelfiePhoto(applicationUuid: string, res: Response): Promise<void> {
     const application = await this.prisma.client.application.findUnique({
       where: { uuid: applicationUuid },
-      select: { selfieRelativePath: true },
+      select: { kyc: { select: { livenessSelfiePath: true } } },
     });
     if (!application) {
       throw new NotFoundException('Application not found');
     }
-    const rel = application.selfieRelativePath?.trim();
+    const rel = application.kyc?.livenessSelfiePath?.trim();
     if (!rel) {
       throw new NotFoundException('Selfie is not saved yet.');
     }
@@ -531,12 +483,17 @@ export class LosApplicationService {
   async serveApplicationAadhaarPhoto(applicationUuid: string, res: Response): Promise<void> {
     const application = await this.prisma.client.application.findUnique({
       where: { uuid: applicationUuid },
-      select: { aadhaarPhotoRelativePath: true },
+      select: { customerId: true },
     });
     if (!application) {
       throw new NotFoundException('Application not found');
     }
-    const rel = application.aadhaarPhotoRelativePath?.trim();
+    const customerKyc = await this.prisma.client.customerKyc.findFirst({
+      where: { customerId: application.customerId },
+      orderBy: { createdAt: 'desc' },
+      select: { aadhaarPhotoPath: true },
+    });
+    const rel = customerKyc?.aadhaarPhotoPath?.trim();
     if (!rel) {
       throw new NotFoundException('Aadhaar photo is not available yet.');
     }
@@ -556,15 +513,18 @@ export class LosApplicationService {
     });
     if (!application) throw new NotFoundException('Application not found.');
 
-    const existing = this.loanDocs.relativePathForType(docType, application);
-    const canGenerate = Boolean(application.details?.loanAmount && application.details?.loanTenure);
+    const docCtx = toLoanDocumentContext(application);
+    const existing = this.loanDocs.relativePathForType(docType, docCtx);
+    const canGenerate = Boolean(
+      application.details?.selectedLoanAmount && application.details?.expectedRepaymentDays,
+    );
 
     let rel: string;
     if (canGenerate) {
       const merge = this.loanDocs.buildMergeInput({
         customer: application.customer,
         lead: application.lead,
-        application,
+        application: docCtx,
       });
       rel = await this.loanDocs.ensurePdf(
         docType,
@@ -574,7 +534,7 @@ export class LosApplicationService {
         merge,
         existing,
         false,
-        application.loanDocumentsAcceptedAt != null,
+        docCtx.loanDocumentsAcceptedAt != null,
       );
     } else {
       rel = existing?.trim() ?? '';
@@ -606,6 +566,43 @@ export class LosApplicationService {
     const lower = relativePath.toLowerCase();
     const mime = lower.endsWith('.png') ? 'image/png' : 'image/jpeg';
     res.setHeader('Content-Type', mime);
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.send(buf);
+  }
+
+  async serveApplicationCibilReportPdf(applicationUuid: string, res: Response): Promise<void> {
+    const application = await this.prisma.client.application.findUnique({
+      where: { uuid: applicationUuid },
+      select: {
+        leadId: true,
+        customer: { select: { uuid: true } },
+      },
+    });
+
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+
+    const pdfResult = await this.bureauReportPdf.ensurePdfForLead({
+      leadId: application.leadId,
+      customerUuid: application.customer.uuid,
+    });
+    if (!pdfResult?.relativePath) {
+      throw new NotFoundException('Bureau report PDF is not available for this application.');
+    }
+
+    let buf: Buffer;
+    try {
+      buf = await this.kycFiles.readBytes(pdfResult.relativePath);
+    } catch (err) {
+      if (isStorageObjectMissing(err)) {
+        throw new NotFoundException('Bureau report PDF file is missing from storage.');
+      }
+      throw err;
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="cibil-summary-report.pdf"');
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     res.send(buf);
   }
@@ -652,7 +649,7 @@ export class LosApplicationService {
     return {
       bureauReportUuid: bureauReportRow.uuid,
       fetchedAt: bureauReportRow.createdAt.toISOString(),
-      reportPdfUrl: pdfResult?.publicUrl ?? null,
+      reportPdfUrl: this.resolveBureauReportPdfUrl(applicationUuid, pdfResult, true),
       htmlUrl: bureauReportRow.htmlUrl,
       rawPayload: bureauReportRow.rawPayload,
       report,
@@ -666,18 +663,19 @@ export class LosApplicationService {
     });
 
     if (!application) throw new NotFoundException(`Application ${applicationUuid} not found`);
-    if (!application.details?.loanAmount || !application.details?.loanTenure) {
+    if (!application.details?.selectedLoanAmount || !application.details?.expectedRepaymentDays) {
       throw new NotFoundException('Loan selection is incomplete — cannot generate documents.');
     }
 
+    const docCtx = toLoanDocumentContext(application);
     const merge = this.loanDocs.buildMergeInput({
       customer: application.customer,
       lead: application.lead,
-      application,
+      application: docCtx,
     });
 
     const docType = LOAN_DOCUMENT_TYPE.KEY_FACT;
-    const existing = this.loanDocs.relativePathForType(docType, application);
+    const existing = this.loanDocs.relativePathForType(docType, docCtx);
     await this.loanDocs.ensurePdf(
       docType,
       application.customer.uuid,
@@ -686,15 +684,77 @@ export class LosApplicationService {
       merge,
       existing,
       true,
-      application.loanDocumentsAcceptedAt != null,
+      docCtx.loanDocumentsAcceptedAt != null,
     );
     const generated = [docType];
 
     return { applicationUuid, generated };
+  }
+
+  /** Public CDN/presigned URL, or LOS-authenticated download path when the bucket is private. */
+  private resolveBureauReportPdfUrl(
+    applicationUuid: string,
+    pdfResult: { relativePath: string; publicUrl: string | null } | null,
+    hasBureauReport: boolean,
+  ): string | null {
+    if (!hasBureauReport) return null;
+    if (pdfResult?.publicUrl) return pdfResult.publicUrl;
+    return `/applications/${applicationUuid}/cibil-report/pdf`;
   }
 }
 
 function isStorageObjectMissing(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   return msg.includes('NoSuchKey') || msg.includes('S3 GET failed (404)') || msg.includes('S3 HEAD failed (404)');
+}
+
+function buildLoanAgreementView(
+  details: {
+    loanDocumentsAcceptedAt: Date | null;
+    loanDocumentsAcceptedIp: string | null;
+  } | null,
+) {
+  if (!details?.loanDocumentsAcceptedAt) {
+    return null;
+  }
+  return {
+    documentName: LOAN_DOCUMENT_ACCEPTANCE_NAME,
+    signedAt: details.loanDocumentsAcceptedAt.toISOString(),
+    ipAddress: details.loanDocumentsAcceptedIp,
+  };
+}
+
+function toLoanDocumentContext(
+  application: {
+    id: bigint;
+    uuid: string;
+    details: {
+      emailId: string | null;
+      emailVerificationType: string | null;
+      loanDocumentsAcceptedAt: Date | null;
+      loanDocumentsAcceptedIp: string | null;
+      keyFactPdfRelativePath: string | null;
+      loanAgreementPdfRelativePath: string | null;
+      selectedLoanAmount: { toString(): string } | null;
+      interestRate: { toString(): string } | null;
+      processingFeePercentage: { toString(): string } | null;
+      gstPercentage: { toString(): string } | null;
+      expectedRepaymentDays: number | null;
+      expectedRepaymentDate: Date | null;
+      reasonForLoan: { name: string } | null;
+    } | null;
+  },
+) {
+  const details = application.details;
+  return {
+    id: application.id,
+    uuid: application.uuid,
+    email: details?.emailId ?? null,
+    emailVerificationType: details?.emailVerificationType ?? null,
+    loanDocumentsAcceptedAt: details?.loanDocumentsAcceptedAt ?? null,
+    loanDocumentsAcceptedIp: details?.loanDocumentsAcceptedIp ?? null,
+    keyFactPdfRelativePath: details?.keyFactPdfRelativePath ?? null,
+    loanAgreementPdfRelativePath: details?.loanAgreementPdfRelativePath ?? null,
+    details,
+  };
 }

@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
+import { computeFeeAmountsFromLoanDetail } from '../../../../common/loan/loan-disbursement-view.util';
 import type {
   CustomerLoanCard,
   CustomerLoanRepaymentLine,
@@ -21,18 +22,6 @@ function decToAmountString(value: Prisma.Decimal | null | undefined): string | n
   const n = value.toNumber();
   if (!Number.isFinite(n)) return null;
   return n.toFixed(2);
-}
-
-function sumAmounts(parts: Array<Prisma.Decimal | null | undefined>): string | null {
-  let total = 0;
-  let any = false;
-  for (const p of parts) {
-    if (p == null) continue;
-    any = true;
-    total += p.toNumber();
-  }
-  if (!any) return null;
-  return total.toFixed(2);
 }
 
 function isoDateOnly(d: Date | null | undefined): string | null {
@@ -65,39 +54,50 @@ function mapRow(r: {
   uuid: string;
   applicationStatus: { name: string };
   details: {
-    loanAmount: Prisma.Decimal | null;
-    loanTenure: number | null;
-    interestAmount: Prisma.Decimal | null;
-    processingFeeAmount: Prisma.Decimal | null;
-    gstAmount: Prisma.Decimal | null;
-    loanMaturityDate: Date | null;
-  } | null;
-  disbursement: {
-    disbursedAt: Date | null;
+    selectedLoanAmount: Prisma.Decimal | null;
+    expectedRepaymentDays: number | null;
+    expectedRepaymentDate: Date | null;
+    bankAccountNumber: string | null;
     bankName: string | null;
-    accountNumber: string | null;
+    interestRate: Prisma.Decimal | null;
+    processingFeePercentage: Prisma.Decimal | null;
+    gstPercentage: Prisma.Decimal | null;
+  } | null;
+  loanAccount: {
+    principalAmount: Prisma.Decimal;
+    totalRepaymentAmount: Prisma.Decimal;
+    loanMaturityDate: Date;
+    disbursedAt: Date;
+    bankAccountNumber: string | null;
   } | null;
 }): CustomerLoanCard {
-  const d = r.details;
-  const totalRepayment = sumAmounts([
-    d?.loanAmount ?? null,
-    d?.interestAmount ?? null,
-    d?.processingFeeAmount ?? null,
-    d?.gstAmount ?? null,
-  ]);
+  const loanDetail = r.details;
+  const loanAccount = r.loanAccount;
+  const fees = computeFeeAmountsFromLoanDetail(loanDetail);
 
   return {
     applicationUuid: r.uuid,
     status: r.applicationStatus.name,
-    loanAmount: decToAmountString(d?.loanAmount ?? null),
-    tenureDays: d?.loanTenure ?? null,
-    interestAmount: decToAmountString(d?.interestAmount ?? null),
-    processingFeeAmount: decToAmountString(d?.processingFeeAmount ?? null),
-    gstAmount: decToAmountString(d?.gstAmount ?? null),
-    totalRepayment,
-    maturityDate: isoDateOnly(d?.loanMaturityDate ?? null),
-    disbursedAt: r.disbursement?.disbursedAt ? r.disbursement.disbursedAt.toISOString() : null,
-    bankDisplay: maskBank(r.disbursement?.bankName ?? null, r.disbursement?.accountNumber ?? null),
+    loanAmount: loanAccount
+      ? decToAmountString(loanAccount.principalAmount)
+      : decToAmountString(loanDetail?.selectedLoanAmount ?? null),
+    tenureDays: loanDetail?.expectedRepaymentDays ?? null,
+    interestAmount: fees.interestAmount != null ? fees.interestAmount.toFixed(2) : null,
+    processingFeeAmount: fees.processingFeeAmount != null ? fees.processingFeeAmount.toFixed(2) : null,
+    gstAmount: fees.gstAmount != null ? fees.gstAmount.toFixed(2) : null,
+    totalRepayment: loanAccount
+      ? decToAmountString(loanAccount.totalRepaymentAmount)
+      : fees.repaymentAmount != null
+        ? fees.repaymentAmount.toFixed(2)
+        : null,
+    maturityDate: loanAccount
+      ? isoDateOnly(loanAccount.loanMaturityDate)
+      : isoDateOnly(loanDetail?.expectedRepaymentDate ?? null),
+    disbursedAt: loanAccount ? loanAccount.disbursedAt.toISOString() : null,
+    bankDisplay: maskBank(
+      loanDetail?.bankName ?? null,
+      loanAccount?.bankAccountNumber ?? loanDetail?.bankAccountNumber ?? null,
+    ),
   };
 }
 
@@ -127,43 +127,52 @@ export class GetCustomerLoansDashboardUseCase {
         applicationStatus: { select: { name: true } },
         details: {
           select: {
-            loanAmount: true,
-            loanTenure: true,
-            interestAmount: true,
-            processingFeeAmount: true,
-            gstAmount: true,
-            loanMaturityDate: true,
+            selectedLoanAmount: true,
+            expectedRepaymentDays: true,
+            expectedRepaymentDate: true,
+            bankAccountNumber: true,
+            ifscCode: true,
+            bankName: true,
+            interestRate: true,
+            processingFeePercentage: true,
+            gstPercentage: true,
           },
         },
-        disbursement: {
+        loanAccount: {
           select: {
+            principalAmount: true,
+            totalRepaymentAmount: true,
+            loanMaturityDate: true,
             disbursedAt: true,
-            bankName: true,
-            accountNumber: true,
+            bankAccountNumber: true,
           },
         },
       },
     });
 
     const todayStart = startOfTodayUtc();
-
     const cards = rows.map(mapRow);
+
+    const maturityFor = (raw: (typeof rows)[number]) =>
+      raw.loanAccount?.loanMaturityDate ?? raw.details?.expectedRepaymentDate ?? null;
+
+    const disbursedAtFor = (raw: (typeof rows)[number]) => raw.loanAccount?.disbursedAt ?? null;
 
     const activeIndices = rows
       .map((raw, i) => ({ raw, i }))
       .filter(({ raw }) => {
         if (isTerminalApplicationStatus(raw.applicationStatus.name)) return false;
-        const maturity = raw.details?.loanMaturityDate ?? null;
+        const maturity = maturityFor(raw);
         if (!maturity) return false;
         const maturityStart = new Date(
           Date.UTC(maturity.getUTCFullYear(), maturity.getUTCMonth(), maturity.getUTCDate())
         );
-        const disbursed = isDisbursedRow(raw.disbursement?.disbursedAt ?? null, raw.applicationStatus.name);
+        const disbursed = isDisbursedRow(disbursedAtFor(raw), raw.applicationStatus.name);
         return disbursed && maturityStart >= todayStart;
       })
       .sort((a, b) => {
-        const da = a.raw.disbursement?.disbursedAt?.getTime() ?? 0;
-        const db = b.raw.disbursement?.disbursedAt?.getTime() ?? 0;
+        const da = disbursedAtFor(a.raw)?.getTime() ?? 0;
+        const db = disbursedAtFor(b.raw)?.getTime() ?? 0;
         return db - da;
       })
       .map(({ i }) => i);
@@ -174,40 +183,40 @@ export class GetCustomerLoansDashboardUseCase {
       const raw = rows[i];
       const status = raw.applicationStatus.name;
       if (isTerminalApplicationStatus(status)) return true;
-      const maturity = raw.details?.loanMaturityDate ?? null;
+      const maturity = maturityFor(raw);
       if (!maturity) return false;
       const maturityStart = new Date(
         Date.UTC(maturity.getUTCFullYear(), maturity.getUTCMonth(), maturity.getUTCDate())
       );
-      const disbursed = isDisbursedRow(raw.disbursement?.disbursedAt ?? null, status);
+      const disbursed = isDisbursedRow(disbursedAtFor(raw), status);
       return disbursed && maturityStart < todayStart;
     });
 
     const isActiveRow = (raw: (typeof rows)[number]): boolean => {
       if (isTerminalApplicationStatus(raw.applicationStatus.name)) return false;
-      const maturity = raw.details?.loanMaturityDate ?? null;
+      const maturity = maturityFor(raw);
       if (!maturity) return false;
       const maturityStart = new Date(
         Date.UTC(maturity.getUTCFullYear(), maturity.getUTCMonth(), maturity.getUTCDate())
       );
-      const disbursed = isDisbursedRow(raw.disbursement?.disbursedAt ?? null, raw.applicationStatus.name);
+      const disbursed = isDisbursedRow(disbursedAtFor(raw), raw.applicationStatus.name);
       return disbursed && maturityStart >= todayStart;
     };
 
     const isPastRow = (raw: (typeof rows)[number]): boolean => {
       if (isTerminalApplicationStatus(raw.applicationStatus.name)) return true;
-      const maturity = raw.details?.loanMaturityDate ?? null;
+      const maturity = maturityFor(raw);
       if (!maturity) return false;
       const maturityStart = new Date(
         Date.UTC(maturity.getUTCFullYear(), maturity.getUTCMonth(), maturity.getUTCDate())
       );
-      const disbursed = isDisbursedRow(raw.disbursement?.disbursedAt ?? null, raw.applicationStatus.name);
+      const disbursed = isDisbursedRow(disbursedAtFor(raw), raw.applicationStatus.name);
       return disbursed && maturityStart < todayStart;
     };
 
     const inProgress = cards.filter((_, i) => {
       const raw = rows[i];
-      if (raw.details?.loanAmount == null) return false;
+      if (raw.details?.selectedLoanAmount == null) return false;
       if (isActiveRow(raw)) return false;
       if (isPastRow(raw)) return false;
       return true;
@@ -217,7 +226,7 @@ export class GetCustomerLoansDashboardUseCase {
     for (const i of activeIndices) {
       const card = cards[i];
       const raw = rows[i];
-      const maturity = raw.details?.loanMaturityDate ?? null;
+      const maturity = maturityFor(raw);
       const total = card.totalRepayment;
       if (maturity && total) {
         const maturityStart = new Date(

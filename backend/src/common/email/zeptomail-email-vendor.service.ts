@@ -57,7 +57,7 @@ export class ZeptomailEmailVendorService {
     const apiUrl = resolveZeptomailApiUrl(this.config);
 
     if (!from || !token) {
-      throw new Error('EMAIL_FROM and EMAIL_PASSOWRD (Zeptomail send-mail token) are required');
+      throw new Error('EMAIL_FROM and EMAIL_AUTH_KEY (Zeptomail send-mail token) are required');
     }
 
     const attachments = (input.attachments ?? []).map((attachment) => ({

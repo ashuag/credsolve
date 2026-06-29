@@ -2,33 +2,29 @@
 
 import './application-review.css';
 
-import Link from 'next/link';
 import {
   ReviewBankPanel,
   ReviewCibilPanel,
   ReviewKycPanel,
   ReviewLoanPanel,
   ReviewPersonalPanel,
+  ReviewRecordIdsPanel,
   ReviewReferencesPanel,
   ReviewSourcesPanel,
+  ReviewTimelinePanel,
 } from '@/components/applications/review/application-review-panels';
 import { ApplicationReviewHero } from '@/components/applications/review/application-review-hero';
-import { ApplicationReviewToolbar, CopyUuidButton } from '@/components/applications/review/application-review-ui';
+import { ApplicationReviewToolbar } from '@/components/applications/review/application-review-ui';
 import { canRejectApplicationStatus, RejectRecordModal } from '@/components/shared/reject-record-modal';
-import { LosStatusPill } from '@/components/shared/los-status-pill';
 import { buildReviewFlags } from '@/lib/application-review-flags';
 import { isApplicationRecordRejected } from '@/lib/application-workspace-status';
-import {
-  formatReviewDateTime,
-  truncateUuid,
-} from '@/lib/application-review-format';
 import { buildApplicationJourney, journeyProgressPercent } from '@/lib/customer-journey';
 import { extractCibilPan } from '@/lib/kyc-field-match';
 import { formatPersonName } from '@/lib/format-person-name';
 import { getApplicationCibilReport, type LosApplicationDetails } from '@/lib/api';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-type ReviewTab = 'personal' | 'cibil' | 'loan' | 'kyc' | 'bank' | 'refs' | 'utm';
+type ReviewTab = 'personal' | 'cibil' | 'loan' | 'kyc' | 'bank' | 'refs' | 'utm' | 'ids' | 'timeline';
 
 export function ApplicationReviewDashboard({
   row,
@@ -47,7 +43,7 @@ export function ApplicationReviewDashboard({
 
   const profile = row.lead.profile;
   const displayName = formatPersonName(profile?.fullName, 'Applicant (name pending)');
-  const cibilScore = row.bureauReport?.cibilScore ?? row.eligibility?.cibilScore ?? null;
+  const cibilScore = row.bureauReport?.cibilScore ?? null;
   const loanAmount = row.details?.loanAmount ?? row.preApprovedLoanAmount;
   const journeySteps = buildApplicationJourney(row);
   const progressPct = journeyProgressPercent(journeySteps);
@@ -92,27 +88,13 @@ export function ApplicationReviewDashboard({
       badge: row.referencesCount > 0 ? <span className="cnt">{row.referencesCount}</span> : null,
     },
     { id: 'utm', label: 'Sources & UTMs' },
+    { id: 'timeline', label: 'Timeline' },
+    { id: 'ids', label: 'Record IDs' },
   ];
 
   return (
     <div className="app-review ar-full-bleed">
       <div className="ar-wrap">
-      <div className="ar-actions">
-        <div className="ar-nav">
-          <Link href="/applications" className="navbtn">
-            ← All applications
-          </Link>
-          <Link href={`/leads/${row.leadUuid}`} className="navbtn">
-            Lead workspace
-          </Link>
-        </div>
-        <ApplicationReviewToolbar
-          onRefresh={onRefresh}
-          onReject={canRejectApplicationStatus(row.statusCode) ? () => setRejectOpen(true) : undefined}
-          rejectDisabled={!canRejectApplicationStatus(row.statusCode)}
-        />
-      </div>
-
       <ApplicationReviewHero
         row={row}
         displayName={displayName}
@@ -120,6 +102,14 @@ export function ApplicationReviewDashboard({
         loanAmount={loanAmount}
         journeySteps={journeySteps}
       />
+
+      <div className="ar-toolbar">
+        <ApplicationReviewToolbar
+          onRefresh={onRefresh}
+          onReject={canRejectApplicationStatus(row.statusCode) ? () => setRejectOpen(true) : undefined}
+          rejectDisabled={!canRejectApplicationStatus(row.statusCode)}
+        />
+      </div>
 
       <RejectRecordModal
         open={rejectOpen}
@@ -130,65 +120,6 @@ export function ApplicationReviewDashboard({
         onClose={() => setRejectOpen(false)}
         onSuccess={onRefresh}
       />
-
-      <section className="records">
-        <div>
-          <div className="rec-label">Record IDs</div>
-          <div className="id-grid">
-            {[
-              { label: 'Application', value: row.uuid, href: null },
-              { label: 'Lead', value: row.leadUuid, href: `/leads/${row.leadUuid}` },
-              { label: 'Customer', value: row.customerUuid, href: `/customers/${row.customerUuid}` },
-            ].map((item) => (
-              <div key={item.label} className="idbox">
-                <div className="ik">{item.label}</div>
-                <div className="iv">
-                  {item.href ? (
-                    <Link href={item.href} className="uuid uuid-link" title={item.value}>
-                      {truncateUuid(item.value)}
-                    </Link>
-                  ) : (
-                    <span className="uuid" title={item.value}>
-                      {truncateUuid(item.value)}
-                    </span>
-                  )}
-                  <CopyUuidButton value={item.value} label={item.label} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div>
-          <div className="rec-label">Timeline</div>
-          <div className="meta-grid">
-            <div className="meta">
-              <div className="mk">Opened</div>
-              <div className="mv">{formatReviewDateTime(row.createdAt)}</div>
-            </div>
-            <div className="meta">
-              <div className="mk">Updated</div>
-              <div className="mv">{formatReviewDateTime(row.updatedAt)}</div>
-            </div>
-            <div className="meta">
-              <div className="mk">Email verified</div>
-              <div className="mv">{formatReviewDateTime(row.emailVerifiedAt)}</div>
-            </div>
-            <div className="meta">
-              <div className="mk">Lead</div>
-              <div className={`mv lead-status${row.lead.statusCode.toUpperCase().includes('REJECT') ? ' rejected' : row.lead.statusCode.toUpperCase() === 'CONVERTED' ? ' conv' : ''}`}>
-                {row.lead.statusCode.toUpperCase().includes('REJECT') ? (
-                  <LosStatusPill code={row.lead.statusCode} label={row.lead.statusLabel} />
-                ) : (
-                  <>
-                    {row.lead.statusCode.toUpperCase() === 'CONVERTED' ? '● ' : ''}
-                    {row.lead.statusLabel}
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <nav className="tabs" aria-label="Application review sections">
         {tabs.map((tab) => (
@@ -227,6 +158,12 @@ export function ApplicationReviewDashboard({
           </div>
           <div className={`panel${activeTab === 'utm' ? ' on' : ''}`}>
             <ReviewSourcesPanel row={row} />
+          </div>
+          <div className={`panel${activeTab === 'timeline' ? ' on' : ''}`}>
+            <ReviewTimelinePanel row={row} />
+          </div>
+          <div className={`panel${activeTab === 'ids' ? ' on' : ''}`}>
+            <ReviewRecordIdsPanel row={row} />
           </div>
         </div>
 

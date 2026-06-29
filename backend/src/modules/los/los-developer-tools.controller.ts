@@ -71,20 +71,4 @@ export class LosDeveloperToolsController {
     });
   }
 
-  @Post('kyc-deepfake-check')
-  @HttpCode(HttpStatus.OK)
-  @UseInterceptors(
-    FileInterceptor('image', {
-      limits: { fileSize: MAX_SELFIE_BYTES },
-    }),
-  )
-  @ApiConsumes('multipart/form-data')
-  @ApiOperation({
-    summary: 'Dry-run selfie authenticity check (local ML; Tenacio optional)',
-    description:
-      'Runs on-server selfie face validation first. Tenacio deepfake is called only when TENACIO_DEEPFAKE_WORKFLOW_ID is configured and local validation passes.',
-  })
-  async kycDeepfakeCheck(@UploadedFile() image: UploadedFileLike | undefined) {
-    return this.kycDevTools.runDeepfakeCheck(image);
-  }
 }

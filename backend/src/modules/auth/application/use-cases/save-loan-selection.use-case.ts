@@ -65,10 +65,6 @@ export class SaveLoanSelectionUseCase {
       throw new BadRequestException('Tenure end date must be within the next 2 months.');
     }
 
-    const interestAmountNum = dto.loanAmount * (loanSettings.roiPerDayPercent / 100) * tenureDays;
-    const processingFeeAmountNum = (dto.loanAmount * loanSettings.processingFeePercent) / 100;
-    const gstAmountNum = (processingFeeAmountNum * loanSettings.processingFeeGstPercent) / 100;
-
     await this.prisma.client.$transaction(async (tx) => {
       let application = await tx.application.findFirst({
         where: { leadId: lead.id, customerId: customer.id },
@@ -105,16 +101,16 @@ export class SaveLoanSelectionUseCase {
 
       const principal = new Prisma.Decimal(dto.loanAmount);
       const detailsCore = {
-        loanAmount: principal,
-        loanTenure: tenureDays,
+        selectedLoanAmount: principal,
         interestRate: new Prisma.Decimal(loanSettings.roiPerDayPercent),
-        interestAmount: new Prisma.Decimal(interestAmountNum),
-        processingFee: new Prisma.Decimal(loanSettings.processingFeePercent),
-        processingFeeAmount: new Prisma.Decimal(processingFeeAmountNum),
-        gstAmount: new Prisma.Decimal(gstAmountNum),
-        loanMaturityDate: tenureEndDate,
-        loanDisbursementDate: new Date(),
+        processingFeePercentage: new Prisma.Decimal(loanSettings.processingFeePercent),
+        gstPercentage: new Prisma.Decimal(loanSettings.processingFeeGstPercent),
+        expectedRepaymentDays: tenureDays,
+        expectedRepaymentDate: tenureEndDate,
         reasonForLoanId: reasonForLoan.id,
+        bankAccountNumber: null,
+        ifscCode: null,
+        bankName: null,
       };
 
       await tx.applicationDetail.upsert({
@@ -122,50 +118,70 @@ export class SaveLoanSelectionUseCase {
         create: {
           applicationId: application.id,
           ...detailsCore,
-        },
-        update: detailsCore,
-      });
-
-      // Loan selection is the upstream checkpoint for the rest of the journey.
-      // If the customer revisits and changes selection, force downstream steps
-      // (references, email, sanction-letter OTP, KYC/bank) to be completed again.
-      await tx.leadReference.deleteMany({
-        where: { leadId: lead.id },
-      });
-
-      await tx.application.update({
-        where: { id: application.id },
-        data: {
-          email: null,
-          emailVerifiedAt: null,
+          emailId: null,
           emailVerificationType: null,
+          emailVerifiedAt: null,
           loanDocumentsAcceptedAt: null,
+          loanDocumentsAcceptedIp: null,
           keyFactPdfRelativePath: null,
           loanAgreementPdfRelativePath: null,
-          digilockerAadhaarFormJson: Prisma.JsonNull,
-          aadhaarPhotoRelativePath: null,
-          selfieRelativePath: null,
-          livenessVendorJson: Prisma.JsonNull,
-          livenessCheckedAt: null,
-          livenessPassed: false,
-          livenessDone: false,
-          livenessDoneAt: null,
-          kycStatus: 0,
-          kycCompletedAt: null,
+          keyFactEsigned: false,
           pennyDropAttempts: 0,
+          pennyDropVendorJson: Prisma.JsonNull,
+        },
+        update: {
+          ...detailsCore,
+          emailId: null,
+          emailVerificationType: null,
+          emailVerifiedAt: null,
+          loanDocumentsAcceptedAt: null,
+          loanDocumentsAcceptedIp: null,
+          keyFactPdfRelativePath: null,
+          loanAgreementPdfRelativePath: null,
+          keyFactEsigned: false,
+          pennyDropAttempts: 0,
+          pennyDropVendorJson: Prisma.JsonNull,
         },
       });
 
-      await tx.applicationAgreement.deleteMany({
+      await tx.applicationReference.deleteMany({
         where: { applicationId: application.id },
       });
 
-      await tx.applicationDisbursement.deleteMany({
+      await tx.applicationKyc.upsert({
         where: { applicationId: application.id },
+        create: {
+          applicationId: application.id,
+          kycStatus: 0,
+          livenessSelfiePath: null,
+          isLiveness: false,
+          livenessCheckedAt: null,
+          livenessDoneAt: null,
+          livenessPassed: false,
+          livenessVendorJson: Prisma.JsonNull,
+          faceMatchCheckedAt: null,
+          selfieFaceValidationJson: Prisma.JsonNull,
+          selfieFaceValidationPassed: false,
+          digilockerAadhaarDownloadAttempts: 0,
+          kycCompletedAt: null,
+        },
+        update: {
+          kycStatus: 0,
+          livenessSelfiePath: null,
+          isLiveness: false,
+          livenessCheckedAt: null,
+          livenessDoneAt: null,
+          livenessPassed: false,
+          livenessVendorJson: Prisma.JsonNull,
+          faceMatchCheckedAt: null,
+          selfieFaceValidationJson: Prisma.JsonNull,
+          selfieFaceValidationPassed: false,
+          digilockerAadhaarDownloadAttempts: 0,
+          kycCompletedAt: null,
+        },
       });
     });
 
     return { success: true };
   }
 }
-

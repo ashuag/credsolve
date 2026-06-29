@@ -41,12 +41,12 @@ export class RejectPanClientValidationUseCase {
 
     const attemptsAllowed = await this.loadMaxAttempts();
     const rows = await this.prisma.client.$queryRaw<Array<{ pan_validation_attempts: number }>>`
-      SELECT \`pan_validation_attempts\` FROM \`lead\` WHERE \`id\` = ${leadRow.id} LIMIT 1
+      SELECT \`pan_validation_attempts\` FROM \`lead_detail\` WHERE \`lead_id\` = ${leadRow.id} LIMIT 1
     `;
     const attemptsUsed = Number(rows[0]?.pan_validation_attempts ?? 0) + 1;
 
     await this.prisma.client.$executeRaw`
-      UPDATE \`lead\` SET \`pan_validation_attempts\` = ${attemptsUsed} WHERE \`id\` = ${leadRow.id}
+      UPDATE \`lead_detail\` SET \`pan_validation_attempts\` = ${attemptsUsed} WHERE \`lead_id\` = ${leadRow.id}
     `;
 
     if (attemptsUsed < attemptsAllowed) {

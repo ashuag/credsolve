@@ -1,7 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { ApplicationCibilReportTab } from '@/components/applications/application-cibil-report-tab';
 import {
+  CopyUuidButton,
   MaskedSecret,
   ReviewCard,
   ReviewEmptyState,
@@ -19,7 +21,9 @@ import {
   maskPan,
   parseInrNumber,
   cibilScoreBand,
+  truncateUuid,
 } from '@/lib/application-review-format';
+import { isApplicationJourneyStepActive } from '@/lib/customer-journey';
 import { usesAnnualFinancialMetric, usesMonthlyIncomeMetric, resolveOccupationKey } from '@/lib/customer-details';
 import {
   compareGenders,
@@ -48,6 +52,7 @@ import {
   formatSelfieFaceValidationSummary,
 } from '@/lib/kyc-selfie-validation-display';
 import { KycPhotoGallery } from '@/components/shared/kyc-photo-gallery';
+import { LosStatusPill } from '@/components/shared/los-status-pill';
 import { formatPersonName } from '@/lib/format-person-name';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 
@@ -380,6 +385,7 @@ export function ReviewKycPanel({
   authToken: string | null;
 }) {
   const kycDone = row.kycStatus === 1;
+  const isCurrentStep = isApplicationJourneyStepActive(row, 'kyc');
   return (
     <>
       <ReviewCard
@@ -391,7 +397,15 @@ export function ReviewKycPanel({
         }
         title="KYC & liveness"
         iconTone={kycDone ? 'ok' : 'default'}
-        right={kycDone ? <ReviewPill tone="ok">Completed</ReviewPill> : <ReviewPill tone="warn">Pending</ReviewPill>}
+        right={
+          kycDone ? (
+            <ReviewPill tone="ok">Completed</ReviewPill>
+          ) : isCurrentStep ? (
+            <ReviewPill tone="warn">Current step</ReviewPill>
+          ) : (
+            <ReviewPill tone="warn">Pending</ReviewPill>
+          )
+        }
       >
         <div style={{ marginBottom: 16 }}>
           <ReviewSectionLabel>KYC photos</ReviewSectionLabel>
@@ -486,7 +500,7 @@ export function ReviewBankPanel({ row }: { row: LosApplicationDetails }) {
     );
   }
 
-  const pending = !bank.disbursedAt && !bank.utr?.trim();
+  const pending = !bank.disbursedAt;
 
   return (
     <ReviewCard
@@ -511,12 +525,14 @@ export function ReviewBankPanel({ row }: { row: LosApplicationDetails }) {
             )
           }
         />
-        <ReviewField label="Disbursement amount" value={<span className="mono">{formatReviewInr(bank.amount ?? row.details?.disbursedAmount)}</span>} tone="accent" />
+        <ReviewField label="Disbursement amount" value={<span className="mono">{formatReviewInr(bank.disburseAmount ?? bank.amount ?? row.details?.disbursedAmount)}</span>} tone="accent" />
         <ReviewField
-          label="UTR"
-          value={bank.utr ?? 'Not yet generated'}
-          tone={!bank.utr?.trim() ? 'flag' : undefined}
-          sub={!bank.utr?.trim() ? 'Populated after payout is initiated' : undefined}
+          label="Expected repay date"
+          value={bank.expectedRepaymentDate ? formatReviewDateOnly(bank.expectedRepaymentDate) : '—'}
+        />
+        <ReviewField
+          label="Repayment amount"
+          value={<span className="mono">{formatReviewInr(bank.repaymentAmount ?? row.details?.repaymentAmount)}</span>}
         />
         <ReviewField
           label="Disbursed at"
@@ -957,7 +973,7 @@ export function ReviewCibilPanel({
   applicationUuid: string;
   onReportCreated?: () => void;
 }) {
-  const score = row.bureauReport?.cibilScore ?? row.eligibility?.cibilScore ?? null;
+  const score = row.bureauReport?.cibilScore ?? null;
 
   return (
     <>
@@ -984,7 +1000,8 @@ export function ReviewCibilPanel({
 }
 
 export function ReviewReferencesPanel({ row }: { row: LosApplicationDetails }) {
-  const pending = row.references.length < 2;
+  const refsIncomplete = row.references.length < 2;
+  const isCurrentStep = isApplicationJourneyStepActive(row, 'refs');
   return (
     <ReviewCard
       icon={
@@ -994,7 +1011,15 @@ export function ReviewReferencesPanel({ row }: { row: LosApplicationDetails }) {
         </svg>
       }
       title="References"
-      right={pending ? <ReviewPill tone="warn">Current step</ReviewPill> : <ReviewPill tone="ok">{row.references.length} saved</ReviewPill>}
+      right={
+        refsIncomplete && isCurrentStep ? (
+          <ReviewPill tone="warn">Current step</ReviewPill>
+        ) : refsIncomplete ? (
+          <ReviewPill tone="warn">Pending</ReviewPill>
+        ) : (
+          <ReviewPill tone="ok">{row.references.length} saved</ReviewPill>
+        )
+      }
     >
       {row.references.length === 0 ? (
         <ReviewEmptyState title="References pending collection" subtitle="Captured references and verification calls appear here." />
@@ -1061,5 +1086,89 @@ export function ReviewSourcesPanel({ row }: { row: LosApplicationDetails }) {
         </ReviewCard>
       ) : null}
     </>
+  );
+}
+
+export function ReviewRecordIdsPanel({ row }: { row: LosApplicationDetails }) {
+  const records = [
+    { label: 'Application', value: row.uuid, href: null },
+    { label: 'Lead', value: row.leadUuid, href: `/leads/${row.leadUuid}` },
+    { label: 'Customer', value: row.customerUuid, href: `/customers/${row.customerUuid}` },
+  ] as const;
+
+  return (
+    <ReviewCard
+      icon={
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+        </svg>
+      }
+      title="Record IDs"
+      right={<ReviewPill tone="info">3 linked records</ReviewPill>}
+    >
+      <div className="id-grid">
+        {records.map((item) => (
+          <div key={item.label} className="idbox">
+            <div className="ik">{item.label}</div>
+            <div className="iv">
+              {item.href ? (
+                <Link href={item.href} className="uuid uuid-link" title={item.value}>
+                  {truncateUuid(item.value)}
+                </Link>
+              ) : (
+                <span className="uuid" title={item.value}>
+                  {truncateUuid(item.value)}
+                </span>
+              )}
+              <CopyUuidButton value={item.value} label={item.label} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </ReviewCard>
+  );
+}
+
+export function ReviewTimelinePanel({ row }: { row: LosApplicationDetails }) {
+  return (
+    <ReviewCard
+      icon={
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </svg>
+      }
+      title="Timeline"
+      right={<ReviewPill tone="info">Application activity</ReviewPill>}
+    >
+      <div className="meta-grid">
+        <div className="meta">
+          <div className="mk">Opened</div>
+          <div className="mv">{formatReviewDateTime(row.createdAt)}</div>
+        </div>
+        <div className="meta">
+          <div className="mk">Updated</div>
+          <div className="mv">{formatReviewDateTime(row.updatedAt)}</div>
+        </div>
+        <div className="meta">
+          <div className="mk">Email verified</div>
+          <div className="mv">{formatReviewDateTime(row.emailVerifiedAt)}</div>
+        </div>
+        <div className="meta">
+          <div className="mk">Lead</div>
+          <div className={`mv lead-status${row.lead.statusCode.toUpperCase().includes('REJECT') ? ' rejected' : row.lead.statusCode.toUpperCase() === 'CONVERTED' ? ' conv' : ''}`}>
+            {row.lead.statusCode.toUpperCase().includes('REJECT') ? (
+              <LosStatusPill code={row.lead.statusCode} label={row.lead.statusLabel} />
+            ) : (
+              <>
+                {row.lead.statusCode.toUpperCase() === 'CONVERTED' ? '● ' : ''}
+                {row.lead.statusLabel}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </ReviewCard>
   );
 }

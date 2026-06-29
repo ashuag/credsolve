@@ -184,43 +184,6 @@ export function ReviewEmptyState({ title, subtitle }: { title: string; subtitle:
   );
 }
 
-function RefreshIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
-      <path d="M21 3v5h-5" />
-      <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
-      <path d="M3 21v-5h5" />
-    </svg>
-  );
-}
-
-function RejectIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M15 9l-6 6M9 9l6 6" />
-    </svg>
-  );
-}
-
-function RequestDocsIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <path d="M14 2v6h6M12 18v-6M9 15h6" />
-    </svg>
-  );
-}
-
-function ApproveIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
-  );
-}
-
 export function ApplicationReviewToolbar({
   onRefresh,
   onReject,
@@ -231,37 +194,18 @@ export function ApplicationReviewToolbar({
   rejectDisabled?: boolean;
 }) {
   return (
-    <div className="ar-actions-right">
-      <button
-        type="button"
-        className="navbtn navbtn-icon navbtn-reject"
-        disabled={rejectDisabled || !onReject}
-        onClick={onReject}
-        aria-label="Reject application"
-        title="Reject application"
-      >
-        <RejectIcon />
-      </button>
-      <button
-        type="button"
-        className="navbtn navbtn-icon navbtn-request"
-        disabled
-        aria-label="Request documents"
-        title="Request documents (coming soon)"
-      >
-        <RequestDocsIcon />
-      </button>
-      <button
-        type="button"
-        className="navbtn navbtn-icon navbtn-approve"
-        disabled
-        aria-label="Approve and continue"
-        title="Approve and continue (coming soon)"
-      >
-        <ApproveIcon />
-      </button>
-      <button type="button" className="navbtn btn-primary" onClick={onRefresh} aria-label="Refresh data" title="Refresh data">
-        <RefreshIcon />
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {onReject ? (
+        <button
+          type="button"
+          onClick={onReject}
+          disabled={rejectDisabled}
+          className="min-h-[38px] rounded-[8px] border border-[rgba(239,68,68,0.35)] bg-white px-4 text-[0.82rem] font-bold text-[#dc2626] hover:bg-[rgba(254,242,242,0.9)] disabled:cursor-not-allowed disabled:opacity-55"
+        >
+          Reject application
+        </button>
+      ) : null}
+      <button type="button" onClick={onRefresh} className="los-btn-primary min-h-[38px] px-4 text-[0.82rem]">
         Refresh data
       </button>
     </div>

@@ -72,6 +72,15 @@ export class LosDataController {
     await this.losApplication.serveApplicationAadhaarPhoto(applicationUuid, res);
   }
 
+  @Get('applications/:applicationUuid/cibil-report/pdf')
+  @ApiOperation({ summary: 'Stream CIBIL summary PDF for an application (LOS auth)' })
+  async applicationCibilReportPdf(
+    @Param('applicationUuid') applicationUuid: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    await this.losApplication.serveApplicationCibilReportPdf(applicationUuid, res);
+  }
+
   @Get('applications/:applicationUuid/cibil-report')
   @ApiOperation({
     summary: 'Structured CIBIL report view for an application (from latest bureau pull)',

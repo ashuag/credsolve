@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { StorageModule } from './common/storage/storage.module';
@@ -12,6 +13,7 @@ import { VendorApiModule } from './common/vendor/vendor-api.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BureauModule } from './modules/bureau/bureau.module';
 import { LosModule } from './modules/los/los.module';
+import { CronModule } from './modules/cron/cron.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
@@ -25,6 +27,7 @@ import { PrismaModule } from './prisma/prisma.module';
         join(__dirname, '..', '..', '.env'),
       ].filter((p) => existsSync(p)),
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     StorageModule,
     RedisModule,
@@ -34,6 +37,7 @@ import { PrismaModule } from './prisma/prisma.module';
     AuthModule,
     BureauModule,
     LosModule,
+    CronModule,
   ],
   controllers: [AppController],
   providers: [AppService],

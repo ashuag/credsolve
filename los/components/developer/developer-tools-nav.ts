@@ -7,7 +7,6 @@ export const DEVELOPER_TOOL_LINKS = [
   { href: '/developer-tools/post-bre-rules', label: 'Post BRE Rules' },
   { href: '/developer-tools/kyc-selfie-face-check', label: 'KYC Selfie Face Check' },
   { href: '/developer-tools/kyc-face-match-check', label: 'KYC Face Match Check' },
-  { href: '/developer-tools/kyc-deepfake-check', label: 'KYC Selfie Authenticity' },
 ] as const;
 
 export function isDeveloperToolsPath(pathname: string): boolean {

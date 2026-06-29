@@ -12,14 +12,6 @@ export type TenacioFaceMatchBody = {
   };
 };
 
-/** Tenacio deepfake / synthetic media check on a single image URL. */
-export type TenacioDeepfakeBody = {
-  input: {
-    consent: boolean;
-    url: string;
-  };
-};
-
 type VendorCallResult = {
   configured: boolean;
   skipReason?: string;
@@ -33,12 +25,11 @@ type UrlResolved = { absoluteUrl: string } | { baseUrl: string; path: string };
 type PickUrlOutcome = VendorCallResult | { resolved: UrlResolved };
 
 /**
- * Tenacio KYC add-ons: face match and deepfake detection.
+ * Tenacio KYC face match.
  *
  * Face match env (either prefix works):
  * - `TENACIO_KYC_FACE_MATCH_*` or `TENACIO_FACE_MATCH_*`
  * - URL can be the full POST URL or the services base (`…/services`) plus `*_SERVICE=face-match`
- * Deepfake env: `TENACIO_DEEPFAKE_WORKFLOW_ID`, `TENACIO_DEEPFAKE_URL` or `TENACIO_DEEPFAKE_SERVICE`
  */
 @Injectable()
 export class KycTenacioVendorService {
@@ -57,45 +48,14 @@ export class KycTenacioVendorService {
         'Set TENACIO_KYC_FACE_MATCH_WORKFLOW_ID (or TENACIO_FACE_MATCH_WORKFLOW_ID) for face match checks.',
       body,
       leadId,
-      redactRequest: (b) => {
-        const input = b?.input as Record<string, unknown> | undefined;
-        return {
-          ...b,
-          input: {
-            ...input,
-            url1: typeof input?.url1 === 'string' ? `[REDACTED:${input.url1.length} chars]` : input?.url1,
-            url2: typeof input?.url2 === 'string' ? `[REDACTED:${input.url2.length} chars]` : input?.url2,
-          },
-        };
-      },
     });
   }
 
-  isDeepfakeConfigured(): boolean {
-    return Boolean(this.resolveAuth() && this.readEnv('TENACIO_DEEPFAKE_WORKFLOW_ID'));
-  }
-
-  async postDeepfakeCheck(body: TenacioDeepfakeBody, leadId: bigint | null): Promise<VendorCallResult> {
-    return this.postService({
-      workflowEnv: 'TENACIO_DEEPFAKE_WORKFLOW_ID',
-      fullUrlEnv: 'TENACIO_DEEPFAKE_URL',
-      serviceEnv: 'TENACIO_DEEPFAKE_SERVICE',
-      auditEnv: 'TENACIO_DEEPFAKE_AUDIT_SERVICE',
-      defaultAudit: 'deepfake-detection',
-      missingWorkflowMsg: 'Set TENACIO_DEEPFAKE_WORKFLOW_ID for deepfake detection.',
-      body,
-      leadId,
-      redactRequest: (b) => {
-        const input = b?.input as Record<string, unknown> | undefined;
-        return {
-          ...b,
-          input: {
-            ...input,
-            url: typeof input?.url === 'string' ? `[REDACTED:${input.url.length} chars]` : input?.url,
-          },
-        };
-      },
-    });
+  isFaceMatchConfigured(): boolean {
+    return Boolean(
+      this.resolveAuth() &&
+        this.readEnv(['TENACIO_KYC_FACE_MATCH_WORKFLOW_ID', 'TENACIO_FACE_MATCH_WORKFLOW_ID']),
+    );
   }
 
   private async postService(params: {
@@ -105,9 +65,9 @@ export class KycTenacioVendorService {
     auditEnv: string | string[];
     defaultAudit: string;
     missingWorkflowMsg: string;
-    body: TenacioFaceMatchBody | TenacioDeepfakeBody;
+    body: TenacioFaceMatchBody;
     leadId: bigint | null;
-    redactRequest: (body: TenacioFaceMatchBody | TenacioDeepfakeBody | undefined) => unknown;
+    redactRequest?: (body: TenacioFaceMatchBody | undefined) => unknown;
   }): Promise<VendorCallResult> {
     const auth = this.resolveAuth();
     if (!auth) {
@@ -138,7 +98,7 @@ export class KycTenacioVendorService {
     const auditName = (this.readEnv(params.auditEnv) || params.defaultAudit).trim().slice(0, 120);
     const providerName = (process.env.TENACIO_PROVIDER ?? 'Tenacio').trim();
 
-    this.logger.log(`${auditName} POST input (redacted URLs in audit log)`);
+    this.logger.log(`${auditName} POST input: ${JSON.stringify(params.body)}`);
 
     const result = await this.vendorApi.request<unknown, typeof params.body>({
       providerName,
@@ -150,7 +110,7 @@ export class KycTenacioVendorService {
       headers: this.headers(auth.clientId, auth.apiKey, workflowId),
       body: params.body,
       leadId: params.leadId,
-      redactRequest: params.redactRequest,
+      ...(params.redactRequest ? { redactRequest: params.redactRequest } : {}),
     });
 
     return {

@@ -67,7 +67,7 @@ export type LosLeadDetails = {
   bureauFetchedLabel: string;
   /** LOS / ops note on the lead row (`lead.lead_status_note`). */
   leadStatusNote: string | null;
-  /** Vendor/bureau diagnostic text (`lead.bureau_fetched_note`). */
+  /** Vendor/bureau diagnostic text (`lead_detail.bureau_fetched_note`). */
   bureauFetchedNote: string | null;
   /** Master rejection reason when `rejection_reason_id` is set. */
   rejectionReason: { code: string; label: string } | null;
@@ -213,15 +213,7 @@ export type LosApplicationDetails = {
     gstAmount: string | null;
     disbursedAmount: string | null;
     repaymentAmount: string | null;
-    loanDisbursementDate: string | null;
     loanMaturityDate: string | null;
-  } | null;
-  eligibility: {
-    isEligible: boolean;
-    approvedAmount: string | null;
-    cibilScore: number | null;
-    ineligibleReason: string | null;
-    checkedAt: string;
   } | null;
   bureauReport: {
     uuid: string;
@@ -236,12 +228,36 @@ export type LosApplicationDetails = {
     ipAddress: string | null;
   } | null;
   disbursement: {
-    amount: string | null;
+    loanAmount: string | null;
+    processingFeeAmount: string | null;
+    gstAmount: string | null;
+    disburseAmount: string | null;
+    expectedRepaymentDays: number | null;
+    expectedRepaymentDate: string | null;
+    actualRepaymentDate: string | null;
+    actualRepaymentDays: number | null;
+    repaymentAmount: string | null;
+    lateFee: string | null;
     accountNumber: string | null;
     ifscCode: string | null;
     bankName: string | null;
-    utr: string | null;
     disbursedAt: string | null;
+    /** @deprecated use loanAmount */
+    amount: string | null;
+  } | null;
+  loanAccount: {
+    loanAccountNumber: string;
+    principalAmount: string;
+    netDisbursedAmount: string;
+    interestRate: string;
+    interestAmount: string;
+    totalRepaymentAmount: string;
+    disbursedAt: string;
+    loanMaturityDate: string;
+    utr: string | null;
+    bankAccountNumber: string | null;
+    ifscCode: string | null;
+    closedAt: string | null;
   } | null;
   loanDocuments: {
     keyFactReady: boolean;

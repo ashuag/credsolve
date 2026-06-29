@@ -3,7 +3,11 @@
  * DB paths stay `customer/{uuid}/…`; the prefix is applied only when talking to object storage.
  */
 export function resolveStorageKeyPrefix(): string {
-  const explicit = (process.env.S3_KEY_PREFIX ?? process.env.SPACES_KEY_PREFIX ?? '')
+  const explicit = (
+    process.env.S3_KEY_PREFIX ??
+    process.env.SPACES_KEY_PREFIX ??
+    ''
+  )
     .trim()
     .replace(/^\/+|\/+$/g, '');
   if (explicit) return explicit;

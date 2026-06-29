@@ -84,13 +84,13 @@ export class SubmitVerifiedBankUseCase {
     const applicationRow = await this.prisma.client.application.findFirst({
       where: { leadId: lead.id },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, pennyDropAttempts: true },
+      select: { id: true, details: { select: { pennyDropAttempts: true } } },
     });
     if (!applicationRow) {
       throw new BadRequestException('Create application details before bank details.');
     }
 
-    const attemptsUsed = applicationRow.pennyDropAttempts;
+    const attemptsUsed = applicationRow.details?.pennyDropAttempts ?? 0;
     if (attemptsUsed >= attemptsAllowed) {
       return {
         success: false,
@@ -136,9 +136,13 @@ export class SubmitVerifiedBankUseCase {
 
     if (!pennyOk) {
       const nextAttemptsUsed = attemptsUsed + 1;
-      await this.prisma.client.application.update({
-        where: { id: applicationRow.id },
-        data: { pennyDropAttempts: nextAttemptsUsed },
+      await this.prisma.client.applicationDetail.update({
+        where: { applicationId: applicationRow.id },
+        data: {
+          pennyDropAttempts: nextAttemptsUsed,
+          pennyDropVendorJson:
+            vendor === null ? Prisma.JsonNull : (vendor as Prisma.InputJsonValue),
+        },
       });
       const retryLimitReached = nextAttemptsUsed >= attemptsAllowed;
       const baseMessage =
@@ -179,37 +183,19 @@ export class SubmitVerifiedBankUseCase {
         select: { id: true, applicationStatusId: true },
       });
       if (!application) {
-        throw new BadRequestException('Create application details before bank details.');
+        throw new BadRequestException('Create loan details before bank details.');
       }
 
-      const details = await tx.applicationDetail.findUnique({
+      await tx.applicationDetail.updateMany({
         where: { applicationId: application.id },
-        select: { loanAmount: true },
-      });
-      const disbursementAmount = details?.loanAmount ?? null;
-
-      await tx.applicationDisbursement.upsert({
-        where: { applicationId: application.id },
-        create: {
-          applicationId: application.id,
-          amount: disbursementAmount ? new Prisma.Decimal(disbursementAmount.toString()) : null,
-          accountNumber,
+        data: {
+          bankAccountNumber: accountNumber,
           ifscCode: ifsc,
-          disbursedAt: null,
-        },
-        update: {
-          amount: disbursementAmount ? new Prisma.Decimal(disbursementAmount.toString()) : null,
-          accountNumber,
-          ifscCode: ifsc,
+          bankName: verifiedBankName.length > 0 ? verifiedBankName : null,
+          pennyDropVendorJson:
+            vendor === null ? Prisma.JsonNull : (vendor as Prisma.InputJsonValue),
         },
       });
-
-      const bankNameToStore = verifiedBankName.length > 0 ? verifiedBankName : null;
-      await tx.$executeRaw`
-        UPDATE application_disbursement
-        SET bank_name = ${bankNameToStore}
-        WHERE application_id = ${application.id}
-      `;
 
       await tx.application.update({
         where: { id: application.id },

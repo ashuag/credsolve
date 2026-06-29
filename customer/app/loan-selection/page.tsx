@@ -52,9 +52,67 @@ function formatInr(amount: number): string {
 
 const LOAN_AMOUNT_STEP = 500;
 
-function snapLoanAmount(value: number, min: number, max: number, step = LOAN_AMOUNT_STEP): number {
-  const snapped = Math.round(value / step) * step;
-  return Math.min(max, Math.max(min, snapped));
+function snapLoanAmount(value: number, min: number, max: number): number {
+  const bounded = Math.min(max, Math.max(min, value));
+  const stepped = Math.round(bounded / LOAN_AMOUNT_STEP) * LOAN_AMOUNT_STEP;
+  return Math.min(max, Math.max(min, stepped));
+}
+
+function formatRepaymentDateDisplay(date: Date): string {
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const yyyy = date.getFullYear();
+  return `${dd} / ${mm} / ${yyyy}`;
+}
+
+function RepaymentDateCard({
+  repaymentDate,
+  tenureDays,
+  variant = 'light',
+}: {
+  repaymentDate: Date;
+  tenureDays: number;
+  variant?: 'light' | 'dark';
+}) {
+  const isDark = variant === 'dark';
+
+  return (
+    <div
+      className={
+        isDark
+          ? 'rounded-2xl border border-white/20 bg-white/10 p-4'
+          : 'bg-slate-50 rounded-2xl p-5 border border-slate-200'
+      }
+    >
+      <div
+        className={
+          isDark
+            ? 'text-[0.75rem] font-bold text-blue-200 uppercase tracking-wider mb-3'
+            : 'text-[0.75rem] font-bold text-slate-500 uppercase tracking-wider mb-3'
+        }
+      >
+        Repayment Date
+      </div>
+      <div
+        className={
+          isDark
+            ? 'rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-center'
+            : 'rounded-xl border border-slate-200 bg-white px-4 py-3 text-center'
+        }
+        title="Repayment date is set by policy: 1st–15th → end of this month; 16th onward → end of next month."
+      >
+        <span className={isDark ? 'text-[1.1rem] font-black text-white' : 'text-[1rem] font-bold text-brand-navy'}>
+          {formatRepaymentDateDisplay(repaymentDate)}
+        </span>
+      </div>
+      <div className="mt-3 flex justify-between items-center">
+        <span className={isDark ? 'text-[0.8rem] text-white/60' : 'text-[0.8rem] text-slate-500'}>Selected tenure:</span>
+        <span className={isDark ? 'text-[0.8rem] font-bold text-white' : 'text-[0.8rem] font-bold text-brand-navy'}>
+          {tenureDays} days
+        </span>
+      </div>
+    </div>
+  );
 }
 
 /** Default slider position: midpoint of min/max, aligned to step. */
@@ -211,6 +269,8 @@ export default function LoanSelectionPage() {
 
   const leftInfographic = (
     <div className="w-full max-w-[380px] bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/20 shadow-2xl">
+      <RepaymentDateCard repaymentDate={fixedRepaymentDate} tenureDays={tenureDays} variant="dark" />
+      <div className="h-px bg-white/10 my-5" />
       <div className="text-[0.7rem] font-black text-blue-200 uppercase tracking-[0.2em] mb-4">Loan Calculation</div>
       <div className="grid gap-3">
         <SummaryItem label="Principal" value={formatInr(calculations.principal)} />
@@ -249,8 +309,12 @@ export default function LoanSelectionPage() {
         </h1>
         <p className="text-[0.95rem] text-slate-500 mb-8 leading-relaxed">
           Choose an amount between your minimum loan and your pre-approved limit. Repayment date follows our schedule
-          (month-end rule). Your summary updates on the left.
+          (month-end rule) and is shown in your loan summary on the left.
         </p>
+
+        <div className="mb-6 lg:hidden">
+          <RepaymentDateCard repaymentDate={fixedRepaymentDate} tenureDays={tenureDays} />
+        </div>
 
         <div className="grid gap-6">
           <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
@@ -281,25 +345,6 @@ export default function LoanSelectionPage() {
             }}
             error={purposeError}
           />
-
-          <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
-            <label htmlFor="loanEndDate" className="block text-[0.75rem] font-bold text-slate-500 uppercase tracking-wider mb-3">
-              Repayment Date
-            </label>
-            <input
-              id="loanEndDate"
-              type="date"
-              readOnly
-              aria-readonly="true"
-              value={selectedEndDate}
-              title="Repayment date is set by policy: 1st–15th → end of this month; 16th onward → end of next month."
-              className="w-full h-[54px] rounded-xl border border-slate-200 bg-slate-50 px-4 text-[1rem] font-bold text-brand-navy outline-none cursor-default"
-            />
-            <div className="mt-3 flex justify-between items-center">
-              <span className="text-[0.8rem] text-slate-500">Selected tenure:</span>
-              <span className="text-[0.8rem] font-bold text-brand-navy">{tenureDays} days</span>
-            </div>
-          </div>
         </div>
 
         <div className="mt-10 flex flex-col sm:flex-row gap-3">

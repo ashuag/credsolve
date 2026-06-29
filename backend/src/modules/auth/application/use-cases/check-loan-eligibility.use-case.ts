@@ -3,6 +3,7 @@ import type { Request } from 'express';
 import { computeOpenUnsecuredExposureBreakdown } from '../../../../common/cibil/cibil-tradeline.parser';
 import { CreditLimitTierResolverService } from '../../../../common/cibil/credit-limit-tier-resolver.service';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
+import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
 import { isCibilNewToCreditScore } from '../../../../common/vendor/tenacio-bureau-payload.mapper';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { BureauReportRepository } from '../../infrastructure/repositories/bureau-report.repository';
@@ -99,12 +100,14 @@ export class CheckLoanEligibilityUseCase {
         applications: {
           orderBy: { createdAt: 'desc' },
           take: 1,
-          select: { eligibility: { select: { isEligible: true } } },
+          select: {
+            applicationStatus: { select: { name: true } },
+          },
         },
       },
     })) as {
       leadStatus: { name: string } | null;
-      applications: Array<{ eligibility: { isEligible: boolean } | null }>;
+      applications: Array<{ applicationStatus: { name: string } }>;
     } | null;
 
     if (!row) {
@@ -116,8 +119,8 @@ export class CheckLoanEligibilityUseCase {
       throw new ForbiddenException(LOAN_OFFER_UNAVAILABLE_MESSAGE);
     }
 
-    const eligibility = row.applications[0]?.eligibility;
-    if (eligibility?.isEligible === false) {
+    const latestApplication = row.applications[0];
+    if (latestApplication?.applicationStatus.name === APPLICATION_STATUS.REJECTED) {
       throw new ForbiddenException(LOAN_OFFER_UNAVAILABLE_MESSAGE);
     }
 

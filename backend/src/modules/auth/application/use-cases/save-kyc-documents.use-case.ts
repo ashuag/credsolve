@@ -70,9 +70,15 @@ export class SaveKycDocumentsUseCase {
     const applicationForKyc = await this.prisma.client.application.findFirst({
       where: { leadId: leadForKyc.id, customerId: customer.id },
       orderBy: { createdAt: 'desc' },
-      select: { kycStatus: true },
+      select: { kyc: { select: { kycStatus: true } } },
     });
-    assertApplicationKycNotCompleted(applicationForKyc?.kycStatus);
+    assertApplicationKycNotCompleted(applicationForKyc?.kyc?.kycStatus);
+
+    const uploadedDocuments = DOC_SPECS.map((spec) => {
+      const file = byField.get(spec.field as DocField)!;
+      const original = file.originalname?.trim() || `${spec.name}.upload`;
+      return original.slice(0, 255);
+    });
 
     await this.prisma.client.$transaction(async (tx) => {
       let customerKyc = await tx.customerKyc.findFirst({
@@ -88,61 +94,11 @@ export class SaveKycDocumentsUseCase {
         });
       }
 
-      const uploadProvider = await tx.kycProvider.upsert({
-        where: { name: 'UPLOAD' },
-        create: { name: 'UPLOAD', displayName: 'Upload Documents', isActive: true },
-        update: { displayName: 'Upload Documents', isActive: true },
-      });
-
-      const allDocTypes = [
-        ...DOC_SPECS,
-        { field: 'legacyPanFront', name: 'PAN_FRONT', displayName: 'PAN front' },
-        { field: 'legacyPanBack', name: 'PAN_BACK', displayName: 'PAN back' },
-        { field: 'legacyAadhaar', name: 'AADHAAR', displayName: 'Aadhaar' },
-      ] as const;
-
-      const docTypes = await Promise.all(
-        allDocTypes.map((docType) =>
-          tx.kycDocument.upsert({
-            where: { name: docType.name },
-            create: {
-              name: docType.name,
-              displayName: docType.displayName,
-              isActive: true,
-            },
-            update: {
-              displayName: docType.displayName,
-              isActive: true,
-            },
-          })
-        )
-      );
-
-      const docTypeIds = docTypes.map((d) => d.id);
-
-      await tx.customerKycDocument.deleteMany({
-        where: {
-          customerKycId: customerKyc.id,
-          documentTypeId: { in: docTypeIds },
+      await tx.customerKyc.update({
+        where: { id: customerKyc.id },
+        data: {
+          aadhaarData: { uploadedDocuments },
         },
-      });
-
-      const docTypeByName = new Map(docTypes.map((d) => [d.name, d.id]));
-
-      await tx.customerKycDocument.createMany({
-        data: DOC_SPECS.map((spec) => {
-          const file = byField.get(spec.field as DocField)!;
-          const original = file.originalname?.trim() || `${spec.name}.upload`;
-          const fileName = original.slice(0, 255);
-
-          return {
-            customerKycId: customerKyc.id,
-            documentTypeId: docTypeByName.get(spec.name)!,
-            kycProviderId: uploadProvider.id,
-            fileName,
-            verifiedAt: null,
-          };
-        }),
       });
     });
 

@@ -12,7 +12,7 @@ export class SaveLoanSelectionDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   tenureEndDate!: string;
 
-  /** Must be whitelisted: global `forbidNonWhitelisted` otherwise rejects the whole request and `application_detail` is not saved. */
+  /** Must be whitelisted: global `forbidNonWhitelisted` otherwise rejects the whole request and `loan_detail` is not saved. */
   @ApiProperty({ description: 'Loan purpose label (matched to active `reason_for_loan.name`)' })
   @IsString()
   @IsNotEmpty()

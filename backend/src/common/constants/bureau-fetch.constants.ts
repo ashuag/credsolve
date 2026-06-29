@@ -1,5 +1,5 @@
 /**
- * `lead.bureau_fetched` SmallInt status codes.
+ * `lead_detail.bureau_fetched` SmallInt status codes.
  *
  *   0 → NOT_FETCHED — No bureau pull completed yet (or skipped without DB write).
  *   1 → SUCCESS     — Tenacio bureau soft-pull returned OK.

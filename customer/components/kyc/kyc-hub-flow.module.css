@@ -21,10 +21,10 @@
   min-height: 0;
   width: 100%;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  padding: 32px 20px;
-  overflow-y: auto;
+  padding: 16px 20px;
+  overflow: hidden;
   background:
     radial-gradient(1200px 600px at 85% -10%, #e8eefc 0%, transparent 60%),
     radial-gradient(900px 500px at -5% 110%, #e6edfb 0%, transparent 55%),
@@ -35,6 +35,9 @@
 .shell {
   width: 100%;
   max-width: 1180px;
+  flex: 1;
+  min-height: 0;
+  max-height: 100%;
   display: grid;
   grid-template-columns: minmax(0, 460px) 1fr;
   background: #fff;
@@ -46,10 +49,23 @@
 .left {
   position: relative;
   color: #fff;
-  padding: 38px 36px;
+  padding: 24px 28px 16px;
   background:
     radial-gradient(120% 80% at 50% -10%, #1c3a73 0%, transparent 55%),
     linear-gradient(160deg, #10244c 0%, #0b1b38 60%, #0a1730 100%);
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.leftInner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  flex-direction: column;
   overflow: hidden;
 }
 
@@ -71,16 +87,16 @@
 }
 
 .gauge svg {
-  width: 200px;
-  height: 120px;
+  width: 168px;
+  height: 100px;
   display: block;
 }
 
 .pct {
   font-family: var(--font-sora), 'Sora', sans-serif;
   font-weight: 800;
-  font-size: 30px;
-  margin-top: -6px;
+  font-size: 26px;
+  margin-top: -8px;
   letter-spacing: 0.5px;
 }
 
@@ -96,9 +112,9 @@
 
 .steps {
   display: flex;
-  gap: 14px;
+  gap: 10px;
   justify-content: center;
-  margin-top: 16px;
+  margin-top: 10px;
   flex-wrap: wrap;
 }
 
@@ -142,9 +158,9 @@
 .leftTitle {
   font-family: var(--font-sora), 'Sora', sans-serif;
   font-weight: 700;
-  font-size: 26px;
+  font-size: 22px;
   text-align: center;
-  margin: 30px 0 0;
+  margin: 14px 0 0;
   position: relative;
   z-index: 1;
 }
@@ -157,54 +173,21 @@
 .leftSub {
   text-align: center;
   color: #9fb1d4;
-  font-size: 13.5px;
-  line-height: 1.5;
-  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  margin: 6px 0 0;
   position: relative;
   z-index: 1;
 }
 
-.selection {
-  position: relative;
-  z-index: 1;
-  margin-top: 26px;
-  border-radius: 16px;
-  padding: 22px 22px 6px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.selectionCap {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  color: var(--cyan);
-  margin: 0 0 14px;
-}
-
-.row {
+.calcSlot {
+  flex: 1;
+  min-height: 0;
+  margin-top: 12px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.row:last-child {
-  border-bottom: none;
-}
-
-.rowK {
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 1.5px;
-  color: #8ba0c4;
-}
-
-.rowV {
-  font-family: var(--font-sora), 'Sora', sans-serif;
-  font-weight: 700;
-  font-size: 17px;
+  width: 100%;
+  justify-content: center;
+  overflow: hidden;
 }
 
 .pills {
@@ -212,9 +195,10 @@
   z-index: 1;
   display: flex;
   justify-content: space-between;
-  margin-top: 26px;
-  padding-top: 20px;
+  margin-top: auto;
+  padding-top: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
 }
 
 .pill {
@@ -226,7 +210,7 @@
   display: block;
   font-family: var(--font-sora), 'Sora', sans-serif;
   font-weight: 700;
-  font-size: 19px;
+  font-size: 16px;
 }
 
 .pill span {
@@ -241,6 +225,8 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .eyebrow {
@@ -659,16 +645,28 @@
 
 @media (max-width: 900px) {
   .page {
-    padding: 20px 16px;
-    align-items: flex-start;
+    padding: 12px 12px;
+    align-items: stretch;
+    overflow: hidden;
   }
 
   .shell {
+    display: flex;
+    flex-direction: column;
     grid-template-columns: 1fr;
+    max-height: 100%;
+    min-height: 0;
+  }
+
+  .left {
+    max-height: 42vh;
+    flex-shrink: 0;
   }
 
   .right {
-    padding: 38px 28px;
+    padding: 28px 22px;
+    min-height: 0;
+    flex: 1;
   }
 
   .rightTitle {

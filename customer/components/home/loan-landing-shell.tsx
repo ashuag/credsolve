@@ -141,7 +141,7 @@ export function LoanLandingShell({
 
         {/* ── Left panel (desktop only) ── */}
         {/* `overflow-x-hidden` alone makes `overflow-y` compute to `auto` (CSS overflow pairing), which shows a vertical scrollbar on this rail when content is a few px taller than the column. */}
-        <div className="relative hidden min-h-0 w-full flex-col overflow-hidden bg-[#0a1628] lg:flex lg:w-5/12">
+        <div className="relative hidden h-full min-h-0 w-full flex-col overflow-hidden bg-[#0a1628] lg:flex lg:w-5/12">
 
           {/* Background Mesh */}
           <div className="absolute inset-0 stats-mesh opacity-90 pointer-events-none" />
@@ -152,30 +152,30 @@ export function LoanLandingShell({
           <div className="absolute -bottom-20 -left-16 w-80 h-80 bg-[#818cf8] rounded-full mix-blend-screen blur-[100px] opacity-25 animate-blob animation-delay-4000" />
 
           {showSpeedometer ? (
-            <div className="relative z-20 flex shrink-0 flex-col items-center px-4 pt-4 pb-1">
+            <div className="relative z-20 flex shrink-0 flex-col items-center px-4 pb-0.5 pt-3">
               <div className="flex w-full max-w-[min(100%,280px)] justify-center">
-                <JourneySpeedometer />
+                <JourneySpeedometer compact />
               </div>
-              <div className="mt-3 h-px w-[calc(100%-2rem)] max-w-[280px] shrink-0 bg-white/10" />
+              <div className="mt-2 h-px w-[calc(100%-2rem)] max-w-[280px] shrink-0 bg-white/10" />
             </div>
           ) : null}
 
           {/* Content wrapper (headline + infographic + stats) — flex-1 so it fills remaining rail height */}
-          <div className="relative z-10 flex min-h-0 flex-1 flex-col px-8 pb-4 pt-2 xl:px-10 gap-3 xl:gap-3">
+          <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-2 px-8 pb-3 pt-1 xl:px-10">
             {/* Headline */}
-            <div className="text-center shrink-0">
-              <h1 className="text-xl xl:text-[1.8rem] font-[900] text-white tracking-tight leading-[1.1] mb-1.5">
+            <div className="shrink-0 text-center">
+              <h1 className="mb-1 text-xl font-[900] leading-[1.1] tracking-tight text-white xl:text-[1.65rem]">
                 {leftTitle || defaultTitle}
               </h1>
-              <p className="text-[0.88rem] text-slate-300 leading-snug max-w-sm mx-auto font-[500]">
+              <p className="mx-auto max-w-sm text-[0.8rem] font-[500] leading-snug text-slate-300">
                 {leftDescription || 'Experience a seamless digital journey. Get your loan approved in minutes without the hassle of paperwork.'}
               </p>
             </div>
 
             {/* Infographic OR feature list */}
             {leftInfographic ? (
-              <div className="flex min-h-0 flex-1 justify-center items-center py-1">
-                <div className="flex w-full max-w-[min(280px,90%)] items-center justify-center transition-transform duration-500 hover:scale-[1.015]">
+              <div className="flex min-h-0 flex-1 overflow-hidden py-0.5">
+                <div className="mx-auto flex h-full w-full min-h-0 max-w-[min(340px,92%)] items-start justify-center">
                   {leftInfographic}
                 </div>
               </div>
@@ -195,11 +195,13 @@ export function LoanLandingShell({
             )}
 
             {/* Stats bar */}
-            <div className="mt-auto shrink-0 border-t border-white/10 pt-3 flex justify-around">
+            <div className="mt-auto flex shrink-0 justify-around border-t border-white/10 pt-2">
               {stats.map((stat) => (
                 <div key={stat.label} className="text-center">
-                  <div className="text-[1.4rem] font-[900] text-white leading-none tracking-tight mb-0.5">{stat.value}</div>
-                  <div className="text-[0.62rem] text-[#1496f3] uppercase tracking-[0.15em] font-[800]">{stat.label}</div>
+                  <div className="mb-0.5 text-[1.15rem] font-[900] leading-none tracking-tight text-white xl:text-[1.25rem]">
+                    {stat.value}
+                  </div>
+                  <div className="text-[0.58rem] font-[800] uppercase tracking-[0.14em] text-[#1496f3]">{stat.label}</div>
                 </div>
               ))}
             </div>
@@ -213,15 +215,15 @@ export function LoanLandingShell({
           className={[
             'flex min-h-0 min-w-0 flex-1 flex-col bg-white',
             fullBleedPanel
-              ? 'overflow-hidden px-5 pt-4 pb-[max(16px,env(safe-area-inset-bottom))] lg:p-8 lg:py-6'
-              : 'overflow-y-auto px-5 pt-6 pb-[max(24px,env(safe-area-inset-bottom))] lg:justify-start lg:overflow-y-auto lg:p-10 lg:py-10 lg:px-14',
+              ? 'overflow-x-hidden overflow-y-hidden px-5 pt-4 pb-[max(16px,env(safe-area-inset-bottom))] lg:p-8 lg:py-6'
+              : 'overflow-x-hidden overflow-y-auto px-5 pt-6 pb-[max(24px,env(safe-area-inset-bottom))] lg:justify-start lg:p-10 lg:py-10 lg:px-14',
           ].join(' ')}
         >
           <div
             className={
               fullBleedPanel
-                ? 'flex min-h-0 w-full flex-1 flex-col'
-                : 'w-full lg:mx-auto lg:max-w-[480px]'
+                ? 'flex min-h-0 w-full min-w-0 max-w-full flex-1 flex-col overflow-x-hidden'
+                : 'w-full min-w-0 max-w-full lg:mx-auto lg:max-w-[480px]'
             }
           >
             {journeyPanel}

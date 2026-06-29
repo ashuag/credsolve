@@ -57,6 +57,14 @@ export function ApplicationReviewHero({
             <span>{profile?.occupation ?? '—'}</span>
             <span className="ah-sep">•</span>
             <span>{formatCityState(profile?.city, profile?.state)}</span>
+            <span className="ah-sep">•</span>
+            <span className="mono">{row.mobileNumber}</span>
+            {row.email?.trim() ? (
+              <>
+                <span className="ah-sep">•</span>
+                <span>{row.email.trim()}</span>
+              </>
+            ) : null}
             {identityVerified ? (
               <span className="ah-id-badge">
                 <span className="ah-id-dot" aria-hidden />

@@ -1,0 +1,11 @@
+# Lead expiry — run once per day after the API is built.
+# Install: crontab -e  (paste one line below; fix paths and schedule)
+#
+# Daily 00:05 server local time:
+# 5 0 * * * cd /home/saurabha/www/moneyCash/backend && /usr/bin/npm run cron:expire-leads >> /var/log/moneycash-lead-expiry.log 2>&1
+#
+# If the Nest API already runs 24/7 with LEAD_EXPIRY_CRON_ENABLED=true (default),
+# you do NOT need this crontab line — the in-app scheduler handles it.
+#
+# If you use crontab only, disable the in-app job in backend/.env:
+#   LEAD_EXPIRY_CRON_ENABLED=false

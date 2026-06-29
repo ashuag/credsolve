@@ -291,7 +291,13 @@ function SectionNav({
   );
 }
 
-export function CibilReportViewer({ payload }: { payload: LosApplicationCibilReportPayload }) {
+export function CibilReportViewer({
+  payload,
+  pdfDownloadUrl,
+}: {
+  payload: LosApplicationCibilReportPayload;
+  pdfDownloadUrl?: string | null;
+}) {
   const report = payload.report;
 
   const sections = useMemo(
@@ -354,14 +360,14 @@ export function CibilReportViewer({ payload }: { payload: LosApplicationCibilRep
             ) : null}
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            {payload.reportPdfUrl ? (
+            {pdfDownloadUrl ? (
               <a
-                href={payload.reportPdfUrl}
+                href={pdfDownloadUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex min-h-[36px] items-center rounded-full border border-[rgba(23,44,113,0.12)] bg-white px-4 text-[0.8rem] font-bold text-brand-blue no-underline hover:border-[rgba(20,150,243,0.35)]"
               >
-                Download summary PDF
+                Download CIBIL report
               </a>
             ) : null}
             {(payload.htmlUrl ?? report.vendorHtmlUrl) ? (

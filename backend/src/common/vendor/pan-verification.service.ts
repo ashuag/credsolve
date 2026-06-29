@@ -9,16 +9,6 @@ function formatDobDdMmYyyy(iso: string): string {
   return `${d}-${m}-${y}`;
 }
 
-function maskPan(pan: string | undefined): string {
-  if (!pan || pan.length < 4) return '*****';
-  return `******${pan.slice(-4)}`;
-}
-
-function maskDob(dob: string | undefined): string {
-  if (!dob || dob.length !== 10) return '****';
-  return `**-**-${dob.slice(-4)}`;
-}
-
 // ── Vendor request / response shapes ─────────────────────────────────────
 
 type TenacioNsdlBody = {
@@ -56,7 +46,7 @@ type TenacioNsdlResponse = {
 
 export type PanVerificationResult = {
   /**
-   * SmallInt for `lead.pan_verified`:
+   * SmallInt for `lead_detail.pan_verified`:
    *   0 = NOT_CHECKED (transient failure, safe to retry)
    *   1 = VERIFIED
    *   2 = NOT_VERIFIED (definitive negative from vendor)
@@ -196,14 +186,6 @@ export class PanVerificationService {
           },
         },
         leadId: input.leadId,
-        redactRequest: (body) => ({
-          ...body,
-          input: {
-            ...body?.input,
-            panNumber: maskPan(body?.input?.panNumber),
-            dob: maskDob(body?.input?.dob),
-          },
-        }),
       });
 
       if (!result.ok || !result.body) {

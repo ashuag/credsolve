@@ -514,8 +514,7 @@ export class PostBreCheckService {
       this.prisma.client.lead.findUnique({
         where: { id: input.leadId },
         select: {
-          panNumber: true,
-          leadDetail: { select: { dateOfBirth: true } },
+          leadDetail: { select: { panNumber: true, dateOfBirth: true } },
         },
       }),
     ]);
@@ -694,7 +693,7 @@ export class PostBreCheckService {
 
   private checkBureauIdentity(
     rawPayload: unknown,
-    lead: { panNumber: string | null; leadDetail: { dateOfBirth: Date | null } | null },
+    lead: { leadDetail: { panNumber: string | null; dateOfBirth: Date | null } | null },
   ): { passed: boolean; rejectReason: string } {
     let reportData: ReturnType<typeof extractCibilReportData>;
     try {
@@ -703,7 +702,7 @@ export class PostBreCheckService {
       return { passed: true, rejectReason: '' };
     }
 
-    const leadPan = lead.panNumber?.trim().toUpperCase() ?? null;
+    const leadPan = lead.leadDetail?.panNumber?.trim().toUpperCase() ?? null;
     const reportPan = reportData.pan?.trim().toUpperCase() ?? null;
     if (leadPan && reportPan && leadPan !== reportPan) {
       return {

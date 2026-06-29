@@ -1,5 +1,10 @@
 import { createHash, createHmac } from 'node:crypto';
-import { resolveAwsSigningCredentials, type AwsSigningCredentials } from './aws-instance-credentials.util';
+import {
+  resolveAwsSigningCredentials,
+  awsUseEc2InstanceRole,
+  hasStaticAwsCredentials,
+  type AwsSigningCredentials,
+} from './aws-instance-credentials.util';
 
 export type { AwsSigningCredentials };
 
@@ -247,6 +252,7 @@ export function buildSpacesClientConfigFromEnv(): SpacesClientConfig | null {
   };
 }
 
+/** @deprecated AWS S3 uses `@aws-sdk/client-s3` via `buildAwsS3SdkConfigFromEnv`. */
 export function buildAwsS3ClientConfigFromEnv(): SpacesClientConfig | null {
   const bucket = (process.env.S3_CUSTOMER_BUCKET ?? process.env.S3_BUCKET ?? '').trim();
   const region = (process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? '').trim();
@@ -262,15 +268,17 @@ export function buildAwsS3ClientConfigFromEnv(): SpacesClientConfig | null {
     host,
   };
 
-  const accessKeyId = (process.env.AWS_ACCESS_KEY_ID ?? '').trim();
-  const secretAccessKey = (process.env.AWS_SECRET_ACCESS_KEY ?? '').trim();
-  if (accessKeyId && secretAccessKey) {
+  if (hasStaticAwsCredentials()) {
     return {
       ...base,
-      accessKeyId,
-      secretAccessKey,
+      accessKeyId: (process.env.AWS_ACCESS_KEY_ID ?? '').trim(),
+      secretAccessKey: (process.env.AWS_SECRET_ACCESS_KEY ?? '').trim(),
       sessionToken: (process.env.AWS_SESSION_TOKEN ?? '').trim() || undefined,
     };
+  }
+
+  if (!awsUseEc2InstanceRole()) {
+    return null;
   }
 
   return {
@@ -281,12 +289,11 @@ export function buildAwsS3ClientConfigFromEnv(): SpacesClientConfig | null {
 
 export function buildObjectStorageClientConfigFromEnv(): {
   config: SpacesClientConfig;
-  provider: ObjectStorageProvider;
+  provider: 'spaces';
 } | null {
   const driver = (process.env.STORAGE_DRIVER ?? '').trim().toLowerCase();
   if (driver === 's3' || driver === 'aws') {
-    const config = buildAwsS3ClientConfigFromEnv();
-    return config ? { config, provider: 's3' } : null;
+    return null;
   }
   if (driver === 'spaces' || driver === '') {
     const config = buildSpacesClientConfigFromEnv();

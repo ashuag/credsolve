@@ -52,7 +52,7 @@ function countByUtcDayKeys(dayKeys: string[], dates: Date[]): Map<string, number
 
 function sumDisbursementsByUtcDayKeys(
   dayKeys: string[],
-  rows: Array<{ disbursedAt: Date | null; amount: Prisma.Decimal | null }>,
+  rows: Array<{ disbursedAt: Date | null; principalAmount: Prisma.Decimal | null }>,
 ): Map<string, { count: number; amount: Prisma.Decimal }> {
   const keySet = new Set(dayKeys);
   const agg = new Map<string, { count: number; amount: Prisma.Decimal }>();
@@ -69,8 +69,8 @@ function sumDisbursementsByUtcDayKeys(
     }
     const cur = agg.get(k)!;
     cur.count += 1;
-    if (row.amount != null) {
-      cur.amount = cur.amount.add(row.amount);
+    if (row.principalAmount != null) {
+      cur.amount = cur.amount.add(row.principalAmount);
     }
   }
   return agg;
@@ -109,8 +109,7 @@ type ApplicationStatusGroup = {
 type DashboardRecentApplication = {
   uuid: string;
   updatedAt: Date;
-  kycStatus: number;
-  livenessPassed: boolean;
+  kyc: { kycStatus: number; livenessPassed: boolean } | null;
   applicationStatus: { name: string; displayName: string | null };
   lead: { leadDetail: { fullName: string | null } | null };
   customer: { mobileNumber: string };
@@ -177,9 +176,9 @@ export class LosDashboardService {
         where: { createdAt: { gte: seriesSince, lt: seriesUntil } },
         select: { createdAt: true },
       }),
-      prisma.applicationDisbursement.findMany({
+      prisma.loanAccount.findMany({
         where: { disbursedAt: { gte: seriesSince, lt: seriesUntil } },
-        select: { disbursedAt: true, amount: true },
+        select: { disbursedAt: true, principalAmount: true },
       }),
     ]);
 
@@ -259,33 +258,36 @@ export class LosDashboardService {
       prisma.lead.count({
         where: { isActive: true, createdAt: { gte: startOfDay, lt: endOfDay } },
       }),
-      prisma.applicationDisbursement.aggregate({
+      prisma.loanAccount.aggregate({
         where: { disbursedAt: { gte: startOfDay, lt: endOfDay } },
-        _sum: { amount: true },
+        _sum: { principalAmount: true },
       }),
-      prisma.applicationEligibility.aggregate({
+      prisma.application.aggregate({
         where: {
-          application: {
-            applicationStatus: { name: APPLICATION_STATUS.APPROVED },
-          },
+          applicationStatus: { name: APPLICATION_STATUS.APPROVED },
+          preApprovedLoanAmount: { not: null },
         },
-        _sum: { approvedAmount: true },
+        _sum: { preApprovedLoanAmount: true },
       }),
       prisma.applicationDetail.aggregate({
-        where: { loanAmount: { not: null } },
-        _avg: { loanAmount: true },
+        where: { selectedLoanAmount: { not: null } },
+        _avg: { selectedLoanAmount: true },
       }),
-      prisma.application.count({
+      prisma.applicationKyc.count({
         where: {
           kycStatus: 0,
-          applicationStatus: { name: { in: [APPLICATION_STATUS.DRAFT, APPLICATION_STATUS.IN_REVIEW] } },
+          application: {
+            applicationStatus: { name: { in: [APPLICATION_STATUS.DRAFT, APPLICATION_STATUS.IN_REVIEW] } },
+          },
         },
       }),
-      prisma.application.count({
+      prisma.applicationKyc.count({
         where: {
           kycStatus: 1,
           livenessPassed: false,
-          applicationStatus: { name: { in: [APPLICATION_STATUS.DRAFT, APPLICATION_STATUS.IN_REVIEW] } },
+          application: {
+            applicationStatus: { name: { in: [APPLICATION_STATUS.DRAFT, APPLICATION_STATUS.IN_REVIEW] } },
+          },
         },
       }),
       prisma.application.findMany({
@@ -294,8 +296,7 @@ export class LosDashboardService {
         select: {
           uuid: true,
           updatedAt: true,
-          kycStatus: true,
-          livenessPassed: true,
+          kyc: { select: { kycStatus: true, livenessPassed: true } },
           applicationStatus: { select: { name: true, displayName: true } },
           lead: { select: { leadDetail: { select: { fullName: true } } } },
           customer: { select: { mobileNumber: true } },
@@ -363,7 +364,7 @@ export class LosDashboardService {
           ? 'Disbursement recorded'
           : app.applicationStatus.name === APPLICATION_STATUS.APPROVED
             ? 'Loan sanctioned'
-            : app.kycStatus === 1
+            : app.kyc?.kycStatus === 1
               ? 'KYC cleared'
               : app.applicationStatus.name === APPLICATION_STATUS.IN_REVIEW
                 ? 'Credit review queue'
@@ -397,9 +398,9 @@ export class LosDashboardService {
         disbursedCount,
       },
       amounts: {
-        sanctionedOpenPipelineInr: sanctionedPipelineAgg._sum.approvedAmount?.toString() ?? null,
-        disbursedTodayInr: disbursedTodayAgg._sum.amount?.toString() ?? null,
-        avgRequestedLoanInr: avgLoanAgg._avg.loanAmount?.toString() ?? null,
+        sanctionedOpenPipelineInr: sanctionedPipelineAgg._sum.preApprovedLoanAmount?.toString() ?? null,
+        disbursedTodayInr: disbursedTodayAgg._sum.principalAmount?.toString() ?? null,
+        avgRequestedLoanInr: avgLoanAgg._avg.selectedLoanAmount?.toString() ?? null,
       },
       credit: {
         approvalRatePercent,

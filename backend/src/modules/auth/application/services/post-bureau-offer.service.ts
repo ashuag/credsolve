@@ -65,7 +65,6 @@ export class PostBureauOfferService {
 
     const { preApprovedAmountInr } = await this.checkLoanEligibility.computeForLead(params.leadId);
     const approved = new Prisma.Decimal(preApprovedAmountInr);
-    const cibilScore = postBre.cibilScore;
 
     const convertedLeadStatus = await this.prisma.client.leadStatus.findFirst({
       where: { name: LEAD_STATUS.CONVERTED, isActive: true },
@@ -84,23 +83,6 @@ export class PostBureauOfferService {
       await tx.application.update({
         where: { id: application.id },
         data: { preApprovedLoanAmount: approved },
-      });
-
-      await tx.applicationEligibility.upsert({
-        where: { applicationId: application.id },
-        create: {
-          applicationId: application.id,
-          isEligible: true,
-          approvedAmount: approved,
-          cibilScore,
-        },
-        update: {
-          isEligible: true,
-          approvedAmount: approved,
-          cibilScore,
-          ineligibleReason: null,
-          checkedAt: new Date(),
-        },
       });
 
       if (convertedLeadStatus) {
@@ -166,27 +148,14 @@ export class PostBureauOfferService {
       if (rejectedAppStatus) {
         await tx.application.update({
           where: { id: application.id },
-          data: { applicationStatusId: rejectedAppStatus.id },
+          data: {
+            applicationStatusId: rejectedAppStatus.id,
+            preApprovedLoanAmount: null,
+            applicationStatusNote:
+              params.ineligibleReason?.slice(0, 256) ?? params.note.slice(0, 256),
+          },
         });
       }
-
-      await tx.applicationEligibility.upsert({
-        where: { applicationId: application.id },
-        create: {
-          applicationId: application.id,
-          isEligible: false,
-          approvedAmount: null,
-          cibilScore: params.cibilScore,
-          ineligibleReason: params.ineligibleReason?.slice(0, 500) ?? params.note.slice(0, 500),
-        },
-        update: {
-          isEligible: false,
-          approvedAmount: null,
-          cibilScore: params.cibilScore,
-          ineligibleReason: params.ineligibleReason?.slice(0, 500) ?? params.note.slice(0, 500),
-          checkedAt: new Date(),
-        },
-      });
     });
 
     const customer = await this.prisma.client.customer.findUnique({

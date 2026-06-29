@@ -22,16 +22,19 @@ x-entrypoint-mount: &entrypoint-mount
 services:
   backend:
     <<: *node-defaults
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    image: moneycash-backend-dev:local
     tty: true
     env_file: ./backend/.env
     # Nest must listen on all interfaces so other containers (customer, los) can reach `backend:4001`.
     environment:
       HOST: "0.0.0.0"
-      # Persist Puppeteer Chrome inside the bind-mounted backend tree (not ephemeral /root/.cache).
-      PUPPETEER_CACHE_DIR: /workspace/backend/.cache/puppeteer
-      # Dev: bundled Chrome from postinstall/entrypoint. Staging/prod VPS: system Chrome via
-      # npm run loan-docs:setup-chromium and PUPPETEER_EXECUTABLE_PATH — see
-      # backend/assets/loan-documents/README.md.
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
+      # AWS credentials come from backend/.env via env_file. Do not set AWS_ACCESS_KEY_ID here —
+      # docker-compose ${VAR:-} interpolation uses the host shell and would override .env with empty strings.
     ports:
       - "4001:4001"
     working_dir: /workspace/backend

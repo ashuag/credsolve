@@ -30,7 +30,7 @@ model ReferenceRelation {
   id             Int             @id @default(autoincrement()) @db.SmallInt
   name           String          @unique @db.VarChar(50)
   isActive       Boolean         @default(true) @map("is_active")
-  leadReferences LeadReference[]
+  applicationReferences ApplicationReference[]
 
   @@map("reference_relation")
 }
@@ -50,7 +50,7 @@ model ReasonForLoan {
   name              String              @unique @db.VarChar(50)
   isActive          Boolean             @default(true) @map("is_active")
   createdAt         DateTime            @default(now()) @map("created_at")
-  applicationDetail ApplicationDetail[]
+  loanDetails           ApplicationDetail[]
 
   @@map("reason_for_loan")
 }
@@ -66,23 +66,21 @@ model OtpType {
 }
 
 model KycProvider {
-  id                   Int                   @id @default(autoincrement()) @db.SmallInt
-  name                 String                @unique @db.VarChar(50)
-  displayName          String                @map("display_name") @db.VarChar(50)
-  isActive             Boolean               @default(true) @map("is_active")
-  createdAt            DateTime              @default(now()) @map("created_at")
-  customerKycDocuments CustomerKycDocument[]
+  id          Int      @id @default(autoincrement()) @db.SmallInt
+  name        String   @unique @db.VarChar(50)
+  displayName String   @map("display_name") @db.VarChar(50)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
 
   @@map("kyc_provider")
 }
 
 model KycDocument {
-  id                   Int                   @id @default(autoincrement()) @db.SmallInt
-  name                 String                @unique @db.VarChar(50)
-  displayName          String                @map("display_name") @db.VarChar(50)
-  isActive             Boolean               @default(true) @map("is_active")
-  createdAt            DateTime              @default(now()) @map("created_at")
-  customerKycDocuments CustomerKycDocument[]
+  id          Int      @id @default(autoincrement()) @db.SmallInt
+  name        String   @unique @db.VarChar(50)
+  displayName String   @map("display_name") @db.VarChar(50)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
 
   @@map("kyc_document")
 }
@@ -134,7 +132,8 @@ model RejectionReason {
   id       Int     @id @default(autoincrement()) @db.SmallInt
   name     String  @unique @db.VarChar(50)
   isActive Boolean @default(true) @map("is_active")
-  leads    Lead[]
+  leads        Lead[]
+  applications Application[]
 
   @@map("rejection_reason")
 }
@@ -147,4 +146,14 @@ model ApplicationStatus {
   applications Application[]
 
   @@map("application_status")
+}
+
+model LoanStatus {
+  id           Int           @id @default(autoincrement()) @db.SmallInt
+  name         String        @unique @db.VarChar(20)
+  displayName  String?       @map("display_name") @db.VarChar(50)
+  isActive     Boolean       @default(true) @map("is_active")
+  loanAccounts LoanAccount[]
+
+  @@map("loan_status")
 }

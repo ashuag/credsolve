@@ -23,16 +23,22 @@
     "cibil:preview-pdf": "npm run build && node scripts/preview-cibil-report-pdf.mjs",
     "loan-docs:preview-pdf": "npm run build && node scripts/preview-loan-document-pdf.mjs",
     "loan-docs:setup-chromium": "bash scripts/setup-chromium-staging.sh",
+    "cron:expire-leads": "npm run build && node build/src/cli/expire-leads.js",
     "nest": "nest"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1075.0",
+    "@aws-sdk/s3-request-presigner": "^3.1075.0",
     "@nestjs/common": "^11.1.11",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.11",
     "@nestjs/platform-express": "^11.1.11",
+    "@nestjs/schedule": "^6.0.0",
     "@nestjs/swagger": "^11.2.3",
     "@prisma/adapter-mariadb": "^7.6.0",
     "@prisma/client": "^7.0.0",
+    "@tensorflow/tfjs-node": "^4.22.0",
+    "@vladmandic/face-api": "^1.7.15",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
@@ -46,12 +52,10 @@
     "nodemailer": "6.10.1",
     "pdf-lib": "^1.17.1",
     "pdf-rfc3161": "^0.1.4",
-    "puppeteer": "^24.36.0",
     "prisma": "^7.0.0",
+    "puppeteer": "^24.36.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2",
-    "@tensorflow/tfjs-node": "^4.22.0",
-    "@vladmandic/face-api": "^1.7.15"
+    "rxjs": "^7.8.2"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.14",

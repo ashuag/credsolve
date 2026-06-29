@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { BankRepository } from '../../infrastructure/repositories/bank.repository';
@@ -44,43 +43,25 @@ export class SaveBankDetailsUseCase {
       const application = await tx.application.findFirst({
         where: { leadId: lead.id },
         orderBy: { createdAt: 'desc' },
-        select: { id: true, applicationStatusId: true },
+        select: { id: true },
       });
       if (!application) {
-        throw new BadRequestException('Create application details before bank details.');
+        throw new BadRequestException('Create loan details before bank details.');
       }
 
-      const details = await tx.applicationDetail.findUnique({
+      const updated = await tx.applicationDetail.updateMany({
         where: { applicationId: application.id },
-        select: { loanAmount: true },
-      });
-      const disbursementAmount = details?.loanAmount ?? null;
-
-      await tx.applicationDisbursement.upsert({
-        where: { applicationId: application.id },
-        create: {
-          applicationId: application.id,
-          amount: disbursementAmount ? new Prisma.Decimal(disbursementAmount.toString()) : null,
-          accountNumber: dto.accountNumber,
+        data: {
+          bankAccountNumber: dto.accountNumber,
           ifscCode: dto.ifscCode.toUpperCase(),
-          disbursedAt: null,
-        },
-        update: {
-          amount: disbursementAmount ? new Prisma.Decimal(disbursementAmount.toString()) : null,
-          accountNumber: dto.accountNumber,
-          ifscCode: dto.ifscCode.toUpperCase(),
+          bankName: normalizedBankName.length > 0 ? normalizedBankName : null,
         },
       });
-
-      // `bank_name` is written via raw SQL so the DB stays compatible even when the column was added after the initial migration.
-      await tx.$executeRaw`
-        UPDATE application_disbursement
-        SET bank_name = ${normalizedBankName.length > 0 ? normalizedBankName : null}
-        WHERE application_id = ${application.id}
-      `;
+      if (updated.count === 0) {
+        throw new BadRequestException('Complete loan selection before bank details.');
+      }
     });
 
     return { success: true };
   }
 }
-

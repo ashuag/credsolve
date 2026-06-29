@@ -32,3 +32,10 @@ enum VendorHttpMethod {
   PATCH
   DELETE
 }
+
+enum LoanRepaymentPaymentMode {
+  UPI
+  NEFT
+  IMPS
+  CASH
+}

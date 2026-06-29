@@ -11,8 +11,6 @@ export type LosTenacioDryRunResult = {
   summary: {
     matchScore?: number | null;
     matchPassed?: boolean | null;
-    deepfakeDetected?: boolean | null;
-    authenticityScore?: number | null;
     livenessScore?: number | null;
     isLive?: boolean | null;
     multipleFacesDetected?: boolean | null;
@@ -74,12 +72,6 @@ export type KycSelfieFaceLocalResult = {
   qualifyingDetectionCount: number;
 };
 
-export type LosDeepfakeCheckResult = {
-  local: KycSelfieFaceLocalResult;
-  tenacio: LosTenacioDryRunResult | null;
-  businessOk: boolean;
-};
-
 export async function runKycFaceMatchCheck(
   token: string,
   payload: FaceMatchCheckPayload,
@@ -100,16 +92,5 @@ export async function runKycFaceMatchCheck(
     '/developer-tools/kyc-face-match-check',
     { method: 'POST', body: form },
     'Face match check failed.',
-  );
-}
-
-export async function runKycDeepfakeCheck(token: string, image: File): Promise<LosDeepfakeCheckResult> {
-  const form = new FormData();
-  form.set('image', image, image.name || 'image.jpg');
-  return authorizedLosRequest(
-    token,
-    '/developer-tools/kyc-deepfake-check',
-    { method: 'POST', body: form },
-    'Deepfake check failed.',
   );
 }

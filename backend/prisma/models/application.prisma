@@ -1,78 +1,61 @@
 // ============================================================
 // APPLICATION
 // ============================================================
-//
-// Application aggregate: one row per loan application, with a small set
-// of 1:1 sub-aggregates (details, eligibility, agreement, disbursement).
 
 model Application {
-  id                           BigInt                 @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid                         String                 @unique @default(uuid()) @db.Char(36)
-  customerId                   BigInt                 @map("customer_id") @db.UnsignedBigInt
-  leadId                       BigInt                 @map("lead_id") @db.UnsignedBigInt
-  email                        String?                @map("email_id") @db.VarChar(150)
-  emailVerifiedAt              DateTime?              @map("email_verified_at") @db.DateTime
-  emailVerificationType        EmailVerificationType? @map("email_verification_type")
-  applicationStatusId          Int                    @map("application_status_id") @db.SmallInt
-  preApprovedLoanAmount        Decimal?               @map("pre_approved_loan_amount") @db.Decimal(12, 2)
-  kycStatus                    Int                    @default(0) @map("kyc_status") @db.SmallInt // 0: Not Done, 1: Completed, 2: failed, 3: technical issue
-  kycCompletedAt               DateTime?              @map("kyc_completed_at")
-  /// DigiLocker Aadhaar download payload for forms (large `photo` replaced by stored-file reference).
-  digilockerAadhaarFormJson    Json?                  @map("digilocker_aadhaar_form_json")
-  /// Object key (DigitalOcean Spaces or local `storage/`): `customer/{customer_uuid}/photos/aadhaar/{application_uuid}.{jpg|png}`.
-  aadhaarPhotoRelativePath     String?                @map("aadhaar_photo_relative_path") @db.VarChar(512)
-  /// `customer/{customer_uuid}/photos/selfie/{application_uuid}.jpg`
-  selfieRelativePath           String?                @map("selfie_relative_path") @db.VarChar(512)
-  /// On-server TensorFlow face check snapshot (computed confidence, breakdown, etc.).
-  selfieFaceValidationJson     Json?                  @map("selfie_face_validation_json")
-  selfieFaceValidationPassed   Boolean                @default(false) @map("selfie_face_validation_passed")
-  selfieFaceValidationCheckedAt DateTime?             @map("selfie_face_validation_checked_at")
-  livenessVendorJson           Json?                  @map("liveness_vendor_json")
-  livenessCheckedAt            DateTime?              @map("liveness_checked_at")
-  livenessPassed               Boolean                @default(false) @map("liveness_passed")
-  livenessDone                 Boolean                @default(false) @map("liveness_done")
-  livenessDoneAt               DateTime?              @map("liveness_done_at")
-  /// Object key: `customer/{uuid}/loan-documents/{app_uuid}/key-fact-statement.pdf` (and loan-agreement.pdf)
-  keyFactPdfRelativePath       String?                @map("key_fact_pdf_relative_path") @db.VarChar(512)
-  keyFactEsigned               Boolean                @default(false) @map("key_fact_esigned")
-  /// `customer/{uuid}/loan-documents/{app_uuid}/loan-agreement.pdf`
-  loanAgreementPdfRelativePath String?                @map("loan_agreement_pdf_relative_path") @db.VarChar(512)
-  loanDocumentsAcceptedAt      DateTime?              @map("loan_documents_accepted_at")
-  pennyDropAttempts            Int                    @default(0) @map("penny_drop_attempts") @db.SmallInt
-  createdAt                    DateTime               @default(now()) @map("created_at")
-  updatedAt                    DateTime               @updatedAt @map("updated_at")
+  id                    BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                  String    @unique @default(uuid()) @db.Char(36)
+  customerId            BigInt    @map("customer_id") @db.UnsignedBigInt
+  leadId                BigInt    @map("lead_id") @db.UnsignedBigInt
+  applicationStatusId   Int       @map("application_status_id") @db.SmallInt
+  preApprovedLoanAmount Decimal?  @map("pre_approved_loan_amount") @db.Decimal(12, 2)
+  applicationStatusNote String?   @map("application_status_note") @db.VarChar(256)
+  rejectionReasonId     Int?      @map("rejection_reason_id") @db.SmallInt
+  createdAt             DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
 
-  customer          Customer                 @relation(fields: [customerId], references: [id])
-  lead              Lead                     @relation(fields: [leadId], references: [id])
-  applicationStatus ApplicationStatus        @relation(fields: [applicationStatusId], references: [id])
+  customer          Customer              @relation(fields: [customerId], references: [id])
+  lead              Lead                  @relation(fields: [leadId], references: [id])
+  applicationStatus ApplicationStatus     @relation(fields: [applicationStatusId], references: [id])
+  rejectionReason   RejectionReason?      @relation(fields: [rejectionReasonId], references: [id])
   details           ApplicationDetail?
-  eligibility       ApplicationEligibility?
-  agreement         ApplicationAgreement?
-  disbursement      ApplicationDisbursement?
+  kyc               ApplicationKyc?
+  references        ApplicationReference[]
+  loanAccount       LoanAccount?
 
   @@index([customerId, applicationStatusId])
   @@index([leadId, createdAt])
   @@index([leadId, applicationStatusId])
   @@index([applicationStatusId])
+  @@index([rejectionReasonId])
   @@map("application")
 }
 
 model ApplicationDetail {
-  id                   BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid                 String    @unique @default(uuid()) @db.Char(36)
-  applicationId        BigInt    @unique @map("application_id") @db.UnsignedBigInt
-  reasonForLoanId      Int?      @map("reason_for_loan_id") @db.SmallInt
-  loanAmount           Decimal?  @map("loan_amount") @db.Decimal(12, 2)
-  loanTenure           Int?      @map("loan_tenure") @db.MediumInt
-  interestRate         Decimal?  @map("interest_rate") @db.Decimal(5, 2)
-  interestAmount       Decimal?  @map("interest_amount") @db.Decimal(12, 2)
-  processingFee        Decimal?  @map("processing_fee") @db.Decimal(5, 2)
-  processingFeeAmount  Decimal?  @map("processing_fee_amount") @db.Decimal(12, 2)
-  gstAmount            Decimal?  @map("gst_amount") @db.Decimal(12, 2)
-  loanDisbursementDate DateTime? @map("loan_disbursement_date") @db.Date
-  loanMaturityDate     DateTime? @map("loan_maturity_date") @db.Date
-  createdAt            DateTime  @default(now()) @map("created_at")
-  updatedAt            DateTime  @updatedAt @map("updated_at")
+  id                           BigInt                 @id @default(autoincrement()) @db.UnsignedBigInt
+  applicationId                BigInt                 @unique @map("application_id") @db.UnsignedBigInt
+  emailId                      String?                @map("email_id") @db.VarChar(150)
+  emailVerificationType        EmailVerificationType? @map("email_verification_type")
+  emailVerifiedAt              DateTime?              @map("email_verified_at") @db.DateTime(3)
+  selectedLoanAmount           Decimal?               @map("selected_loan_amount") @db.Decimal(12, 2)
+  interestRate                 Decimal?               @map("interest_rate") @db.Decimal(5, 2)
+  processingFeePercentage      Decimal?               @map("processing_fee_percentage") @db.Decimal(5, 2)
+  gstPercentage                Decimal?               @map("gst_percentage") @db.Decimal(5, 2)
+  reasonForLoanId              Int?                   @map("reason_for_loan_id") @db.SmallInt
+  expectedRepaymentDays        Int?                   @map("expected_repayment_days") @db.MediumInt
+  expectedRepaymentDate        DateTime?              @map("expected_repayment_date") @db.Date
+  bankAccountNumber            String?                @map("bank_account_number") @db.VarChar(20)
+  ifscCode                     String?                @map("ifsc_code") @db.VarChar(11)
+  bankName                     String?                @map("bank_name") @db.VarChar(100)
+  keyFactPdfRelativePath       String?                @map("key_fact_pdf_relative_path") @db.VarChar(512)
+  keyFactEsigned               Boolean                @default(false) @map("key_fact_esigned")
+  loanAgreementPdfRelativePath String?                @map("loan_agreement_pdf_relative_path") @db.VarChar(512)
+  loanDocumentsAcceptedAt      DateTime?              @map("loan_documents_accepted_at") @db.DateTime(3)
+  loanDocumentsAcceptedIp      String?                @map("loan_documents_accepted_ip") @db.VarChar(45)
+  pennyDropAttempts            Int                    @default(0) @map("penny_drop_attempts") @db.SmallInt
+  pennyDropVendorJson          Json?                  @map("penny_drop_vendor_json")
+  createdAt                    DateTime               @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt                    DateTime               @updatedAt @map("updated_at") @db.DateTime(3)
 
   application   Application    @relation(fields: [applicationId], references: [id])
   reasonForLoan ReasonForLoan? @relation(fields: [reasonForLoanId], references: [id])
@@ -80,48 +63,43 @@ model ApplicationDetail {
   @@map("application_detail")
 }
 
-model ApplicationEligibility {
-  id               BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  applicationId    BigInt   @unique @map("application_id") @db.UnsignedBigInt
-  isEligible       Boolean  @map("is_eligible")
-  approvedAmount   Decimal? @map("approved_amount") @db.Decimal(12, 2)
-  cibilScore       Int?     @map("cibil_score")
-  ineligibleReason String?  @map("ineligible_reason") @db.VarChar(500)
-  checkedAt        DateTime @default(now()) @map("checked_at")
-  createdAt        DateTime @default(now()) @map("created_at")
+model ApplicationKyc {
+  id                          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  applicationId               BigInt    @unique @map("application_id") @db.UnsignedBigInt
+  kycStatus                   Int       @default(0) @map("kyc_status") @db.SmallInt
+  livenessSelfiePath          String?   @map("liveness_selfie_path") @db.VarChar(512)
+  isLiveness                  Boolean   @default(false) @map("is_liveness")
+  livenessCheckedAt           DateTime? @map("liveness_checked_at") @db.DateTime(3)
+  livenessDoneAt              DateTime? @map("liveness_done_at") @db.DateTime(3)
+  livenessPassed              Boolean   @default(false) @map("liveness_passed")
+  livenessVendorJson          Json?     @map("liveness_vendor_json")
+  faceMatchCheckedAt          DateTime? @map("face_match_checked_at") @db.DateTime(3)
+  selfieFaceValidationJson       Json?     @map("selfie_face_validation_json")
+  selfieFaceValidationPassed     Boolean   @default(false) @map("selfie_face_validation_passed")
+  digilockerAadhaarDownloadAttempts Int  @default(0) @map("digilocker_aadhaar_download_attempts") @db.SmallInt
+  kycCompletedAt                 DateTime? @map("kyc_completed_at") @db.DateTime(3)
+  createdAt                      DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt                   DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
 
   application Application @relation(fields: [applicationId], references: [id])
 
-  @@map("application_eligibility")
+  @@map("application_kyc")
 }
 
-model ApplicationAgreement {
-  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid          String    @unique @default(uuid()) @db.Char(36)
-  applicationId BigInt    @unique @map("application_id") @db.UnsignedBigInt
-  documentName  String?   @map("document_name") @db.VarChar(255)
-  ipAddress     String?   @map("ip_address") @db.VarChar(45)
-  signedAt      DateTime? @map("signed_at")
-  createdAt     DateTime  @default(now()) @map("created_at")
+model ApplicationReference {
+  id             BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  applicationId  BigInt   @map("application_id") @db.UnsignedBigInt
+  referenceIndex Int      @map("reference_index") @db.SmallInt
+  fullName       String   @map("full_name") @db.VarChar(100)
+  mobileNumber   String   @map("mobile_number") @db.VarChar(10)
+  relationId     Int      @map("relation_id") @db.SmallInt
+  createdAt      DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.DateTime(3)
 
-  application Application @relation(fields: [applicationId], references: [id])
+  application Application       @relation(fields: [applicationId], references: [id])
+  relation    ReferenceRelation @relation(fields: [relationId], references: [id])
 
-  @@map("application_agreement")
-}
-
-model ApplicationDisbursement {
-  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid          String    @unique @default(uuid()) @db.Char(36)
-  applicationId BigInt    @unique @map("application_id") @db.UnsignedBigInt
-  amount        Decimal?  @db.Decimal(12, 2)
-  accountNumber String?   @map("account_number") @db.VarChar(20)
-  ifscCode      String?   @map("ifsc_code") @db.VarChar(11)
-  bankName      String?   @map("bank_name") @db.VarChar(100)
-  utr           String?   @db.VarChar(50)
-  disbursedAt   DateTime? @map("disbursed_at")
-  createdAt     DateTime  @default(now()) @map("created_at")
-
-  application Application @relation(fields: [applicationId], references: [id])
-
-  @@map("application_disbursement")
+  @@unique([applicationId, referenceIndex])
+  @@index([applicationId])
+  @@map("application_reference")
 }

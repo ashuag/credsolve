@@ -7,6 +7,7 @@ import {
   createApplicationCibilReport,
   getApplicationCibilReport,
   getApplicationDetails,
+  resolveLosKycPhotoSrc,
   runPostBureauBreCheck,
   type LosApplicationCibilReportPayload,
   type PostBreDryRunResult,
@@ -296,6 +297,12 @@ export function ApplicationCibilReportTab({ applicationUuid, onReportCreated }: 
     );
   }
 
+  const pdfDownloadUrl =
+    resolveLosKycPhotoSrc(
+      payload.reportPdfUrl ?? `/applications/${encodeURIComponent(applicationUuid)}/cibil-report/pdf`,
+      getToken() ?? '',
+    );
+
   const viewTabs: Array<{ id: CibilReportView; label: string }> = [
     { id: 'report', label: 'View CIBIL report' },
     { id: 'bre', label: 'Post BRE check' },
@@ -324,19 +331,19 @@ export function ApplicationCibilReportTab({ applicationUuid, onReportCreated }: 
             {tab.label}
           </button>
         ))}
-        {payload.reportPdfUrl ? (
+        {pdfDownloadUrl ? (
           <a
-            href={payload.reportPdfUrl}
+            href={pdfDownloadUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="ml-auto inline-flex min-h-[38px] items-center rounded-[10px] border border-[rgba(23,44,113,0.12)] bg-white px-4 text-[0.82rem] font-bold text-brand-blue no-underline hover:border-[rgba(20,150,243,0.35)]"
           >
-            Download PDF
+            Download CIBIL report
           </a>
         ) : null}
       </nav>
 
-      {activeView === 'report' ? <CibilReportViewer payload={payload} /> : null}
+      {activeView === 'report' ? <CibilReportViewer payload={payload} pdfDownloadUrl={pdfDownloadUrl} /> : null}
       {activeView === 'bre' ? <PostBreView rawPayload={payload.rawPayload} /> : null}
       {activeView === 'json' ? <CibilJsonViewer rawPayload={payload.rawPayload} /> : null}
     </div>

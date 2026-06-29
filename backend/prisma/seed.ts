@@ -15,6 +15,7 @@ import { seedBank } from './seeds/bank.seed';
 import { seedRejectionReason } from './seeds/rejection-reason.seed';
 import { seedReferenceRelation } from './seeds/reference-relation.seed';
 import { seedSmsTemplate } from './seeds/sms-template.seed';
+import { seedLoanStatus } from './seeds/loan_status.seed';
 
 async function assertMigrationsApplied(prisma: ReturnType<typeof createPrismaClient>) {
     const rows = await prisma.$queryRaw<{ cnt: bigint }[]>`
@@ -71,6 +72,7 @@ async function main() {
         await seedUserRole(prisma);
         await seedUser(prisma);
         await seedApplicationStatus(prisma);
+        await seedLoanStatus(prisma);
         await seedLoanReason(prisma);
         await seedSetting(prisma);
         await seedEligibilityCriteria(prisma);

@@ -72,17 +72,26 @@ export class SaveLeadReferencesUseCase {
     }
 
     await this.prisma.client.$transaction(async (tx) => {
+      const application = await tx.application.findFirst({
+        where: { leadId: leadRow.id, customerId: customer.id },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+      if (!application) {
+        throw new BadRequestException('Complete loan selection before adding references.');
+      }
+
       await Promise.all(
         refs.map((ref) =>
-          tx.leadReference.upsert({
+          tx.applicationReference.upsert({
             where: {
-              leadId_referenceIndex: {
-                leadId: leadRow.id,
+              applicationId_referenceIndex: {
+                applicationId: application.id,
                 referenceIndex: ref.referenceIndex,
               },
             },
             create: {
-              leadId: leadRow.id,
+              applicationId: application.id,
               referenceIndex: ref.referenceIndex,
               fullName: ref.fullName,
               mobileNumber: ref.mobileNumber,

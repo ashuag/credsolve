@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { FlowLoader } from '@/components/ui/flow-loader';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
@@ -18,7 +18,6 @@ import { EmailEntryStep, type EmailMode } from './email-entry-step';
 import { EmailOtpStep } from './email-otp-step';
 import { PersonalDetailsStep, type PersonalDetailsSection } from './personal-details-step';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
-import { LoanSummaryLeftRail } from '@/components/loan/loan-summary-left-rail';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 
 // Flow: mobile → profile → pre-BRE/PAN/CIBIL → pre-approved → loan selection → email → loan docs + OTP → KYC → bank → references
@@ -36,6 +35,91 @@ const STEP_LABELS: Record<OnboardingStep, string> = {
   details: 'Your profile',
   email: 'Link email',
   'email-otp': 'Verify email',
+};
+
+const ONBOARDING_LEFT_PANEL: Record<
+  OnboardingStep,
+  { title: ReactNode; description: string; infographic: ReactNode }
+> = {
+  details: {
+    title: (
+      <>
+        Final <span className="text-[#60a5fa]">Details</span>
+      </>
+    ),
+    description: 'Complete your profile to unlock instant disbursal of your approved loan amount.',
+    infographic: (
+      <svg viewBox="0 0 400 400" className="w-full h-full drop-shadow-xl" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="docGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#818cf8" />
+            <stop offset="100%" stopColor="#4338ca" />
+          </linearGradient>
+        </defs>
+        <g transform="translate(120, 80)">
+          <rect x="0" y="0" width="160" height="220" rx="12" fill="url(#docGrad)" stroke="rgba(255,255,255,0.4)" strokeWidth="4" />
+          <circle cx="80" cy="60" r="30" fill="rgba(255,255,255,0.2)" />
+          <rect x="40" y="120" width="80" height="12" rx="6" fill="rgba(255,255,255,0.8)" />
+          <rect x="40" y="150" width="50" height="12" rx="6" fill="rgba(255,255,255,0.4)" />
+          <circle cx="140" cy="200" r="24" fill="#10b981" />
+          <path d="M130 200 L138 208 L150 192" stroke="#ffffff" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </g>
+      </svg>
+    ),
+  },
+  email: {
+    title: (
+      <>
+        Secure <span className="text-[#60a5fa]">Access</span>
+      </>
+    ),
+    description: 'Link your email address to secure your account and track your loan progress.',
+    infographic: (
+      <svg viewBox="0 0 400 400" className="w-full h-full drop-shadow-xl" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="envGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#60a5fa" />
+            <stop offset="100%" stopColor="#1d4ed8" />
+          </linearGradient>
+        </defs>
+        <g transform="translate(100, 120)">
+          <rect x="0" y="0" width="200" height="140" rx="16" fill="url(#envGrad)" stroke="rgba(255,255,255,0.4)" strokeWidth="4" />
+          <path d="M0 20 L100 90 L200 20" stroke="rgba(255,255,255,0.8)" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="100" cy="90" r="30" fill="#facc15" />
+          <text x="100" y="98" fill="#854d0e" fontSize="24" fontWeight="bold" textAnchor="middle">
+            @
+          </text>
+        </g>
+      </svg>
+    ),
+  },
+  'email-otp': {
+    title: (
+      <>
+        Verify <span className="text-[#60a5fa]">Email</span>
+      </>
+    ),
+    description: 'Enter the secure code sent to your email to verify your identity.',
+    infographic: (
+      <svg viewBox="0 0 400 400" className="w-full h-full drop-shadow-xl" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="shieldGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#10b981" />
+            <stop offset="100%" stopColor="#047857" />
+          </linearGradient>
+        </defs>
+        <g transform="translate(140, 100)">
+          <path
+            d="M60 0 L120 20 L120 60 C120 100 80 140 60 160 C40 140 0 100 0 60 L0 20 Z"
+            fill="url(#shieldGrad)"
+            stroke="rgba(255,255,255,0.4)"
+            strokeWidth="4"
+          />
+          <path d="M30 70 L50 90 L90 40" stroke="#ffffff" strokeWidth="10" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </g>
+      </svg>
+    ),
+  },
 };
 
 export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
@@ -208,14 +292,8 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
   const portalSession = session;
   const activeLead = portalSession.lead!;
 
-  const leftTitle = (
-    <>
-      Loan <span className="text-[#60a5fa]">details</span>
-    </>
-  );
-  const leftDescription =
-    'Principal, tenure, and maturity from your application stay visible while you complete this step.';
-  const leftInfographic = <LoanSummaryLeftRail loanSelection={portalSession.loanSelection} />;
+  const { title: leftTitle, description: leftDescription, infographic: leftInfographic } =
+    ONBOARDING_LEFT_PANEL[step];
 
   /** Back handler for mobile app bar — navigates within onboarding or exits */
   function handleMobileBack() {

@@ -13,20 +13,23 @@ mkdir -p "$APP_DIR/.cache"
 
   DEPS_STAMP="$APP_DIR/node_modules/.puppeteer-runtime-deps-stamp"
   if [ ! -f "$DEPS_STAMP" ] && command -v apt-get >/dev/null 2>&1; then
-    echo "[puppeteer-setup] Installing Chrome runtime libraries..."
+    echo "[puppeteer-setup] Installing Chromium + runtime libraries..."
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
     apt-get install -y -qq \
-      ca-certificates fonts-liberation fonts-noto-core \
+      chromium \
+      ca-certificates fonts-liberation fonts-noto-core fonts-noto-color-emoji fonts-indic \
       libasound2 libatk-bridge2.0-0 libatk1.0-0 libcairo2 libcups2 \
       libdbus-1-3 libdrm2 libgbm1 libglib2.0-0 libgtk-3-0 libnspr4 libnss3 \
       libpango-1.0-0 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 libxdamage1 \
       libxext6 libxfixes3 libxkbcommon0 libxrandr2 libxshmfence1 libxss1
     touch "$DEPS_STAMP"
-    echo "[puppeteer-setup] Runtime libraries installed."
+    echo "[puppeteer-setup] Chromium installed at /usr/bin/chromium"
   fi
 
-  if [ -f "$APP_DIR/scripts/ensure-puppeteer-chrome.mjs" ]; then
+  if [ -x /usr/bin/chromium ] && [ "${PUPPETEER_SKIP_CHROMIUM_DOWNLOAD:-}" = "true" ]; then
+    echo "[puppeteer-setup] System Chromium ready — skipping bundled Chrome download."
+  elif [ -f "$APP_DIR/scripts/ensure-puppeteer-chrome.mjs" ]; then
     node "$APP_DIR/scripts/ensure-puppeteer-chrome.mjs"
   fi
 

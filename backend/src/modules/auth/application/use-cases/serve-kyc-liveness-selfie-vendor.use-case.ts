@@ -20,10 +20,10 @@ export class ServeKycLivenessSelfieVendorUseCase {
 
     const application = await this.prisma.client.application.findUnique({
       where: { uuid: parsed.applicationUuid },
-      select: { selfieRelativePath: true },
+      select: { kyc: { select: { livenessSelfiePath: true } } },
     });
 
-    const rel = application?.selfieRelativePath?.trim();
+    const rel = application?.kyc?.livenessSelfiePath?.trim();
     if (!rel) {
       throw new NotFoundException('Selfie is not saved yet.');
     }

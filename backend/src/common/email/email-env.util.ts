@@ -14,8 +14,23 @@ export type ResolvedEmailTransportConfig = ResolvedEmailFromConfig & {
   pass: string;
 };
 
-/** Zeptomail and legacy SMTP share `EMAIL_PASSOWRD` (typo preserved) or `EMAIL_PASSWORD`. */
+/** Strip `Zoho-enczapikey` when the full Authorization value was pasted into env. */
+export function normalizeZeptomailAuthKey(raw: string): string {
+  const trimmed = raw.trim();
+  const prefix = 'Zoho-enczapikey';
+  if (trimmed.toLowerCase().startsWith(prefix.toLowerCase())) {
+    return trimmed.slice(prefix.length).trim();
+  }
+  return trimmed;
+}
+
+/** Zeptomail API key (`EMAIL_AUTH_KEY`) or legacy SMTP password env vars. */
 export function resolveEmailPassword(config: ConfigService): string {
+  const authKey = config.get<string>('EMAIL_AUTH_KEY')?.trim();
+  if (authKey) {
+    return normalizeZeptomailAuthKey(authKey);
+  }
+
   return (
     config.get<string>('EMAIL_PASSOWRD')
     ?? config.get<string>('EMAIL_PASSWORD')

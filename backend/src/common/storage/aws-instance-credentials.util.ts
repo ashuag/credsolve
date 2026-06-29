@@ -6,8 +6,20 @@ export type AwsSigningCredentials = {
 };
 
 const IMDS_BASE = 'http://169.254.169.254';
-const IMDS_TIMEOUT_MS = 2000;
+const IMDS_TIMEOUT_MS = 5000;
 const REFRESH_BUFFER_MS = 5 * 60 * 1000;
+
+/** Set `AWS_EC2_INSTANCE_ROLE=true` on EC2 (not in local Docker — IMDS is unreachable there). */
+export function awsUseEc2InstanceRole(): boolean {
+  const raw = (process.env.AWS_EC2_INSTANCE_ROLE ?? '').trim().toLowerCase();
+  return raw === 'true' || raw === '1' || raw === 'yes';
+}
+
+export function hasStaticAwsCredentials(): boolean {
+  return Boolean(
+    (process.env.AWS_ACCESS_KEY_ID ?? '').trim() && (process.env.AWS_SECRET_ACCESS_KEY ?? '').trim(),
+  );
+}
 
 type CachedCredentials = {
   creds: AwsSigningCredentials;
@@ -21,15 +33,20 @@ let cached: CachedCredentials | null = null;
  * On EC2 with MoneyCashEC2Role attached, no AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY needed.
  */
 export async function resolveAwsSigningCredentials(): Promise<AwsSigningCredentials> {
-  const accessKeyId = (process.env.AWS_ACCESS_KEY_ID ?? '').trim();
-  const secretAccessKey = (process.env.AWS_SECRET_ACCESS_KEY ?? '').trim();
-  if (accessKeyId && secretAccessKey) {
+  if (hasStaticAwsCredentials()) {
     const sessionToken = (process.env.AWS_SESSION_TOKEN ?? '').trim();
     return {
-      accessKeyId,
-      secretAccessKey,
+      accessKeyId: (process.env.AWS_ACCESS_KEY_ID ?? '').trim(),
+      secretAccessKey: (process.env.AWS_SECRET_ACCESS_KEY ?? '').trim(),
       sessionToken: sessionToken || undefined,
     };
+  }
+
+  if (!awsUseEc2InstanceRole()) {
+    throw new Error(
+      'S3 credentials missing. For local/Docker dev set AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY. ' +
+        'On EC2 set AWS_EC2_INSTANCE_ROLE=true (MoneyCashEC2Role attached).',
+    );
   }
 
   const now = Date.now();
@@ -100,9 +117,15 @@ async function fetchImdsToken(): Promise<string> {
     return token;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    const dockerHint =
+      message.includes('aborted') || message.includes('fetch failed')
+        ? ' Docker containers cannot reach EC2 metadata unless hop limit is 2 and the role is attached to the host.'
+        : '';
     throw new Error(
-      `Could not load AWS credentials from EC2 instance metadata (${message}). ` +
-        'Attach an IAM role to the instance or set AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY for local dev.',
+      `Could not load AWS credentials from EC2 instance metadata (${message}).` +
+        dockerHint +
+        ' Attach MoneyCashEC2Role to the EC2 instance, set AWS_EC2_INSTANCE_ROLE=true, ' +
+        'or use AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY for dev.',
     );
   } finally {
     clearTimeout(timer);

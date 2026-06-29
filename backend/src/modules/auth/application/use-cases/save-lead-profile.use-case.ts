@@ -103,6 +103,7 @@ export class SaveLeadProfileUseCase {
       netMonthlyIncome,
       annualTurnover,
       annualProfit,
+      panNumber: panUpper,
       ...(dto.creditConsentAccepted === true ? { cibilConsentAt: new Date() } : {}),
     };
 
@@ -115,11 +116,6 @@ export class SaveLeadProfileUseCase {
       update: profilePayload,
     });
 
-    await this.prisma.client.lead.update({
-      where: { id: leadRow.id },
-      data: { panNumber: panUpper },
-    });
-
     const panCheck = this.panVerification.validatePanStructure(panUpper, dto.fullName.trim());
     if (!panCheck.valid) {
       const maxAttempts = await this.loadMaxPanAttempts();
@@ -127,7 +123,7 @@ export class SaveLeadProfileUseCase {
       const attemptsUsed = currentAttempts + 1;
 
       await this.prisma.client.$executeRaw`
-        UPDATE \`lead\` SET \`pan_validation_attempts\` = ${attemptsUsed} WHERE \`id\` = ${leadRow.id}
+        UPDATE \`lead_detail\` SET \`pan_validation_attempts\` = ${attemptsUsed} WHERE \`lead_id\` = ${leadRow.id}
       `;
 
       if (attemptsUsed >= maxAttempts) {
@@ -157,7 +153,7 @@ export class SaveLeadProfileUseCase {
 
   private async fetchPanAttempts(leadId: bigint): Promise<number> {
     const rows = await this.prisma.client.$queryRaw<Array<{ pan_validation_attempts: number }>>`
-      SELECT \`pan_validation_attempts\` FROM \`lead\` WHERE \`id\` = ${leadId} LIMIT 1
+      SELECT \`pan_validation_attempts\` FROM \`lead_detail\` WHERE \`lead_id\` = ${leadId} LIMIT 1
     `;
     return Number(rows[0]?.pan_validation_attempts ?? 0);
   }

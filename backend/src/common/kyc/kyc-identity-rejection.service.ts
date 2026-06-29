@@ -64,11 +64,19 @@ export class KycIdentityRejectionService {
         },
       });
 
+      await tx.applicationKyc.upsert({
+        where: { applicationId: params.applicationId },
+        create: {
+          applicationId: params.applicationId,
+          kycStatus: APPLICATION_KYC_STATUS.FAILED,
+        },
+        update: { kycStatus: APPLICATION_KYC_STATUS.FAILED },
+      });
       await tx.application.update({
         where: { id: params.applicationId },
         data: {
-          kycStatus: APPLICATION_KYC_STATUS.FAILED,
           ...(kycFailedAppStatus ? { applicationStatusId: kycFailedAppStatus.id } : {}),
+          ...(rejectionReason ? { rejectionReasonId: rejectionReason.id } : {}),
         },
       });
     });

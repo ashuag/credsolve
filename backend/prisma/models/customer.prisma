@@ -18,47 +18,24 @@ model Customer {
   applications  Application[]
   customerKycs  CustomerKyc[]
   bureauReports BureauReport[]
+  loanAccounts  LoanAccount[]
 
   @@map("customer")
 }
 
 model CustomerKyc {
-  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid          String    @unique @default(uuid()) @db.Char(36)
-  customerId    BigInt    @map("customer_id") @db.UnsignedBigInt
-  panNumber     String?   @map("pan_number") @db.Char(10)
-  panVerifiedAt DateTime? @map("pan_verified_at")
-  fullName      String?   @map("full_name") @db.VarChar(100)
-  dateOfBirth   DateTime? @map("date_of_birth") @db.Date
-  kycVerifiedAt DateTime? @map("kyc_verified_at")
-  expiresAt     DateTime? @map("expires_at")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  id                BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  customerId        BigInt    @map("customer_id") @db.UnsignedBigInt
+  panCardNumber     String?   @map("pan_card_number") @db.Char(10)
+  panCardVerifiedAt DateTime? @map("pan_card_verified_at") @db.DateTime(3)
+  aadhaarVerifiedAt DateTime? @map("aadhaar_verified_at") @db.DateTime(3)
+  aadhaarData       Json?     @map("aadhaar_data")
+  aadhaarPhotoPath  String?   @map("aadhaar_photo_path") @db.VarChar(512)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.DateTime(3)
 
-  customer             Customer              @relation(fields: [customerId], references: [id])
-  customerKycDocuments CustomerKycDocument[]
+  customer Customer @relation(fields: [customerId], references: [id])
 
   @@index([customerId])
-  @@index([panNumber])
-  @@index([kycVerifiedAt])
-  @@index([expiresAt])
+  @@index([panCardNumber])
   @@map("customer_kyc")
-}
-
-model CustomerKycDocument {
-  id             BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid           String    @unique @default(uuid()) @db.Char(36)
-  customerKycId  BigInt    @map("customer_kyc_id") @db.UnsignedBigInt
-  documentTypeId Int       @map("document_type_id") @db.SmallInt
-  kycProviderId  Int       @map("kyc_provider_id") @db.SmallInt
-  fileName       String?   @map("file_name") @db.VarChar(255)
-  verifiedAt     DateTime? @map("verified_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-
-  customerKyc  CustomerKyc @relation(fields: [customerKycId], references: [id])
-  kycProvider  KycProvider @relation(fields: [kycProviderId], references: [id])
-  documentType KycDocument @relation(fields: [documentTypeId], references: [id])
-
-  @@index([customerKycId])
-  @@map("customer_kyc_document")
 }

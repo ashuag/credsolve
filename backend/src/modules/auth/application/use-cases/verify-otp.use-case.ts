@@ -5,10 +5,11 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { EmailVerificationType, type Prisma } from '@prisma/client';
 import type { VerifyOtpDto } from '../dto/verify-otp.dto';
 import type { VerifyOtpResult } from '../contracts/verify-otp-result.contract';
 import type { CustomerSessionPayload } from '../contracts/customer-session-payload.contract';
+import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { canReapplyAfterRejection } from '../../../../common/lead/lead-reapply-policy.util';
 import { OTP_TYPE } from '../../../../common/constants/otp.constants';
@@ -22,7 +23,6 @@ import { OtpTypeRepository } from '../../infrastructure/repositories/otp-type.re
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { ApplicationRepository } from '../../infrastructure/repositories/application.repository';
-import { EmailVerificationType } from '@prisma/client';
 
 export type VerifyOtpSessionMeta = {
   ip?: string;
@@ -84,19 +84,22 @@ export class VerifyOtpUseCase {
     const blacklistThreshold = leadPolicy.blacklistRejectionThreshold;
     const blacklistDurationDays = leadPolicy.blacklistDurationDays;
 
-    const { customer, lead } = await this.prisma.client.$transaction(async (tx) => {
+    this.logger.log('leadPolicy', leadPolicy);
+    this.logger.log('reapplyDays', reapplyDays);
+    this.logger.log('blacklistThreshold', blacklistThreshold);
+    this.logger.log('blacklistDurationDays', blacklistDurationDays);
+
+    const { customer, lead } = await this.prisma.client.$transaction(async (tx: Prisma.TransactionClient) => {
       await this.otpRequests.markVerified(tx, request.id, verifiedAt);
       const cust = await this.customers.upsertByMobile(tx, request.value);
-      
+      this.logger.log('cust', cust);
       const newStatus = await this.leadStatuses.findActiveByName(tx, LEAD_STATUS.NEW);
       if (!newStatus) {
         throw new InternalServerErrorException('Lead status NEW is missing. Run database seeds.');
       }
-      const leadExpireAt = new Date();
-      this.logger.log('leadExpireAt', leadExpireAt);
-      leadExpireAt.setUTCDate(leadExpireAt.getUTCDate() + settings.leadExpireDays);
-
       let recentLead = await this.leads.findActiveByCustomerId(cust.id, tx);
+
+      this.logger.log('recentLead', recentLead);
 
       if (recentLead) {
         const statusName = recentLead.leadStatus.name;
@@ -105,7 +108,7 @@ export class VerifyOtpUseCase {
             await this.leads.deactivate(recentLead.id, tx);
             recentLead = null;
           }
-        } else if (this.shouldDeactivateForNewApplication(recentLead)) {
+        } else if (await this.shouldDeactivateForNewApplication(recentLead, tx)) {
           await this.leads.deactivate(recentLead.id, tx);
           recentLead = null;
         }
@@ -116,7 +119,6 @@ export class VerifyOtpUseCase {
           {
             customerId: cust.id,
             leadStatusId: newStatus.id,
-            expiresAt: leadExpireAt,
           },
           tx
         );
@@ -212,7 +214,7 @@ export class VerifyOtpUseCase {
 
     const verifiedAt = new Date();
 
-    await this.prisma.client.$transaction(async (tx) => {
+    await this.prisma.client.$transaction(async (tx: Prisma.TransactionClient) => {
       await this.otpRequests.markVerified(tx, request.id, verifiedAt);
       const lead = await this.leads.findActiveByCustomerId(customer.id, tx);
       if (!lead) {
@@ -238,9 +240,25 @@ export class VerifyOtpUseCase {
     };
   }
 
-  /** Old CONVERTED leads should be deactivated to make room for a new application. */
-  private shouldDeactivateForNewApplication(lead: { leadStatus: { name: string } }): boolean {
-    return lead.leadStatus.name === LEAD_STATUS.CONVERTED;
+  /**
+   * Deactivate a CONVERTED lead only after disbursement so the customer can start a new application.
+   * In-progress applications (e.g. draft at sanction letter) must keep the same lead on re-login.
+   */
+  private async shouldDeactivateForNewApplication(
+    lead: { id: bigint; leadStatus: { name: string } },
+    tx: Prisma.TransactionClient,
+  ): Promise<boolean> {
+    if (lead.leadStatus.name !== LEAD_STATUS.CONVERTED) {
+      return false;
+    }
+    const disbursedApp = await tx.application.findFirst({
+      where: {
+        leadId: lead.id,
+        applicationStatus: { name: APPLICATION_STATUS.DISBURSED, isActive: true },
+      },
+      select: { id: true },
+    });
+    return Boolean(disbursedApp);
   }
 
   /**
@@ -251,13 +269,13 @@ export class VerifyOtpUseCase {
   private async checkAutoRejectOrBlacklist(
     customerId: bigint,
     lead: { id: bigint; leadStatus: { name: string } },
-    tx: Parameters<Parameters<PrismaService['client']['$transaction']>[0]>[0],
+    tx: Prisma.TransactionClient,
     cfg: { reapplyDays: number; blacklistThreshold: number; blacklistDurationDays: number },
   ) {
     if (lead.leadStatus.name !== LEAD_STATUS.NEW) return null;
 
     const shouldBlacklist = await this.leads.shouldBlackListCustomer(
-      customerId, cfg.blacklistThreshold, tx as any,
+      customerId, cfg.blacklistThreshold, tx,
     );
     if (!shouldBlacklist) return null;
 
@@ -268,7 +286,7 @@ export class VerifyOtpUseCase {
       lead.id,
       LEAD_STATUS.BLACKLISTED,
       `Blacklisted: ${cfg.blacklistThreshold} consecutive rejections`,
-      tx as any,
+      tx,
     );
   }
 
@@ -276,7 +294,7 @@ export class VerifyOtpUseCase {
     leadId: bigint,
     statusName: string,
     note: string,
-    tx: any,
+    tx: Prisma.TransactionClient,
   ) {
     const statusRow = await this.leadStatuses.findActiveByName(tx, statusName);
     if (!statusRow) {

@@ -12,10 +12,6 @@ export class ApplicationRepository {
     return tx ?? this.prisma.client;
   }
 
-  /**
-   * Returns the latest application for the lead, or creates a DRAFT row so
-   * email can be stored before loan selection runs.
-   */
   async ensureDraftApplicationForLead(
     params: { leadId: bigint; customerId: bigint },
     tx?: DbClient,
@@ -42,6 +38,22 @@ export class ApplicationRepository {
     });
   }
 
+  private async ensureApplicationDetails(applicationId: bigint, tx?: DbClient) {
+    return this.db(tx).applicationDetail.upsert({
+      where: { applicationId },
+      create: { applicationId },
+      update: {},
+    });
+  }
+
+  private async ensureApplicationKyc(applicationId: bigint, tx?: DbClient) {
+    return this.db(tx).applicationKyc.upsert({
+      where: { applicationId },
+      create: { applicationId },
+      update: {},
+    });
+  }
+
   async updateEmailWithVerification(
     params: {
       leadId: bigint;
@@ -56,10 +68,11 @@ export class ApplicationRepository {
       tx,
     );
     const verifiedAt = new Date();
-    return this.db(tx).application.update({
-      where: { id: application.id },
+    await this.ensureApplicationDetails(application.id, tx);
+    return this.db(tx).applicationDetail.update({
+      where: { applicationId: application.id },
       data: {
-        email: params.email,
+        emailId: params.email,
         emailVerificationType: params.verificationType,
         emailVerifiedAt: verifiedAt,
       },
@@ -69,16 +82,26 @@ export class ApplicationRepository {
   async updateDigilockerAadhaarArtifacts(
     params: {
       applicationId: bigint;
+      customerId: bigint;
       digilockerAadhaarFormJson: Prisma.InputJsonValue;
       aadhaarPhotoRelativePath: string | null;
     },
     tx?: DbClient,
   ) {
-    return this.db(tx).application.update({
-      where: { id: params.applicationId },
+    let customerKyc = await this.db(tx).customerKyc.findFirst({
+      where: { customerId: params.customerId },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!customerKyc) {
+      customerKyc = await this.db(tx).customerKyc.create({
+        data: { customerId: params.customerId },
+      });
+    }
+    return this.db(tx).customerKyc.update({
+      where: { id: customerKyc.id },
       data: {
-        digilockerAadhaarFormJson: params.digilockerAadhaarFormJson,
-        aadhaarPhotoRelativePath: params.aadhaarPhotoRelativePath,
+        aadhaarData: params.digilockerAadhaarFormJson,
+        aadhaarPhotoPath: params.aadhaarPhotoRelativePath,
       },
     });
   }
@@ -87,20 +110,20 @@ export class ApplicationRepository {
     params: { applicationId: bigint; selfieRelativePath: string },
     tx?: DbClient,
   ) {
-    return this.db(tx).application.update({
-      where: { id: params.applicationId },
+    await this.ensureApplicationKyc(params.applicationId, tx);
+    return this.db(tx).applicationKyc.update({
+      where: { applicationId: params.applicationId },
       data: {
-        selfieRelativePath: params.selfieRelativePath,
+        livenessSelfiePath: params.selfieRelativePath,
         selfieFaceValidationJson: Prisma.JsonNull,
         selfieFaceValidationPassed: false,
-        selfieFaceValidationCheckedAt: null,
+        faceMatchCheckedAt: null,
         livenessPassed: false,
-        livenessDone: false,
+        isLiveness: false,
         livenessDoneAt: null,
         livenessCheckedAt: null,
         livenessVendorJson: Prisma.JsonNull,
         kycStatus: APPLICATION_KYC_STATUS.NOT_DONE,
-        kycCompletedAt: null,
       },
     });
   }
@@ -114,12 +137,13 @@ export class ApplicationRepository {
     },
     tx?: DbClient,
   ) {
-    return this.db(tx).application.update({
-      where: { id: params.applicationId },
+    await this.ensureApplicationKyc(params.applicationId, tx);
+    return this.db(tx).applicationKyc.update({
+      where: { applicationId: params.applicationId },
       data: {
         selfieFaceValidationJson: params.selfieFaceValidationJson,
         selfieFaceValidationPassed: params.passed,
-        selfieFaceValidationCheckedAt: params.checkedAt,
+        faceMatchCheckedAt: params.checkedAt,
       },
     });
   }
@@ -135,13 +159,14 @@ export class ApplicationRepository {
     },
     tx?: DbClient,
   ) {
-    return this.db(tx).application.update({
-      where: { id: params.applicationId },
+    await this.ensureApplicationKyc(params.applicationId, tx);
+    return this.db(tx).applicationKyc.update({
+      where: { applicationId: params.applicationId },
       data: {
         livenessVendorJson: params.livenessVendorJson,
         livenessPassed: params.passed,
         livenessCheckedAt: params.checkedAt,
-        ...(params.done !== undefined ? { livenessDone: params.done } : {}),
+        ...(params.done !== undefined ? { isLiveness: params.done } : {}),
         ...(params.doneAt !== undefined ? { livenessDoneAt: params.doneAt } : {}),
       },
     });

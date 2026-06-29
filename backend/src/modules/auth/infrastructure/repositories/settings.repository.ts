@@ -456,6 +456,12 @@ export class SettingsRepository {
     };
   }
 
+  /** Days before the daily cron rejects stale leads/applications (default 90). */
+  async loadLeadExpireDays(): Promise<number> {
+    const settings = await this.loadAuthOtpSettings();
+    return settings.leadExpireDays;
+  }
+
   /** Max penny-drop verification attempts per application (default 2). */
   async loadPennyDropRetryCount(): Promise<number> {
     const row = await this.prisma.client.setting.findFirst({

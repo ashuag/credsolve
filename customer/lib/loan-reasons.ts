@@ -1,6 +1,6 @@
 /** Must match active `reason_for_loan.name` rows seeded from backend `LoanReason` constants. */
 export type CustomerLoanPurposeOption = {
-  /** Stored in `application_detail.reason_for_loan_id` via exact name lookup. */
+  /** Stored in `loan_detail.reason_for_loan_id` via exact name lookup. */
   value: string;
   /** Short label shown in the customer picker. */
   label: string;

@@ -9,7 +9,7 @@ Customers receive a single **Loan Sanction letter cum Key Fact Statement** PDF g
 | `templates/MoneyCash_Loan_Document.html` | Source layout (sanction letter, KFS, commercial terms) |
 | `moneycash-logo.png`, `asra-fincorp-logo.png` | Assets referenced in HTML |
 
-Per-application filled PDFs are stored via `KycFilesService` (DigitalOcean Spaces or local disk):
+Per-application filled PDFs are stored in S3 via `KycFilesService`:
 
 `customer/<customer_uuid>/loan-documents/<application_uuid>/key-fact-statement.pdf`
 

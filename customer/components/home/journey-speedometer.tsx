@@ -58,7 +58,7 @@ function getStepIndexFromPathname(pathname: string): number {
   return 0;
 }
 
-export function JourneySpeedometer() {
+export function JourneySpeedometer({ compact = false }: { compact?: boolean }) {
   const gradientId = `mc-speedo-grad-${useId().replace(/:/g, '')}`;
   const pathname = usePathname() || '';
   const { session } = useCustomerSession();
@@ -99,10 +99,14 @@ export function JourneySpeedometer() {
   const needleAngle = progress * 1.8 - 90;
 
   return (
-    <div className="flex flex-col items-center w-full gap-2">
+    <div className={['flex w-full flex-col items-center', compact ? 'gap-1' : 'gap-2'].join(' ')}>
       <svg
         viewBox="0 0 180 78"
-        className="w-[min(90vw,220px)] sm:w-[min(90vw,260px)] lg:w-[min(90vw,280px)] shrink-0"
+        className={
+          compact
+            ? 'w-[min(90vw,200px)] shrink-0'
+            : 'w-[min(90vw,220px)] shrink-0 sm:w-[min(90vw,260px)] lg:w-[min(90vw,280px)]'
+        }
         aria-hidden
       >
         <defs>
@@ -165,15 +169,21 @@ export function JourneySpeedometer() {
         <circle cx={cx} cy={cy} r="2.5" fill="#1e293b" />
       </svg>
 
-      <div className="flex flex-col items-center gap-0.5 -mt-2 text-center">
-        <span className="text-[1.1rem] sm:text-[1.25rem] font-black tabular-nums leading-none text-white">
+      <div className={['flex flex-col items-center text-center', compact ? 'gap-0 -mt-3' : 'gap-0.5 -mt-2'].join(' ')}>
+        <span
+          className={[
+            'font-black tabular-nums leading-none text-white',
+            compact ? 'text-[1rem]' : 'text-[1.1rem] sm:text-[1.25rem]',
+          ].join(' ')}
+        >
           {progress}%
         </span>
-        <span className="text-[0.58rem] font-extrabold uppercase tracking-[0.18em] text-sky-300/95 leading-none">
+        <span className="text-[0.58rem] font-extrabold uppercase tracking-[0.18em] leading-none text-sky-300/95">
           {stepText}
         </span>
       </div>
 
+      {compact ? null : (
       <div className="flex max-w-full flex-wrap items-start justify-center gap-x-1.5 gap-y-2 px-1 pt-0.5 sm:gap-x-3 sm:px-2">
         {JOURNEY_STEPS.map((step, i) => {
           const done = i < stepIndex;
@@ -200,6 +210,7 @@ export function JourneySpeedometer() {
           );
         })}
       </div>
+      )}
     </div>
   );
 }

@@ -6,7 +6,7 @@ const PAN_VERIFIED = {
   API_DISABLED: 4,
 } as const;
 
-/** Mirrors backend `lead.bureau_fetched` codes. */
+/** Mirrors backend `lead_detail.bureau_fetched` codes. */
 const BUREAU_FETCHED = {
   SUCCESS: 1,
   FAILED: 2,

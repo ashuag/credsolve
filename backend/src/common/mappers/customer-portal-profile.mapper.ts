@@ -50,7 +50,7 @@ export function mapOccupationDbNameToPortalSlug(name: string | null | undefined)
   return OCC_DB_TO_SLUG[name] ?? null;
 }
 
-/** True when `lead.pan_verified` / stored detail reflects a successful vendor verification. */
+/** True when `lead_detail.pan_verified` / stored detail reflects a successful vendor verification. */
 export function isPanVerifiedFromDb(panVerified: boolean | number | null | undefined): boolean {
   if (panVerified === true) {
     return true;

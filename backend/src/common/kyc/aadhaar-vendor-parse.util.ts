@@ -311,39 +311,6 @@ export function extractFaceMatchPassed(vendor: unknown): boolean | null {
   ]);
 }
 
-/** `true` when vendor flags the image as deepfake / synthetic. */
-export function extractDeepfakeDetected(vendor: unknown): boolean | null {
-  const deepfake = extractBooleanFlag(vendor, [
-    'isDeepfake',
-    'is_deepfake',
-    'deepfakeDetected',
-    'deepfake_detected',
-    'syntheticDetected',
-    'synthetic_detected',
-    'isSynthetic',
-    'is_synthetic',
-  ]);
-  if (deepfake !== null) return deepfake;
-
-  const authentic = extractBooleanFlag(vendor, ['isAuthentic', 'is_authentic', 'authentic', 'isReal', 'is_real']);
-  if (authentic !== null) return !authentic;
-
-  return null;
-}
-
-/** Deepfake / authenticity score when provided (higher = more likely real). */
-export function extractDeepfakeScore(vendor: unknown): number | null {
-  return extractNumericScore(vendor, [
-    'authenticityScore',
-    'authenticity_score',
-    'deepfakeScore',
-    'deepfake_score',
-    'realScore',
-    'real_score',
-    'score',
-  ]);
-}
-
 export function extractLivenessMultipleFacesDetected(vendor: unknown): boolean | null {
   if (!isRecord(vendor)) return null;
 
@@ -367,7 +334,7 @@ export function extractLivenessMultipleFacesDetected(vendor: unknown): boolean |
 
 /**
  * Shallow `data` object for form binding; replaces `photo` with a short reference
- * (relative path under `KYC_FILES_ROOT`) when provided.
+ * (relative object-storage key) when provided.
  */
 export function buildDigilockerAadhaarFormJson(
   vendor: unknown,

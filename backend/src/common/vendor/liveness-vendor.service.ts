@@ -104,18 +104,6 @@ export class LivenessVendorService {
       headers: this.headers(auth.clientId, auth.apiKey, workflowId),
       body: livenessInput,
       leadId,
-      redactRequest: (b) => {
-        const input = b?.input as Record<string, unknown> | undefined;
-        const url = input?.url;
-        if (typeof url !== 'string') return b;
-        return {
-          ...b,
-          input: {
-            ...input,
-            url: `[REDACTED:${url.length} chars]`,
-          },
-        };
-      },
     });
 
     return {

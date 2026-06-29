@@ -1,4 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { computeInterestAmountFromLoanDetail } from '../../../../common/loan/loan-calculation.util';
+import { computeFeeAmountsFromLoanDetail } from '../../../../common/loan/loan-disbursement-view.util';
 import {
   LOAN_DOCUMENT_PDF_FILES,
   LOAN_DOCUMENT_TYPE,
@@ -15,6 +17,34 @@ function toNumber(value: string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+type ApplicationDetailsRow = {
+  emailId: string | null;
+  emailVerificationType: string | null;
+  loanDocumentsAcceptedAt: Date | null;
+  loanDocumentsAcceptedIp: string | null;
+  keyFactPdfRelativePath: string | null;
+  loanAgreementPdfRelativePath: string | null;
+  selectedLoanAmount: { toString(): string } | null;
+  interestRate: { toString(): string } | null;
+  processingFeePercentage: { toString(): string } | null;
+  gstPercentage: { toString(): string } | null;
+  expectedRepaymentDays: number | null;
+  expectedRepaymentDate: Date | null;
+  reasonForLoan: { name: string } | null;
+};
+
+export type LoanDocumentApplicationContext = {
+  id: bigint;
+  uuid: string;
+  email: string | null;
+  emailVerificationType: string | null;
+  loanDocumentsAcceptedAt: Date | null;
+  loanDocumentsAcceptedIp: string | null;
+  keyFactPdfRelativePath: string | null;
+  loanAgreementPdfRelativePath: string | null;
+  details: ApplicationDetailsRow | null;
+};
+
 @Injectable()
 export class LoanDocumentApplicationService {
   constructor(
@@ -30,46 +60,52 @@ export class LoanDocumentApplicationService {
     });
     if (!customer) throw new NotFoundException('Customer not found.');
 
-    const application = await this.prisma.client.application.findFirst({
+    const applicationRow = await this.prisma.client.application.findFirst({
       where: { leadId, customerId: customer.id },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         uuid: true,
-        email: true,
-        emailVerificationType: true,
-        loanDocumentsAcceptedAt: true,
-        keyFactPdfRelativePath: true,
-        loanAgreementPdfRelativePath: true,
-        agreement: {
-          select: {
-            ipAddress: true,
-            signedAt: true,
-          },
-        },
         details: {
           select: {
-            loanAmount: true,
-            loanTenure: true,
-            loanMaturityDate: true,
+            emailId: true,
+            emailVerificationType: true,
+            loanDocumentsAcceptedAt: true,
+            loanDocumentsAcceptedIp: true,
+            keyFactPdfRelativePath: true,
+            loanAgreementPdfRelativePath: true,
+            selectedLoanAmount: true,
             interestRate: true,
-            interestAmount: true,
-            processingFee: true,
-            processingFeeAmount: true,
-            gstAmount: true,
+            processingFeePercentage: true,
+            gstPercentage: true,
+            expectedRepaymentDays: true,
+            expectedRepaymentDate: true,
             reasonForLoan: { select: { name: true } },
           },
         },
       },
     });
-    if (!application) throw new NotFoundException('No application found for this lead.');
+    if (!applicationRow) throw new NotFoundException('No application found for this lead.');
+
+    const details = applicationRow.details;
+    const application: LoanDocumentApplicationContext = {
+      id: applicationRow.id,
+      uuid: applicationRow.uuid,
+      email: details?.emailId ?? null,
+      emailVerificationType: details?.emailVerificationType ?? null,
+      loanDocumentsAcceptedAt: details?.loanDocumentsAcceptedAt ?? null,
+      loanDocumentsAcceptedIp: details?.loanDocumentsAcceptedIp ?? null,
+      keyFactPdfRelativePath: details?.keyFactPdfRelativePath ?? null,
+      loanAgreementPdfRelativePath: details?.loanAgreementPdfRelativePath ?? null,
+      details,
+    };
 
     const lead = await this.prisma.client.lead.findUnique({
       where: { id: leadId },
       select: {
-        panNumber: true,
         leadDetail: {
           select: {
+            panNumber: true,
             fullName: true,
             addressLine1: true,
             addressLine2: true,
@@ -86,8 +122,8 @@ export class LoanDocumentApplicationService {
   buildMergeInput(params: {
     customer: { mobileNumber: string };
     lead: {
-      panNumber: string | null;
       leadDetail: {
+        panNumber: string | null;
         fullName: string | null;
         addressLine1: string | null;
         addressLine2: string | null;
@@ -97,59 +133,49 @@ export class LoanDocumentApplicationService {
     } | null;
     application: {
       uuid: string;
-      agreement?: {
-        ipAddress: string | null;
-        signedAt: Date | null;
-      } | null;
-      details: {
-        loanAmount: { toString(): string } | null;
-        loanTenure: number | null;
-        loanMaturityDate: Date | null;
-        interestRate: { toString(): string } | null;
-        interestAmount: { toString(): string } | null;
-        processingFee: { toString(): string } | null;
-        processingFeeAmount: { toString(): string } | null;
-        gstAmount: { toString(): string } | null;
-        reasonForLoan: { name: string } | null;
-      } | null;
+      loanDocumentsAcceptedIp?: string | null;
+      loanDocumentsAcceptedAt?: Date | null;
+      details: ApplicationDetailsRow | null;
     };
     acceptanceIpAddress?: string | null;
     acceptanceSignedAt?: Date | null;
   }): LoanDocumentMergeInput {
     const detail = params.lead?.leadDetail;
     const appDetails = params.application.details;
-    const loanAmount = toNumber(appDetails?.loanAmount?.toString() ?? null);
-    const processingFeeAmount = toNumber(appDetails?.processingFeeAmount?.toString() ?? null);
-    const processingFeePercent =
-      loanAmount != null && loanAmount > 0 && processingFeeAmount != null
-        ? (processingFeeAmount / loanAmount) * 100
-        : toNumber(appDetails?.processingFee?.toString() ?? null);
+    const tenureDays = appDetails?.expectedRepaymentDays ?? null;
+    const fees = computeFeeAmountsFromLoanDetail(appDetails);
+    const interestAmount =
+      fees.interestAmount
+      ?? computeInterestAmountFromLoanDetail(appDetails, tenureDays);
 
     return {
       fullName: detail?.fullName ?? null,
       mobileNumber: params.customer.mobileNumber,
-      panNumber: params.lead?.panNumber ?? null,
+      panNumber: params.lead?.leadDetail?.panNumber ?? null,
       addressLine1: detail?.addressLine1 ?? null,
       addressLine2: detail?.addressLine2 ?? null,
       currentCity: detail?.city?.name ?? null,
       pincode: detail?.pincode ?? null,
-      loanAmountInr: appDetails?.loanAmount?.toString() ?? null,
+      loanAmountInr: appDetails?.selectedLoanAmount?.toString() ?? null,
       loanPurpose: appDetails?.reasonForLoan?.name ?? null,
       interestRatePerDayPercent: appDetails?.interestRate?.toString() ?? null,
-      interestAmountInr: appDetails?.interestAmount?.toString() ?? null,
-      processingFeeAmountInr: appDetails?.processingFeeAmount?.toString() ?? null,
-      gstAmountInr: appDetails?.gstAmount?.toString() ?? null,
-      loanTenureDays: appDetails?.loanTenure ?? null,
-      loanMaturityDate: appDetails?.loanMaturityDate ?? null,
+      interestAmountInr: interestAmount != null ? interestAmount.toFixed(2) : null,
+      processingFeeAmountInr:
+        fees.processingFeeAmount != null ? fees.processingFeeAmount.toFixed(2) : null,
+      gstAmountInr: fees.gstAmount != null ? fees.gstAmount.toFixed(2) : null,
+      loanTenureDays: tenureDays,
+      loanMaturityDate: appDetails?.expectedRepaymentDate ?? null,
       applicationUuid: params.application.uuid,
-      processingFeePercent,
+      processingFeePercent: toNumber(appDetails?.processingFeePercentage?.toString() ?? null),
       acceptanceIpAddress:
-        params.application.agreement?.ipAddress?.trim()
-        ?? params.acceptanceIpAddress?.trim()
+        params.acceptanceIpAddress?.trim()
+        ?? params.application.loanDocumentsAcceptedIp?.trim()
+        ?? appDetails?.loanDocumentsAcceptedIp?.trim()
         ?? null,
       acceptanceSignedAt:
-        params.application.agreement?.signedAt
-        ?? params.acceptanceSignedAt
+        params.acceptanceSignedAt
+        ?? params.application.loanDocumentsAcceptedAt
+        ?? appDetails?.loanDocumentsAcceptedAt
         ?? null,
     };
   }
@@ -183,9 +209,10 @@ export class LoanDocumentApplicationService {
         ? { keyFactPdfRelativePath: rel, keyFactEsigned: esigned }
         : { loanAgreementPdfRelativePath: rel };
 
-    await this.prisma.client.application.update({
-      where: { id: applicationId },
-      data,
+    await this.prisma.client.applicationDetail.upsert({
+      where: { applicationId },
+      create: { applicationId, ...data },
+      update: data,
     });
 
     return rel;

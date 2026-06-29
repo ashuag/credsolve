@@ -41,7 +41,7 @@ export function buildReviewFlags(row: LosApplicationDetails, bureauPan?: string 
     });
   }
 
-  if (bank?.accountNumber?.trim() && !bank.utr?.trim() && !bank.disbursedAt) {
+  if (bank?.accountNumber?.trim() && !bank.disbursedAt) {
     flags.push({
       icon: '⌖',
       title: 'UTR not generated',

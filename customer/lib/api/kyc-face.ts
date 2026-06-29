@@ -17,9 +17,6 @@ export type PostKycLivenessResponse = {
   faceValidationMessage?: string;
   faceMatchPassed?: boolean;
   faceMatchMessage?: string;
-  authenticityPassed?: boolean;
-  authenticityMessage?: string;
-  deepfakeDetected?: boolean | null;
   suggestRetrySelfie?: boolean;
   bestComputedConfidence?: number | null;
 };
@@ -76,7 +73,6 @@ function extractVendorFailureLine(vendor: unknown, depth = 0): string | undefine
 
 export function pickLivenessFailureUserMessage(out: PostKycLivenessResponse): string {
   return (
-    out.authenticityMessage?.trim() ||
     out.faceValidationMessage?.trim() ||
     out.faceMatchMessage?.trim() ||
     out.vendorErrorMessage?.trim() ||
@@ -101,6 +97,6 @@ export async function postKycLiveness(): Promise<PostKycLivenessResponse | null>
     '/applications/kyc/liveness',
     {},
     'Unable to run liveness check.',
-    { timeoutMs: 60_000 },
+    { timeoutMs: 120_000 },
   );
 }

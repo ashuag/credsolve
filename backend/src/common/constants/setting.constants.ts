@@ -2,7 +2,7 @@ export const SettingKey = {
     LEAD_EXPIRE_DAYS: {
         key: 'LEAD_EXPIRE_DAYS',
         default: '90',
-        description: 'Days before lead expires',
+        description: 'Days after lead creation before the daily cron rejects stale leads/applications',
     },
     OTP_EXPIRE_DURATION: {
         key: 'OTP_EXPIRE_DURATION',

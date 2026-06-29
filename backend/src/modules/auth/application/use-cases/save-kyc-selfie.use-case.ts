@@ -1,7 +1,11 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
 import type { UploadedFileLike } from '../../../../common/types/uploaded-file';
 import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
+import {
+  buildKycPipelineStepLog,
+  formatKycPipelineStepForLogger,
+} from '../../../../common/kyc/kyc-liveness-pipeline-log.util';
 import {
   assertApplicationFaceStepNotComplete,
 } from '../../../../common/kyc/application-kyc-guard.util';
@@ -16,6 +20,8 @@ const MAX_SELFIE_BYTES = 6 * 1024 * 1024;
 
 @Injectable()
 export class SaveKycSelfieUseCase {
+  private readonly logger = new Logger(SaveKycSelfieUseCase.name);
+
   constructor(
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
@@ -63,20 +69,32 @@ export class SaveKycSelfieUseCase {
       leadId: lead.id,
       customerId: customer.id,
     });
+
+    const [appKyc, customerKyc] = await Promise.all([
+      this.prisma.client.applicationKyc.findUnique({
+        where: { applicationId: application.id },
+      }),
+      this.prisma.client.customerKyc.findFirst({
+        where: { customerId: customer.id },
+        orderBy: { createdAt: 'desc' },
+        select: { aadhaarData: true },
+      }),
+    ]);
+
     assertApplicationFaceStepNotComplete({
-      kycStatus: application.kycStatus,
-      selfieRelativePath: application.selfieRelativePath,
-      livenessPassed: application.livenessPassed,
-      digilockerAadhaarFormJson: application.digilockerAadhaarFormJson,
+      kycStatus: appKyc?.kycStatus,
+      selfieRelativePath: appKyc?.livenessSelfiePath,
+      livenessPassed: appKyc?.livenessPassed,
+      digilockerAadhaarFormJson: customerKyc?.aadhaarData,
     });
 
     // Recover applications marked COMPLETED after Aadhaar-only (before selfie was required).
     if (
-      application.kycStatus === APPLICATION_KYC_STATUS.COMPLETED &&
-      !application.selfieRelativePath?.trim()
+      appKyc?.kycStatus === APPLICATION_KYC_STATUS.COMPLETED &&
+      !appKyc.livenessSelfiePath?.trim()
     ) {
-      await this.prisma.client.application.update({
-        where: { id: application.id },
+      await this.prisma.client.applicationKyc.update({
+        where: { applicationId: application.id },
         data: {
           kycStatus: APPLICATION_KYC_STATUS.NOT_DONE,
           kycCompletedAt: null,
@@ -87,6 +105,21 @@ export class SaveKycSelfieUseCase {
     const rel = this.kycFiles.selfieRelativePath(customer.uuid, application.uuid);
     await this.kycFiles.writeBytes(rel, file.buffer);
     await this.applications.updateSelfiePath({ applicationId: application.id, selfieRelativePath: rel });
+
+    this.logger.log(
+      formatKycPipelineStepForLogger(
+        buildKycPipelineStepLog('1-selfie-upload', {
+          ok: true,
+          request: {
+            applicationId: application.id.toString(),
+            leadId: lead.id.toString(),
+            bytes: file.buffer.length,
+            mime: file.mimetype ?? null,
+          },
+          response: { success: true, selfieRelativePath: rel },
+        }),
+      ),
+    );
 
     return {
       success: true,

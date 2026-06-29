@@ -68,22 +68,24 @@ const leadDetailUpsertSelect = {
   city: { select: { id: true, name: true, stateId: true, state: { select: { code: true } } } },
 } as const;
 
-const leadPanSelect = {
+const leadDetailPanSelect = {
   panNumber: true,
   panVerified: true,
   panVerifiedAt: true,
-  leadStatusNote: true,
-  bureauFetched: true
+  bureauFetched: true,
 } as const;
 
 const bureauSoftPullLeadSelect = {
   uuid: true,
   customerId: true,
-  bureauFetched: true,
   customer: { select: { uuid: true } },
   leadStatus: { select: { name: true } },
   leadDetail: {
-    select: { cibilConsentAt: true, fullName: true },
+    select: {
+      cibilConsentAt: true,
+      fullName: true,
+      bureauFetched: true,
+    },
   },
 } as const;
 
@@ -94,7 +96,6 @@ type LeadPanVerificationRow = {
   panVerified: number;
   panVerifiedAt: Date | null;
   panValidationAttempts: number;
-  leadStatusNote: string | null;
   bureauFetched: number;
 };
 
@@ -102,11 +103,11 @@ type BureauSoftPullLeadRow = {
   customer?: { uuid: string };
   uuid: string;
   customerId: bigint;
-  bureauFetched: number;
   leadStatus: { name: string } | null;
   leadDetail: {
     cibilConsentAt: Date | null;
     fullName: string | null;
+    bureauFetched: number;
   } | null;
 };
 
@@ -160,7 +161,7 @@ export type VerifyPanResult =
     };
 
 /**
- * Status written to `lead.pan_verified` (SmallInt):
+ * Status written to `lead_detail.pan_verified` (SmallInt):
  *   0 = NOT_CHECKED — vendor call failed or was skipped; safe to retry.
  *   1 = VERIFIED    — panStatus=valid, nameMatch, dobMatch, category=Individual.
  *   2 = NOT_VERIFIED — vendor confirmed the PAN doesn't match.
@@ -204,8 +205,8 @@ export class VerifyPanUseCase {
 
     const panUpper = dto.panNumber.trim().toUpperCase();
 
-    const priorLeadPan = (await this.leads.findUniqueLead({
-      where: { id: leadRow.id },
+    const priorLeadPan = (await this.prisma.client.leadDetail.findUnique({
+      where: { leadId: leadRow.id },
       select: { panNumber: true, panVerified: true },
     })) as { panNumber: string | null; panVerified: number } | null;
 
@@ -237,24 +238,15 @@ export class VerifyPanUseCase {
       breSettings,
     );
 
-    const [[detailRaw, leadPanRaw]] = await Promise.all([
-      Promise.all([
-        this.leads.upsertLeadDetail({
-          where: { leadId: leadRow.id },
-          create: { leadId: leadRow.id, ...leadDetailPayload },
-          update: leadDetailPayload,
-          select: leadDetailUpsertSelect,
-        }),
-        this.leads.updateLead({
-          where: { id: leadRow.id },
-          data: { panNumber: panUpper },
-          select: leadPanSelect,
-        }),
-      ]),
-    ]);
+    const detailRaw = await this.leads.upsertLeadDetail({
+      where: { leadId: leadRow.id },
+      create: { leadId: leadRow.id, panNumber: panUpper, ...leadDetailPayload },
+      update: { panNumber: panUpper, ...leadDetailPayload },
+      select: { ...leadDetailUpsertSelect, ...leadDetailPanSelect },
+    });
 
-    const detail = detailRaw as unknown as LeadDetailBreRow;
-    const leadPan = leadPanRaw as LeadPanVerificationRow;
+    const detail = detailRaw as unknown as LeadDetailBreRow & LeadPanVerificationRow;
+    const leadPan = detail;
 
     if (!preBreResult.passed) {
       this.logger.log(
@@ -348,8 +340,8 @@ export class VerifyPanUseCase {
     }
 
     if (verification.panVerifiedStatus === PAN_VERIFIED.VERIFIED) {
-      const bureauSnap = (await this.leads.findUniqueLead({
-        where: { id: leadRow.id },
+      const bureauSnap = (await this.prisma.client.leadDetail.findUnique({
+        where: { leadId: leadRow.id },
         select: { bureauFetched: true },
       })) as { bureauFetched: number } | null;
       const needBureau =
@@ -524,12 +516,12 @@ export class VerifyPanUseCase {
   ): Promise<VerifyPanResult> {
     const maxAttempts = await this.loadPanValidationMaxAttempts();
     const panAttemptRows = await this.prisma.client.$queryRaw<Array<{ pan_validation_attempts: number }>>`
-      SELECT \`pan_validation_attempts\` FROM \`lead\` WHERE \`id\` = ${leadId} LIMIT 1
+      SELECT \`pan_validation_attempts\` FROM \`lead_detail\` WHERE \`lead_id\` = ${leadId} LIMIT 1
     `;
     const attemptsUsed = Number(panAttemptRows[0]?.pan_validation_attempts ?? 0) + 1;
 
     await this.prisma.client.$executeRaw`
-      UPDATE \`lead\` SET \`pan_validation_attempts\` = ${attemptsUsed} WHERE \`id\` = ${leadId}
+      UPDATE \`lead_detail\` SET \`pan_validation_attempts\` = ${attemptsUsed} WHERE \`lead_id\` = ${leadId}
     `;
 
     if (attemptsUsed < maxAttempts) {
@@ -567,7 +559,7 @@ export class VerifyPanUseCase {
   /**
    * Tenacio bureau soft-pull after PAN is verified, when `BUREAU_FETCH_ENABLED`
    * is on, the lead is not terminal-negative, and the customer has bureau
-   * consent on `lead_detail`. Outcome is written to `lead.bureau_fetched` /
+   * consent on `lead_detail`. Outcome is written to `lead_detail.bureau_fetched` /
    * `bureau_fetched_at` / `bureau_fetched_note`. Returns `failed` when the vendor
    * HTTP status is not 200 (caller shows thank-you and rejects the lead).
    */
@@ -591,7 +583,7 @@ export class VerifyPanUseCase {
       this.logger.debug(`Bureau soft-pull skipped (leadId=${leadId}): no lead_detail.`);
       return 'skipped';
     }
-    if (row.bureauFetched === BUREAU_FETCHED.SUCCESS) {
+    if (row.leadDetail.bureauFetched === BUREAU_FETCHED.SUCCESS) {
       this.logger.debug(`Bureau soft-pull skipped (leadId=${leadId}): bureau already fetched successfully.`);
       return 'skipped';
     }
@@ -634,8 +626,8 @@ export class VerifyPanUseCase {
     // identity (e.g. serviceStatusCode 422 "Authentication required"). Treat the
     // customer as New-To-Credit; the caller rejects the lead with NEW_TO_CREDIT.
     if (out.isNewToCredit) {
-      await this.leads.updateLead({
-        where: { id: leadId },
+      await this.leads.updateLeadDetail({
+        where: { leadId },
         data: {
           bureauFetched: BUREAU_FETCHED.FAILED,
           bureauFetchedAt: now,
@@ -652,8 +644,8 @@ export class VerifyPanUseCase {
       out.httpStatus === 200 && out.vendorBody != null && isTenacioBureauSuccessPayload(out.vendorBody);
 
     if (bureauSucceeded) {
-      await this.leads.updateLead({
-        where: { id: leadId },
+      await this.leads.updateLeadDetail({
+        where: { leadId },
         data: {
           bureauFetched: BUREAU_FETCHED.SUCCESS,
           bureauFetchedAt: now,
@@ -707,8 +699,8 @@ export class VerifyPanUseCase {
       if (isTenacioBureauClientError(envelope.serviceStatusCode)) {
         const leadNote = (envelope.serviceErrorMessage ?? 'Bureau identity verification failed').slice(0, 256);
         const bureauNote = envelopeNote.slice(0, 500);
-        await this.leads.updateLead({
-          where: { id: leadId },
+        await this.leads.updateLeadDetail({
+          where: { leadId },
           data: {
             bureauFetched: BUREAU_FETCHED.FAILED,
             bureauFetchedAt: now,
@@ -726,8 +718,8 @@ export class VerifyPanUseCase {
     const note = envelopeNote.includes('http=')
       ? envelopeNote
       : `http=${out.httpStatus ?? 'n/a'} err=${out.error?.message ?? 'vendor'}`.slice(0, 500);
-    await this.leads.updateLead({
-      where: { id: leadId },
+    await this.leads.updateLeadDetail({
+      where: { leadId },
       data: {
         bureauFetched: BUREAU_FETCHED.FAILED,
         bureauFetchedAt: now,
@@ -831,35 +823,50 @@ export class VerifyPanUseCase {
     });
   }
 
-  private updatePanStatus(leadId: bigint, status: number, note?: string | null) {
+  private async updatePanStatus(leadId: bigint, status: number, note?: string | null) {
     const vendorWasContacted =
       status === PAN_VERIFIED.VERIFIED ||
       status === PAN_VERIFIED.NOT_VERIFIED ||
       status === PAN_VERIFIED.API_FAILURE;
 
-    return this.leads.updateLead({
-      where: { id: leadId },
-      data: {
-        panVerified: status,
-        panVerifiedAt: vendorWasContacted ? new Date() : null,
-        ...(vendorWasContacted
-          ? {
-              leadStatusNote:
-                status === PAN_VERIFIED.VERIFIED
-                  ? null
-                  : note?.trim()
-                    ? note.trim().slice(0, 256)
-                    : null,
-            }
-          : {}),
-      },
-      select: leadPanSelect,
-    }) as Promise<LeadPanVerificationRow>;
+    if (vendorWasContacted) {
+      await this.leads.updateLead({
+        where: { id: leadId },
+        data: {
+          leadStatusNote:
+            status === PAN_VERIFIED.VERIFIED
+              ? null
+              : note?.trim()
+                ? note.trim().slice(0, 256)
+                : null,
+        },
+      });
+    }
+
+    const [detailRow, leadRow] = await Promise.all([
+      this.leads.updateLeadDetail({
+        where: { leadId },
+        data: {
+          panVerified: status,
+          panVerifiedAt: vendorWasContacted ? new Date() : null,
+        },
+        select: leadDetailPanSelect,
+      }),
+      this.leads.findUniqueLead({
+        where: { id: leadId },
+        select: { leadStatusNote: true },
+      }),
+    ]);
+
+    return {
+      ...(detailRow as LeadPanVerificationRow),
+      leadStatusNote: (leadRow as { leadStatusNote: string | null } | null)?.leadStatusNote ?? null,
+    };
   }
 
   private buildResult(
     detail: LeadDetailBreRow,
-    leadPan: LeadPanVerificationRow,
+    leadPan: LeadPanVerificationRow & { leadStatusNote?: string | null },
     verification: {
       panVerifiedStatus: number;
       nameMatch: boolean;

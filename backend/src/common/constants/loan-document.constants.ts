@@ -31,6 +31,9 @@ export const LENDER_SIGNING_LOCATION = 'New Delhi, IN';
 export const LENDER_SIGNING_CONTACT = NBFC_EMAIL;
 export const LOAN_DOCUMENT_SIGNING_REASON = 'Loan Sanction Letter cum Key Fact Statement';
 
+/** Stored acceptance label shown in LOS when loan documents are OTP-accepted. */
+export const LOAN_DOCUMENT_ACCEPTANCE_NAME = 'Loan Sanction letter cum Key Fact Statement';
+
 /** Default placeholder size for PKCS#7 signature (hex chars in /Contents). */
 export const LOAN_DOCUMENT_SIGNATURE_PLACEHOLDER_LENGTH = 8192;
 

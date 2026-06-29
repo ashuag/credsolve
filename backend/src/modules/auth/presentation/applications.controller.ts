@@ -99,7 +99,7 @@ export class ApplicationsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Run MoneyCash local KYC checks (selfie face validation, Aadhaar face match, authenticity), then Tenacio liveness on the stored selfie URL when outbound is enabled. No vendor HTTP when KYC_LIVENESS_PAUSED, TENACIO_LIVENESS_DISABLED, or POST target is not configured.',
+      'Pipeline: (1) selfie upload, (2) internal liveness, (2.1) internal face match, (3) Tenacio liveness, (4) Tenacio face match. Each step is logged with request/response. No vendor HTTP when KYC_LIVENESS_PAUSED, TENACIO_LIVENESS_DISABLED, or POST target is not configured.',
   })
   @ApiOkResponse({ description: 'Vendor outcome; updates application when HTTP call completes' })
   kycLivenessRoute(@Req() req: Request) {

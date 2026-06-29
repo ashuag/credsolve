@@ -31,7 +31,7 @@ export type CustomerPortalProfileSnapshot = {
 export type CustomerPortalJourneySnapshot = {
   /** Lead detail + consent are complete enough to proceed to pre-approved offer. */
   detailsCompleted: boolean;
-  /** Customer has selected a loan amount + tenure (application_detail populated). */
+  /** Customer has selected a loan amount + tenure (`application_detail` populated). */
   loanSelectionCompleted: boolean;
   /** Key Fact Statement + Loan Agreement accepted (mobile OTP) before KYC. */
   loanDocumentsCompleted: boolean;
@@ -39,7 +39,7 @@ export type CustomerPortalJourneySnapshot = {
   kycCompleted: boolean;
   /** Two personal references saved after bank details. */
   referencesCompleted: boolean;
-  /** Customer has provided bank details (disbursement details). */
+  /** Customer has provided bank details on `application_detail`. */
   bankDetailsCompleted: boolean;
 };
 
@@ -76,7 +76,7 @@ export type CustomerLoanSelectionSnapshot = {
   maturityDate: string | null;
 };
 
-/** Saved personal reference (`lead_reference` row). */
+/** Saved personal reference (`application_reference` row). */
 export type CustomerLeadReferenceSnapshot = {
   referenceIndex: number;
   fullName: string;

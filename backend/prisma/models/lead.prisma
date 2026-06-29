@@ -6,16 +6,8 @@ model Lead {
   leadStatusNote                    String?   @map("lead_status_note") @db.VarChar(256)
   rejectionReasonId                 Int?      @map("rejection_reason_id") @db.SmallInt
   sourceId                          Int?      @map("source_id")
-  panNumber                         String?   @map("pan_number") @db.Char(10)
-  panVerified                       Int       @default(0) @map("pan_verified") @db.SmallInt
-  panVerifiedAt                     DateTime? @map("pan_verified_at")
-  panValidationAttempts             Int       @default(0) @map("pan_validation_attempts") @db.SmallInt
-  digilockerAadhaarDownloadAttempts Int       @default(0) @map("digilocker_aadhaar_download_attempts") @db.SmallInt
-  bureauFetched                     Int       @default(0) @map("bureau_fetched") @db.SmallInt
-  bureauFetchedAt                   DateTime? @map("bureau_fetched_at")
-  bureauFetchedNote                 String?   @map("bureau_fetched_note") @db.VarChar(500)
   isActive                          Boolean   @default(true) @map("is_active")
-  expiresAt                         DateTime? @map("expires_at")
+  expiredAt                         DateTime? @map("expired_at")
   createdAt                         DateTime  @default(now()) @map("created_at")
   updatedAt                         DateTime  @updatedAt @map("updated_at")
 
@@ -24,7 +16,6 @@ model Lead {
   rejectionReason RejectionReason? @relation(fields: [rejectionReasonId], references: [id])
   source          LeadSource?      @relation(fields: [sourceId], references: [id])
   leadDetail      LeadDetail?
-  leadReferences  LeadReference[]
   leadUtms        LeadUtm[]
   applications    Application[]
   vendorApiLogs   VendorApiLog[]
@@ -34,9 +25,8 @@ model Lead {
   @@index([leadStatusId])
   @@index([rejectionReasonId])
   @@index([sourceId])
-  @@index([expiresAt])
+  @@index([expiredAt])
   @@index([createdAt])
-  @@index([panVerified, panVerifiedAt])
   @@map("lead")
 }
 
@@ -55,8 +45,15 @@ model LeadDetail {
   netMonthlyIncome Decimal?  @map("net_monthly_income") @db.Decimal(12, 2)
   annualTurnover   Decimal?  @map("annual_turnover") @db.Decimal(12, 2)
   annualProfit     Decimal?  @map("annual_profit") @db.Decimal(12, 2)
-  cibilConsentAt   DateTime? @map("cibil_consent_at")
-  createdAt        DateTime  @default(now()) @map("created_at")
+  cibilConsentAt        DateTime? @map("cibil_consent_at")
+  panNumber             String?   @map("pan_number") @db.Char(10)
+  panVerified           Int       @default(0) @map("pan_verified") @db.SmallInt
+  panVerifiedAt         DateTime? @map("pan_verified_at")
+  panValidationAttempts Int       @default(0) @map("pan_validation_attempts") @db.SmallInt
+  bureauFetched         Int       @default(0) @map("bureau_fetched") @db.SmallInt
+  bureauFetchedAt       DateTime? @map("bureau_fetched_at")
+  bureauFetchedNote     String?   @map("bureau_fetched_note") @db.VarChar(500)
+  createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
   lead       Lead        @relation(fields: [leadId], references: [id])
@@ -66,27 +63,8 @@ model LeadDetail {
 
   @@index([cityId])
   @@index([pincode])
+  @@index([panVerified, panVerifiedAt])
   @@map("lead_detail")
-}
-
-/// Two personal references collected after bank details.
-model LeadReference {
-  id             BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid           String   @unique @default(uuid()) @db.Char(36)
-  leadId         BigInt   @map("lead_id") @db.UnsignedBigInt
-  referenceIndex Int      @map("reference_index") @db.SmallInt
-  fullName       String   @map("full_name") @db.VarChar(100)
-  mobileNumber   String   @map("mobile_number") @db.VarChar(10)
-  relationId     Int      @map("relation_id") @db.SmallInt
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-
-  lead     Lead              @relation(fields: [leadId], references: [id])
-  relation ReferenceRelation @relation(fields: [relationId], references: [id])
-
-  @@unique([leadId, referenceIndex])
-  @@index([leadId])
-  @@map("lead_reference")
 }
 
 /// External vendor HTTP calls (Tenacio, etc.) for audit and debugging.

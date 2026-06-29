@@ -139,3 +139,7 @@ export function journeyProgressPercent(steps: JourneyStep[]): number {
   const active = steps.some((s) => s.state === 'active') ? 0.5 : 0;
   return Math.round(((done + active) / steps.length) * 100);
 }
+
+export function isApplicationJourneyStepActive(row: LosApplicationDetails, stepId: string): boolean {
+  return buildApplicationJourney(row).some((s) => s.id === stepId && s.state === 'active');
+}

@@ -16,6 +16,11 @@ export class LeadRepository {
     return this.db(tx).leadDetail.upsert(args);
   }
 
+  /** Prisma `lead_detail.update` — caller supplies full args. */
+  updateLeadDetail(args: any, tx?: DbClient) {
+    return this.db(tx).leadDetail.update(args);
+  }
+
   /** Prisma `lead.update` — caller supplies full args. */
   updateLead(args: any, tx?: DbClient) {
     return (this.db(tx) as any).lead.update(args);
@@ -44,14 +49,13 @@ export class LeadRepository {
   }
 
   createForCustomer(
-    params: { customerId: bigint; leadStatusId: number; expiresAt: Date },
+    params: { customerId: bigint; leadStatusId: number },
     tx?: DbClient
   ) {
     return this.db(tx).lead.create({
       data: {
         customerId: params.customerId,
         leadStatusId: params.leadStatusId,
-        expiresAt: params.expiresAt,
       },
       include: {
         leadStatus: { select: { name: true } },
@@ -131,14 +135,22 @@ export class LeadRepository {
     return this.db(tx).lead.findFirst({
       where: { customerId, isActive: true },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, uuid: true, panNumber: true },
+      select: {
+        id: true,
+        uuid: true,
+        leadDetail: { select: { panNumber: true } },
+      },
     });
   }
 
   findByUuidForCustomer(uuid: string, customerId: bigint, tx?: DbClient) {
     return this.db(tx).lead.findFirst({
       where: { uuid, customerId, isActive: true },
-      select: { id: true, uuid: true, panNumber: true },
+      select: {
+        id: true,
+        uuid: true,
+        leadDetail: { select: { panNumber: true } },
+      },
     });
   }
 

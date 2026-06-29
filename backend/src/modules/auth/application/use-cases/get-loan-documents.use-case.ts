@@ -38,7 +38,7 @@ export class GetLoanDocumentsUseCase {
       throw new BadRequestException('Verify your email before reviewing loan documents.');
     }
 
-    if (!app.details?.loanAmount || !app.details?.loanTenure) {
+    if (!app.details?.selectedLoanAmount || !app.details?.expectedRepaymentDays) {
       throw new BadRequestException('Complete loan selection before reviewing documents.');
     }
 

@@ -23,16 +23,6 @@ export type BureauTenacioRequestBody = {
   input: BureauTenacioInput;
 };
 
-function maskPan(pan: string | undefined): string {
-  if (!pan || pan.length < 4) return '*****';
-  return `******${pan.slice(-4)}`;
-}
-
-function maskMobile(mobile: string | undefined): string {
-  if (!mobile || mobile.length < 4) return '****';
-  return `******${mobile.slice(-4)}`;
-}
-
 /**
  * Tenacio bureau pull (Experian/CIBIL workflow) using env `VENDOR_HOST`, `TENACIO_CLIENT_ID` (sent as HTTP
  * `client-id`), `TENACIO_API_KEY` (sent as HTTP `x-api-key`). Path and `workflow-id` use `TENACIO_CIBIL_*`.
@@ -160,14 +150,6 @@ export class BureauFetchService {
       },
       body: normalizedBody,
       leadId,
-      redactRequest: (b) => ({
-        ...b,
-        input: {
-          ...b?.input,
-          panNumber: maskPan(b?.input?.panNumber),
-          mobileNumber: maskMobile(b?.input?.mobileNumber),
-        },
-      }),
     });
 
     // A processed-but-failed bureau pull with a client-side (4xx) service status

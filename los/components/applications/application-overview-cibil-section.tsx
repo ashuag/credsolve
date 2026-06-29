@@ -834,8 +834,9 @@ function BankDetailsPanel({ row }: { row: LosApplicationDetails }) {
         { label: 'Bank name', value: bank.bankName ?? '—' },
         { label: 'Account number', value: bank.accountNumber ?? '—' },
         { label: 'IFSC', value: bank.ifscCode ?? '—' },
-        { label: 'Disbursement amount', value: formatInr(bank.amount) },
-        { label: 'UTR', value: bank.utr ?? '—' },
+        { label: 'Disbursement amount', value: formatInr(bank.disburseAmount ?? bank.amount) },
+        { label: 'Expected repay date', value: formatDateOnly(bank.expectedRepaymentDate) },
+        { label: 'Repayment amount', value: formatInr(bank.repaymentAmount) },
         { label: 'Disbursed at', value: formatDateTime(bank.disbursedAt) },
       ]}
     />

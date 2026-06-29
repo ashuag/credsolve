@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { LoanDocumentScrollPanel } from '@/components/loan-documents/loan-document-scroll-panel';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
-import { LoanSummaryLeftRail } from '@/components/loan/loan-summary-left-rail';
+import { LoanCalculationLeftRail } from '@/components/loan/loan-calculation-left-rail';
 import { AlertBanner } from '@/components/ui/alert-banner';
 import { OtpInputGrid } from '@/components/ui/otp-input-grid';
 import { Spinner } from '@/components/ui/spinner';
@@ -133,7 +133,7 @@ export default function LoanDocumentsPage() {
           <p className="text-slate-500 font-medium">Preparing your loan documents…</p>
         </div>
       ) : phase === 'otp' ? (
-        <form onSubmit={handleVerifyOtp} className="flex flex-col gap-6 overflow-y-auto">
+        <form onSubmit={handleVerifyOtp} className="flex w-full min-w-0 max-w-full flex-col gap-6 overflow-x-hidden overflow-y-auto">
           <h1 className="text-2xl font-black text-brand-navy">Confirm with OTP</h1>
           <p className="text-slate-500 text-sm">
             Enter the code sent to your registered mobile number to accept the Loan Sanction letter cum Key Fact
@@ -227,8 +227,8 @@ export default function LoanDocumentsPage() {
               Sanction <span className="text-[#60a5fa]">letter</span>
             </>
           }
-          leftDescription="Review your sanction letter cum Key Fact Statement before identity verification (KYC)."
-          leftInfographic={<LoanSummaryLeftRail loanSelection={loanSelection} />}
+          leftDescription="Review your sanction letter and Key Fact Statement before KYC."
+          leftInfographic={<LoanCalculationLeftRail loanSelection={loanSelection} />}
           mobileStepLabel="Sanction letter"
           mobileOnBack={() => router.push(CUSTOMER_EMAIL_JOURNEY_PATH)}
         />

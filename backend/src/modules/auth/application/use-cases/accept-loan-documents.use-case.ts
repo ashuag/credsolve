@@ -110,25 +110,13 @@ export class AcceptLoanDocumentsUseCase {
     const acceptedAt = await this.prisma.client.$transaction(async (tx) => {
       await this.otpRequests.markVerified(tx, request.id, verifiedAt);
 
-      const updated = await tx.application.update({
-        where: { id: app.id },
-        data: { loanDocumentsAcceptedAt: verifiedAt },
-        select: { loanDocumentsAcceptedAt: true },
-      });
-
-      await tx.applicationAgreement.upsert({
+      const updated = await tx.applicationDetail.update({
         where: { applicationId: app.id },
-        create: {
-          applicationId: app.id,
-          documentName: 'Loan Sanction letter cum Key Fact Statement',
-          ipAddress: ip ?? null,
-          signedAt: verifiedAt,
+        data: {
+          loanDocumentsAcceptedAt: verifiedAt,
+          loanDocumentsAcceptedIp: ip ?? null,
         },
-        update: {
-          documentName: 'Loan Sanction letter cum Key Fact Statement',
-          ipAddress: ip ?? null,
-          signedAt: verifiedAt,
-        },
+        select: { loanDocumentsAcceptedAt: true },
       });
 
       return updated.loanDocumentsAcceptedAt!;

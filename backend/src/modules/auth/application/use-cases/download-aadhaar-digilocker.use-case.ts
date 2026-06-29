@@ -84,9 +84,13 @@ export class DownloadAadhaarDigilockerUseCase {
       leadId: lead.id,
       customerId: customer.id,
     });
-    assertApplicationKycNotCompleted(applicationRow.kycStatus);
+    const appKyc = await this.prisma.client.applicationKyc.findUnique({
+      where: { applicationId: applicationRow.id },
+      select: { kycStatus: true },
+    });
+    assertApplicationKycNotCompleted(appKyc?.kycStatus);
 
-    const priorAttempts = await this.kycDigilockerDownloadFailure.readAttemptsUsed(lead.id);
+    const priorAttempts = await this.kycDigilockerDownloadFailure.readAttemptsUsed(applicationRow.id);
     if (priorAttempts >= DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS) {
       return {
         configured: true,
@@ -201,6 +205,7 @@ export class DownloadAadhaarDigilockerUseCase {
       const formJson = buildDigilockerAadhaarFormJson(vendor, photoRel) ?? { _note: 'digilocker_vendor_unparsed' };
       await this.applications.updateDigilockerAadhaarArtifacts({
         applicationId: application.id,
+        customerId: customer.id,
         digilockerAadhaarFormJson: formJson as Prisma.InputJsonValue,
         aadhaarPhotoRelativePath: photoRel,
       });
@@ -225,16 +230,22 @@ export class DownloadAadhaarDigilockerUseCase {
   }
 
   private async persistVendorAttempt(
-    application: { id: bigint; digilockerAadhaarFormJson: Prisma.JsonValue | null },
+    application: { id: bigint; customerId: bigint },
     httpStatus: number | null,
     vendor: unknown,
   ): Promise<void> {
-    if (isDigilockerAadhaarCaptureComplete(application.digilockerAadhaarFormJson)) {
+    const customerKyc = await this.prisma.client.customerKyc.findFirst({
+      where: { customerId: application.customerId },
+      orderBy: { createdAt: 'desc' },
+      select: { aadhaarData: true },
+    });
+    if (isDigilockerAadhaarCaptureComplete(customerKyc?.aadhaarData)) {
       return;
     }
     try {
       await this.applications.updateDigilockerAadhaarArtifacts({
         applicationId: application.id,
+        customerId: application.customerId,
         digilockerAadhaarFormJson: buildDigilockerVendorAttemptJson({
           httpStatus,
           vendor,

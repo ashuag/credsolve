@@ -100,7 +100,9 @@ export class SubmitProfessionalApplicationUseCase {
       }),
       this.prisma.client.applicationStatus.findMany({
         where: {
-          name: { in: [APPLICATION_STATUS.IN_REVIEW, APPLICATION_STATUS.DRAFT] },
+          name: {
+            in: [APPLICATION_STATUS.IN_REVIEW, APPLICATION_STATUS.DRAFT, APPLICATION_STATUS.REJECTED],
+          },
           isActive: true,
         },
         select: { id: true, name: true },
@@ -112,11 +114,15 @@ export class SubmitProfessionalApplicationUseCase {
     }
     const inReviewAppStatus = appStatuses.find((s) => s.name === APPLICATION_STATUS.IN_REVIEW);
     const draftStatus = appStatuses.find((s) => s.name === APPLICATION_STATUS.DRAFT);
+    const rejectedAppStatus = appStatuses.find((s) => s.name === APPLICATION_STATUS.REJECTED);
     if (!inReviewAppStatus) {
       throw new BadRequestException('Application status IN_REVIEW is not configured.');
     }
     if (!draftStatus) {
       throw new BadRequestException('Application status DRAFT is not configured.');
+    }
+    if (!rejectedAppStatus) {
+      throw new BadRequestException('Application status REJECTED is not configured.');
     }
 
     await this.prisma.client.$transaction(async (tx) => {
@@ -150,23 +156,17 @@ export class SubmitProfessionalApplicationUseCase {
 
       await tx.application.update({
         where: { id: application.id },
-        data: { applicationStatusId: inReviewAppStatus.id },
-      });
-
-      await tx.applicationEligibility.upsert({
-        where: { applicationId: application.id },
-        create: {
-          applicationId: application.id,
-          isEligible: eligible,
-          approvedAmount: eligible ? new Prisma.Decimal(preApprovedAmountInr) : null,
-          cibilScore: eligible ? cibilScore : null,
-        },
-        update: {
-          isEligible: eligible,
-          approvedAmount: eligible ? new Prisma.Decimal(preApprovedAmountInr) : null,
-          cibilScore: eligible ? cibilScore : null,
-          checkedAt: new Date(),
-        },
+        data: eligible
+          ? {
+              applicationStatusId: inReviewAppStatus.id,
+              preApprovedLoanAmount: new Prisma.Decimal(preApprovedAmountInr),
+              applicationStatusNote: null,
+            }
+          : {
+              applicationStatusId: rejectedAppStatus.id,
+              preApprovedLoanAmount: null,
+              applicationStatusNote: 'Pre-approved amount is below the minimum loan amount.',
+            },
       });
 
       await tx.lead.update({

@@ -171,7 +171,6 @@ const BREADCRUMBS: Record<string, string> = {
   '/developer-tools/post-bre-rules': 'Post BRE Rules',
   '/developer-tools/kyc-selfie-face-check': 'KYC Selfie Face Check',
   '/developer-tools/kyc-face-match-check': 'KYC Face Match Check',
-  '/developer-tools/kyc-deepfake-check': 'KYC Selfie Authenticity',
   ...Object.fromEntries(ELIGIBILITY_SECTION_DEFINITIONS.map((item) => [item.href, item.label])),
   '/eligibility-criteria/credit-limit-eligibility-check': 'Credit Limit Tier',
 };

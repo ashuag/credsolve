@@ -2,8 +2,6 @@
 
 import type { RefObject, KeyboardEvent } from 'react';
 
-const OTP_LENGTH = 6;
-
 type OtpInputGridProps = {
   digits: string[];
   inputRefs: RefObject<Array<HTMLInputElement | null>>;
@@ -28,8 +26,7 @@ export function OtpInputGrid({
 }: OtpInputGridProps) {
   return (
     <div
-      className="grid gap-[10px] max-sm:gap-2"
-      style={{ gridTemplateColumns: `repeat(${OTP_LENGTH}, minmax(0, 1fr))` }}
+      className="grid w-full min-w-0 max-w-full grid-cols-6 gap-2 overflow-hidden sm:gap-[10px]"
       aria-label={ariaLabel}
     >
       {digits.map((digit, index) => (
@@ -49,7 +46,7 @@ export function OtpInputGrid({
             e.preventDefault();
             onPaste(e.clipboardData.getData('text'));
           }}
-          className="w-full min-h-[56px] rounded-[16px] border border-[rgba(18,36,79,0.16)] bg-white text-brand-navy text-center text-[1.35rem] font-extrabold outline-0 shadow-[0_10px_18px_rgba(23,44,113,0.04)] transition-all duration-[180ms] focus:border-[rgba(20,150,243,0.46)] focus:shadow-[0_0_0_4px_rgba(20,150,243,0.12),0_16px_28px_rgba(23,44,113,0.1)] focus:-translate-y-0.5 focus:scale-[1.04] focus:animate-otp-border-pulse max-sm:min-h-[50px]"
+          className="box-border w-full min-w-0 min-h-[50px] rounded-[14px] border border-[rgba(18,36,79,0.16)] bg-white text-brand-navy text-center text-[1.15rem] font-extrabold outline-0 shadow-[0_10px_18px_rgba(23,44,113,0.04)] transition-[border-color,box-shadow] duration-[180ms] focus:border-[rgba(20,150,243,0.46)] focus:shadow-[0_0_0_3px_rgba(20,150,243,0.12)] sm:min-h-[56px] sm:rounded-[16px] sm:text-[1.35rem]"
           aria-label={`OTP digit ${index + 1}`}
         />
       ))}

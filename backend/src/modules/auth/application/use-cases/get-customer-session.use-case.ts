@@ -21,10 +21,17 @@ import { BureauReportRepository } from '../../infrastructure/repositories/bureau
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
 import { DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS } from '../../../../common/constants/kyc.constants';
-import { KycDigilockerDownloadFailureService } from '../../../../common/kyc/kyc-digilocker-download-failure.service';
 import { isKycLivenessOutboundSkipped } from '../../../../common/kyc/kyc-liveness-env.util';
 import { fetchLatestApplicationKycSnapshot } from '../../../../prisma/application-kyc-snapshot.query';
 import { PrismaService } from '../../../../prisma/prisma.service';
+
+function countUploadedKycDocuments(aadhaarData: unknown): number {
+  if (!aadhaarData || typeof aadhaarData !== 'object' || Array.isArray(aadhaarData)) {
+    return 0;
+  }
+  const docs = (aadhaarData as { uploadedDocuments?: unknown }).uploadedDocuments;
+  return Array.isArray(docs) ? docs.length : 0;
+}
 
 @Injectable()
 export class GetCustomerSessionUseCase {
@@ -35,7 +42,6 @@ export class GetCustomerSessionUseCase {
     private readonly settings: SettingsRepository,
     private readonly bureauReports: BureauReportRepository,
     private readonly postBureauOffer: PostBureauOfferService,
-    private readonly kycDigilockerDownloadFailure: KycDigilockerDownloadFailureService,
   ) {}
 
   async execute(req: Request): Promise<CustomerSessionResult> {
@@ -124,16 +130,7 @@ export class GetCustomerSessionUseCase {
 
     logger.debug("emailVerified", emailVerified);
 
-    let profile = formatLeadDetailForPortal(
-      leadRow.leadDetail
-        ? {
-            ...leadRow.leadDetail,
-            panNumber: leadRow.panNumber ?? null,
-            panVerified: leadRow.panVerified,
-            panVerifiedAt: leadRow.panVerifiedAt,
-          }
-        : null,
-    );
+    let profile = formatLeadDetailForPortal(leadRow.leadDetail);
 
     const [applicationExtras, latestCustomerKyc, leadReferenceRows] = await Promise.all([
       application
@@ -141,17 +138,24 @@ export class GetCustomerSessionUseCase {
             where: { id: application.id },
             select: {
               updatedAt: true,
-              pennyDropAttempts: true,
               details: {
                 select: {
-                  loanAmount: true,
-                  loanTenure: true,
-                  loanMaturityDate: true,
+                  pennyDropAttempts: true,
+                  selectedLoanAmount: true,
                   reasonForLoanId: true,
+                  expectedRepaymentDays: true,
+                  expectedRepaymentDate: true,
+                  bankAccountNumber: true,
+                  ifscCode: true,
+                  bankName: true,
                 },
               },
-              disbursement: {
-                select: { accountNumber: true, ifscCode: true, bankName: true },
+              loanAccount: {
+                select: {
+                  disbursedAt: true,
+                  loanMaturityDate: true,
+                  loanAccountNumber: true,
+                },
               },
             },
           })
@@ -160,35 +164,29 @@ export class GetCustomerSessionUseCase {
         where: { customerId: customer.id },
         orderBy: { createdAt: 'desc' },
         select: {
-          id: true,
-          kycVerifiedAt: true,
-          fullName: true,
-          _count: { select: { customerKycDocuments: true } },
+          aadhaarData: true,
         },
       }),
-      this.prisma.client.leadReference.findMany({
-        where: {
-          leadId: leadRow.id,
-          fullName: { not: '' },
-          mobileNumber: { not: '' },
-        },
-        orderBy: { referenceIndex: 'asc' },
-        select: {
-          referenceIndex: true,
-          fullName: true,
-          mobileNumber: true,
-          relationId: true,
-        },
-      }),
+      application
+        ? this.prisma.client.applicationReference.findMany({
+            where: {
+              applicationId: application.id,
+              fullName: { not: '' },
+              mobileNumber: { not: '' },
+            },
+            orderBy: { referenceIndex: 'asc' },
+            select: {
+              referenceIndex: true,
+              fullName: true,
+              mobileNumber: true,
+              relationId: true,
+            },
+          })
+        : Promise.resolve([]),
     ]);
 
     const appDetails = applicationExtras?.details ?? null;
-    const disbursement = applicationExtras?.disbursement ?? null;
-
-    const kycDisplayName = latestCustomerKyc?.fullName?.trim();
-    if (profile && kycDisplayName && !profile.fullName?.trim()) {
-      profile = { ...profile, fullName: kycDisplayName };
-    }
+    const loanAccount = applicationExtras?.loanAccount ?? null;
 
     const profileFieldsComplete = Boolean(
       profile?.fullName?.trim() &&
@@ -201,18 +199,19 @@ export class GetCustomerSessionUseCase {
         profile?.creditConsentAccepted,
     );
     const panChecksComplete =
-      isPanVerifiedFromDb(leadRow.panVerified) || leadRow.panVerified === PAN_VERIFIED.API_DISABLED;
+      isPanVerifiedFromDb(leadRow.leadDetail?.panVerified) ||
+      leadRow.leadDetail?.panVerified === PAN_VERIFIED.API_DISABLED;
     const detailsCompleted = profileFieldsComplete && panChecksComplete;
 
     const loanSelectionCompleted = Boolean(
-      appDetails?.loanAmount != null &&
-        appDetails?.loanTenure != null &&
+      appDetails?.selectedLoanAmount != null &&
+        appDetails?.expectedRepaymentDays != null &&
         appDetails?.reasonForLoanId != null,
     );
 
     const loanDocumentsCompleted = Boolean(application?.loanDocumentsAcceptedAt);
 
-    const kycDocsCount = latestCustomerKyc?._count.customerKycDocuments ?? 0;
+    const kycDocsCount = countUploadedKycDocuments(latestCustomerKyc?.aadhaarData);
     const livenessOutboundSkipped = isKycLivenessOutboundSkipped();
     const hasSavedSelfie = Boolean(application?.selfieRelativePath?.trim());
     const hasDigilockerForm = isDigilockerAadhaarCaptureComplete(application?.digilockerAadhaarFormJson ?? null);
@@ -241,24 +240,35 @@ export class GetCustomerSessionUseCase {
     const referencesCompleted = leadReferences.length >= 2;
 
     const bankDetailsCompleted = Boolean(
-      disbursement?.accountNumber?.trim() && disbursement?.ifscCode?.trim(),
+      appDetails?.bankAccountNumber?.trim() && appDetails?.ifscCode?.trim(),
     );
 
     const loanSelection =
       appDetails &&
-      (appDetails.loanAmount != null || appDetails.loanTenure != null || appDetails.loanMaturityDate != null)
+      (appDetails.selectedLoanAmount != null ||
+        appDetails.expectedRepaymentDays != null ||
+        appDetails.expectedRepaymentDate != null)
         ? {
-            amountInr: appDetails.loanAmount != null ? appDetails.loanAmount.toString() : null,
-            tenureDays: appDetails.loanTenure ?? null,
-            maturityDate: appDetails.loanMaturityDate
-              ? appDetails.loanMaturityDate.toISOString().slice(0, 10)
-              : null,
+            amountInr:
+              appDetails.selectedLoanAmount != null ? appDetails.selectedLoanAmount.toString() : null,
+            tenureDays: appDetails.expectedRepaymentDays ?? null,
+            maturityDate: loanAccount?.loanMaturityDate
+              ? loanAccount.loanMaturityDate.toISOString().slice(0, 10)
+              : appDetails.expectedRepaymentDate
+                ? appDetails.expectedRepaymentDate.toISOString().slice(0, 10)
+                : null,
           }
         : null;
 
-    const digilockerAadhaarDownloadAttempts = await this.kycDigilockerDownloadFailure.readAttemptsUsed(
-      leadRow.id,
-    );
+    const digilockerAadhaarDownloadAttempts =
+      application != null
+        ? (
+            await this.prisma.client.applicationKyc.findUnique({
+              where: { applicationId: application.id },
+              select: { digilockerAadhaarDownloadAttempts: true },
+            })
+          )?.digilockerAadhaarDownloadAttempts ?? 0
+        : 0;
 
     const kycFaceProgress =
       application != null
@@ -285,7 +295,7 @@ export class GetCustomerSessionUseCase {
         : null;
 
     const pennyDropRetryCount = await this.settings.loadPennyDropRetryCount();
-    const pennyDropAttempts = applicationExtras?.pennyDropAttempts ?? 0;
+    const pennyDropAttempts = applicationExtras?.details?.pennyDropAttempts ?? 0;
     const bankVerificationProgress =
       application && kycCompleted && !bankDetailsCompleted
         ? {
