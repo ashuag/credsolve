@@ -1,33 +1,16 @@
 import type { NextConfig } from 'next';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getCustomerServerApiBase } from './lib/nest-api-base';
 
 const allowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? '')
   .split(',')
   .map((value) => value.trim())
   .filter(Boolean);
 
-/** Used only for server-side rewrites; must be an absolute origin (see error below). */
-const rawApiTarget = process.env.API_SERVER_URL ?? process.env.NEXT_PUBLIC_API_URL;
+// Fail fast at build/start if the server-side API proxy target is misconfigured.
+getCustomerServerApiBase();
 
-function ensureNestApiRewriteBase(url: string): string {
-  const trimmed = url.trim().replace(/\/$/, '');
-  if (!/^https?:\/\//i.test(trimmed)) {
-    return trimmed;
-  }
-  try {
-    const u = new URL(trimmed);
-    const pathOnly = (u.pathname.replace(/\/$/, '') || '/') as string;
-    if (pathOnly === '/') {
-      return `${u.origin}/api`;
-    }
-    return trimmed;
-  } catch {
-    return trimmed;
-  }
-}
-
-const apiProxyTarget = rawApiTarget ? ensureNestApiRewriteBase(rawApiTarget) : undefined;
 const envDistDir = process.env.NEXT_DIST_DIR?.trim();
 const isProductionRuntime = (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
 const configDir = path.dirname(fileURLToPath(import.meta.url));
@@ -51,21 +34,12 @@ if (isProductionRuntime) {
   });
 }
 
-if (!apiProxyTarget) {
-  throw new Error('Missing API_SERVER_URL or NEXT_PUBLIC_API_URL in customer environment.');
-}
-
-if (!/^https?:\/\//i.test(apiProxyTarget)) {
-  throw new Error(
-    'Customer app rewrites need an absolute API URL. Set API_SERVER_URL=http://localhost:4001/api ' +
-      '(host dev) or API_SERVER_URL=http://backend:4001/api (Docker). ' +
-      'Using only NEXT_PUBLIC_API_URL=/api breaks proxying and causes 500s on /api/*.'
-  );
-}
-
 const nextConfig: NextConfig = {
   output: 'standalone',
   poweredByHeader: false,
+  // Let the edge reverse proxy handle compression — avoids double-compression 500s
+  // and ERR_HTTP_HEADERS_SENT when Next and the proxy both gzip the same response.
+  compress: false,
   compiler: {
     // Smaller client bundles in production; keep error/warn for debugging.
     removeConsole: isProductionRuntime ? { exclude: ['error', 'warn'] } : false,
@@ -78,14 +52,6 @@ const nextConfig: NextConfig = {
   allowedDevOrigins,
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
-  },
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${apiProxyTarget}/:path*`
-      }
-    ];
   },
   images: {
     qualities: [75, 95],

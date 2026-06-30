@@ -1,14 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
-import { JourneyProgressProvider } from '@/components/journey/journey-progress-context';
+import { KycJourneyLeftPanel } from '@/components/kyc/kyc-journey-left-panel';
+import styles from '@/components/kyc/kyc-hub-flow.module.css';
+import { JourneyProgressProvider, useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { AlertBanner } from '@/components/ui/alert-banner';
 import { Spinner } from '@/components/ui/spinner';
 import { getApiUrl } from '@/lib/api-url';
 import { getCustomerJourneyResumePath, type CustomerSessionResponse } from '@/lib/api/customer-session';
+import { kycJourneyProgressFromSession } from '@/lib/kyc-journey-progress';
 import { pickLivenessFailureUserMessage, postKycLiveness, postKycSelfie } from '@/lib/api/kyc-face';
 import { openUserCamera, openUserCameraErrorMessage } from '@/lib/media/open-user-camera';
 
@@ -29,6 +32,37 @@ function shallowStringEntries(obj: unknown): Array<[string, string]> {
     if (typeof v === 'string' && v.length > 0 && v.length < 500) out.push([k, v]);
   }
   return out.slice(0, 12);
+}
+
+function KycSelfieShell({
+  session,
+  children,
+}: {
+  session: Extract<CustomerSessionResponse, { authenticated: true }>;
+  children: React.ReactNode;
+}) {
+  const journey = useJourneyProgressOptional();
+  const { progressPct, activeStepIndex } = useMemo(
+    () => kycJourneyProgressFromSession(session),
+    [session],
+  );
+
+  useEffect(() => {
+    journey?.setCompletion01(progressPct / 100);
+  }, [journey, progressPct]);
+
+  return (
+    <div className={styles.page}>
+      <div className={styles.shell}>
+        <KycJourneyLeftPanel
+          loanSelection={session.loanSelection}
+          progressPct={progressPct}
+          activeStepIndex={activeStepIndex}
+        />
+        <section className={styles.right}>{children}</section>
+      </div>
+    </div>
+  );
 }
 
 export default function KycSelfiePage() {
@@ -144,6 +178,11 @@ export default function KycSelfiePage() {
       setError(out.skipReason ?? 'Liveness is not configured on the server.');
       return false;
     }
+    if (out.internalError) {
+      await refresh();
+      router.replace('/thank-you');
+      return false;
+    }
     if (out.suggestRetrySelfie || out.faceValidationPassed === false || out.faceMatchPassed === false) {
       setSuggestRetake(true);
       setRetakeSelfie(true);
@@ -239,9 +278,13 @@ export default function KycSelfiePage() {
   if (loading || !session) {
     return (
       <CustomerJourneyGuard>
-        <div className="flex min-h-[40vh] items-center justify-center p-6">
-          <Spinner size={36} />
-        </div>
+        <JourneyProgressProvider>
+          <div className={styles.page}>
+            <div className="flex flex-1 items-center justify-center p-6">
+              <Spinner size={36} />
+            </div>
+          </div>
+        </JourneyProgressProvider>
       </CustomerJourneyGuard>
     );
   }
@@ -249,9 +292,13 @@ export default function KycSelfiePage() {
   if (session.authenticated !== true) {
     return (
       <CustomerJourneyGuard>
-        <div className="flex min-h-[40vh] items-center justify-center p-6">
-          <Spinner size={36} />
-        </div>
+        <JourneyProgressProvider>
+          <div className={styles.page}>
+            <div className="flex flex-1 items-center justify-center p-6">
+              <Spinner size={36} />
+            </div>
+          </div>
+        </JourneyProgressProvider>
       </CustomerJourneyGuard>
     );
   }
@@ -274,19 +321,14 @@ export default function KycSelfiePage() {
   return (
     <CustomerJourneyGuard>
       <JourneyProgressProvider>
-        <div className="mx-auto max-w-lg p-6 grid gap-4">
-          <header>
-            <p className="m-0 text-[0.7rem] font-[800] uppercase tracking-[0.14em] text-[#1496f3]">KYC</p>
-            <h1 className="mt-2 text-brand-navy text-2xl font-[900] tracking-tight">Selfie &amp; liveness</h1>
-          </header>
+        <KycSelfieShell session={session}>
+          <div className="grid max-w-xl gap-4">
+            <header>
+              <p className={`m-0 ${styles.eyebrow}`}>KYC</p>
+              <h1 className={styles.rightTitle}>Selfie &amp; liveness</h1>
+            </header>
 
           {error ? <AlertBanner variant="error">{error}</AlertBanner> : null}
-          {suggestRetake && !busy ? (
-            <AlertBanner variant="error">
-              Your selfie did not pass our on-server checks (face validation or Aadhaar match). Take a new photo with
-              your full face visible, then we will run liveness again.
-            </AlertBanner>
-          ) : null}
 
           {photoHref ? (
             <div className="rounded-2xl border border-[rgba(18,36,79,0.12)] p-3 bg-white/90">
@@ -386,7 +428,8 @@ export default function KycSelfiePage() {
               </div>
             </div>
           ) : null}
-        </div>
+          </div>
+        </KycSelfieShell>
       </JourneyProgressProvider>
     </CustomerJourneyGuard>
   );

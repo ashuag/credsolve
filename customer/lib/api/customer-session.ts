@@ -159,6 +159,10 @@ export function getCustomerJourneyResumePath(
     return '/thank-you-interest';
   }
 
+  if (session.lead.status === CUSTOMER_LEAD_STATUS.INTERNAL_ERROR) {
+    return '/thank-you';
+  }
+
   const journey = session.journey;
   if (!journey.detailsCompleted) return '/onboarding?mode=login';
   if (!journey.loanSelectionCompleted) return '/pre-approved-loan';

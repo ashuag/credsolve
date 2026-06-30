@@ -30,3 +30,39 @@ export function formatKycPipelineStepForLogger(entry: KycLivenessPipelineStepLog
   ].filter(Boolean);
   return parts.join(' ');
 }
+
+export type LocalKycCheckPhase = '2-internal-liveness' | '2.1-internal-face-match';
+
+export type LocalKycCheckOperation = 'read-storage' | 'validate' | 'compare';
+
+export function isObjectStorageMissingKeyError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  const name = err && typeof err === 'object' && 'name' in err ? String(err.name) : '';
+  return (
+    name === 'NoSuchKey' ||
+    /nosuchkey/i.test(msg) ||
+    /specified key does not exist/i.test(msg) ||
+    /S3 GET failed \(404\)/i.test(msg)
+  );
+}
+
+/** Human-readable failure line for Nest logs and pipeline `response.error`. */
+export function describeLocalKycCheckFailure(
+  phase: LocalKycCheckPhase,
+  operation: LocalKycCheckOperation,
+  relativePath: string,
+  err: unknown,
+): string {
+  const cause = err instanceof Error ? err.message : String(err);
+  const asset = phase === '2-internal-liveness' ? 'selfie' : 'Aadhaar reference photo';
+  const action =
+    operation === 'read-storage'
+      ? 'read from object storage'
+      : operation === 'validate'
+        ? 'run internal liveness on'
+        : 'compare';
+  if (operation === 'read-storage' && isObjectStorageMissingKeyError(err)) {
+    return `${phase}: ${asset} not found in object storage (key="${relativePath}"): ${cause}`;
+  }
+  return `${phase}: failed to ${action} ${asset} (key="${relativePath}"): ${cause}`;
+}

@@ -16,23 +16,24 @@ import {
 } from '../../../../common/kyc/aadhaar-vendor-parse.util';
 import { KycFaceMatchService } from '../../../../common/kyc/kyc-face-match.service';
 import {
-  KYC_FACE_MATCH_RETRY_HINT,
   toPersistedFaceMatchInspection,
 } from '../../../../common/kyc/kyc-face-match-inspection-persist.util';
-import type { KycFaceMatchInspection } from '../../../../common/kyc/kyc-face-match.util';
 import { emptyFaceMatchInspection } from '../../../../common/kyc/kyc-face-match.util';
 import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
 import { KycSelfieFaceValidationService } from '../../../../common/kyc/kyc-selfie-face-validation.service';
+import { toPersistedSelfieFaceInspection } from '../../../../common/kyc/kyc-selfie-face-inspection-persist.util';
 import {
-  KYC_SELFIE_FACE_RETRY_HINT,
-  toPersistedSelfieFaceInspection,
-} from '../../../../common/kyc/kyc-selfie-face-inspection-persist.util';
-import type { KycSelfieFaceInspection } from '../../../../common/kyc/kyc-selfie-face-validation.util';
+  isKycVendorTechnicalFailure,
+  KYC_SELFIE_GENERIC_RETRY_MESSAGE,
+} from '../../../../common/kyc/kyc-liveness-customer-message.util';
 import { resolveKycLivenessSelfiePublicUrl } from '../../../../common/kyc/kyc-liveness-selfie-url.util';
 import {
   buildKycPipelineStepLog,
+  describeLocalKycCheckFailure,
   formatKycPipelineStepForLogger,
   type KycLivenessPipelineStepLog,
+  type LocalKycCheckOperation,
+  type LocalKycCheckPhase,
 } from '../../../../common/kyc/kyc-liveness-pipeline-log.util';
 import { resolveKycPublicObjectUrl } from '../../../../common/kyc/kyc-public-object-url.util';
 import { KycTenacioVendorService } from '../../../../common/vendor/kyc-tenacio-vendor.service';
@@ -44,6 +45,8 @@ import {
   isKycLivenessOutboundSkipped,
 } from '../../../../common/kyc/kyc-liveness-env.util';
 import { assertActiveApplicationLoanDocumentsAccepted } from '../../../../common/loan-documents/application-loan-documents-guard.util';
+import { KYC_VENDOR_TECHNICAL_ISSUE_CUSTOMER_MESSAGE } from '../../../../common/constants/kyc.constants';
+import { VendorInternalErrorService } from '../../../../common/vendor/vendor-internal-error.service';
 import { fetchLatestApplicationKycSnapshot } from '../../../../prisma/application-kyc-snapshot.query';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
@@ -67,6 +70,10 @@ export type RunKycLivenessResult = {
   faceMatchMessage?: string;
   suggestRetrySelfie?: boolean;
   bestComputedConfidence?: number | null;
+  /** Generic customer copy (never raw vendor errors). */
+  customerMessage?: string;
+  /** Vendor auth/config failure — lead escalated to INTERNAL_ERROR; show thank-you. */
+  internalError?: boolean;
 };
 
 type LocalKycChecksPayload = {
@@ -113,6 +120,7 @@ export class RunKycLivenessUseCase {
     private readonly prisma: PrismaService,
     private readonly settings: SettingsRepository,
     private readonly kycCompletion: KycCompletionService,
+    private readonly internalError: VendorInternalErrorService,
   ) {}
 
   async execute(req: Request): Promise<RunKycLivenessResult> {
@@ -172,6 +180,13 @@ export class RunKycLivenessUseCase {
     });
 
     if (!localChecks.ok) {
+      if (localChecks.localChecksPayload) {
+        await this.persistKycPipelineResult({
+          applicationId: application.id,
+          localChecksPayload: localChecks.localChecksPayload,
+          passed: false,
+        });
+      }
       return {
         configured: true,
         ok: false,
@@ -179,17 +194,22 @@ export class RunKycLivenessUseCase {
         vendor: localChecks.localChecksPayload ?? null,
         livenessPassed: false,
         faceValidationPassed: localChecks.faceValidationPassed,
-        faceValidationMessage: localChecks.faceValidationMessage,
+        faceValidationMessage: localChecks.faceValidationMessage ?? KYC_SELFIE_GENERIC_RETRY_MESSAGE,
         faceMatchPassed: localChecks.faceMatchPassed,
         faceMatchMessage: localChecks.faceMatchMessage,
         suggestRetrySelfie: localChecks.suggestRetrySelfie,
         bestComputedConfidence: localChecks.bestComputedConfidence,
-        vendorErrorMessage:
-          localChecks.faceValidationMessage ?? localChecks.faceMatchMessage,
+        customerMessage: KYC_SELFIE_GENERIC_RETRY_MESSAGE,
       };
     }
 
     let localChecksPayload = localChecks.localChecksPayload!;
+
+    await this.persistKycPipelineResult({
+      applicationId: application.id,
+      localChecksPayload,
+      passed: false,
+    });
 
     if (isKycLivenessOutboundSkipped()) {
       const checkedAt = new Date();
@@ -235,6 +255,11 @@ export class RunKycLivenessUseCase {
       photoVersion,
     });
     if (!selfieUrlResult.ok) {
+      await this.persistKycPipelineResult({
+        applicationId: application.id,
+        localChecksPayload,
+        passed: false,
+      });
       return {
         configured: false,
         skipReason: selfieUrlResult.error,
@@ -250,6 +275,11 @@ export class RunKycLivenessUseCase {
 
     const aadhaarRelativePath = application.aadhaarPhotoRelativePath?.trim();
     if (!aadhaarRelativePath) {
+      await this.persistKycPipelineResult({
+        applicationId: application.id,
+        localChecksPayload,
+        passed: false,
+      });
       return {
         configured: true,
         ok: false,
@@ -265,6 +295,11 @@ export class RunKycLivenessUseCase {
 
     const aadhaarUrlResult = await resolveKycPublicObjectUrl(this.kycFiles, aadhaarRelativePath);
     if (!aadhaarUrlResult.ok) {
+      await this.persistKycPipelineResult({
+        applicationId: application.id,
+        localChecksPayload,
+        passed: false,
+      });
       return {
         configured: false,
         skipReason: aadhaarUrlResult.error,
@@ -289,6 +324,31 @@ export class RunKycLivenessUseCase {
     vendorChecks = { tenacioLiveness: livenessGate.payload };
 
     if (!livenessGate.ok) {
+      const vendorBody = livenessGate.payload?.vendor;
+      if (
+        isKycVendorTechnicalFailure({
+          message: livenessGate.message,
+          httpStatus: livenessGate.httpStatus,
+          vendor: vendorBody,
+        })
+      ) {
+        return this.returnVendorTechnicalIssue({
+          applicationId: application.id,
+          leadId: lead.id,
+          providerName: 'Tenacio',
+          serviceName: 'liveness',
+          httpStatus: livenessGate.httpStatus,
+          localChecksPayload,
+          vendorChecks,
+          bestComputedConfidence: localChecks.bestComputedConfidence,
+        });
+      }
+      await this.persistKycPipelineResult({
+        applicationId: application.id,
+        localChecksPayload,
+        vendorChecks,
+        passed: false,
+      });
       return {
         configured: livenessGate.configured,
         skipReason: livenessGate.skipReason,
@@ -300,7 +360,8 @@ export class RunKycLivenessUseCase {
         faceMatchPassed: true,
         suggestRetrySelfie: true,
         bestComputedConfidence: localChecks.bestComputedConfidence,
-        vendorErrorMessage: livenessGate.message,
+        customerMessage: KYC_SELFIE_GENERIC_RETRY_MESSAGE,
+        faceValidationMessage: KYC_SELFIE_GENERIC_RETRY_MESSAGE,
       };
     }
 
@@ -315,6 +376,31 @@ export class RunKycLivenessUseCase {
     vendorChecks = { ...vendorChecks, tenacioFaceMatch: faceMatchGate.payload };
 
     if (!faceMatchGate.ok) {
+      const vendorBody = faceMatchGate.payload?.vendor;
+      if (
+        isKycVendorTechnicalFailure({
+          message: faceMatchGate.message,
+          httpStatus: faceMatchGate.httpStatus,
+          vendor: vendorBody,
+        })
+      ) {
+        return this.returnVendorTechnicalIssue({
+          applicationId: application.id,
+          leadId: lead.id,
+          providerName: 'Tenacio',
+          serviceName: 'face-match',
+          httpStatus: faceMatchGate.httpStatus,
+          localChecksPayload,
+          vendorChecks,
+          bestComputedConfidence: localChecks.bestComputedConfidence,
+        });
+      }
+      await this.persistKycPipelineResult({
+        applicationId: application.id,
+        localChecksPayload,
+        vendorChecks,
+        passed: false,
+      });
       return {
         configured: faceMatchGate.configured,
         skipReason: faceMatchGate.skipReason,
@@ -324,25 +410,23 @@ export class RunKycLivenessUseCase {
         livenessPassed: false,
         faceValidationPassed: true,
         faceMatchPassed: false,
-        faceMatchMessage: faceMatchGate.message
-          ? `${faceMatchGate.message} ${KYC_FACE_MATCH_RETRY_HINT}`
-          : undefined,
+        faceMatchMessage: KYC_SELFIE_GENERIC_RETRY_MESSAGE,
         suggestRetrySelfie: true,
         bestComputedConfidence: localChecks.bestComputedConfidence,
-        vendorErrorMessage: faceMatchGate.message,
+        customerMessage: KYC_SELFIE_GENERIC_RETRY_MESSAGE,
       };
     }
 
     const businessOk = livenessGate.passed && faceMatchGate.passed;
     const checkedAt = new Date();
 
-    await this.applications.updateLivenessResult({
+    await this.persistKycPipelineResult({
       applicationId: application.id,
-      livenessVendorJson: mergeVendorPayload(localChecksPayload, vendorChecks) as Prisma.InputJsonValue,
+      localChecksPayload,
+      vendorChecks,
       passed: businessOk,
-      checkedAt,
       done: businessOk,
-      doneAt: businessOk ? checkedAt : null,
+      checkedAt,
     });
 
     if (businessOk) {
@@ -355,6 +439,29 @@ export class RunKycLivenessUseCase {
       });
     }
 
+    if (!businessOk) {
+      const vendorBody = faceMatchGate.payload?.vendor ?? livenessGate.payload?.vendor;
+      const vendorMessage = livenessGate.message ?? faceMatchGate.message;
+      if (
+        isKycVendorTechnicalFailure({
+          message: vendorMessage,
+          httpStatus: livenessGate.httpStatus ?? faceMatchGate.httpStatus,
+          vendor: vendorBody,
+        })
+      ) {
+        return this.returnVendorTechnicalIssue({
+          applicationId: application.id,
+          leadId: lead.id,
+          providerName: 'Tenacio',
+          serviceName: 'liveness',
+          httpStatus: livenessGate.httpStatus ?? faceMatchGate.httpStatus,
+          localChecksPayload,
+          vendorChecks,
+          bestComputedConfidence: localChecks.bestComputedConfidence,
+        });
+      }
+    }
+
     return {
       configured: true,
       ok: businessOk,
@@ -364,7 +471,13 @@ export class RunKycLivenessUseCase {
       faceValidationPassed: true,
       faceMatchPassed: faceMatchGate.passed,
       bestComputedConfidence: localChecks.bestComputedConfidence,
-      vendorErrorMessage: businessOk ? undefined : livenessGate.message ?? faceMatchGate.message,
+      ...(businessOk
+        ? {}
+        : {
+            suggestRetrySelfie: true,
+            customerMessage: KYC_SELFIE_GENERIC_RETRY_MESSAGE,
+            faceMatchMessage: KYC_SELFIE_GENERIC_RETRY_MESSAGE,
+          }),
     };
   }
 
@@ -374,6 +487,75 @@ export class RunKycLivenessUseCase {
   ): void {
     pipelineSteps.push(entry);
     this.logger.log(formatKycPipelineStepForLogger(entry));
+  }
+
+  private async persistKycPipelineResult(params: {
+    applicationId: bigint;
+    localChecksPayload: LocalKycChecksPayload;
+    vendorChecks?: VendorChecksPayload;
+    passed: boolean;
+    done?: boolean;
+    checkedAt?: Date;
+  }): Promise<void> {
+    const checkedAt = params.checkedAt ?? new Date();
+    const done = params.done ?? false;
+    try {
+      await this.applications.updateLivenessResult({
+        applicationId: params.applicationId,
+        livenessVendorJson: mergeVendorPayload(
+          params.localChecksPayload,
+          params.vendorChecks ?? {},
+        ) as Prisma.InputJsonValue,
+        passed: params.passed,
+        checkedAt,
+        done,
+        doneAt: done ? checkedAt : null,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Failed to persist KYC pipeline result (applicationId=${params.applicationId.toString()}): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
+
+  private async returnVendorTechnicalIssue(params: {
+    applicationId: bigint;
+    leadId: bigint;
+    providerName: string;
+    serviceName: string;
+    httpStatus: number | null;
+    localChecksPayload: LocalKycChecksPayload;
+    vendorChecks: VendorChecksPayload;
+    bestComputedConfidence: number | null;
+  }): Promise<RunKycLivenessResult> {
+    await this.persistKycPipelineResult({
+      applicationId: params.applicationId,
+      localChecksPayload: params.localChecksPayload,
+      vendorChecks: params.vendorChecks,
+      passed: false,
+    });
+
+    await this.internalError.handleVendorTechnicalIssue({
+      leadId: params.leadId,
+      providerName: params.providerName,
+      serviceName: params.serviceName,
+    });
+
+    return {
+      configured: true,
+      ok: false,
+      httpStatus: params.httpStatus,
+      vendor: mergeVendorPayload(params.localChecksPayload, params.vendorChecks),
+      livenessPassed: false,
+      internalError: true,
+      customerMessage: KYC_VENDOR_TECHNICAL_ISSUE_CUSTOMER_MESSAGE,
+      faceValidationPassed: true,
+      faceMatchPassed: true,
+      suggestRetrySelfie: false,
+      bestComputedConfidence: params.bestComputedConfidence,
+    };
   }
 
   private async runTenacioLivenessCheck(params: {
@@ -648,15 +830,25 @@ export class RunKycLivenessUseCase {
     localChecksPayload?: LocalKycChecksPayload;
   }> {
     const pipelineSteps: KycLivenessPipelineStepLog[] = [];
-    let selfieInspection: KycSelfieFaceInspection;
-    let faceMatchInspection: KycFaceMatchInspection;
+    let localCheckPhase: LocalKycCheckPhase = '2-internal-liveness';
+    let localCheckOperation: LocalKycCheckOperation = 'read-storage';
+    let activeRelativePath = params.selfieRelativePath;
+    let persistedSelfieAfterValidation: ReturnType<typeof toPersistedSelfieFaceInspection> | null =
+      null;
+    let bestComputedConfidenceAfterValidation: number | null = null;
 
     try {
+      localCheckPhase = '2-internal-liveness';
+      localCheckOperation = 'read-storage';
+      activeRelativePath = params.selfieRelativePath;
       const selfieBuffer = await this.kycFiles.readBytes(params.selfieRelativePath);
 
       // Step 2 — internal liveness (selfie face validation).
-      selfieInspection = await this.selfieFaceValidation.inspectJpegBuffer(selfieBuffer);
+      localCheckOperation = 'validate';
+      const selfieInspection = await this.selfieFaceValidation.inspectJpegBuffer(selfieBuffer);
       const persistedSelfie = toPersistedSelfieFaceInspection(selfieInspection);
+      persistedSelfieAfterValidation = persistedSelfie;
+      bestComputedConfidenceAfterValidation = selfieInspection.bestComputedConfidence;
       this.recordPipelineStep(
         pipelineSteps,
         buildKycPipelineStepLog('2-internal-liveness', {
@@ -679,7 +871,7 @@ export class RunKycLivenessUseCase {
         return {
           ok: false,
           faceValidationPassed: false,
-          faceValidationMessage: `${reason} ${KYC_SELFIE_FACE_RETRY_HINT}`,
+          faceValidationMessage: KYC_SELFIE_GENERIC_RETRY_MESSAGE,
           suggestRetrySelfie: true,
           bestComputedConfidence: selfieInspection.bestComputedConfidence,
           localChecksPayload: {
@@ -725,8 +917,12 @@ export class RunKycLivenessUseCase {
         };
       }
 
+      localCheckPhase = '2.1-internal-face-match';
+      localCheckOperation = 'read-storage';
+      activeRelativePath = aadhaarPath;
       const aadhaarBuffer = await this.kycFiles.readBytes(aadhaarPath);
-      faceMatchInspection = await this.faceMatch.compareJpegBuffers(aadhaarBuffer, selfieBuffer);
+      localCheckOperation = 'compare';
+      const faceMatchInspection = await this.faceMatch.compareJpegBuffers(aadhaarBuffer, selfieBuffer);
       const persistedFaceMatch = toPersistedFaceMatchInspection(faceMatchInspection);
       this.recordPipelineStep(
         pipelineSteps,
@@ -746,7 +942,7 @@ export class RunKycLivenessUseCase {
           ok: false,
           faceValidationPassed: true,
           faceMatchPassed: false,
-          faceMatchMessage: `${reason} ${KYC_FACE_MATCH_RETRY_HINT}`,
+          faceMatchMessage: KYC_SELFIE_GENERIC_RETRY_MESSAGE,
           suggestRetrySelfie: true,
           bestComputedConfidence: selfieInspection.bestComputedConfidence,
           localChecksPayload: {
@@ -769,44 +965,79 @@ export class RunKycLivenessUseCase {
         },
       };
     } catch (err) {
-      this.logger.warn(
-        `MoneyCash local KYC checks failed: ${err instanceof Error ? err.message : String(err)}`,
+      const failureDetail = describeLocalKycCheckFailure(
+        localCheckPhase,
+        localCheckOperation,
+        activeRelativePath,
+        err,
       );
+      this.logger.warn(`MoneyCash local KYC checks failed: ${failureDetail}`);
+      const pipelineRequest =
+        localCheckPhase === '2.1-internal-face-match'
+          ? {
+              aadhaarRelativePath:
+                localCheckOperation === 'read-storage' ? activeRelativePath : params.aadhaarPhotoRelativePath?.trim(),
+              selfieRelativePath: params.selfieRelativePath,
+              operation: localCheckOperation,
+            }
+          : {
+              selfieRelativePath: activeRelativePath,
+              operation: localCheckOperation,
+            };
       this.recordPipelineStep(
         pipelineSteps,
-        buildKycPipelineStepLog('2-internal-liveness', {
+        buildKycPipelineStepLog(localCheckPhase, {
           ok: false,
-          request: { selfieRelativePath: params.selfieRelativePath },
-          response: { error: err instanceof Error ? err.message : String(err) },
+          request: pipelineRequest,
+          response: { error: failureDetail },
         }),
       );
+
+      const selfieAlreadyValidated = persistedSelfieAfterValidation !== null;
+      const aadhaarStorageMissing =
+        localCheckPhase === '2.1-internal-face-match' && localCheckOperation === 'read-storage';
+
       return {
         ok: false,
-        faceValidationPassed: false,
-        faceValidationMessage: `We could not verify your selfie before liveness. ${KYC_SELFIE_FACE_RETRY_HINT}`,
-        suggestRetrySelfie: true,
-        bestComputedConfidence: null,
+        faceValidationPassed: selfieAlreadyValidated ? true : false,
+        faceValidationMessage: selfieAlreadyValidated
+          ? undefined
+          : KYC_SELFIE_GENERIC_RETRY_MESSAGE,
+        faceMatchPassed: selfieAlreadyValidated ? false : undefined,
+        faceMatchMessage: aadhaarStorageMissing
+          ? 'Aadhaar reference photo is not available in storage. Complete DigiLocker Aadhaar download again.'
+          : selfieAlreadyValidated
+            ? KYC_SELFIE_GENERIC_RETRY_MESSAGE
+            : undefined,
+        suggestRetrySelfie: !aadhaarStorageMissing,
+        bestComputedConfidence: bestComputedConfidenceAfterValidation,
         localChecksPayload: {
-          selfieFaceValidation: toPersistedSelfieFaceInspection({
-            ok: false,
-            reason: 'Local checks threw before completion.',
-            productionValidationDisabled: false,
-            imageWidth: 0,
-            imageHeight: 0,
-            minConfidenceRequired: 0,
-            minComputedConfidenceRequired: 0,
-            bestComputedConfidence: null,
-            confidenceBreakdown: null,
-            minFaceAreaRatio: 0,
-            laplacianVariance: null,
-            minLaplacianVarianceRequired: 0,
-            blurPassed: null,
-            rawDetectionCount: 0,
-            qualifyingDetectionCount: 0,
-            detections: [],
-          }),
+          selfieFaceValidation:
+            persistedSelfieAfterValidation ??
+            toPersistedSelfieFaceInspection({
+              ok: false,
+              reason: failureDetail,
+              productionValidationDisabled: false,
+              imageWidth: 0,
+              imageHeight: 0,
+              minConfidenceRequired: 0,
+              minComputedConfidenceRequired: 0,
+              bestComputedConfidence: null,
+              confidenceBreakdown: null,
+              minFaceAreaRatio: 0,
+              laplacianVariance: null,
+              minLaplacianVarianceRequired: 0,
+              blurPassed: null,
+              rawDetectionCount: 0,
+              qualifyingDetectionCount: 0,
+              detections: [],
+            }),
           faceMatch: toPersistedFaceMatchInspection(
-            emptyFaceMatchInspection('Skipped — local checks error.'),
+            emptyFaceMatchInspection(
+              selfieAlreadyValidated
+                ? `Skipped — ${failureDetail}`
+                : 'Skipped — internal liveness failed before face match.',
+            ),
           ),
           pipelineSteps,
           localChecksCompletedAt: new Date().toISOString(),

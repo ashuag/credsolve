@@ -33,6 +33,9 @@ if (isProductionRuntime) {
 const nextConfig: NextConfig = {
   output: 'standalone',
   poweredByHeader: false,
+  // Let the edge reverse proxy handle compression — avoids double-compression 500s
+  // and ERR_HTTP_HEADERS_SENT when Next and the proxy both gzip the same response.
+  compress: false,
   compiler: {
     removeConsole: isProductionRuntime ? { exclude: ['error', 'warn'] } : false,
   },

@@ -1,4 +1,8 @@
 import { apiPost, apiPostFormData } from './client';
+import {
+  isKycVendorTechnicalFailure,
+  KYC_SELFIE_GENERIC_RETRY_MESSAGE,
+} from '../kyc-liveness-messages';
 
 export type PostKycSelfieResponse = {
   success: true;
@@ -19,65 +23,27 @@ export type PostKycLivenessResponse = {
   faceMatchMessage?: string;
   suggestRetrySelfie?: boolean;
   bestComputedConfidence?: number | null;
+  /** Generic customer copy from API (preferred over raw vendor fields). */
+  customerMessage?: string;
+  /** Vendor auth/config failure — show thank-you, not retake selfie. */
+  internalError?: boolean;
 };
 
-function isRec(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === 'object' && !Array.isArray(v);
-}
-
-/** Mirrors backend `pickTenacioVendorErrorMessage` so older APIs without `vendorErrorMessage` still show vendor text. */
-function extractVendorFailureLine(vendor: unknown, depth = 0): string | undefined {
-  if (depth > 6 || !isRec(vendor)) return undefined;
-
-  const nested = vendor.error;
-  if (typeof nested === 'string') {
-    const m = nested.trim();
-    if (m) return m;
-  }
-  if (isRec(nested)) {
-    for (const key of ['message', 'description', 'detail', 'title'] as const) {
-      const val = nested[key];
-      if (typeof val === 'string') {
-        const m = val.trim();
-        if (m) return m;
-      }
-    }
-  }
-
-  if (typeof vendor.message === 'string') {
-    const m = vendor.message.trim();
-    if (m) return m;
-  }
-
-  const errors = vendor.errors;
-  if (Array.isArray(errors)) {
-    for (const item of errors) {
-      if (typeof item === 'string') {
-        const m = item.trim();
-        if (m) return m;
-      }
-      if (isRec(item)) {
-        for (const key of ['message', 'msg', 'description'] as const) {
-          const val = item[key];
-          if (typeof val === 'string') {
-            const m = val.trim();
-            if (m) return m;
-          }
-        }
-      }
-    }
-  }
-
-  return extractVendorFailureLine(vendor.data, depth + 1);
-}
-
 export function pickLivenessFailureUserMessage(out: PostKycLivenessResponse): string {
+  if (out.internalError) {
+    return (
+      out.customerMessage?.trim() ||
+      'Thank you for your request. One of our representatives will contact you shortly for additional information. We appreciate your patience.'
+    );
+  }
+  if (isKycVendorTechnicalFailure(out)) {
+    return KYC_SELFIE_GENERIC_RETRY_MESSAGE;
+  }
   return (
+    out.customerMessage?.trim() ||
     out.faceValidationMessage?.trim() ||
     out.faceMatchMessage?.trim() ||
-    out.vendorErrorMessage?.trim() ||
-    extractVendorFailureLine(out.vendor) ||
-    'Liveness check did not pass. You can try again.'
+    KYC_SELFIE_GENERIC_RETRY_MESSAGE
   );
 }
 

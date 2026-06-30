@@ -102,3 +102,35 @@ export function buildVendor5xxNote(params: {
   if (params.transportError?.trim()) parts.push(params.transportError.trim());
   return parts.join(' · ').slice(0, 256);
 }
+
+/** Tenacio auth / header misconfiguration — not a customer selfie quality issue. */
+export function isVendorTechnicalConfigurationError(params: {
+  message?: string | null;
+  httpStatus?: number | null;
+}): boolean {
+  const msg = (params.message ?? '').trim().toLowerCase();
+  if (!msg) return false;
+
+  if (
+    msg.includes('invalid x-api-key') ||
+    msg.includes('x-api-key') ||
+    msg.includes('invalid api key') ||
+    msg.includes('invalid client-id') ||
+    msg.includes('invalid client id') ||
+    msg.includes('header validation')
+  ) {
+    return true;
+  }
+
+  if (params.httpStatus === 401 || params.httpStatus === 403) {
+    return (
+      msg.includes('x-api-key') ||
+      msg.includes('client-id') ||
+      msg.includes('client id') ||
+      msg.includes('unauthorized') ||
+      msg.includes('forbidden')
+    );
+  }
+
+  return false;
+}

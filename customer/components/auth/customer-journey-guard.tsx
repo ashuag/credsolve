@@ -4,6 +4,7 @@ import { ReactNode, useEffect, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { isLeadRejectedAndLocked } from '@/lib/api/customer-session';
+import { CUSTOMER_LEAD_STATUS } from '@/lib/lead-status';
 import { CUSTOMER_EMAIL_JOURNEY_PATH, CUSTOMER_EMAIL_VERIFY_PATH } from '@/lib/api/customer-session';
 import { isLoanDocumentsJourneyComplete } from '@/lib/loan-documents-journey';
 
@@ -118,6 +119,13 @@ export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
     if (isLeadRejectedAndLocked(session.lead)) {
       if (pathname !== '/thank-you-interest') {
         router.replace('/thank-you-interest');
+      }
+      return;
+    }
+
+    if (session.lead.status === CUSTOMER_LEAD_STATUS.INTERNAL_ERROR) {
+      if (pathname !== '/thank-you') {
+        router.replace('/thank-you');
       }
       return;
     }

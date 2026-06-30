@@ -1,24 +1,4 @@
-/**
- * Nest uses global prefix `/api`. If `NEXT_PUBLIC_API_URL` is an absolute origin without that
- * prefix (e.g. `http://localhost:4001`), requests hit `/leads/...` on the host and Nest returns 404
- * for the real path `/api/leads/...`.
- */
-function ensureNestGlobalPrefix(url: string): string {
-  const s = url.trim();
-  if (!/^https?:\/\//i.test(s)) {
-    return s.replace(/\/$/, '') || s;
-  }
-  try {
-    const u = new URL(s);
-    const pathOnly = (u.pathname.replace(/\/$/, '') || '/') as string;
-    if (pathOnly === '/') {
-      return `${u.origin}/api`;
-    }
-    return s.replace(/\/$/, '');
-  } catch {
-    return s.replace(/\/$/, '');
-  }
-}
+import { ensureNestApiBase } from './nest-api-base';
 
 export function getApiUrl() {
   if (typeof window === 'undefined') {
@@ -28,7 +8,7 @@ export function getApiUrl() {
       throw new Error('Missing API_SERVER_URL or NEXT_PUBLIC_API_URL in customer environment.');
     }
 
-    return ensureNestGlobalPrefix(apiUrl);
+    return ensureNestApiBase(apiUrl);
   }
 
   const rawPublic = (process.env.NEXT_PUBLIC_API_URL ?? '').trim();
@@ -52,7 +32,7 @@ export function getApiUrl() {
     return '/api';
   }
 
-  return ensureNestGlobalPrefix(rawPublic);
+  return ensureNestApiBase(rawPublic);
 }
 
 /**
@@ -69,7 +49,7 @@ export function buildGoogleOAuthStartHref(queryString: string): string {
     return `/auth/google/login${suffix}`;
   }
 
-  const apiBase = ensureNestGlobalPrefix(raw);
+  const apiBase = ensureNestApiBase(raw);
   if (!/^https?:\/\//i.test(apiBase)) {
     return `/auth/google/login${suffix}`;
   }
