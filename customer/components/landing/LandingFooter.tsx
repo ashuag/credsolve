@@ -210,7 +210,7 @@ export function LandingFooter() {
             </div>
 
             {/* Social */}
-            <div>
+            {/* <div>
               <p className="mb-3 text-[0.62rem] font-[800] uppercase tracking-[0.2em] text-white/25">Follow Us</p>
               <div className="flex gap-2.5">
                 {(Object.entries(SOCIAL_ICONS) as [string, React.ReactNode][]).map(([name, icon]) => (
@@ -224,7 +224,7 @@ export function LandingFooter() {
                   </Link>
                 ))}
               </div>
-            </div>
+            </div> */}
           </div>
 
           {/* Link columns */}
