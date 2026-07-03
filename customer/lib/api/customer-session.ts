@@ -224,7 +224,8 @@ export function getCustomerPostMobileOtpRedirectPath(
   accountHubFallback = '/my-account',
   otpLeadStatus?: string | null,
 ): string {
-  if (isInternalErrorLead(session?.lead ?? null, otpLeadStatus)) {
+  const lead = session && session.authenticated ? session.lead : null;
+  if (isInternalErrorLead(lead, otpLeadStatus)) {
     if (canResumeKycAfterInternalError(session)) return '/kyc/selfie';
     return '/thank-you';
   }
