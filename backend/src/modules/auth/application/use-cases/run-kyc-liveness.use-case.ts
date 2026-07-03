@@ -437,6 +437,8 @@ export class RunKycLivenessUseCase {
         aadhaarPhotoRelativePath: application.aadhaarPhotoRelativePath,
         verifiedAt: checkedAt,
       });
+      const providerName = (process.env.TENACIO_PROVIDER ?? 'Tenacio').trim();
+      await this.internalError.recoverLeadIfVendorFailuresCleared(lead.id, providerName);
     }
 
     if (!businessOk) {

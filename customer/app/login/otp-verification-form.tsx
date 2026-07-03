@@ -7,7 +7,9 @@ import { AlertBanner } from '@/components/ui/alert-banner';
 import { FlowLoader } from '@/components/ui/flow-loader';
 import { OtpInputGrid } from '@/components/ui/otp-input-grid';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
-import { getCustomerJourneyResumePath, isLeadRejectedAndLocked } from '@/lib/api/customer-session';
+import {
+  getCustomerPostMobileOtpRedirectPath,
+} from '@/lib/api/customer-session';
 import { useCountdown } from '@/lib/hooks/use-countdown';
 import { useOtpInput } from '@/lib/hooks/use-otp-input';
 import { formatCustomerMobile, isValidCustomerMobile } from '@/lib/mobile';
@@ -20,7 +22,7 @@ type OtpVerificationFormProps = {
   compact?: boolean;
   onChangeNumber?: () => void;
   initialOtpRequest?: SendOtpResponse | null;
-  /** After OTP success, navigate here (e.g. `/dashboard` for account login). Overrides default onboarding redirect. */
+  /** When the customer has no active lead after OTP, navigate here (default account hub). */
   successRedirect?: string;
 };
 
@@ -93,22 +95,25 @@ export function OtpVerificationForm({
     setError('');
 
     try {
-      await verifyCustomerOtp(otpRequest.requestId, otp.joined);
-      const updatedSession = await refreshCustomerSession();
+      const verifyResult = await verifyCustomerOtp(otpRequest.requestId, otp.joined);
+      const otpLeadStatus = verifyResult.leadStatus ?? null;
+
+      let updatedSession = await refreshCustomerSession();
+      if (!updatedSession.authenticated) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        updatedSession = await refreshCustomerSession();
+      }
+
+      const accountHubFallback =
+        successRedirect ?? (mode === 'login' ? '/my-account' : '/apply-for-loan');
+      const destination = getCustomerPostMobileOtpRedirectPath(
+        updatedSession,
+        accountHubFallback,
+        updatedSession.lead?.status ?? otpLeadStatus,
+      );
+
       startTransition(() => {
-        if (updatedSession?.authenticated && isLeadRejectedAndLocked(updatedSession.lead)) {
-          router.push('/thank-you-interest');
-          return;
-        }
-        if (successRedirect) {
-          router.push(successRedirect);
-          return;
-        }
-        if (mode === 'login') {
-          router.push('/dashboard');
-          return;
-        }
-        router.push(getCustomerJourneyResumePath(updatedSession));
+        router.replace(destination);
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to verify OTP right now.');

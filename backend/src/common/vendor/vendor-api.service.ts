@@ -224,22 +224,37 @@ export class VendorApiService {
       respondedAt,
     });
 
-    if (opts.leadId != null && isVendorApi5xxFailure({ httpStatus, body: parsedResponse })) {
-      void this.internalError
-        .handleVendor5xx({
-          leadId: opts.leadId,
-          providerName: opts.providerName,
-          serviceName: opts.serviceName,
-          httpStatus,
-          body: parsedResponse,
-          transportError: error?.message,
-        })
-        .catch((err) => {
-          const message = err instanceof Error ? err.message : String(err);
-          this.logger.warn(
-            `INTERNAL_ERROR escalation failed (${opts.providerName}/${opts.serviceName}, leadId=${opts.leadId?.toString()}): ${message}`,
-          );
-        });
+    if (opts.leadId != null) {
+      if (isVendorApi5xxFailure({ httpStatus, body: parsedResponse })) {
+        void this.internalError
+          .handleVendor5xx({
+            leadId: opts.leadId,
+            providerName: opts.providerName,
+            serviceName: opts.serviceName,
+            httpStatus,
+            body: parsedResponse,
+            transportError: error?.message,
+          })
+          .catch((err) => {
+            const message = err instanceof Error ? err.message : String(err);
+            this.logger.warn(
+              `INTERNAL_ERROR escalation failed (${opts.providerName}/${opts.serviceName}, leadId=${opts.leadId?.toString()}): ${message}`,
+            );
+          });
+      } else if (ok) {
+        void this.internalError
+          .maybeRecoverLeadAfterVendorSuccess({
+            leadId: opts.leadId,
+            providerName: opts.providerName,
+            serviceName: opts.serviceName,
+          })
+          .catch((err) => {
+            const message = err instanceof Error ? err.message : String(err);
+            this.logger.warn(
+              `INTERNAL_ERROR recovery skipped (${opts.providerName}/${opts.serviceName}, leadId=${opts.leadId?.toString()}): ${message}`,
+            );
+          });
+      }
     }
 
     return {

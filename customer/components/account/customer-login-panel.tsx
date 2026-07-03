@@ -59,7 +59,7 @@ export function CustomerLoginPanel() {
           compact
           initialOtpRequest={otpRequest}
           onChangeNumber={() => setOtpRequest(null)}
-          successRedirect="/dashboard"
+          successRedirect="/my-account"
         />
       </Suspense>
     );

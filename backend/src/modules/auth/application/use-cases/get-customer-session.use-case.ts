@@ -22,6 +22,7 @@ import { LeadRepository } from '../../infrastructure/repositories/lead.repositor
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
 import { DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS } from '../../../../common/constants/kyc.constants';
 import { isKycLivenessOutboundSkipped } from '../../../../common/kyc/kyc-liveness-env.util';
+import { VendorInternalErrorService } from '../../../../common/vendor/vendor-internal-error.service';
 import { fetchLatestApplicationKycSnapshot } from '../../../../prisma/application-kyc-snapshot.query';
 import { PrismaService } from '../../../../prisma/prisma.service';
 
@@ -42,6 +43,7 @@ export class GetCustomerSessionUseCase {
     private readonly settings: SettingsRepository,
     private readonly bureauReports: BureauReportRepository,
     private readonly postBureauOffer: PostBureauOfferService,
+    private readonly vendorInternalError: VendorInternalErrorService,
   ) {}
 
   async execute(req: Request): Promise<CustomerSessionResult> {
@@ -88,6 +90,21 @@ export class GetCustomerSessionUseCase {
     // }
 
     let statusName = leadRow.leadStatus.name;
+
+    if (statusName === LEAD_STATUS.INTERNAL_ERROR) {
+      const providerName = (process.env.TENACIO_PROVIDER ?? 'Tenacio').trim();
+      const recovered = await this.vendorInternalError.recoverLeadIfVendorFailuresCleared(
+        leadRow.id,
+        providerName,
+      );
+      if (recovered) {
+        const refreshedLead = await this.leads.findActiveByCustomerId(customer.id);
+        if (refreshedLead) {
+          leadRow = refreshedLead;
+          statusName = leadRow.leadStatus.name;
+        }
+      }
+    }
 
     if (statusName === LEAD_STATUS.CONVERTED) {
       const disbursedApp = await this.prisma.client.application.findFirst({

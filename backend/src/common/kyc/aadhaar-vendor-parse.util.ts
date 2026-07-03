@@ -157,7 +157,7 @@ export function extractLivenessScore(vendor: unknown): number | null {
 
   for (const obj of candidates) {
     if (!isRecord(obj)) continue;
-    for (const key of ['liveness_score', 'score'] as const) {
+    for (const key of ['liveness_score', 'livenessScore', 'score'] as const) {
       const v = obj[key];
       if (typeof v === 'number' && Number.isFinite(v)) return v;
       if (typeof v === 'string') {

@@ -1,13 +1,18 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { AccountLoginInfographic } from '@/components/account/account-login-infographic';
 import { CustomerLoginPanel } from '@/components/account/customer-login-panel';
 import { MyAccountSection } from '@/components/account/my-account-section';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { LandingNavbar } from '@/components/landing/LandingNavbar';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
-import { isCustomerPortalSignedIn } from '@/lib/api/customer-session';
+import {
+  getCustomerJourneyResumePath,
+  isCustomerPortalSignedIn,
+  isInternalErrorLead,
+} from '@/lib/api/customer-session';
 import { Spinner } from '@/components/ui/spinner';
 
 const LOGIN_LEFT_TITLE = (
@@ -20,7 +25,16 @@ const LOGIN_LEFT_TITLE = (
 );
 
 export function MyAccountClientPage() {
+  const router = useRouter();
   const { loading, session } = useCustomerSession();
+
+  const signedIn = isCustomerPortalSignedIn(session);
+  const internalErrorLead = signedIn && isInternalErrorLead(session.lead);
+
+  useEffect(() => {
+    if (loading || !internalErrorLead) return;
+    router.replace(getCustomerJourneyResumePath(session));
+  }, [internalErrorLead, loading, router, session]);
 
   if (loading) {
     return (
@@ -30,7 +44,13 @@ export function MyAccountClientPage() {
     );
   }
 
-  const signedIn = isCustomerPortalSignedIn(session);
+  if (internalErrorLead) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#fffdf8]">
+        <Spinner size={40} />
+      </div>
+    );
+  }
 
   if (signedIn) {
     return <MyAccountSection />;

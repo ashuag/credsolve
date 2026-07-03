@@ -137,9 +137,36 @@ export function hasActiveLoanLead(session: CustomerSessionResponse | null | unde
   return Boolean(session && session.authenticated && session.lead != null);
 }
 
+/** Active lead escalated for vendor / internal processing failure (e.g. Tenacio `api 505`). */
+export function isInternalErrorLead(
+  lead: CustomerPortalLead | null | undefined,
+  leadStatusHint?: string | null,
+): boolean {
+  const status = (lead?.status ?? leadStatusHint ?? '').trim();
+  return status === CUSTOMER_LEAD_STATUS.INTERNAL_ERROR;
+}
+
 /**
- * Returns the most relevant page to continue a signed-in customer's in-progress journey.
+ * `INTERNAL_ERROR` from a transient vendor failure (e.g. liveness 505) while KYC selfie
+ * step is still incomplete — customer should retry on `/kyc/selfie`, not `/thank-you`.
  */
+export function canResumeKycAfterInternalError(
+  session: CustomerSessionResponse | null | undefined,
+): boolean {
+  if (!session?.authenticated || !session.lead) return false;
+  if (!isInternalErrorLead(session.lead)) return false;
+  const journey = session.journey;
+  if (!journey.detailsCompleted || !journey.loanSelectionCompleted) return false;
+  if (!session.lead.emailVerified) return false;
+  if (!isLoanDocumentsJourneyComplete(session)) return false;
+  const kyc = session.kycFaceProgress;
+  const livenessNeeded = kyc?.livenessRequired !== false;
+  return Boolean(
+    kyc?.digilockerAadhaarCaptured &&
+      (!kyc.selfieCaptured || (livenessNeeded && !kyc.livenessPassed)),
+  );
+}
+
 /** Returns `true` when the lead is REJECTED or BLACKLISTED and the reapply window hasn't elapsed yet. */
 export function isLeadRejectedAndLocked(lead: CustomerPortalLead | null | undefined): boolean {
   if (!lead) return false;
@@ -148,6 +175,9 @@ export function isLeadRejectedAndLocked(lead: CustomerPortalLead | null | undefi
   return new Date(lead.rejectedUntil).getTime() > Date.now();
 }
 
+/**
+ * Returns the most relevant page to continue a signed-in customer's in-progress journey.
+ */
 export function getCustomerJourneyResumePath(
   session: CustomerSessionResponse | null | undefined
 ): string {
@@ -159,7 +189,8 @@ export function getCustomerJourneyResumePath(
     return '/thank-you-interest';
   }
 
-  if (session.lead.status === CUSTOMER_LEAD_STATUS.INTERNAL_ERROR) {
+  if (isInternalErrorLead(session.lead)) {
+    if (canResumeKycAfterInternalError(session)) return '/kyc/selfie';
     return '/thank-you';
   }
 
@@ -182,6 +213,31 @@ export function getCustomerJourneyResumePath(
   if (!journey.bankDetailsCompleted) return '/bank-details';
   if (!journey.referencesCompleted) return '/references';
   return '/thank-you';
+}
+
+/**
+ * After mobile OTP: resume an in-flight application (including `INTERNAL_ERROR` → thank-you),
+ * or fall back to the account hub when there is no active lead.
+ */
+export function getCustomerPostMobileOtpRedirectPath(
+  session: CustomerSessionResponse | null | undefined,
+  accountHubFallback = '/my-account',
+  otpLeadStatus?: string | null,
+): string {
+  if (isInternalErrorLead(session?.lead ?? null, otpLeadStatus)) {
+    if (canResumeKycAfterInternalError(session)) return '/kyc/selfie';
+    return '/thank-you';
+  }
+  if (!session?.authenticated) {
+    return '/my-account?mode=login';
+  }
+  if (isLeadRejectedAndLocked(session.lead)) {
+    return '/thank-you-interest';
+  }
+  if (session.lead) {
+    return getCustomerJourneyResumePath(session);
+  }
+  return accountHubFallback;
 }
 
 /**

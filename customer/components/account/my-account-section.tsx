@@ -15,6 +15,7 @@ import { formatInr } from '@/lib/format-inr';
 import {
   getCustomerJourneyResumePath,
   isCustomerPortalSignedIn,
+  isInternalErrorLead,
   isLeadRejectedAndLocked,
 } from '@/lib/api/customer-session';
 import { cn } from '@/lib/cn';
@@ -458,6 +459,10 @@ export function MyAccountSection() {
   useEffect(() => {
     if (!isCustomerPortalSignedIn(session)) {
       router.replace('/my-account');
+      return;
+    }
+    if (isInternalErrorLead(session.lead)) {
+      router.replace(getCustomerJourneyResumePath(session));
       return;
     }
     void load();
