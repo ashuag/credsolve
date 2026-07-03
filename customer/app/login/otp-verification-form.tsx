@@ -109,7 +109,7 @@ export function OtpVerificationForm({
       const destination = getCustomerPostMobileOtpRedirectPath(
         updatedSession,
         accountHubFallback,
-        updatedSession.lead?.status ?? otpLeadStatus,
+        (updatedSession.authenticated ? updatedSession.lead?.status : null) ?? otpLeadStatus,
       );
 
       startTransition(() => {
