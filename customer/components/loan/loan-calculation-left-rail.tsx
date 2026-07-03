@@ -83,7 +83,7 @@ export function LoanCalculationLeftRail({
     return computeLoanBreakdown(principal, tenureDays, settings);
   }, [principal, settings, tenureDays]);
 
-  if (!breakdown || !maturityDate) {
+  if (!breakdown || !maturityDate || tenureDays == null) {
     return <LoanSummaryLeftRail loanSelection={loanSelection} />;
   }
 
