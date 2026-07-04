@@ -214,8 +214,17 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
   }, [step, journeyProgress]);
 
   async function handleDetailsSaved() {
-    await refresh();
-    router.push('/pre-approved-loan');
+    const next = await refresh();
+    // Post-BRE sets CONVERTED + pre-approved amount; always continue to the offer step.
+    if (next.authenticated && next.lead && !isLeadRejectedAndLocked(next.lead)) {
+      router.replace('/pre-approved-loan');
+      return;
+    }
+    if (next.authenticated && isLeadRejectedAndLocked(next.lead)) {
+      router.replace('/thank-you-interest');
+      return;
+    }
+    router.replace('/apply-for-loan');
   }
 
   function handleEmailNext(confirmedEmail: string, mode: EmailMode, otpRequest: SendEmailOtpResponse) {

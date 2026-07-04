@@ -30,21 +30,18 @@ export function MyAccountClientPage() {
 
   const signedIn = isCustomerPortalSignedIn(session);
   const internalErrorLead = signedIn && isInternalErrorLead(session.lead);
+  const resumeOfferStep =
+    signedIn && Boolean(session.lead) && !session.journey.loanSelectionCompleted;
 
   useEffect(() => {
-    if (loading || !internalErrorLead) return;
-    router.replace(getCustomerJourneyResumePath(session));
-  }, [internalErrorLead, loading, router, session]);
+    if (loading || !signedIn) return;
+    // Mid-journey (e.g. right after bureau / post-BRE): go to the next step, not the account hub.
+    if (resumeOfferStep || internalErrorLead) {
+      router.replace(getCustomerJourneyResumePath(session));
+    }
+  }, [internalErrorLead, loading, resumeOfferStep, router, session, signedIn]);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#fffdf8]">
-        <Spinner size={40} />
-      </div>
-    );
-  }
-
-  if (internalErrorLead) {
+  if (loading || resumeOfferStep || internalErrorLead) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#fffdf8]">
         <Spinner size={40} />

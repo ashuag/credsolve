@@ -84,6 +84,8 @@ export type CustomerSessionResponse =
         referencesCompleted: boolean;
         bankDetailsCompleted: boolean;
       };
+      /** Post-BRE pre-approved ceiling; set after bureau pass. */
+      preApprovedAmountInr: number | null;
       loanSelection: CustomerLoanSelectionSnapshot | null;
       leadReferences: CustomerLeadReferenceSnapshot[];
       kycFaceProgress: CustomerKycFaceProgress | null;
@@ -226,12 +228,32 @@ function isAccountHubFallback(path: string): boolean {
 }
 
 /**
+ * When `/auth/me` is not ready yet (cookie race right after verify-otp), route from the
+ * lead status returned by verify-otp itself.
+ */
+function resumePathFromOtpLeadStatus(otpLeadStatus: string): string | null {
+  const status = otpLeadStatus.trim();
+  if (status === CUSTOMER_LEAD_STATUS.INTERNAL_ERROR) return '/thank-you';
+  if (status === CUSTOMER_LEAD_STATUS.REJECTED || status === CUSTOMER_LEAD_STATUS.BLACKLISTED) {
+    return '/thank-you-interest';
+  }
+  if (status === CUSTOMER_LEAD_STATUS.NEW) return '/onboarding?mode=register';
+  // CONVERTED (post-BRE) and IN_PROGRESS — offer page refreshes session and continues.
+  if (status === CUSTOMER_LEAD_STATUS.CONVERTED || status === CUSTOMER_LEAD_STATUS.IN_PROGRESS) {
+    return '/pre-approved-loan';
+  }
+  return null;
+}
+
+/**
  * After mobile OTP: resume an in-flight application (including `INTERNAL_ERROR` → thank-you),
  * or fall back to the account hub when there is no active lead.
  *
  * My Account login (`accountHubFallback` = `/my-account`) must keep rejected / KYC-failed
  * customers on the hub. Sending them to `/thank-you-interest` logs them out and loops them
  * back to the login screen.
+ *
+ * Prefer `otpLeadStatus` from verify-otp when the session cookie is not visible to `/auth/me` yet.
  */
 export function getCustomerPostMobileOtpRedirectPath(
   session: CustomerSessionResponse | null | undefined,
@@ -239,23 +261,40 @@ export function getCustomerPostMobileOtpRedirectPath(
   otpLeadStatus?: string | null,
 ): string {
   const lead = session && session.authenticated ? session.lead : null;
+  const statusHint = (lead?.status ?? otpLeadStatus ?? '').trim();
+
   if (isInternalErrorLead(lead, otpLeadStatus)) {
     if (canResumeKycAfterInternalError(session)) return '/kyc/selfie';
     return '/thank-you';
   }
-  if (!session?.authenticated) {
-    return '/my-account?mode=login';
-  }
-  if (isLeadRejectedAndLocked(session.lead)) {
-    if (isAccountHubFallback(accountHubFallback)) {
-      return accountHubFallback;
+
+  if (session?.authenticated && lead) {
+    if (isLeadRejectedAndLocked(lead)) {
+      if (isAccountHubFallback(accountHubFallback)) {
+        return accountHubFallback;
+      }
+      return '/thank-you-interest';
     }
-    return '/thank-you-interest';
-  }
-  if (session.lead) {
     return getCustomerJourneyResumePath(session);
   }
-  return accountHubFallback;
+
+  // Session missing or lead not loaded yet — trust verify-otp lead status.
+  const fromOtp = statusHint ? resumePathFromOtpLeadStatus(statusHint) : null;
+  if (fromOtp) {
+    if (
+      fromOtp === '/thank-you-interest' &&
+      isAccountHubFallback(accountHubFallback)
+    ) {
+      return accountHubFallback;
+    }
+    return fromOtp;
+  }
+
+  if (session?.authenticated) {
+    return accountHubFallback;
+  }
+
+  return '/my-account?mode=login';
 }
 
 /**

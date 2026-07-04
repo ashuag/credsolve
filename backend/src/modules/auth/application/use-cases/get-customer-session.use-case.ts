@@ -72,6 +72,7 @@ export class GetCustomerSessionUseCase {
         referencesCompleted: false,
         bankDetailsCompleted: false,
       },
+      preApprovedAmountInr: null,
       loanSelection: null,
       leadReferences: [],
       kycFaceProgress: null,
@@ -155,6 +156,7 @@ export class GetCustomerSessionUseCase {
             where: { id: application.id },
             select: {
               updatedAt: true,
+              preApprovedLoanAmount: true,
               details: {
                 select: {
                   pennyDropAttempts: true,
@@ -323,6 +325,12 @@ export class GetCustomerSessionUseCase {
           }
         : null;
 
+    const preApprovedRaw = applicationExtras?.preApprovedLoanAmount;
+    const preApprovedAmountInr =
+      preApprovedRaw != null && Number.isFinite(Number(preApprovedRaw))
+        ? Math.floor(Number(preApprovedRaw))
+        : null;
+
     return {
       authenticated: true,
       customerId: customer.uuid,
@@ -343,6 +351,8 @@ export class GetCustomerSessionUseCase {
         referencesCompleted,
         bankDetailsCompleted,
       },
+      preApprovedAmountInr:
+        preApprovedAmountInr != null && preApprovedAmountInr > 0 ? preApprovedAmountInr : null,
       loanSelection,
       leadReferences,
       kycFaceProgress,

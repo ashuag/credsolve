@@ -98,9 +98,13 @@ export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (loading || !pathname) return;
 
+    // Offer / selection hydrate the session after OTP (cookie can lag). Never race them to apply-for-loan.
+    const isOfferStep =
+      pathname === '/pre-approved-loan' || pathname === '/loan-selection';
+
     // Not signed in → push to start (thank-you is public so customers still see confirmation after submit or via link).
     if (!session?.authenticated) {
-      if (pathname !== '/apply-for-loan' && pathname !== '/thank-you') {
+      if (!isOfferStep && pathname !== '/apply-for-loan' && pathname !== '/thank-you') {
         router.replace('/apply-for-loan');
       }
       return;
@@ -108,7 +112,7 @@ export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
 
     // Signed in but no active lead → start flow (still allow confirmation page).
     if (!session.lead) {
-      if (pathname !== '/thank-you') {
+      if (!isOfferStep && pathname !== '/thank-you') {
         router.replace('/apply-for-loan');
       }
       return;
@@ -135,6 +139,15 @@ export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
     }
 
     if (!isPathAllowedForStage(stage, pathname)) {
+      // After bureau/post-BRE the lead is CONVERTED and offer is ready; allow the offer
+      // page even if journey flags are still catching up from a stale session snapshot.
+      if (
+        pathname === '/pre-approved-loan' &&
+        session.lead &&
+        !session.journey.loanSelectionCompleted
+      ) {
+        return;
+      }
       router.replace(redirectPath);
     }
   }, [loading, pathname, redirectPath, router, session, stage]);

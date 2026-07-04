@@ -99,8 +99,9 @@ export function OtpVerificationForm({
       const otpLeadStatus = verifyResult.leadStatus ?? null;
 
       let updatedSession = await refreshCustomerSession();
-      if (!updatedSession.authenticated) {
-        await new Promise((resolve) => setTimeout(resolve, 200));
+      // Cookie can lag verify-otp; retry so CONVERTED / in-progress leads resume correctly.
+      for (let attempt = 0; attempt < 3 && !updatedSession.authenticated; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 150 * (attempt + 1)));
         updatedSession = await refreshCustomerSession();
       }
 
@@ -109,7 +110,7 @@ export function OtpVerificationForm({
       const destination = getCustomerPostMobileOtpRedirectPath(
         updatedSession,
         accountHubFallback,
-        (updatedSession.authenticated ? updatedSession.lead?.status : null) ?? otpLeadStatus,
+        otpLeadStatus,
       );
 
       startTransition(() => {

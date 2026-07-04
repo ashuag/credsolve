@@ -27,6 +27,9 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
 
   const isLandingPage = pathname === '/';
   const isApplyPage = pathname === '/apply-for-loan';
+  /** Offer / selection steps use the full journey shell (no account tab bar). */
+  const isOfferJourneyPage =
+    pathname === '/pre-approved-loan' || pathname === '/loan-selection';
   const isAccountLoginPage = pathname === '/my-account';
   const isOnboardingLayout = pathname === '/onboarding' || pathname === '/email-verify';
   const isLoanDocumentsPage = pathname === '/loan-documents';
@@ -37,7 +40,13 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
-  if (isLandingPage || isApplyPage || (isAccountLoginPage && !signedIn) || isKycHubPage) {
+  if (
+    isLandingPage ||
+    isApplyPage ||
+    isOfferJourneyPage ||
+    (isAccountLoginPage && !signedIn) ||
+    isKycHubPage
+  ) {
     if (isKycHubPage) {
       return (
         <div className="flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden">

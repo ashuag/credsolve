@@ -103,6 +103,11 @@ export type CustomerSessionResult =
       lead: CustomerPortalLeadSnapshot | null;
       profile: CustomerPortalProfileSnapshot | null;
       journey: CustomerPortalJourneySnapshot;
+      /**
+       * Pre-approved ceiling from post-BRE (`application.pre_approved_loan_amount`).
+       * Present after bureau pass; used by `/pre-approved-loan` without a second eligibility call.
+       */
+      preApprovedAmountInr: number | null;
       /** Populated when the customer has saved loan amount / tenure on the application. */
       loanSelection: CustomerLoanSelectionSnapshot | null;
       /** Saved lead references for form prepopulation; empty array when none. */

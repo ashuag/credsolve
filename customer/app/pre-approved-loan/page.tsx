@@ -8,26 +8,11 @@ import {useCustomerSession} from '@/components/providers/customer-session-provid
 import {Spinner} from '@/components/ui/spinner';
 import {fetchLoanEligibility} from '@/lib/api/eligibility';
 import {ApiRequestError} from '@/lib/api/client';
-import {isLeadRejectedAndLocked} from '@/lib/api/customer-session';
+import {
+  isLeadRejectedAndLocked,
+  type CustomerSessionResponse,
+} from '@/lib/api/customer-session';
 import {LoanLandingShell} from '@/components/home/loan-landing-shell';
-
-const SUMMARY_ITEMS = [
-  {
-    label: 'Status',
-    value: 'Pre-approved',
-    kind: 'check'
-  },
-  {
-    label: 'Next step',
-    value: 'Complete account',
-    kind: 'profile'
-  },
-  {
-    label: 'Final stage',
-    value: 'Verification',
-    kind: 'shield'
-  }
-] as const;
 
 const BENEFIT_TAGS = ['100% Digital', 'Secure verification', 'Continue in minutes'] as const;
 
@@ -35,46 +20,11 @@ function formatInr(amount: number) {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
-    maximumFractionDigits: 0
+    maximumFractionDigits: 0,
   }).format(amount);
 }
 
-function SummaryIcon({ kind }: { kind: (typeof SUMMARY_ITEMS)[number]['kind'] }) {
-  if (kind === 'profile') {
-    return (
-      <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" fill="none" stroke="currentColor" strokeWidth="1.9">
-        <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M5 20a7 7 0 0 1 14 0" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  }
-
-  if (kind === 'shield') {
-    return (
-      <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" fill="none" stroke="currentColor" strokeWidth="1.9">
-        <path d="M12 3 5 6v5.4c0 4.4 2.8 8 7 9.6 4.2-1.6 7-5.2 7-9.6V6Z" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="m9.4 12.2 1.8 1.9 3.5-3.8" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" fill="none" stroke="currentColor" strokeWidth="1.9">
-      <path d="m7.5 12.5 2.6 2.6 6-6.6" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="12" cy="12" r="9" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function AmountVisual({
-  amount,
-  caption,
-  loading = false
-}: {
-  amount: string;
-  caption: string;
-  loading?: boolean;
-}) {
+function AmountVisual({ amount, caption }: { amount: string; caption: string }) {
   return (
     <div className="relative overflow-hidden rounded-[22px] border border-[rgba(255,255,255,0.12)] bg-[linear-gradient(145deg,#0f1f57,#1b3788_58%,#1b91e8_120%)] p-4 shadow-[0_18px_40px_rgba(17,33,88,0.24)] sm:rounded-[24px] sm:p-5 min-w-0">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
@@ -98,22 +48,11 @@ function AmountVisual({
 
         <div className="relative z-[1] w-full min-w-0 max-w-[min(17rem,100%)] rounded-[20px] border border-[rgba(255,255,255,0.16)] bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.08))] px-4 py-5 text-center shadow-[0_16px_32px_rgba(5,13,40,0.26)] backdrop-blur-[10px] sm:max-w-[min(19rem,100%)] sm:rounded-[24px] sm:px-6 sm:py-6">
           <div className="text-[0.76rem] font-black uppercase tracking-[0.16em] text-[#fff1bb]">Eligible loan amount</div>
-          {loading ? (
-            <div className="mt-6 grid justify-items-center gap-4">
-              <Spinner size={38} />
-              <div className="text-[0.92rem] font-bold text-[rgba(236,243,255,0.88)]">Checking your amount</div>
-            </div>
-          ) : (
-            <div className="mt-3 w-full min-w-0 break-words text-[clamp(1.5rem,7vw,2.4rem)] font-bold leading-[1.08] tracking-[-0.05em] text-white [overflow-wrap:anywhere]">
-              {amount}
-            </div>
-          )}
-          <p className="mt-3 mb-0 text-[0.94rem] leading-[1.6] text-[rgba(236,243,255,0.76)]">{caption}</p>
+          <div className="mt-2 text-[clamp(1.75rem,6vw,2.35rem)] font-black tracking-tight text-white break-words">
+            {amount}
+          </div>
+          <p className="mt-3 text-[0.82rem] font-medium leading-snug text-[rgba(236,243,255,0.82)]">{caption}</p>
         </div>
-      </div>
-
-      <div className="absolute bottom-4 left-4 rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.08)] px-3 py-1.5 text-[0.68rem] font-bold text-[rgba(236,243,255,0.86)]">
-        Quick eligibility result
       </div>
     </div>
   );
@@ -121,41 +60,28 @@ function AmountVisual({
 
 function LoadingState() {
   return (
-    <section className="grid gap-3">
-      <div className="rounded-[22px] border border-[rgba(18,36,79,0.08)] bg-white/90 p-4 shadow-[0_12px_24px_rgba(23,44,113,0.07)]">
-        <div className="inline-flex rounded-full bg-[rgba(20,150,243,0.08)] px-3 py-1.5 text-[0.72rem] font-black uppercase tracking-[0.14em] text-brand-blue">
-          Pre-approved loan
-        </div>
-        <h1 className="m-0 mt-3 text-[clamp(1.35rem,6.8vw,2.1rem)] leading-tight tracking-[-0.03em] text-brand-navy">
-          Preparing your pre-approved amount.
-        </h1>
-        <p className="m-0 mt-2 text-[0.92rem] leading-[1.55] text-brand-muted">
-          We are loading your eligible amount and the next step.
-        </p>
-      </div>
-      <AmountVisual amount="..." caption="Finalizing your eligible amount from the quick check." loading />
-    </section>
+    <div className="flex flex-col items-center justify-center gap-4 py-16">
+      <Spinner size={40} />
+      <p className="m-0 text-sm font-semibold text-brand-muted">Calculating your pre-approved amount…</p>
+    </div>
   );
 }
 
-function ErrorState({ error }: { error: string }) {
+function ErrorState({ error, onRetry }: { error: string; onRetry: () => void }) {
   return (
-    <section className="mc-card mc-card-glow mx-auto grid max-w-2xl gap-4 text-center">
-      <div className="mx-auto mc-chip">Pre-approved loan</div>
-      <h1 className="m-0 text-[clamp(2rem,5vw,3rem)] leading-[0.96] tracking-[-0.05em] text-brand-navy">
-        We could not load your loan amount.
-      </h1>
-      <p className="m-0 text-[0.98rem] leading-[1.7] text-brand-muted">{error}</p>
-      <div className="flex flex-wrap justify-center gap-3">
-        <Link href="/onboarding" className="mc-btn-primary">
-          Back to onboarding
-        </Link>
-        <Link href="/" className="mc-btn-secondary bg-[rgba(20,150,243,0.08)] text-brand-navy">
-          Back to home
-        </Link>
-      </div>
-    </section>
+    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-6 text-rose-900">
+      <p className="m-0 font-bold">{error}</p>
+      <button type="button" className="mc-btn-primary mt-4" onClick={onRetry}>
+        Try again
+      </button>
+    </div>
   );
+}
+
+function readPreApprovedAmount(session: CustomerSessionResponse | null | undefined): number | null {
+  if (!session || session.authenticated !== true) return null;
+  const amount = session.preApprovedAmountInr;
+  return typeof amount === 'number' && Number.isFinite(amount) && amount > 0 ? amount : null;
 }
 
 export default function PreApprovedLoanPage() {
@@ -163,65 +89,82 @@ export default function PreApprovedLoanPage() {
   const { loading: sessionLoading, session, refresh } = useCustomerSession();
   const [amountInr, setAmountInr] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const sessionExpiredHandledRef = useRef(false);
+  const [loadKey, setLoadKey] = useState(0);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     if (sessionLoading) return;
 
-    if (!session?.authenticated || !session.lead) {
-      router.replace('/apply-for-loan');
-      return;
-    }
-
-    if (isLeadRejectedAndLocked(session.lead)) {
-      router.replace('/thank-you-interest');
-      return;
-    }
-  }, [sessionLoading, session, router]);
-
-  useEffect(() => {
-    if (sessionLoading || !session?.authenticated || !session.lead) return;
-    if (isLeadRejectedAndLocked(session.lead)) return;
-
-    let cancelled = false;
+    const requestId = ++requestIdRef.current;
+    const isCurrent = () => requestIdRef.current === requestId;
 
     (async () => {
+      setError(null);
+
+      // 1) Fast path: amount already on session (post-BRE).
+      const fromSession = readPreApprovedAmount(session);
+      if (fromSession != null) {
+        if (isCurrent()) setAmountInr(fromSession);
+        return;
+      }
+
+      // 2) Refresh session once (cookie may have just been set after OTP).
+      const latest = await refresh();
+      if (!isCurrent()) return;
+
+      if (latest.authenticated && latest.lead && isLeadRejectedAndLocked(latest.lead)) {
+        router.replace('/thank-you-interest');
+        return;
+      }
+
+      const fromRefresh = readPreApprovedAmount(latest);
+      if (fromRefresh != null) {
+        setAmountInr(fromRefresh);
+        return;
+      }
+
+      // 3) Always try eligibility with the session cookie — do not gate on client session shape.
       try {
         const res = await fetchLoanEligibility();
-        if (!cancelled) {
+        if (!isCurrent()) return;
+        if (typeof res.preApprovedAmountInr === 'number' && res.preApprovedAmountInr > 0) {
           setAmountInr(res.preApprovedAmountInr);
+          return;
         }
+        setError('No pre-approved amount is available for your profile yet.');
       } catch (e) {
-        if (cancelled) {
-          return;
-        }
-
-        if (e instanceof ApiRequestError && e.statusCode === 401) {
-          if (sessionExpiredHandledRef.current) return;
-          sessionExpiredHandledRef.current = true;
-          await refresh();
-          router.replace('/apply-for-loan');
-          return;
-        }
-
+        if (!isCurrent()) return;
         if (e instanceof ApiRequestError && e.statusCode === 403) {
           router.replace('/thank-you-interest');
           return;
         }
-
-        setError(e instanceof Error ? e.message : 'Something went wrong.');
+        if (e instanceof ApiRequestError && e.statusCode === 401) {
+          setError('Your session expired. Please sign in again and return to this page.');
+          return;
+        }
+        setError(
+          e instanceof Error ? e.message : 'Unable to load your pre-approved amount. Please try again.',
+        );
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionLoading, session, router, refresh]);
+  // `session` is read once at start; `refresh()` loads the latest. Do not depend on `session`
+  // or every provider update cancels an in-flight eligibility request.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadKey = manual retry
+  }, [sessionLoading, loadKey, router, refresh]);
 
   let content;
 
   if (error) {
-    content = <ErrorState error={error} />;
+    content = (
+      <ErrorState
+        error={error}
+        onRetry={() => {
+          setError(null);
+          setAmountInr(null);
+          setLoadKey((k) => k + 1);
+        }}
+      />
+    );
   } else if (amountInr === null) {
     content = (
       <div className="h-full flex flex-col justify-center">
@@ -239,15 +182,18 @@ export default function PreApprovedLoanPage() {
               <div className="h-2 w-8 rounded-full bg-blue-600"></div>
               <div className="h-2 w-8 rounded-full bg-blue-600"></div>
             </div>
-            <span className="ml-3 text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Step 3 — Offer</span>
+            <span className="ml-3 text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">
+              Step 3 — Offer
+            </span>
           </div>
 
           <div className="mb-8">
             <AmountVisual amount={formatInr(amountInr)} caption="Secured offer generated." />
           </div>
-          
+
           <p className="text-[1rem] text-slate-600 leading-relaxed mb-8 font-medium">
-            Great news! You have been pre-approved for the amount shown above. Complete your account selection to move ahead to disbursement.
+            Great news! You have been pre-approved for the amount shown above. Complete your account
+            selection to move ahead to disbursement.
           </p>
 
           <Link href="/loan-selection" className="mc-btn-primary block w-full text-center py-4 text-[1rem]">
@@ -278,15 +224,17 @@ export default function PreApprovedLoanPage() {
 
   return (
     <CustomerJourneyGuard>
-      <LoanLandingShell
-        journeyPanel={content}
-        leftTitle={amountInr !== null ? leftTitle : undefined}
-        leftDescription={
-          amountInr !== null
-            ? "Your financial profile has been verified. We have generated a custom loan offer just for you. Proceed to claim your amount."
-            : "We are securely calculating your eligible loan amount based on your profile."
-        }
-      />
+      <div className="min-h-screen bg-[linear-gradient(135deg,#f0fdf4,#e6f0ff)] flex flex-col items-center justify-center p-4 sm:p-6 md:p-8">
+        <LoanLandingShell
+          journeyPanel={content}
+          leftTitle={amountInr !== null ? leftTitle : undefined}
+          leftDescription={
+            amountInr !== null
+              ? 'Your financial profile has been verified. We have generated a custom loan offer just for you. Proceed to claim your amount.'
+              : 'We are securely calculating your eligible loan amount based on your profile.'
+          }
+        />
+      </div>
     </CustomerJourneyGuard>
   );
 }

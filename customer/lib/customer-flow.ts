@@ -10,10 +10,10 @@ export function resolveCustomerFlowPath(
     case CUSTOMER_LEAD_STATUS.NEW:
       return `/onboarding?mode=${onboardingMode}`;
     case CUSTOMER_LEAD_STATUS.IN_PROGRESS:
-      // Prefer `getCustomerPostAuthResumePath` / `getCustomerJourneyResumePath` when you have a full session.
-      return '/my-account';
     case CUSTOMER_LEAD_STATUS.CONVERTED:
-      return '/my-account';
+      // Prefer `getCustomerJourneyResumePath` when you have a full session.
+      // CONVERTED after post-BRE still needs pre-approved offer / loan selection.
+      return '/pre-approved-loan';
     default:
       return '/my-account';
   }
