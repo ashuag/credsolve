@@ -296,6 +296,7 @@ export class GetCustomerSessionUseCase {
             ),
             selfieCaptured: Boolean(application.selfieRelativePath?.trim()),
             livenessPassed: application.livenessPassed === true,
+            livenessCheckCompleted: application.livenessCheckCompleted === true,
             livenessRequired: !livenessOutboundSkipped,
             digilockerAadhaarForm: application.digilockerAadhaarFormJson ?? null,
             digilockerAadhaarPhotoUrl: application.aadhaarPhotoRelativePath?.trim()

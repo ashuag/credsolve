@@ -99,7 +99,7 @@ export class ApplicationsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Pipeline: (1) selfie upload, (2) internal liveness, (2.1) internal face match, (3) Tenacio liveness, (4) Tenacio face match. Each step is logged with request/response. No vendor HTTP when KYC_LIVENESS_PAUSED, TENACIO_LIVENESS_DISABLED, or POST target is not configured.',
+      'Pipeline: (1) selfie upload, (2) MoneyCash liveness, (3) Tenacio liveness, (4) MoneyCash face match. All must pass to proceed; any failure escalates to thank-you (INTERNAL_ERROR). No Tenacio HTTP when KYC_LIVENESS_PAUSED, TENACIO_LIVENESS_DISABLED, or POST target is not configured.',
   })
   @ApiOkResponse({ description: 'Vendor outcome; updates application when HTTP call completes' })
   kycLivenessRoute(@Req() req: Request) {

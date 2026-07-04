@@ -31,7 +31,7 @@ export function formatKycPipelineStepForLogger(entry: KycLivenessPipelineStepLog
   return parts.join(' ');
 }
 
-export type LocalKycCheckPhase = '2-internal-liveness' | '2.1-internal-face-match';
+export type LocalKycCheckPhase = '2-moneycash-liveness' | '4-moneycash-face-match';
 
 export type LocalKycCheckOperation = 'read-storage' | 'validate' | 'compare';
 
@@ -54,7 +54,7 @@ export function describeLocalKycCheckFailure(
   err: unknown,
 ): string {
   const cause = err instanceof Error ? err.message : String(err);
-  const asset = phase === '2-internal-liveness' ? 'selfie' : 'Aadhaar reference photo';
+  const asset = phase === '2-moneycash-liveness' ? 'selfie' : 'Aadhaar reference photo';
   const action =
     operation === 'read-storage'
       ? 'read from object storage'

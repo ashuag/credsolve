@@ -50,6 +50,8 @@ export type CustomerKycFaceProgress = {
   digilockerAadhaarCaptured: boolean;
   selfieCaptured: boolean;
   livenessPassed: boolean;
+  /** When `true`, KYC face pipeline finished (pass or fail) — do not resume selfie on failure. */
+  livenessCheckCompleted?: boolean;
   /** When `false`, face step does not require calling the liveness API (server pause). */
   livenessRequired?: boolean;
   digilockerAadhaarForm: unknown | null;
@@ -147,8 +149,8 @@ export function isInternalErrorLead(
 }
 
 /**
- * `INTERNAL_ERROR` from a transient vendor failure (e.g. liveness 505) while KYC selfie
- * step is still incomplete — customer should retry on `/kyc/selfie`, not `/thank-you`.
+ * Resume `/kyc/selfie` only when the face pipeline never finished (e.g. upload interrupted).
+ * Any completed failure (MoneyCash liveness, Tenacio liveness, MoneyCash face match) stays on thank-you.
  */
 export function canResumeKycAfterInternalError(
   session: CustomerSessionResponse | null | undefined,
@@ -160,11 +162,10 @@ export function canResumeKycAfterInternalError(
   if (!session.lead.emailVerified) return false;
   if (!isLoanDocumentsJourneyComplete(session)) return false;
   const kyc = session.kycFaceProgress;
-  const livenessNeeded = kyc?.livenessRequired !== false;
-  return Boolean(
-    kyc?.digilockerAadhaarCaptured &&
-      (!kyc.selfieCaptured || (livenessNeeded && !kyc.livenessPassed)),
-  );
+  if (!kyc?.digilockerAadhaarCaptured) return false;
+  if (kyc.livenessCheckCompleted) return false;
+  const livenessNeeded = kyc.livenessRequired !== false;
+  return !kyc.selfieCaptured || (livenessNeeded && !kyc.livenessPassed);
 }
 
 /** Returns `true` when the lead is REJECTED or BLACKLISTED and the reapply window hasn't elapsed yet. */
@@ -202,6 +203,9 @@ export function getCustomerJourneyResumePath(
 
   const kyc = session.kycFaceProgress;
   const livenessNeeded = kyc?.livenessRequired !== false;
+  if (kyc?.livenessCheckCompleted && !kyc.livenessPassed) {
+    return '/thank-you';
+  }
   if (
     kyc?.digilockerAadhaarCaptured &&
     (!kyc.selfieCaptured || (livenessNeeded && !kyc.livenessPassed))
@@ -215,9 +219,19 @@ export function getCustomerJourneyResumePath(
   return '/thank-you';
 }
 
+/** True when post-OTP should open the account hub (My Account login), not resume apply flow. */
+function isAccountHubFallback(path: string): boolean {
+  const base = path.split('?')[0] ?? path;
+  return base === '/my-account' || base === '/dashboard';
+}
+
 /**
  * After mobile OTP: resume an in-flight application (including `INTERNAL_ERROR` → thank-you),
  * or fall back to the account hub when there is no active lead.
+ *
+ * My Account login (`accountHubFallback` = `/my-account`) must keep rejected / KYC-failed
+ * customers on the hub. Sending them to `/thank-you-interest` logs them out and loops them
+ * back to the login screen.
  */
 export function getCustomerPostMobileOtpRedirectPath(
   session: CustomerSessionResponse | null | undefined,
@@ -233,6 +247,9 @@ export function getCustomerPostMobileOtpRedirectPath(
     return '/my-account?mode=login';
   }
   if (isLeadRejectedAndLocked(session.lead)) {
+    if (isAccountHubFallback(accountHubFallback)) {
+      return accountHubFallback;
+    }
     return '/thank-you-interest';
   }
   if (session.lead) {

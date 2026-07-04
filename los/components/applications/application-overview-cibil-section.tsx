@@ -16,7 +16,15 @@ import {
   nameMatchVerdict,
   normalizeAadhaarGender,
 } from '@/lib/kyc-field-match';
-import { formatConfidencePercent, formatLivenessSummary, formatSelfieFaceValidationSummary, formatLaplacianVariance } from '@/lib/kyc-selfie-validation-display';
+import {
+  explainKycNotDone,
+  formatConfidencePercent,
+  formatDistance,
+  formatLivenessSummary,
+  formatMoneyCashFaceMatchSummary,
+  formatSelfieFaceValidationSummary,
+  formatLaplacianVariance,
+} from '@/lib/kyc-selfie-validation-display';
 import { formatPersonName } from '@/lib/format-person-name';
 import {
   fetchApplicationLoanDocumentBlob,
@@ -686,14 +694,20 @@ function ReferenceDetailsPanel({ row }: { row: LosApplicationDetails }) {
 }
 
 function KycDetailPanel({ row }: { row: LosApplicationDetails }) {
+  const kycNotDoneReason = explainKycNotDone(row);
   return (
     <div className="grid gap-4">
+      {kycNotDoneReason ? (
+        <p className="m-0 rounded-[10px] border border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.9)] px-3 py-2.5 text-[0.84rem] leading-[1.45] text-[#92400e]">
+          {kycNotDoneReason}
+        </p>
+      ) : null}
       <DetailGrid
         rows={[
           { label: 'KYC status', value: `${row.kycStatusLabel} (${row.kycStatus})` },
           { label: 'KYC fetched at', value: formatDateTime(row.kycCompletedAt) },
           {
-            label: 'Face validation (on-server)',
+            label: 'Face validation (MoneyCash)',
             value: formatSelfieFaceValidationSummary(row),
           },
           {
@@ -706,6 +720,30 @@ function KycDetailPanel({ row }: { row: LosApplicationDetails }) {
               row.selfieFaceValidation?.laplacianVariance != null
                 ? `${formatLaplacianVariance(row.selfieFaceValidation.laplacianVariance)} (min ${formatLaplacianVariance(row.selfieFaceValidation.minLaplacianVarianceRequired)})`
                 : '—',
+          },
+          {
+            label: 'Face match (MoneyCash)',
+            value: formatMoneyCashFaceMatchSummary(row),
+          },
+          {
+            label: 'Face match score',
+            value: formatConfidencePercent(row.moneyCashFaceMatch?.matchScore),
+          },
+          {
+            label: 'Face match distance',
+            value:
+              row.moneyCashFaceMatch?.distance != null
+                ? `${formatDistance(row.moneyCashFaceMatch.distance)} (max ${formatDistance(row.moneyCashFaceMatch.maxDistanceThreshold)})`
+                : '—',
+          },
+          {
+            label: 'Face match passed',
+            value:
+              row.moneyCashFaceMatch == null ? '—' : row.moneyCashFaceMatch.passed ? 'Yes' : 'No',
+          },
+          {
+            label: 'Face match at',
+            value: formatDateTime(row.moneyCashFaceMatch?.checkedAt),
           },
           { label: 'Liveness (Tenacio)', value: formatLivenessSummary(row) },
           { label: 'Liveness passed', value: row.livenessPassed ? 'Yes' : 'No' },

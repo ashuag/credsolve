@@ -134,13 +134,14 @@ export function LoanLandingShell({
       <div className={[
         'w-full flex flex-col bg-white lg:mx-auto',
         fullBleedPanel
-          ? 'min-h-0 flex-1 overflow-hidden lg:max-w-[1240px] lg:flex-row lg:rounded-[2.5rem] lg:border lg:border-slate-100 lg:relative lg:z-10 lg:shadow-[0_24px_80px_rgba(23,44,113,0.12),0_8px_32px_rgba(23,44,113,0.06)] lg:animate-fade-in-up'
-          : 'lg:max-w-[1240px] lg:flex-row lg:rounded-[2.5rem] lg:shadow-[0_24px_80px_rgba(23,44,113,0.12),0_8px_32px_rgba(23,44,113,0.06)] lg:overflow-hidden lg:border lg:border-slate-100 lg:relative lg:z-10 lg:animate-fade-in-up',
+          ? 'min-h-0 flex-1 overflow-hidden lg:max-w-[1240px] lg:flex-row lg:items-stretch lg:rounded-[2.5rem] lg:border lg:border-slate-100 lg:relative lg:z-10 lg:shadow-[0_24px_80px_rgba(23,44,113,0.12),0_8px_32px_rgba(23,44,113,0.06)] lg:animate-fade-in-up'
+          : 'lg:max-w-[1240px] lg:flex-row lg:items-stretch lg:rounded-[2.5rem] lg:shadow-[0_24px_80px_rgba(23,44,113,0.12),0_8px_32px_rgba(23,44,113,0.06)] lg:overflow-hidden lg:border lg:border-slate-100 lg:relative lg:z-10 lg:animate-fade-in-up',
       ].join(' ')}>
 
         {/* ── Left panel (desktop only) ── */}
+        {/* Stretch to the row height (do not use h-full — percentage height blocks flex stretch when the parent has no explicit height). */}
         {/* `overflow-x-hidden` alone makes `overflow-y` compute to `auto` (CSS overflow pairing), which shows a vertical scrollbar on this rail when content is a few px taller than the column. */}
-        <div className="relative hidden h-full min-h-0 w-full flex-col overflow-hidden bg-[#0a1628] lg:flex lg:w-5/12">
+        <div className="relative hidden min-h-0 w-full flex-col overflow-hidden bg-[#0a1628] lg:flex lg:w-5/12 lg:self-stretch">
 
           {/* Background Mesh */}
           <div className="absolute inset-0 stats-mesh opacity-90 pointer-events-none" />

@@ -12,7 +12,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { getApiUrl } from '@/lib/api-url';
 import { getCustomerJourneyResumePath, type CustomerSessionResponse } from '@/lib/api/customer-session';
 import { kycJourneyProgressFromSession } from '@/lib/kyc-journey-progress';
-import { pickLivenessFailureUserMessage, postKycLiveness, postKycSelfie } from '@/lib/api/kyc-face';
+import { postKycLiveness, postKycSelfie } from '@/lib/api/kyc-face';
 import { openUserCamera, openUserCameraErrorMessage } from '@/lib/media/open-user-camera';
 
 function dataUrlToFile(dataUrl: string, name: string): File {
@@ -79,7 +79,6 @@ export default function KycSelfiePage() {
   const [retakeSelfie, setRetakeSelfie] = useState(false);
   /** Shown immediately after capture so the UI does not flash the previous cached selfie. */
   const [pendingSelfiePreview, setPendingSelfiePreview] = useState<string | null>(null);
-  const [suggestRetake, setSuggestRetake] = useState(false);
 
   const navigatingRef = useRef(false);
 
@@ -163,10 +162,14 @@ export default function KycSelfiePage() {
     if (loading || busy || session?.authenticated !== true || retakeSelfie) return;
     const progress = session.kycFaceProgress;
     if (!progress?.selfieCaptured) return;
+    if (progress.livenessCheckCompleted && !progress.livenessPassed) {
+      router.replace('/thank-you');
+      return;
+    }
     if (progress.livenessRequired === false || progress.livenessPassed) {
       void continueToNextStep();
     }
-  }, [loading, busy, session, retakeSelfie]);
+  }, [loading, busy, session, retakeSelfie, router]);
 
   async function runLivenessCheck(): Promise<boolean> {
     const out = await postKycLiveness();
@@ -178,19 +181,15 @@ export default function KycSelfiePage() {
       setError(out.skipReason ?? 'Liveness is not configured on the server.');
       return false;
     }
-    if (out.internalError) {
+    // MoneyCash liveness → Tenacio liveness → MoneyCash face match: all must pass.
+    if (
+      out.internalError ||
+      !out.livenessPassed ||
+      out.faceValidationPassed === false ||
+      out.faceMatchPassed === false
+    ) {
       await refresh();
       router.replace('/thank-you');
-      return false;
-    }
-    if (out.suggestRetrySelfie || out.faceValidationPassed === false || out.faceMatchPassed === false) {
-      setSuggestRetake(true);
-      setRetakeSelfie(true);
-      setPendingSelfiePreview(null);
-      stopCamera();
-    }
-    if (!out.livenessPassed) {
-      setError(pickLivenessFailureUserMessage(out));
       return false;
     }
     return true;
@@ -229,7 +228,6 @@ export default function KycSelfiePage() {
         setError('Selfie upload did not complete.');
         return;
       }
-      setSuggestRetake(false);
       setRetakeSelfie(false);
       stopCamera();
 
@@ -237,8 +235,8 @@ export default function KycSelfiePage() {
         session?.authenticated === true && session.kycFaceProgress?.livenessRequired !== false;
       setBusyLabel(
         livenessRequired
-          ? 'Running face checks, then Tenacio liveness & face match…'
-          : 'Running local face checks…',
+          ? 'Running MoneyCash liveness, Tenacio liveness, then face match…'
+          : 'Running MoneyCash liveness and face match…',
       );
       const passed = await runLivenessCheck();
       const nextSession = await refresh();
@@ -260,7 +258,7 @@ export default function KycSelfiePage() {
   async function handleLiveness() {
     setError('');
     setBusy(true);
-    setBusyLabel('Running face checks, then Tenacio liveness & face match…');
+    setBusyLabel('Running MoneyCash liveness, Tenacio liveness, then face match…');
     try {
       const passed = await runLivenessCheck();
       const nextSession = await refresh();
@@ -303,15 +301,16 @@ export default function KycSelfiePage() {
     );
   }
 
+  /** Only when selfie was saved but the face pipeline never finished (e.g. network drop). */
   const livenessRetryNeeded =
     kyc?.selfieCaptured === true &&
+    kyc.livenessCheckCompleted !== true &&
     kyc.livenessRequired !== false &&
     kyc.livenessPassed !== true;
 
   function handleRetakeSelfie() {
     setError('');
     setPendingSelfiePreview(null);
-    setSuggestRetake(false);
     setRetakeSelfie(true);
   }
 
@@ -405,8 +404,7 @@ export default function KycSelfiePage() {
           {livenessRetryNeeded && !retakeSelfie ? (
             <div className="grid gap-3 rounded-2xl border border-[rgba(18,36,79,0.12)] bg-white/90 p-4">
               <p className="m-0 text-sm text-brand-muted">
-                Selfie saved. Face liveness did not pass or was not completed — retry with the same photo, or take a
-                new selfie and try again.
+                Selfie saved, but face checks did not finish. Retry the checks, or take a new selfie.
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
                 <button
@@ -415,7 +413,7 @@ export default function KycSelfiePage() {
                   onClick={() => void handleLiveness()}
                   className="mc-btn-primary"
                 >
-                  {busy ? busyLabel || 'Please wait…' : 'Retry liveness check'}
+                  {busy ? busyLabel || 'Please wait…' : 'Retry face checks'}
                 </button>
                 <button
                   type="button"

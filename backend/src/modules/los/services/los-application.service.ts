@@ -6,6 +6,7 @@ import { isDigilockerAadhaarCaptureComplete } from '../../../common/kyc/aadhaar-
 import { extractProfileFromDigilockerFormJson } from '../../../common/kyc/digilocker-form-profile.util';
 import { appendPhotoCacheBuster } from '../../../common/kyc/kyc-photo-url.util';
 import { buildLivenessVendorSummary } from '../../../common/kyc/kyc-liveness-summary.util';
+import { extractLocalFaceMatchFromVendorJson } from '../../../common/kyc/kyc-face-match-inspection-persist.util';
 import { parsePersistedSelfieFaceValidation } from '../../../common/kyc/kyc-selfie-face-inspection-persist.util';
 import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -353,6 +354,7 @@ export class LosApplicationService {
         application.kyc?.selfieFaceValidationPassed ?? false,
         application.kyc?.faceMatchCheckedAt ?? null,
       ),
+      moneyCashFaceMatch: extractLocalFaceMatchFromVendorJson(application.kyc?.livenessVendorJson),
       livenessSummary: buildLivenessVendorSummary({
         passed: application.kyc?.livenessPassed ?? false,
         checkedAt: application.kyc?.livenessCheckedAt ?? null,

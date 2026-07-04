@@ -10,6 +10,8 @@ export type ApplicationKycSnapshotRow = {
   aadhaarPhotoRelativePath: string | null;
   selfieRelativePath: string | null;
   livenessPassed: boolean;
+  /** `application_kyc.is_liveness` — pipeline finished (pass or fail). */
+  livenessCheckCompleted: boolean;
   loanDocumentsAcceptedAt: Date | null;
 };
 
@@ -32,6 +34,7 @@ export async function fetchLatestApplicationKycSnapshot(
             ck.aadhaar_photo_path AS aadhaarPhotoRelativePath,
             ak.liveness_selfie_path AS selfieRelativePath,
             COALESCE(ak.liveness_passed, false) AS livenessPassed,
+            COALESCE(ak.is_liveness, false) AS livenessCheckCompleted,
             ad.loan_documents_accepted_at AS loanDocumentsAcceptedAt
           FROM application a
           LEFT JOIN application_detail ad ON ad.application_id = a.id
@@ -52,6 +55,7 @@ export async function fetchLatestApplicationKycSnapshot(
             ck.aadhaar_photo_path AS aadhaarPhotoRelativePath,
             ak.liveness_selfie_path AS selfieRelativePath,
             COALESCE(ak.liveness_passed, false) AS livenessPassed,
+            COALESCE(ak.is_liveness, false) AS livenessCheckCompleted,
             ad.loan_documents_accepted_at AS loanDocumentsAcceptedAt
           FROM application a
           LEFT JOIN application_detail ad ON ad.application_id = a.id
@@ -70,5 +74,6 @@ export async function fetchLatestApplicationKycSnapshot(
     ...row,
     kycStatus: Number(row.kycStatus),
     livenessPassed: Boolean(row.livenessPassed),
+    livenessCheckCompleted: Boolean(row.livenessCheckCompleted),
   };
 }

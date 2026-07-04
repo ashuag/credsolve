@@ -46,9 +46,12 @@ import {
   type LosApplicationDetails,
 } from '@/lib/api';
 import {
+  explainKycNotDone,
   formatConfidencePercent,
+  formatDistance,
   formatLaplacianVariance,
   formatLivenessSummary,
+  formatMoneyCashFaceMatchSummary,
   formatSelfieFaceValidationSummary,
 } from '@/lib/kyc-selfie-validation-display';
 import { KycPhotoGallery } from '@/components/shared/kyc-photo-gallery';
@@ -386,6 +389,7 @@ export function ReviewKycPanel({
 }) {
   const kycDone = row.kycStatus === 1;
   const isCurrentStep = isApplicationJourneyStepActive(row, 'kyc');
+  const kycNotDoneReason = explainKycNotDone(row);
   return (
     <>
       <ReviewCard
@@ -407,6 +411,22 @@ export function ReviewKycPanel({
           )
         }
       >
+        {kycNotDoneReason ? (
+          <p
+            style={{
+              margin: '0 0 14px',
+              padding: '10px 12px',
+              borderRadius: 10,
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              background: 'rgba(255, 251, 235, 0.9)',
+              fontSize: '12px',
+              lineHeight: 1.45,
+              color: '#92400e',
+            }}
+          >
+            {kycNotDoneReason}
+          </p>
+        ) : null}
         <div style={{ marginBottom: 16 }}>
           <ReviewSectionLabel>KYC photos</ReviewSectionLabel>
           <div style={{ marginTop: 8 }}>
@@ -416,7 +436,7 @@ export function ReviewKycPanel({
         <div className="fgrid">
           <ReviewField label="KYC status" value={`${row.kycStatusLabel} (${row.kycStatus})`} tone={kycDone ? 'accent' : undefined} />
           <ReviewField
-            label="Face validation (on-server ML)"
+            label="Face validation (MoneyCash)"
             value={formatSelfieFaceValidationSummary(row)}
             tone={row.selfieFaceValidation?.passed ? 'accent' : row.selfieFaceValidation?.checkedAt ? 'flag' : undefined}
             sub={
@@ -432,6 +452,24 @@ export function ReviewKycPanel({
             }
           />
           <ReviewField
+            label="Face match (MoneyCash)"
+            value={formatMoneyCashFaceMatchSummary(row)}
+            tone={
+              row.moneyCashFaceMatch?.passed
+                ? 'accent'
+                : row.moneyCashFaceMatch?.checkedAt || row.moneyCashFaceMatch?.reason
+                  ? 'flag'
+                  : undefined
+            }
+            sub={
+              row.moneyCashFaceMatch?.reason && !row.moneyCashFaceMatch.passed
+                ? row.moneyCashFaceMatch.reason
+                : row.moneyCashFaceMatch?.distance != null
+                  ? `Distance ${formatDistance(row.moneyCashFaceMatch.distance)} (max ${formatDistance(row.moneyCashFaceMatch.maxDistanceThreshold)})`
+                  : undefined
+            }
+          />
+          <ReviewField
             label="Liveness (Tenacio)"
             value={formatLivenessSummary(row)}
             tone={row.livenessPassed ? 'accent' : row.livenessSummary?.checkedAt ? 'flag' : undefined}
@@ -441,14 +479,39 @@ export function ReviewKycPanel({
                 : undefined
             }
           />
-          <ReviewField label="Liveness passed" value={row.livenessPassed ? 'Yes' : 'No'} tone={row.livenessPassed ? 'accent' : undefined} />
+          <ReviewField
+            label="Face match passed"
+            value={
+              row.moneyCashFaceMatch == null
+                ? '—'
+                : row.moneyCashFaceMatch.passed
+                  ? 'Yes'
+                  : 'No'
+            }
+            tone={
+              row.moneyCashFaceMatch?.passed
+                ? 'accent'
+                : row.moneyCashFaceMatch?.checkedAt || row.moneyCashFaceMatch?.reason
+                  ? 'flag'
+                  : undefined
+            }
+          />
+          <ReviewField
+            label="Liveness passed"
+            value={row.livenessPassed ? 'Yes' : 'No'}
+            tone={row.livenessPassed ? 'accent' : row.livenessCheckedAt || row.livenessSummary?.checkedAt ? 'flag' : undefined}
+          />
           <ReviewField label="KYC fetched at" value={formatReviewDateTime(row.kycCompletedAt)} />
           <ReviewField label="Face validation at" value={formatReviewDateTime(row.selfieFaceValidation?.checkedAt ?? null)} />
+          <ReviewField
+            label="Face match at"
+            value={formatReviewDateTime(row.moneyCashFaceMatch?.checkedAt ?? null)}
+          />
           <ReviewField label="Liveness checked at" value={formatReviewDateTime(row.livenessCheckedAt)} />
         </div>
         {row.livenessPassed ? (
           <p style={{ margin: '13px 0 0', fontSize: '11.5px', color: 'var(--ink-3)' }}>
-            Aadhaar photo and live selfie liveness check passed — see the applicant header.
+            MoneyCash face checks and Tenacio liveness passed — see the applicant header.
           </p>
         ) : null}
       </ReviewCard>

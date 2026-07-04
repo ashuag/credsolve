@@ -138,6 +138,28 @@ export type LosLivenessSummary = {
   vendorStatus: string | null;
 };
 
+/** MoneyCash on-server face match (Aadhaar photo vs selfie). */
+export type LosMoneyCashFaceMatch = {
+  passed: boolean;
+  checkedAt: string | null;
+  matchScore: number | null;
+  distance: number | null;
+  maxDistanceThreshold: number;
+  reason: string | null;
+  reference: {
+    faceDetected: boolean;
+    detectionScore: number | null;
+    imageWidth: number;
+    imageHeight: number;
+  } | null;
+  probe: {
+    faceDetected: boolean;
+    detectionScore: number | null;
+    imageWidth: number;
+    imageHeight: number;
+  } | null;
+};
+
 export type LosApplicationDetails = {
   uuid: string;
   customerUuid: string;
@@ -153,6 +175,7 @@ export type LosApplicationDetails = {
   livenessPassed: boolean;
   livenessCheckedAt: string | null;
   selfieFaceValidation: LosSelfieFaceValidation | null;
+  moneyCashFaceMatch: LosMoneyCashFaceMatch | null;
   livenessSummary: LosLivenessSummary | null;
   kycPhotos: {
     /** Storage object key, e.g. `customer/{uuid}/photos/selfie/{app}.jpg`. */
