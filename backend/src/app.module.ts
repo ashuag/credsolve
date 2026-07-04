@@ -12,6 +12,7 @@ import { SmsModule } from './common/sms/sms.module';
 import { VendorApiModule } from './common/vendor/vendor-api.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BureauModule } from './modules/bureau/bureau.module';
+import { ContactModule } from './modules/contact/contact.module';
 import { LosModule } from './modules/los/los.module';
 import { CronModule } from './modules/cron/cron.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -36,6 +37,7 @@ import { PrismaModule } from './prisma/prisma.module';
     VendorApiModule,
     AuthModule,
     BureauModule,
+    ContactModule,
     LosModule,
     CronModule,
   ],

@@ -4,6 +4,7 @@ import { CibilModule } from '../../common/cibil/cibil.module';
 import { LoanDocumentsModule } from '../../common/loan-documents/loan-documents.module';
 import { SmsModule } from '../../common/sms/sms.module';
 import { StorageModule } from '../../common/storage/storage.module';
+import { ContactModule } from '../contact/contact.module';
 import { LosAuthController } from './auth/los-auth.controller';
 import { LosAuthService } from './auth/los-auth.service';
 import { LosAuthGuard } from './auth/los-auth.guard';
@@ -18,6 +19,7 @@ import { LosNegativeListService } from './services/los-negative-list.service';
 import { LosMastersController } from './los-masters.controller';
 import { LosNegativeListsController } from './los-negative-lists.controller';
 import { LosBreController } from './los-bre.controller';
+import { LosContactController } from './los-contact.controller';
 import { LosDeveloperToolsController } from './los-developer-tools.controller';
 import { LosTeamController } from './los-team.controller';
 import { LosTeamService } from './los-team.service';
@@ -25,7 +27,7 @@ import { LosRejectionService } from './services/los-rejection.service';
 import { LosKycDevToolsService } from './services/los-kyc-dev-tools.service';
 
 @Module({
-  imports: [BreModule, CibilModule, StorageModule, LoanDocumentsModule, SmsModule],
+  imports: [BreModule, CibilModule, StorageModule, LoanDocumentsModule, SmsModule, ContactModule],
   controllers: [
     LosAuthController,
     LosDataController,
@@ -33,6 +35,7 @@ import { LosKycDevToolsService } from './services/los-kyc-dev-tools.service';
     LosNegativeListsController,
     LosTeamController,
     LosBreController,
+    LosContactController,
     LosDeveloperToolsController,
   ],
   providers: [

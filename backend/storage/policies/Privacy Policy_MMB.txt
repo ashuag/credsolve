@@ -104,9 +104,9 @@ When user visits authorized and industry approved service providers app/website 
 
 4.1. After termination of user account, My Money Bazaar shall destroy the data collected from user, except the records and the data pertaining to the transactions undertaken using My Money Bazaar’s services on the App/web, and where required to ensure compliance with applicable laws. Please note that under the applicable laws, My Money Bazaar shall maintain record of the transactions with My Money Bazaar, including personal data such as username, contact details, etc. Subject to the above, My Money Bazaar will delete all other Personal Information including the banking details (debit/credit card), and passwords of user when user account is terminated. The termination of an account is defined wherein consumer has no dues, uninstalled the APP and has no interaction with the service provider for more than 90 days.
 
-4.2. Please note that My Money Bazaar will not require user to disclose users personal, financial or security details vide email or other communication, except through the App/web, unless otherwise explicitly specified by My Money Bazaar. If user receive any email/ phone call/ SMS or other communication requesting user to share their security/financial information, please do not respond to such requests, and delete such requests. Please however forward such requests to grievance@mymoneybazaar.com for notifying My Money Bazaar of the same, prior to deletion of such requests.
+4.2. Please note that My Money Bazaar will not require user to disclose users personal, financial or security details vide email or other communication, except through the App/web, unless otherwise explicitly specified by My Money Bazaar. If user receive any email/ phone call/ SMS or other communication requesting user to share their security/financial information, please do not respond to such requests, and delete such requests. Please however forward such requests to grievance@uvaid@moneycah.inzaar.com for notifying My Money Bazaar of the same, prior to deletion of such requests.
 
-4.3. “Phishing” is an attempt to steal personal details and financial account details from any app/web user. Such “Phishers” use fake emails to lead users to counterfeit app/web s where the user is tricked into entering their personal details such as credit card numbers, passwords, PIN etc. Users are abstained from providing their details on such app/web and immediately report such requests to My Money Bazaar at grievance@mymoneybazaar.com My Money Bazaar shall not be held responsible for any loss, damage etc. caused to users by responding to such emails and sharing information with authorized and industry approved service providers parties specified under Sections 4.2 and 4.3.
+4.3. “Phishing” is an attempt to steal personal details and financial account details from any app/web user. Such “Phishers” use fake emails to lead users to counterfeit app/web s where the user is tricked into entering their personal details such as credit card numbers, passwords, PIN etc. Users are abstained from providing their details on such app/web and immediately report such requests to My Money Bazaar at grievance@uvaid@moneycah.inzaar.com My Money Bazaar shall not be held responsible for any loss, damage etc. caused to users by responding to such emails and sharing information with authorized and industry approved service providers parties specified under Sections 4.2 and 4.3.
 
 5. Disclosure of Information
 
@@ -176,11 +176,11 @@ User can always choose not to provide information, which is not mandatory in nat
 
 My Money Bazaar shall address users’ grievances with respect to processing of information provided in relation to this Privacy Policy in a time bound manner. For this purpose, My Money Bazaar hereby designate a grievance officer to redress to any of user’s grievances in a timely manner and within 1 (One) month from the date of receipt of grievance.
 
-Grievance Officer: Ms. Gurmeet Kaur
+Grievance Officer: Mr. Uvaid Malik
 
-Email Address: grievance@mymoneybazaar.com
+Email Address: uvaid@moneycash.in
 
-Phone Number: 7838554897
+Phone Number: 8826370278
 
 14. Governing law and dispute resolution
 

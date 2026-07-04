@@ -14,6 +14,7 @@ export * from './customers';
 export * from './invitations';
 export * from './masters';
 export * from './sms-templates';
+export * from './contact';
 export * from './negative-lists';
 export * from './bre';
 export * from './cibil-report';

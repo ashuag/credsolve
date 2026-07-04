@@ -14,11 +14,11 @@ function rebrand(text) {
   return text
     .replaceAll('My Money Bazaar India Private Limited', 'MoneyCash')
     .replaceAll('My Money Bazaar', 'MoneyCash')
-    .replaceAll('https://mymoneybazaar.com/privacy-policy', '/privacy-policy')
-    .replaceAll('https://www.mymoneybazaar.com', 'https://www.moneycash.in')
-    .replaceAll('www.mymoneybazaar.com', 'www.moneycash.in')
-    .replaceAll('mymoneybazaar.com', 'moneycash.in')
-    .replaceAll('grievance@mymoneybazaar.com', 'legal@moneycash.in')
+    .replaceAll('https://www.moneycash.in/privacy-policy', '/privacy-policy')
+    .replaceAll('https://www.moneycash.in', 'https://www.moneycash.in')
+    .replaceAll('www.moneycash.in', 'www.moneycash.in')
+    .replaceAll('moneycash.in', 'moneycash.in')
+    .replaceAll('uvaid@moneycash.in', 'legal@moneycash.in')
     .replace(/\(\s*Hereinafter\s*[“"]MoneyCash[”"]\s*\)/gi, '')
     .replace(/\bMMB's\b/g, "MoneyCash's")
     .replace(/\bMMB\b/g, 'MoneyCash')
@@ -100,11 +100,11 @@ const docs = [
       'How MoneyCash collects, uses, stores, and protects personal information on the website and app.',
     registeredOffice:
       'CREDSOLVE Technologies Private Limited, Flat No. E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh — 201009',
-    contactEmail: 'legal@moneycash.in',
+    contactEmail: 'uvaid@moneycash.in',
     grievanceOfficer: {
-      name: 'Ms. Gurmeet Kaur',
-      email: 'legal@moneycash.in',
-      phone: '+91-7838554897',
+      name: 'Mr. Uvaid Malik',
+      email: 'uvaid@moneycash.in',
+      phone: '+91-8826370278',
     },
   }),
 ];

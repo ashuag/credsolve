@@ -44,7 +44,7 @@ const LOAN_LINKS = [
 const COMPANY_LINKS = [
   { label: 'How It Works', href: '#how-it-works' },
   { label: 'About Us', href: '/about-us' },
-  { label: 'Contact Us', href: '#contact' },
+  { label: 'Contact Us', href: '/contact-us' },
   { label: 'Privacy Policy', href: '/privacy-policy' },
   { label: 'Terms & Conditions', href: '/terms-and-conditions' },
   { label: 'All Policies', href: '/policies' },
@@ -162,7 +162,7 @@ export function LandingFooter() {
 
             {/* Contact cards */}
             <div className="grid gap-3 sm:grid-cols-2">
-              <a
+              {/* <a
                 href="tel:1800123MONEY"
                 className="group flex items-center gap-3 rounded-2xl border border-white/6 bg-white/3 p-4 transition-all hover:border-brand-blue/25 hover:bg-brand-blue/8"
               >
@@ -175,11 +175,11 @@ export function LandingFooter() {
                   <div className="text-[0.58rem] font-[800] uppercase tracking-[0.14em] text-white/25">Toll Free</div>
                   <div className="truncate text-sm font-[800] text-white">1800-123-MONEY</div>
                 </div>
-              </a>
+              </a> */}
 
               <a
                 href="mailto:contact@moneycash.in"
-                className="group flex items-center gap-3 rounded-2xl border border-white/6 bg-white/3 p-4 transition-all hover:border-brand-blue/25 hover:bg-brand-blue/8"
+                className="group flex items-center gap-3 rounded-2xl border border-white/6 bg-white/3 p-4 transition-all hover:border-brand-blue/25 hover:bg-brand-blue/8 sm:col-span-2"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-blue/15 transition-colors group-hover:bg-brand-blue/25">
                   <svg viewBox="0 0 24 24" className="h-4 w-4 text-brand-blue-light" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>

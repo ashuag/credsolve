@@ -107,6 +107,13 @@ const navGroups: { section: string; color: string; items: NavItem[] }[] = [
     ],
   },
   {
+    section: 'Support',
+    color: '#0d9488',
+    items: [
+      { href: '/contact-submissions', label: 'Contact Us', icon: 'customers' },
+    ],
+  },
+  {
     section: 'Developer Tool',
     color: '#8b5cf6',
     items: [
@@ -136,6 +143,7 @@ const GROUP_ACCENT: Record<string, { dot: string; bg: string; border: string; te
   'Team':          { dot: 'bg-teal-600',    bg: 'rgba(13,148,136,0.07)', border: 'rgba(13,148,136,0.18)', text: '#0d9488' },
   'Configuration': { dot: 'bg-amber-400',  bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)',  text: '#d97706' },
   'Sources & Utm': { dot: 'bg-amber-500',  bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)', text: '#d97706' },
+  'Support':       { dot: 'bg-teal-600',   bg: 'rgba(13,148,136,0.07)', border: 'rgba(13,148,136,0.18)', text: '#0d9488' },
   'BRE':           { dot: 'bg-brand-blue', bg: 'rgba(20,150,243,0.07)', border: 'rgba(20,150,243,0.18)', text: '#1496f3' },
   'Developer Tool': { dot: 'bg-violet-500', bg: 'rgba(139,92,246,0.08)', border: 'rgba(139,92,246,0.2)', text: '#7c3aed' },
 };
@@ -159,6 +167,7 @@ const BREADCRUMBS: Record<string, string> = {
   '/masters/sms-templates': 'SMS Templates',
   '/masters/lead-sources': 'Source Management',
   '/masters/source-utm': 'Utm Management',
+  '/contact-submissions': 'Contact Us Submissions',
   '/eligibility-criteria/negative-pincode': 'Negative Pincode',
   '/eligibility-criteria/negative-city': 'Negative City',
   '/eligibility-criteria/negative-state': 'Negative State',

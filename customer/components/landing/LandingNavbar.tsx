@@ -21,7 +21,7 @@ const NAV_LINKS = [
   { label: 'How It Works', href: '#how-it-works' },
   { label: 'Loans', href: '#loans' },
   { label: 'About Us', href: '/about-us' },
-  { label: 'Contact', href: '#contact' },
+  { label: 'Contact', href: '/contact-us' },
 ];
 
 const ANNOUNCEMENTS = [
