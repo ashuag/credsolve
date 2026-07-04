@@ -1,17 +1,27 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import type { LegalDocumentContent } from '@/lib/legal-content';
+import { LEGAL_NAV_ITEMS, type LegalDocumentContent } from '@/lib/legal-content';
+
+/** Only real app routes — avoids turning prose like "app/web" into `<a href="/web">`. */
+const INTERNAL_PATHS = ['/policies', ...LEGAL_NAV_ITEMS.map((item) => item.href)].sort(
+  (a, b) => b.length - a.length,
+);
+const INTERNAL_PATH_PATTERN = INTERNAL_PATHS.map((path) =>
+  path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+).join('|');
+const LINKIFY_PATTERN = new RegExp(
+  `(${INTERNAL_PATH_PATTERN}|[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}|https?:\\/\\/[^\\s]+|www\\.[^\\s]+)`,
+  'gi',
+);
 
 function linkifyParagraph(text: string): ReactNode {
   const parts: Array<{ type: 'text' | 'link'; value: string; href?: string }> = [];
-  const pattern =
-    /(\/[a-z-]+|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|https?:\/\/[^\s]+|www\.[^\s]+)/gi;
   let lastIndex = 0;
-  let match: RegExpExecArray | null;
 
-  while ((match = pattern.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push({ type: 'text', value: text.slice(lastIndex, match.index) });
+  for (const match of text.matchAll(LINKIFY_PATTERN)) {
+    const index = match.index ?? 0;
+    if (index > lastIndex) {
+      parts.push({ type: 'text', value: text.slice(lastIndex, index) });
     }
     const token = match[0];
     if (token.startsWith('/')) {
@@ -23,7 +33,7 @@ function linkifyParagraph(text: string): ReactNode {
     } else {
       parts.push({ type: 'link', value: token, href: token });
     }
-    lastIndex = match.index + token.length;
+    lastIndex = index + token.length;
   }
 
   if (lastIndex < text.length) {

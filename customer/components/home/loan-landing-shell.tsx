@@ -9,7 +9,6 @@ import { useJourneyProgressOptional } from '@/components/journey/journey-progres
 const DEFAULT_FEATURES = [
   { icon: 'M5 13l4 4L19 7', label: 'Zero paperwork — 100% digital' },
   { icon: 'M13 10V3L4 14h7v7l9-11h-7z', label: 'Approved in under 2 minutes' },
-  { icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', label: 'Bank-grade 256-bit encryption' },
   { icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', label: 'No hidden fees, ever' },
 ];
 

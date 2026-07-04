@@ -61,6 +61,9 @@ services:
     working_dir: /workspace/los
     volumes:
       - ./los:/workspace/los:cached
+      # Keep .next off the bind mount — Next's atomic manifest writes race on
+      # host-mounted volumes and produce ENOENT on `_buildManifest.js.tmp.*`.
+      - los-next:/workspace/los/.next
       - *entrypoint-mount
     command: ["npm", "run", "dev"]
 
@@ -77,8 +80,15 @@ services:
     working_dir: /workspace/customer
     volumes:
       - ./customer:/workspace/customer:cached
+      # Keep .next off the bind mount — Next's atomic manifest writes race on
+      # host-mounted volumes and produce ENOENT on `_buildManifest.js.tmp.*`.
+      - customer-next:/workspace/customer/.next
       - *entrypoint-mount
     command: ["npm", "run", "dev"]
+
+volumes:
+  customer-next:
+  los-next:
 
 networks:
   shared-net:
