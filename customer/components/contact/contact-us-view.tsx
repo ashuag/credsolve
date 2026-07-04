@@ -16,6 +16,8 @@ import { cn } from '@/lib/cn';
 const CONTACT_EMAIL = 'contact@moneycash.in';
 const CONTACT_ADDRESS =
   'E-2748 Gaur Siddhartham, Siddharth Vihar, Ghaziabad City, Ghaziabad, Ghaziabad- 201009, Uttar Pradesh';
+const CONTACT_MAP_LINK = 'https://maps.app.goo.gl/1cc4TMr1Wm6SEq6g8';
+const CONTACT_MAP_EMBED = `https://www.google.com/maps?q=${encodeURIComponent(CONTACT_ADDRESS)}&output=embed`;
 
 type FormState = {
   name: string;
@@ -115,7 +117,12 @@ export function ContactUsView() {
             </div>
           </a>
 
-          <div className="flex items-start gap-4 rounded-[20px] border border-[rgba(18,36,79,0.08)] bg-white p-5 shadow-[0_12px_24px_rgba(23,44,113,0.05)]">
+          <a
+            href={CONTACT_MAP_LINK}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-start gap-4 rounded-[20px] border border-[rgba(18,36,79,0.08)] bg-white p-5 shadow-[0_12px_24px_rgba(23,44,113,0.05)] transition-all hover:-translate-y-0.5 hover:border-[rgba(244,180,0,0.35)] hover:shadow-[0_18px_36px_rgba(23,44,113,0.1)]"
+          >
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[rgba(244,180,0,0.14)] text-[#c98a00]">
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
@@ -128,6 +135,17 @@ export function ContactUsView() {
                 {CONTACT_ADDRESS}
               </address>
             </div>
+          </a>
+
+          <div className="overflow-hidden rounded-[20px] border border-[rgba(18,36,79,0.08)] bg-white shadow-[0_12px_24px_rgba(23,44,113,0.05)]">
+            <iframe
+              title="MoneyCash office location on Google Maps"
+              src={CONTACT_MAP_EMBED}
+              className="h-[260px] w-full border-0"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              allowFullScreen
+            />
           </div>
         </div>
 
@@ -158,10 +176,10 @@ export function ContactUsView() {
               <label className={cn(FORM_FIELD_CLASS, errors.name ? FORM_FIELD_ERROR_CLASS : FORM_FIELD_NORMAL_CLASS, 'group')}>
                 <span className={FORM_LABEL_CLASS}>Name</span>
                 <input
-                  className={FORM_INPUT_CLASS}
+                  className={cn(FORM_INPUT_CLASS, 'uppercase placeholder:normal-case')}
                   type="text"
                   value={form.name}
-                  onChange={(e) => updateField('name', e.target.value)}
+                  onChange={(e) => updateField('name', e.target.value.toUpperCase())}
                   placeholder="Your full name"
                   maxLength={150}
                   autoComplete="name"

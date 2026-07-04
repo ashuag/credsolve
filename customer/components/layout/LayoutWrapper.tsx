@@ -7,10 +7,11 @@ import { MobileTabBar } from '@/components/layout/mobile-tab-bar';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { isCustomerPortalSignedIn } from '@/lib/api/customer-session';
 
-/** Self-contained legal/policy routes that render their own header via LegalPageShell. */
+/** Self-contained routes that render their own header via LegalPageShell. */
 const SELF_CONTAINED_LEGAL_ROUTES = new Set([
   '/policies',
   '/about-us',
+  '/contact-us',
   '/terms-and-conditions',
   '/privacy-policy',
   '/fair-practices-code',
