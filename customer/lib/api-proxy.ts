@@ -13,6 +13,17 @@ const HOP_BY_HOP = new Set([
   'host',
 ]);
 
+/**
+ * Response headers that must NOT be forwarded. Node's `fetch` (undici) transparently
+ * decodes the upstream body when we re-stream `upstream.body`, so the original
+ * `content-encoding` (gzip/br) no longer matches the bytes we forward — leaving it in
+ * makes the browser try to decompress plain JSON and fail with "Failed to fetch" while
+ * reading the body (e.g. a compressed `GET /auth/me` looked like `{ authenticated:false }`).
+ * `content-length` is dropped for the same reason (decoded length differs); the platform
+ * re-adds the correct framing.
+ */
+const RESPONSE_STRIP_HEADERS = new Set(['content-encoding', 'content-length']);
+
 const PROXY_TIMEOUT_MS = 60_000;
 
 function buildUpstreamUrl(pathSegments: string[], search: string): string {
@@ -36,7 +47,8 @@ function forwardRequestHeaders(request: NextRequest): Headers {
 function forwardResponseHeaders(upstream: Response): Headers {
   const headers = new Headers();
   upstream.headers.forEach((value, key) => {
-    if (HOP_BY_HOP.has(key.toLowerCase())) {
+    const lower = key.toLowerCase();
+    if (HOP_BY_HOP.has(lower) || RESPONSE_STRIP_HEADERS.has(lower) || lower === 'set-cookie') {
       return;
     }
     headers.set(key, value);
@@ -70,9 +82,16 @@ export async function proxyCustomerApiRequest(
     return NextResponse.json({ message: 'API unavailable' }, { status: 502 });
   }
 
-  return new NextResponse(upstream.body, {
+  const response = new NextResponse(upstream.body, {
     status: upstream.status,
     statusText: upstream.statusText,
     headers: forwardResponseHeaders(upstream),
   });
+
+  const setCookies = upstream.headers.getSetCookie();
+  setCookies.forEach((cookie) => {
+    response.headers.append('Set-Cookie', cookie);
+  });
+
+  return response;
 }

@@ -3,7 +3,12 @@
 import { ReactNode, useEffect, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
-import { isLeadRejectedAndLocked, isInternalErrorLead, canResumeKycAfterInternalError, CUSTOMER_EMAIL_JOURNEY_PATH, CUSTOMER_EMAIL_VERIFY_PATH } from '@/lib/api/customer-session';
+import {
+  isLeadRejectedAndLocked,
+  isInternalErrorLead,
+  canResumeKycAfterInternalError,
+  CUSTOMER_EMAIL_JOURNEY_PATH,
+} from '@/lib/api/customer-session';
 import { isLoanDocumentsJourneyComplete } from '@/lib/loan-documents-journey';
 
 type JourneyStage =
@@ -15,6 +20,21 @@ type JourneyStage =
   | 'bankDetails'
   | 'references'
   | 'done';
+
+/** In-progress application routes — never race these to apply-for-loan while session hydrates. */
+function isInJourneyPath(path: string): boolean {
+  return (
+    path === '/pre-approved-loan' ||
+    path === '/loan-selection' ||
+    path.startsWith('/email-verify') ||
+    path.startsWith('/onboarding') ||
+    path === '/loan-documents' ||
+    path === '/kyc' ||
+    path.startsWith('/kyc/') ||
+    path === '/bank-details' ||
+    path === '/references'
+  );
+}
 
 function stageFromSession(session: ReturnType<typeof useCustomerSession>['session']): JourneyStage {
   if (!session?.authenticated || !session.lead) return 'details';
@@ -57,12 +77,12 @@ function isPathAllowedForStage(stage: JourneyStage, path: string): boolean {
     path === '/' ||
     path === '/thank-you' ||
     path === '/thank-you-interest' ||
-    path === '/dashboard'
+    path === '/dashboard' ||
+    path === '/my-account'
   ) {
     return true;
   }
 
-  // DigiLocker OAuth return must stay on this route for every stage (otherwise guard sends users to bank).
   if (path === '/kyc/digilocker-callback') {
     return true;
   }
@@ -98,23 +118,22 @@ export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (loading || !pathname) return;
 
-    // Offer / selection hydrate the session after OTP (cookie can lag). Never race them to apply-for-loan.
-    const isOfferStep =
-      pathname === '/pre-approved-loan' || pathname === '/loan-selection';
+    const inJourney = isInJourneyPath(pathname);
 
-    // Not signed in → push to start (thank-you is public so customers still see confirmation after submit or via link).
+    // Session still hydrating — stay on journey pages; do NOT refresh here (causes /auth/me loops).
     if (!session?.authenticated) {
-      if (!isOfferStep && pathname !== '/apply-for-loan' && pathname !== '/thank-you') {
-        router.replace('/apply-for-loan');
+      if (inJourney || pathname === '/apply-for-loan' || pathname === '/thank-you' || pathname === '/my-account') {
+        return;
       }
+      router.replace('/apply-for-loan');
       return;
     }
 
-    // Signed in but no active lead → start flow (still allow confirmation page).
     if (!session.lead) {
-      if (!isOfferStep && pathname !== '/thank-you') {
-        router.replace('/apply-for-loan');
+      if (inJourney || pathname === '/thank-you' || pathname === '/my-account') {
+        return;
       }
+      router.replace('/apply-for-loan');
       return;
     }
 
@@ -139,12 +158,12 @@ export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
     }
 
     if (!isPathAllowedForStage(stage, pathname)) {
-      // After bureau/post-BRE the lead is CONVERTED and offer is ready; allow the offer
-      // page even if journey flags are still catching up from a stale session snapshot.
+      if (pathname === '/pre-approved-loan' && !session.journey.loanSelectionCompleted) {
+        return;
+      }
       if (
-        pathname === '/pre-approved-loan' &&
-        session.lead &&
-        !session.journey.loanSelectionCompleted
+        (pathname.startsWith('/email-verify') || pathname === '/loan-selection') &&
+        session.journey.detailsCompleted
       ) {
         return;
       }

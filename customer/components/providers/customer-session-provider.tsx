@@ -31,20 +31,50 @@ export function CustomerSessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<CustomerSessionResponse | null>(null);
   /** Only the first `/auth/me` fetch toggles `loading`; later refreshes update `session` silently. */
   const isInitialLoadRef = useRef(true);
+  /** Ignore outdated refresh results so a slow response cannot clobber a newer one. */
+  const refreshSeqRef = useRef(0);
 
   const refresh = useCallback(async (): Promise<CustomerSessionResponse> => {
     const isInitialLoad = isInitialLoadRef.current;
     if (isInitialLoad) {
       setLoading(true);
     }
+    const seq = ++refreshSeqRef.current;
     try {
       const next = await fetchCustomerSession({ force: true });
-      setSession(next);
-      return next;
+      // A newer refresh started while we were in flight — do not overwrite state.
+      if (seq !== refreshSeqRef.current) {
+        return next;
+      }
+      let applied = next;
+      setSession((prev) => {
+        // Never let a stale anonymous payload wipe a known signed-in session.
+        if (
+          prev &&
+          prev.authenticated === true &&
+          prev.lead &&
+          (next.authenticated !== true || !next.lead)
+        ) {
+          applied = prev;
+          return prev;
+        }
+        return next;
+      });
+      return applied;
     } catch {
-      const fallback: CustomerSessionResponse = { authenticated: false };
-      setSession(fallback);
-      return fallback;
+      if (seq !== refreshSeqRef.current) {
+        return { authenticated: false };
+      }
+      // Keep an existing signed-in session if a transient fetch fails.
+      let preserved: CustomerSessionResponse = { authenticated: false };
+      setSession((prev) => {
+        if (prev && prev.authenticated === true && prev.lead) {
+          preserved = prev;
+          return prev;
+        }
+        return { authenticated: false };
+      });
+      return preserved;
     } finally {
       if (isInitialLoad) {
         isInitialLoadRef.current = false;

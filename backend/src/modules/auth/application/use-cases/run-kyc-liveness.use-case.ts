@@ -37,7 +37,10 @@ import {
   isKycLivenessOutboundSkipped,
 } from '../../../../common/kyc/kyc-liveness-env.util';
 import { assertActiveApplicationLoanDocumentsAccepted } from '../../../../common/loan-documents/application-loan-documents-guard.util';
-import { KYC_VENDOR_TECHNICAL_ISSUE_CUSTOMER_MESSAGE } from '../../../../common/constants/kyc.constants';
+import {
+  KYC_LIVENESS_MAX_ATTEMPTS,
+  KYC_VENDOR_TECHNICAL_ISSUE_CUSTOMER_MESSAGE,
+} from '../../../../common/constants/kyc.constants';
 import { VendorInternalErrorService } from '../../../../common/vendor/vendor-internal-error.service';
 import { fetchLatestApplicationKycSnapshot } from '../../../../prisma/application-kyc-snapshot.query';
 import { PrismaService } from '../../../../prisma/prisma.service';
@@ -64,8 +67,14 @@ export type RunKycLivenessResult = {
   bestComputedConfidence?: number | null;
   /** Generic customer copy (never raw vendor errors). */
   customerMessage?: string;
-  /** Any pipeline failure — lead escalated to INTERNAL_ERROR; show thank-you. */
+  /** Terminal pipeline failure — attempts exhausted, lead escalated to INTERNAL_ERROR; show thank-you. */
   internalError?: boolean;
+  /** Failed pipeline runs so far (including this one). */
+  attemptsUsed?: number;
+  /** Total allowed pipeline runs before escalation. */
+  attemptsAllowed?: number;
+  /** Retries left before the lead is escalated to the thank-you page. */
+  attemptsRemaining?: number;
 };
 
 type LocalKycChecksPayload = {
@@ -393,21 +402,39 @@ export class RunKycLivenessUseCase {
         localChecksCompletedAt: new Date().toISOString(),
       } satisfies LocalKycChecksPayload);
 
+    // Count this failure. The customer may retake the selfie and rerun the
+    // pipeline until the attempt budget is spent; only then do we finalize the
+    // KYC step and escalate the lead to the thank-you page.
+    const attemptsUsed = await this.applications.incrementLivenessAttempts(params.applicationId);
+    const attemptsAllowed = KYC_LIVENESS_MAX_ATTEMPTS;
+    const attemptsRemaining = Math.max(0, attemptsAllowed - attemptsUsed);
+    const exhausted = attemptsUsed >= attemptsAllowed;
+
     const checkedAt = new Date();
     await this.persistKycPipelineResult({
       applicationId: params.applicationId,
       localChecksPayload,
       vendorChecks: params.vendorChecks,
       passed: false,
-      done: true,
+      // `done` (is_liveness) finalizes the step → thank-you. Keep it open while
+      // the customer still has retries left.
+      done: exhausted,
       checkedAt,
     });
 
-    await this.internalError.handleVendorTechnicalIssue({
-      leadId: params.leadId,
-      providerName: params.providerName,
-      serviceName: params.serviceName,
-    });
+    if (exhausted) {
+      await this.internalError.handleVendorTechnicalIssue({
+        leadId: params.leadId,
+        providerName: params.providerName,
+        serviceName: params.serviceName,
+      });
+    } else {
+      this.logger.warn(
+        `KYC pipeline failed (application=${params.applicationId.toString()}, ${params.providerName}/${params.serviceName}) — attempt ${attemptsUsed}/${attemptsAllowed}; ${attemptsRemaining} retr${
+          attemptsRemaining === 1 ? 'y' : 'ies'
+        } left before escalation.`,
+      );
+    }
 
     return {
       configured: params.configured ?? true,
@@ -416,14 +443,17 @@ export class RunKycLivenessUseCase {
       httpStatus: params.httpStatus ?? null,
       vendor: mergeVendorPayload(localChecksPayload, params.vendorChecks ?? {}),
       livenessPassed: false,
-      internalError: true,
-      customerMessage: KYC_VENDOR_TECHNICAL_ISSUE_CUSTOMER_MESSAGE,
+      internalError: exhausted,
+      customerMessage: exhausted ? KYC_VENDOR_TECHNICAL_ISSUE_CUSTOMER_MESSAGE : undefined,
       vendorErrorMessage: params.vendorErrorMessage,
       faceValidationPassed: params.faceValidationPassed,
       faceMatchPassed: params.faceMatchPassed,
       faceMatchMessage: params.faceMatchMessage,
-      suggestRetrySelfie: false,
+      suggestRetrySelfie: !exhausted,
       bestComputedConfidence: params.bestComputedConfidence,
+      attemptsUsed,
+      attemptsAllowed,
+      attemptsRemaining,
     };
   }
 

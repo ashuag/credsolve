@@ -12,6 +12,8 @@ export type ApplicationKycSnapshotRow = {
   livenessPassed: boolean;
   /** `application_kyc.is_liveness` — pipeline finished (pass or fail). */
   livenessCheckCompleted: boolean;
+  /** `application_kyc.liveness_attempts` — failed pipeline runs so far. */
+  livenessAttempts: number;
   loanDocumentsAcceptedAt: Date | null;
 };
 
@@ -35,6 +37,7 @@ export async function fetchLatestApplicationKycSnapshot(
             ak.liveness_selfie_path AS selfieRelativePath,
             COALESCE(ak.liveness_passed, false) AS livenessPassed,
             COALESCE(ak.is_liveness, false) AS livenessCheckCompleted,
+            COALESCE(ak.liveness_attempts, 0) AS livenessAttempts,
             ad.loan_documents_accepted_at AS loanDocumentsAcceptedAt
           FROM application a
           LEFT JOIN application_detail ad ON ad.application_id = a.id
@@ -56,6 +59,7 @@ export async function fetchLatestApplicationKycSnapshot(
             ak.liveness_selfie_path AS selfieRelativePath,
             COALESCE(ak.liveness_passed, false) AS livenessPassed,
             COALESCE(ak.is_liveness, false) AS livenessCheckCompleted,
+            COALESCE(ak.liveness_attempts, 0) AS livenessAttempts,
             ad.loan_documents_accepted_at AS loanDocumentsAcceptedAt
           FROM application a
           LEFT JOIN application_detail ad ON ad.application_id = a.id
@@ -75,5 +79,6 @@ export async function fetchLatestApplicationKycSnapshot(
     kycStatus: Number(row.kycStatus),
     livenessPassed: Boolean(row.livenessPassed),
     livenessCheckCompleted: Boolean(row.livenessCheckCompleted),
+    livenessAttempts: Number(row.livenessAttempts ?? 0),
   };
 }

@@ -163,6 +163,7 @@ export class SaveLoanSelectionUseCase {
           selfieFaceValidationJson: Prisma.JsonNull,
           selfieFaceValidationPassed: false,
           digilockerAadhaarDownloadAttempts: 0,
+          livenessAttempts: 0,
           kycCompletedAt: null,
         },
         update: {
@@ -177,6 +178,7 @@ export class SaveLoanSelectionUseCase {
           selfieFaceValidationJson: Prisma.JsonNull,
           selfieFaceValidationPassed: false,
           digilockerAadhaarDownloadAttempts: 0,
+          livenessAttempts: 0,
           kycCompletedAt: null,
         },
       });

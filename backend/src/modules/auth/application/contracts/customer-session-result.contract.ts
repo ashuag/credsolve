@@ -70,6 +70,10 @@ export type CustomerKycFaceProgressSnapshot = {
   /** Failed DigiLocker Aadhaar download attempts for the active lead. */
   digilockerAadhaarDownloadAttempts: number;
   digilockerAadhaarDownloadMaxAttempts: number;
+  /** Failed KYC liveness / face-match pipeline runs for the active application. */
+  livenessAttempts: number;
+  /** Total allowed liveness runs before the lead is escalated to thank-you. */
+  livenessMaxAttempts: number;
 };
 
 export type CustomerLoanSelectionSnapshot = {

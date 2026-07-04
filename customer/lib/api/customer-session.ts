@@ -61,6 +61,10 @@ export type CustomerKycFaceProgress = {
   selfieUpdatedAt?: string | null;
   digilockerAadhaarDownloadAttempts?: number;
   digilockerAadhaarDownloadMaxAttempts?: number;
+  /** Failed KYC liveness / face-match runs so far. */
+  livenessAttempts?: number;
+  /** Total allowed liveness runs before escalation to thank-you. */
+  livenessMaxAttempts?: number;
 };
 
 export type CustomerBankVerificationProgress = {
@@ -350,6 +354,8 @@ export function getKycHubBackPath(session: Extract<CustomerSessionResponse, { au
 
 /** Coalesce concurrent `/auth/me` calls (e.g. React Strict Mode double mount). */
 let sessionRequest: Promise<CustomerSessionResponse> | null = null;
+/** Bumped on each `force` fetch so `finally` only clears the latest in-flight request. */
+let sessionRequestGeneration = 0;
 
 export type FetchCustomerSessionOptions = {
   /** When true, always hits `/auth/me` (e.g. after saving references before thank-you). */
@@ -361,7 +367,10 @@ export async function fetchCustomerSession(
 ): Promise<CustomerSessionResponse> {
   if (options?.force) {
     sessionRequest = null;
+    sessionRequestGeneration += 1;
   }
+  const generation = sessionRequestGeneration;
+
   if (!sessionRequest) {
     sessionRequest = (async (): Promise<CustomerSessionResponse> => {
       const data = await apiGet<CustomerSessionResponse>('/auth/me', 'Unable to load session.');
@@ -370,7 +379,9 @@ export async function fetchCustomerSession(
       }
       return data;
     })().finally(() => {
-      sessionRequest = null;
+      if (sessionRequestGeneration === generation) {
+        sessionRequest = null;
+      }
     });
   }
   return sessionRequest as Promise<CustomerSessionResponse>;

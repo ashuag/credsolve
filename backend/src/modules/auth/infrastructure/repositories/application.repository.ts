@@ -148,6 +148,17 @@ export class ApplicationRepository {
     });
   }
 
+  /** Atomically bumps the failed-liveness counter and returns the new total. */
+  async incrementLivenessAttempts(applicationId: bigint, tx?: DbClient): Promise<number> {
+    await this.ensureApplicationKyc(applicationId, tx);
+    const updated = await this.db(tx).applicationKyc.update({
+      where: { applicationId },
+      data: { livenessAttempts: { increment: 1 } },
+      select: { livenessAttempts: true },
+    });
+    return updated.livenessAttempts;
+  }
+
   async updateLivenessResult(
     params: {
       applicationId: bigint;

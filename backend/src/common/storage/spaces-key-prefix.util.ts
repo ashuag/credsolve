@@ -13,9 +13,9 @@ export function resolveStorageKeyPrefix(): string {
   if (explicit) return explicit;
 
   const nodeEnv = (process.env.NODE_ENV ?? '').trim().toLowerCase();
-  if (nodeEnv === 'production' || nodeEnv === 'prod') return 'prod';
+  if (nodeEnv === 'production' || nodeEnv === 'prod') return 'production';
   if (nodeEnv === 'staging') return 'staging';
-  return 'local';
+  return 'dev';
 }
 
 /** @deprecated Use `resolveStorageKeyPrefix`. */

@@ -13,6 +13,7 @@ import {
 } from '@/lib/api/eligibility';
 import { saveLoanSelection } from '@/lib/api/lead';
 import { CUSTOMER_EMAIL_JOURNEY_PATH } from '@/lib/api/customer-session';
+import { saveEmailVerifyHandoff } from '@/lib/email-verify-handoff';
 import { CUSTOMER_LOAN_PURPOSE_OPTIONS } from '@/lib/loan-reasons';
 import { clearStoredLoanPurpose, readStoredLoanPurpose } from '@/lib/loan-purpose-selection';
 import { computeFixedRepaymentDate } from '@/lib/repayment-date';
@@ -243,8 +244,17 @@ export default function LoanSelectionPage() {
         loanPurpose,
       });
       clearStoredLoanPurpose();
-      await refresh();
-      router.push(CUSTOMER_EMAIL_JOURNEY_PATH);
+      const next = await refresh();
+      if (next.authenticated && next.lead) {
+        saveEmailVerifyHandoff({
+          leadUuid: next.lead.uuid,
+          email: next.lead.email,
+          emailVerified: next.lead.emailVerified,
+          mobileNumber: next.mobileNumber,
+          loanSelection: next.loanSelection,
+        });
+      }
+      router.replace(CUSTOMER_EMAIL_JOURNEY_PATH);
     } catch (e) {
       setSettingsError(e instanceof Error ? e.message : 'Unable to save loan selection.');
       setIsSaving(false);

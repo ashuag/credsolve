@@ -25,8 +25,14 @@ export type PostKycLivenessResponse = {
   bestComputedConfidence?: number | null;
   /** Generic customer copy from API (preferred over raw vendor fields). */
   customerMessage?: string;
-  /** Vendor auth/config failure — show thank-you, not retake selfie. */
+  /** Terminal failure — attempts exhausted; show thank-you, not retake selfie. */
   internalError?: boolean;
+  /** Failed pipeline runs so far (including this one). */
+  attemptsUsed?: number;
+  /** Total allowed pipeline runs before escalation. */
+  attemptsAllowed?: number;
+  /** Retries left before the lead is escalated to the thank-you page. */
+  attemptsRemaining?: number;
 };
 
 export function pickLivenessFailureUserMessage(out: PostKycLivenessResponse): string {

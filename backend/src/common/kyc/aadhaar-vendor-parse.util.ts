@@ -82,7 +82,7 @@ export function pickTenacioVendorErrorMessage(vendor: unknown, depth = 0): strin
 }
 
 const DATA_URL_RE = /^data:image\/(jpeg|jpg|png);base64,(.+)$/i;
-const B64ISH_RE = /^[A-Za-z0-9+/=\s]+$/;
+const B64ISH_RE = /^[A-Za-z0-9+/=\s\-_]+$/;
 
 function decodeOnePhoto(raw: string): { buffer: Buffer; ext: 'jpg' | 'png' } | null {
   const trimmed = raw.trim();

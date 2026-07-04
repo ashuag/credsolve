@@ -20,7 +20,10 @@ import { CustomerRepository } from '../../infrastructure/repositories/customer.r
 import { BureauReportRepository } from '../../infrastructure/repositories/bureau-report.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
-import { DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS } from '../../../../common/constants/kyc.constants';
+import {
+  DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS,
+  KYC_LIVENESS_MAX_ATTEMPTS,
+} from '../../../../common/constants/kyc.constants';
 import { isKycLivenessOutboundSkipped } from '../../../../common/kyc/kyc-liveness-env.util';
 import { VendorInternalErrorService } from '../../../../common/vendor/vendor-internal-error.service';
 import { fetchLatestApplicationKycSnapshot } from '../../../../prisma/application-kyc-snapshot.query';
@@ -311,6 +314,8 @@ export class GetCustomerSessionUseCase {
                 : null,
             digilockerAadhaarDownloadAttempts,
             digilockerAadhaarDownloadMaxAttempts: DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS,
+            livenessAttempts: application.livenessAttempts ?? 0,
+            livenessMaxAttempts: KYC_LIVENESS_MAX_ATTEMPTS,
           }
         : null;
 

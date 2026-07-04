@@ -12,7 +12,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { getApiUrl } from '@/lib/api-url';
 import { getCustomerJourneyResumePath, type CustomerSessionResponse } from '@/lib/api/customer-session';
 import { kycJourneyProgressFromSession } from '@/lib/kyc-journey-progress';
-import { postKycLiveness, postKycSelfie } from '@/lib/api/kyc-face';
+import { pickLivenessFailureUserMessage, postKycLiveness, postKycSelfie } from '@/lib/api/kyc-face';
 import { openUserCamera, openUserCameraErrorMessage } from '@/lib/media/open-user-camera';
 
 function dataUrlToFile(dataUrl: string, name: string): File {
@@ -182,17 +182,30 @@ export default function KycSelfiePage() {
       return false;
     }
     // MoneyCash liveness → Tenacio liveness → MoneyCash face match: all must pass.
-    if (
-      out.internalError ||
+    const failed =
       !out.livenessPassed ||
       out.faceValidationPassed === false ||
-      out.faceMatchPassed === false
-    ) {
+      out.faceMatchPassed === false;
+
+    if (!failed) return true;
+
+    // Attempts exhausted → escalate to the thank-you page.
+    if (out.internalError) {
       await refresh();
       router.replace('/thank-you');
       return false;
     }
-    return true;
+
+    // Retries remain — keep the customer on the selfie step with a clear reason.
+    const baseMessage = pickLivenessFailureUserMessage(out);
+    const remaining = out.attemptsRemaining;
+    setError(
+      typeof remaining === 'number' && remaining > 0
+        ? `${baseMessage} You have ${remaining} attempt${remaining === 1 ? '' : 's'} left.`
+        : baseMessage,
+    );
+    setRetakeSelfie(true);
+    return false;
   }
 
   async function handleCapture() {
@@ -301,12 +314,16 @@ export default function KycSelfiePage() {
     );
   }
 
-  /** Only when selfie was saved but the face pipeline never finished (e.g. network drop). */
+  /** Selfie saved but the face pipeline hasn't passed yet — a prior attempt failed or never finished. */
   const livenessRetryNeeded =
     kyc?.selfieCaptured === true &&
     kyc.livenessCheckCompleted !== true &&
     kyc.livenessRequired !== false &&
     kyc.livenessPassed !== true;
+
+  const livenessMaxAttempts = kyc?.livenessMaxAttempts ?? 3;
+  const livenessAttemptsUsed = kyc?.livenessAttempts ?? 0;
+  const livenessAttemptsRemaining = Math.max(0, livenessMaxAttempts - livenessAttemptsUsed);
 
   function handleRetakeSelfie() {
     setError('');
@@ -404,7 +421,13 @@ export default function KycSelfiePage() {
           {livenessRetryNeeded && !retakeSelfie ? (
             <div className="grid gap-3 rounded-2xl border border-[rgba(18,36,79,0.12)] bg-white/90 p-4">
               <p className="m-0 text-sm text-brand-muted">
-                Selfie saved, but face checks did not finish. Retry the checks, or take a new selfie.
+                We couldn&apos;t verify your selfie yet. Retry the checks, or take a new selfie in good
+                lighting facing the camera.
+                {livenessAttemptsUsed > 0 && livenessAttemptsRemaining > 0
+                  ? ` You have ${livenessAttemptsRemaining} attempt${
+                      livenessAttemptsRemaining === 1 ? '' : 's'
+                    } left.`
+                  : ''}
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
                 <button
