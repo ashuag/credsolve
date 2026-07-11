@@ -3,6 +3,11 @@ import { AnyFilesInterceptor, FileFieldsInterceptor, FileInterceptor } from '@ne
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import type { UploadedFileLike } from '../../../common/types/uploaded-file';
+import {
+  parseSmoothLivenessSegments,
+  smoothSegmentFrameTotal,
+  type SmoothLivenessSegment,
+} from '../../../common/kyc/kyc-smooth-liveness-segments.util';
 import { RateLimitByRoute } from '../../../common/rate-limit/rate-limit-route.decorator';
 import { RedisIpRateLimitGuard } from '../../../common/rate-limit/redis-ip-rate-limit.guard';
 import { VpnBlockGuard } from '../../../common/ip-reputation/vpn-block.guard';
