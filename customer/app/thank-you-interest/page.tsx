@@ -18,7 +18,7 @@ export default function ThankYouInterestPage() {
     if (loading) return;
 
     if (!session?.authenticated) {
-      router.replace('/');
+      router.replace('/apply-for-loan');
       return;
     }
 

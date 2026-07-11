@@ -9,6 +9,7 @@ import { buildLivenessVendorSummary } from '../../../common/kyc/kyc-liveness-sum
 import { extractLocalFaceMatchFromVendorJson } from '../../../common/kyc/kyc-face-match-inspection-persist.util';
 import { parsePersistedSelfieFaceValidation } from '../../../common/kyc/kyc-selfie-face-inspection-persist.util';
 import { KycFilesService } from '../../../common/kyc/kyc-files.service';
+import { resolveLivenessVideoRelativePath } from '../../../common/kyc/kyc-liveness-video-path.util';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
 import { LoanDocumentApplicationService } from '../../auth/application/services/loan-document-application.service';
@@ -18,6 +19,10 @@ import {
   mapLosDisbursementApiView,
   mapLosLoanDetailsFromStaging,
 } from '../../../common/loan/loan-disbursement-view.util';
+import { APPLICATION_KYC_STATUS, APPLICATION_STATUS } from '../../../common/constants/application.constants';
+import { KYC_LIVENESS_MAX_ATTEMPTS } from '../../../common/constants/kyc.constants';
+import { LEAD_STATUS } from '../../../common/constants/lead.constants';
+import { canGrantKycLivenessRetry } from '../kyc-grant-retry.util';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -327,10 +332,20 @@ export class LosApplicationService {
 
     const selfieRelativePath = application.kyc?.livenessSelfiePath?.trim() || null;
     const aadhaarPhotoRelativePath = customerKyc?.aadhaarPhotoPath?.trim() || null;
+    const livenessVideoRelativePath = await resolveLivenessVideoRelativePath({
+      columnPath: application.kyc?.livenessVideoPath,
+      vendorJson: application.kyc?.livenessVendorJson,
+      customerUuid: application.customer.uuid,
+      applicationUuid: application.uuid,
+      kycFiles: this.kycFiles,
+    });
     const photoVersion = application.updatedAt.getTime();
-    const [selfiePublicUrl, aadhaarPublicUrl] = await Promise.all([
+    const [selfiePublicUrl, aadhaarPublicUrl, livenessVideoPublicUrl] = await Promise.all([
       selfieRelativePath ? this.kycFiles.resolvePublicReadUrl(selfieRelativePath) : Promise.resolve(null),
       aadhaarPhotoRelativePath ? this.kycFiles.resolvePublicReadUrl(aadhaarPhotoRelativePath) : Promise.resolve(null),
+      livenessVideoRelativePath
+        ? this.kycFiles.resolvePublicReadUrl(livenessVideoRelativePath)
+        : Promise.resolve(null),
     ]);
     const bust = (url: string | null) =>
       url && /^https?:\/\//i.test(url) ? appendPhotoCacheBuster(url, photoVersion) : url;
@@ -348,6 +363,8 @@ export class LosApplicationService {
       kycStatusLabel: applicationKycStatusLabel(application.kyc?.kycStatus ?? 0),
       kycCompletedAt: application.kyc?.kycCompletedAt?.toISOString() ?? null,
       livenessPassed: application.kyc?.livenessPassed ?? false,
+      livenessCheckCompleted: application.kyc?.isLiveness ?? false,
+      livenessAttempts: application.kyc?.livenessAttempts ?? 0,
       livenessCheckedAt: application.kyc?.livenessCheckedAt?.toISOString() ?? null,
       selfieFaceValidation: parsePersistedSelfieFaceValidation(
         application.kyc?.selfieFaceValidationJson,
@@ -363,13 +380,28 @@ export class LosApplicationService {
       kycPhotos: {
         selfiePath: selfieRelativePath,
         aadhaarPhotoPath: aadhaarPhotoRelativePath,
+        livenessVideoPath: livenessVideoRelativePath,
         selfieUrl:
           bust(selfiePublicUrl) ??
           (selfieRelativePath ? `/applications/${application.uuid}/kyc/selfie-photo` : null),
         aadhaarPhotoUrl:
           bust(aadhaarPublicUrl) ??
           (aadhaarPhotoRelativePath ? `/applications/${application.uuid}/kyc/aadhaar-photo` : null),
+        livenessVideoUrl:
+          bust(livenessVideoPublicUrl) ??
+          (livenessVideoRelativePath
+            ? `/applications/${application.uuid}/kyc/liveness-video`
+            : null),
       },
+      canGrantKycLivenessRetry: canGrantKycLivenessRetry({
+        kycStatus: application.kyc?.kycStatus ?? 0,
+        livenessPassed: application.kyc?.livenessPassed ?? false,
+        livenessCheckCompleted: application.kyc?.isLiveness ?? false,
+        livenessAttempts: application.kyc?.livenessAttempts ?? 0,
+        livenessCheckedAt: application.kyc?.livenessCheckedAt ?? null,
+        applicationStatusCode: application.applicationStatus.name,
+        leadStatusCode: lead.leadStatus.name,
+      }),
       preApprovedLoanAmount: application.preApprovedLoanAmount?.toString() ?? null,
       createdAt: application.createdAt.toISOString(),
       updatedAt: application.updatedAt.toISOString(),
@@ -502,6 +534,31 @@ export class LosApplicationService {
     await this.streamKycPhoto(rel, res);
   }
 
+  async serveApplicationLivenessVideo(applicationUuid: string, res: Response): Promise<void> {
+    const application = await this.prisma.client.application.findUnique({
+      where: { uuid: applicationUuid },
+      select: {
+        uuid: true,
+        customer: { select: { uuid: true } },
+        kyc: { select: { livenessVideoPath: true, livenessVendorJson: true } },
+      },
+    });
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+    const rel = await resolveLivenessVideoRelativePath({
+      columnPath: application.kyc?.livenessVideoPath,
+      vendorJson: application.kyc?.livenessVendorJson,
+      customerUuid: application.customer.uuid,
+      applicationUuid: application.uuid,
+      kycFiles: this.kycFiles,
+    });
+    if (!rel) {
+      throw new NotFoundException('Liveness video is not available yet.');
+    }
+    await this.streamKycVideo(rel, res);
+  }
+
   async serveApplicationLoanDocument(applicationUuid: string, docTypeRaw: string, res: Response): Promise<void> {
     const allowed: LoanDocumentType[] = [LOAN_DOCUMENT_TYPE.KEY_FACT];
     if (!allowed.includes(docTypeRaw as LoanDocumentType)) {
@@ -567,6 +624,19 @@ export class LosApplicationService {
     const buf = await this.kycFiles.readBytes(relativePath);
     const lower = relativePath.toLowerCase();
     const mime = lower.endsWith('.png') ? 'image/png' : 'image/jpeg';
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.send(buf);
+  }
+
+  private async streamKycVideo(relativePath: string, res: Response): Promise<void> {
+    const buf = await this.kycFiles.readBytes(relativePath);
+    const lower = relativePath.toLowerCase();
+    const mime = lower.endsWith('.mp4')
+      ? 'video/mp4'
+      : lower.endsWith('.webm')
+        ? 'video/webm'
+        : 'application/octet-stream';
     res.setHeader('Content-Type', mime);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     res.send(buf);
@@ -691,6 +761,128 @@ export class LosApplicationService {
     const generated = [docType];
 
     return { applicationUuid, generated };
+  }
+
+  /**
+   * Grants the customer one more KYC liveness attempt after attempts are exhausted
+   * or the lead was escalated to INTERNAL_ERROR. Keeps prior audit JSON for LOS review.
+   */
+  async grantKycLivenessRetry(applicationUuid: string) {
+    const application = await this.prisma.client.application.findUnique({
+      where: { uuid: applicationUuid },
+      include: {
+        kyc: true,
+        details: {
+          select: {
+            selectedLoanAmount: true,
+            expectedRepaymentDays: true,
+          },
+        },
+        applicationStatus: { select: { name: true } },
+        lead: {
+          include: {
+            leadStatus: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+
+    const kyc = application.kyc;
+    if (!kyc) {
+      throw new BadRequestException('KYC record not found for this application.');
+    }
+
+    const snapshot = {
+      kycStatus: kyc.kycStatus,
+      livenessPassed: kyc.livenessPassed,
+      livenessCheckCompleted: kyc.isLiveness,
+      livenessAttempts: kyc.livenessAttempts,
+      livenessCheckedAt: kyc.livenessCheckedAt,
+      applicationStatusCode: application.applicationStatus.name,
+      leadStatusCode: application.lead.leadStatus.name,
+    };
+
+    if (!canGrantKycLivenessRetry(snapshot)) {
+      throw new BadRequestException(
+        'This application is not eligible for a KYC liveness retry grant.',
+      );
+    }
+
+    const loanSelectionCompleted = Boolean(
+      application.details?.selectedLoanAmount != null &&
+        application.details?.expectedRepaymentDays != null,
+    );
+
+    const [inProgressLeadStatus, convertedLeadStatus, inReviewAppStatus] = await Promise.all([
+      this.prisma.client.leadStatus.findFirst({
+        where: { name: LEAD_STATUS.IN_PROGRESS, isActive: true },
+        select: { id: true },
+      }),
+      this.prisma.client.leadStatus.findFirst({
+        where: { name: LEAD_STATUS.CONVERTED, isActive: true },
+        select: { id: true },
+      }),
+      this.prisma.client.applicationStatus.findFirst({
+        where: { name: APPLICATION_STATUS.IN_REVIEW, isActive: true },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!inProgressLeadStatus) {
+      throw new BadRequestException('Lead status IN_PROGRESS is not configured.');
+    }
+
+    const recoveryLeadStatus =
+      loanSelectionCompleted && convertedLeadStatus ? convertedLeadStatus : inProgressLeadStatus;
+
+    const leadWasInternalError = application.lead.leadStatus.name === LEAD_STATUS.INTERNAL_ERROR;
+    const appWasInternalError = application.applicationStatus.name === APPLICATION_STATUS.INTERNAL_ERROR;
+    const retryAttempts = Math.max(0, KYC_LIVENESS_MAX_ATTEMPTS - 1);
+
+    await this.prisma.client.$transaction(async (tx) => {
+      await tx.applicationKyc.update({
+        where: { applicationId: application.id },
+        data: {
+          isLiveness: false,
+          livenessDoneAt: null,
+          livenessPassed: false,
+          livenessAttempts: retryAttempts,
+          ...(kyc.kycStatus === APPLICATION_KYC_STATUS.TECHNICAL_ISSUE
+            ? { kycStatus: APPLICATION_KYC_STATUS.NOT_DONE }
+            : {}),
+        },
+      });
+
+      if (leadWasInternalError) {
+        await tx.lead.update({
+          where: { id: application.leadId },
+          data: {
+            leadStatusId: recoveryLeadStatus.id,
+            leadStatusNote: null,
+          },
+        });
+      }
+
+      if (appWasInternalError && inReviewAppStatus) {
+        await tx.application.update({
+          where: { id: application.id },
+          data: { applicationStatusId: inReviewAppStatus.id },
+        });
+      }
+    });
+
+    return {
+      success: true as const,
+      applicationUuid,
+      leadUuid: application.lead.uuid,
+      livenessAttemptsRemaining: 1,
+      leadRecovered: leadWasInternalError,
+      applicationRecovered: appWasInternalError,
+    };
   }
 
   /** Public CDN/presigned URL, or LOS-authenticated download path when the bucket is private. */

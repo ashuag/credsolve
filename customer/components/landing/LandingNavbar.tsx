@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { CustomerAccountMenu } from '@/components/layout/customer-account-menu';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
-import { logoutCustomer } from '@/lib/api/auth';
 import {
   getCustomerAccountMenuTriggerLabel,
   hasActiveLoanLead,
@@ -34,7 +33,7 @@ const ANNOUNCEMENTS = [
 export function LandingNavbar() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { session, refresh } = useCustomerSession();
+  const { session, signOut } = useCustomerSession();
   const loginHref = buildHrefWithSearch('/my-account', searchParams, { mode: 'login' });
   const applyHref = buildHrefWithSearch('/apply-for-loan', searchParams);
   const accountHref = buildHrefWithSearch('/my-account', searchParams);
@@ -55,13 +54,8 @@ export function LandingNavbar() {
 
   async function handleLogoutFromSheet() {
     setMenuOpen(false);
-    try {
-      await logoutCustomer();
-    } catch {
-      /* ignore */
-    }
-    await refresh();
-    router.push('/');
+    await signOut();
+    router.replace('/');
     router.refresh();
   }
 

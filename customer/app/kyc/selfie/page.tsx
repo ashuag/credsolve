@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
+import { ActiveLivenessCapture } from '@/components/kyc/active-liveness-capture';
+import { KycFacePipelineSteps } from '@/components/kyc/kyc-face-pipeline-steps';
 import { KycJourneyLeftPanel } from '@/components/kyc/kyc-journey-left-panel';
 import styles from '@/components/kyc/kyc-hub-flow.module.css';
 import { JourneyProgressProvider, useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
@@ -10,19 +12,9 @@ import { useCustomerSession } from '@/components/providers/customer-session-prov
 import { AlertBanner } from '@/components/ui/alert-banner';
 import { Spinner } from '@/components/ui/spinner';
 import { getApiUrl } from '@/lib/api-url';
-import { getCustomerJourneyResumePath, type CustomerSessionResponse } from '@/lib/api/customer-session';
+import { getCustomerJourneyResumePath, hasKycLivenessRetryRemaining, type CustomerSessionResponse } from '@/lib/api/customer-session';
 import { kycJourneyProgressFromSession } from '@/lib/kyc-journey-progress';
-import { pickLivenessFailureUserMessage, postKycLiveness, postKycSelfie } from '@/lib/api/kyc-face';
-import { openUserCamera, openUserCameraErrorMessage } from '@/lib/media/open-user-camera';
-
-function dataUrlToFile(dataUrl: string, name: string): File {
-  const [head, b64] = dataUrl.split(',');
-  const mime = head?.match(/:(.*?);/)?.[1] ?? 'image/jpeg';
-  const bin = atob(b64 ?? '');
-  const u8 = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i += 1) u8[i] = bin.charCodeAt(i);
-  return new File([u8], name, { type: mime });
-}
+import { pickLivenessFailureUserMessage, type PostKycLivenessResponse } from '@/lib/api/kyc-face';
 
 function shallowStringEntries(obj: unknown): Array<[string, string]> {
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return [];
@@ -68,225 +60,96 @@ function KycSelfieShell({
 export default function KycSelfiePage() {
   const router = useRouter();
   const { loading, session, refresh } = useCustomerSession();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [busyLabel, setBusyLabel] = useState('');
-  const [cameraReady, setCameraReady] = useState(false);
-  /** Open webcam only while capturing; not after a saved selfie (avoids permission prompts on refresh / return visits). */
-  const [retakeSelfie, setRetakeSelfie] = useState(false);
-  /** Shown immediately after capture so the UI does not flash the previous cached selfie. */
-  const [pendingSelfiePreview, setPendingSelfiePreview] = useState<string | null>(null);
-
   const navigatingRef = useRef(false);
 
   const kyc = session?.authenticated === true ? session.kycFaceProgress : null;
+  const livenessAttemptsRemaining = useMemo(() => {
+    if (!kyc || kyc.livenessPassed) return null;
+    const max = kyc.livenessMaxAttempts ?? 3;
+    const used = kyc.livenessAttempts ?? 0;
+    return Math.max(0, max - used);
+  }, [kyc]);
+  const livenessAttemptsAllowed = kyc?.livenessMaxAttempts ?? 3;
   const photoHref =
     kyc?.digilockerAadhaarPhotoUrl && session?.authenticated === true
       ? `${getApiUrl()}${kyc.digilockerAadhaarPhotoUrl}`
       : null;
-  const selfieHref =
-    kyc?.kycSelfiePhotoUrl && session?.authenticated === true
-      ? `${getApiUrl()}${kyc.kycSelfiePhotoUrl}${
-          kyc.selfieUpdatedAt ? `?v=${encodeURIComponent(kyc.selfieUpdatedAt)}` : ''
-        }`
-      : null;
 
-  const stopCamera = useCallback(() => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-    setCameraReady(false);
-  }, []);
-
-  const selfieAlreadySaved = kyc?.selfieCaptured === true;
-  const needsWebcamStream =
-    !loading &&
-    session?.authenticated === true &&
-    kyc != null &&
-    (!selfieAlreadySaved || retakeSelfie);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!needsWebcamStream) {
-      stopCamera();
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    (async () => {
-      const result = await openUserCamera();
-      if (cancelled) {
-        if (result.ok) result.stream.getTracks().forEach((t) => t.stop());
+  const continueToNextStep = useCallback(
+    async (prefetched?: CustomerSessionResponse) => {
+      if (navigatingRef.current) return;
+      navigatingRef.current = true;
+      const next = prefetched ?? (await refresh());
+      if (!next.authenticated) {
+        navigatingRef.current = false;
         return;
       }
-      if (!result.ok) {
-        setError(openUserCameraErrorMessage(result.reason));
-        return;
-      }
+      router.replace(getCustomerJourneyResumePath(next));
+    },
+    [refresh, router],
+  );
 
-      const { stream } = result;
-      streamRef.current = stream;
-      const video = videoRef.current;
-      if (video) {
-        video.srcObject = stream;
-        await video.play().catch(() => undefined);
-      }
-      setCameraReady(true);
-    })();
-
-    return () => {
-      cancelled = true;
-      stopCamera();
-    };
-  }, [needsWebcamStream, stopCamera]);
-
-  async function continueToNextStep(prefetched?: CustomerSessionResponse) {
-    if (navigatingRef.current) return;
-    navigatingRef.current = true;
-    const next = prefetched ?? (await refresh());
-    if (!next.authenticated) {
-      navigatingRef.current = false;
-      return;
-    }
-    router.replace(getCustomerJourneyResumePath(next));
-  }
-
+  // If the face step is already done (or not required), skip straight ahead.
   useEffect(() => {
-    if (loading || busy || session?.authenticated !== true || retakeSelfie) return;
+    if (loading || busy || session?.authenticated !== true) return;
     const progress = session.kycFaceProgress;
-    if (!progress?.selfieCaptured) return;
-    if (progress.livenessCheckCompleted && !progress.livenessPassed) {
+    if (!progress) return;
+    if (
+      progress.livenessCheckCompleted &&
+      !progress.livenessPassed &&
+      !hasKycLivenessRetryRemaining(progress)
+    ) {
       router.replace('/thank-you');
       return;
     }
-    if (progress.livenessRequired === false || progress.livenessPassed) {
+    if (progress.livenessPassed || progress.livenessRequired === false) {
       void continueToNextStep();
     }
-  }, [loading, busy, session, retakeSelfie, router]);
+  }, [loading, busy, session, router, continueToNextStep]);
 
-  async function runLivenessCheck(): Promise<boolean> {
-    const out = await postKycLiveness();
-    if (!out) {
-      setError('Empty response from liveness.');
-      return false;
-    }
-    if (!out.configured) {
-      setError(out.skipReason ?? 'Liveness is not configured on the server.');
-      return false;
-    }
-    // MoneyCash liveness → Tenacio liveness → MoneyCash face match: all must pass.
-    const failed =
-      !out.livenessPassed ||
-      out.faceValidationPassed === false ||
-      out.faceMatchPassed === false;
+  const handleComplete = useCallback(
+    async (out: PostKycLivenessResponse) => {
+      setError('');
+      const failed =
+        !out.livenessPassed ||
+        out.faceValidationPassed === false ||
+        out.expressionAntiSpoofPassed === false ||
+        out.activeLivenessPassed === false ||
+        out.faceMatchPassed === false;
 
-    if (!failed) return true;
-
-    // Attempts exhausted → escalate to the thank-you page.
-    if (out.internalError) {
-      await refresh();
-      router.replace('/thank-you');
-      return false;
-    }
-
-    // Retries remain — keep the customer on the selfie step with a clear reason.
-    const baseMessage = pickLivenessFailureUserMessage(out);
-    const remaining = out.attemptsRemaining;
-    setError(
-      typeof remaining === 'number' && remaining > 0
-        ? `${baseMessage} You have ${remaining} attempt${remaining === 1 ? '' : 's'} left.`
-        : baseMessage,
-    );
-    setRetakeSelfie(true);
-    return false;
-  }
-
-  async function handleCapture() {
-    setError('');
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || !cameraReady) {
-      setError('Camera is not ready yet.');
-      return;
-    }
-    const w = video.videoWidth;
-    const h = video.videoHeight;
-    if (!w || !h) {
-      setError('Video has no dimensions yet — wait a moment and try again.');
-      return;
-    }
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      setError('Could not read from camera.');
-      return;
-    }
-    ctx.drawImage(video, 0, 0, w, h);
-    setBusy(true);
-    setBusyLabel('Saving selfie…');
-    try {
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-      setPendingSelfiePreview(dataUrl);
-      const file = dataUrlToFile(dataUrl, 'selfie.jpg');
-      const out = await postKycSelfie(file);
-      if (!out?.success) {
-        setError('Selfie upload did not complete.');
+      if (!failed) {
+        setBusy(true);
+        const nextSession = await refresh();
+        if (!nextSession.authenticated) {
+          setBusy(false);
+          return;
+        }
+        await continueToNextStep(nextSession);
         return;
       }
-      setRetakeSelfie(false);
-      stopCamera();
 
-      const livenessRequired =
-        session?.authenticated === true && session.kycFaceProgress?.livenessRequired !== false;
-      setBusyLabel(
-        livenessRequired
-          ? 'Running MoneyCash liveness, Tenacio liveness, then face match…'
-          : 'Running MoneyCash liveness and face match…',
+      // Attempts exhausted → escalate to the thank-you page.
+      if (out.internalError) {
+        await refresh();
+        router.replace('/thank-you');
+        return;
+      }
+
+      const baseMessage = pickLivenessFailureUserMessage(out);
+      const remaining = out.attemptsRemaining;
+      setError(
+        typeof remaining === 'number' && remaining > 0
+          ? `${baseMessage} You have ${remaining} attempt${remaining === 1 ? '' : 's'} left.`
+          : baseMessage,
       );
-      const passed = await runLivenessCheck();
-      const nextSession = await refresh();
-      setPendingSelfiePreview(null);
-      if (!nextSession.authenticated) return;
-      if (!passed) return;
+      await refresh();
+    },
+    [continueToNextStep, refresh, router],
+  );
 
-      await continueToNextStep(nextSession);
-    } catch (e) {
-      setPendingSelfiePreview(null);
-      const msg = e instanceof Error ? e.message : 'Selfie upload failed.';
-      setError(msg);
-    } finally {
-      setBusy(false);
-      setBusyLabel('');
-    }
-  }
-
-  async function handleLiveness() {
-    setError('');
-    setBusy(true);
-    setBusyLabel('Running MoneyCash liveness, Tenacio liveness, then face match…');
-    try {
-      const passed = await runLivenessCheck();
-      const nextSession = await refresh();
-      if (!nextSession.authenticated) return;
-      if (!passed) return;
-      await continueToNextStep(nextSession);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Liveness request failed.');
-    } finally {
-      setBusy(false);
-      setBusyLabel('');
-    }
-  }
-
-  if (loading || !session) {
+  if (loading || !session || session.authenticated !== true) {
     return (
       <CustomerJourneyGuard>
         <JourneyProgressProvider>
@@ -298,37 +161,6 @@ export default function KycSelfiePage() {
         </JourneyProgressProvider>
       </CustomerJourneyGuard>
     );
-  }
-
-  if (session.authenticated !== true) {
-    return (
-      <CustomerJourneyGuard>
-        <JourneyProgressProvider>
-          <div className={styles.page}>
-            <div className="flex flex-1 items-center justify-center p-6">
-              <Spinner size={36} />
-            </div>
-          </div>
-        </JourneyProgressProvider>
-      </CustomerJourneyGuard>
-    );
-  }
-
-  /** Selfie saved but the face pipeline hasn't passed yet — a prior attempt failed or never finished. */
-  const livenessRetryNeeded =
-    kyc?.selfieCaptured === true &&
-    kyc.livenessCheckCompleted !== true &&
-    kyc.livenessRequired !== false &&
-    kyc.livenessPassed !== true;
-
-  const livenessMaxAttempts = kyc?.livenessMaxAttempts ?? 3;
-  const livenessAttemptsUsed = kyc?.livenessAttempts ?? 0;
-  const livenessAttemptsRemaining = Math.max(0, livenessMaxAttempts - livenessAttemptsUsed);
-
-  function handleRetakeSelfie() {
-    setError('');
-    setPendingSelfiePreview(null);
-    setRetakeSelfie(true);
   }
 
   const form = kyc?.digilockerAadhaarForm;
@@ -341,114 +173,53 @@ export default function KycSelfiePage() {
           <div className="grid max-w-xl gap-4">
             <header>
               <p className={`m-0 ${styles.eyebrow}`}>KYC</p>
-              <h1 className={styles.rightTitle}>Selfie &amp; liveness</h1>
+              <h1 className={styles.rightTitle}>Quick face verification</h1>
+              <p className="m-0 mt-1 text-sm text-brand-muted">
+                Look at the camera, turn your head, and smile — we match you to your Aadhaar photo and check
+                that you are live.
+              </p>
             </header>
 
-          {error ? <AlertBanner variant="error">{error}</AlertBanner> : null}
-
-          {photoHref ? (
-            <div className="rounded-2xl border border-[rgba(18,36,79,0.12)] p-3 bg-white/90">
-              <p className="m-0 mb-2 text-sm font-semibold text-brand-navy">Aadhaar reference photo</p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={photoHref} alt="Aadhaar reference" className="w-full max-h-56 object-contain rounded-xl" />
-            </div>
-          ) : null}
-
-          {entries.length > 0 ? (
-            <dl className="grid gap-1 rounded-2xl border border-[rgba(18,36,79,0.08)] p-3 bg-slate-50/80 text-sm">
-              {entries.map(([k, v]) => (
-                <div key={k} className="grid grid-cols-[minmax(0,0.35fr)_1fr] gap-2">
-                  <dt className="text-brand-muted font-medium truncate">{k}</dt>
-                  <dd className="m-0 text-brand-navy break-words">{v}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : null}
-
-          {(pendingSelfiePreview ?? selfieHref) && !retakeSelfie ? (
-            <div className="rounded-2xl border border-[rgba(18,36,79,0.12)] p-3 bg-white/90">
-              <p className="m-0 mb-2 text-sm font-semibold text-brand-navy">Your saved selfie</p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={pendingSelfiePreview ?? selfieHref!}
-                alt="Your selfie"
-                className="w-full max-h-56 object-contain rounded-xl"
-              />
-            </div>
-          ) : null}
-
-          {needsWebcamStream ? (
-            <div className="rounded-2xl overflow-hidden border border-[rgba(18,36,79,0.12)] bg-black aspect-[4/3] max-h-[360px]">
-              <video ref={videoRef} className="h-full w-full object-cover" autoPlay playsInline muted />
-            </div>
-          ) : null}
-          <canvas ref={canvasRef} className="hidden" />
-
-          {needsWebcamStream ? (
-            <button type="button" disabled={busy || !cameraReady} onClick={() => void handleCapture()} className="mc-btn-primary">
-              {busy ? busyLabel || 'Please wait…' : 'Capture from webcam'}
-            </button>
-          ) : null}
-
-          {busy && busyLabel && !needsWebcamStream ? (
-            <div className="flex items-center justify-center gap-3 rounded-2xl border border-[rgba(18,36,79,0.1)] bg-white/80 p-4">
-              <Spinner size={28} />
-              <p className="m-0 text-sm font-semibold text-brand-navy">{busyLabel}</p>
-            </div>
-          ) : null}
-
-          {selfieAlreadySaved && !retakeSelfie && !livenessRetryNeeded ? (
-            <button
-              type="button"
-              className="text-sm font-semibold text-[#1496f3] underline-offset-2 hover:underline bg-transparent border-0 p-0 cursor-pointer text-left"
-              onClick={handleRetakeSelfie}
-            >
-              Replace selfie (opens camera)
-            </button>
-          ) : retakeSelfie ? (
-            <button
-              type="button"
-              className="text-sm font-medium text-brand-muted underline-offset-2 hover:underline bg-transparent border-0 p-0 cursor-pointer text-left"
-              onClick={() => {
-                setRetakeSelfie(false);
-                setError('');
-              }}
-            >
-              Cancel replace
-            </button>
-          ) : null}
-
-          {livenessRetryNeeded && !retakeSelfie ? (
-            <div className="grid gap-3 rounded-2xl border border-[rgba(18,36,79,0.12)] bg-white/90 p-4">
-              <p className="m-0 text-sm text-brand-muted">
-                We couldn&apos;t verify your selfie yet. Retry the checks, or take a new selfie in good
-                lighting facing the camera.
-                {livenessAttemptsUsed > 0 && livenessAttemptsRemaining > 0
-                  ? ` You have ${livenessAttemptsRemaining} attempt${
-                      livenessAttemptsRemaining === 1 ? '' : 's'
-                    } left.`
-                  : ''}
+            <div className="grid gap-2">
+              <p className="m-0 text-[0.68rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
+                Verification steps
               </p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void handleLiveness()}
-                  className="mc-btn-primary"
-                >
-                  {busy ? busyLabel || 'Please wait…' : 'Retry face checks'}
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={handleRetakeSelfie}
-                  className="mc-btn-secondary bg-[rgba(20,150,243,0.08)] text-brand-navy"
-                >
-                  Take selfie again
-                </button>
-              </div>
+              <KycFacePipelineSteps />
             </div>
-          ) : null}
+
+            {error ? <AlertBanner variant="error">{error}</AlertBanner> : null}
+
+            {photoHref ? (
+              <div className="rounded-2xl border border-[rgba(18,36,79,0.12)] p-3 bg-white/90">
+                <p className="m-0 mb-2 text-sm font-semibold text-brand-navy">Aadhaar reference photo</p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photoHref} alt="Aadhaar reference" className="w-full max-h-56 object-contain rounded-xl" />
+              </div>
+            ) : null}
+
+            {entries.length > 0 ? (
+              <dl className="grid gap-1 rounded-2xl border border-[rgba(18,36,79,0.08)] p-3 bg-slate-50/80 text-sm">
+                {entries.map(([k, v]) => (
+                  <div key={k} className="grid grid-cols-[minmax(0,0.35fr)_1fr] gap-2">
+                    <dt className="text-brand-muted font-medium truncate">{k}</dt>
+                    <dd className="m-0 text-brand-navy break-words">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+
+            {busy ? (
+              <div className="flex items-center justify-center gap-3 rounded-2xl border border-[rgba(18,36,79,0.1)] bg-white/80 p-4">
+                <Spinner size={28} />
+                <p className="m-0 text-sm font-semibold text-brand-navy">Verified — continuing…</p>
+              </div>
+            ) : (
+              <ActiveLivenessCapture
+                onComplete={handleComplete}
+                attemptsRemaining={livenessAttemptsRemaining}
+                attemptsAllowed={livenessAttemptsAllowed}
+              />
+            )}
           </div>
         </KycSelfieShell>
       </JourneyProgressProvider>

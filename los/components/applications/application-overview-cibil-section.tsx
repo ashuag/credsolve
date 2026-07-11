@@ -18,12 +18,6 @@ import {
 } from '@/lib/kyc-field-match';
 import {
   explainKycNotDone,
-  formatConfidencePercent,
-  formatDistance,
-  formatLivenessSummary,
-  formatMoneyCashFaceMatchSummary,
-  formatSelfieFaceValidationSummary,
-  formatLaplacianVariance,
 } from '@/lib/kyc-selfie-validation-display';
 import { formatPersonName } from '@/lib/format-person-name';
 import {
@@ -33,6 +27,10 @@ import {
   type CibilReportData,
   type LosApplicationDetails,
 } from '@/lib/api';
+import { KycGrantRetryButton } from '@/components/applications/kyc-grant-retry-button';
+import { canGrantKycLivenessRetryFromRow } from '@/lib/kyc-grant-retry-eligibility';
+import { KycPipelineSteps } from '@/components/applications/kyc-pipeline-steps';
+import { KycPhotoGallery } from '@/components/shared/kyc-photo-gallery';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 
 type OverviewTab = 'profile' | 'cibil' | 'loan' | 'kyc' | 'bank' | 'references' | 'sources';
@@ -693,8 +691,20 @@ function ReferenceDetailsPanel({ row }: { row: LosApplicationDetails }) {
   );
 }
 
-function KycDetailPanel({ row }: { row: LosApplicationDetails }) {
+function KycDetailPanel({
+  row,
+  applicationUuid,
+  authToken,
+  onRefresh,
+}: {
+  row: LosApplicationDetails;
+  applicationUuid: string;
+  authToken: string | null;
+  onRefresh?: () => void;
+}) {
   const kycNotDoneReason = explainKycNotDone(row);
+  const showGrantKycRetry =
+    row.canGrantKycLivenessRetry || canGrantKycLivenessRetryFromRow(row);
   return (
     <div className="grid gap-4">
       {kycNotDoneReason ? (
@@ -702,52 +712,40 @@ function KycDetailPanel({ row }: { row: LosApplicationDetails }) {
           {kycNotDoneReason}
         </p>
       ) : null}
+      {showGrantKycRetry ? (
+        <KycGrantRetryButton
+          row={row}
+          applicationUuid={applicationUuid}
+          authToken={authToken}
+          onSuccess={onRefresh}
+        />
+      ) : null}
+      <div>
+        <p className="m-0 mb-2 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
+          KYC photos &amp; video
+        </p>
+        <KycPhotoGallery row={row} authToken={authToken} />
+      </div>
+      <KycPipelineSteps row={row} variant="overview" />
       <DetailGrid
         rows={[
           { label: 'KYC status', value: `${row.kycStatusLabel} (${row.kycStatus})` },
-          { label: 'KYC fetched at', value: formatDateTime(row.kycCompletedAt) },
+          { label: 'KYC completed at', value: formatDateTime(row.kycCompletedAt) },
           {
-            label: 'Face validation (MoneyCash)',
-            value: formatSelfieFaceValidationSummary(row),
+            label: 'KYC pipeline passed',
+            value: row.livenessPassed ? 'Yes' : 'No',
           },
-          {
-            label: 'Computed confidence',
-            value: formatConfidencePercent(row.selfieFaceValidation?.bestComputedConfidence),
-          },
-          {
-            label: 'Face sharpness (Laplacian)',
-            value:
-              row.selfieFaceValidation?.laplacianVariance != null
-                ? `${formatLaplacianVariance(row.selfieFaceValidation.laplacianVariance)} (min ${formatLaplacianVariance(row.selfieFaceValidation.minLaplacianVarianceRequired)})`
-                : '—',
-          },
-          {
-            label: 'Face match (MoneyCash)',
-            value: formatMoneyCashFaceMatchSummary(row),
-          },
-          {
-            label: 'Face match score',
-            value: formatConfidencePercent(row.moneyCashFaceMatch?.matchScore),
-          },
-          {
-            label: 'Face match distance',
-            value:
-              row.moneyCashFaceMatch?.distance != null
-                ? `${formatDistance(row.moneyCashFaceMatch.distance)} (max ${formatDistance(row.moneyCashFaceMatch.maxDistanceThreshold)})`
-                : '—',
-          },
-          {
-            label: 'Face match passed',
-            value:
-              row.moneyCashFaceMatch == null ? '—' : row.moneyCashFaceMatch.passed ? 'Yes' : 'No',
-          },
-          {
-            label: 'Face match at',
-            value: formatDateTime(row.moneyCashFaceMatch?.checkedAt),
-          },
-          { label: 'Liveness (Tenacio)', value: formatLivenessSummary(row) },
-          { label: 'Liveness passed', value: row.livenessPassed ? 'Yes' : 'No' },
+          { label: 'Selfie quality checked at', value: formatDateTime(row.selfieFaceValidation?.checkedAt ?? null) },
           { label: 'Liveness checked at', value: formatDateTime(row.livenessCheckedAt) },
+          {
+            label: 'Face match checked at',
+            value: formatDateTime(
+              row.moneyCashFaceMatch?.reason?.startsWith('Pending') ||
+                row.moneyCashFaceMatch?.reason?.startsWith('Skipped')
+                ? null
+                : row.moneyCashFaceMatch?.checkedAt,
+            ),
+          },
         ]}
       />
 
@@ -946,7 +944,14 @@ export function ApplicationOverviewCibilSection({
             onDataChange={onReportCreated}
           />
         ) : null}
-        {activeTab === 'kyc' ? <KycDetailPanel row={row} /> : null}
+        {activeTab === 'kyc' ? (
+          <KycDetailPanel
+            row={row}
+            applicationUuid={applicationUuid}
+            authToken={authToken}
+            onRefresh={onReportCreated}
+          />
+        ) : null}
         {activeTab === 'bank' ? <BankDetailsPanel row={row} /> : null}
         {activeTab === 'references' ? <ReferenceDetailsPanel row={row} /> : null}
         {activeTab === 'sources' ? <SourcesUtmPanel row={row} /> : null}

@@ -79,6 +79,15 @@ export class KycFilesService {
     return `customer/${customerUuid}/photos/selfie/${applicationUuid}.jpg`;
   }
 
+  /** Short active-liveness recording (challenge–response) stored as an audit artifact. */
+  livenessVideoRelativePath(
+    customerUuid: string,
+    applicationUuid: string,
+    ext: 'webm' | 'mp4',
+  ): string {
+    return `customer/${customerUuid}/videos/liveness/${applicationUuid}.${ext}`;
+  }
+
   loanDocumentPdfRelativePath(
     customerUuid: string,
     applicationUuid: string,

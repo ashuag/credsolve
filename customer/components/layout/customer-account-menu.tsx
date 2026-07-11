@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
-import { logoutCustomer } from '@/lib/api/auth';
 import { buildHrefWithSearch } from '@/lib/navigation';
 
 const TRIGGER_CLASS =
@@ -17,7 +16,7 @@ type CustomerAccountMenuProps = {
 export function CustomerAccountMenu({ triggerLabel }: CustomerAccountMenuProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { refresh } = useCustomerSession();
+  const { signOut } = useCustomerSession();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -45,13 +44,8 @@ export function CustomerAccountMenu({ triggerLabel }: CustomerAccountMenuProps) 
 
   async function handleLogout() {
     closeMenu();
-    try {
-      await logoutCustomer();
-    } catch {
-      /* still refresh if cookie cleared */
-    }
-    await refresh();
-    router.push('/');
+    await signOut();
+    router.replace('/');
     router.refresh();
   }
 

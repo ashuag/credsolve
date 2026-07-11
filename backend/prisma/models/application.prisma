@@ -73,6 +73,7 @@ model ApplicationKyc {
   livenessDoneAt              DateTime? @map("liveness_done_at") @db.DateTime(3)
   livenessPassed              Boolean   @default(false) @map("liveness_passed")
   livenessVendorJson          Json?     @map("liveness_vendor_json")
+  livenessVideoPath           String?   @map("liveness_video_path") @db.VarChar(512)
   faceMatchCheckedAt          DateTime? @map("face_match_checked_at") @db.DateTime(3)
   selfieFaceValidationJson       Json?     @map("selfie_face_validation_json")
   selfieFaceValidationPassed     Boolean   @default(false) @map("selfie_face_validation_passed")

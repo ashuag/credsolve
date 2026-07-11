@@ -133,9 +133,23 @@ export type LosSelfieFaceValidation = {
 export type LosLivenessSummary = {
   passed: boolean;
   checkedAt: string | null;
+  /** @deprecated Tenacio passive liveness — customer journey uses MoneyCash active liveness. */
   vendorScore: number | null;
+  /** @deprecated Tenacio passive liveness — customer journey uses MoneyCash active liveness. */
   isLive: boolean | null;
+  /** @deprecated Tenacio passive liveness — customer journey uses MoneyCash active liveness. */
   vendorStatus: string | null;
+  mode: 'smooth' | 'challenge' | null;
+  activeLivenessPassed: boolean | null;
+  activeLivenessReason: string | null;
+  headTurnLeftDetected: boolean | null;
+  headTurnRightDetected: boolean | null;
+  blinkDetected: boolean | null;
+  smileDetected: boolean | null;
+  expressionAntiSpoofPassed: boolean | null;
+  expressionAntiSpoofReason: string | null;
+  framesWithFace: number | null;
+  framesAnalyzed: number | null;
 };
 
 /** MoneyCash on-server face match (Aadhaar photo vs selfie). */
@@ -173,6 +187,8 @@ export type LosApplicationDetails = {
   kycStatusLabel: string;
   kycCompletedAt: string | null;
   livenessPassed: boolean;
+  livenessCheckCompleted: boolean;
+  livenessAttempts: number;
   livenessCheckedAt: string | null;
   selfieFaceValidation: LosSelfieFaceValidation | null;
   moneyCashFaceMatch: LosMoneyCashFaceMatch | null;
@@ -181,10 +197,15 @@ export type LosApplicationDetails = {
     /** Storage object key, e.g. `customer/{uuid}/photos/selfie/{app}.jpg`. */
     selfiePath: string | null;
     aadhaarPhotoPath: string | null;
+    /** Storage object key for the active-liveness screen recording. */
+    livenessVideoPath: string | null;
     /** Full HTTPS CDN/presigned URL when public storage is configured; otherwise LOS stream path. */
     selfieUrl: string | null;
     aadhaarPhotoUrl: string | null;
+    livenessVideoUrl: string | null;
   };
+  /** True when LOS ops may grant one more customer KYC liveness attempt. */
+  canGrantKycLivenessRetry: boolean;
   preApprovedLoanAmount: string | null;
   createdAt: string;
   updatedAt: string;

@@ -3,6 +3,10 @@
 import { resolveLosKycPhotoSrc } from '@/lib/api';
 import { useEffect, useState } from 'react';
 
+function cx(...classes: Array<string | false | null | undefined>): string {
+  return classes.filter(Boolean).join(' ');
+}
+
 type LightboxState = { src: string; alt: string; label: string };
 
 export function KycPhotoLightbox({
@@ -85,6 +89,31 @@ export function KycPhotoTile({
   );
 }
 
+export function KycLivenessVideoPlayer({
+  src,
+  label = 'Liveness video (short)',
+}: {
+  src: string;
+  label?: string;
+}) {
+  return (
+    <div className="grid h-full gap-2 rounded-[12px] border border-[rgba(23,44,113,0.12)] bg-white p-2">
+      <span className="text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
+        {label}
+      </span>
+      <video
+        src={src}
+        controls
+        playsInline
+        preload="metadata"
+        className="h-40 w-full rounded-[10px] bg-[rgba(8,18,40,0.92)] object-contain"
+      >
+        Your browser does not support inline video playback.
+      </video>
+    </div>
+  );
+}
+
 export function KycPhotoGallery({
   row,
   authToken,
@@ -94,6 +123,7 @@ export function KycPhotoGallery({
     kycPhotos: {
       selfieUrl: string | null;
       aadhaarPhotoUrl: string | null;
+      livenessVideoUrl?: string | null;
     };
     updatedAt: string;
   };
@@ -107,18 +137,30 @@ export function KycPhotoGallery({
   const aadhaarSrc = authToken
     ? resolveLosKycPhotoSrc(row.kycPhotos.aadhaarPhotoUrl, authToken, version)
     : null;
+  const livenessVideoSrc = authToken
+    ? resolveLosKycPhotoSrc(row.kycPhotos.livenessVideoUrl ?? null, authToken, version)
+    : null;
 
   const [lightbox, setLightbox] = useState<LightboxState | null>(null);
 
-  if (!selfieSrc && !aadhaarSrc) {
+  if (!selfieSrc && !aadhaarSrc && !livenessVideoSrc) {
     return (
-      <p className="m-0 text-[0.84rem] text-brand-muted">No KYC photos captured yet.</p>
+      <p className="m-0 text-[0.84rem] text-brand-muted">No KYC photos or liveness video captured yet.</p>
     );
   }
 
   return (
     <>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div
+        className={cx(
+          'grid gap-3',
+          livenessVideoSrc && (aadhaarSrc || selfieSrc)
+            ? 'grid-cols-1 md:grid-cols-3'
+            : aadhaarSrc && selfieSrc
+              ? 'grid-cols-1 sm:grid-cols-2'
+              : 'grid-cols-1',
+        )}
+      >
         {aadhaarSrc ? (
           <KycPhotoTile
             label="Aadhaar photo"
@@ -134,6 +176,9 @@ export function KycPhotoGallery({
             alt="Customer selfie"
             onOpen={() => setLightbox({ src: selfieSrc, alt: 'Customer selfie', label: 'Selfie' })}
           />
+        ) : null}
+        {livenessVideoSrc ? (
+          <KycLivenessVideoPlayer src={livenessVideoSrc} />
         ) : null}
       </div>
       {lightbox ? (

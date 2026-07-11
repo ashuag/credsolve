@@ -14,6 +14,7 @@ import {
   fetchCustomerSession,
   type CustomerSessionResponse,
 } from '@/lib/api/customer-session';
+import { logoutCustomer } from '@/lib/api/auth';
 
 type CustomerSessionContextValue = {
   /** True until the first `/auth/me` fetch completes. */
@@ -22,6 +23,8 @@ type CustomerSessionContextValue = {
   session: CustomerSessionResponse | null;
   /** Reloads session from `GET /auth/me` and returns the result. */
   refresh: () => Promise<CustomerSessionResponse>;
+  /** Clears the HttpOnly cookie server-side and resets client session to signed-out. */
+  signOut: () => Promise<void>;
 };
 
 const CustomerSessionContext = createContext<CustomerSessionContextValue | undefined>(undefined);
@@ -83,6 +86,19 @@ export function CustomerSessionProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const signOut = useCallback(async (): Promise<void> => {
+    try {
+      await logoutCustomer();
+    } catch {
+      /* still clear local session — cookie may already be gone */
+    }
+    // Invalidate any in-flight refresh so it cannot restore the previous session.
+    refreshSeqRef.current += 1;
+    isInitialLoadRef.current = false;
+    setSession({ authenticated: false });
+    setLoading(false);
+  }, []);
+
   useEffect(() => {
     void refresh();
   }, [refresh]);
@@ -92,8 +108,9 @@ export function CustomerSessionProvider({ children }: { children: ReactNode }) {
       loading,
       session,
       refresh,
+      signOut,
     }),
-    [loading, session, refresh]
+    [loading, session, refresh, signOut]
   );
 
   return <CustomerSessionContext.Provider value={value}>{children}</CustomerSessionContext.Provider>;

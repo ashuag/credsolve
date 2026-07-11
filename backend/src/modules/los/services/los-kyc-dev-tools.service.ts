@@ -22,6 +22,12 @@ import {
 import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import type { KycSelfieFaceInspection } from '../../../common/kyc/kyc-selfie-face-validation.util';
 import { KycSelfieFaceValidationService } from '../../../common/kyc/kyc-selfie-face-validation.service';
+import {
+  KycActiveLivenessService,
+  type ActiveLivenessAnalysis,
+  type ActiveLivenessFacePosition,
+} from '../../../common/kyc/kyc-active-liveness.service';
+import type { ActiveLivenessChallenge } from '../../../common/kyc/kyc-active-liveness.util';
 import { KycTenacioVendorService } from '../../../common/vendor/kyc-tenacio-vendor.service';
 import { LivenessVendorService } from '../../../common/vendor/liveness-vendor.service';
 
@@ -50,6 +56,9 @@ export type LosSelfieFaceCheckResult = {
   businessOk: boolean;
 };
 
+export type LosActiveLivenessCheckResult = ActiveLivenessAnalysis;
+export type LosActiveLivenessFacePositionResult = ActiveLivenessFacePosition;
+
 @Injectable()
 export class LosKycDevToolsService {
   constructor(
@@ -58,7 +67,47 @@ export class LosKycDevToolsService {
     private readonly liveness: LivenessVendorService,
     private readonly faceMatch: KycFaceMatchService,
     private readonly selfieFaceValidation: KycSelfieFaceValidationService,
+    private readonly activeLiveness: KycActiveLivenessService,
   ) {}
+
+  async runActiveLivenessCheck(params: {
+    challenge: ActiveLivenessChallenge;
+    frames: UploadedFileLike[];
+  }): Promise<LosActiveLivenessCheckResult> {
+    const frames = params.frames ?? [];
+    if (frames.length < 2) {
+      throw new BadRequestException('Provide at least 2 captured frames for the challenge.');
+    }
+    if (frames.length > 30) {
+      throw new BadRequestException('Too many frames — capture 30 or fewer per challenge.');
+    }
+
+    const buffers: Buffer[] = [];
+    for (const frame of frames) {
+      if (!frame?.buffer?.length) continue;
+      if (frame.size > MAX_IMAGE_BYTES) {
+        throw new BadRequestException('Each captured frame must be 6MB or smaller.');
+      }
+      const mime = (frame.mimetype ?? '').toLowerCase();
+      if (!mime.includes('jpeg') && !mime.includes('jpg')) {
+        throw new BadRequestException('Captured frames must be JPEG images.');
+      }
+      buffers.push(frame.buffer);
+    }
+
+    if (buffers.length < 2) {
+      throw new BadRequestException('Could not read the captured frames. Please retry the challenge.');
+    }
+
+    return this.activeLiveness.analyzeFrames(params.challenge, buffers);
+  }
+
+  async runActiveLivenessFacePosition(
+    frame: UploadedFileLike | undefined,
+  ): Promise<LosActiveLivenessFacePositionResult> {
+    this.assertJpeg(frame, 'frame');
+    return this.activeLiveness.detectFacePosition(frame!.buffer!);
+  }
 
   async runSelfieFaceCheck(image: UploadedFileLike | undefined): Promise<LosSelfieFaceCheckResult> {
     this.assertJpeg(image, 'selfie');

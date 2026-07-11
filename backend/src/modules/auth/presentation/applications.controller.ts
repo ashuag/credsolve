@@ -1,5 +1,5 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Req, UploadedFile, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
-import { AnyFilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
+import { BadRequestException, Body, Controller, HttpCode, HttpStatus, Post, Req, UploadedFile, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { AnyFilesInterceptor, FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import type { UploadedFileLike } from '../../../common/types/uploaded-file';
@@ -15,7 +15,11 @@ import { SubmitVerifiedBankUseCase } from '../application/use-cases/submit-verif
 import { SaveBankDetailsUseCase } from '../application/use-cases/save-bank-details.use-case';
 import { SaveKycDocumentsUseCase } from '../application/use-cases/save-kyc-documents.use-case';
 import { SaveKycSelfieUseCase } from '../application/use-cases/save-kyc-selfie.use-case';
-import { RunKycLivenessUseCase } from '../application/use-cases/run-kyc-liveness.use-case';
+import {
+  RunKycLivenessUseCase,
+  type ActiveLivenessChallengeSegment,
+} from '../application/use-cases/run-kyc-liveness.use-case';
+import { CheckKycFacePositionUseCase } from '../application/use-cases/check-kyc-face-position.use-case';
 import { SaveLoanSelectionUseCase } from '../application/use-cases/save-loan-selection.use-case';
 import { SaveProfessionalDetailsDto } from '../application/dto/save-professional-details.dto';
 import { SubmitProfessionalApplicationUseCase } from '../application/use-cases/submit-professional-application.use-case';
@@ -31,6 +35,7 @@ export class ApplicationsController {
     private readonly saveKycDocuments: SaveKycDocumentsUseCase,
     private readonly saveKycSelfie: SaveKycSelfieUseCase,
     private readonly runKycLiveness: RunKycLivenessUseCase,
+    private readonly checkKycFacePosition: CheckKycFacePositionUseCase,
     private readonly saveBankDetails: SaveBankDetailsUseCase,
     private readonly lookupIfsc: LookupIfscUseCase,
     private readonly submitVerifiedBank: SubmitVerifiedBankUseCase
@@ -94,16 +99,72 @@ export class ApplicationsController {
     return this.saveKycSelfie.execute(req, selfie);
   }
 
+  @Post('kyc/face-position')
+  @RateLimitByRoute('kyc-face-position')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    FileInterceptor('frame', {
+      limits: { fileSize: 6 * 1024 * 1024 },
+    }),
+  )
+  @ApiOperation({
+    summary:
+      'Single-frame face-position probe used to gate the active-liveness run (face must be inside the guide oval).',
+  })
+  @ApiOkResponse({ description: 'Detected face box + normalized position, or faceDetected=false' })
+  kycFacePositionRoute(@Req() req: Request, @UploadedFile() frame: UploadedFileLike | undefined) {
+    return this.checkKycFacePosition.execute(req, frame);
+  }
+
   @Post('kyc/liveness')
   @RateLimitByRoute('kyc-liveness')
   @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'video', maxCount: 1 },
+        { name: 'frames', maxCount: 120 },
+      ],
+      { limits: { fileSize: 25 * 1024 * 1024 } },
+    ),
+  )
   @ApiOperation({
     summary:
-      'Pipeline: (1) selfie upload, (2) MoneyCash liveness, (3) Tenacio liveness, (4) MoneyCash face match. All must pass to proceed. A failure is retryable up to KYC_LIVENESS_MAX_ATTEMPTS times (retake selfie + rerun); once attempts are exhausted the lead is escalated to thank-you (INTERNAL_ERROR). No Tenacio HTTP when KYC_LIVENESS_PAUSED, TENACIO_LIVENESS_DISABLED, or POST target is not configured.',
+      'KYC pipeline: (1) MoneyCash selfie quality, (2) MoneyCash Aadhaar face match, (3) expression anti-spoof, (4) active liveness — smooth head-turn + smile session (default) or legacy per-challenge mode.',
   })
-  @ApiOkResponse({ description: 'Vendor outcome; updates application when HTTP call completes' })
-  kycLivenessRoute(@Req() req: Request) {
-    return this.runKycLiveness.execute(req);
+  @ApiOkResponse({ description: 'Pipeline outcome; completes KYC when all checks pass' })
+  kycLivenessRoute(
+    @Req() req: Request,
+    @UploadedFiles() files: { video?: UploadedFileLike[]; frames?: UploadedFileLike[] } | undefined,
+    @Body('challenges') challengesRaw?: string,
+    @Body('smoothSegments') smoothSegmentsRaw?: string,
+    @Body('mode') modeRaw?: string,
+  ) {
+    const mode = (modeRaw ?? 'smooth').trim().toLowerCase() === 'challenges' ? 'challenges' : 'smooth';
+    const frames = files?.frames ?? [];
+    let smoothSegments: SmoothLivenessSegment[] | undefined;
+    if (mode === 'smooth' && smoothSegmentsRaw?.trim()) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(smoothSegmentsRaw);
+      } catch {
+        throw new BadRequestException('Invalid smooth liveness segment metadata.');
+      }
+      smoothSegments = parseSmoothLivenessSegments(parsed) ?? undefined;
+      if (!smoothSegments) {
+        throw new BadRequestException('Invalid smooth liveness segment metadata.');
+      }
+      if (smoothSegmentFrameTotal(smoothSegments) !== frames.length) {
+        throw new BadRequestException('Smooth liveness frame count does not match segment metadata.');
+      }
+    }
+    return this.runKycLiveness.execute(req, {
+      video: files?.video?.[0],
+      frames,
+      challenges: mode === 'challenges' ? parseActiveLivenessChallenges(challengesRaw) : undefined,
+      smoothSegments,
+      mode,
+    });
   }
 
   @Post('bank/ifsc-lookup')
@@ -134,4 +195,27 @@ export class ApplicationsController {
   bankDetailsRoute(@Req() req: Request, @Body() body: SaveBankDetailsDto) {
     return this.saveBankDetails.execute(req, body);
   }
+}
+
+/** Parses the `challenges` JSON field from the multipart active-liveness request. */
+function parseActiveLivenessChallenges(raw: string | undefined): ActiveLivenessChallengeSegment[] {
+  if (!raw?.trim()) {
+    throw new BadRequestException('Missing liveness challenge metadata.');
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new BadRequestException('Invalid liveness challenge metadata.');
+  }
+  if (!Array.isArray(parsed)) {
+    throw new BadRequestException('Invalid liveness challenge metadata.');
+  }
+  return parsed.map((item) => {
+    const record = (item ?? {}) as Record<string, unknown>;
+    return {
+      challenge: record.challenge as ActiveLivenessChallengeSegment['challenge'],
+      count: Number(record.count),
+    };
+  });
 }

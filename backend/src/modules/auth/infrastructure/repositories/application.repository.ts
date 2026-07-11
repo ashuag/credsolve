@@ -159,6 +159,19 @@ export class ApplicationRepository {
     return updated.livenessAttempts;
   }
 
+  /** Reopens the face pipeline when ops granted a retry or attempts remain. */
+  async reopenLivenessPipeline(applicationId: bigint, tx?: DbClient) {
+    await this.ensureApplicationKyc(applicationId, tx);
+    return this.db(tx).applicationKyc.update({
+      where: { applicationId },
+      data: {
+        isLiveness: false,
+        livenessDoneAt: null,
+        livenessPassed: false,
+      },
+    });
+  }
+
   async updateLivenessResult(
     params: {
       applicationId: bigint;
@@ -180,6 +193,20 @@ export class ApplicationRepository {
         ...(params.done !== undefined ? { isLiveness: params.done } : {}),
         ...(params.doneAt !== undefined ? { livenessDoneAt: params.doneAt } : {}),
       },
+    });
+  }
+
+  /** Stores the S3/Spaces object key for the captured active-liveness video. */
+  async updateLivenessVideoPath(
+    params: { applicationId: bigint; livenessVideoPath: string },
+    tx?: DbClient,
+  ) {
+    await this.ensureApplicationKyc(params.applicationId, tx);
+    const data: Prisma.ApplicationKycUpdateInput = {};
+    (data as Record<string, unknown>).livenessVideoPath = params.livenessVideoPath;
+    return this.db(tx).applicationKyc.update({
+      where: { applicationId: params.applicationId },
+      data,
     });
   }
 }

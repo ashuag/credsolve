@@ -9,14 +9,16 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { UploadedFileLike } from '../../common/types/uploaded-file';
 import { LosAuthGuard } from './auth/los-auth.guard';
+import { ActiveLivenessCheckDto } from './dto/active-liveness-check.dto';
 import { KycFaceMatchCheckDto } from './dto/kyc-face-match-check.dto';
 import { LosKycDevToolsService } from './services/los-kyc-dev-tools.service';
 
 const MAX_SELFIE_BYTES = 6 * 1024 * 1024;
+const MAX_ACTIVE_LIVENESS_FRAMES = 30;
 
 @ApiTags('LOS Developer Tools')
 @Controller(['los/developer-tools', 'los/los/developer-tools'])
@@ -71,4 +73,42 @@ export class LosDeveloperToolsController {
     });
   }
 
+  @Post('active-liveness-check')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    FilesInterceptor('frames', MAX_ACTIVE_LIVENESS_FRAMES, {
+      limits: { fileSize: MAX_SELFIE_BYTES },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Active (challenge-response) liveness check on a burst of captured frames',
+    description:
+      'Runs on-server face-api landmark detection across the uploaded frames and verifies the requested action (blink / turn head / smile / open mouth) actually happened.',
+  })
+  async activeLivenessCheck(
+    @UploadedFiles() frames: UploadedFileLike[] | undefined,
+    @Body() body: ActiveLivenessCheckDto,
+  ) {
+    return this.kycDevTools.runActiveLivenessCheck({
+      challenge: body.challenge,
+      frames: frames ?? [],
+    });
+  }
+
+  @Post('active-liveness-face-position')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    FileInterceptor('frame', {
+      limits: { fileSize: MAX_SELFIE_BYTES },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Detect face position in a single frame (used to gate the active liveness run)',
+    description: 'Returns the detected face box + normalized center so the UI can confirm the face is inside the guide oval before starting.',
+  })
+  async activeLivenessFacePosition(@UploadedFile() frame: UploadedFileLike | undefined) {
+    return this.kycDevTools.runActiveLivenessFacePosition(frame);
+  }
 }

@@ -7,6 +7,8 @@ import {
   isLeadRejectedAndLocked,
   isInternalErrorLead,
   canResumeKycAfterInternalError,
+  resolveKycStagePath,
+  shouldResumeKycSelfie,
   CUSTOMER_EMAIL_JOURNEY_PATH,
 } from '@/lib/api/customer-session';
 import { isLoanDocumentsJourneyComplete } from '@/lib/loan-documents-journey';
@@ -21,18 +23,13 @@ type JourneyStage =
   | 'references'
   | 'done';
 
-/** In-progress application routes — never race these to apply-for-loan while session hydrates. */
-function isInJourneyPath(path: string): boolean {
+/** Routes a signed-out visitor may open without being redirected to apply-for-loan. */
+function isGuestAccessiblePath(path: string): boolean {
   return (
-    path === '/pre-approved-loan' ||
-    path === '/loan-selection' ||
-    path.startsWith('/email-verify') ||
-    path.startsWith('/onboarding') ||
-    path === '/loan-documents' ||
-    path === '/kyc' ||
-    path.startsWith('/kyc/') ||
-    path === '/bank-details' ||
-    path === '/references'
+    path === '/' ||
+    path === '/apply-for-loan' ||
+    path === '/my-account' ||
+    path === '/login'
   );
 }
 
@@ -49,10 +46,13 @@ function stageFromSession(session: ReturnType<typeof useCustomerSession>['sessio
   return 'done';
 }
 
-function defaultPathForStage(stage: JourneyStage): string {
+function defaultPathForStage(
+  stage: JourneyStage,
+  session: ReturnType<typeof useCustomerSession>['session'],
+): string {
   switch (stage) {
     case 'kyc':
-      return '/kyc';
+      return resolveKycStagePath(session);
     case 'details':
       return '/onboarding?mode=login';
     case 'preApproved':
@@ -113,16 +113,14 @@ export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
   const { loading, session } = useCustomerSession();
 
   const stage = useMemo(() => stageFromSession(session), [session]);
-  const redirectPath = useMemo(() => defaultPathForStage(stage), [stage]);
+  const redirectPath = useMemo(() => defaultPathForStage(stage, session), [session, stage]);
 
   useEffect(() => {
     if (loading || !pathname) return;
 
-    const inJourney = isInJourneyPath(pathname);
-
-    // Session still hydrating — stay on journey pages; do NOT refresh here (causes /auth/me loops).
+    // Signed out — only public entry routes; journey steps (KYC, thank-you, etc.) → apply.
     if (!session?.authenticated) {
-      if (inJourney || pathname === '/apply-for-loan' || pathname === '/thank-you' || pathname === '/my-account') {
+      if (isGuestAccessiblePath(pathname)) {
         return;
       }
       router.replace('/apply-for-loan');
@@ -130,7 +128,7 @@ export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
     }
 
     if (!session.lead) {
-      if (inJourney || pathname === '/thank-you' || pathname === '/my-account') {
+      if (isGuestAccessiblePath(pathname)) {
         return;
       }
       router.replace('/apply-for-loan');
@@ -154,6 +152,11 @@ export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
       if (pathname !== '/thank-you') {
         router.replace('/thank-you');
       }
+      return;
+    }
+
+    if (stage === 'kyc' && pathname === '/kyc' && shouldResumeKycSelfie(session)) {
+      router.replace('/kyc/selfie');
       return;
     }
 

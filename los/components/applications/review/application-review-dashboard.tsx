@@ -148,7 +148,7 @@ export function ApplicationReviewDashboard({
             <ReviewLoanPanel row={row} applicationUuid={applicationUuid} authToken={authToken} onDataChange={onRefresh} />
           </div>
           <div className={`panel${activeTab === 'kyc' ? ' on' : ''}`}>
-            <ReviewKycPanel row={row} authToken={authToken} />
+            <ReviewKycPanel row={row} applicationUuid={applicationUuid} authToken={authToken} onRefresh={onRefresh} />
           </div>
           <div className={`panel${activeTab === 'bank' ? ' on' : ''}`}>
             <ReviewBankPanel row={row} />

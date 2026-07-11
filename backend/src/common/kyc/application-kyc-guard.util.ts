@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { APPLICATION_KYC_STATUS } from '../constants/application.constants';
 import { isDigilockerAadhaarCaptureComplete } from './aadhaar-vendor-parse.util';
-import { isKycLivenessOutboundSkipped } from './kyc-liveness-env.util';
+import { isActiveLivenessDisabled } from './kyc-active-liveness.util';
 
 export type ApplicationFaceStepSnapshot = {
   kycStatus?: number | null;
@@ -13,7 +13,7 @@ export type ApplicationFaceStepSnapshot = {
 export function isApplicationFaceStepComplete(application: ApplicationFaceStepSnapshot): boolean {
   const hasSelfie = Boolean(application.selfieRelativePath?.trim());
   const hasAadhaar = isDigilockerAadhaarCaptureComplete(application.digilockerAadhaarFormJson ?? null);
-  const livenessOk = application.livenessPassed === true || isKycLivenessOutboundSkipped();
+  const livenessOk = application.livenessPassed === true || isActiveLivenessDisabled();
   return hasAadhaar && hasSelfie && livenessOk;
 }
 

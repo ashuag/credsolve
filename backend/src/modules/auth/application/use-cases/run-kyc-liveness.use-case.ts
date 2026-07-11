@@ -3,24 +3,21 @@ import type { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { isApplicationFaceStepComplete } from '../../../../common/kyc/application-kyc-guard.util';
 import { KycCompletionService } from '../../../../common/kyc/kyc-completion.service';
-import { LivenessVendorService } from '../../../../common/vendor/liveness-vendor.service';
+import { KycActiveLivenessService } from '../../../../common/kyc/kyc-active-liveness.service';
 import {
-  extractLivenessFaceOccluded,
-  extractLivenessIsLive,
-  extractLivenessMultipleFacesDetected,
-  extractLivenessScore,
-  isTenacioVendorBusinessSuccess,
-  pickTenacioVendorErrorMessage,
-} from '../../../../common/kyc/aadhaar-vendor-parse.util';
+  type ActiveLivenessChallenge,
+  isActiveLivenessChallenge,
+} from '../../../../common/kyc/kyc-active-liveness.util';
+import type { ExpressionFrameMetric } from '../../../../common/kyc/kyc-face-expression.util';
 import { KycFaceMatchService } from '../../../../common/kyc/kyc-face-match.service';
 import {
   toPersistedFaceMatchInspection,
 } from '../../../../common/kyc/kyc-face-match-inspection-persist.util';
 import { emptyFaceMatchInspection } from '../../../../common/kyc/kyc-face-match.util';
 import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
+import { encodeLivenessFramesToWebm } from '../../../../common/kyc/kyc-liveness-video-from-frames.util';
 import { KycSelfieFaceValidationService } from '../../../../common/kyc/kyc-selfie-face-validation.service';
 import { toPersistedSelfieFaceInspection } from '../../../../common/kyc/kyc-selfie-face-inspection-persist.util';
-import { resolveKycLivenessSelfiePublicUrl } from '../../../../common/kyc/kyc-liveness-selfie-url.util';
 import {
   buildKycPipelineStepLog,
   describeLocalKycCheckFailure,
@@ -29,13 +26,10 @@ import {
   type LocalKycCheckOperation,
   type LocalKycCheckPhase,
 } from '../../../../common/kyc/kyc-liveness-pipeline-log.util';
+import type { UploadedFileLike } from '../../../../common/types/uploaded-file';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { ApplicationRepository } from '../../infrastructure/repositories/application.repository';
-import {
-  isKycLivenessCheckPaused,
-  isKycLivenessOutboundSkipped,
-} from '../../../../common/kyc/kyc-liveness-env.util';
 import { assertActiveApplicationLoanDocumentsAccepted } from '../../../../common/loan-documents/application-loan-documents-guard.util';
 import {
   KYC_LIVENESS_MAX_ATTEMPTS,
@@ -44,7 +38,35 @@ import {
 import { VendorInternalErrorService } from '../../../../common/vendor/vendor-internal-error.service';
 import { fetchLatestApplicationKycSnapshot } from '../../../../prisma/application-kyc-snapshot.query';
 import { PrismaService } from '../../../../prisma/prisma.service';
-import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
+import {
+  parseSmoothLivenessSegments,
+  smoothSegmentFrameTotal,
+  type SmoothLivenessSegment,
+} from '../../../../common/kyc/kyc-smooth-liveness-segments.util';
+
+/** Minimum distinct challenges the customer must complete for a valid active-liveness run. */
+const MIN_ACTIVE_LIVENESS_CHALLENGES = 2;
+/** Max size for the uploaded liveness recording. */
+const MAX_LIVENESS_VIDEO_BYTES = 25 * 1024 * 1024;
+
+export type ActiveLivenessChallengeSegment = {
+  challenge: ActiveLivenessChallenge;
+  count: number;
+};
+
+/** Multipart payload posted by the customer active-liveness step. */
+export type RunKycLivenessInput = {
+  /** Short recording of the whole liveness session (webm/mp4). Stored as an audit artifact. */
+  video?: UploadedFileLike;
+  /** JPEG frame bursts for all challenges, concatenated in `challenges` order. */
+  frames: UploadedFileLike[];
+  /** Challenge sequence with per-challenge frame counts (legacy multi-challenge mode). */
+  challenges?: ActiveLivenessChallengeSegment[];
+  /** `smooth` = one continuous head-turn + smile session with expression anti-spoof (recommended). */
+  mode?: 'smooth' | 'challenges';
+  /** Per-phase frame counts for smooth mode (baseline → turn → smile). */
+  smoothSegments?: SmoothLivenessSegment[];
+};
 
 export type RunKycLivenessResult = {
   configured: boolean;
@@ -53,9 +75,8 @@ export type RunKycLivenessResult = {
   httpStatus: number | null;
   vendor: unknown;
   livenessPassed: boolean;
-  /** From Tenacio `error.message` when the vendor rejects the request (HTTP may still be 200 via proxy). */
   vendorErrorMessage?: string;
-  /** When `application.kyc_status` was already completed (no vendor call). */
+  /** When `application.kyc_status` was already completed (no checks run). */
   alreadyCompleted?: boolean;
   /** On-server selfie face validation (MoneyCash liveness module). */
   faceValidationPassed?: boolean;
@@ -63,17 +84,19 @@ export type RunKycLivenessResult = {
   /** On-server Aadhaar vs selfie face match (MoneyCash face-api module). */
   faceMatchPassed?: boolean;
   faceMatchMessage?: string;
+  /** On-server active (challenge–response) liveness result. */
+  activeLivenessPassed?: boolean;
+  activeLivenessMessage?: string;
+  expressionAntiSpoofPassed?: boolean;
+  expressionAntiSpoofMessage?: string;
   suggestRetrySelfie?: boolean;
   bestComputedConfidence?: number | null;
-  /** Generic customer copy (never raw vendor errors). */
+  /** Generic customer copy (never raw errors). */
   customerMessage?: string;
   /** Terminal pipeline failure — attempts exhausted, lead escalated to INTERNAL_ERROR; show thank-you. */
   internalError?: boolean;
-  /** Failed pipeline runs so far (including this one). */
   attemptsUsed?: number;
-  /** Total allowed pipeline runs before escalation. */
   attemptsAllowed?: number;
-  /** Retries left before the lead is escalated to the thank-you page. */
   attemptsRemaining?: number;
 };
 
@@ -84,15 +107,33 @@ type LocalKycChecksPayload = {
   localChecksCompletedAt: string;
 };
 
-type VendorChecksPayload = {
-  tenacioLiveness?: {
-    configured: boolean;
+type ActiveLivenessChallengePayload = {
+  challenge: ActiveLivenessChallenge | 'smooth';
+  passed: boolean;
+  reason: string;
+  framesAnalyzed: number;
+  framesWithFace: number;
+  aggregates: Record<string, number | null | boolean | string>;
+  validationDisabled: boolean;
+  expressionAntiSpoof?: {
     passed: boolean;
-    livenessScore: number | null;
-    isLive: boolean | null;
-    skipReason?: string;
-    vendor: unknown;
-    httpStatus: number | null;
+    reason: string;
+    aggregates: Record<string, number | null | boolean | string>;
+  };
+};
+
+type VendorChecksPayload = {
+  expressionAntiSpoof?: {
+    passed: boolean;
+    reason: string;
+    aggregates: Record<string, number | null | boolean | string>;
+  };
+  activeLiveness?: {
+    passed: boolean;
+    validationDisabled: boolean;
+    challenges: ActiveLivenessChallengePayload[];
+    videoStored: boolean;
+    videoPath: string | null;
   };
 };
 
@@ -104,17 +145,16 @@ export class RunKycLivenessUseCase {
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
     private readonly applications: ApplicationRepository,
-    private readonly liveness: LivenessVendorService,
+    private readonly activeLiveness: KycActiveLivenessService,
     private readonly kycFiles: KycFilesService,
     private readonly selfieFaceValidation: KycSelfieFaceValidationService,
     private readonly faceMatch: KycFaceMatchService,
     private readonly prisma: PrismaService,
-    private readonly settings: SettingsRepository,
     private readonly kycCompletion: KycCompletionService,
     private readonly internalError: VendorInternalErrorService,
   ) {}
 
-  async execute(req: Request): Promise<RunKycLivenessResult> {
+  async execute(req: Request, input: RunKycLivenessInput): Promise<RunKycLivenessResult> {
     const session = req.customerSession;
     if (!session) {
       throw new UnauthorizedException('Sign in with mobile OTP before continuing.');
@@ -142,6 +182,15 @@ export class RunKycLivenessUseCase {
       throw new BadRequestException('No application found for this lead.');
     }
 
+    if (
+      application.livenessCheckCompleted &&
+      !application.livenessPassed &&
+      application.livenessAttempts < KYC_LIVENESS_MAX_ATTEMPTS
+    ) {
+      await this.applications.reopenLivenessPipeline(application.id);
+      application.livenessCheckCompleted = false;
+    }
+
     if (isApplicationFaceStepComplete(application)) {
       return {
         configured: true,
@@ -154,17 +203,41 @@ export class RunKycLivenessUseCase {
     }
 
     if (!application.selfieRelativePath?.trim()) {
-      throw new BadRequestException('Upload a selfie before running liveness.');
+      throw new BadRequestException('Capture your selfie before running liveness.');
     }
 
-    const selfieRelativePath = application.selfieRelativePath.trim();
-    const applicationFresh = await this.prisma.client.application.findUnique({
-      where: { id: application.id },
-      select: { updatedAt: true },
-    });
-    const photoVersion = applicationFresh?.updatedAt?.getTime() ?? Date.now();
+    const mode = input.mode === 'challenges' ? 'challenges' : 'smooth';
+    if (!input.frames.length) {
+      throw new BadRequestException('No liveness frames were received. Please retry.');
+    }
+    const challenges =
+      mode === 'challenges' ? this.validateChallengeSegments(input) : null;
 
-    // Step 2 — MoneyCash liveness (selfie face validation).
+    const selfieRelativePath = application.selfieRelativePath.trim();
+
+    const storedLivenessVideoPath = await this.storeLivenessVideo({
+      video: input.video,
+      frames: input.frames,
+      customerUuid: customer.uuid,
+      applicationUuid: application.uuid,
+      pipelineSteps: [],
+    });
+    if (storedLivenessVideoPath) {
+      try {
+        await this.applications.updateLivenessVideoPath({
+          applicationId: application.id,
+          livenessVideoPath: storedLivenessVideoPath,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Failed to persist liveness video path (applicationId=${application.id.toString()}): ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+
+    // Step 1 — MoneyCash selfie quality (face validation).
     const moneyCashLiveness = await this.runMoneyCashLivenessCheck({
       applicationId: application.id,
       selfieRelativePath,
@@ -182,89 +255,14 @@ export class RunKycLivenessUseCase {
     }
 
     let localChecksPayload = moneyCashLiveness.localChecksPayload;
-    let vendorChecks: VendorChecksPayload = {};
-    let tenacioHttpStatus: number | null = null;
 
-    // Step 3 — Tenacio liveness (skipped when outbound is disabled / paused).
-    if (isKycLivenessOutboundSkipped()) {
-      const skipReason = isKycLivenessCheckPaused()
-        ? 'Tenacio liveness paused — MoneyCash checks only.'
-        : 'Tenacio liveness outbound skipped — MoneyCash checks only.';
-      const tenacioPayload: NonNullable<VendorChecksPayload['tenacioLiveness']> = {
-        configured: false,
-        passed: true,
-        livenessScore: null,
-        isLive: null,
-        skipReason,
-        vendor: null,
-        httpStatus: null,
-      };
-      this.recordPipelineStep(
-        localChecksPayload.pipelineSteps,
-        buildKycPipelineStepLog('3-tenacio-liveness', {
-          ok: true,
-          request: null,
-          response: tenacioPayload,
-          skipReason,
-        }),
-      );
-      vendorChecks = { tenacioLiveness: tenacioPayload };
-    } else {
-      const selfieUrlResult = await resolveKycLivenessSelfiePublicUrl(this.kycFiles, {
-        applicationUuid: application.uuid,
-        selfieRelativePath,
-        photoVersion,
-      });
-      if (!selfieUrlResult.ok) {
-        return this.returnKycPipelineFailed({
-          applicationId: application.id,
-          leadId: lead.id,
-          providerName: 'Tenacio',
-          serviceName: 'liveness',
-          localChecksPayload,
-          faceValidationPassed: true,
-          bestComputedConfidence: moneyCashLiveness.bestComputedConfidence,
-          configured: false,
-          skipReason: selfieUrlResult.error,
-          vendorErrorMessage: selfieUrlResult.error,
-        });
-      }
-
-      const livenessGate = await this.runTenacioLivenessCheck({
-        leadId: lead.id,
-        selfieUrl: selfieUrlResult.url,
-        selfieRelativePath,
-        pipelineSteps: localChecksPayload.pipelineSteps,
-      });
-      vendorChecks = { tenacioLiveness: livenessGate.payload };
-      tenacioHttpStatus = livenessGate.httpStatus;
-
-      if (!livenessGate.ok || !livenessGate.passed) {
-        return this.returnKycPipelineFailed({
-          applicationId: application.id,
-          leadId: lead.id,
-          providerName: 'Tenacio',
-          serviceName: 'liveness',
-          httpStatus: livenessGate.httpStatus,
-          localChecksPayload,
-          vendorChecks,
-          faceValidationPassed: true,
-          bestComputedConfidence: moneyCashLiveness.bestComputedConfidence,
-          configured: livenessGate.configured,
-          skipReason: livenessGate.skipReason,
-          vendorErrorMessage: livenessGate.message,
-        });
-      }
-    }
-
-    // Step 4 — MoneyCash face match (Aadhaar vs selfie).
+    // Step 2 — MoneyCash face match (Aadhaar vs selfie).
     const moneyCashFaceMatch = await this.runMoneyCashFaceMatchCheck({
       applicationId: application.id,
       selfieRelativePath,
       aadhaarPhotoRelativePath: application.aadhaarPhotoRelativePath,
       pipelineSteps: localChecksPayload.pipelineSteps,
       selfieFaceValidation: localChecksPayload.selfieFaceValidation,
-      bestComputedConfidence: moneyCashLiveness.bestComputedConfidence,
     });
     localChecksPayload = moneyCashFaceMatch.localChecksPayload ?? localChecksPayload;
 
@@ -275,13 +273,100 @@ export class RunKycLivenessUseCase {
         providerName: 'MoneyCash',
         serviceName: 'face-match',
         localChecksPayload,
-        vendorChecks,
         faceValidationPassed: true,
         faceMatchPassed: false,
         faceMatchMessage: moneyCashFaceMatch.faceMatchMessage,
         bestComputedConfidence: moneyCashLiveness.bestComputedConfidence,
       });
     }
+
+    // Steps 3–4 — expression anti-spoof, then active liveness (smooth or legacy challenges).
+    const smoothFrameBuffers =
+      mode === 'smooth'
+        ? input.frames
+            .map((f) => f.buffer)
+            .filter((b): b is Buffer => Boolean(b?.length))
+        : [];
+    if (mode === 'smooth' && smoothFrameBuffers.length < 8) {
+      throw new BadRequestException('Not enough liveness frames were received. Please try again.');
+    }
+
+    const smoothFrameMetrics =
+      mode === 'smooth'
+        ? await this.activeLiveness.measureSmoothSessionFrames(smoothFrameBuffers)
+        : null;
+
+    let vendorChecks: VendorChecksPayload = {};
+    let activeGate: {
+      passed: boolean;
+      message?: string;
+      payload: NonNullable<VendorChecksPayload['activeLiveness']>;
+    };
+
+    if (mode === 'smooth' && smoothFrameMetrics) {
+      const expressionGate = this.runExpressionAntiSpoofCheck({
+        frameMetrics: smoothFrameMetrics,
+        pipelineSteps: localChecksPayload.pipelineSteps,
+      });
+      vendorChecks = { expressionAntiSpoof: expressionGate.payload };
+
+      if (!expressionGate.passed) {
+        return this.returnKycPipelineFailed({
+          applicationId: application.id,
+          leadId: lead.id,
+          providerName: 'MoneyCash',
+          serviceName: 'expression-anti-spoof',
+          localChecksPayload,
+          vendorChecks,
+          faceValidationPassed: true,
+          faceMatchPassed: true,
+          expressionAntiSpoofPassed: false,
+          expressionAntiSpoofMessage: expressionGate.payload.reason,
+          bestComputedConfidence: moneyCashLiveness.bestComputedConfidence,
+        });
+      }
+
+      activeGate = this.runSmoothActiveLivenessCheck({
+        frameMetrics: smoothFrameMetrics,
+        smoothSegments: input.smoothSegments,
+        pipelineSteps: localChecksPayload.pipelineSteps,
+      });
+    } else {
+      activeGate = await this.runActiveLivenessCheck({
+        frames: input.frames,
+        challenges: challenges!,
+        pipelineSteps: localChecksPayload.pipelineSteps,
+      });
+    }
+
+    vendorChecks = { ...vendorChecks, activeLiveness: activeGate.payload };
+    if (storedLivenessVideoPath && activeGate.payload) {
+      activeGate.payload.videoStored = true;
+      activeGate.payload.videoPath = storedLivenessVideoPath;
+    }
+
+    if (!activeGate.passed) {
+      return this.returnKycPipelineFailed({
+        applicationId: application.id,
+        leadId: lead.id,
+        providerName: 'MoneyCash',
+        serviceName: 'active-liveness',
+        localChecksPayload,
+        vendorChecks,
+        faceValidationPassed: true,
+        faceMatchPassed: true,
+        activeLivenessPassed: false,
+        activeLivenessMessage: activeGate.message,
+        bestComputedConfidence: moneyCashLiveness.bestComputedConfidence,
+      });
+    }
+
+    // All checks passed — liveness video was already stored at the start of the run.
+    if (activeGate.payload) {
+      activeGate.payload.videoStored = Boolean(storedLivenessVideoPath);
+      activeGate.payload.videoPath = storedLivenessVideoPath;
+    }
+    vendorChecks = { ...vendorChecks, activeLiveness: activeGate.payload };
 
     const checkedAt = new Date();
     await this.persistKycPipelineResult({
@@ -292,6 +377,22 @@ export class RunKycLivenessUseCase {
       done: true,
       checkedAt,
     });
+    // Best-effort: the video key is also recorded inside `livenessVendorJson`, so a
+    // failure here (e.g. column missing) never blocks KYC completion.
+    if (storedLivenessVideoPath) {
+      try {
+        await this.applications.updateLivenessVideoPath({
+          applicationId: application.id,
+          livenessVideoPath: storedLivenessVideoPath,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Failed to persist liveness video path (applicationId=${application.id.toString()}): ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
 
     await this.kycCompletion.completeFromDigilockerAadhaar({
       applicationId: application.id,
@@ -300,19 +401,307 @@ export class RunKycLivenessUseCase {
       aadhaarPhotoRelativePath: application.aadhaarPhotoRelativePath,
       verifiedAt: checkedAt,
     });
-    const providerName = (process.env.TENACIO_PROVIDER ?? 'Tenacio').trim();
+    const providerName = (process.env.TENACIO_PROVIDER ?? 'MoneyCash').trim();
     await this.internalError.recoverLeadIfVendorFailuresCleared(lead.id, providerName);
 
     return {
       configured: true,
       ok: true,
-      httpStatus: tenacioHttpStatus,
+      httpStatus: 200,
       vendor: mergeVendorPayload(localChecksPayload, vendorChecks),
       livenessPassed: true,
       faceValidationPassed: true,
+      activeLivenessPassed: true,
       faceMatchPassed: true,
       bestComputedConfidence: moneyCashLiveness.bestComputedConfidence,
     };
+  }
+
+  /** Validates the challenge sequence + that the frame counts line up with the uploaded frames. */
+  private validateChallengeSegments(input: RunKycLivenessInput): ActiveLivenessChallengeSegment[] {
+    const segments = Array.isArray(input.challenges) ? input.challenges : [];
+    if (segments.length < MIN_ACTIVE_LIVENESS_CHALLENGES) {
+      throw new BadRequestException(
+        `Complete at least ${MIN_ACTIVE_LIVENESS_CHALLENGES} liveness actions before submitting.`,
+      );
+    }
+
+    let total = 0;
+    for (const seg of segments) {
+      if (!isActiveLivenessChallenge(seg?.challenge)) {
+        throw new BadRequestException('Invalid liveness action received. Please retry.');
+      }
+      if (!Number.isInteger(seg.count) || seg.count <= 0) {
+        throw new BadRequestException('Invalid liveness frame data received. Please retry.');
+      }
+      total += seg.count;
+    }
+
+    if (!input.frames.length) {
+      throw new BadRequestException('No liveness frames were received. Please retry.');
+    }
+    if (total !== input.frames.length) {
+      throw new BadRequestException('Liveness frame data was incomplete. Please retry.');
+    }
+    return segments;
+  }
+
+  /** Step 3 — expression anti-spoof on the smooth-session frame burst. */
+  private runExpressionAntiSpoofCheck(params: {
+    frameMetrics: ExpressionFrameMetric[];
+    pipelineSteps: KycLivenessPipelineStepLog[];
+  }): {
+    passed: boolean;
+    payload: NonNullable<VendorChecksPayload['expressionAntiSpoof']>;
+  } {
+    const antiSpoof = this.activeLiveness.evaluateExpressionAntiSpoofFromFrames(params.frameMetrics);
+
+    this.recordPipelineStep(
+      params.pipelineSteps,
+      buildKycPipelineStepLog('3-expression-anti-spoof', {
+        ok: antiSpoof.passed,
+        request: { mode: 'smooth', frames: params.frameMetrics.length },
+        response: antiSpoof,
+      }),
+    );
+
+    return { passed: antiSpoof.passed, payload: antiSpoof };
+  }
+
+  /** Step 4 (smooth) — head turns + smile only (expression anti-spoof runs separately). */
+  private runSmoothActiveLivenessCheck(params: {
+    frameMetrics: ExpressionFrameMetric[];
+    smoothSegments?: SmoothLivenessSegment[] | null;
+    pipelineSteps: KycLivenessPipelineStepLog[];
+  }): {
+    passed: boolean;
+    message?: string;
+    payload: NonNullable<VendorChecksPayload['activeLiveness']>;
+  } {
+    const analysis = this.activeLiveness.evaluateSmoothActiveLivenessFromFrames(
+      params.frameMetrics,
+      { segments: params.smoothSegments },
+    );
+    const payload: ActiveLivenessChallengePayload = {
+      challenge: 'smooth',
+      passed: analysis.passed,
+      reason: analysis.reason,
+      framesAnalyzed: analysis.framesAnalyzed,
+      framesWithFace: analysis.framesWithFace,
+      aggregates: analysis.aggregates,
+      validationDisabled: analysis.validationDisabled,
+    };
+
+    this.recordPipelineStep(
+      params.pipelineSteps,
+      buildKycPipelineStepLog('4-active-liveness', {
+        ok: analysis.passed,
+        request: { mode: 'smooth', frames: params.frameMetrics.length },
+        response: payload,
+      }),
+    );
+
+    return {
+      passed: analysis.passed,
+      message: analysis.passed ? undefined : analysis.reason,
+      payload: {
+        passed: analysis.passed,
+        validationDisabled: analysis.validationDisabled,
+        challenges: [payload],
+        videoStored: false,
+        videoPath: null,
+      },
+    };
+  }
+
+  /** Step 4 (legacy) — run each challenge's frame burst through the on-server active-liveness analyzer. */
+  private async runActiveLivenessCheck(params: {
+    frames: UploadedFileLike[];
+    challenges: ActiveLivenessChallengeSegment[];
+    pipelineSteps: KycLivenessPipelineStepLog[];
+  }): Promise<{
+    passed: boolean;
+    message?: string;
+    payload: NonNullable<VendorChecksPayload['activeLiveness']>;
+  }> {
+    const challengePayloads: ActiveLivenessChallengePayload[] = [];
+    let offset = 0;
+    let passed = true;
+    let firstFailure: string | undefined;
+    let validationDisabled = false;
+
+    for (const seg of params.challenges) {
+      const slice = params.frames.slice(offset, offset + seg.count);
+      offset += seg.count;
+      const buffers = slice
+        .map((f) => f.buffer)
+        .filter((b): b is Buffer => Boolean(b?.length));
+
+      const analysis = await this.activeLiveness.analyzeFrames(seg.challenge, buffers);
+      validationDisabled = validationDisabled || analysis.validationDisabled;
+
+      const payload: ActiveLivenessChallengePayload = {
+        challenge: seg.challenge,
+        passed: analysis.passed,
+        reason: analysis.reason,
+        framesAnalyzed: analysis.framesAnalyzed,
+        framesWithFace: analysis.framesWithFace,
+        aggregates: analysis.aggregates,
+        validationDisabled: analysis.validationDisabled,
+      };
+      challengePayloads.push(payload);
+
+      this.recordPipelineStep(
+        params.pipelineSteps,
+        buildKycPipelineStepLog('4-active-liveness', {
+          ok: analysis.passed,
+          request: { challenge: seg.challenge, frames: seg.count },
+          response: payload,
+        }),
+      );
+
+      if (!analysis.passed) {
+        passed = false;
+        firstFailure = firstFailure ?? analysis.reason;
+      }
+    }
+
+    return {
+      passed,
+      message: firstFailure,
+      payload: {
+        passed,
+        validationDisabled,
+        challenges: challengePayloads,
+        videoStored: false,
+        videoPath: null,
+      },
+    };
+  }
+
+  /** Persists the short liveness recording to object storage. Best-effort — never blocks completion. */
+  private async storeLivenessVideo(params: {
+    video?: UploadedFileLike;
+    frames?: UploadedFileLike[];
+    customerUuid: string;
+    applicationUuid: string;
+    pipelineSteps: KycLivenessPipelineStepLog[];
+  }): Promise<string | null> {
+    const uploaded = await this.storeUploadedLivenessVideo(params);
+    if (uploaded) return uploaded;
+    return this.storeLivenessVideoFromFrames(params);
+  }
+
+  private inferLivenessVideoExt(video: UploadedFileLike): 'webm' | 'mp4' | null {
+    const mime = (video.mimetype ?? '').toLowerCase();
+    if (mime.includes('webm')) return 'webm';
+    if (mime.includes('mp4') || mime.includes('quicktime')) return 'mp4';
+
+    const name = (video.originalname ?? '').toLowerCase();
+    if (name.endsWith('.webm')) return 'webm';
+    if (name.endsWith('.mp4')) return 'mp4';
+
+    const buf = video.buffer;
+    if (!buf?.length) return null;
+    if (buf.length >= 4 && buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) {
+      return 'webm';
+    }
+    if (
+      buf.length >= 12 &&
+      buf[4] === 0x66 &&
+      buf[5] === 0x74 &&
+      buf[6] === 0x79 &&
+      buf[7] === 0x70
+    ) {
+      return 'mp4';
+    }
+
+    if (!mime || mime === 'application/octet-stream') return 'webm';
+    return null;
+  }
+
+  private async storeUploadedLivenessVideo(params: {
+    video?: UploadedFileLike;
+    customerUuid: string;
+    applicationUuid: string;
+    pipelineSteps: KycLivenessPipelineStepLog[];
+  }): Promise<string | null> {
+    const video = params.video;
+    if (!video?.buffer?.length) return null;
+
+    const ext = this.inferLivenessVideoExt(video);
+    if (!ext) {
+      this.logger.warn(`Liveness video rejected — unsupported mime "${video.mimetype ?? 'unknown'}".`);
+      return null;
+    }
+    if (video.size > MAX_LIVENESS_VIDEO_BYTES) {
+      this.logger.warn(`Liveness video rejected — ${video.size} bytes exceeds limit.`);
+      return null;
+    }
+
+    const rel = this.kycFiles.livenessVideoRelativePath(
+      params.customerUuid,
+      params.applicationUuid,
+      ext,
+    );
+    try {
+      await this.kycFiles.writeBytes(rel, video.buffer);
+      this.recordPipelineStep(
+        params.pipelineSteps,
+        buildKycPipelineStepLog('4-active-liveness', {
+          ok: true,
+          request: { operation: 'store-video', bytes: video.buffer.length, mime: video.mimetype ?? ext },
+          response: { livenessVideoPath: rel },
+        }),
+      );
+      return rel;
+    } catch (err) {
+      this.logger.warn(
+        `Failed to store liveness video (${rel}): ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return null;
+    }
+  }
+
+  private async storeLivenessVideoFromFrames(params: {
+    frames?: UploadedFileLike[];
+    customerUuid: string;
+    applicationUuid: string;
+    pipelineSteps: KycLivenessPipelineStepLog[];
+  }): Promise<string | null> {
+    const frameBuffers =
+      params.frames
+        ?.map((frame) => frame.buffer)
+        .filter((buffer): buffer is Buffer => Boolean(buffer?.length)) ?? [];
+    if (frameBuffers.length < 2) return null;
+
+    const encoded = await encodeLivenessFramesToWebm(frameBuffers);
+    if (!encoded?.length) return null;
+
+    const rel = this.kycFiles.livenessVideoRelativePath(
+      params.customerUuid,
+      params.applicationUuid,
+      'webm',
+    );
+    try {
+      await this.kycFiles.writeBytes(rel, encoded);
+      this.recordPipelineStep(
+        params.pipelineSteps,
+        buildKycPipelineStepLog('4-active-liveness', {
+          ok: true,
+          request: { operation: 'store-video-from-frames', frameCount: frameBuffers.length },
+          response: { livenessVideoPath: rel },
+        }),
+      );
+      return rel;
+    } catch (err) {
+      this.logger.warn(
+        `Failed to store liveness video from frames (${rel}): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+      return null;
+    }
   }
 
   private recordPipelineStep(
@@ -355,7 +744,7 @@ export class RunKycLivenessUseCase {
   }
 
   /**
-   * Any failed gate (MoneyCash liveness, Tenacio liveness, MoneyCash face match)
+   * Any failed gate (MoneyCash liveness, active liveness, MoneyCash face match)
    * finalizes the pipeline and escalates the lead to INTERNAL_ERROR (thank-you page).
    */
   private async returnKycPipelineFailed(params: {
@@ -367,6 +756,10 @@ export class RunKycLivenessUseCase {
     localChecksPayload?: LocalKycChecksPayload;
     vendorChecks?: VendorChecksPayload;
     faceValidationPassed?: boolean;
+    activeLivenessPassed?: boolean;
+    activeLivenessMessage?: string;
+    expressionAntiSpoofPassed?: boolean;
+    expressionAntiSpoofMessage?: string;
     faceMatchPassed?: boolean;
     faceMatchMessage?: string;
     bestComputedConfidence: number | null;
@@ -402,9 +795,8 @@ export class RunKycLivenessUseCase {
         localChecksCompletedAt: new Date().toISOString(),
       } satisfies LocalKycChecksPayload);
 
-    // Count this failure. The customer may retake the selfie and rerun the
-    // pipeline until the attempt budget is spent; only then do we finalize the
-    // KYC step and escalate the lead to the thank-you page.
+    // Count this failure. The customer may retry the liveness actions until the
+    // attempt budget is spent; only then do we finalize the KYC step and escalate.
     const attemptsUsed = await this.applications.incrementLivenessAttempts(params.applicationId);
     const attemptsAllowed = KYC_LIVENESS_MAX_ATTEMPTS;
     const attemptsRemaining = Math.max(0, attemptsAllowed - attemptsUsed);
@@ -416,8 +808,6 @@ export class RunKycLivenessUseCase {
       localChecksPayload,
       vendorChecks: params.vendorChecks,
       passed: false,
-      // `done` (is_liveness) finalizes the step → thank-you. Keep it open while
-      // the customer still has retries left.
       done: exhausted,
       checkedAt,
     });
@@ -447,6 +837,10 @@ export class RunKycLivenessUseCase {
       customerMessage: exhausted ? KYC_VENDOR_TECHNICAL_ISSUE_CUSTOMER_MESSAGE : undefined,
       vendorErrorMessage: params.vendorErrorMessage,
       faceValidationPassed: params.faceValidationPassed,
+      activeLivenessPassed: params.activeLivenessPassed,
+      activeLivenessMessage: params.activeLivenessMessage,
+      expressionAntiSpoofPassed: params.expressionAntiSpoofPassed,
+      expressionAntiSpoofMessage: params.expressionAntiSpoofMessage,
       faceMatchPassed: params.faceMatchPassed,
       faceMatchMessage: params.faceMatchMessage,
       suggestRetrySelfie: !exhausted,
@@ -457,124 +851,7 @@ export class RunKycLivenessUseCase {
     };
   }
 
-  private async runTenacioLivenessCheck(params: {
-    leadId: bigint;
-    selfieUrl: string;
-    selfieRelativePath: string;
-    pipelineSteps: KycLivenessPipelineStepLog[];
-  }): Promise<{
-    ok: boolean;
-    configured: boolean;
-    passed: boolean;
-    skipReason?: string;
-    httpStatus: number | null;
-    message?: string;
-    payload: NonNullable<VendorChecksPayload['tenacioLiveness']>;
-  }> {
-    const livenessInput = { input: { consent: true, url: params.selfieUrl } };
-
-    const out = await this.liveness.postLivenessCheck(
-      livenessInput,
-      params.leadId,
-      params.selfieRelativePath,
-    );
-
-    const vendor = out.vendorBody ?? null;
-    const vendorStatusOk = out.ok && isTenacioVendorBusinessSuccess(vendor);
-
-    if (!out.configured) {
-      const payload: NonNullable<VendorChecksPayload['tenacioLiveness']> = {
-        configured: false,
-        passed: false,
-        livenessScore: extractLivenessScore(vendor),
-        isLive: extractLivenessIsLive(vendor),
-        skipReason: out.skipReason,
-        vendor,
-        httpStatus: out.httpStatus,
-      };
-      this.recordPipelineStep(
-        params.pipelineSteps,
-        buildKycPipelineStepLog('3-tenacio-liveness', {
-          ok: false,
-          request: livenessInput,
-          response: vendor,
-          httpStatus: out.httpStatus,
-          skipReason: out.skipReason,
-        }),
-      );
-      return {
-        ok: false,
-        configured: false,
-        passed: false,
-        skipReason: out.skipReason,
-        httpStatus: out.httpStatus,
-        message: out.skipReason,
-        payload,
-      };
-    }
-
-    const minScore = await this.settings.loadMinLivenessApiScore();
-    const livenessScore = extractLivenessScore(vendor);
-    const scoreOk = livenessScore === null || livenessScore >= minScore;
-    const isLive = extractLivenessIsLive(vendor);
-    const isLiveOk = isLive === null || isLive === true;
-    const multipleFaces = extractLivenessMultipleFacesDetected(vendor);
-    const multipleFacesOk = multipleFaces === null || multipleFaces === false;
-    const faceOccluded = extractLivenessFaceOccluded(vendor);
-    const faceOccludedOk = faceOccluded === null || faceOccluded === false;
-    const passed = vendorStatusOk && scoreOk && isLiveOk && multipleFacesOk && faceOccludedOk;
-
-    const payload: NonNullable<VendorChecksPayload['tenacioLiveness']> = {
-      configured: true,
-      passed,
-      livenessScore,
-      isLive,
-      vendor,
-      httpStatus: out.httpStatus,
-    };
-
-    this.recordPipelineStep(
-      params.pipelineSteps,
-      buildKycPipelineStepLog('3-tenacio-liveness', {
-        ok: passed,
-        request: livenessInput,
-        response: {
-          vendor,
-          livenessScore,
-          isLive,
-          scoreOk,
-          isLiveOk,
-          multipleFacesOk,
-          faceOccludedOk,
-          minScore,
-        },
-        httpStatus: out.httpStatus,
-      }),
-    );
-
-    if (!passed) {
-      const message =
-        pickTenacioVendorErrorMessage(vendor) ?? 'Liveness check did not pass. Please try again with a live selfie.';
-      return {
-        ok: false,
-        configured: true,
-        passed: false,
-        httpStatus: out.httpStatus,
-        message,
-        payload,
-      };
-    }
-
-    return {
-      ok: true,
-      configured: true,
-      passed: true,
-      httpStatus: out.httpStatus,
-      payload,
-    };
-  }
-
-  /** Step 2 — MoneyCash liveness (on-server selfie face validation). */
+  /** Step 1 — MoneyCash selfie quality (on-server face validation). */
   private async runMoneyCashLivenessCheck(params: {
     applicationId: bigint;
     selfieRelativePath: string;
@@ -615,7 +892,7 @@ export class RunKycLivenessUseCase {
         faceMatch: toPersistedFaceMatchInspection(
           emptyFaceMatchInspection(
             selfieInspection.ok
-              ? 'Pending — MoneyCash face match runs after Tenacio liveness.'
+              ? 'Pending — runs after selfie quality passes.'
               : 'Skipped — MoneyCash liveness failed.',
           ),
         ),
@@ -680,14 +957,13 @@ export class RunKycLivenessUseCase {
     }
   }
 
-  /** Step 4 — MoneyCash face match (Aadhaar reference vs selfie). */
+  /** Step 2 — MoneyCash face match (Aadhaar reference vs selfie). */
   private async runMoneyCashFaceMatchCheck(params: {
     applicationId: bigint;
     selfieRelativePath: string;
     aadhaarPhotoRelativePath: string | null;
     pipelineSteps: KycLivenessPipelineStepLog[];
     selfieFaceValidation: ReturnType<typeof toPersistedSelfieFaceInspection>;
-    bestComputedConfidence: number | null;
   }): Promise<{
     ok: boolean;
     faceMatchMessage?: string;

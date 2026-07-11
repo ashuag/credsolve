@@ -54,6 +54,14 @@ export class LosDataController {
     return this.losRejection.rejectApplication(applicationUuid, body);
   }
 
+  @Post('applications/:applicationUuid/kyc/grant-retry')
+  @ApiOperation({
+    summary: 'Grant the customer one more KYC liveness attempt after failure or INTERNAL_ERROR escalation',
+  })
+  grantKycLivenessRetry(@Param('applicationUuid') applicationUuid: string) {
+    return this.losApplication.grantKycLivenessRetry(applicationUuid);
+  }
+
   @Get('applications/:applicationUuid/kyc/selfie-photo')
   @ApiOperation({ summary: 'Stream customer selfie for an application (LOS auth)' })
   async applicationSelfiePhoto(
@@ -70,6 +78,15 @@ export class LosDataController {
     @Res() res: Response,
   ): Promise<void> {
     await this.losApplication.serveApplicationAadhaarPhoto(applicationUuid, res);
+  }
+
+  @Get('applications/:applicationUuid/kyc/liveness-video')
+  @ApiOperation({ summary: 'Stream customer active-liveness short video for an application (LOS auth)' })
+  async applicationLivenessVideo(
+    @Param('applicationUuid') applicationUuid: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    await this.losApplication.serveApplicationLivenessVideo(applicationUuid, res);
   }
 
   @Get('applications/:applicationUuid/cibil-report/pdf')

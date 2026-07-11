@@ -21,6 +21,7 @@ export type RateLimitRouteId =
   | 'bank-submit-verified'
   | 'kyc-selfie'
   | 'kyc-liveness'
+  | 'kyc-face-position'
   | 'loan-documents'
   | 'loan-documents-otp';
 

@@ -47,14 +47,11 @@ import {
 } from '@/lib/api';
 import {
   explainKycNotDone,
-  formatConfidencePercent,
-  formatDistance,
-  formatLaplacianVariance,
-  formatLivenessSummary,
-  formatMoneyCashFaceMatchSummary,
-  formatSelfieFaceValidationSummary,
 } from '@/lib/kyc-selfie-validation-display';
 import { KycPhotoGallery } from '@/components/shared/kyc-photo-gallery';
+import { KycGrantRetryButton } from '@/components/applications/kyc-grant-retry-button';
+import { canGrantKycLivenessRetryFromRow } from '@/lib/kyc-grant-retry-eligibility';
+import { KycPipelineSteps } from '@/components/applications/kyc-pipeline-steps';
 import { LosStatusPill } from '@/components/shared/los-status-pill';
 import { formatPersonName } from '@/lib/format-person-name';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
@@ -382,14 +379,28 @@ export function ReviewLoanPanel({
 
 export function ReviewKycPanel({
   row,
+  applicationUuid,
   authToken,
+  onRefresh,
 }: {
   row: LosApplicationDetails;
+  applicationUuid: string;
   authToken: string | null;
+  onRefresh?: () => void;
 }) {
   const kycDone = row.kycStatus === 1;
   const isCurrentStep = isApplicationJourneyStepActive(row, 'kyc');
   const kycNotDoneReason = explainKycNotDone(row);
+  const showGrantKycRetry =
+    row.canGrantKycLivenessRetry || canGrantKycLivenessRetryFromRow(row);
+  const livenessMaxAttempts = 3;
+  const customerSelfRetriesLeft = Math.max(0, livenessMaxAttempts - row.livenessAttempts);
+  const customerCanSelfRetry =
+    !row.livenessPassed &&
+    customerSelfRetriesLeft > 0 &&
+    !row.livenessCheckCompleted &&
+    row.lead.statusCode !== 'INTERNAL_ERROR' &&
+    row.statusCode !== 'INTERNAL_ERROR';
   return (
     <>
       <ReviewCard
@@ -427,91 +438,78 @@ export function ReviewKycPanel({
             {kycNotDoneReason}
           </p>
         ) : null}
+        {!showGrantKycRetry && kycNotDoneReason && customerCanSelfRetry ? (
+          <p
+            style={{
+              margin: '0 0 14px',
+              padding: '10px 12px',
+              borderRadius: 10,
+              border: '1px solid rgba(20, 150, 243, 0.25)',
+              background: 'rgba(240, 249, 255, 0.9)',
+              fontSize: '12px',
+              lineHeight: 1.45,
+              color: '#0c4a6e',
+            }}
+          >
+            Customer can retry from the selfie step on their own ({customerSelfRetriesLeft} attempt
+            {customerSelfRetriesLeft === 1 ? '' : 's'} left). Use &quot;Grant customer 1 KYC retry&quot;
+            after attempts are exhausted or the lead is in INTERNAL_ERROR.
+          </p>
+        ) : null}
+        {showGrantKycRetry ? (
+          <div style={{ marginBottom: 16 }}>
+            <KycGrantRetryButton
+              row={row}
+              applicationUuid={applicationUuid}
+              authToken={authToken}
+              onSuccess={onRefresh}
+            />
+          </div>
+        ) : null}
         <div style={{ marginBottom: 16 }}>
-          <ReviewSectionLabel>KYC photos</ReviewSectionLabel>
+          <ReviewSectionLabel>KYC photos &amp; video</ReviewSectionLabel>
           <div style={{ marginTop: 8 }}>
             <KycPhotoGallery row={row} authToken={authToken} />
+          </div>
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <ReviewSectionLabel>KYC pipeline</ReviewSectionLabel>
+          <div style={{ marginTop: 10 }}>
+            <KycPipelineSteps row={row} variant="review" />
           </div>
         </div>
         <div className="fgrid">
           <ReviewField label="KYC status" value={`${row.kycStatusLabel} (${row.kycStatus})`} tone={kycDone ? 'accent' : undefined} />
           <ReviewField
-            label="Face validation (MoneyCash)"
-            value={formatSelfieFaceValidationSummary(row)}
-            tone={row.selfieFaceValidation?.passed ? 'accent' : row.selfieFaceValidation?.checkedAt ? 'flag' : undefined}
-            sub={
-              row.selfieFaceValidation?.reason && !row.selfieFaceValidation.passed
-                ? row.selfieFaceValidation.reason
-                : row.selfieFaceValidation?.confidenceBreakdown
-                  ? `Detection ${formatConfidencePercent(row.selfieFaceValidation.confidenceBreakdown.detection)} · alignment ${formatConfidencePercent(row.selfieFaceValidation.confidenceBreakdown.landmarkAlignment)}${
-                      row.selfieFaceValidation.laplacianVariance != null
-                        ? ` · Laplacian ${formatLaplacianVariance(row.selfieFaceValidation.laplacianVariance)} (min ${formatLaplacianVariance(row.selfieFaceValidation.minLaplacianVarianceRequired)})`
-                        : ''
-                    }`
-                  : undefined
-            }
+            label="KYC pipeline passed"
+            value={row.livenessPassed ? 'Yes' : 'No'}
+            tone={row.livenessPassed ? 'accent' : row.livenessCheckedAt || row.livenessSummary?.checkedAt ? 'flag' : undefined}
           />
+          <ReviewField label="KYC completed at" value={formatReviewDateTime(row.kycCompletedAt)} />
+          <ReviewField label="Selfie quality checked at" value={formatReviewDateTime(row.selfieFaceValidation?.checkedAt ?? null)} />
+          <ReviewField label="Liveness checked at" value={formatReviewDateTime(row.livenessCheckedAt)} />
           <ReviewField
-            label="Face match (MoneyCash)"
-            value={formatMoneyCashFaceMatchSummary(row)}
+            label="Liveness attempts used"
+            value={`${row.livenessAttempts} / 3`}
             tone={
-              row.moneyCashFaceMatch?.passed
-                ? 'accent'
-                : row.moneyCashFaceMatch?.checkedAt || row.moneyCashFaceMatch?.reason
-                  ? 'flag'
-                  : undefined
-            }
-            sub={
-              row.moneyCashFaceMatch?.reason && !row.moneyCashFaceMatch.passed
-                ? row.moneyCashFaceMatch.reason
-                : row.moneyCashFaceMatch?.distance != null
-                  ? `Distance ${formatDistance(row.moneyCashFaceMatch.distance)} (max ${formatDistance(row.moneyCashFaceMatch.maxDistanceThreshold)})`
-                  : undefined
-            }
-          />
-          <ReviewField
-            label="Liveness (Tenacio)"
-            value={formatLivenessSummary(row)}
-            tone={row.livenessPassed ? 'accent' : row.livenessSummary?.checkedAt ? 'flag' : undefined}
-            sub={
-              row.livenessSummary?.vendorStatus
-                ? `Vendor status: ${row.livenessSummary.vendorStatus}`
+              !row.livenessPassed && row.livenessAttempts >= 3
+                ? 'flag'
                 : undefined
             }
           />
           <ReviewField
-            label="Face match passed"
-            value={
-              row.moneyCashFaceMatch == null
-                ? '—'
-                : row.moneyCashFaceMatch.passed
-                  ? 'Yes'
-                  : 'No'
-            }
-            tone={
-              row.moneyCashFaceMatch?.passed
-                ? 'accent'
-                : row.moneyCashFaceMatch?.checkedAt || row.moneyCashFaceMatch?.reason
-                  ? 'flag'
-                  : undefined
-            }
+            label="Face match checked at"
+            value={formatReviewDateTime(
+              row.moneyCashFaceMatch?.reason?.startsWith('Pending') ||
+                row.moneyCashFaceMatch?.reason?.startsWith('Skipped')
+                ? null
+                : row.moneyCashFaceMatch?.checkedAt ?? null,
+            )}
           />
-          <ReviewField
-            label="Liveness passed"
-            value={row.livenessPassed ? 'Yes' : 'No'}
-            tone={row.livenessPassed ? 'accent' : row.livenessCheckedAt || row.livenessSummary?.checkedAt ? 'flag' : undefined}
-          />
-          <ReviewField label="KYC fetched at" value={formatReviewDateTime(row.kycCompletedAt)} />
-          <ReviewField label="Face validation at" value={formatReviewDateTime(row.selfieFaceValidation?.checkedAt ?? null)} />
-          <ReviewField
-            label="Face match at"
-            value={formatReviewDateTime(row.moneyCashFaceMatch?.checkedAt ?? null)}
-          />
-          <ReviewField label="Liveness checked at" value={formatReviewDateTime(row.livenessCheckedAt)} />
         </div>
         {row.livenessPassed ? (
           <p style={{ margin: '13px 0 0', fontSize: '11.5px', color: 'var(--ink-3)' }}>
-            MoneyCash face checks and Tenacio liveness passed — see the applicant header.
+            MoneyCash selfie quality, Aadhaar face match, expression anti-spoof, and active liveness all passed.
           </p>
         ) : null}
       </ReviewCard>
