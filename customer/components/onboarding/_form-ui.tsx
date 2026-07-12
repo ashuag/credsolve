@@ -16,9 +16,9 @@ export function inputCls(err: boolean) {
 type FormInputProps = Omit<
   React.InputHTMLAttributes<HTMLInputElement>,
   'id' | 'name' | 'className' | 'aria-invalid' | 'aria-describedby'
-> & { id: string; label: string; error?: string; span2?: boolean; labelSentenceCase?: boolean };
+> & { id: string; label: string; error?: string; span2?: boolean; labelSentenceCase?: boolean; className?: string };
 
-export function FormInput({ id, label, error, span2, labelSentenceCase, ...rest }: FormInputProps) {
+export function FormInput({ id, label, error, span2, labelSentenceCase, className, ...rest }: FormInputProps) {
   const hasErr = Boolean(error);
   const inner = (
     <div className="flex flex-col gap-1.5 w-full">
@@ -36,7 +36,7 @@ export function FormInput({ id, label, error, span2, labelSentenceCase, ...rest 
         id={id} name={id}
         aria-invalid={hasErr}
         aria-describedby={hasErr ? `${id}-error` : undefined}
-        className={inputCls(hasErr)}
+        className={cn(inputCls(hasErr), className)}
         {...rest}
       />
       {error && <p id={`${id}-error`} className="text-[#b2372d] text-[0.75rem] pl-1 font-medium m-0">{error}</p>}

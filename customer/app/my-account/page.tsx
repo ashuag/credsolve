@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import { MyAccountClientPage } from './my-account-client-page';
 
 export const metadata: Metadata = {
-  title: 'Log in — My account',
+  title: 'My account — MoneyCash',
   description:
-    'Sign in with your registered mobile number and OTP to access your MoneyCash dashboard, resume applications, and manage your loans.',
+    'Your MoneyCash account hub — view previous loans, track active repayments, and complete your loan journey.',
   openGraph: {
     title: 'Log in — My account | MoneyCash',
     description:

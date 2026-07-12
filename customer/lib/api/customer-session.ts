@@ -217,6 +217,24 @@ export function isLeadRejectedAndLocked(lead: CustomerPortalLead | null | undefi
   return new Date(lead.rejectedUntil).getTime() > Date.now();
 }
 
+/** True when the customer still has loan-application steps left (hub should show "Complete your journey"). */
+export function isCustomerJourneyIncomplete(
+  session: CustomerSessionResponse | null | undefined,
+): boolean {
+  if (!session?.authenticated) return false;
+  if (!session.lead) return true;
+  if (isLeadRejectedAndLocked(session.lead)) return false;
+  const j = session.journey;
+  return !(
+    j.detailsCompleted &&
+    j.loanSelectionCompleted &&
+    j.loanDocumentsCompleted &&
+    j.kycCompleted &&
+    j.bankDetailsCompleted &&
+    j.referencesCompleted
+  );
+}
+
 /**
  * Returns the most relevant page to continue a signed-in customer's in-progress journey.
  */

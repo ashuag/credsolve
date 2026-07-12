@@ -202,6 +202,7 @@ export function PersonalDetailsStep(
       if (['monthlyIncome', 'annualTurnover', 'annualProfit'].includes(key)) v = v.replace(/\D/g, '').slice(0, 12);
       else if (key === 'pincode') v = v.replace(/\D/g, '').slice(0, 6);
       else if (key === 'fullName') v = sanitizePersonNameInput(v);
+      else if (key === 'addressLine1' || key === 'addressLine2') v = v.toUpperCase();
       setFields((prev) => {
         const next = { ...prev, [key]: v } as Fields;
         if (key === 'occupation') {

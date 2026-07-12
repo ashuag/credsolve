@@ -201,7 +201,7 @@ export default function ReferencesPage() {
             <label className="grid gap-1.5">
               <span className="text-[0.75rem] font-bold text-slate-500 uppercase tracking-wider pl-1">Name</span>
               <input
-                className={inputClass(Boolean(errors[index]?.fullName))}
+                className={cn(inputClass(Boolean(errors[index]?.fullName)), 'uppercase placeholder:normal-case')}
                 value={refs[index].fullName}
                 onChange={(e) => updateRef(index, 'fullName', e.target.value)}
                 placeholder="Full name"

@@ -22,7 +22,7 @@ export const PERSON_NAME_VALIDATION_MESSAGE =
   'Name may only contain letters, spaces, and periods.';
 
 export function sanitizePersonNameInput(value: string): string {
-  return value.replace(/[^\p{L} .]/gu, '');
+  return value.replace(/[^\p{L} .]/gu, '').toUpperCase();
 }
 
 export function isValidPersonName(value: string): boolean {

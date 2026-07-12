@@ -35,6 +35,7 @@ export function ProfileFields({
         <FormInput
           span2 labelSentenceCase id="fullName" label="Full name as per PAN card" error={errors.fullName}
           type="text" autoComplete="name" placeholder="XXX YYY" required
+          className="uppercase placeholder:normal-case"
           value={fields.fullName} onChange={onFieldChange('fullName')}
         />
 

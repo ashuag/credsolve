@@ -45,10 +45,12 @@ export function FinancialFields({
 
         <FormInput span2 id="addressLine1" label="Address line 1" error={errors.addressLine1}
           type="text" autoComplete="address-line1" placeholder="Flat / House no, Building, Street" required
+          className="uppercase placeholder:normal-case"
           value={fields.addressLine1} onChange={onFieldChange('addressLine1')} />
 
         <FormInput span2 id="addressLine2" label="Address line 2" error={errors.addressLine2}
           type="text" autoComplete="address-line2" placeholder="Landmark / Area / Apartment name"
+          className="uppercase placeholder:normal-case"
           value={fields.addressLine2} onChange={onFieldChange('addressLine2')} />
       </div>
 
