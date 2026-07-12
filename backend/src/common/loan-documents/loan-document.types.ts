@@ -15,6 +15,8 @@ export type LoanDocumentMergeInput = {
   loanTenureDays: number | null;
   loanMaturityDate: Date | string | null;
   applicationUuid?: string | null;
+  /** Public application reference (exactly 12 chars, e.g. APP2026K7M2Q); preferred for KFS account no. */
+  applicationNumber?: string | null;
   processingFeePercent?: string | number | null;
   asOf?: Date;
   /** Captured when the customer accepts loan documents (OTP verified). */

@@ -28,6 +28,10 @@ import {
   type ActiveLivenessFacePosition,
 } from '../../../common/kyc/kyc-active-liveness.service';
 import type { ActiveLivenessChallenge } from '../../../common/kyc/kyc-active-liveness.util';
+import {
+  parseSmoothLivenessSegments,
+  type SmoothLivenessSegment,
+} from '../../../common/kyc/kyc-smooth-liveness-segments.util';
 import { KycTenacioVendorService } from '../../../common/vendor/kyc-tenacio-vendor.service';
 import { LivenessVendorService } from '../../../common/vendor/liveness-vendor.service';
 
@@ -71,15 +75,23 @@ export class LosKycDevToolsService {
   ) {}
 
   async runActiveLivenessCheck(params: {
-    challenge: ActiveLivenessChallenge;
+    mode?: 'smooth' | 'challenges';
+    challenge?: ActiveLivenessChallenge;
     frames: UploadedFileLike[];
+    smoothSegmentsRaw?: string;
   }): Promise<LosActiveLivenessCheckResult> {
+    const mode = params.mode === 'smooth' ? 'smooth' : 'challenges';
     const frames = params.frames ?? [];
-    if (frames.length < 2) {
-      throw new BadRequestException('Provide at least 2 captured frames for the challenge.');
+    const minFrames = mode === 'smooth' ? 8 : 2;
+    if (frames.length < minFrames) {
+      throw new BadRequestException(
+        mode === 'smooth'
+          ? 'Provide at least 8 captured frames for the smooth KYC session.'
+          : 'Provide at least 2 captured frames for the challenge.',
+      );
     }
-    if (frames.length > 30) {
-      throw new BadRequestException('Too many frames — capture 30 or fewer per challenge.');
+    if (frames.length > 40) {
+      throw new BadRequestException('Too many frames — capture 40 or fewer.');
     }
 
     const buffers: Buffer[] = [];
@@ -95,10 +107,30 @@ export class LosKycDevToolsService {
       buffers.push(frame.buffer);
     }
 
-    if (buffers.length < 2) {
-      throw new BadRequestException('Could not read the captured frames. Please retry the challenge.');
+    if (buffers.length < minFrames) {
+      throw new BadRequestException('Could not read the captured frames. Please retry.');
     }
 
+    if (mode === 'smooth') {
+      let segments: SmoothLivenessSegment[] | null = null;
+      if (params.smoothSegmentsRaw?.trim()) {
+        try {
+          segments = parseSmoothLivenessSegments(JSON.parse(params.smoothSegmentsRaw));
+        } catch {
+          throw new BadRequestException('smoothSegments must be valid JSON.');
+        }
+        if (!segments) {
+          throw new BadRequestException(
+            'smoothSegments must be an array of { phase: baseline|turn|smile, count }.',
+          );
+        }
+      }
+      return this.activeLiveness.analyzeSmoothSession(buffers, { segments });
+    }
+
+    if (!params.challenge) {
+      throw new BadRequestException('challenge is required when mode is challenges.');
+    }
     return this.activeLiveness.analyzeFrames(params.challenge, buffers);
   }
 

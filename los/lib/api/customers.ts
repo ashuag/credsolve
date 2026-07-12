@@ -33,6 +33,7 @@ export type LosCustomerLeadSummary = {
 
 export type LosCustomerApplicationSummary = {
   uuid: string;
+  applicationNumber: string;
   leadUuid: string;
   email: string | null;
   statusCode: string;

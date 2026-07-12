@@ -5,6 +5,8 @@
 model Application {
   id                    BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
   uuid                  String    @unique @default(uuid()) @db.Char(36)
+  /// Public alphanumeric reference (exactly 12 chars, e.g. APP2026K7M2Q). Becomes loan_account_number at disbursement.
+  applicationNumber     String    @unique @map("application_number") @db.VarChar(12)
   customerId            BigInt    @map("customer_id") @db.UnsignedBigInt
   leadId                BigInt    @map("lead_id") @db.UnsignedBigInt
   applicationStatusId   Int       @map("application_status_id") @db.SmallInt

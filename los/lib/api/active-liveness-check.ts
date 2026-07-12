@@ -20,6 +20,8 @@ export type ActiveLivenessFrameMetric = {
   mouthOpenRatio: number | null;
   smileRatio: number | null;
   yaw: number | null;
+  expressions?: Record<string, number> | null;
+  dominantExpression?: string | null;
 };
 
 export type ActiveLivenessThresholds = {
@@ -34,16 +36,26 @@ export type ActiveLivenessThresholds = {
   invertYaw: boolean;
 };
 
+export type SmoothLivenessSegmentMeta = {
+  phase: 'baseline' | 'turn' | 'smile';
+  count: number;
+};
+
 export type LosActiveLivenessCheckResult = {
-  challenge: ActiveLivenessChallenge;
+  challenge: ActiveLivenessChallenge | 'smooth';
   passed: boolean;
   reason: string;
   framesAnalyzed: number;
   framesWithFace: number;
   thresholds: ActiveLivenessThresholds;
-  aggregates: Record<string, number | null>;
+  aggregates: Record<string, number | null | boolean | string>;
   frames: ActiveLivenessFrameMetric[];
   validationDisabled: boolean;
+  expressionAntiSpoof?: {
+    passed: boolean;
+    reason: string;
+    aggregates: Record<string, number | null | boolean | string>;
+  };
 };
 
 export const ACTIVE_LIVENESS_CHALLENGE_LABELS: Record<ActiveLivenessChallenge, string> = {
@@ -84,6 +96,7 @@ export async function runActiveLivenessCheck(
   frames: File[],
 ): Promise<LosActiveLivenessCheckResult> {
   const form = new FormData();
+  form.set('mode', 'challenges');
   form.set('challenge', challenge);
   frames.forEach((file, i) => form.append('frames', file, file.name || `frame-${i}.jpg`));
   return authorizedLosRequest<LosActiveLivenessCheckResult>(
@@ -91,5 +104,25 @@ export async function runActiveLivenessCheck(
     '/developer-tools/active-liveness-check',
     { method: 'POST', body: form },
     'Active liveness check failed.',
+  );
+}
+
+/** Customer KYC smooth session (prepare → turn → smile + expression anti-spoof; no face match). */
+export async function runSmoothActiveLivenessCheck(
+  token: string,
+  frames: File[],
+  smoothSegments?: SmoothLivenessSegmentMeta[],
+): Promise<LosActiveLivenessCheckResult> {
+  const form = new FormData();
+  form.set('mode', 'smooth');
+  frames.forEach((file, i) => form.append('frames', file, file.name || `frame-${i}.jpg`));
+  if (smoothSegments?.length) {
+    form.set('smoothSegments', JSON.stringify(smoothSegments));
+  }
+  return authorizedLosRequest<LosActiveLivenessCheckResult>(
+    token,
+    '/developer-tools/active-liveness-check',
+    { method: 'POST', body: form },
+    'Smooth active liveness check failed.',
   );
 }

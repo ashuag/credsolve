@@ -3,6 +3,7 @@
 // ============================================================
 //
 // `loan_account` is created at disbursement (one per application).
+// `loan_account_number` is set from `application.application_number` (see resolveLoanAccountNumberAtDisbursement).
 // `loan_repayment` records individual payment events against an account.
 
 model LoanAccount {

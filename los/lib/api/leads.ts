@@ -27,6 +27,8 @@ export type LosLead = {
 
 export type LosApplication = {
   uuid: string;
+  /** Public alphanumeric reference (exactly 12 chars, e.g. APP2026K7M2Q); reused as loan account number at disbursement. */
+  applicationNumber: string;
   customerUuid: string;
   leadUuid: string | null;
   mobileNumber: string;
@@ -103,6 +105,7 @@ export type LosLeadDetails = {
   } | null;
   applications: Array<{
     uuid: string;
+    applicationNumber: string;
     statusCode: string;
     statusLabel: string;
     loanAmount: string | null;
@@ -176,6 +179,7 @@ export type LosMoneyCashFaceMatch = {
 
 export type LosApplicationDetails = {
   uuid: string;
+  applicationNumber: string;
   customerUuid: string;
   leadUuid: string;
   mobileNumber: string;

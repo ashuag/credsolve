@@ -214,6 +214,7 @@ export class LosLeadService {
         : null,
       applications: lead.applications.map((application) => ({
         uuid: application.uuid,
+        applicationNumber: application.applicationNumber,
         statusCode: application.applicationStatus.name,
         statusLabel: displayName(application.applicationStatus.name, application.applicationStatus.displayName),
         loanAmount: application.details?.selectedLoanAmount?.toString() ?? null,

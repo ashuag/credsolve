@@ -52,7 +52,7 @@ export function ApplicationReviewHero({
             ) : null}
           </div>
           <div className="ah-meta">
-            <span className="mono">{formatApplicationDisplayId(row.uuid, row.createdAt)}</span>
+            <span className="mono">{formatApplicationDisplayId(row.applicationNumber)}</span>
             <span className="ah-sep">•</span>
             <span>{profile?.occupation ?? '—'}</span>
             <span className="ah-sep">•</span>

@@ -141,10 +141,13 @@ export class KycActiveLivenessService implements OnModuleDestroy {
    * Smooth one-shot session: head turns + smile from a continuous capture, plus expression anti-spoof.
    * No head-turn challenges — fewer false failures, better UX.
    */
-  async analyzeSmoothSession(frameBuffers: Buffer[]): Promise<ActiveLivenessAnalysis> {
+  async analyzeSmoothSession(
+    frameBuffers: Buffer[],
+    options?: { segments?: SmoothLivenessSegment[] | null },
+  ): Promise<ActiveLivenessAnalysis> {
     const thresholds = this.resolveThresholds();
     const frames = await this.measureSmoothSessionFrames(frameBuffers);
-    const liveness = this.evaluateSmoothActiveLivenessFromFrames(frames);
+    const liveness = this.evaluateSmoothActiveLivenessFromFrames(frames, options);
     const antiSpoof = this.evaluateExpressionAntiSpoofFromFrames(frames);
 
     const passed = liveness.passed && antiSpoof.passed;

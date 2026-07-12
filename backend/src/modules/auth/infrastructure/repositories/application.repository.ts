@@ -1,8 +1,11 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { Prisma, type EmailVerificationType } from '@prisma/client';
 import { APPLICATION_KYC_STATUS, APPLICATION_STATUS } from '../../../../common/constants/application.constants';
+import { generateApplicationNumber } from '../../../../common/loan/application-number.util';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import type { DbClient } from './db.client';
+
+const APPLICATION_NUMBER_CREATE_ATTEMPTS = 8;
 
 @Injectable()
 export class ApplicationRepository {
@@ -10,6 +13,47 @@ export class ApplicationRepository {
 
   private db(tx?: DbClient) {
     return tx ?? this.prisma.client;
+  }
+
+  /**
+   * Creates an application with a unique `applicationNumber`.
+   * Retries on rare unique collisions of the random suffix.
+   */
+  async createDraftApplication(
+    params: { leadId: bigint; customerId: bigint; applicationStatusId: number },
+    tx?: DbClient,
+  ) {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < APPLICATION_NUMBER_CREATE_ATTEMPTS; attempt += 1) {
+      try {
+        return await this.db(tx).application.create({
+          data: {
+            customerId: params.customerId,
+            leadId: params.leadId,
+            applicationStatusId: params.applicationStatusId,
+            applicationNumber: generateApplicationNumber(),
+          },
+        });
+      } catch (err) {
+        lastError = err;
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError
+          && err.code === 'P2002'
+        ) {
+          const target = err.meta?.target;
+          const targets = Array.isArray(target)
+            ? target.map(String)
+            : [String(target ?? '')];
+          if (targets.some((t) => /application_number|applicationNumber/i.test(t))) {
+            continue;
+          }
+        }
+        throw err;
+      }
+    }
+    throw lastError instanceof Error
+      ? lastError
+      : new InternalServerErrorException('Failed to allocate a unique application number.');
   }
 
   async ensureDraftApplicationForLead(
@@ -29,13 +73,14 @@ export class ApplicationRepository {
     if (!draftStatus) {
       throw new InternalServerErrorException('Application status DRAFT is missing. Run database seeds.');
     }
-    return this.db(tx).application.create({
-      data: {
+    return this.createDraftApplication(
+      {
         customerId: params.customerId,
         leadId: params.leadId,
         applicationStatusId: draftStatus.id,
       },
-    });
+      tx,
+    );
   }
 
   private async ensureApplicationDetails(applicationId: bigint, tx?: DbClient) {

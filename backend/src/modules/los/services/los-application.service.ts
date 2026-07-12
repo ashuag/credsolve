@@ -31,6 +31,7 @@ function displayName(name: string, custom: string | null): string {
 const loanDocumentApplicationSelect = {
   id: true,
   uuid: true,
+  applicationNumber: true,
   customerId: true,
   details: {
     select: {
@@ -217,6 +218,7 @@ export class LosApplicationService {
 
       return {
         uuid: application.uuid,
+        applicationNumber: application.applicationNumber,
         customerUuid: application.customer.uuid,
         leadUuid: application.lead.uuid,
         mobileNumber: application.customer.mobileNumber,
@@ -352,6 +354,7 @@ export class LosApplicationService {
 
     return {
       uuid: application.uuid,
+      applicationNumber: application.applicationNumber,
       customerUuid: application.customer.uuid,
       leadUuid: lead.uuid,
       mobileNumber: application.customer.mobileNumber,
@@ -922,6 +925,7 @@ function toLoanDocumentContext(
   application: {
     id: bigint;
     uuid: string;
+    applicationNumber: string;
     details: {
       emailId: string | null;
       emailVerificationType: string | null;
@@ -943,6 +947,7 @@ function toLoanDocumentContext(
   return {
     id: application.id,
     uuid: application.uuid,
+    applicationNumber: application.applicationNumber,
     email: details?.emailId ?? null,
     emailVerificationType: details?.emailVerificationType ?? null,
     loanDocumentsAcceptedAt: details?.loanDocumentsAcceptedAt ?? null,

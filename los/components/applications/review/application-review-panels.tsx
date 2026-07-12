@@ -1152,9 +1152,30 @@ export function ReviewSourcesPanel({ row }: { row: LosApplicationDetails }) {
 
 export function ReviewRecordIdsPanel({ row }: { row: LosApplicationDetails }) {
   const records = [
-    { label: 'Application', value: row.uuid, href: null },
-    { label: 'Lead', value: row.leadUuid, href: `/leads/${row.leadUuid}` },
-    { label: 'Customer', value: row.customerUuid, href: `/customers/${row.customerUuid}` },
+    {
+      label: 'Application ID',
+      value: row.applicationNumber,
+      href: null as string | null,
+      display: row.applicationNumber.trim().toUpperCase(),
+    },
+    {
+      label: 'Application UUID',
+      value: row.uuid,
+      href: null as string | null,
+      display: truncateUuid(row.uuid),
+    },
+    {
+      label: 'Lead',
+      value: row.leadUuid,
+      href: `/leads/${row.leadUuid}`,
+      display: truncateUuid(row.leadUuid),
+    },
+    {
+      label: 'Customer',
+      value: row.customerUuid,
+      href: `/customers/${row.customerUuid}`,
+      display: truncateUuid(row.customerUuid),
+    },
   ] as const;
 
   return (
@@ -1166,7 +1187,7 @@ export function ReviewRecordIdsPanel({ row }: { row: LosApplicationDetails }) {
         </svg>
       }
       title="Record IDs"
-      right={<ReviewPill tone="info">3 linked records</ReviewPill>}
+      right={<ReviewPill tone="info">4 linked records</ReviewPill>}
     >
       <div className="id-grid">
         {records.map((item) => (
@@ -1175,11 +1196,11 @@ export function ReviewRecordIdsPanel({ row }: { row: LosApplicationDetails }) {
             <div className="iv">
               {item.href ? (
                 <Link href={item.href} className="uuid uuid-link" title={item.value}>
-                  {truncateUuid(item.value)}
+                  {item.display}
                 </Link>
               ) : (
                 <span className="uuid" title={item.value}>
-                  {truncateUuid(item.value)}
+                  {item.display}
                 </span>
               )}
               <CopyUuidButton value={item.value} label={item.label} />

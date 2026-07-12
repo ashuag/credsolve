@@ -74,10 +74,8 @@ export function cibilScoreBand(score: number | null | undefined): string {
   return 'Below threshold — high risk band';
 }
 
-export function formatApplicationDisplayId(uuid: string, createdAt: string): string {
-  const year = new Date(createdAt).getFullYear();
-  const suffix = uuid.replace(/-/g, '').slice(-5).toUpperCase();
-  return `APP-${year}-${suffix}`;
+export function formatApplicationDisplayId(applicationNumber: string): string {
+  return applicationNumber.trim().toUpperCase();
 }
 
 export function formatCityState(

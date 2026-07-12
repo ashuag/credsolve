@@ -31,13 +31,6 @@ function shortINR(value: string | null | undefined) {
   return `₹${n}`;
 }
 
-function formatDate(iso: string | null | undefined) {
-  if (!iso) return '—';
-  const d = new Date(`${iso}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
 function formatDateTime(iso: string | null | undefined) {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -139,13 +132,12 @@ function RejectionReasonCell({ app }: { app: LosApplication }) {
 }
 
 const TABLE_HEADERS = [
+  { key: 'app-id', label: 'Application ID', className: 'whitespace-nowrap' },
   { key: 'name', label: 'Name', className: 'min-w-[140px]' },
   { key: 'mobile', label: 'Mobile', className: 'whitespace-nowrap' },
   { key: 'email', label: 'Email', className: 'min-w-[160px]' },
   { key: 'cibil', label: 'CIBIL score', className: 'whitespace-nowrap' },
   { key: 'loan', label: 'Loan amount', className: 'whitespace-nowrap' },
-  { key: 'repay-date', label: 'Repayment date', className: 'whitespace-nowrap' },
-  { key: 'repayment', label: 'Repayment amount', className: 'whitespace-nowrap' },
   { key: 'kyc', label: 'KYC', className: 'whitespace-nowrap' },
   { key: 'created', label: 'Created', className: 'whitespace-nowrap' },
   { key: 'modified', label: 'Last modified', className: 'whitespace-nowrap' },
@@ -163,8 +155,8 @@ type ColFilters = Partial<Record<(typeof COLUMNS)[number]['key'], string>>;
 type SortDir = 'asc' | 'desc';
 type SortState = { key: (typeof TABLE_HEADERS)[number]['key']; dir: SortDir } | null;
 
-const DATE_FILTER_KEYS = new Set(['repay-date', 'created', 'modified']);
-const NUMERIC_FILTER_KEYS = new Set(['cibil', 'loan', 'repayment']);
+const DATE_FILTER_KEYS = new Set(['created', 'modified']);
+const NUMERIC_FILTER_KEYS = new Set(['cibil', 'loan']);
 
 function appDateKey(iso: string | null | undefined): string | null {
   if (!iso) return null;
@@ -184,6 +176,8 @@ function appDateTimestamp(iso: string | null | undefined): number | null {
 
 function getAppText(app: LosApplication, key: string): string {
   switch (key) {
+    case 'app-id':
+      return app.applicationNumber?.trim() || '';
     case 'name':
       return app.fullName?.trim() || 'Details pending';
     case 'mobile':
@@ -194,10 +188,6 @@ function getAppText(app: LosApplication, key: string): string {
       return app.cibilScore != null ? String(app.cibilScore) : '';
     case 'loan':
       return app.selectedLoanAmount ?? '';
-    case 'repay-date':
-      return formatDate(app.repayDate);
-    case 'repayment':
-      return app.repaymentAmount ?? '';
     case 'kyc':
       return app.kycCompleted ? 'Completed' : app.kycStatusLabel;
     case 'created':
@@ -241,12 +231,7 @@ function appMatchesFilters(app: LosApplication, filters: ColFilters): boolean {
       continue;
     }
     if (DATE_FILTER_KEYS.has(col.key)) {
-      const iso =
-        col.key === 'repay-date'
-          ? app.repayDate
-          : col.key === 'created'
-            ? app.createdAt
-            : app.updatedAt;
+      const iso = col.key === 'created' ? app.createdAt : app.updatedAt;
       if (appDateKey(iso) !== raw) return false;
       continue;
     }
@@ -254,11 +239,7 @@ function appMatchesFilters(app: LosApplication, filters: ColFilters): boolean {
       const target = Number(raw);
       if (!Number.isFinite(target)) continue;
       const actual =
-        col.key === 'cibil'
-          ? app.cibilScore
-          : col.key === 'loan'
-            ? Number(app.selectedLoanAmount)
-            : Number(app.repaymentAmount);
+        col.key === 'cibil' ? app.cibilScore : Number(app.selectedLoanAmount);
       if (actual == null || !Number.isFinite(actual) || actual !== target) return false;
       continue;
     }
@@ -269,6 +250,8 @@ function appMatchesFilters(app: LosApplication, filters: ColFilters): boolean {
 
 function getAppSortValue(app: LosApplication, key: string): string | number | null {
   switch (key) {
+    case 'app-id':
+      return (app.applicationNumber ?? '').toUpperCase();
     case 'name':
       return (app.fullName?.trim() || 'Details pending').toLowerCase();
     case 'mobile':
@@ -279,12 +262,6 @@ function getAppSortValue(app: LosApplication, key: string): string | number | nu
       return app.cibilScore;
     case 'loan': {
       const n = Number(app.selectedLoanAmount);
-      return Number.isFinite(n) ? n : null;
-    }
-    case 'repay-date':
-      return appDateTimestamp(app.repayDate);
-    case 'repayment': {
-      const n = Number(app.repaymentAmount);
       return Number.isFinite(n) ? n : null;
     }
     case 'kyc':
@@ -653,7 +630,16 @@ export function ApplicationsPanel() {
                         } ${idx === paginated.length - 1 ? 'border-b-0' : 'border-[rgba(23,44,113,0.05)]'}`}
                       >
                         <td className="px-3 py-2.5">
-                          <Link href={`/applications/${app.uuid}`} className="font-semibold text-brand-blue no-underline hover:underline whitespace-nowrap">
+                          <Link
+                            href={`/applications/${app.uuid}`}
+                            className="font-mono text-[0.82rem] font-semibold text-brand-blue no-underline hover:underline whitespace-nowrap"
+                            title={app.applicationNumber}
+                          >
+                            {app.applicationNumber}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <Link href={`/applications/${app.uuid}`} className="font-semibold text-brand-navy no-underline hover:underline whitespace-nowrap">
                             {name}
                           </Link>
                         </td>
@@ -663,8 +649,6 @@ export function ApplicationsPanel() {
                         </td>
                         <td className="px-3 py-2.5"><CibilBadge score={app.cibilScore} /></td>
                         <td className="px-3 py-2.5 font-extrabold text-brand-navy whitespace-nowrap">{formatINR(app.selectedLoanAmount)}</td>
-                        <td className="px-3 py-2.5 text-brand-muted whitespace-nowrap text-[0.82rem]">{formatDate(app.repayDate)}</td>
-                        <td className="px-3 py-2.5 text-brand-text whitespace-nowrap">{formatINR(app.repaymentAmount)}</td>
                         <td className="px-3 py-2.5"><KycStatusCell app={app} /></td>
                         <td className="px-3 py-2.5 text-brand-muted whitespace-nowrap text-[0.78rem]">{formatDateTime(app.createdAt)}</td>
                         <td className="px-3 py-2.5 text-brand-muted whitespace-nowrap text-[0.78rem]">{formatDateTime(app.updatedAt)}</td>

@@ -168,6 +168,7 @@ export class LosCustomerService {
       })),
       applications: customer.applications.map((application) => ({
         uuid: application.uuid,
+        applicationNumber: application.applicationNumber,
         leadUuid: application.lead.uuid,
         email: application.details?.emailId ?? null,
         statusCode: application.applicationStatus.name,

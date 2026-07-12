@@ -15,6 +15,7 @@ const OCCUPATION_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
 );
 import { parseOptionalInrAmount } from '../../../../common/utils/parse-inr-amount';
 import { PrismaService } from '../../../../prisma/prisma.service';
+import { ApplicationRepository } from '../../infrastructure/repositories/application.repository';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { BureauReportRepository } from '../../infrastructure/repositories/bureau-report.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
@@ -35,6 +36,7 @@ export class SubmitProfessionalApplicationUseCase {
   constructor(
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
+    private readonly applications: ApplicationRepository,
     private readonly prisma: PrismaService,
     private readonly bureauReports: BureauReportRepository,
     private readonly checkLoanEligibility: CheckLoanEligibilityUseCase
@@ -145,13 +147,14 @@ export class SubmitProfessionalApplicationUseCase {
       });
 
       if (!application) {
-        application = await tx.application.create({
-          data: {
+        application = await this.applications.createDraftApplication(
+          {
             customerId: customer.id,
             leadId: leadRow.id,
             applicationStatusId: draftStatus.id,
           },
-        });
+          tx,
+        );
       }
 
       await tx.application.update({

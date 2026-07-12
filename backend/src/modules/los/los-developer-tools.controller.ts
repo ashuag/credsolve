@@ -18,7 +18,7 @@ import { KycFaceMatchCheckDto } from './dto/kyc-face-match-check.dto';
 import { LosKycDevToolsService } from './services/los-kyc-dev-tools.service';
 
 const MAX_SELFIE_BYTES = 6 * 1024 * 1024;
-const MAX_ACTIVE_LIVENESS_FRAMES = 30;
+const MAX_ACTIVE_LIVENESS_FRAMES = 40;
 
 @ApiTags('LOS Developer Tools')
 @Controller(['los/developer-tools', 'los/los/developer-tools'])
@@ -82,17 +82,19 @@ export class LosDeveloperToolsController {
   )
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Active (challenge-response) liveness check on a burst of captured frames',
+    summary: 'Active liveness check (smooth customer KYC flow or legacy per-challenge bursts)',
     description:
-      'Runs on-server face-api landmark detection across the uploaded frames and verifies the requested action (blink / turn head / smile / open mouth) actually happened.',
+      'mode=smooth mirrors the customer KYC capture (prepare → turn → smile) with expression anti-spoof, excluding Aadhaar face match. mode=challenges keeps the legacy single-action burst check.',
   })
   async activeLivenessCheck(
     @UploadedFiles() frames: UploadedFileLike[] | undefined,
     @Body() body: ActiveLivenessCheckDto,
   ) {
     return this.kycDevTools.runActiveLivenessCheck({
+      mode: body.mode,
       challenge: body.challenge,
       frames: frames ?? [],
+      smoothSegmentsRaw: body.smoothSegments,
     });
   }
 

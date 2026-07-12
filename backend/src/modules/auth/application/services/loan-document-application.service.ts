@@ -36,6 +36,7 @@ type ApplicationDetailsRow = {
 export type LoanDocumentApplicationContext = {
   id: bigint;
   uuid: string;
+  applicationNumber: string;
   email: string | null;
   emailVerificationType: string | null;
   loanDocumentsAcceptedAt: Date | null;
@@ -66,6 +67,7 @@ export class LoanDocumentApplicationService {
       select: {
         id: true,
         uuid: true,
+        applicationNumber: true,
         details: {
           select: {
             emailId: true,
@@ -91,6 +93,7 @@ export class LoanDocumentApplicationService {
     const application: LoanDocumentApplicationContext = {
       id: applicationRow.id,
       uuid: applicationRow.uuid,
+      applicationNumber: applicationRow.applicationNumber,
       email: details?.emailId ?? null,
       emailVerificationType: details?.emailVerificationType ?? null,
       loanDocumentsAcceptedAt: details?.loanDocumentsAcceptedAt ?? null,
@@ -133,6 +136,7 @@ export class LoanDocumentApplicationService {
     } | null;
     application: {
       uuid: string;
+      applicationNumber: string;
       loanDocumentsAcceptedIp?: string | null;
       loanDocumentsAcceptedAt?: Date | null;
       details: ApplicationDetailsRow | null;
@@ -166,6 +170,7 @@ export class LoanDocumentApplicationService {
       loanTenureDays: tenureDays,
       loanMaturityDate: appDetails?.expectedRepaymentDate ?? null,
       applicationUuid: params.application.uuid,
+      applicationNumber: params.application.applicationNumber,
       processingFeePercent: toNumber(appDetails?.processingFeePercentage?.toString() ?? null),
       acceptanceIpAddress:
         params.acceptanceIpAddress?.trim()

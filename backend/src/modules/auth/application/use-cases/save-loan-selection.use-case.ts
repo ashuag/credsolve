@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { Request } from 'express';
+import { ApplicationRepository } from '../../infrastructure/repositories/application.repository';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { PrismaService } from '../../../../prisma/prisma.service';
@@ -29,6 +30,7 @@ export class SaveLoanSelectionUseCase {
   constructor(
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
+    private readonly applications: ApplicationRepository,
     private readonly prisma: PrismaService,
     private readonly settings: SettingsRepository,
     private readonly checkLoanEligibility: CheckLoanEligibilityUseCase,
@@ -66,27 +68,10 @@ export class SaveLoanSelectionUseCase {
     }
 
     await this.prisma.client.$transaction(async (tx) => {
-      let application = await tx.application.findFirst({
-        where: { leadId: lead.id, customerId: customer.id },
-        orderBy: { createdAt: 'desc' },
-      });
-
-      if (!application) {
-        const draftStatus = await tx.applicationStatus.findFirst({
-          where: { name: 'DRAFT', isActive: true },
-          select: { id: true },
-        });
-        if (!draftStatus) {
-          throw new BadRequestException('Application status DRAFT is not configured.');
-        }
-        application = await tx.application.create({
-          data: {
-            customerId: customer.id,
-            leadId: lead.id,
-            applicationStatusId: draftStatus.id,
-          },
-        });
-      }
+      const application = await this.applications.ensureDraftApplicationForLead(
+        { leadId: lead.id, customerId: customer.id },
+        tx,
+      );
 
       const loanPurpose = dto.loanPurpose.trim();
       const reasonForLoan = await tx.reasonForLoan.findFirst({

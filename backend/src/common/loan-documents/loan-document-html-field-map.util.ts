@@ -90,7 +90,10 @@ export function buildLoanDocumentHtmlFieldValues(input: LoanDocumentMergeInput):
   const borrowerName = base.NAME;
   const address = base.ADDRESS;
   const purpose = base.PURPOSE_OF_LOAN;
-  const accountNo = input.applicationUuid?.trim() ?? '';
+  const accountNo =
+    input.applicationNumber?.trim()
+    || input.applicationUuid?.trim()
+    || '';
   const maturity =
     input.loanMaturityDate != null
       ? formatDateDdMmYyyy(

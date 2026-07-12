@@ -392,7 +392,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
                       <span className="text-[0.65rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">Application</span>
-                      <p className="m-0 mt-1 font-mono text-[0.72rem] font-bold text-brand-navy">{application.uuid.slice(0, 8)}…</p>
+                      <p className="m-0 mt-1 font-mono text-[0.72rem] font-bold text-brand-navy">{application.applicationNumber}</p>
                     </div>
                     <LosStatusPill code={application.statusCode} label={application.statusLabel} />
                   </div>
