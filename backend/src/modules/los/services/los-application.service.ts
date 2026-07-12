@@ -172,7 +172,13 @@ export class LosApplicationService {
           select: {
             uuid: true,
             leadStatusNote: true,
-            leadDetail: { select: { fullName: true } },
+            leadDetail: {
+              select: {
+                fullName: true,
+                panVerified: true,
+                bureauFetched: true,
+              },
+            },
             leadStatus: { select: { name: true, displayName: true } },
             rejectionReason: { select: { name: true } },
           },
@@ -190,9 +196,12 @@ export class LosApplicationService {
             bankName: true,
             interestRate: true,
             emailId: true,
+            emailVerifiedAt: true,
+            loanDocumentsAcceptedAt: true,
           },
         },
-        kyc: { select: { kycStatus: true } },
+        kyc: { select: { kycStatus: true, kycCompletedAt: true } },
+        _count: { select: { references: true } },
         loanAccount: {
           select: {
             totalRepaymentAmount: true,
@@ -253,6 +262,14 @@ export class LosApplicationService {
         kycStatus,
         kycStatusLabel: applicationKycStatusLabel(kycStatus),
         kycCompleted: kycStatus === 1,
+        kycCompletedAt: application.kyc?.kycCompletedAt?.toISOString() ?? null,
+        emailVerifiedAt: appDetails?.emailVerifiedAt?.toISOString() ?? null,
+        loanDocumentsAcceptedAt: appDetails?.loanDocumentsAcceptedAt?.toISOString() ?? null,
+        referencesCount: application._count.references,
+        bankAccountNumber: appDetails?.bankAccountNumber ?? null,
+        disbursedAt: loanAccount?.disbursedAt?.toISOString() ?? null,
+        panVerified: application.lead.leadDetail?.panVerified ?? 0,
+        bureauFetched: application.lead.leadDetail?.bureauFetched ?? 0,
         createdAt: application.createdAt.toISOString(),
         updatedAt: application.updatedAt.toISOString(),
       };

@@ -52,6 +52,14 @@ export type LosApplication = {
   kycStatus: number;
   kycStatusLabel: string;
   kycCompleted: boolean;
+  kycCompletedAt: string | null;
+  emailVerifiedAt: string | null;
+  loanDocumentsAcceptedAt: string | null;
+  referencesCount: number;
+  bankAccountNumber: string | null;
+  disbursedAt: string | null;
+  panVerified: number;
+  bureauFetched: number;
   createdAt: string;
   updatedAt: string;
 };

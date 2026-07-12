@@ -60,7 +60,10 @@ export function buildLoanDocumentReplacements(input: LoanDocumentMergeInput): Re
   const addressParts = [input.addressLine1, input.addressLine2, input.currentCity, input.pincode]
     .map((s) => s?.trim())
     .filter(Boolean);
-  const address = addressParts.join(', ');
+  // Sanction letter / KFS: borrower identity fields are always uppercase.
+  const address = addressParts.join(', ').toUpperCase();
+  const borrowerName = (input.fullName?.trim() ?? '').toUpperCase();
+  const purposeOfLoan = (input.loanPurpose?.trim() ?? '').toUpperCase();
 
   const loanAmount = toNumber(input.loanAmountInr);
   const processingFeeAmount = toNumber(input.processingFeeAmountInr);
@@ -71,7 +74,6 @@ export function buildLoanDocumentReplacements(input: LoanDocumentMergeInput): Re
     loanAmount != null
       ? loanAmount - (processingFeeAmount ?? 0) - (gstAmount ?? 0)
       : null;
-  const borrowerName = input.fullName?.trim() ?? '';
   const tenure = input.loanTenureDays != null ? String(input.loanTenureDays) : '';
   const maturity =
     input.loanMaturityDate != null
@@ -83,7 +85,7 @@ export function buildLoanDocumentReplacements(input: LoanDocumentMergeInput): Re
   return {
     NAME: borrowerName,
     BORROWER_NAME: borrowerName,
-    PURPOSE_OF_LOAN: input.loanPurpose?.trim() ?? '',
+    PURPOSE_OF_LOAN: purposeOfLoan,
     SANCTIONED_AMOUNT: loanAmount != null ? formatInr(loanAmount) : '',
     DISBURSED_AMOUNT: netDisbursed != null ? formatInr(netDisbursed) : '',
     LOAN_AMOUNT: loanAmount != null ? formatInr(loanAmount) : '',

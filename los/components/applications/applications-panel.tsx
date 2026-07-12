@@ -2,6 +2,8 @@
 
 import { getApplications, getMasters, type LosApplication } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
+import { APPLICATION_JOURNEY_STAGE_FILTER_OPTIONS } from '@/lib/constants/application-journey-stages';
+import { resolveApplicationStageLabel } from '@/lib/customer-journey';
 import { formatPersonName } from '@/lib/format-person-name';
 import Link from 'next/link';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
@@ -93,24 +95,44 @@ function CibilBadge({ score }: { score: number | null | undefined }) {
   );
 }
 
-function KycStatusCell({ app }: { app: LosApplication }) {
-  if (app.kycCompleted) {
-    return (
-      <span className="inline-flex items-center rounded-full border border-[rgba(16,185,129,0.25)] bg-[rgba(16,185,129,0.1)] px-2 py-0.5 text-[0.72rem] font-bold text-[#059669]">
-        Completed
-      </span>
-    );
-  }
-  if (app.kycStatus === 2) {
-    return (
-      <span className="inline-flex items-center rounded-full border border-[rgba(239,68,68,0.25)] bg-[rgba(239,68,68,0.1)] px-2 py-0.5 text-[0.72rem] font-bold text-[#dc2626]">
-        Failed
-      </span>
-    );
-  }
+function applicationStageLabel(app: LosApplication): string {
+  return resolveApplicationStageLabel({
+    statusCode: app.statusCode,
+    statusLabel: app.statusLabel,
+    kycStatus: app.kycStatus,
+    kycStatusLabel: app.kycStatusLabel,
+    kycCompletedAt: app.kycCompletedAt,
+    emailVerifiedAt: app.emailVerifiedAt,
+    loanDocumentsAcceptedAt: app.loanDocumentsAcceptedAt,
+    selectedLoanAmount: app.selectedLoanAmount,
+    referencesCount: app.referencesCount,
+    bankAccountNumber: app.bankAccountNumber,
+    disbursedAt: app.disbursedAt,
+    fullName: app.fullName,
+    leadStatusCode: app.leadStatusCode,
+    leadStatusLabel: app.leadStatusLabel,
+    panVerified: app.panVerified,
+    bureauFetched: app.bureauFetched,
+  });
+}
+
+function StageCell({ app }: { app: LosApplication }) {
+  const label = applicationStageLabel(app);
+  const rejected =
+    app.leadStatusCode.toUpperCase().includes('REJECT') ||
+    app.statusCode.toUpperCase().includes('REJECT') ||
+    app.statusCode.toUpperCase() === 'KYC_FAILED';
+  const style = rejected
+    ? { background: 'rgba(239,68,68,0.1)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.2)' }
+    : { background: 'rgba(99,102,241,0.1)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.2)' };
+
   return (
-    <span className="inline-flex items-center rounded-full border border-[rgba(100,116,139,0.2)] bg-[rgba(100,116,139,0.08)] px-2 py-0.5 text-[0.72rem] font-bold text-brand-muted">
-      Not completed
+    <span
+      className="inline-flex items-center max-w-[140px] rounded-full px-2 py-0.5 text-[0.72rem] font-bold leading-tight"
+      style={style}
+      title={label}
+    >
+      {label}
     </span>
   );
 }
@@ -138,11 +160,11 @@ const TABLE_HEADERS = [
   { key: 'email', label: 'Email', className: 'min-w-[160px]' },
   { key: 'cibil', label: 'CIBIL score', className: 'whitespace-nowrap' },
   { key: 'loan', label: 'Loan amount', className: 'whitespace-nowrap' },
-  { key: 'kyc', label: 'KYC', className: 'whitespace-nowrap' },
-  { key: 'created', label: 'Created', className: 'whitespace-nowrap' },
-  { key: 'modified', label: 'Last modified', className: 'whitespace-nowrap' },
+  { key: 'stage', label: 'Stage', className: 'min-w-[120px]' },
   { key: 'status', label: 'Status', className: 'whitespace-nowrap' },
   { key: 'reason', label: 'Rejection reason', className: 'min-w-[160px]' },
+  { key: 'created', label: 'Created', className: 'whitespace-nowrap' },
+  { key: 'modified', label: 'Last modified', className: 'whitespace-nowrap' },
 ] as const;
 
 const COLUMNS: ReadonlyArray<{ key: string; label: string }> = TABLE_HEADERS.map((h) => ({
@@ -188,8 +210,8 @@ function getAppText(app: LosApplication, key: string): string {
       return app.cibilScore != null ? String(app.cibilScore) : '';
     case 'loan':
       return app.selectedLoanAmount ?? '';
-    case 'kyc':
-      return app.kycCompleted ? 'Completed' : app.kycStatusLabel;
+    case 'stage':
+      return applicationStageLabel(app);
     case 'created':
       return formatDateTime(app.createdAt);
     case 'modified':
@@ -216,10 +238,8 @@ function appMatchesFilters(app: LosApplication, filters: ColFilters): boolean {
       }
       continue;
     }
-    if (col.key === 'kyc') {
-      if (raw === 'completed' && !app.kycCompleted) return false;
-      if (raw === 'failed' && app.kycStatus !== 2) return false;
-      if (raw === 'not_completed' && (app.kycCompleted || app.kycStatus === 2)) return false;
+    if (col.key === 'stage') {
+      if (applicationStageLabel(app) !== raw) return false;
       continue;
     }
     if (col.key === 'reason') {
@@ -264,8 +284,8 @@ function getAppSortValue(app: LosApplication, key: string): string | number | nu
       const n = Number(app.selectedLoanAmount);
       return Number.isFinite(n) ? n : null;
     }
-    case 'kyc':
-      return app.kycCompleted ? 'Completed' : app.kycStatus === 2 ? 'Failed' : 'Not completed';
+    case 'stage':
+      return applicationStageLabel(app).toLowerCase();
     case 'created':
       return appDateTimestamp(app.createdAt);
     case 'modified':
@@ -559,16 +579,12 @@ export function ApplicationsPanel() {
                               onChange={(value) => setColumnFilter('status', value)}
                               options={statuses.map((s) => ({ value: s.code, label: s.displayName }))}
                             />
-                          ) : header.key === 'kyc' ? (
+                          ) : header.key === 'stage' ? (
                             <ColumnFilterInput
                               type="select"
-                              value={columnFilters.kyc ?? ''}
-                              onChange={(value) => setColumnFilter('kyc', value)}
-                              options={[
-                                { value: 'completed', label: 'Completed' },
-                                { value: 'not_completed', label: 'Not completed' },
-                                { value: 'failed', label: 'Failed' },
-                              ]}
+                              value={columnFilters.stage ?? ''}
+                              onChange={(value) => setColumnFilter('stage', value)}
+                              options={[...APPLICATION_JOURNEY_STAGE_FILTER_OPTIONS]}
                             />
                           ) : DATE_FILTER_KEYS.has(header.key) ? (
                             <ColumnFilterInput
@@ -600,7 +616,9 @@ export function ApplicationsPanel() {
                                       ? 'Search email…'
                                       : header.key === 'reason'
                                         ? 'Search reason…'
-                                        : 'Search…'
+                                        : header.key === 'stage'
+                                          ? 'Search stage…'
+                                          : 'Search…'
                               }
                             />
                           )}
@@ -649,11 +667,11 @@ export function ApplicationsPanel() {
                         </td>
                         <td className="px-3 py-2.5"><CibilBadge score={app.cibilScore} /></td>
                         <td className="px-3 py-2.5 font-extrabold text-brand-navy whitespace-nowrap">{formatINR(app.selectedLoanAmount)}</td>
-                        <td className="px-3 py-2.5"><KycStatusCell app={app} /></td>
-                        <td className="px-3 py-2.5 text-brand-muted whitespace-nowrap text-[0.78rem]">{formatDateTime(app.createdAt)}</td>
-                        <td className="px-3 py-2.5 text-brand-muted whitespace-nowrap text-[0.78rem]">{formatDateTime(app.updatedAt)}</td>
+                        <td className="px-3 py-2.5"><StageCell app={app} /></td>
                         <td className="px-3 py-2.5"><StatusPill label={status.label} code={status.code} /></td>
                         <td className="px-3 py-2.5"><RejectionReasonCell app={app} /></td>
+                        <td className="px-3 py-2.5 text-brand-muted whitespace-nowrap text-[0.78rem]">{formatDateTime(app.createdAt)}</td>
+                        <td className="px-3 py-2.5 text-brand-muted whitespace-nowrap text-[0.78rem]">{formatDateTime(app.updatedAt)}</td>
                       </tr>
                     );
                   })}

@@ -1,4 +1,8 @@
 import type { LosApplicationDetails, LosLeadDetails } from '@/lib/api';
+import {
+  APPLICATION_JOURNEY_STAGES,
+  applicationJourneyStageLabel,
+} from '@/lib/constants/application-journey-stages';
 import { formatPersonName } from '@/lib/format-person-name';
 
 export type JourneyStepState = 'done' | 'active' | 'pending' | 'failed';
@@ -113,16 +117,37 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
     row.lead.leadStatusNote?.trim() ??
     (leadRejected ? row.lead.statusLabel : appRejected ? row.statusLabel : undefined);
 
-  const steps: JourneyStep[] = [
-    step('profile', 'Profile', profileDone, false),
-    step('credit', 'PAN & bureau', panDone && bureauDone, rejected && !bureauDone, row.bureauReport?.cibilScore != null ? `CIBIL ${row.bureauReport.cibilScore}` : undefined),
-    step('loan', 'Loan offer', loanDone, false, row.details?.loanAmount ? `₹${row.details.loanAmount}` : undefined),
-    step('email', 'Email OTP', emailDone, false),
-    step('letter', 'Sanction letter', docsDone, false, row.loanDocuments.acceptedAt ? 'Accepted' : undefined),
-    step('kyc', 'KYC & liveness', kycDone, kycFailed, row.kycStatusLabel),
-    step('bank', 'Bank details', bankDone, false),
-    step('refs', 'References', refsDone, false, refsDone ? `${row.referencesCount} saved` : undefined),
-  ];
+  const doneById = {
+    profile: profileDone,
+    credit: panDone && bureauDone,
+    loan: loanDone,
+    email: emailDone,
+    letter: docsDone,
+    kyc: kycDone,
+    bank: bankDone,
+    refs: refsDone,
+  } as const;
+  const failedById = {
+    profile: false,
+    credit: rejected && !bureauDone,
+    loan: false,
+    email: false,
+    letter: false,
+    kyc: kycFailed,
+    bank: false,
+    refs: false,
+  } as const;
+  const detailById: Partial<Record<(typeof APPLICATION_JOURNEY_STAGES)[number]['id'], string | undefined>> = {
+    credit: row.bureauReport?.cibilScore != null ? `CIBIL ${row.bureauReport.cibilScore}` : undefined,
+    loan: row.details?.loanAmount ? `₹${row.details.loanAmount}` : undefined,
+    letter: row.loanDocuments.acceptedAt ? 'Accepted' : undefined,
+    kyc: row.kycStatusLabel,
+    refs: refsDone ? `${row.referencesCount} saved` : undefined,
+  };
+
+  const steps: JourneyStep[] = APPLICATION_JOURNEY_STAGES.map((stage) =>
+    step(stage.id, stage.label, doneById[stage.id], failedById[stage.id], detailById[stage.id]),
+  );
 
   if (rejected || kycFailed) {
     const label = kycFailed && !rejected ? 'KYC failed' : leadRejected ? 'Lead rejected' : 'Application rejected';
@@ -143,3 +168,64 @@ export function journeyProgressPercent(steps: JourneyStep[]): number {
 export function isApplicationJourneyStepActive(row: LosApplicationDetails, stepId: string): boolean {
   return buildApplicationJourney(row).some((s) => s.id === stepId && s.state === 'active');
 }
+
+/** Minimal list-row shape for resolving the active customer journey stage label. */
+export type ApplicationListStageInput = {
+  statusCode: string;
+  statusLabel: string;
+  kycStatus: number;
+  kycStatusLabel: string;
+  kycCompletedAt: string | null;
+  emailVerifiedAt: string | null;
+  loanDocumentsAcceptedAt: string | null;
+  selectedLoanAmount: string | null;
+  referencesCount: number;
+  bankAccountNumber: string | null;
+  disbursedAt: string | null;
+  fullName: string | null;
+  leadStatusCode: string;
+  leadStatusLabel: string;
+  panVerified: number;
+  bureauFetched: number;
+};
+
+/** Active journey stage for application list rows (matches application review hero). */
+export function resolveApplicationStageLabel(input: ApplicationListStageInput): string {
+  const leadRejected = input.leadStatusCode.toUpperCase() === 'REJECTED';
+  const appRejected = input.statusCode.toUpperCase().includes('REJECT');
+  const rejected = appRejected || leadRejected;
+  const kycFailed = input.statusCode.toUpperCase() === 'KYC_FAILED' || input.kycStatus === 2;
+
+  if (rejected || kycFailed) {
+    if (input.leadStatusCode.toUpperCase().includes('REJECT')) return input.leadStatusLabel;
+    if (input.statusCode.toUpperCase().includes('REJECT')) return input.statusLabel;
+    if (input.statusCode.toUpperCase() === 'KYC_FAILED') return input.kycStatusLabel;
+    return 'Rejected';
+  }
+
+  const profileDone = Boolean(input.fullName?.trim());
+  const panDone = input.panVerified === PAN_VERIFIED.VERIFIED;
+  const bureauDone = input.bureauFetched === BUREAU_FETCHED.SUCCESS;
+  const loanDone = Boolean(input.selectedLoanAmount);
+  const emailDone = Boolean(input.emailVerifiedAt);
+  const docsDone = Boolean(input.loanDocumentsAcceptedAt);
+  const kycDone = input.kycStatus === KYC_COMPLETED && input.kycCompletedAt != null;
+  const bankDone = Boolean(input.bankAccountNumber || input.disbursedAt);
+  const refsDone = input.referencesCount >= 2;
+
+  const doneById = {
+    profile: profileDone,
+    credit: panDone && bureauDone,
+    loan: loanDone,
+    email: emailDone,
+    letter: docsDone,
+    kyc: kycDone,
+    bank: bankDone,
+    refs: refsDone,
+  } as const;
+
+  const active = APPLICATION_JOURNEY_STAGES.find((stage) => !doneById[stage.id]);
+  return active?.label ?? input.statusLabel;
+}
+
+export { APPLICATION_JOURNEY_STAGES, APPLICATION_JOURNEY_STAGE_FILTER_OPTIONS, applicationJourneyStageLabel };
