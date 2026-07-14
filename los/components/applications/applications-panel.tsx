@@ -616,9 +616,7 @@ export function ApplicationsPanel() {
                                       ? 'Search email…'
                                       : header.key === 'reason'
                                         ? 'Search reason…'
-                                        : header.key === 'stage'
-                                          ? 'Search stage…'
-                                          : 'Search…'
+                                        : 'Search…'
                               }
                             />
                           )}
