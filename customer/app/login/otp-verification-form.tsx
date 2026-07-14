@@ -1,6 +1,6 @@
 'use client';
 
-import { startTransition, useEffect, useState, type SubmitEvent } from 'react';
+import { startTransition, useCallback, useEffect, useRef, useState, type SubmitEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SendOtpResponse, sendCustomerOtp, verifyCustomerOtp } from '@/lib/api/auth';
 import { AlertBanner } from '@/components/ui/alert-banner';
@@ -43,6 +43,7 @@ export function OtpVerificationForm({
 
   const otp = useOtpInput(() => { setError(''); setStatus(''); });
   const resendCountdown = useCountdown(otpRequest?.resendAvailableAt);
+  const autoVerifyAttemptRef = useRef<string | null>(null);
 
   const currentMobile = otpRequest?.mobileNumber ? String(otpRequest.mobileNumber) : '';
   const displayMobile = otpRequest?.maskedMobile ?? formatCustomerMobile(currentMobile);
@@ -81,8 +82,8 @@ export function OtpVerificationForm({
     }
   }
 
-  async function handleVerifyOtp(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const runVerify = useCallback(async () => {
+    if (isVerifying) return;
     if (!otpRequest) { setError('Request a fresh OTP before trying to verify.'); return; }
     if (new Date(otpRequest.expiresAt).getTime() <= Date.now()) {
       setError('This OTP has expired. Request a new code to continue.');
@@ -120,7 +121,33 @@ export function OtpVerificationForm({
       setError(err instanceof Error ? err.message : 'Unable to verify OTP right now.');
       setIsVerifying(false);
     }
+  }, [
+    isVerifying,
+    mode,
+    otp.joined,
+    otpRequest,
+    refreshCustomerSession,
+    router,
+    successRedirect,
+  ]);
+
+  async function handleVerifyOtp(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await runVerify();
   }
+
+  // Auto-verify once all 6 digits are entered or pasted — no extra tap required.
+  useEffect(() => {
+    if (otp.joined.length !== OTP_LENGTH) {
+      autoVerifyAttemptRef.current = null;
+      return;
+    }
+    if (isVerifying || !otpRequest) return;
+    if (autoVerifyAttemptRef.current === otp.joined) return;
+
+    autoVerifyAttemptRef.current = otp.joined;
+    void runVerify();
+  }, [otp.joined, isVerifying, otpRequest, runVerify]);
 
   const verificationCard = (
     <section className={compact ? "h-full flex flex-col justify-center" : "mc-card mc-card-glow"}>

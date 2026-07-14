@@ -7,8 +7,8 @@ import { useCustomerSession } from '@/components/providers/customer-session-prov
 import { Spinner } from '@/components/ui/spinner';
 import {
   fetchCustomerLoansDashboard,
+  initiateCustomerRepayment,
   type CustomerLoanCard,
-  type CustomerLoanRepaymentLine,
   type CustomerLoansDashboard,
 } from '@/lib/api/customer-loans';
 import { formatInr } from '@/lib/format-inr';
@@ -16,7 +16,9 @@ import {
   getCustomerJourneyResumePath,
   isCustomerJourneyIncomplete,
   isCustomerPortalSignedIn,
+  hasOpenCustomerLoan,
 } from '@/lib/api/customer-session';
+import { isCustomerSessionRequiredMessage } from '@/lib/customer-session-required';
 import { cn } from '@/lib/cn';
 import { formatIsoDateDdMmYyyy } from '@/lib/format-date';
 
@@ -79,25 +81,37 @@ function buildJourneySteps(
 
 function statusBadgeClass(status: string): string {
   const s = status.toUpperCase();
-  if (s === 'DISBURSED') return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+  // Loan account outcomes
+  if (s === 'CLOSED' || s === 'PAID' || s === 'PAID_FULLY') {
+    return 'bg-emerald-100 text-emerald-900 border-emerald-300';
+  }
+  if (s === 'OVERDUE') {
+    return 'bg-rose-100 text-rose-900 border-rose-300';
+  }
+  if (s === 'ACTIVE') {
+    return 'bg-sky-100 text-sky-900 border-sky-300';
+  }
+  if (s === 'WRITTEN_OFF') {
+    return 'bg-slate-200 text-slate-800 border-slate-300';
+  }
+  // Application journey statuses
+  if (s === 'DISBURSED') return 'bg-indigo-100 text-indigo-900 border-indigo-200';
   if (s === 'IN_REVIEW') return 'bg-amber-100 text-amber-900 border-amber-200';
   if (s === 'APPROVED') return 'bg-sky-100 text-sky-900 border-sky-200';
-  if (s === 'REJECTED') return 'bg-rose-100 text-rose-900 border-rose-200';
+  if (s === 'REJECTED' || s === 'KYC_FAILED' || s === 'CANCELLED') {
+    return 'bg-rose-100 text-rose-900 border-rose-200';
+  }
   if (s === 'DRAFT') return 'bg-slate-100 text-slate-700 border-slate-200';
   return 'bg-[rgba(20,150,243,0.12)] text-brand-navy border-[rgba(20,150,243,0.25)]';
 }
 
-function repaymentStatusClass(status: CustomerLoanRepaymentLine['status']): string {
-  switch (status) {
-    case 'overdue':
-      return 'bg-rose-100 text-rose-900';
-    case 'due':
-      return 'bg-amber-100 text-amber-900';
-    case 'scheduled':
-      return 'bg-slate-100 text-slate-700';
-    default:
-      return 'bg-emerald-100 text-emerald-900';
-  }
+function statusBadgeLabel(status: string): string {
+  const s = status.toUpperCase();
+  if (s === 'CLOSED') return 'Paid fully';
+  if (s === 'OVERDUE') return 'Overdue';
+  if (s === 'ACTIVE') return 'Active';
+  if (s === 'WRITTEN_OFF') return 'Written off';
+  return status.replace(/_/g, ' ');
 }
 
 function ResumeArrow() {
@@ -167,11 +181,18 @@ function JourneyTracker({ steps, completed, total }: { steps: JourneyStep[]; com
   );
 }
 
-function StatBlock({ label, value }: { label: string; value: ReactNode }) {
+function DetailRow({ label, value, emphasize }: { label: string; value: ReactNode; emphasize?: boolean }) {
   return (
-    <div className="rounded-xl bg-white/80 p-3 ring-1 ring-[rgba(18,36,79,0.06)] backdrop-blur">
-      <p className="text-[0.62rem] font-black uppercase tracking-wider text-slate-400">{label}</p>
-      <p className="mt-0.5 text-[1.05rem] font-extrabold text-brand-navy">{value}</p>
+    <div className="flex items-start justify-between gap-4 border-b border-[rgba(18,36,79,0.06)] py-3 last:border-b-0">
+      <dt className="text-[0.78rem] font-semibold text-slate-500">{label}</dt>
+      <dd
+        className={cn(
+          'text-right text-[0.92rem] font-extrabold text-brand-navy',
+          emphasize && 'text-[1.05rem] text-[#1c347d]',
+        )}
+      >
+        {value}
+      </dd>
     </div>
   );
 }
@@ -242,13 +263,52 @@ function CompleteJourneyCard({
   );
 }
 
-function ActiveLoanCard({ loan }: { loan: CustomerLoanCard }) {
+function ActiveLoanCard({
+  loan,
+  onPaid,
+}: {
+  loan: CustomerLoanCard;
+  onPaid?: () => void;
+}) {
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
+  const router = useRouter();
+  const { refresh } = useCustomerSession();
+  const amountDueToday = loan.amountDueToday ?? loan.totalRepayment;
+  const amountAtMaturity = loan.amountDueAtMaturity ?? loan.totalRepayment;
+  const daysLabel =
+    loan.daysOutstanding == null
+      ? null
+      : `${loan.daysOutstanding} day${loan.daysOutstanding === 1 ? '' : 's'} of interest accrued`;
+
+  const onPayNow = async () => {
+    if (paying) return;
+    setPaying(true);
+    setPayError(null);
+    try {
+      const result = await initiateCustomerRepayment(loan.applicationUuid);
+      if (!result?.success) {
+        setPayError('Payment was unsuccessful. Please try again.');
+        return;
+      }
+      await refresh();
+      onPaid?.();
+      router.push(result.redirectPath || '/payments');
+    } catch (e) {
+      setPayError(e instanceof Error ? e.message : 'Payment was unsuccessful. Please try again.');
+    } finally {
+      setPaying(false);
+    }
+  };
+
   return (
-    <div className="relative overflow-hidden rounded-[24px] border border-blue-100 bg-white p-6 shadow-[0_12px_40px_rgba(23,44,113,0.08)]">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+    <div className="relative overflow-hidden rounded-[28px] border border-[rgba(18,36,79,0.1)] bg-white shadow-[0_20px_50px_rgba(23,44,113,0.1)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[rgba(18,36,79,0.06)] px-6 py-4">
         <div>
-          <p className="text-[0.65rem] font-black uppercase tracking-wider text-slate-400">Active loan</p>
-          <p className="mt-0.5 font-mono text-xs text-brand-muted">{loan.applicationUuid}</p>
+          <p className="text-[0.62rem] font-black uppercase tracking-[0.16em] text-slate-400">Loan number</p>
+          <p className="mt-0.5 font-mono text-[0.95rem] font-extrabold tracking-wide text-brand-navy">
+            {loan.loanNumber ?? loan.applicationUuid}
+          </p>
         </div>
         <span
           className={cn(
@@ -256,35 +316,130 @@ function ActiveLoanCard({ loan }: { loan: CustomerLoanCard }) {
             statusBadgeClass(loan.status),
           )}
         >
-          {loan.status.replace(/_/g, ' ')}
+          {statusBadgeLabel(loan.status)}
         </span>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className="relative overflow-hidden rounded-[20px] bg-gradient-to-br from-[#12244f] to-[#0a1628] p-5 text-white shadow-[0_12px_24px_rgba(18,36,79,0.18)]">
-          <p className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-slate-300">Amount to repay</p>
-          <p className="mt-1 text-3xl font-black text-[#ffc519] drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)]">
-            {loan.totalRepayment ? formatInr(loan.totalRepayment) : '—'}
+      <div className="grid gap-0 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
+        <div className="relative overflow-hidden bg-gradient-to-br from-[#12244f] via-[#1c347d] to-[#0a1628] p-6 text-white lg:min-h-full">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(255,197,25,0.2),transparent_70%)]"
+          />
+          <p className="relative text-[0.65rem] font-black uppercase tracking-[0.14em] text-slate-300">
+            Amount to be paid today
           </p>
-          <p className="mt-2 text-[0.72rem] font-medium text-slate-300">Principal + interest + fees</p>
+          <p className="relative mt-2 text-[clamp(2rem,4vw,2.6rem)] font-black leading-none tracking-tight text-[#ffc519]">
+            {amountDueToday ? formatInr(amountDueToday) : '—'}
+          </p>
+          <p className="relative mt-3 max-w-sm text-[0.85rem] leading-relaxed text-slate-300">
+            Principal plus interest accrued till today.
+            {daysLabel ? (
+              <>
+                <br />
+                <span className="text-slate-400">{daysLabel}</span>
+              </>
+            ) : null}
+          </p>
+
+          <dl className="relative mt-6 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-white/10 px-3.5 py-3 ring-1 ring-white/10">
+              <dt className="text-[0.58rem] font-black uppercase tracking-wider text-slate-400">
+                Interest till today
+              </dt>
+              <dd className="mt-1 text-[1.05rem] font-extrabold text-white">
+                {loan.interestTillToday != null ? formatInr(loan.interestTillToday) : '—'}
+              </dd>
+            </div>
+            <div className="rounded-2xl bg-white/10 px-3.5 py-3 ring-1 ring-white/10">
+              <dt className="text-[0.58rem] font-black uppercase tracking-wider text-slate-400">
+                Principal
+              </dt>
+              <dd className="mt-1 text-[1.05rem] font-extrabold text-white">
+                {loan.loanAmount ? formatInr(loan.loanAmount) : '—'}
+              </dd>
+            </div>
+          </dl>
+
+          <button
+            type="button"
+            onClick={() => void onPayNow()}
+            disabled={paying}
+            className="relative mt-6 flex w-full items-center justify-center rounded-2xl bg-[#ffc519] px-5 py-3.5 text-[1rem] font-extrabold text-[#12244f] shadow-[0_12px_28px_rgba(255,197,25,0.28)] transition hover:brightness-105 disabled:cursor-wait disabled:opacity-70"
+          >
+            {paying ? 'Preparing payment…' : 'Pay Now'}
+          </button>
+          {payError ? (
+            <p className="relative mt-3 text-[0.8rem] font-semibold text-rose-200" role="alert">
+              {payError}
+            </p>
+          ) : null}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <StatBlock label="Principal" value={loan.loanAmount ? formatInr(loan.loanAmount) : '—'} />
-          <StatBlock label="Tenure" value={loan.tenureDays != null ? `${loan.tenureDays} days` : '—'} />
-          <StatBlock label="Maturity" value={formatIsoDateDdMmYyyy(loan.maturityDate)} />
-          <StatBlock label="Bank" value={loan.bankDisplay || '—'} />
+        <div className="flex flex-col gap-5 p-6">
+          <div>
+            <h3 className="text-[0.72rem] font-black uppercase tracking-[0.14em] text-slate-400">
+              Scheduled at maturity
+            </h3>
+            <dl className="mt-1">
+              <DetailRow
+                label="Principal amount"
+                value={loan.loanAmount ? formatInr(loan.loanAmount) : '—'}
+              />
+              <DetailRow
+                label="Interest"
+                value={loan.interestAmount ? formatInr(loan.interestAmount) : '—'}
+              />
+              <DetailRow
+                label="Amount to be paid on maturity"
+                value={amountAtMaturity ? formatInr(amountAtMaturity) : '—'}
+                emphasize
+              />
+              <DetailRow
+                label="Repayment due date"
+                value={formatIsoDateDdMmYyyy(loan.maturityDate)}
+              />
+            </dl>
+          </div>
+
+          <div className="rounded-2xl bg-[#f4f8ff] p-4 ring-1 ring-[rgba(20,150,243,0.12)]">
+            <h3 className="text-[0.72rem] font-black uppercase tracking-[0.14em] text-brand-blue">
+              Accrued till today
+            </h3>
+            <dl className="mt-1">
+              <DetailRow
+                label="Interest till today"
+                value={loan.interestTillToday != null ? formatInr(loan.interestTillToday) : '—'}
+              />
+              <DetailRow
+                label="Amount to be paid today"
+                value={amountDueToday ? formatInr(amountDueToday) : '—'}
+                emphasize
+              />
+            </dl>
+          </div>
+
+          {(loan.bankDisplay || loan.disbursedAt) && (
+            <p className="text-[0.78rem] leading-relaxed text-brand-muted">
+              {loan.bankDisplay ? (
+                <>
+                  Credited to <span className="font-semibold text-brand-navy">{loan.bankDisplay}</span>
+                </>
+              ) : null}
+              {loan.disbursedAt ? (
+                <>
+                  {loan.bankDisplay ? ' · ' : null}
+                  Disbursed{' '}
+                  {new Date(loan.disbursedAt).toLocaleString('en-IN', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  })}
+                </>
+              ) : null}
+            </p>
+          )}
         </div>
       </div>
-
-      {loan.disbursedAt ? (
-        <div className="mt-5 flex flex-wrap items-center justify-between border-t border-slate-100 pt-4 text-xs text-brand-muted">
-          <span>Disbursed on</span>
-          <span className="font-bold text-brand-navy">
-            {new Date(loan.disbursedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
-          </span>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -305,7 +460,7 @@ function InProgressLoanCard({ loan }: { loan: CustomerLoanCard }) {
             statusBadgeClass(loan.status),
           )}
         >
-          {loan.status.replace(/_/g, ' ')}
+          {statusBadgeLabel(loan.status)}
         </span>
       </div>
       <p className="mt-3 text-sm text-brand-muted">
@@ -316,6 +471,11 @@ function InProgressLoanCard({ loan }: { loan: CustomerLoanCard }) {
 }
 
 function LoanSummaryCard({ loan }: { loan: CustomerLoanCard }) {
+  const isPaidFully = loan.status.toUpperCase() === 'CLOSED';
+  const repaymentDays = isPaidFully
+    ? (loan.daysOutstanding ?? loan.tenureDays)
+    : loan.tenureDays;
+
   return (
     <div className="rounded-[20px] border border-[rgba(18,36,79,0.1)] bg-white p-5 shadow-sm transition-all hover:shadow-[0_8px_24px_rgba(23,44,113,0.06)]">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -325,9 +485,11 @@ function LoanSummaryCard({ loan }: { loan: CustomerLoanCard }) {
             statusBadgeClass(loan.status),
           )}
         >
-          {loan.status.replace(/_/g, ' ')}
+          {statusBadgeLabel(loan.status)}
         </span>
-        <span className="font-mono text-[0.72rem] text-brand-muted">{loan.applicationUuid.slice(0, 13)}…</span>
+        <span className="font-mono text-[0.72rem] font-bold text-brand-navy">
+          {loan.loanNumber ?? `${loan.applicationUuid.slice(0, 13)}…`}
+        </span>
       </div>
 
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
@@ -340,14 +502,27 @@ function LoanSummaryCard({ loan }: { loan: CustomerLoanCard }) {
           <dd className="text-base font-extrabold text-brand-navy">{formatInr(loan.totalRepayment)}</dd>
         </div>
         <div>
-          <dt className="text-[0.7rem] font-bold uppercase tracking-wider text-slate-400">Tenure</dt>
+          <dt className="text-[0.7rem] font-bold uppercase tracking-wider text-slate-400">
+            {isPaidFully ? 'Repayment days' : 'Tenure'}
+          </dt>
           <dd className="font-semibold text-brand-navy">
-            {loan.tenureDays != null ? `${loan.tenureDays} days` : '—'}
+            {repaymentDays != null ? `${repaymentDays} days` : '—'}
           </dd>
         </div>
         <div>
-          <dt className="text-[0.7rem] font-bold uppercase tracking-wider text-slate-400">Maturity</dt>
-          <dd className="font-semibold text-brand-navy">{formatIsoDateDdMmYyyy(loan.maturityDate)}</dd>
+          <dt className="text-[0.7rem] font-bold uppercase tracking-wider text-slate-400">
+            {isPaidFully ? 'Repaid on' : 'Maturity'}
+          </dt>
+          <dd className="font-semibold text-brand-navy">
+            {isPaidFully
+              ? loan.repaidAt
+                ? new Date(loan.repaidAt).toLocaleString('en-IN', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  })
+                : '—'
+              : formatIsoDateDdMmYyyy(loan.maturityDate)}
+          </dd>
         </div>
         {loan.disbursedAt ? (
           <div className="flex justify-between border-t border-slate-50 pt-2 sm:col-span-2">
@@ -423,14 +598,18 @@ function AccountHero({
   greetingName,
   mobileNumber,
   journeyPct,
+  hasOpenLoan,
+  amountDueToday,
 }: {
   greetingName: string | null;
   mobileNumber: string | null;
   journeyPct: number;
+  hasOpenLoan: boolean;
+  amountDueToday: string | null;
 }) {
   const initial = greetingName?.charAt(0)?.toUpperCase() ?? 'M';
   return (
-    <div className="relative overflow-hidden rounded-[28px] border border-[rgba(18,36,79,0.08)] bg-[linear-gradient(135deg,#12244f_0%,#1c347d_55%,#0f1f45_100%)] p-6 text-white shadow-[0_24px_60px_rgba(18,36,79,0.28)]">
+    <div className="relative overflow-hidden rounded-[28px] border border-[rgba(18,36,79,0.08)] bg-[linear-gradient(135deg,#12244f_0%,#1c347d_55%,#0f1f45_100%)] p-6 text-white shadow-[0_24px_60px_rgba(18,36,79,0.28)] sm:p-7">
       <div
         aria-hidden
         className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(255,197,25,0.22),transparent_68%)]"
@@ -450,10 +629,17 @@ function AccountHero({
             ) : null}
           </div>
         </div>
-        <div className="rounded-2xl bg-white/10 px-4 py-3 text-center ring-1 ring-white/15 backdrop-blur">
-          <p className="text-[0.6rem] font-black uppercase tracking-wider text-slate-300">Journey</p>
-          <p className="text-2xl font-black text-[#ffc519]">{journeyPct}%</p>
-        </div>
+        {hasOpenLoan && amountDueToday ? (
+          <div className="rounded-2xl bg-white/10 px-4 py-3 text-right ring-1 ring-white/15 backdrop-blur">
+            <p className="text-[0.6rem] font-black uppercase tracking-wider text-slate-300">Due today</p>
+            <p className="text-xl font-black text-[#ffc519] sm:text-2xl">{formatInr(amountDueToday)}</p>
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-white/10 px-4 py-3 text-center ring-1 ring-white/15 backdrop-blur">
+            <p className="text-[0.6rem] font-black uppercase tracking-wider text-slate-300">Journey</p>
+            <p className="text-2xl font-black text-[#ffc519]">{journeyPct}%</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -494,12 +680,13 @@ function TabButton({
 
 export function MyAccountSection() {
   const router = useRouter();
-  const { session, refresh, loading: sessionLoading } = useCustomerSession();
+  const { session, loading: sessionLoading, signOut, refresh } = useCustomerSession();
   const [data, setData] = useState<CustomerLoansDashboard | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [fetching, setFetching] = useState(true);
   const [activeTab, setActiveTab] = useState<AccountTab>('overview');
   const [tabInitialized, setTabInitialized] = useState(false);
+  const signedIn = isCustomerPortalSignedIn(session);
 
   const loadLoans = useCallback(async () => {
     setFetching(true);
@@ -522,22 +709,39 @@ export function MyAccountSection() {
     }
   }, []);
 
-  useEffect(() => {
-    if (sessionLoading) return;
-    if (!isCustomerPortalSignedIn(session)) {
+  const onLoadErrorRetry = useCallback(async () => {
+    if (loadError && isCustomerSessionRequiredMessage(loadError)) {
+      try {
+        await signOut();
+      } catch {
+        // Cookie may already be gone; still show login.
+      }
       router.replace('/my-account?mode=login');
       return;
     }
-    void (async () => {
-      await refresh();
-      await loadLoans();
-    })();
-  }, [sessionLoading, session, router, refresh, loadLoans]);
+    await refresh();
+    await loadLoans();
+  }, [loadError, signOut, router, refresh, loadLoans]);
+
+  // Session is already loaded by CustomerSessionProvider — do not refresh() here
+  // (that updates `session` and re-fires this effect in a loop).
+  useEffect(() => {
+    if (sessionLoading) return;
+    if (!signedIn) {
+      router.replace('/my-account?mode=login');
+      return;
+    }
+    void loadLoans();
+  }, [sessionLoading, signedIn, router, loadLoans]);
 
   const journeySteps = useMemo(() => buildJourneySteps(session), [session]);
-  const showIncompleteJourney = useMemo(() => isCustomerJourneyIncomplete(session), [session]);
-
   const dash = data ?? { activeLoans: [], pastLoans: [], inProgress: [], repaymentSchedule: [] };
+  const hasOpenLoan =
+    hasOpenCustomerLoan(session) || dash.activeLoans.length > 0;
+  const showIncompleteJourney = useMemo(() => {
+    if (hasOpenLoan) return false;
+    return isCustomerJourneyIncomplete(session);
+  }, [hasOpenLoan, session]);
 
   useEffect(() => {
     if (tabInitialized || fetching) return;
@@ -562,7 +766,7 @@ export function MyAccountSection() {
     return (
       <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-6 text-rose-900">
         <p className="font-bold">{loadError}</p>
-        <button type="button" className="mc-btn-primary mt-4" onClick={() => void loadLoans()}>
+        <button type="button" className="mc-btn-primary mt-4" onClick={() => void onLoadErrorRetry()}>
           Try again
         </button>
       </div>
@@ -578,139 +782,136 @@ export function MyAccountSection() {
   const journeyPct = Math.round((journeySteps.completed / journeySteps.total) * 100);
   const overviewBadge =
     (showIncompleteJourney ? 1 : 0) + dash.activeLoans.length + dash.inProgress.length;
+  const primaryDueToday =
+    dash.activeLoans[0]?.amountDueToday ?? dash.activeLoans[0]?.totalRepayment ?? null;
 
   return (
-    <div className="grid gap-6 animate-fade-in-up">
-      <AccountHero greetingName={greetingName} mobileNumber={mobileNumber} journeyPct={journeyPct} />
-
-      <div className="flex gap-6 border-b border-[rgba(18,36,79,0.08)]">
-        <TabButton
-          active={activeTab === 'overview'}
-          label="Overview"
-          badge={overviewBadge > 0 ? overviewBadge : undefined}
-          onClick={() => setActiveTab('overview')}
+    <div className="mx-auto w-full max-w-5xl animate-fade-in-up px-4 py-6 sm:px-6 sm:py-8">
+      <div className="grid gap-6">
+        <AccountHero
+          greetingName={greetingName}
+          mobileNumber={mobileNumber}
+          journeyPct={journeyPct}
+          hasOpenLoan={hasOpenLoan}
+          amountDueToday={primaryDueToday}
         />
-        <TabButton
-          active={activeTab === 'history'}
-          label="Previous loans"
-          badge={dash.pastLoans.length || undefined}
-          onClick={() => setActiveTab('history')}
-        />
-      </div>
 
-      {activeTab === 'overview' ? (
-        <div className="grid gap-6">
-          {showIncompleteJourney ? (
-            <CompleteJourneyCard
-              steps={journeySteps.steps}
-              completed={journeySteps.completed}
-              total={journeySteps.total}
-              nextLabel={journeySteps.nextLabel}
-            />
-          ) : null}
-
-          {dash.inProgress.length > 0 ? (
-            <section className="grid gap-4">
-              <h2 className="text-lg font-extrabold text-brand-navy">Applications in progress</h2>
-              <div className="grid gap-4 lg:grid-cols-2">
-                {dash.inProgress.map((loan) => (
-                  <InProgressLoanCard key={loan.applicationUuid} loan={loan} />
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          {dash.activeLoans.length > 0 ? (
-            <section className="grid gap-4">
-              <h2 className="text-lg font-extrabold text-brand-navy">Active loan</h2>
-              <div className="grid gap-4">
-                {dash.activeLoans.map((loan) => (
-                  <ActiveLoanCard key={loan.applicationUuid} loan={loan} />
-                ))}
-              </div>
-            </section>
-          ) : !showIncompleteJourney ? (
-            <EmptyStateCard
-              icon={<WalletIcon />}
-              title="No active loan yet"
-              description="Once your application is approved and disbursed, your loan and repayment details will appear here."
-              action={{ label: 'Apply for a loan', href: COMPLETE_JOURNEY_HREF }}
-            />
-          ) : null}
-
-          {dash.activeLoans.length > 0 && dash.repaymentSchedule.length > 0 ? (
-            <section className="grid gap-4">
-              <h2 className="text-lg font-extrabold text-brand-navy">Repayment schedule</h2>
-              <div className="overflow-hidden rounded-[20px] border border-[rgba(18,36,79,0.1)] bg-white shadow-sm">
-                <ul className="divide-y divide-[rgba(18,36,79,0.06)]">
-                  {dash.repaymentSchedule.map((line, idx) => (
-                    <li
-                      key={`${line.dueDate}-${idx}`}
-                      className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div>
-                        <p className="font-bold text-brand-navy">{line.label}</p>
-                        <p className="text-sm text-brand-muted">Due {formatIsoDateDdMmYyyy(line.dueDate)}</p>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <span className="text-xl font-extrabold text-brand-navy">{formatInr(line.amount)}</span>
-                        <span
-                          className={cn(
-                            'rounded-full px-3 py-1 text-[0.68rem] font-extrabold uppercase tracking-wide',
-                            repaymentStatusClass(line.status),
-                          )}
-                        >
-                          {line.status}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </section>
-          ) : null}
+        <div className="flex gap-6 border-b border-[rgba(18,36,79,0.08)]">
+          <TabButton
+            active={activeTab === 'overview'}
+            label="Overview"
+            badge={overviewBadge > 0 ? overviewBadge : undefined}
+            onClick={() => setActiveTab('overview')}
+          />
+          <TabButton
+            active={activeTab === 'history'}
+            label="Previous loans"
+            badge={dash.pastLoans.length || undefined}
+            onClick={() => setActiveTab('history')}
+          />
         </div>
-      ) : (
-        <div className="grid gap-6">
-          <section className="grid gap-4">
-            <div>
-              <h2 className="text-lg font-extrabold text-brand-navy">Previous loan details</h2>
-              <p className="mt-1 text-sm text-brand-muted">
-                A record of your closed, matured, and past applications.
-              </p>
-            </div>
-            {dash.pastLoans.length === 0 ? (
-              <EmptyStateCard
-                icon={<HistoryIcon />}
-                title="No loan history yet"
-                description="Your previous loans and closed applications will appear here once you complete a loan cycle."
-                action={
-                  showIncompleteJourney
-                    ? { label: 'Complete your journey', href: COMPLETE_JOURNEY_HREF }
-                    : { label: 'Apply for a loan', href: COMPLETE_JOURNEY_HREF }
-                }
+
+        {activeTab === 'overview' ? (
+          <div className="grid gap-6">
+            {showIncompleteJourney ? (
+              <CompleteJourneyCard
+                steps={journeySteps.steps}
+                completed={journeySteps.completed}
+                total={journeySteps.total}
+                nextLabel={journeySteps.nextLabel}
               />
-            ) : (
-              <div className="grid gap-4 lg:grid-cols-2">
-                {dash.pastLoans.map((loan) => (
-                  <LoanSummaryCard key={loan.applicationUuid} loan={loan} />
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
-      )}
+            ) : null}
 
-      {session && isCustomerPortalSignedIn(session) && showIncompleteJourney ? (
-        <p className="text-center text-[0.78rem] text-brand-muted">
-          Continue from{' '}
-          <span className="font-semibold text-brand-navy">{journeySteps.nextLabel}</span>
-          {' · '}
-          <Link href={getCustomerJourneyResumePath(session)} className="font-bold text-brand-blue hover:underline">
-            Jump to current step
-          </Link>
-        </p>
-      ) : null}
+            {dash.inProgress.length > 0 && !hasOpenLoan ? (
+              <section className="grid gap-4">
+                <div>
+                  <h2 className="text-lg font-extrabold text-brand-navy">Applications in progress</h2>
+                  <p className="mt-1 text-sm text-brand-muted">Track submissions that are still under review.</p>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {dash.inProgress.map((loan) => (
+                    <InProgressLoanCard key={loan.applicationUuid} loan={loan} />
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {dash.activeLoans.length > 0 ? (
+              <section className="grid gap-4">
+                <div>
+                  <h2 className="text-lg font-extrabold text-brand-navy">
+                    Your active loan{dash.activeLoans.length > 1 ? 's' : ''}
+                  </h2>
+                  <p className="mt-1 text-sm text-brand-muted">
+                    Pay any time — interest accrues daily until repayment.
+                  </p>
+                </div>
+                <div className="grid gap-5">
+                  {dash.activeLoans.map((loan) => (
+                    <ActiveLoanCard
+                      key={loan.applicationUuid}
+                      loan={loan}
+                      onPaid={() => void loadLoans()}
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : !showIncompleteJourney ? (
+              <EmptyStateCard
+                icon={<WalletIcon />}
+                title="No active loan yet"
+                description="Once your application is approved and disbursed, your loan and repayment details will appear here."
+                action={{ label: 'Apply for a loan', href: COMPLETE_JOURNEY_HREF }}
+              />
+            ) : null}
+          </div>
+        ) : (
+          <div className="grid gap-6">
+            <section className="grid gap-4">
+              <div>
+                <h2 className="text-lg font-extrabold text-brand-navy">Previous loans</h2>
+                <p className="mt-1 text-sm text-brand-muted">
+                  Closed, matured, and past applications in one place.
+                </p>
+              </div>
+              {dash.pastLoans.length === 0 ? (
+                <EmptyStateCard
+                  icon={<HistoryIcon />}
+                  title="No loan history yet"
+                  description="Your previous loans and closed applications will appear here once you complete a loan cycle."
+                  action={
+                    showIncompleteJourney
+                      ? { label: 'Complete your journey', href: COMPLETE_JOURNEY_HREF }
+                      : hasOpenLoan
+                        ? undefined
+                        : { label: 'Apply for a loan', href: COMPLETE_JOURNEY_HREF }
+                  }
+                />
+              ) : (
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {dash.pastLoans.map((loan) => (
+                    <LoanSummaryCard key={loan.applicationUuid} loan={loan} />
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
+        {session && isCustomerPortalSignedIn(session) && showIncompleteJourney ? (
+          <p className="text-center text-[0.78rem] text-brand-muted">
+            Continue from{' '}
+            <span className="font-semibold text-brand-navy">{journeySteps.nextLabel}</span>
+            {' · '}
+            <Link
+              href={getCustomerJourneyResumePath(session)}
+              className="font-bold text-brand-blue hover:underline"
+            >
+              Jump to current step
+            </Link>
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }

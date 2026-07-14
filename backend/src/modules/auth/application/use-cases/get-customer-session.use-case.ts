@@ -1,10 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Request } from 'express';
+import {
+  customerHasOpenLoan,
+  canDeactivateConvertedLeadForReapply,
+  findLeadIdWithOpenLoanForCustomer,
+} from '../../../../common/loan/customer-open-loan.util';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { getRejectedUntilIso } from '../../../../common/lead/lead-reapply-policy.util';
 import {
   APPLICATION_KYC_STATUS,
-  APPLICATION_STATUS,
 } from '../../../../common/constants/application.constants';
 import { isDigilockerAadhaarCaptureComplete } from '../../../../common/kyc/aadhaar-vendor-parse.util';
 import {
@@ -80,18 +84,26 @@ export class GetCustomerSessionUseCase {
       leadReferences: [],
       kycFaceProgress: null,
       bankVerificationProgress: null,
+      hasOpenLoan: false,
     };
 
+    const hasOpenLoan = await customerHasOpenLoan(this.prisma.client, customer.id);
+    noLeadResult.hasOpenLoan = hasOpenLoan;
+
     let leadRow = await this.leads.findActiveByCustomerId(customer.id);
-    
+
+    // Disbursement must not drop the lead — restore CONVERTED lead if it was wrongly deactivated.
+    if (!leadRow && hasOpenLoan) {
+      const openLoanLeadId = await findLeadIdWithOpenLoanForCustomer(this.prisma.client, customer.id);
+      if (openLoanLeadId) {
+        await this.leads.reactivate(openLoanLeadId);
+        leadRow = await this.leads.findActiveByCustomerId(customer.id);
+      }
+    }
+
     if (!leadRow) {
       return noLeadResult;
     }
-
-    // leadRow = await this.syncOfferEligibilityForLead(leadRow, customer.id);
-    // if (!leadRow) {
-    //   return noLeadResult;
-    // }
 
     let statusName = leadRow.leadStatus.name;
 
@@ -110,16 +122,33 @@ export class GetCustomerSessionUseCase {
       }
     }
 
-    if (statusName === LEAD_STATUS.CONVERTED) {
-      const disbursedApp = await this.prisma.client.application.findFirst({
-        where: {
-          leadId: leadRow.id,
-          applicationStatus: { name: APPLICATION_STATUS.DISBURSED, isActive: true },
-        },
-        select: { id: true },
-      });
+    // Spurious new lead while an open loan exists — drop it and restore the disbursed lead.
+    if (
+      hasOpenLoan &&
+      statusName !== LEAD_STATUS.CONVERTED &&
+      statusName !== LEAD_STATUS.REJECTED &&
+      statusName !== LEAD_STATUS.BLACKLISTED
+    ) {
+      await this.leads.deactivate(leadRow.id);
+      const openLoanLeadId = await findLeadIdWithOpenLoanForCustomer(this.prisma.client, customer.id);
+      if (openLoanLeadId) {
+        await this.leads.reactivate(openLoanLeadId);
+        leadRow = await this.leads.findActiveByCustomerId(customer.id);
+        if (!leadRow) {
+          return noLeadResult;
+        }
+        statusName = leadRow.leadStatus.name;
+      } else {
+        return noLeadResult;
+      }
+    }
 
-      if (disbursedApp) {
+    // Never deactivate the CONVERTED lead on session load while a loan is still open.
+    // Once the loan is CLOSED / WRITTEN_OFF, free the customer to start a fresh application
+    // (same rule as mobile OTP reapply) — otherwise journey-complete keeps routing to /thank-you.
+    if (!hasOpenLoan && statusName === LEAD_STATUS.CONVERTED) {
+      const mayReapply = await canDeactivateConvertedLeadForReapply(this.prisma.client, leadRow.id);
+      if (mayReapply) {
         await this.leads.deactivate(leadRow.id);
         return noLeadResult;
       }
@@ -362,6 +391,7 @@ export class GetCustomerSessionUseCase {
       leadReferences,
       kycFaceProgress,
       bankVerificationProgress,
+      hasOpenLoan,
     };
   }
 

@@ -14,6 +14,7 @@ import {
   LSP_NODAL_NAME,
   LSP_NODAL_PHONE,
 } from '../constants/loan-document.constants';
+import { normalizeClientIp } from '../http/client-ip.util';
 import { inrAmountToWords } from '../utils/inr-amount-words.util';
 import { buildLoanDocumentReplacements } from './loan-document-merge-data.util';
 import type { LoanDocumentMergeInput } from './loan-document.types';
@@ -36,6 +37,12 @@ function formatDateDdMmYyyy(d: Date): string {
   return `${dd}-${mm}-${yyyy}`;
 }
 
+function formatPercent(value: number): string {
+  const trimmed = Number(value.toFixed(2));
+  const display = Number.isInteger(trimmed) ? String(trimmed) : String(trimmed);
+  return `${display}%`;
+}
+
 function formatAcceptanceTimestamp(value: Date | string): string {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return '';
@@ -51,16 +58,20 @@ function formatAcceptanceTimestamp(value: Date | string): string {
   }).format(d)} IST`;
 }
 
+/** APR base = sanctioned amount minus processing fee (GST excluded); compound annualized rate. */
 function computeAprPercent(
-  principal: number | null,
-  interest: number | null,
+  loanAmount: number | null,
+  processingFee: number | null,
+  totalPayable: number | null,
   tenureDays: number | null,
 ): string {
-  if (principal == null || principal <= 0 || interest == null || tenureDays == null || tenureDays <= 0) {
+  if (loanAmount == null || loanAmount <= 0 || totalPayable == null || tenureDays == null || tenureDays <= 0) {
     return '';
   }
-  const apr = (interest / principal) * (365 / tenureDays) * 100;
-  return `${apr.toFixed(2)}%`;
+  const aprBase = loanAmount - (processingFee ?? 0);
+  if (aprBase <= 0) return '';
+  const apr = (Math.pow(totalPayable / aprBase, 365 / tenureDays) - 1) * 100;
+  return `${apr.toFixed(1)}%`;
 }
 
 /** Maps HTML template `input#id` values from application merge data. */
@@ -90,10 +101,7 @@ export function buildLoanDocumentHtmlFieldValues(input: LoanDocumentMergeInput):
   const borrowerName = base.NAME;
   const address = base.ADDRESS;
   const purpose = base.PURPOSE_OF_LOAN;
-  const accountNo =
-    input.applicationNumber?.trim()
-    || input.applicationUuid?.trim()
-    || '';
+  const accountNo = input.applicationNumber?.trim() ?? '';
   const maturity =
     input.loanMaturityDate != null
       ? formatDateDdMmYyyy(
@@ -108,7 +116,7 @@ export function buildLoanDocumentHtmlFieldValues(input: LoanDocumentMergeInput):
     sl_amount_words: loanAmount != null ? inrAmountToWords(loanAmount) : '',
     sl_interest_rate: base.INTEREST_RATE,
     sl_proc_fee_amt: processingFee != null ? formatInrPlain(processingFee) : '',
-    sl_proc_fee_pct: processingPct != null ? String(Number(processingPct.toFixed(2))) : '',
+    sl_proc_fee_pct: processingPct != null ? formatPercent(processingPct) : '',
     sl_penal_rate: DEFAULT_PENAL_RATE_PERCENT,
     sl_penal_min: DEFAULT_PENAL_MIN_INR,
     sl_penal_max: DEFAULT_PENAL_MAX_INR,
@@ -132,7 +140,7 @@ export function buildLoanDocumentHtmlFieldValues(input: LoanDocumentMergeInput):
           ? `${formatInrPlain(processingFee)} (${processingPct.toFixed(2)}%)`
           : formatInrPlain(processingFee)
         : '',
-    kfs_apr: computeAprPercent(loanAmount, interestAmount, tenure),
+    kfs_apr: computeAprPercent(loanAmount, processingFee, totalPayable, tenure),
     kfs_total_payable: totalPayable != null ? formatInrPlain(totalPayable) : '',
     rep_due_date: maturity,
     rep_principal: loanAmount != null ? formatInrPlain(loanAmount) : '',
@@ -155,7 +163,7 @@ export function buildLoanDocumentHtmlFieldValues(input: LoanDocumentMergeInput):
     ct_lender_office: LENDER_REGISTERED_OFFICE,
     sig_signed_by: borrowerName,
     sig_name: borrowerName,
-    sig_ip: input.acceptanceIpAddress?.trim() ?? '',
+    sig_ip: normalizeClientIp(input.acceptanceIpAddress) ?? '',
     sig_ts:
       input.acceptanceSignedAt != null ? formatAcceptanceTimestamp(input.acceptanceSignedAt) : '',
     lender_dsc_signer: input.lenderDscSignerName?.trim() || LENDER_NAME,

@@ -38,7 +38,7 @@ export const LOAN_DOCUMENT_ACCEPTANCE_NAME = 'Loan Sanction letter cum Key Fact 
 export const LOAN_DOCUMENT_SIGNATURE_PLACEHOLDER_LENGTH = 8192;
 
 /** Default penal charge parameters (sanction letter section A). */
-export const DEFAULT_PENAL_RATE_PERCENT = '10';
+export const DEFAULT_PENAL_RATE_PERCENT = '10%';
 export const DEFAULT_PENAL_MIN_INR = '100';
 export const DEFAULT_PENAL_MAX_INR = '3,000';
 export const DEFAULT_MAX_MONTHLY_RATE_PERCENT = '30';

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BreModule } from '../../common/bre/bre.module';
 import { CibilModule } from '../../common/cibil/cibil.module';
+import { EmailModule } from '../../common/email/email.module';
 import { LoanDocumentsModule } from '../../common/loan-documents/loan-documents.module';
 import { SmsModule } from '../../common/sms/sms.module';
 import { StorageModule } from '../../common/storage/storage.module';
@@ -24,10 +25,12 @@ import { LosDeveloperToolsController } from './los-developer-tools.controller';
 import { LosTeamController } from './los-team.controller';
 import { LosTeamService } from './los-team.service';
 import { LosRejectionService } from './services/los-rejection.service';
+import { LosDisbursementService } from './services/los-disbursement.service';
+import { LosLoanService } from './services/los-loan.service';
 import { LosKycDevToolsService } from './services/los-kyc-dev-tools.service';
 
 @Module({
-  imports: [BreModule, CibilModule, StorageModule, LoanDocumentsModule, SmsModule, ContactModule],
+  imports: [BreModule, CibilModule, StorageModule, LoanDocumentsModule, SmsModule, ContactModule, EmailModule],
   controllers: [
     LosAuthController,
     LosDataController,
@@ -50,6 +53,8 @@ import { LosKycDevToolsService } from './services/los-kyc-dev-tools.service';
     LosMasterService,
     LosNegativeListService,
     LosRejectionService,
+    LosDisbursementService,
+    LosLoanService,
     LosKycDevToolsService,
   ],
   exports: [LosSessionService],

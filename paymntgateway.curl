@@ -1,0 +1,26 @@
+curl --request POST \
+  --url https://wire.easebuzz.in/api/v1/quick_transfers/initiate/ \
+  --header 'Accept: application/json' \
+  --header 'Authorization: f34e134bb2d6f244c4124668e38d9bf9292db6c228ad9a4bffde9c5193c6ebe3' \
+  --header 'Content-Type: application/json' \
+  --header 'F55E22E7FB: ' \
+  --data '{
+  "key": "1Z1234567X",
+  "virtual_account_number": "10289407830",
+  "beneficiary_type": "bank_account",
+  "beneficiary_name": "Saurabh Agarwal",
+  "account_number": "02731050042457",
+  "ifsc_code": "HDFC0000273",
+  "unique_request_number": "MCASH12345",
+  "payment_mode": "IMPS",
+  "amount": 1,
+  "email": "saurabhagarwal2k8@gmail.com",
+  "phone": "8882911939",
+  "narration": "loan disbursed",
+  "scheduled_for": "2026-07-13",
+  "udf1": "InstaTest",
+  "udf2": "Insta",
+  "udf3": "222222414",
+  "udf4": "InstaTest123",
+  "udf5": "2Test22"
+}'

@@ -12,6 +12,7 @@ import {
   LOAN_DOCUMENT_TYPE,
 } from '../../../../common/constants/loan-document.constants';
 import { EmailService } from '../../../../common/email/email.service';
+import { readClientIp } from '../../../../common/http/client-ip.util';
 import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
 import { isLeadEmailVerifiedForPortal } from '../../../../common/mappers/customer-portal-profile.mapper';
 import { maskEmail } from '../../infrastructure/utils/email.util';
@@ -24,14 +25,6 @@ import { SettingsRepository } from '../../infrastructure/repositories/settings.r
 import { PrismaService } from '../../../../prisma/prisma.service';
 import type { AcceptLoanDocumentsDto } from '../dto/accept-loan-documents.dto';
 import { LoanDocumentApplicationService } from '../services/loan-document-application.service';
-
-function readClientIp(req: Request): string | undefined {
-  const xf = req.headers['x-forwarded-for'];
-  if (typeof xf === 'string' && xf.length > 0) {
-    return xf.split(',')[0]?.trim();
-  }
-  return req.ip;
-}
 
 @Injectable()
 export class AcceptLoanDocumentsUseCase {

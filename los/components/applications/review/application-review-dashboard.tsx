@@ -21,7 +21,12 @@ import { isApplicationRecordRejected } from '@/lib/application-workspace-status'
 import { buildApplicationJourney, journeyProgressPercent } from '@/lib/customer-journey';
 import { extractCibilPan } from '@/lib/kyc-field-match';
 import { formatPersonName } from '@/lib/format-person-name';
-import { getApplicationCibilReport, type LosApplicationDetails } from '@/lib/api';
+import {
+  approveApplication,
+  disburseApplication,
+  getApplicationCibilReport,
+  type LosApplicationDetails,
+} from '@/lib/api';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type ReviewTab = 'personal' | 'cibil' | 'loan' | 'kyc' | 'bank' | 'refs' | 'utm' | 'ids' | 'timeline';
@@ -40,6 +45,9 @@ export function ApplicationReviewDashboard({
   const [activeTab, setActiveTab] = useState<ReviewTab>(row.details?.loanAmount ? 'loan' : 'personal');
   const [bureauPan, setBureauPan] = useState<string | null>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [approveBusy, setApproveBusy] = useState(false);
+  const [disburseBusy, setDisburseBusy] = useState(false);
 
   const profile = row.lead.profile;
   const displayName = formatPersonName(profile?.fullName, 'Applicant (name pending)');
@@ -49,6 +57,13 @@ export function ApplicationReviewDashboard({
   const progressPct = journeyProgressPercent(journeySteps);
   const isRejected = isApplicationRecordRejected(row);
   const flags = useMemo(() => buildReviewFlags(row, bureauPan), [row, bureauPan]);
+  const statusCode = row.statusCode.toUpperCase();
+  const journeyComplete =
+    !isRejected &&
+    journeySteps.length > 0 &&
+    journeySteps.every((step) => step.state === 'done');
+  const canApprove = journeyComplete && statusCode !== 'APPROVED' && statusCode !== 'DISBURSED';
+  const canDisburse = statusCode === 'APPROVED' && !row.loanAccount;
 
   const loadBureauPan = useCallback(async () => {
     if (!authToken || !row.bureauReport) {
@@ -66,6 +81,42 @@ export function ApplicationReviewDashboard({
   useEffect(() => {
     void loadBureauPan();
   }, [loadBureauPan]);
+
+  const handleApprove = useCallback(async () => {
+    if (!authToken || approveBusy) return;
+    const confirmed = window.confirm(
+      `Approve application ${row.applicationNumber}? Status will change to APPROVED.`,
+    );
+    if (!confirmed) return;
+    setApproveBusy(true);
+    setActionError(null);
+    try {
+      await approveApplication(authToken, applicationUuid);
+      onRefresh();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Failed to approve application.');
+    } finally {
+      setApproveBusy(false);
+    }
+  }, [applicationUuid, approveBusy, authToken, onRefresh, row.applicationNumber]);
+
+  const handleDisburse = useCallback(async () => {
+    if (!authToken || disburseBusy) return;
+    const confirmed = window.confirm(
+      `Disburse loan for ${row.applicationNumber}?\n\nThis will create the loan account (loan number = application number), set status to DISBURSED, and email the final sanction letter. Payment gateway is skipped for now.`,
+    );
+    if (!confirmed) return;
+    setDisburseBusy(true);
+    setActionError(null);
+    try {
+      await disburseApplication(authToken, applicationUuid);
+      onRefresh();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Failed to disburse loan.');
+    } finally {
+      setDisburseBusy(false);
+    }
+  }, [applicationUuid, authToken, disburseBusy, onRefresh, row.applicationNumber]);
 
   const tabs: Array<{ id: ReviewTab; label: string; badge?: React.ReactNode }> = [
     { id: 'personal', label: 'Personal details' },
@@ -108,8 +159,18 @@ export function ApplicationReviewDashboard({
           onRefresh={onRefresh}
           onReject={canRejectApplicationStatus(row.statusCode) ? () => setRejectOpen(true) : undefined}
           rejectDisabled={!canRejectApplicationStatus(row.statusCode)}
+          onApprove={canApprove ? () => void handleApprove() : undefined}
+          approveBusy={approveBusy}
+          onDisburse={canDisburse ? () => void handleDisburse() : undefined}
+          disburseBusy={disburseBusy}
         />
       </div>
+
+      {actionError ? (
+        <div className="mb-4 rounded-[10px] border border-[rgba(239,68,68,0.3)] bg-[#fef2f2] px-4 py-3 text-[0.85rem] font-semibold text-[#b91c1c]" role="alert">
+          {actionError}
+        </div>
+      ) : null}
 
       <RejectRecordModal
         open={rejectOpen}

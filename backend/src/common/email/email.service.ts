@@ -254,6 +254,36 @@ export class EmailService {
       audit: { serviceName: 'email-loan-documents', leadId: audit?.leadId ?? null },
     });
   }
+
+  async sendFinalSanctionLetterEmail(
+    to: string,
+    attachments: EmailAttachment[],
+    audit?: Pick<SendEmailAuditContext, 'leadId'>,
+  ): Promise<void> {
+    const subject = 'Your MoneyCash loan has been disbursed — final sanction letter';
+    const text = [
+      'Good news — your MoneyCash loan has been disbursed.',
+      '',
+      'Attached is your final Sanction letter cum Key Fact Statement for your records.',
+      '',
+      'If you have any questions, please contact support.',
+    ].join('\n');
+
+    const html = `
+      <p>Good news — your MoneyCash loan has been <strong>disbursed</strong>.</p>
+      <p>Attached is your final <strong>Sanction letter cum Key Fact Statement</strong> for your records.</p>
+      <p style="color:#555;font-size:0.85em;">If you have any questions, please contact support.</p>
+    `.trim();
+
+    await this.sendEmail({
+      to,
+      subject,
+      text,
+      html,
+      attachments,
+      audit: { serviceName: 'email-final-sanction-letter', leadId: audit?.leadId ?? null },
+    });
+  }
 }
 
 function serializeNodemailerResponse(info: SentMessageInfo): Record<string, unknown> {

@@ -78,12 +78,26 @@ function buildJourneySteps(
 
 function statusBadgeClass(status: string): string {
   const s = status.toUpperCase();
-  if (s === 'DISBURSED') return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+  if (s === 'CLOSED' || s === 'PAID' || s === 'PAID_FULLY') {
+    return 'bg-emerald-100 text-emerald-900 border-emerald-300';
+  }
+  if (s === 'OVERDUE') return 'bg-rose-100 text-rose-900 border-rose-300';
+  if (s === 'ACTIVE') return 'bg-sky-100 text-sky-900 border-sky-300';
+  if (s === 'WRITTEN_OFF') return 'bg-slate-200 text-slate-800 border-slate-300';
+  if (s === 'DISBURSED') return 'bg-indigo-100 text-indigo-900 border-indigo-200';
   if (s === 'IN_REVIEW') return 'bg-amber-100 text-amber-900 border-amber-200';
   if (s === 'APPROVED') return 'bg-sky-100 text-sky-900 border-sky-200';
   if (s === 'REJECTED') return 'bg-rose-100 text-rose-900 border-rose-200';
   if (s === 'DRAFT') return 'bg-slate-100 text-slate-700 border-slate-200';
   return 'bg-[rgba(20,150,243,0.12)] text-brand-navy border-[rgba(20,150,243,0.25)]';
+}
+
+function statusBadgeLabel(status: string): string {
+  const s = status.toUpperCase();
+  if (s === 'CLOSED') return 'Paid fully';
+  if (s === 'OVERDUE') return 'Overdue';
+  if (s === 'ACTIVE') return 'Active';
+  return status.replace(/_/g, ' ');
 }
 
 function repaymentStatusClass(status: CustomerLoanRepaymentLine['status']): string {
@@ -227,7 +241,7 @@ function ResumeJourneyCard({
             statusBadgeClass(loan.status)
           )}
         >
-          {loan.status.replace(/_/g, ' ')}
+          {statusBadgeLabel(loan.status)}
         </span>
       </div>
 
@@ -270,6 +284,11 @@ function ResumeJourneyCard({
 }
 
 function LoanSummaryCard({ loan, emphasize }: { loan: CustomerLoanCard; emphasize?: boolean }) {
+  const isPaidFully = loan.status.toUpperCase() === 'CLOSED';
+  const repaymentDays = isPaidFully
+    ? (loan.daysOutstanding ?? loan.tenureDays)
+    : loan.tenureDays;
+
   return (
     <div
       className={cn(
@@ -286,9 +305,11 @@ function LoanSummaryCard({ loan, emphasize }: { loan: CustomerLoanCard; emphasiz
             statusBadgeClass(loan.status)
           )}
         >
-          {loan.status.replace(/_/g, ' ')}
+          {statusBadgeLabel(loan.status)}
         </span>
-        <span className="font-mono text-[0.72rem] text-brand-muted">{loan.applicationUuid.slice(0, 13)}…</span>
+        <span className="font-mono text-[0.72rem] font-bold text-brand-navy">
+          {loan.loanNumber ?? `${loan.applicationUuid.slice(0, 13)}…`}
+        </span>
       </div>
       <dl className="mt-4 grid gap-3 sm:grid-cols-2">
         <div>
@@ -300,12 +321,27 @@ function LoanSummaryCard({ loan, emphasize }: { loan: CustomerLoanCard; emphasiz
           <dd className="text-lg font-extrabold text-brand-navy">{formatInr(loan.totalRepayment)}</dd>
         </div>
         <div>
-          <dt className="text-[0.7rem] font-bold uppercase tracking-wider text-slate-400">Tenure</dt>
-          <dd className="font-bold text-brand-navy">{loan.tenureDays != null ? `${loan.tenureDays} days` : '—'}</dd>
+          <dt className="text-[0.7rem] font-bold uppercase tracking-wider text-slate-400">
+            {isPaidFully ? 'Repayment days' : 'Tenure'}
+          </dt>
+          <dd className="font-bold text-brand-navy">
+            {repaymentDays != null ? `${repaymentDays} days` : '—'}
+          </dd>
         </div>
         <div>
-          <dt className="text-[0.7rem] font-bold uppercase tracking-wider text-slate-400">Maturity</dt>
-          <dd className="font-bold text-brand-navy">{formatIsoDateDdMmYyyy(loan.maturityDate)}</dd>
+          <dt className="text-[0.7rem] font-bold uppercase tracking-wider text-slate-400">
+            {isPaidFully ? 'Repaid on' : 'Maturity'}
+          </dt>
+          <dd className="font-bold text-brand-navy">
+            {isPaidFully
+              ? loan.repaidAt
+                ? new Date(loan.repaidAt).toLocaleString('en-IN', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  })
+                : '—'
+              : formatIsoDateDdMmYyyy(loan.maturityDate)}
+          </dd>
         </div>
         {loan.disbursedAt && (
           <div className="sm:col-span-2">
@@ -512,7 +548,11 @@ export function CustomerDashboard() {
                 ? 'Once your application is approved and disbursed, your active loan will appear here.'
                 : 'Once you take a MoneyCash loan it shows up here with principal, repayment, and bank info.'
             }
-            action={hasResumeable ? undefined : { label: 'Apply for a loan', href: '/apply-for-loan' }}
+            action={
+              hasResumeable || dash.activeLoans.length > 0
+                ? undefined
+                : { label: 'Apply for a loan', href: '/apply-for-loan' }
+            }
           />
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">

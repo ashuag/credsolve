@@ -41,6 +41,19 @@ function forwardRequestHeaders(request: NextRequest): Headers {
     }
     headers.set(key, value);
   });
+
+  // Ensure Nest sees the browser IP (not the customer→backend Docker hop).
+  const forwarded = request.headers.get('x-forwarded-for');
+  const realIp = request.headers.get('x-real-ip');
+  const clientIp =
+    (forwarded?.split(',')[0]?.trim() || realIp?.trim() || request.headers.get('cf-connecting-ip')?.trim() || '')
+      .replace(/^::ffff:/i, '');
+
+  if (clientIp) {
+    headers.set('x-forwarded-for', clientIp);
+    headers.set('x-real-ip', clientIp);
+  }
+
   return headers;
 }
 

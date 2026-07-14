@@ -120,5 +120,10 @@ export type CustomerSessionResult =
       kycFaceProgress: CustomerKycFaceProgressSnapshot | null;
       /** Penny-drop attempt counters while bank details are pending; `null` when not applicable. */
       bankVerificationProgress: CustomerBankVerificationProgressSnapshot | null;
+      /**
+       * True when the customer has an ACTIVE/OVERDUE loan account.
+       * Blocks starting another application until the loan is CLOSED.
+       */
+      hasOpenLoan: boolean;
     }
   | { authenticated: false };

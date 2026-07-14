@@ -302,6 +302,8 @@ export type LosApplicationDetails = {
     amount: string | null;
   } | null;
   loanAccount: {
+    /** Same as application_number; falls back to loanAccountNumber if older API. */
+    loanNumber?: string;
     loanAccountNumber: string;
     principalAmount: string;
     netDisbursedAmount: string;

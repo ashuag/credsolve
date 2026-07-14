@@ -2,6 +2,12 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
+import {
+  computeAmountDueNowInr,
+  computeInterestAmountInr,
+  calendarDaysBetween,
+  decimalToNumber,
+} from '../../../../common/loan/loan-calculation.util';
 import { computeFeeAmountsFromLoanDetail } from '../../../../common/loan/loan-disbursement-view.util';
 import type {
   CustomerLoanCard,
@@ -64,36 +70,98 @@ function mapRow(r: {
     gstPercentage: Prisma.Decimal | null;
   } | null;
   loanAccount: {
+    loanNumber: string;
     principalAmount: Prisma.Decimal;
+    interestRate: Prisma.Decimal;
+    interestAmount: Prisma.Decimal;
     totalRepaymentAmount: Prisma.Decimal;
     loanMaturityDate: Date;
     disbursedAt: Date;
+    closedAt: Date | null;
     bankAccountNumber: string | null;
+    loanStatus: { name: string };
   } | null;
 }): CustomerLoanCard {
   const loanDetail = r.details;
   const loanAccount = r.loanAccount;
   const fees = computeFeeAmountsFromLoanDetail(loanDetail);
 
+  const principal =
+    decimalToNumber(loanAccount?.principalAmount) ??
+    decimalToNumber(loanDetail?.selectedLoanAmount);
+  const dailyRate =
+    decimalToNumber(loanAccount?.interestRate) ?? decimalToNumber(loanDetail?.interestRate);
+  const tenureDays = loanDetail?.expectedRepaymentDays ?? null;
+
+  // Full-tenure interest / amount due on maturity (KFS / scheduled).
+  let interestAtMaturity =
+    fees.interestAmount ??
+    (loanAccount != null ? decimalToNumber(loanAccount.interestAmount) : null);
+  if (
+    interestAtMaturity == null &&
+    principal != null &&
+    dailyRate != null &&
+    tenureDays != null
+  ) {
+    interestAtMaturity = computeInterestAmountInr(principal, dailyRate, tenureDays);
+  }
+
+  let amountDueAtMaturity: number | null =
+    principal != null && interestAtMaturity != null
+      ? Math.round((principal + interestAtMaturity) * 100) / 100
+      : decimalToNumber(loanAccount?.totalRepaymentAmount) ?? fees.repaymentAmount;
+
+  // Accrual till today: inclusive days (disbursement day = day 1).
+  let daysOutstanding: number | null = null;
+  let interestTillToday: number | null = null;
+  let amountDueToday: number | null = null;
+
+  if (loanAccount && loanAccount.closedAt == null && principal != null && dailyRate != null) {
+    const due = computeAmountDueNowInr(principal, dailyRate, loanAccount.disbursedAt);
+    daysOutstanding = due.daysOutstanding;
+    interestTillToday = due.interestAmount;
+    amountDueToday = due.amountDue;
+  } else if (loanAccount?.closedAt != null) {
+    // Inclusive days from disbursement through repayment (disbursement day = day 1).
+    daysOutstanding = calendarDaysBetween(loanAccount.disbursedAt, loanAccount.closedAt) + 1;
+    interestTillToday = decimalToNumber(loanAccount.interestAmount);
+    amountDueToday = decimalToNumber(loanAccount.totalRepaymentAmount);
+    amountDueAtMaturity = amountDueToday ?? amountDueAtMaturity;
+  }
+
+  const interestAmountStr = interestAtMaturity != null ? interestAtMaturity.toFixed(2) : null;
+  const amountDueAtMaturityStr = amountDueAtMaturity != null ? amountDueAtMaturity.toFixed(2) : null;
+  const interestTillTodayStr = interestTillToday != null ? interestTillToday.toFixed(2) : null;
+  const amountDueTodayStr = amountDueToday != null ? amountDueToday.toFixed(2) : null;
+
+  const displayStatus =
+    loanAccount != null
+      ? loanAccount.closedAt != null
+        ? 'CLOSED'
+        : loanAccount.loanStatus.name
+      : r.applicationStatus.name;
+
   return {
     applicationUuid: r.uuid,
-    status: r.applicationStatus.name,
-    loanAmount: loanAccount
-      ? decToAmountString(loanAccount.principalAmount)
-      : decToAmountString(loanDetail?.selectedLoanAmount ?? null),
-    tenureDays: loanDetail?.expectedRepaymentDays ?? null,
-    interestAmount: fees.interestAmount != null ? fees.interestAmount.toFixed(2) : null,
+    loanNumber: loanAccount?.loanNumber ?? null,
+    status: displayStatus,
+    loanAmount: principal != null ? principal.toFixed(2) : null,
+    // Closed loans: show actual days held; open / in-progress: planned KFS tenure.
+    tenureDays:
+      loanAccount?.closedAt != null && daysOutstanding != null ? daysOutstanding : tenureDays,
+    interestAmount: interestAmountStr,
+    amountDueAtMaturity: amountDueAtMaturityStr,
+    daysOutstanding,
+    interestTillToday: interestTillTodayStr,
+    amountDueToday: amountDueTodayStr,
     processingFeeAmount: fees.processingFeeAmount != null ? fees.processingFeeAmount.toFixed(2) : null,
     gstAmount: fees.gstAmount != null ? fees.gstAmount.toFixed(2) : null,
-    totalRepayment: loanAccount
-      ? decToAmountString(loanAccount.totalRepaymentAmount)
-      : fees.repaymentAmount != null
-        ? fees.repaymentAmount.toFixed(2)
-        : null,
+    totalRepayment: amountDueTodayStr ?? amountDueAtMaturityStr,
     maturityDate: loanAccount
       ? isoDateOnly(loanAccount.loanMaturityDate)
       : isoDateOnly(loanDetail?.expectedRepaymentDate ?? null),
     disbursedAt: loanAccount ? loanAccount.disbursedAt.toISOString() : null,
+    repaidAt: loanAccount?.closedAt ? loanAccount.closedAt.toISOString() : null,
     bankDisplay: maskBank(
       loanDetail?.bankName ?? null,
       loanAccount?.bankAccountNumber ?? loanDetail?.bankAccountNumber ?? null,
@@ -140,11 +208,16 @@ export class GetCustomerLoansDashboardUseCase {
         },
         loanAccount: {
           select: {
+            loanNumber: true,
             principalAmount: true,
+            interestRate: true,
+            interestAmount: true,
             totalRepaymentAmount: true,
             loanMaturityDate: true,
             disbursedAt: true,
+            closedAt: true,
             bankAccountNumber: true,
+            loanStatus: { select: { name: true } },
           },
         },
       },
@@ -158,10 +231,14 @@ export class GetCustomerLoansDashboardUseCase {
 
     const disbursedAtFor = (raw: (typeof rows)[number]) => raw.loanAccount?.disbursedAt ?? null;
 
+    const isOpenLoanAccount = (raw: (typeof rows)[number]): boolean =>
+      Boolean(raw.loanAccount && raw.loanAccount.closedAt == null);
+
     const activeIndices = rows
       .map((raw, i) => ({ raw, i }))
       .filter(({ raw }) => {
         if (isTerminalApplicationStatus(raw.applicationStatus.name)) return false;
+        if (!isOpenLoanAccount(raw)) return false;
         const maturity = maturityFor(raw);
         if (!maturity) return false;
         const maturityStart = new Date(
@@ -183,6 +260,7 @@ export class GetCustomerLoansDashboardUseCase {
       const raw = rows[i];
       const status = raw.applicationStatus.name;
       if (isTerminalApplicationStatus(status)) return true;
+      if (raw.loanAccount?.closedAt != null) return true;
       const maturity = maturityFor(raw);
       if (!maturity) return false;
       const maturityStart = new Date(
@@ -194,6 +272,7 @@ export class GetCustomerLoansDashboardUseCase {
 
     const isActiveRow = (raw: (typeof rows)[number]): boolean => {
       if (isTerminalApplicationStatus(raw.applicationStatus.name)) return false;
+      if (!isOpenLoanAccount(raw)) return false;
       const maturity = maturityFor(raw);
       if (!maturity) return false;
       const maturityStart = new Date(
@@ -205,6 +284,7 @@ export class GetCustomerLoansDashboardUseCase {
 
     const isPastRow = (raw: (typeof rows)[number]): boolean => {
       if (isTerminalApplicationStatus(raw.applicationStatus.name)) return true;
+      if (raw.loanAccount?.closedAt != null) return true;
       const maturity = maturityFor(raw);
       if (!maturity) return false;
       const maturityStart = new Date(
@@ -227,7 +307,7 @@ export class GetCustomerLoansDashboardUseCase {
       const card = cards[i];
       const raw = rows[i];
       const maturity = maturityFor(raw);
-      const total = card.totalRepayment;
+      const total = card.amountDueAtMaturity ?? card.totalRepayment;
       if (maturity && total) {
         const maturityStart = new Date(
           Date.UTC(maturity.getUTCFullYear(), maturity.getUTCMonth(), maturity.getUTCDate())
@@ -235,10 +315,10 @@ export class GetCustomerLoansDashboardUseCase {
         let lineStatus: CustomerLoanRepaymentLine['status'] = 'scheduled';
         if (maturityStart < todayStart) lineStatus = 'overdue';
         else if (maturityStart.getTime() === todayStart.getTime()) lineStatus = 'due';
-        const suffix = activeLoans.length > 1 ? ` · ${card.applicationUuid.slice(0, 8)}…` : '';
+        const suffix = activeLoans.length > 1 ? ` · ${card.loanNumber ?? card.applicationUuid.slice(0, 8)}…` : '';
         repaymentSchedule.push({
           dueDate: isoDateOnly(maturity) ?? '',
-          label: `Full repayment (principal + interest + fees)${suffix}`,
+          label: `Full repayment (principal + interest)${suffix}`,
           amount: total,
           status: lineStatus,
         });

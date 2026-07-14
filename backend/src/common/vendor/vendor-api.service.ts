@@ -24,6 +24,7 @@ const MAX_LOGGED_RESPONSE_CHARS = 64_000;
  */
 const SENSITIVE_HEADER_NAMES: ReadonlySet<string> = new Set([
   'authorization',
+  'wire-api-key',
   'x-api-key',
   'api-key',
   'apikey',
@@ -74,6 +75,8 @@ export type VendorApiCallOptions<TBody = unknown> = {
    * downstream consumers to redact. Defaults to logging the body verbatim.
    */
   redactRequest?: (body: TBody | undefined) => unknown;
+  /** Extra header names to redact in audit logs (case-insensitive). */
+  sensitiveHeaderNames?: string[];
 };
 
 export type VendorApiCallResult<TResponse> = {
@@ -165,7 +168,7 @@ export class VendorApiService {
       ? { 'Content-Type': 'application/json', Accept: 'application/json', ...(opts.headers ?? {}) }
       : { Accept: 'application/json', ...(opts.headers ?? {}) };
 
-    const redactedHeadersForAudit = redactHeaders(headers);
+    const redactedHeadersForAudit = redactHeaders(headers, opts.sensitiveHeaderNames);
 
     let httpStatus: number | null = null;
     let parsedResponse: TResponse | null = null;
@@ -352,10 +355,18 @@ function joinBaseAndPath(base: string, path: string): string {
  * Header keys are preserved verbatim; the case-insensitive lookup only
  * decides redaction.
  */
-function redactHeaders(headers: Record<string, string>): Record<string, string> {
+function redactHeaders(
+  headers: Record<string, string>,
+  extraSensitiveNames?: string[],
+): Record<string, string> {
+  const sensitive = new Set(SENSITIVE_HEADER_NAMES);
+  for (const name of extraSensitiveNames ?? []) {
+    const trimmed = name.trim().toLowerCase();
+    if (trimmed) sensitive.add(trimmed);
+  }
   const out: Record<string, string> = {};
   for (const [name, value] of Object.entries(headers)) {
-    if (SENSITIVE_HEADER_NAMES.has(name.toLowerCase())) {
+    if (sensitive.has(name.toLowerCase())) {
       out[name] = `[REDACTED:${value.length} chars]`;
     } else {
       out[name] = value;

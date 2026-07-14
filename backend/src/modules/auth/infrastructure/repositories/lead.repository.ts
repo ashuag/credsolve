@@ -131,6 +131,13 @@ export class LeadRepository {
     });
   }
 
+  reactivate(leadId: bigint, tx?: DbClient) {
+    return this.db(tx).lead.update({
+      where: { id: leadId },
+      data: { isActive: true },
+    });
+  }
+
   findActiveSummaryForCustomer(customerId: bigint, tx?: DbClient) {
     return this.db(tx).lead.findFirst({
       where: { customerId, isActive: true },

@@ -10,6 +10,7 @@ import {
   resolveKycStagePath,
   shouldResumeKycSelfie,
   CUSTOMER_EMAIL_JOURNEY_PATH,
+  hasOpenCustomerLoan,
 } from '@/lib/api/customer-session';
 import { isLoanDocumentsJourneyComplete } from '@/lib/loan-documents-journey';
 
@@ -77,8 +78,10 @@ function isPathAllowedForStage(stage: JourneyStage, path: string): boolean {
     path === '/' ||
     path === '/thank-you' ||
     path === '/thank-you-interest' ||
+    path === '/active-loan' ||
     path === '/dashboard' ||
-    path === '/my-account'
+    path === '/my-account' ||
+    path === '/payments'
   ) {
     return true;
   }
@@ -124,6 +127,35 @@ export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
         return;
       }
       router.replace('/apply-for-loan');
+      return;
+    }
+
+    // Active / overdue loan — block further application journey; show repay-first screen.
+    if (hasOpenCustomerLoan(session)) {
+      if (
+        pathname === '/active-loan' ||
+        pathname === '/my-account' ||
+        pathname === '/dashboard' ||
+        pathname === '/payments' ||
+        pathname === '/'
+      ) {
+        return;
+      }
+      if (
+        pathname === '/apply-for-loan' ||
+        pathname.startsWith('/onboarding') ||
+        pathname === '/pre-approved-loan' ||
+        pathname === '/loan-selection' ||
+        pathname.startsWith('/email-verify') ||
+        pathname === '/loan-documents' ||
+        pathname.startsWith('/kyc') ||
+        pathname === '/bank-details' ||
+        pathname === '/references' ||
+        pathname === '/thank-you' ||
+        pathname === '/loan-offer'
+      ) {
+        router.replace('/active-loan');
+      }
       return;
     }
 

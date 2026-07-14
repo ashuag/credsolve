@@ -30,6 +30,7 @@ type NavIcon =
   | 'dashboard'
   | 'leads'
   | 'applications'
+  | 'loans'
   | 'customers'
   | 'agents'
   | 'roles'
@@ -56,6 +57,7 @@ const navGroups: { section: string; color: string; items: NavItem[] }[] = [
     items: [
       { href: '/leads', label: 'Leads', icon: 'leads' },
       { href: '/applications', label: 'Applications', icon: 'applications' },
+      { href: '/loans', label: 'Loans', icon: 'loans' },
       { href: '/customers', label: 'Customers', icon: 'customers' },
     ],
   },
@@ -159,6 +161,7 @@ const BREADCRUMBS: Record<string, string> = {
   '/dashboard': 'LOS Dashboard',
   '/leads': 'Lead Management',
   '/applications': 'Application Management',
+  '/loans': 'Loan Management',
   '/customers': 'Customer Management',
   '/partners': 'Partners',
   '/agents': 'Agent Management',
@@ -220,6 +223,7 @@ function breadcrumbLabel(pathname: string): string {
   if (BREADCRUMBS[pathname]) return BREADCRUMBS[pathname];
   if (/^\/leads\/[^/]+$/.test(pathname)) return 'Lead detail';
   if (/^\/applications\/[^/]+$/.test(pathname)) return 'Application detail';
+  if (/^\/loans\/[^/]+$/.test(pathname)) return 'Loan detail';
   if (/^\/customers\/[^/]+$/.test(pathname)) return 'Customer detail';
   const seg = pathname.replace(/^\//, '').split('/')[0];
   return seg ? seg.charAt(0).toUpperCase() + seg.slice(1) : 'Home';
@@ -233,6 +237,12 @@ function breadcrumbTrail(pathname: string): BreadcrumbItem[] {
     return [
       { label: 'Applications', href: '/applications' },
       { label: 'Application detail' },
+    ];
+  }
+  if (/^\/loans\/[^/]+$/.test(pathname)) {
+    return [
+      { label: 'Loans', href: '/loans' },
+      { label: 'Loan detail' },
     ];
   }
   if (/^\/leads\/[^/]+$/.test(pathname)) {
@@ -320,6 +330,9 @@ function IcLeads(p: SvgProps) {
 function IcApplications(p: SvgProps) {
   return <Icon {...p}><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="m9 12 2 2 4-4" /></Icon>;
 }
+function IcLoans(p: SvgProps) {
+  return <Icon {...p}><rect x="2" y="5" width="20" height="14" rx="2" /><circle cx="12" cy="12" r="3" /><path d="M6 8v8M18 8v8" /></Icon>;
+}
 function IcCustomers(p: SvgProps) {
   return <Icon {...p}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></Icon>;
 }
@@ -353,6 +366,7 @@ function NavIconSvg({ name, size = 18 }: { name: NavIcon; size?: number }) {
     case 'dashboard':    return <IcDashboard {...p} />;
     case 'leads':        return <IcLeads {...p} />;
     case 'applications': return <IcApplications {...p} />;
+    case 'loans':        return <IcLoans {...p} />;
     case 'customers':    return <IcCustomers {...p} />;
     case 'agents':       return <IcAgents {...p} />;
     case 'roles':        return <IcRoles {...p} />;

@@ -8,15 +8,38 @@ export type CustomerLoanRepaymentLine = {
 
 export type CustomerLoanCard = {
   applicationUuid: string;
+  /** Public loan number (same as application number after disbursement). */
+  loanNumber: string | null;
+  /**
+   * Display status for badges: loan account status when disbursed
+   * (ACTIVE / OVERDUE / CLOSED / WRITTEN_OFF), else application status.
+   */
   status: string;
+  /** Principal. */
   loanAmount: string | null;
   tenureDays: number | null;
+  /** Full-tenure interest (as of maturity / KFS). */
   interestAmount: string | null;
+  /** Principal + full-tenure interest (amount due on maturity). */
+  amountDueAtMaturity: string | null;
+  /** Inclusive days from disbursement through today (disbursement day = day 1). */
+  daysOutstanding: number | null;
+  /** Interest accrued from disbursement through today (min 1 day on disbursement day). */
+  interestTillToday: string | null;
+  /** Principal + interest till today (pay-now amount). */
+  amountDueToday: string | null;
   processingFeeAmount: string | null;
   gstAmount: string | null;
+  /**
+   * @deprecated Prefer amountDueToday / amountDueAtMaturity.
+   * Kept for older UI: open loans → amountDueToday; else amountDueAtMaturity.
+   */
   totalRepayment: string | null;
+  /** Repayment due / maturity date (YYYY-MM-DD). */
   maturityDate: string | null;
   disbursedAt: string | null;
+  /** When the loan was closed / fully repaid (ISO datetime). */
+  repaidAt: string | null;
   bankDisplay: string | null;
 };
 

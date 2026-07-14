@@ -2,20 +2,13 @@ import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/
 import type { Request } from 'express';
 import { SMS_TEMPLATE_ID } from '../../../../common/constants/sms.constants';
 import { OTP_TYPE } from '../../../../common/constants/otp.constants';
+import { readClientIp } from '../../../../common/http/client-ip.util';
 import { isLeadEmailVerifiedForPortal } from '../../../../common/mappers/customer-portal-profile.mapper';
 import { SendOtpDto } from '../dto/send-otp.dto';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { SendOtpUseCase } from './send-otp.use-case';
 import { LoanDocumentApplicationService } from '../services/loan-document-application.service';
-
-function readClientIp(req: Request): string | undefined {
-  const xf = req.headers['x-forwarded-for'];
-  if (typeof xf === 'string' && xf.length > 0) {
-    return xf.split(',')[0]?.trim();
-  }
-  return req.ip;
-}
 
 @Injectable()
 export class SendLoanDocumentsOtpUseCase {

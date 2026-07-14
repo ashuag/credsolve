@@ -496,6 +496,11 @@ export class LosApplicationService {
       disbursement: mapLosDisbursementApiView(application.details, application.loanAccount),
       loanAccount: application.loanAccount
         ? {
+            loanNumber:
+              'loanNumber' in application.loanAccount &&
+              typeof (application.loanAccount as { loanNumber?: string }).loanNumber === 'string'
+                ? (application.loanAccount as { loanNumber: string }).loanNumber
+                : application.loanAccount.loanAccountNumber,
             loanAccountNumber: application.loanAccount.loanAccountNumber,
             principalAmount: application.loanAccount.principalAmount.toString(),
             netDisbursedAmount: application.loanAccount.netDisbursedAmount.toString(),

@@ -9,6 +9,8 @@ import { LosCustomerService } from './services/los-customer.service';
 import { LosDashboardService } from './services/los-dashboard.service';
 import { LosMasterService } from './services/los-master.service';
 import { LosRejectionService } from './services/los-rejection.service';
+import { LosDisbursementService } from './services/los-disbursement.service';
+import { LosLoanService } from './services/los-loan.service';
 @ApiTags('LOS Data')
 @Controller('los')
 @UseGuards(LosAuthGuard)
@@ -20,6 +22,8 @@ export class LosDataController {
     private readonly losDashboard: LosDashboardService,
     private readonly losMaster: LosMasterService,
     private readonly losRejection: LosRejectionService,
+    private readonly losDisbursement: LosDisbursementService,
+    private readonly losLoan: LosLoanService,
   ) {}
 
   @Get('dashboard/crm')
@@ -42,6 +46,18 @@ export class LosDataController {
     return this.losApplication.listApplications();
   }
 
+  @Get('loans')
+  @ApiOperation({ summary: 'List disbursed loans for LOS loan management' })
+  loans() {
+    return this.losLoan.listLoans();
+  }
+
+  @Get('loans/:loanUuid')
+  @ApiOperation({ summary: 'Get loan details by loan uuid' })
+  loanByUuid(@Param('loanUuid') loanUuid: string) {
+    return this.losLoan.getLoanDetails(loanUuid);
+  }
+
   @Get('applications/:applicationUuid')
   @ApiOperation({ summary: 'Get application details by application uuid' })
   applicationByUuid(@Param('applicationUuid') applicationUuid: string) {
@@ -52,6 +68,23 @@ export class LosDataController {
   @ApiOperation({ summary: 'Reject an application with reason and ops note (LOS auth)' })
   rejectApplication(@Param('applicationUuid') applicationUuid: string, @Body() body: RejectWorkspaceRecordDto) {
     return this.losRejection.rejectApplication(applicationUuid, body);
+  }
+
+  @Post('applications/:applicationUuid/approve')
+  @ApiOperation({
+    summary: 'Approve an application after the customer journey is complete (status → APPROVED)',
+  })
+  approveApplication(@Param('applicationUuid') applicationUuid: string) {
+    return this.losDisbursement.approveApplication(applicationUuid);
+  }
+
+  @Post('applications/:applicationUuid/disburse')
+  @ApiOperation({
+    summary:
+      'Disburse an APPROVED application: create loan_account (loan_number = application_number), set DISBURSED, email final sanction letter (payment gateway skipped)',
+  })
+  disburseApplication(@Param('applicationUuid') applicationUuid: string) {
+    return this.losDisbursement.disburseApplication(applicationUuid);
   }
 
   @Post('applications/:applicationUuid/kyc/grant-retry')

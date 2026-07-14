@@ -3,7 +3,8 @@
 // ============================================================
 //
 // `loan_account` is created at disbursement (one per application).
-// `loan_account_number` is set from `application.application_number` (see resolveLoanAccountNumberAtDisbursement).
+// `loan_number` and `loan_account_number` are set from `application.application_number`
+// (see resolveLoanAccountNumberAtDisbursement).
 // `loan_repayment` records individual payment events against an account.
 
 model LoanAccount {
@@ -11,6 +12,8 @@ model LoanAccount {
   uuid                 String    @unique @default(uuid()) @db.Char(36)
   applicationId        BigInt    @unique @map("application_id") @db.UnsignedBigInt
   customerId           BigInt    @map("customer_id") @db.UnsignedBigInt
+  /// Public loan reference — same value as `application.application_number` (e.g. APP2026K7M2Q).
+  loanNumber           String    @unique @map("loan_number") @db.VarChar(12)
   loanAccountNumber    String    @unique @map("loan_account_number") @db.VarChar(30)
   principalAmount      Decimal   @map("principal_amount") @db.Decimal(12, 2)
   netDisbursedAmount   Decimal   @map("net_disbursed_amount") @db.Decimal(12, 2)
@@ -37,17 +40,21 @@ model LoanAccount {
 }
 
 model LoanRepayment {
-  id            BigInt                  @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid          String                  @unique @default(uuid()) @db.Char(36)
-  loanAccountId BigInt                  @map("loan_account_id") @db.UnsignedBigInt
-  amount        Decimal                 @db.Decimal(12, 2)
-  paymentMode   LoanRepaymentPaymentMode @map("payment_mode")
-  utr           String?                 @db.VarChar(50)
-  paidAt        DateTime                @map("paid_at") @db.DateTime(3)
-  createdAt     DateTime                @default(now()) @map("created_at") @db.DateTime(3)
+  id             BigInt                   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid           String                   @unique @default(uuid()) @db.Char(36)
+  loanAccountId  BigInt                   @map("loan_account_id") @db.UnsignedBigInt
+  amount         Decimal                  @db.Decimal(12, 2)
+  paymentMode    LoanRepaymentPaymentMode @map("payment_mode")
+  status         LoanRepaymentStatus      @default(SUCCESS)
+  utr            String?                  @db.VarChar(50)
+  failureMessage String?                  @map("failure_message") @db.VarChar(500)
+  vendorRef      String?                  @map("vendor_ref") @db.VarChar(64)
+  paidAt         DateTime                 @map("paid_at") @db.DateTime(3)
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.DateTime(3)
 
   loanAccount LoanAccount @relation(fields: [loanAccountId], references: [id])
 
   @@index([loanAccountId, paidAt])
+  @@index([loanAccountId, status])
   @@map("loan_repayment")
 }

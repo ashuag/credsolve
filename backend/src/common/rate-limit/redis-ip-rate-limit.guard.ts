@@ -42,6 +42,7 @@ const DEFAULTS: Record<RateLimitRouteId, { max: number; windowSec: number }> = {
   'kyc-face-position': { max: 240, windowSec: 60 },
   'loan-documents': { max: 60, windowSec: 3600 },
   'loan-documents-otp': { max: 20, windowSec: 3600 },
+  'loan-repay': { max: 20, windowSec: 3600 },
 };
 
 @Injectable()

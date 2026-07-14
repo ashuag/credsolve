@@ -4,6 +4,7 @@ import type { Request, Response } from 'express';
 import { RateLimitByRoute } from '../../../common/rate-limit/rate-limit-route.decorator';
 import { RedisIpRateLimitGuard } from '../../../common/rate-limit/redis-ip-rate-limit.guard';
 import { VpnBlockGuard } from '../../../common/ip-reputation/vpn-block.guard';
+import { readClientIp } from '../../../common/http/client-ip.util';
 import { SaveLeadDetailsDto } from '../application/dto/save-lead-details.dto';
 import { SaveLeadProfileDto } from '../application/dto/save-lead-profile.dto';
 import { SendOtpDto } from '../application/dto/send-otp.dto';
@@ -13,6 +14,8 @@ import { SaveLeadReferencesDto } from '../application/dto/save-lead-references.d
 import { VerifyPanDto } from '../application/dto/verify-pan.dto';
 import { GetCustomerSessionUseCase } from '../application/use-cases/get-customer-session.use-case';
 import { GetCustomerLoansDashboardUseCase } from '../application/use-cases/get-customer-loans-dashboard.use-case';
+import { GetCustomerPaymentHistoryUseCase } from '../application/use-cases/get-customer-payment-history.use-case';
+import { InitiateCustomerRepaymentUseCase } from '../application/use-cases/initiate-customer-repayment.use-case';
 import { LogoutUseCase } from '../application/use-cases/logout.use-case';
 import { SendOtpUseCase } from '../application/use-cases/send-otp.use-case';
 import { SaveLeadDetailsUseCase } from '../application/use-cases/save-lead-details.use-case';
@@ -39,14 +42,6 @@ import { CustomerGoogleOauthService } from '../infrastructure/google/customer-go
 import { OptionalCustomerSessionGuard } from './guards/optional-customer-session.guard';
 import { RequiredCustomerSessionGuard } from './guards/required-customer-session.guard';
 
-function readClientIp(req: Request): string | undefined {
-  const xf = req.headers['x-forwarded-for'];
-  if (typeof xf === 'string' && xf.length > 0) {
-    return xf.split(',')[0]?.trim();
-  }
-  return req.ip;
-}
-
 @ApiTags('auth')
 @Controller('auth')
 @UseGuards(RedisIpRateLimitGuard, VpnBlockGuard, OptionalCustomerSessionGuard)
@@ -58,6 +53,8 @@ export class AuthController {
     private readonly verifyOtpFlow: VerifyOtpUseCase,
     private readonly customerSession: GetCustomerSessionUseCase,
     private readonly customerLoansDashboard: GetCustomerLoansDashboardUseCase,
+    private readonly customerPaymentHistory: GetCustomerPaymentHistoryUseCase,
+    private readonly initiateCustomerRepayment: InitiateCustomerRepaymentUseCase,
     private readonly logoutFlow: LogoutUseCase,
     private readonly customerGoogleOauth: CustomerGoogleOauthService,
     private readonly saveLeadDetailsFlow: SaveLeadDetailsUseCase,
@@ -203,6 +200,25 @@ export class AuthController {
   })
   myLoans(@Req() req: Request) {
     return this.customerLoansDashboard.execute(req);
+  }
+
+  @Post('my-loans/:applicationUuid/repay')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @RateLimitByRoute('loan-repay')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Collect loan repayment via Easebuzz Wire (principal + interest till today). On success closes the loan and records payment history.',
+  })
+  repayLoan(@Req() req: Request, @Param('applicationUuid') applicationUuid: string) {
+    return this.initiateCustomerRepayment.execute(req, applicationUuid);
+  }
+
+  @Get('my-payments')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @ApiOperation({ summary: 'Customer repayment history (successful and failed attempts)' })
+  myPayments(@Req() req: Request) {
+    return this.customerPaymentHistory.execute(req);
   }
 
   @Get('google/login')

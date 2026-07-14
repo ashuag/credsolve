@@ -9,7 +9,11 @@ import { EmailVerificationType, type Prisma } from '@prisma/client';
 import type { VerifyOtpDto } from '../dto/verify-otp.dto';
 import type { VerifyOtpResult } from '../contracts/verify-otp-result.contract';
 import type { CustomerSessionPayload } from '../contracts/customer-session-payload.contract';
-import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
+import {
+  canDeactivateConvertedLeadForReapply,
+  customerHasOpenLoan,
+  findLeadIdWithOpenLoanForCustomer,
+} from '../../../../common/loan/customer-open-loan.util';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { canReapplyAfterRejection } from '../../../../common/lead/lead-reapply-policy.util';
 import { OTP_TYPE } from '../../../../common/constants/otp.constants';
@@ -115,6 +119,21 @@ export class VerifyOtpUseCase {
       }
 
       if (!recentLead) {
+        // Login (and apply) with an open loan: restore the CONVERTED lead — never block OTP
+        // with "already have an active loan" and never create a parallel NEW lead.
+        const openLoanLeadId = await findLeadIdWithOpenLoanForCustomer(tx, cust.id);
+        if (openLoanLeadId) {
+          await this.leads.reactivate(openLoanLeadId, tx);
+          recentLead = await this.leads.findActiveByCustomerId(cust.id, tx);
+        }
+      }
+
+      if (!recentLead) {
+        if (await customerHasOpenLoan(tx, cust.id)) {
+          throw new BadRequestException(
+            'You already have an active loan. You can apply again after your current loan is closed.',
+          );
+        }
         recentLead = await this.leads.createForCustomer(
           {
             customerId: cust.id,
@@ -241,8 +260,8 @@ export class VerifyOtpUseCase {
   }
 
   /**
-   * Deactivate a CONVERTED lead only after disbursement so the customer can start a new application.
-   * In-progress applications (e.g. draft at sanction letter) must keep the same lead on re-login.
+   * Deactivate a CONVERTED lead only after its loan is CLOSED / WRITTEN_OFF
+   * so the customer can start a new application. An ACTIVE/OVERDUE loan blocks reapply.
    */
   private async shouldDeactivateForNewApplication(
     lead: { id: bigint; leadStatus: { name: string } },
@@ -251,14 +270,7 @@ export class VerifyOtpUseCase {
     if (lead.leadStatus.name !== LEAD_STATUS.CONVERTED) {
       return false;
     }
-    const disbursedApp = await tx.application.findFirst({
-      where: {
-        leadId: lead.id,
-        applicationStatus: { name: APPLICATION_STATUS.DISBURSED, isActive: true },
-      },
-      select: { id: true },
-    });
-    return Boolean(disbursedApp);
+    return canDeactivateConvertedLeadForReapply(tx, lead.id);
   }
 
   /**

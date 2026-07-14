@@ -188,10 +188,22 @@ export function ApplicationReviewToolbar({
   onRefresh,
   onReject,
   rejectDisabled = false,
+  onApprove,
+  approveDisabled = false,
+  approveBusy = false,
+  onDisburse,
+  disburseDisabled = false,
+  disburseBusy = false,
 }: {
   onRefresh: () => void;
   onReject?: () => void;
   rejectDisabled?: boolean;
+  onApprove?: () => void;
+  approveDisabled?: boolean;
+  approveBusy?: boolean;
+  onDisburse?: () => void;
+  disburseDisabled?: boolean;
+  disburseBusy?: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
@@ -203,6 +215,26 @@ export function ApplicationReviewToolbar({
           className="min-h-[38px] rounded-[8px] border border-[rgba(239,68,68,0.35)] bg-white px-4 text-[0.82rem] font-bold text-[#dc2626] hover:bg-[rgba(254,242,242,0.9)] disabled:cursor-not-allowed disabled:opacity-55"
         >
           Reject application
+        </button>
+      ) : null}
+      {onApprove ? (
+        <button
+          type="button"
+          onClick={onApprove}
+          disabled={approveDisabled || approveBusy}
+          className="min-h-[38px] rounded-[8px] border border-[rgba(16,185,129,0.35)] bg-[#ecfdf5] px-4 text-[0.82rem] font-bold text-[#047857] hover:bg-[#d1fae5] disabled:cursor-not-allowed disabled:opacity-55"
+        >
+          {approveBusy ? 'Approving…' : 'Approve'}
+        </button>
+      ) : null}
+      {onDisburse ? (
+        <button
+          type="button"
+          onClick={onDisburse}
+          disabled={disburseDisabled || disburseBusy}
+          className="min-h-[38px] rounded-[8px] bg-[#1c347d] px-4 text-[0.82rem] font-bold text-[#ffc519] hover:bg-[#12244f] disabled:cursor-not-allowed disabled:opacity-55"
+        >
+          {disburseBusy ? 'Disbursing…' : 'Disburse'}
         </button>
       ) : null}
       <button type="button" onClick={onRefresh} className="los-btn-primary min-h-[38px] px-4 text-[0.82rem]">

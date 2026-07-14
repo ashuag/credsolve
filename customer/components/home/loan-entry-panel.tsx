@@ -7,7 +7,7 @@ import { OtpVerificationForm } from '@/app/login/otp-verification-form';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { Spinner } from '@/components/ui/spinner';
 import type { SendOtpResponse } from '@/lib/api/auth';
-import { getCustomerJourneyResumePath, hasActiveLoanLead } from '@/lib/api/customer-session';
+import { getCustomerJourneyResumePath, hasActiveLoanLead, hasOpenCustomerLoan } from '@/lib/api/customer-session';
 import { BRAND_TAGLINE } from '@/lib/brand';
 
 export function LoanEntryPanel() {
@@ -17,9 +17,16 @@ export function LoanEntryPanel() {
   const [resumePending, setResumePending] = useState(false);
   const resumeAttemptRef = useRef(false);
   const hasActiveLead = useMemo(() => hasActiveLoanLead(session), [session]);
+  const hasOpenLoan = useMemo(() => hasOpenCustomerLoan(session), [session]);
 
   useEffect(() => {
     if (loading) return;
+
+    if (hasOpenLoan) {
+      router.replace('/active-loan');
+      return;
+    }
+
     if (!hasActiveLead) {
       resumeAttemptRef.current = false;
       setResumePending(false);
@@ -31,6 +38,10 @@ export function LoanEntryPanel() {
     setResumePending(true);
     void (async () => {
       const latest = await refresh();
+      if (hasOpenCustomerLoan(latest)) {
+        router.replace('/active-loan');
+        return;
+      }
       if (hasActiveLoanLead(latest)) {
         router.replace(getCustomerJourneyResumePath(latest));
         return;
@@ -38,9 +49,9 @@ export function LoanEntryPanel() {
       resumeAttemptRef.current = false;
       setResumePending(false);
     })();
-  }, [hasActiveLead, loading, refresh, router]);
+  }, [hasActiveLead, hasOpenLoan, loading, refresh, router]);
 
-  if (loading || resumePending) {
+  if (loading || resumePending || hasOpenLoan) {
     return (
       <section className="h-full w-full">
         <div className="flex min-h-[220px] h-full items-center justify-center">

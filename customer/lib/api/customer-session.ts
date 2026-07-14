@@ -94,6 +94,8 @@ export type CustomerSessionResponse =
       leadReferences: CustomerLeadReferenceSnapshot[];
       kycFaceProgress: CustomerKycFaceProgress | null;
       bankVerificationProgress: CustomerBankVerificationProgress | null;
+      /** True when an ACTIVE/OVERDUE loan exists — customer cannot start another application. */
+      hasOpenLoan: boolean;
     }
   | { authenticated: false };
 
@@ -222,6 +224,7 @@ export function isCustomerJourneyIncomplete(
   session: CustomerSessionResponse | null | undefined,
 ): boolean {
   if (!session?.authenticated) return false;
+  if (session.hasOpenLoan) return false;
   if (!session.lead) return true;
   if (isLeadRejectedAndLocked(session.lead)) return false;
   const j = session.journey;
@@ -235,14 +238,29 @@ export function isCustomerJourneyIncomplete(
   );
 }
 
+/** Customer already has an ACTIVE/OVERDUE loan and cannot apply again yet. */
+export function hasOpenCustomerLoan(
+  session: CustomerSessionResponse | null | undefined,
+): boolean {
+  return Boolean(session && session.authenticated && session.hasOpenLoan);
+}
+
 /**
  * Returns the most relevant page to continue a signed-in customer's in-progress journey.
  */
 export function getCustomerJourneyResumePath(
   session: CustomerSessionResponse | null | undefined
 ): string {
-  if (!session?.authenticated || !session.lead) {
+  if (!session?.authenticated) {
     return '/my-account?mode=login';
+  }
+
+  if (session.hasOpenLoan) {
+    return '/active-loan';
+  }
+
+  if (!session.lead) {
+    return '/my-account';
   }
 
   if (isLeadRejectedAndLocked(session.lead)) {
@@ -320,6 +338,10 @@ export function getCustomerPostMobileOtpRedirectPath(
   const lead = session && session.authenticated ? session.lead : null;
   const statusHint = (lead?.status ?? otpLeadStatus ?? '').trim();
 
+  if (session?.authenticated && session.hasOpenLoan) {
+    return isAccountHubFallback(accountHubFallback) ? accountHubFallback : '/active-loan';
+  }
+
   if (isInternalErrorLead(lead, otpLeadStatus)) {
     if (canResumeKycAfterInternalError(session)) return '/kyc/selfie';
     return '/thank-you';
@@ -364,6 +386,9 @@ export function getCustomerPostAuthResumePath(
 ): string {
   if (!session.authenticated) {
     return '/my-account?mode=login';
+  }
+  if (session.hasOpenLoan) {
+    return '/active-loan';
   }
   if (session.lead && isLeadRejectedAndLocked(session.lead)) {
     return '/thank-you-interest';

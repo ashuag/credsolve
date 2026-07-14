@@ -39,3 +39,8 @@ enum LoanRepaymentPaymentMode {
   IMPS
   CASH
 }
+
+enum LoanRepaymentStatus {
+  SUCCESS
+  FAILED
+}

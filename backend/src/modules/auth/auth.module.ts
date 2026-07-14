@@ -14,6 +14,8 @@ import { CheckLoanEligibilityUseCase } from './application/use-cases/check-loan-
 import { GetCustomerLeadStatusUseCase } from './application/use-cases/get-customer-lead-status.use-case';
 import { GetCustomerSessionUseCase } from './application/use-cases/get-customer-session.use-case';
 import { GetCustomerLoansDashboardUseCase } from './application/use-cases/get-customer-loans-dashboard.use-case';
+import { GetCustomerPaymentHistoryUseCase } from './application/use-cases/get-customer-payment-history.use-case';
+import { InitiateCustomerRepaymentUseCase } from './application/use-cases/initiate-customer-repayment.use-case';
 import { LogoutUseCase } from './application/use-cases/logout.use-case';
 import { SendOtpUseCase } from './application/use-cases/send-otp.use-case';
 import { SaveLeadDetailsUseCase } from './application/use-cases/save-lead-details.use-case';
@@ -122,6 +124,8 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     AcceptLoanDocumentsUseCase,
     GetCustomerSessionUseCase,
     GetCustomerLoansDashboardUseCase,
+    GetCustomerPaymentHistoryUseCase,
+    InitiateCustomerRepaymentUseCase,
     LogoutUseCase,
   ],
   exports: [CustomerSessionService, BureauReportRepository],

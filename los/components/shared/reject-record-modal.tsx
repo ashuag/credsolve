@@ -213,3 +213,8 @@ export function canRejectApplicationStatus(statusCode: string): boolean {
   const code = statusCode.toUpperCase();
   return !['REJECTED', 'KYC_FAILED', 'CANCELLED', 'DISBURSED', 'ACTIVE'].includes(code);
 }
+
+export function canApproveApplicationStatus(statusCode: string): boolean {
+  const code = statusCode.toUpperCase();
+  return !['APPROVED', 'REJECTED', 'KYC_FAILED', 'CANCELLED', 'DISBURSED', 'ACTIVE'].includes(code);
+}
