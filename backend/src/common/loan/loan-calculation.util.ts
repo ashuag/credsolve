@@ -92,10 +92,8 @@ export function computeDisburseAmountInr(
 export function computeRepaymentAmountInr(
   selectedLoanAmount: number,
   interestAmount: number,
-  processingFeeAmount: number,
-  gstAmount: number,
 ): number {
-  return selectedLoanAmount + interestAmount + processingFeeAmount + gstAmount;
+  return selectedLoanAmount + interestAmount;
 }
 
 export function computeInterestAmountFromLoanDetail(

@@ -54,7 +54,6 @@ export type EasebuzzPayoutLinkResult = {
 type EasebuzzWireTransferConfig = {
   key: string;
   salt: string;
-  wireApiKey: string;
   virtualAccountNumber: string;
   initiateUrl: string;
   paymentMode: string;
@@ -64,7 +63,6 @@ type EasebuzzWireTransferConfig = {
 type EasebuzzWirePayoutLinkConfig = {
   authorization: string;
   key: string;
-  wireApiKey: string;
   payoutLinksUrl: string;
   timeoutMs: number;
 };
@@ -110,17 +108,18 @@ function todayYmdIst(): string {
   return fmt.format(new Date());
 }
 
-/** Round INR to paise, then format for Wire body + Authorization hash (always 2 decimals). */
-function formatWireAmountInr(amountInr: number): { amount: number; amountStr: string } {
-  const amount = Math.round(amountInr * 100) / 100;
-  const amountStr = amount.toFixed(2);
-  return { amount, amountStr };
+/** Round INR to paise and format as `"12.34"` for Wire body + Authorization hash. */
+function formatWireAmountInr(amountInr: number): string {
+  return (Math.round(amountInr * 100) / 100).toFixed(2);
 }
 
 /**
  * Easebuzz Wire quick-transfer Authorization:
- * SHA-512("{key}|{account_number}|{ifsc}|{upi_handle}|{unique_request_number}|{amount}|{salt}")
- * `upi_handle` is empty for beneficiary_type=bank_account.
+ * SHA-512 of pipe string, e.g.
+ *   F55E22E7FB|3812194585|KKBK0000201||MCASH12346|10.00|02CBB44D8C
+ * = {key}|{account_number}|{ifsc}|{upi_handle}|{unique_request_number}|{amount}|{salt}
+ * `upi_handle` is empty for beneficiary_type=bank_account (note the double pipe).
+ * `amount` is always 2 decimal places (e.g. 10.00).
  */
 function buildQuickTransferAuthorization(input: {
   key: string;
@@ -190,7 +189,6 @@ export class EasebuzzWireService {
     const key = envTrim(this.config, 'EASEBUZZ_WIRE_KEY');
     const salt = envTrim(this.config, 'EASEBUZZ_WIRE_SALT');
     const virtualAccountNumber = envTrim(this.config, 'EASEBUZZ_WIRE_VIRTUAL_ACCOUNT_NUMBER');
-    const wireApiKey = envTrim(this.config, 'EASEBUZZ_WIRE_API_KEY');
     const initiateUrl =
       envTrim(this.config, 'EASEBUZZ_WIRE_INITIATE_URL') ||
       'https://wire.easebuzz.in/api/v1/quick_transfers/initiate/';
@@ -213,7 +211,6 @@ export class EasebuzzWireService {
     return {
       key,
       salt,
-      wireApiKey,
       virtualAccountNumber,
       initiateUrl,
       paymentMode,
@@ -230,14 +227,12 @@ export class EasebuzzWireService {
     const missing: string[] = [];
     const authorization = envTrim(this.config, 'EASEBUZZ_WIRE_AUTHORIZATION');
     const key = envTrim(this.config, 'EASEBUZZ_WIRE_KEY');
-    const wireApiKey = envTrim(this.config, 'EASEBUZZ_WIRE_API_KEY');
     const payoutLinksUrl =
       envTrim(this.config, 'EASEBUZZ_WIRE_PAYOUT_LINKS_URL') ||
       'https://wire.easebuzz.in/api/v1/payout_links/';
 
     if (!authorization) missing.push('EASEBUZZ_WIRE_AUTHORIZATION');
     if (!key) missing.push('EASEBUZZ_WIRE_KEY');
-    if (!wireApiKey) missing.push('EASEBUZZ_WIRE_API_KEY');
 
     if (missing.length > 0) {
       throw new ServiceUnavailableException(
@@ -252,7 +247,6 @@ export class EasebuzzWireService {
     return {
       authorization,
       key,
-      wireApiKey,
       payoutLinksUrl,
       timeoutMs,
     };
@@ -265,7 +259,7 @@ export class EasebuzzWireService {
       throw new BadGatewayException('Disbursement amount must be a positive number.');
     }
 
-    const { amount, amountStr } = formatWireAmountInr(input.amountInr);
+    const amountStr = formatWireAmountInr(input.amountInr);
     const accountNumber = input.accountNumber.replace(/\s+/g, '');
     const ifscCode = input.ifscCode.trim().toUpperCase();
     const uniqueRequestNumber = input.uniqueRequestNumber.trim().slice(0, 64);
@@ -278,10 +272,11 @@ export class EasebuzzWireService {
       beneficiary_type: 'bank_account',
       beneficiary_name: input.beneficiaryName.trim().slice(0, 100),
       account_number: accountNumber,
-      ifsc_code: ifscCode,
+      ifsc: ifscCode,
       unique_request_number: uniqueRequestNumber,
       payment_mode: cfg.paymentMode,
-      amount,
+      // Keep exactly 2 decimal places in JSON (e.g. "12240.00"), same string used in Authorization.
+      amount: amountStr,
       email: input.email.trim().slice(0, 120),
       phone: input.phone.replace(/\D/g, '').slice(-10),
       narration: input.narration.trim().slice(0, 50) || 'loan disbursed',
@@ -308,7 +303,8 @@ export class EasebuzzWireService {
     const headers: Record<string, string> = {
       Accept: 'application/json',
       Authorization: authorization,
-      'WIRE-API-KEY': cfg.wireApiKey,
+      // Easebuzz expects the merchant key as the header name (not "WIRE-API-KEY").
+      [cfg.key]: '',
     };
 
     this.logger.log(
@@ -325,7 +321,7 @@ export class EasebuzzWireService {
       leadId: input.leadId,
       timeoutMs: cfg.timeoutMs,
       redactRequest: (payload) => this.redactRequest(payload),
-      sensitiveHeaderNames: ['WIRE-API-KEY'],
+      sensitiveHeaderNames: [cfg.key],
     });
 
     if (!result.ok) {
@@ -394,7 +390,8 @@ export class EasebuzzWireService {
     const headers: Record<string, string> = {
       Accept: 'application/json',
       Authorization: cfg.authorization,
-      'WIRE-API-KEY': cfg.wireApiKey,
+      // Easebuzz expects the merchant key as the header name (not "WIRE-API-KEY").
+      [cfg.key]: '',
     };
 
     this.logger.log(
@@ -411,7 +408,7 @@ export class EasebuzzWireService {
       leadId: input.leadId,
       timeoutMs: cfg.timeoutMs,
       redactRequest: (payload) => this.redactPayoutLinkRequest(payload),
-      sensitiveHeaderNames: ['WIRE-API-KEY'],
+      sensitiveHeaderNames: [cfg.key],
     });
 
     if (!result.ok) {

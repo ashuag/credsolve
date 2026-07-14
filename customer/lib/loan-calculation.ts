@@ -26,7 +26,7 @@ export function computeLoanBreakdown(
     interestAmount,
     processingFeeAmount,
     gstOnProcessing,
-    totalRepaymentAmount: principal + interestAmount + processingFeeAmount + gstOnProcessing,
+    totalRepaymentAmount: principal + interestAmount,
     totalDisbursementAmount: principal - processingFeeAmount - gstOnProcessing,
   };
 }

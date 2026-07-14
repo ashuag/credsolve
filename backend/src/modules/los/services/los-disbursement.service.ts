@@ -40,6 +40,15 @@ function maskAccount(account: string): string {
   return `${'*'.repeat(Math.max(0, digits.length - 4))}${digits.slice(-4)}`;
 }
 
+/**
+ * Easebuzz unique_request_number — stable across retries for the same application.
+ * Example auth pipe: …|MCASH12346|10.00|…
+ */
+function buildUniqueRequestNumber(applicationNumber: string): string {
+  const compact = applicationNumber.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  return `MCASH${compact}`.slice(0, 40);
+}
+
 @Injectable()
 export class LosDisbursementService {
   private readonly logger = new Logger(LosDisbursementService.name);
@@ -182,9 +191,9 @@ export class LosDisbursementService {
     }
 
     const netAmount = fees.disburseAmount;
-    // Loan number (= application number) is the Easebuzz unique_request_number (idempotent retries).
+    // Loan number stays application number; Easebuzz URN uses MCASH{applicationNumber}.
     const loanNumber = resolveLoanAccountNumberAtDisbursement(application.applicationNumber);
-    const uniqueRequestNumber = loanNumber;
+    const uniqueRequestNumber = buildUniqueRequestNumber(application.applicationNumber);
     const skipTransfer = this.easebuzzWire.isTransferSkipped();
 
     let paymentGateway: 'easebuzz' | 'skipped' = 'skipped';

@@ -13,17 +13,21 @@ export const DLA_NAME = 'NA';
 export const RECOVERY_AGENT_NAME = 'CREDSOLVE TECHNOLOGIES PRIVATE LIMITED';
 export const PAYABLE_TO = 'Aasra Fincorp Pvt. Ltd.';
 
-/** Grievance / nodal contacts shown on KFS (LSP = NBFC, RE = Lender). */
-export const LSP_GRO_NAME = 'CREDSOLVE TECHNOLOGIES PRIVATE LIMITED — Grievance Officer';
-export const LSP_GRO_PHONE = '+91-120-0000000';
-export const LSP_NODAL_NAME = 'CREDSOLVE TECHNOLOGIES PRIVATE LIMITED — Nodal Officer';
-export const LSP_NODAL_PHONE = '+91-120-0000000';
-export const LENDER_GRO_NAME = 'Aasra Fincorp Pvt. Ltd. — Grievance Officer';
-export const LENDER_GRO_PHONE = '+91-11-00000000';
-export const LENDER_NODAL_NAME = 'Aasra Fincorp Pvt. Ltd. — Nodal Officer';
-export const LENDER_NODAL_PHONE = '+91-11-00000000';
+/** Grievance / nodal contacts shown on KFS (LSP = NBFC/MoneyCash, RE = Lender). */
+export const LSP_GRO_NAME = 'Uvaid Malik';
+export const LSP_GRO_PHONE = '+91-8826370278';
+export const LSP_GRO_EMAIL = 'uvaid@moneycash.in';
+export const LSP_NODAL_NAME = 'Uvaid Malik';
+export const LSP_NODAL_PHONE = '+91-8826370278';
+export const LSP_NODAL_EMAIL = 'uvaid@moneycash.in';
+export const LENDER_GRO_NAME = 'Subash Patel';
+export const LENDER_GRO_PHONE = '+91-7318066022';
+export const LENDER_GRO_EMAIL = 'support@aasrafincorp.com';
+export const LENDER_NODAL_NAME = 'Subash Patel';
+export const LENDER_NODAL_PHONE = '+91-7318066022';
+export const LENDER_NODAL_EMAIL = 'support@aasrafincorp.com';
 export const LENDER_REGISTERED_OFFICE =
-  'Registered office of Aasra Fincorp Pvt. Ltd. (as per MCA records)';
+  '16/3/8B A N Jha Marg George Town Prayagraj-211002 U.P';
 
 /** PKCS#7 / Adobe signature panel metadata for the NBFC (RE) digital signature. */
 export const LENDER_SIGNING_NAME = LENDER_NAME;
@@ -41,7 +45,6 @@ export const LOAN_DOCUMENT_SIGNATURE_PLACEHOLDER_LENGTH = 8192;
 export const DEFAULT_PENAL_RATE_PERCENT = '10%';
 export const DEFAULT_PENAL_MIN_INR = '100';
 export const DEFAULT_PENAL_MAX_INR = '3,000';
-export const DEFAULT_MAX_MONTHLY_RATE_PERCENT = '30';
 
 export const LOAN_DOCUMENT_HTML_TEMPLATE = 'MoneyCash_Loan_Document.html';
 

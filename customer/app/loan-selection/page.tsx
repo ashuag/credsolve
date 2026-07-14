@@ -217,7 +217,7 @@ export default function LoanSelectionPage() {
     const interestAmount = principal * (settings.roiPerDayPercent / 100) * tenureDays;
     const processingFeeAmount = (principal * settings.processingFeePercent) / 100;
     const gstOnProcessing = (processingFeeAmount * settings.processingFeeGstPercent) / 100;
-    const totalRepaymentAmount = principal + interestAmount + processingFeeAmount + gstOnProcessing;
+    const totalRepaymentAmount = principal + interestAmount;
     const totalDisbursementAmount = principal - processingFeeAmount - gstOnProcessing;
 
     return {

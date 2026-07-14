@@ -39,7 +39,7 @@ function injectPrintFieldStyles(html: string): string {
   color: inherit;
   border: none;
   background: transparent;
-  padding: 0 2px;
+  padding: 0;
 }
 @media print {
   .page-wrapper { padding: 0 !important; }
@@ -50,7 +50,7 @@ function injectPrintFieldStyles(html: string): string {
 }
 
 function fillInputById(html: string, id: string, value: string): string {
-  const escaped = escapeHtml(value);
+  const escaped = escapeHtml(value.trim());
   const span = `<span class="filled-val" data-field="${id}">${escaped}</span>`;
   const pattern = new RegExp(
     `<input\\b(?=[^>]*\\bid="${id}"[^>]*)(?:(?!>).)*>`,

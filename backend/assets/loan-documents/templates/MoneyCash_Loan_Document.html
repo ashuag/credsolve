@@ -607,11 +607,11 @@ th.teal-hdr { background: var(--teal); }
   <table style="width:100%;border-collapse:collapse;margin:14px 0;">
     <tr>
       <td style="width:200px;padding:8px 12px;font-family:var(--font-ui);font-weight:600;font-size:12.5px;color:var(--muted);border:1px solid var(--border);">Amount (in figures)</td>
-      <td style="padding:8px 12px;border:1px solid var(--border);">Rs.&nbsp; <input type="text" id="sl_amount_fig" class="field lf lg" placeholder="e.g. 10,000" title="Filled by moneycash / Lender" autocomplete="off"></td>
+      <td style="padding:8px 12px;border:1px solid var(--border);">₹<input type="text" id="sl_amount_fig" class="field lf lg" placeholder="e.g. 10,000" title="Filled by moneycash / Lender" autocomplete="off"></td>
     </tr>
     <tr>
       <td style="padding:8px 12px;font-family:var(--font-ui);font-weight:600;font-size:12.5px;color:var(--muted);border:1px solid var(--border);">Amount (in words)</td>
-      <td style="padding:8px 12px;border:1px solid var(--border);"><input type="text" id="sl_amount_words" class="field lf xl" placeholder="e.g. Ten Thousand Rupees Only" title="Filled by moneycash / Lender" autocomplete="off"></td>
+      <td style="padding:8px 12px;border:1px solid var(--border);"><input type="text" id="sl_amount_words" class="field lf xl" placeholder="e.g. Ten Thousand Only" title="Filled by moneycash / Lender" autocomplete="off"></td>
     </tr>
   </table>
 
@@ -624,7 +624,7 @@ th.teal-hdr { background: var(--teal); }
 
   <p class="charge-title">Processing Fee</p>
   <p class="para">
-    The Lender will charge a processing fee of INR <input type="text" id="sl_proc_fee_amt" class="field lf sm" placeholder="Amount" title="Filled by moneycash / Lender" autocomplete="off"> or <input type="text" id="sl_proc_fee_pct" class="field lf xs" placeholder="_%" title="Filled by moneycash / Lender" autocomplete="off"> of the loan
+    The Lender will charge a processing fee of ₹<input type="text" id="sl_proc_fee_amt" class="field lf sm" placeholder="Amount" title="Filled by moneycash / Lender" autocomplete="off"> or <input type="text" id="sl_proc_fee_pct" class="field lf xs" placeholder="_%" title="Filled by moneycash / Lender" autocomplete="off"> of the loan
     amount, whichever is higher, plus applicable taxes.
   </p>
 
@@ -632,30 +632,30 @@ th.teal-hdr { background: var(--teal); }
   <p class="para">
     In case of delay in payment of the amount due, Penal charges shall be
     <input type="text" id="sl_penal_rate" class="field lf xs" placeholder="_%" title="Filled by moneycash / Lender" autocomplete="off"> on Principal outstanding, subject to a minimum of
-    INR <input type="text" id="sl_penal_min" class="field lf xs" placeholder="Min INR" title="Filled by moneycash / Lender" autocomplete="off"> and a maximum of INR <input type="text" id="sl_penal_max" class="field lf sm" placeholder="Max INR" title="Filled by moneycash / Lender" autocomplete="off">, excluding taxes.
+    ₹ <input type="text" id="sl_penal_min" class="field lf xs" placeholder="Min ₹" title="Filled by moneycash / Lender" autocomplete="off"> and a maximum of ₹<input type="text" id="sl_penal_max" class="field lf sm" placeholder="Max ₹" title="Filled by moneycash / Lender" autocomplete="off">, excluding taxes.
   </p>
 
   <p class="charge-title">Bounce Charges</p>
   <table>
     <thead><tr>
-      <th class="center" style="width:50%">Amount (Rs)</th>
+      <th class="center" style="width:50%">Amount (₹)</th>
       <th class="center">Bounce Fee (excluding GST)</th>
     </tr></thead>
     <tbody>
-      <tr><td class="center">0 – 2,000</td><td class="center">Rs. 100/-</td></tr>
-      <tr><td class="center">2,001 – 5,000</td><td class="center">Rs. 200/-</td></tr>
-      <tr><td class="center">5,001 – 8,000</td><td class="center">Rs. 300/-</td></tr>
-      <tr><td class="center">8,001 – 10,000</td><td class="center">Rs. 400/-</td></tr>
-      <tr><td class="center">10,001 and above</td><td class="center">Rs. 500/-</td></tr>
+      <tr><td class="center">0 – 2,000</td><td class="center">₹100/-</td></tr>
+      <tr><td class="center">2,001 – 5,000</td><td class="center">₹200/-</td></tr>
+      <tr><td class="center">5,001 – 8,000</td><td class="center">₹300/-</td></tr>
+      <tr><td class="center">8,001 – 10,000</td><td class="center">₹400/-</td></tr>
+      <tr><td class="center">10,001 and above</td><td class="center">₹500/-</td></tr>
     </tbody>
   </table>
 
   <p class="charge-title">Maximum Interest Rate</p>
   <p class="para">
-    The interest rate on the loan shall not exceed <input type="text" id="sl_max_rate" class="field lf xs" placeholder="_%" title="Filled by moneycash / Lender" autocomplete="off">% per month.
+    The interest rate on the loan shall not exceed <input type="text" id="sl_max_rate" class="field lf xs" placeholder="e.g. 1" title="Filled by moneycash / Lender" autocomplete="off">% per day.
   </p>
   <p class="para muted">
-    As the Loan sanctioned is an EMI Loan (repayment in instalments), the nature of
+    As the Loan sanctioned is a Bullet Loan (one-time repayment), the nature of
     Interest applied is a <strong>Flat rate of interest</strong>.
   </p>
   <p class="para">
@@ -759,13 +759,13 @@ th.teal-hdr { background: var(--teal); }
       </tr>
       <tr>
         <td class="td-sr">9</td>
-        <td class="td-label">Sanctioned Loan Amount (in Rupees)</td>
-        <td class="td-val"><input type="text" id="kfs_sanctioned_amt" class="field lf md" placeholder="INR Amount" title="Filled by moneycash / Lender" autocomplete="off"></td>
+        <td class="td-label">Sanctioned Loan Amount (₹)</td>
+        <td class="td-val"><input type="text" id="kfs_sanctioned_amt" class="field lf md" placeholder="₹ Amount" title="Filled by moneycash / Lender" autocomplete="off"></td>
       </tr>
       <tr>
         <td class="td-sr">10</td>
         <td class="td-label">Net disbursed amount</td>
-        <td class="td-val">INR <input type="text" id="kfs_net_disbursed" class="field lf md" placeholder="Net Amount" title="Filled by moneycash / Lender" autocomplete="off"> <span class="muted">(after deduction of Processing Fee)</span></td>
+        <td class="td-val">₹ <input type="text" id="kfs_net_disbursed" class="field lf md" placeholder="Net Amount" title="Filled by moneycash / Lender" autocomplete="off"> <span class="muted">(after deduction of Processing Fee + GST)</span></td>
       </tr>
       <tr>
         <td class="td-sr">11</td>
@@ -818,9 +818,9 @@ th.teal-hdr { background: var(--teal); }
         <td class="td-val"><input type="text" id="kfs_interest_rate" class="field lf md" placeholder="e.g. 1% per day, Fixed" title="Filled by moneycash / Lender" autocomplete="off"></td>
       </tr>
       <tr>
-        <td class="td-sr">(a)</td>
-        <td class="td-label">Total Interest Amount to be charged during the entire loan tenor (in Rupees)</td>
-        <td class="td-val"><input type="text" id="kfs_total_interest" class="field lf md" placeholder="INR Amount" title="Filled by moneycash / Lender" autocomplete="off"></td>
+        <td class="td-sr">15(a)</td>
+        <td class="td-label">Total Interest Amount to be charged during the entire loan tenor (₹)</td>
+        <td class="td-val"><input type="text" id="kfs_total_interest" class="field lf md" placeholder="₹ Amount" title="Filled by moneycash / Lender" autocomplete="off"></td>
       </tr>
     </tbody>
   </table>
@@ -855,14 +855,14 @@ th.teal-hdr { background: var(--teal); }
       <th style="width:36px"></th>
       <th>Type of Fee / Charge</th>
       <th class="center" style="width:140px">One-time / Recurring</th>
-      <th class="center" style="width:180px">Amount (Rs) or % as applicable</th>
+      <th class="center" style="width:180px">Amount (₹) or % as applicable</th>
     </tr></thead>
     <tbody>
       <tr>
         <td class="td-sr">(i)</td>
         <td>Processing Fee</td>
         <td class="center fixed-val">One-time</td>
-        <td class="center"><input type="text" id="fee_processing" class="field lf sm" placeholder="INR / %" title="Filled by moneycash / Lender" autocomplete="off"></td>
+        <td class="center"><input type="text" id="fee_processing" class="field lf sm" placeholder="₹ / %" title="Filled by moneycash / Lender" autocomplete="off"></td>
       </tr>
       <tr>
         <td class="td-sr">(ii)</td>
@@ -928,8 +928,8 @@ th.teal-hdr { background: var(--teal); }
       </tr>
       <tr>
         <td class="td-sr">19</td>
-        <td class="td-label">Total Amount to be paid by the Borrower (in Rupees)</td>
-        <td class="td-val"><input type="text" id="kfs_total_payable" class="field lf md" placeholder="INR Total" title="Filled by moneycash / Lender" autocomplete="off"></td>
+        <td class="td-label">Total Amount to be paid by the Borrower (₹)</td>
+        <td class="td-val"><input type="text" id="kfs_total_payable" class="field lf md" placeholder="₹ Total" title="Filled by moneycash / Lender" autocomplete="off"></td>
       </tr>
     </tbody>
   </table>
@@ -937,19 +937,19 @@ th.teal-hdr { background: var(--teal); }
   <h3 class="sh">Table I — Repayment Schedule</h3>
   <table>
     <thead><tr>
-      <th class="center" style="width:70px">EMI No.</th>
-      <th class="center">EMI Due Date</th>
-      <th class="center">Principal (INR)</th>
-      <th class="center">Interest (INR)</th>
+      <th class="center" style="width:70px">EPI No.</th>
+      <th class="center">Due Date</th>
+      <th class="center">Principal (₹)</th>
+      <th class="center">Interest (₹)</th>
       <th class="center">Total Repayable Amount</th>
     </tr></thead>
     <tbody>
       <tr>
         <td class="center fixed-val">1</td>
         <td class="center"><input type="text" id="rep_due_date" class="field lf date" placeholder="DD-MM-YYYY" title="Filled by moneycash / Lender" autocomplete="off"></td>
-        <td class="center"><input type="text" id="rep_principal" class="field lf sm" placeholder="Principal INR" title="Filled by moneycash / Lender" autocomplete="off"></td>
-        <td class="center"><input type="text" id="rep_interest" class="field lf sm" placeholder="Interest INR" title="Filled by moneycash / Lender" autocomplete="off"></td>
-        <td class="center"><input type="text" id="rep_total" class="field lf md" placeholder="Total Repayable INR" title="Filled by moneycash / Lender" autocomplete="off"></td>
+        <td class="center"><input type="text" id="rep_principal" class="field lf sm" placeholder="Principal ₹" title="Filled by moneycash / Lender" autocomplete="off"></td>
+        <td class="center"><input type="text" id="rep_interest" class="field lf sm" placeholder="Interest ₹" title="Filled by moneycash / Lender" autocomplete="off"></td>
+        <td class="center"><input type="text" id="rep_total" class="field lf md" placeholder="Total Repayable ₹" title="Filled by moneycash / Lender" autocomplete="off"></td>
       </tr>
     </tbody>
   </table>
@@ -957,20 +957,20 @@ th.teal-hdr { background: var(--teal); }
   <h3 class="sh">Table II — Bounce Charge / Penal Charges Grid</h3>
   <ul class="doc-list">
     <li>One-time penal charges @ 10% + applicable taxes (if any).</li>
-    <li>Minimum penal charge: Rs. 100/- + applicable taxes (if any).</li>
-    <li>Maximum penal charge: Rs. 3,000/- + applicable taxes (if any).</li>
+    <li>Minimum penal charge: ₹100/- + applicable taxes (if any).</li>
+    <li>Maximum penal charge: ₹3,000/- + applicable taxes (if any).</li>
   </ul>
   <table>
     <thead><tr>
-      <th class="center" style="width:50%">Amount (Rs)</th>
+      <th class="center" style="width:50%">Amount (₹)</th>
       <th class="center">Bounce Fee (excluding GST)</th>
     </tr></thead>
     <tbody>
-      <tr><td class="center">0 – 2,000</td><td class="center">Rs. 100/-</td></tr>
-      <tr><td class="center">2,001 – 5,000</td><td class="center">Rs. 200/-</td></tr>
-      <tr><td class="center">5,001 – 8,000</td><td class="center">Rs. 300/-</td></tr>
-      <tr><td class="center">8,001 – 10,000</td><td class="center">Rs. 400/-</td></tr>
-      <tr><td class="center">10,001 and above</td><td class="center">Rs. 500/-</td></tr>
+      <tr><td class="center">0 – 2,000</td><td class="center">₹100/-</td></tr>
+      <tr><td class="center">2,001 – 5,000</td><td class="center">₹200/-</td></tr>
+      <tr><td class="center">5,001 – 8,000</td><td class="center">₹300/-</td></tr>
+      <tr><td class="center">8,001 – 10,000</td><td class="center">₹400/-</td></tr>
+      <tr><td class="center">10,001 and above</td><td class="center">₹500/-</td></tr>
     </tbody>
   </table>
 
@@ -996,13 +996,15 @@ th.teal-hdr { background: var(--teal); }
         <td class="gro-cell">
           <div class="gro-sub">Grievance Redressal Officer (GRO)</div>
           <div class="gro-row"><span class="gro-key">Name:</span> <input type="text" id="gro_lsp_name" class="field lf md" placeholder="GRO Name" title="Filled by moneycash / Lender" autocomplete="off"></div>
-          <div class="gro-row"><span class="gro-key">Phone:</span> <input type="text" id="gro_lsp_phone" class="field lf sm" placeholder="Phone" title="Filled by moneycash / Lender" autocomplete="off"> &nbsp; <span class="gro-key">Email:</span> <span class="fixed-val" style="color:var(--teal)">info@moneycash.in</span></div>
+          <div class="gro-row"><span class="gro-key">Phone:</span> <input type="text" id="gro_lsp_phone" class="field lf sm" placeholder="Phone" title="Filled by moneycash / Lender" autocomplete="off"></div>
+          <div class="gro-row"><span class="gro-key">Email:</span> <input type="text" id="gro_lsp_email" class="field lf md" placeholder="Email" title="Filled by moneycash / Lender" autocomplete="off"></div>
           <p class="para muted mt4" style="font-size:12px">The GRO may be reached on the number provided above any time between 10:00 and 19:00 from Monday to Saturday, except on public holidays, or through the e-mail address above. The GRO shall endeavour to resolve the grievance within fourteen (14) days from the date of receipt of the grievance.</p>
         </td>
         <td class="gro-cell">
           <div class="gro-sub">Nodal Officer</div>
           <div class="gro-row"><span class="gro-key">Name:</span> <input type="text" id="nodal_lsp_name" class="field lf md" placeholder="Nodal Officer Name" title="Filled by moneycash / Lender" autocomplete="off"></div>
-          <div class="gro-row"><span class="gro-key">Phone:</span> <input type="text" id="nodal_lsp_phone" class="field lf sm" placeholder="Phone" title="Filled by moneycash / Lender" autocomplete="off"> &nbsp; <span class="gro-key">Email:</span> <span class="fixed-val" style="color:var(--teal)">info@moneycash.in</span></div>
+          <div class="gro-row"><span class="gro-key">Phone:</span> <input type="text" id="nodal_lsp_phone" class="field lf sm" placeholder="Phone" title="Filled by moneycash / Lender" autocomplete="off"></div>
+          <div class="gro-row"><span class="gro-key">Email:</span> <input type="text" id="nodal_lsp_email" class="field lf md" placeholder="Email" title="Filled by moneycash / Lender" autocomplete="off"></div>
           <p class="para muted mt4" style="font-size:12px">If the Borrower does not receive a response from the GRO within fourteen (14) days of making a representation, or is not satisfied with the response received, the Borrower may reach the Nodal Officer any time between 10:00 and 19:00 from Monday to Saturday, except on public holidays.</p>
         </td>
       </tr>
@@ -1011,13 +1013,15 @@ th.teal-hdr { background: var(--teal); }
         <td class="gro-cell">
           <div class="gro-sub">Grievance Redressal Officer (GRO)</div>
           <div class="gro-row"><span class="gro-key">Name:</span> <input type="text" id="gro_re_name" class="field lf md" placeholder="GRO Name" title="Filled by moneycash / Lender" autocomplete="off"></div>
-          <div class="gro-row"><span class="gro-key">Phone:</span> <input type="text" id="gro_re_phone" class="field lf sm" placeholder="Phone" title="Filled by moneycash / Lender" autocomplete="off"> &nbsp; <span class="gro-key">Email:</span> <span class="fixed-val" style="color:var(--teal)">info@moneycash.in</span></div>
+          <div class="gro-row"><span class="gro-key">Phone:</span> <input type="text" id="gro_re_phone" class="field lf sm" placeholder="Phone" title="Filled by moneycash / Lender" autocomplete="off"></div>
+          <div class="gro-row"><span class="gro-key">Email:</span> <input type="text" id="gro_re_email" class="field lf md" placeholder="Email" title="Filled by moneycash / Lender" autocomplete="off"></div>
           <p class="para muted mt4" style="font-size:12px">The GRO may be reached on the number provided above any time between 10:00 and 19:00 from Monday to Saturday, except on public holidays, or through the e-mail address above. The GRO shall endeavour to resolve the grievance within fourteen (14) days from the date of receipt of the grievance.</p>
         </td>
         <td class="gro-cell">
           <div class="gro-sub">Nodal Officer</div>
           <div class="gro-row"><span class="gro-key">Name:</span> <input type="text" id="nodal_re_name" class="field lf md" placeholder="Nodal Officer Name" title="Filled by moneycash / Lender" autocomplete="off"></div>
-          <div class="gro-row"><span class="gro-key">Phone:</span> <input type="text" id="nodal_re_phone" class="field lf sm" placeholder="Phone" title="Filled by moneycash / Lender" autocomplete="off"> &nbsp; <span class="gro-key">Email:</span> <span class="fixed-val" style="color:var(--teal)">info@moneycash.in</span></div>
+          <div class="gro-row"><span class="gro-key">Phone:</span> <input type="text" id="nodal_re_phone" class="field lf sm" placeholder="Phone" title="Filled by moneycash / Lender" autocomplete="off"></div>
+          <div class="gro-row"><span class="gro-key">Email:</span> <input type="text" id="nodal_re_email" class="field lf md" placeholder="Email" title="Filled by moneycash / Lender" autocomplete="off"></div>
           <p class="para muted mt4" style="font-size:12px">If the Borrower does not receive a response from the GRO within fourteen (14) days of making a representation, or is not satisfied with the response received, the Borrower may reach the Nodal Officer any time between 10:00 and 19:00 from Monday to Saturday, except on public holidays.</p>
         </td>
       </tr>
@@ -1099,7 +1103,7 @@ th.teal-hdr { background: var(--teal); }
       and state that I understand English and have read and understood the terms and
       conditions of this Sanction Letter cum Key Fact Statement. I acknowledge receipt
       of the Sanction Letter cum Key Fact Statement of <strong>Aasra Fincorp Pvt. Ltd.</strong> for a
-      Personal Loan.
+      Short Term Loan.
     </p>
     <p class="para mt8">
       For any queries, you may write to us at <strong>info@moneycash.in</strong>.
@@ -1218,8 +1222,8 @@ th.teal-hdr { background: var(--teal); }
       <li>These bounce charges are levied by the Lender.</li>
       <li>The presentation of the instrument is as per NPCI guidelines, which are amended from time to time.</li>
       <li>As per NPCI guidelines, the instrument may be presented once in a month and re-presented only twice in a month.</li>
-      <li>Minimum criteria to levy bounce / penal charges: Rs. 100/- or 10% plus applicable taxes, whichever is lower.</li>
-      <li>Maximum criteria to levy bounce / penal charges: Rs. 3,000/- or 10% plus applicable taxes, whichever is lower.</li>
+      <li>Minimum criteria to levy bounce / penal charges: ₹100/- or 10% plus applicable taxes, whichever is higher.</li>
+      <li>Maximum criteria to levy bounce / penal charges: ₹3,000/- or 10% plus applicable taxes, whichever is lower.</li>
       <li>The penal charges are applied to an individual / customer on a particular loan bearing a unique loan number or account, and only once in a tenure until the date of final repayment. The customer may take a new loan only after paying all dues, including principal, normal interest and any penal / default charges levied until the date of actual payment.</li>
     </ul>
   </div>
@@ -1358,8 +1362,8 @@ const LENDER_FIELDS = [
   "kfs_loan_term","kfs_commencement","kfs_interest_rate","kfs_total_interest",
   "kfs_epi_amount","fee_processing","kfs_apr","kfs_total_payable",
   "rep_due_date","rep_principal","rep_interest","rep_total",
-  "gro_lsp_name","gro_lsp_phone","gro_re_name","gro_re_phone",
-  "nodal_lsp_name","nodal_lsp_phone","nodal_re_name","nodal_re_phone",
+  "gro_lsp_name","gro_lsp_phone","gro_lsp_email","nodal_lsp_name","nodal_lsp_phone","nodal_lsp_email",
+  "gro_re_name","gro_re_phone","gro_re_email","nodal_re_name","nodal_re_phone","nodal_re_email",
   "ct_date","ct_lender_office","kfs_sig_date","kfs_purpose"
 ];
 const CUSTOMER_FIELDS = [

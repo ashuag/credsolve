@@ -130,7 +130,7 @@ export function ReviewLoanPanel({
   const gst = parseInrNumber(details.gstAmount) ?? 0;
   const interest = parseInrNumber(details.interestAmount) ?? 0;
   const disbursed = parseInrNumber(details.disbursedAmount) ?? loanAmount - processingFee - gst;
-  const repayable = parseInrNumber(details.repaymentAmount) ?? loanAmount + interest + processingFee + gst;
+  const repayable = parseInrNumber(details.repaymentAmount) ?? loanAmount + interest;
   const costOfCredit = repayable - disbursed;
   const tenureLabel =
     details.loanTenure != null

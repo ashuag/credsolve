@@ -1,19 +1,23 @@
 import {
-  DEFAULT_MAX_MONTHLY_RATE_PERCENT,
   DEFAULT_PENAL_MAX_INR,
   DEFAULT_PENAL_MIN_INR,
   DEFAULT_PENAL_RATE_PERCENT,
   LENDER_GRO_NAME,
   LENDER_GRO_PHONE,
+  LENDER_GRO_EMAIL,
   LENDER_NODAL_NAME,
   LENDER_NODAL_PHONE,
+  LENDER_NODAL_EMAIL,
   LENDER_NAME,
   LENDER_REGISTERED_OFFICE,
   LSP_GRO_NAME,
   LSP_GRO_PHONE,
+  LSP_GRO_EMAIL,
   LSP_NODAL_NAME,
   LSP_NODAL_PHONE,
+  LSP_NODAL_EMAIL,
 } from '../constants/loan-document.constants';
+import { SettingKey } from '../constants/setting.constants';
 import { normalizeClientIp } from '../http/client-ip.util';
 import { inrAmountToWords } from '../utils/inr-amount-words.util';
 import { buildLoanDocumentReplacements } from './loan-document-merge-data.util';
@@ -43,6 +47,15 @@ function formatPercent(value: number): string {
   return `${display}%`;
 }
 
+/** Numeric ROI display for “shall not exceed X% per day” (no % suffix; template supplies it). */
+function formatRoiPerDayNumber(rate: number | null): string {
+  if (rate == null || !Number.isFinite(rate)) {
+    return SettingKey.ROI_PER_DAY.default;
+  }
+  const trimmed = Number(rate.toFixed(4));
+  return Number.isInteger(trimmed) ? String(trimmed) : String(trimmed);
+}
+
 function formatAcceptanceTimestamp(value: Date | string): string {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return '';
@@ -58,20 +71,29 @@ function formatAcceptanceTimestamp(value: Date | string): string {
   }).format(d)} IST`;
 }
 
-/** APR base = sanctioned amount minus processing fee (GST excluded); compound annualized rate. */
+/**
+ * Loan-period cost and simple annualised APR (as used on KFS):
+ *   periodCost = (totalPayable / netDisbursed) − 1
+ *   APR        = periodCost × 12 × 100
+ * where netDisbursed = sanctioned − processing fee − GST.
+ *
+ * Example: 14040 / 10300.8 − 1 = 36.30%, APR = 36.30 × 12 ≈ 436%.
+ */
 function computeAprPercent(
   loanAmount: number | null,
   processingFee: number | null,
+  gstAmount: number | null,
   totalPayable: number | null,
-  tenureDays: number | null,
 ): string {
-  if (loanAmount == null || loanAmount <= 0 || totalPayable == null || tenureDays == null || tenureDays <= 0) {
+  if (loanAmount == null || loanAmount <= 0 || totalPayable == null) {
     return '';
   }
-  const aprBase = loanAmount - (processingFee ?? 0);
-  if (aprBase <= 0) return '';
-  const apr = (Math.pow(totalPayable / aprBase, 365 / tenureDays) - 1) * 100;
-  return `${apr.toFixed(1)}%`;
+  const netDisbursed = loanAmount - (processingFee ?? 0) - (gstAmount ?? 0);
+  if (!(netDisbursed > 0)) return '';
+  const periodCost = totalPayable / netDisbursed - 1;
+  if (!Number.isFinite(periodCost) || periodCost < 0) return '';
+  const apr = periodCost * 12 * 100;
+  return `${Math.round(apr)}%`;
 }
 
 /** Maps HTML template `input#id` values from application merge data. */
@@ -120,40 +142,45 @@ export function buildLoanDocumentHtmlFieldValues(input: LoanDocumentMergeInput):
     sl_penal_rate: DEFAULT_PENAL_RATE_PERCENT,
     sl_penal_min: DEFAULT_PENAL_MIN_INR,
     sl_penal_max: DEFAULT_PENAL_MAX_INR,
-    sl_max_rate: DEFAULT_MAX_MONTHLY_RATE_PERCENT,
+    // Cap statement uses per-day ROI from application (settings `ROI_PER_DAY`), not a monthly %.
+    sl_max_rate: formatRoiPerDayNumber(interestRate),
     kfs_name: borrowerName,
     kfs_address: address,
     kfs_date: dateStr,
     kfs_borrower_name: borrowerName,
     kfs_purpose: purpose,
     kfs_account_no: accountNo,
-    kfs_sanctioned_amt: loanAmount != null ? formatInrPlain(loanAmount) : '',
+    kfs_sanctioned_amt: loanAmount != null ? `₹${formatInrPlain(loanAmount)}` : '',
     kfs_net_disbursed: netDisbursed != null ? formatInrPlain(netDisbursed) : '',
     kfs_loan_term: tenure != null ? `${tenure} days` : '',
-    kfs_epi_amount: epiTotal != null ? formatInrPlain(epiTotal) : '',
+    kfs_epi_amount: epiTotal != null ? `₹${formatInrPlain(epiTotal)}` : '',
     kfs_commencement: tenure != null ? `${tenure} days` : '',
     kfs_interest_rate: base.INTEREST_RATE,
-    kfs_total_interest: interestAmount != null ? formatInrPlain(interestAmount) : '',
+    kfs_total_interest: interestAmount != null ? `₹${formatInrPlain(interestAmount)}` : '',
     fee_processing:
       processingFee != null
         ? processingPct != null
-          ? `${formatInrPlain(processingFee)} (${processingPct.toFixed(2)}%)`
-          : formatInrPlain(processingFee)
+          ? `₹${formatInrPlain(processingFee)} (${processingPct.toFixed(2)}%)`
+          : `₹${formatInrPlain(processingFee)}`
         : '',
-    kfs_apr: computeAprPercent(loanAmount, processingFee, totalPayable, tenure),
-    kfs_total_payable: totalPayable != null ? formatInrPlain(totalPayable) : '',
+    kfs_apr: computeAprPercent(loanAmount, processingFee, gstAmount, totalPayable),
+    kfs_total_payable: totalPayable != null ? `₹${formatInrPlain(totalPayable)}` : '',
     rep_due_date: maturity,
-    rep_principal: loanAmount != null ? formatInrPlain(loanAmount) : '',
-    rep_interest: interestAmount != null ? formatInrPlain(interestAmount) : '',
-    rep_total: totalPayable != null ? formatInrPlain(totalPayable) : '',
+    rep_principal: loanAmount != null ? `₹${formatInrPlain(loanAmount)}` : '',
+    rep_interest: interestAmount != null ? `₹${formatInrPlain(interestAmount)}` : '',
+    rep_total: totalPayable != null ? `₹${formatInrPlain(totalPayable)}` : '',
     gro_lsp_name: LSP_GRO_NAME,
     gro_lsp_phone: LSP_GRO_PHONE,
+    gro_lsp_email: LSP_GRO_EMAIL,
     nodal_lsp_name: LSP_NODAL_NAME,
     nodal_lsp_phone: LSP_NODAL_PHONE,
+    nodal_lsp_email: LSP_NODAL_EMAIL,
     gro_re_name: LENDER_GRO_NAME,
     gro_re_phone: LENDER_GRO_PHONE,
+    gro_re_email: LENDER_GRO_EMAIL,
     nodal_re_name: LENDER_NODAL_NAME,
     nodal_re_phone: LENDER_NODAL_PHONE,
+    nodal_re_email: LENDER_NODAL_EMAIL,
     decl_name: borrowerName,
     kfs_sig_name: borrowerName,
     kfs_sig_date: `${dateStr}, India`,

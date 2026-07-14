@@ -1,26 +1,44 @@
+ curl --request POST \
+  --url https://wire.easebuzz.in/api/v1/quick_transfers/initiate/ \
+  --header 'Accept: application/json' \
+  --header 'Authorization: 80a2de2870139d6b72c42dd29496bdee539a7d54c520d696a6c2b23ddc0d68d3c303fec0528a8324183635fe73d16fc3bd1a6c895ba0d88afdace696a87ae7d6' \
+  --header 'Content-Type: application/json' \
+  --header 'WIRE-API-KEY: F55E22E7FB' \
+  --data '{
+  "key": "F55E22E7FB",
+  "beneficiary_type": "bank_account",
+  "beneficiary_name": "Saurabh Agarwal",
+  "account_number": "3812194585",
+  "ifsc": "KKBK0000201",
+  "unique_request_number": "MCASH12346",
+  "payment_mode": "IMPS",
+  "amount": 10.00,
+  "email": "saurabhagarwal2k8@gmail.com",
+  "phone": "8882911939",
+  "narration": "loan disbursed"
+}'
+
+
+{"success":true,"data":{"transfer_request":{"id":"trc5315b87025540","unique_request_number":"MCASH12345","failure_reason":null,"source_virtual_account":"10289407830","source_virtual_account_ifsc":"IDFB0020222","virtual_account_id":"vaa25475892641ca82122ce80c5cb174","service_charge":4.0,"gst_amount":0.72,"service_charge_with_gst":4.72,"request_meta":{"yesbank_ftx_gaming":false,"yesbank_ftx":false,"power_axis":false},"success_at":"2026-07-14 16:01:50","beneficiary_id":"bene66ac55c64030ace9f1edee9ca492","approvals":null,"created_at":"2026-07-14T16:01:49.025323+05:30","unique_transaction_reference":"619516185021","payment_mode":"IMPS","amount":1.0,"currency":"INR","narration":"loan disbursed","beneficiary_bank_name":"BANK","beneficiary_account_name":"Saurabh Agarwal","beneficiary_account_number":"02731050042457","beneficiary_account_ifsc":"HDFC0000273","beneficiary_upi_handle":null,"status":"success","queue_on_low_balance":false,"transfer_date":"2026-07-14T16:01:49.209418+05:30","scheduled_for":null,"udf1":"1","udf2":"2","udf3":"3","udf4":"4","udf5":"5","billing_type":1,"billing_source":2,"created_by":null,"beneficiary":71781811}}}
+
+
 curl --request POST \
   --url https://wire.easebuzz.in/api/v1/quick_transfers/initiate/ \
   --header 'Accept: application/json' \
-  --header 'Authorization: f34e134bb2d6f244c4124668e38d9bf9292db6c228ad9a4bffde9c5193c6ebe3' \
+  --header 'Authorization: 80a2de2870139d6b72c42dd29496bdee539a7d54c520d696a6c2b23ddc0d68d3c303fec0528a8324183635fe73d16fc3bd1a6c895ba0d88afdace696a87ae7d6' \
   --header 'Content-Type: application/json' \
-  --header 'F55E22E7FB: ' \
+  --header 'WIRE-API-KEY: F55E22E7FB' \
   --data '{
-  "key": "1Z1234567X",
-  "virtual_account_number": "10289407830",
+  "key": "F55E22E7FB",
   "beneficiary_type": "bank_account",
   "beneficiary_name": "Saurabh Agarwal",
-  "account_number": "02731050042457",
-  "ifsc_code": "HDFC0000273",
-  "unique_request_number": "MCASH12345",
+  "account_number": "3812194585",
+  "ifsc": "KKBK0000201",
+  "unique_request_number": "MCASH12346",
   "payment_mode": "IMPS",
-  "amount": 1,
+  "amount": 10.00,
   "email": "saurabhagarwal2k8@gmail.com",
   "phone": "8882911939",
-  "narration": "loan disbursed",
-  "scheduled_for": "2026-07-13",
-  "udf1": "InstaTest",
-  "udf2": "Insta",
-  "udf3": "222222414",
-  "udf4": "InstaTest123",
-  "udf5": "2Test22"
+  "narration": "loan disbursed"
 }'
+{"success":true,"data":{"transfer_request":{"id":"trb733b9c5b68e48","unique_request_number":"MCASH12346","failure_reason":null,"source_virtual_account":"10289407830","source_virtual_account_ifsc":"IDFB0020222","virtual_account_id":"vaa25475892641ca82122ce80c5cb174","service_charge":4.0,"gst_amount":0.72,"service_charge_with_gst":4.72,"request_meta":{"yesbank_ftx_gaming":false,"yesbank_ftx":false,"power_axis":false},"success_at":"2026-07-14 16:33:25","beneficiary_id":"benef4d17e814683a0ebf5253d71c40d","approvals":null,"created_at":"2026-07-14T16:33:23.777457+05:30","unique_transaction_reference":"619516226615","payment_mode":"IMPS","amount":10.0,"currency":"INR","narration":"loan disbursed","beneficiary_bank_name":"BANK","beneficiary_account_name":"Saurabh Agarwal","beneficiary_account_number":"3812194585","beneficiary_account_ifsc":"KKBK0000201","beneficiary_upi_handle":null,"status":"success","queue_on_low_balance":false,"transfer_date":"2026-07-14T16:33:23.864695+05:30","scheduled_for":null,"udf1":null,"udf2":null,"udf3":null,"udf4":null,"udf5":null,"billing_type":1,"billing_source":2,"created_by":null,"beneficiary":71782767}}}

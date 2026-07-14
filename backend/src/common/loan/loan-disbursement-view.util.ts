@@ -86,12 +86,7 @@ export function computeFeeAmountsFromLoanDetail(loanDetail: LoanDetailStagingRow
   const processingFeeAmount = (principal * processingFeePct) / 100;
   const gstAmount = (processingFeeAmount * gstPct) / 100;
   const disburseAmount = computeDisburseAmountInr(principal, processingFeeAmount, gstAmount);
-  const repaymentAmount = computeRepaymentAmountInr(
-    principal,
-    interestAmount ?? 0,
-    processingFeeAmount,
-    gstAmount,
-  );
+  const repaymentAmount = computeRepaymentAmountInr(principal, interestAmount ?? 0);
   return {
     processingFeeAmount,
     gstAmount,
