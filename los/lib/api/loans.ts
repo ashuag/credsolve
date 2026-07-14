@@ -31,6 +31,30 @@ export type LosLoan = {
   closedAt: string | null;
 };
 
+export type LosLoanDisbursementTransfer = {
+  id: string | null;
+  uniqueRequestNumber: string | null;
+  uniqueTransactionReference: string | null;
+  status: string | null;
+  paymentMode: string | null;
+  amount: string | null;
+  currency: string | null;
+  narration: string | null;
+  failureReason: string | null;
+  serviceCharge: string | null;
+  gstAmount: string | null;
+  serviceChargeWithGst: string | null;
+  beneficiaryAccountName: string | null;
+  beneficiaryAccountNumber: string | null;
+  beneficiaryAccountIfsc: string | null;
+  beneficiaryBankName: string | null;
+  sourceVirtualAccount: string | null;
+  transferDate: string | null;
+  successAt: string | null;
+  createdAt: string | null;
+  raw: Record<string, unknown>;
+};
+
 export type LosLoanDetails = LosLoan & {
   panNumber: string | null;
   address: string | null;
@@ -43,6 +67,7 @@ export type LosLoanDetails = LosLoan & {
   totalPaidAmount: string;
   outstandingAmount: string;
   isDisbursedApplication: boolean;
+  disbursementTransfer: LosLoanDisbursementTransfer | null;
   repayments: Array<{
     uuid: string;
     amount: string;

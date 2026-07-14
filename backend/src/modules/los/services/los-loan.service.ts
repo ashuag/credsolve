@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { APPLICATION_STATUS } from '../../../common/constants/application.constants';
+import { mapEasebuzzTransferLog } from '../../../common/easebuzz/easebuzz-transfer-log.util';
 import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbursement-view.util';
 import { formatLosPersonName } from '../format-los-person-name';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -158,6 +159,23 @@ export class LosLoanService {
       throw new NotFoundException('Loan not found.');
     }
 
+    let gatewayTransferJson: unknown = (loan as { gatewayTransferJson?: unknown }).gatewayTransferJson ?? null;
+    try {
+      const gatewayRows = await this.prisma.client.$queryRaw<
+        Array<{ gateway_transfer_json: unknown }>
+      >`
+        SELECT gateway_transfer_json
+        FROM loan_account
+        WHERE id = ${loan.id}
+        LIMIT 1
+      `;
+      if (gatewayRows[0] && 'gateway_transfer_json' in gatewayRows[0]) {
+        gatewayTransferJson = gatewayRows[0].gateway_transfer_json;
+      }
+    } catch {
+      // Column may not exist until migration is applied; loan detail still loads.
+    }
+
     const repaymentRows = await this.prisma.client.$queryRaw<
       Array<{
         uuid: string;
@@ -232,6 +250,7 @@ export class LosLoanService {
       loanMaturityDate: loan.loanMaturityDate.toISOString().slice(0, 10),
       daysToMaturity,
       utr: loan.utr,
+      disbursementTransfer: mapEasebuzzTransferLog(gatewayTransferJson),
       bankName: details?.bankName ?? null,
       bankAccountNumber: loan.bankAccountNumber ?? details?.bankAccountNumber ?? null,
       bankAccountMasked: maskAccountNumber(loan.bankAccountNumber ?? details?.bankAccountNumber),

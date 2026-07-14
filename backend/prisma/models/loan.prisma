@@ -23,6 +23,8 @@ model LoanAccount {
   disbursedAt          DateTime  @map("disbursed_at") @db.DateTime(3)
   loanMaturityDate     DateTime  @map("loan_maturity_date") @db.Date
   utr                  String?   @db.VarChar(50)
+  /// Easebuzz quick-transfer response body (or `data.transfer_request`) saved at disbursement.
+  gatewayTransferJson  Json?     @map("gateway_transfer_json")
   bankAccountNumber    String?   @map("bank_account_number") @db.VarChar(20)
   ifscCode             String?   @map("ifsc_code") @db.VarChar(11)
   loanStatusId         Int       @map("loan_status_id") @db.SmallInt

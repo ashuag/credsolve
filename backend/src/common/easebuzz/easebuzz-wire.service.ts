@@ -555,7 +555,10 @@ export class EasebuzzWireService {
     }
 
     const data = asRecord(root.data) ?? asRecord(root.result) ?? root;
+    const transferRequest = asRecord(data.transfer_request) ?? asRecord(root.transfer_request);
+
     const vendorStatus = pickString(
+      transferRequest?.status,
       root.status,
       root.transfer_status,
       data.status,
@@ -585,19 +588,29 @@ export class EasebuzzWireService {
     const acceptedByStatus = vendorStatus != null && acceptedStatuses.has(vendorStatus);
     const accepted = acceptedByFlag || acceptedByStatus;
 
+    // Prefer bank UTR / unique_transaction_reference over vendor transfer id (trc…).
     const transferId = pickString(
-      data.id,
-      data.transfer_id,
+      transferRequest?.unique_transaction_reference,
+      transferRequest?.utr,
       data.unique_transaction_reference,
       data.utr,
       data.bank_reference_number,
       data.transaction_id,
+      transferRequest?.id,
+      data.id,
+      data.transfer_id,
       root.id,
       root.transfer_id,
       root.utr,
     );
 
-    const message = pickString(root.message, root.error, data.message, data.error);
+    const message = pickString(
+      root.message,
+      root.error,
+      data.message,
+      data.error,
+      transferRequest?.failure_reason,
+    );
 
     return { accepted, transferId, vendorStatus, message };
   }

@@ -28,6 +28,18 @@ function formatINR(value: string | null | undefined) {
   }).format(n);
 }
 
+function formatINRExact(value: string | null | undefined) {
+  if (!value) return '—';
+  const n = Number(value);
+  if (!Number.isFinite(n)) return value;
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n);
+}
+
 function formatDate(iso: string | null | undefined) {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -288,6 +300,125 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
           </div>
         </Card>
       </div>
+
+      <Card title="Disbursement transfer">
+        {row.disbursementTransfer == null ? (
+          <p className="m-0 text-[0.88rem] text-brand-muted">
+            No gateway transfer log on this loan
+            {row.utr ? ` (UTR on record: ${row.utr})` : ' (transfer may have been skipped)'}.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Field
+                label="Status"
+                value={
+                  <span className="inline-flex items-center gap-2">
+                    <StatusPill
+                      label={row.disbursementTransfer.status ?? 'Unknown'}
+                      code={row.disbursementTransfer.status ?? undefined}
+                    />
+                    {row.disbursementTransfer.paymentMode ? (
+                      <span className="text-[0.78rem] font-bold text-brand-muted">
+                        {row.disbursementTransfer.paymentMode}
+                      </span>
+                    ) : null}
+                  </span>
+                }
+              />
+              <Field
+                label="UTR"
+                value={
+                  <span className="font-mono">
+                    {row.disbursementTransfer.uniqueTransactionReference ?? row.utr ?? '—'}
+                  </span>
+                }
+              />
+              <Field
+                label="Request number"
+                value={
+                  <span className="font-mono">
+                    {row.disbursementTransfer.uniqueRequestNumber ?? '—'}
+                  </span>
+                }
+              />
+              <Field
+                label="Transfer id"
+                value={<span className="font-mono">{row.disbursementTransfer.id ?? '—'}</span>}
+              />
+              <Field
+                label="Amount"
+                value={
+                  row.disbursementTransfer.amount != null
+                    ? `${formatINRExact(row.disbursementTransfer.amount)}${
+                        row.disbursementTransfer.currency && row.disbursementTransfer.currency !== 'INR'
+                          ? ` ${row.disbursementTransfer.currency}`
+                          : ''
+                      }`
+                    : '—'
+                }
+              />
+              <Field label="Narration" value={row.disbursementTransfer.narration} />
+              <Field
+                label="Beneficiary"
+                value={row.disbursementTransfer.beneficiaryAccountName}
+              />
+              <Field
+                label="Beneficiary account"
+                value={
+                  <span className="font-mono">
+                    {row.disbursementTransfer.beneficiaryAccountNumber ?? '—'}
+                  </span>
+                }
+              />
+              <Field
+                label="Beneficiary IFSC"
+                value={
+                  <span className="font-mono">
+                    {row.disbursementTransfer.beneficiaryAccountIfsc ?? '—'}
+                  </span>
+                }
+              />
+              <Field label="Bank" value={row.disbursementTransfer.beneficiaryBankName} />
+              <Field
+                label="Source VA"
+                value={
+                  <span className="font-mono">
+                    {row.disbursementTransfer.sourceVirtualAccount ?? '—'}
+                  </span>
+                }
+              />
+              <Field
+                label="Service charge (incl. GST)"
+                value={
+                  row.disbursementTransfer.serviceChargeWithGst != null
+                    ? formatINRExact(row.disbursementTransfer.serviceChargeWithGst)
+                    : '—'
+                }
+              />
+              <Field
+                label="Transfer at"
+                value={formatDateTime(
+                  row.disbursementTransfer.successAt ??
+                    row.disbursementTransfer.transferDate ??
+                    row.disbursementTransfer.createdAt,
+                )}
+              />
+              {row.disbursementTransfer.failureReason ? (
+                <Field label="Failure reason" value={row.disbursementTransfer.failureReason} />
+              ) : null}
+            </div>
+            <details className="rounded-[12px] border border-[rgba(23,44,113,0.08)] bg-[#f8fafc] px-4 py-3">
+              <summary className="cursor-pointer text-[0.78rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
+                Raw transfer JSON
+              </summary>
+              <pre className="mt-3 mb-0 overflow-x-auto whitespace-pre-wrap break-words text-[0.72rem] font-mono text-brand-text">
+                {JSON.stringify(row.disbursementTransfer.raw, null, 2)}
+              </pre>
+            </details>
+          </div>
+        )}
+      </Card>
 
       <Card
         title="Repayments"

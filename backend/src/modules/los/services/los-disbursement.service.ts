@@ -15,6 +15,7 @@ import {
 } from '../../../common/constants/loan-document.constants';
 import { LOAN_STATUS } from '../../../common/constants/loan.constants';
 import { EasebuzzWireService } from '../../../common/easebuzz/easebuzz-wire.service';
+import { buildGatewayTransferJsonForPersist } from '../../../common/easebuzz/easebuzz-transfer-log.util';
 import { EmailService } from '../../../common/email/email.service';
 import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import { isCustomerJourneyComplete } from '../../../common/loan/customer-journey-complete.util';
@@ -199,6 +200,7 @@ export class LosDisbursementService {
     let paymentGateway: 'easebuzz' | 'skipped' = 'skipped';
     let transferUtr: string | null = null;
     let vendorStatus: string | null = null;
+    let gatewayTransferJson: unknown = null;
 
     if (skipTransfer) {
       this.logger.warn(
@@ -231,6 +233,7 @@ export class LosDisbursementService {
       paymentGateway = 'easebuzz';
       transferUtr = transfer.transferId?.slice(0, 50) ?? uniqueRequestNumber.slice(0, 50);
       vendorStatus = transfer.vendorStatus;
+      gatewayTransferJson = buildGatewayTransferJsonForPersist(transfer.rawBody);
     }
 
     const disbursedStatus = await this.prisma.client.applicationStatus.findFirst({
@@ -306,6 +309,7 @@ export class LosDisbursementService {
               disbursed_at,
               loan_maturity_date,
               utr,
+              gateway_transfer_json,
               bank_account_number,
               ifsc_code,
               loan_status_id,
@@ -326,6 +330,7 @@ export class LosDisbursementService {
               ${disbursedAt},
               ${details.expectedRepaymentDate!},
               ${utrForDb},
+              ${gatewayTransferJson == null ? null : JSON.stringify(gatewayTransferJson)},
               ${details.bankAccountNumber},
               ${details.ifscCode},
               ${activeLoanStatus.id},
