@@ -1,6 +1,7 @@
 import type { LosApplicationDetails, LosLeadDetails } from '@/lib/api';
 import {
   APPLICATION_JOURNEY_STAGES,
+  APPLICATION_JOURNEY_STAGE_FILTER_OPTIONS,
   applicationJourneyStageLabel,
 } from '@/lib/constants/application-journey-stages';
 import { formatPersonName } from '@/lib/format-person-name';

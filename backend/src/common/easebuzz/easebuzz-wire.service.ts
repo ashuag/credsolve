@@ -54,7 +54,6 @@ export type EasebuzzPayoutLinkResult = {
 type EasebuzzWireTransferConfig = {
   key: string;
   salt: string;
-  virtualAccountNumber: string;
   initiateUrl: string;
   paymentMode: string;
   timeoutMs: number;
@@ -97,18 +96,7 @@ function maskEmail(email: string): string {
   return `${local.slice(0, Math.min(2, local.length))}***@${domain}`;
 }
 
-function todayYmdIst(): string {
-  const fmt = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Kolkata',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  // en-CA → YYYY-MM-DD
-  return fmt.format(new Date());
-}
-
-/** Round INR to paise and format as `"12.34"` for Wire body + Authorization hash. */
+/** Round INR to paise and format as `"12.34"` for Wire Authorization hash. */
 function formatWireAmountInr(amountInr: number): string {
   return (Math.round(amountInr * 100) / 100).toFixed(2);
 }
@@ -188,14 +176,12 @@ export class EasebuzzWireService {
     const missing: string[] = [];
     const key = envTrim(this.config, 'EASEBUZZ_WIRE_KEY');
     const salt = envTrim(this.config, 'EASEBUZZ_WIRE_SALT');
-    const virtualAccountNumber = envTrim(this.config, 'EASEBUZZ_WIRE_VIRTUAL_ACCOUNT_NUMBER');
     const initiateUrl =
       envTrim(this.config, 'EASEBUZZ_WIRE_INITIATE_URL') ||
       'https://wire.easebuzz.in/api/v1/quick_transfers/initiate/';
 
     if (!key) missing.push('EASEBUZZ_WIRE_KEY');
     if (!salt) missing.push('EASEBUZZ_WIRE_SALT');
-    if (!virtualAccountNumber) missing.push('EASEBUZZ_WIRE_VIRTUAL_ACCOUNT_NUMBER');
 
     if (missing.length > 0) {
       throw new ServiceUnavailableException(
@@ -211,7 +197,6 @@ export class EasebuzzWireService {
     return {
       key,
       salt,
-      virtualAccountNumber,
       initiateUrl,
       paymentMode,
       timeoutMs,
@@ -263,33 +248,21 @@ export class EasebuzzWireService {
     const accountNumber = input.accountNumber.replace(/\s+/g, '');
     const ifscCode = input.ifscCode.trim().toUpperCase();
     const uniqueRequestNumber = input.uniqueRequestNumber.trim().slice(0, 64);
-    const includeScheduled =
-      envTrim(this.config, 'EASEBUZZ_WIRE_INCLUDE_SCHEDULED_FOR').toLowerCase() !== 'false';
 
+    // Easebuzz quick-transfer body (no virtual_account_number) — amount sent as number with 2dp.
     const body: Record<string, unknown> = {
       key: cfg.key,
-      virtual_account_number: cfg.virtualAccountNumber,
       beneficiary_type: 'bank_account',
       beneficiary_name: input.beneficiaryName.trim().slice(0, 100),
       account_number: accountNumber,
       ifsc: ifscCode,
       unique_request_number: uniqueRequestNumber,
       payment_mode: cfg.paymentMode,
-      // Keep exactly 2 decimal places in JSON (e.g. "12240.00"), same string used in Authorization.
-      amount: amountStr,
+      amount: Number(amountStr),
       email: input.email.trim().slice(0, 120),
       phone: input.phone.replace(/\D/g, '').slice(-10),
       narration: input.narration.trim().slice(0, 50) || 'loan disbursed',
-      udf1: (input.udf1 ?? '').slice(0, 50),
-      udf2: (input.udf2 ?? '').slice(0, 50),
-      udf3: (input.udf3 ?? '').slice(0, 50),
-      udf4: (input.udf4 ?? '').slice(0, 50),
-      udf5: (input.udf5 ?? '').slice(0, 50),
     };
-
-    if (includeScheduled) {
-      body.scheduled_for = todayYmdIst();
-    }
 
     const authorization = buildQuickTransferAuthorization({
       key: cfg.key,
