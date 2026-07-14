@@ -8,6 +8,7 @@ import {
   isTenacioVendorBusinessSuccess,
   pickTenacioVendorErrorMessage,
 } from '../../../../common/kyc/aadhaar-vendor-parse.util';
+import { compareJourneyNameToPennyDrop } from '../../../../common/kyc/penny-drop-name-match.util';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
@@ -155,6 +156,39 @@ export class SubmitVerifiedBankUseCase {
         message: retryLimitReached
           ? `${baseMessage} You have reached the maximum number of verification attempts. Please contact support.`
           : baseMessage,
+        vendor,
+        attemptsUsed: nextAttemptsUsed,
+        attemptsAllowed,
+        retryLimitReached,
+      };
+    }
+
+    const nameMatch = compareJourneyNameToPennyDrop({
+      journeyFullName: holderName,
+      vendor,
+    });
+    if (!nameMatch.matched) {
+      const nextAttemptsUsed = attemptsUsed + 1;
+      await this.prisma.client.applicationDetail.update({
+        where: { applicationId: applicationRow.id },
+        data: {
+          pennyDropAttempts: nextAttemptsUsed,
+          pennyDropVendorJson:
+            vendor === null ? Prisma.JsonNull : (vendor as Prisma.InputJsonValue),
+        },
+      });
+      const retryLimitReached = nextAttemptsUsed >= attemptsAllowed;
+      this.logger.warn(
+        `[penny-drop] Name mismatch lead=${lead.id.toString()} reason=${nameMatch.reason} ` +
+          `bankName=${nameMatch.bankName ? '[present]' : '[missing]'}`,
+      );
+      return {
+        success: false,
+        pennyDropOk: false,
+        applicationStatus: null,
+        message: retryLimitReached
+          ? `${nameMatch.message} You have reached the maximum number of verification attempts. Please contact support.`
+          : nameMatch.message,
         vendor,
         attemptsUsed: nextAttemptsUsed,
         attemptsAllowed,
