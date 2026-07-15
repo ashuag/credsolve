@@ -57,7 +57,7 @@ export function LoanDocumentScrollPanel({
       <div
         ref={scrollRef}
         onScroll={checkScroll}
-        className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50"
+        className="min-h-[min(62dvh,560px)] flex-1 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 lg:min-h-0"
       >
         <iframe
           title={title}

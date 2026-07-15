@@ -215,7 +215,7 @@ export function LoanLandingShell({
           className={[
             'flex min-h-0 min-w-0 flex-1 flex-col bg-white',
             fullBleedPanel
-              ? 'overflow-x-hidden overflow-y-hidden px-5 pt-4 pb-[max(16px,env(safe-area-inset-bottom))] lg:p-8 lg:py-6'
+              ? 'overflow-x-hidden overflow-y-auto px-5 pt-4 pb-[max(16px,env(safe-area-inset-bottom))] lg:overflow-y-hidden lg:p-8 lg:py-6'
               : 'overflow-x-hidden overflow-y-auto px-5 pt-6 pb-[max(24px,env(safe-area-inset-bottom))] lg:justify-start lg:p-10 lg:py-10 lg:px-14',
           ].join(' ')}
         >

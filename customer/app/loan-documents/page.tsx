@@ -231,6 +231,7 @@ export default function LoanDocumentsPage() {
           leftInfographic={<LoanCalculationLeftRail loanSelection={loanSelection} />}
           mobileStepLabel="Sanction letter"
           mobileOnBack={() => router.push(CUSTOMER_EMAIL_JOURNEY_PATH)}
+          showSpeedometer={false}
         />
       </div>
     </CustomerJourneyGuard>

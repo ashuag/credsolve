@@ -104,7 +104,7 @@ const docs = [
     grievanceOfficer: {
       name: 'Mr. saurabh Agarwal',
       email: 'saurabh@moneycash.in',
-      phone: '+91-8826370278',
+      phone: '+91-8882911939',
     },
   }),
 ];
