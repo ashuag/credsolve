@@ -1,9 +1,11 @@
-import 'reflect-metadata';
 import './load-env';
+import './instrument';
+import 'reflect-metadata';
 import { type INestApplication, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { type NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import * as Sentry from '@sentry/nestjs';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
 import type { Request, Response } from 'express';
@@ -146,7 +148,8 @@ async function bootstrap() {
     // eslint-disable-next-line no-console
     console.error(
       '[nest] CORS_ORIGINS is missing or empty in production. Browser calls from your web app will fail CORS. ' +
-        'Set a comma-separated list of exact origins (no path), e.g. CORS_ORIGINS=https://www.moneycash.in,https://moneycash.in'
+        'Set a comma-separated list of exact origins (no path), e.g. ' +
+        'CORS_ORIGINS=https://www.moneycash.in,https://moneycash.in,https://los.moneycash.in'
     );
   }
   if (origins.length > 0) {
@@ -191,8 +194,10 @@ async function bootstrap() {
   );
 }
 
-bootstrap().catch((err) => {
+bootstrap().catch(async (err) => {
   // eslint-disable-next-line no-console
   console.error(err);
+  Sentry.captureException(err);
+  await Sentry.close(2000).catch(() => undefined);
   process.exit(1);
 });

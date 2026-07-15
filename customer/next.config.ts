@@ -1,6 +1,7 @@
 import type { NextConfig } from 'next';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { withSentryConfig } from '@sentry/nextjs';
 import { getCustomerServerApiBase } from './lib/nest-api-base';
 
 const allowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? '')
@@ -62,4 +63,13 @@ const nextConfig: NextConfig = {
   }
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !process.env.CI,
+  // Tunnel through Next to reduce ad-blocker drops of browser events.
+  tunnelRoute: '/sentry-tunnel',
+  widenClientFileUpload: true,
+  disableLogger: true,
+});

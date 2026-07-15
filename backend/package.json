@@ -37,6 +37,8 @@
     "@nestjs/swagger": "^11.2.3",
     "@prisma/adapter-mariadb": "^7.6.0",
     "@prisma/client": "^7.0.0",
+    "@sentry/nestjs": "^10.65.0",
+    "@sentry/node": "^10.65.0",
     "@tensorflow/tfjs-node": "^4.22.0",
     "@vladmandic/face-api": "^1.7.15",
     "bcrypt": "^6.0.0",
