@@ -95,6 +95,14 @@ function DetailModal({
             <span className="font-bold">{item.name}</span>
             <span className="font-bold text-brand-muted">Email</span>
             <a href={`mailto:${item.email}`} className="font-bold text-brand-blue">{item.email}</a>
+            <span className="font-bold text-brand-muted">Phone</span>
+            {item.phone?.trim() ? (
+              <a href={`tel:+91${item.phone}`} className="font-bold text-brand-blue">
+                +91 {item.phone}
+              </a>
+            ) : (
+              <span className="font-bold text-brand-muted">—</span>
+            )}
           </div>
           <div className="grid gap-1.5">
             <span className="text-[0.88rem] font-bold text-brand-muted">Message</span>
@@ -172,6 +180,7 @@ export function ContactSubmissionsPanel() {
       return (
         item.name.toLowerCase().includes(term) ||
         item.email.toLowerCase().includes(term) ||
+        (item.phone ?? '').toLowerCase().includes(term) ||
         item.subject.toLowerCase().includes(term) ||
         item.message.toLowerCase().includes(term)
       );
@@ -222,7 +231,7 @@ export function ContactSubmissionsPanel() {
             <div className="grid gap-3 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.72)] px-5 py-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
               <input
                 type="search"
-                placeholder="Search name, email, subject, message..."
+                placeholder="Search name, email, phone, subject, message..."
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 className="los-input"
@@ -250,7 +259,7 @@ export function ContactSubmissionsPanel() {
               <table className="w-full border-collapse text-[0.88rem]">
                 <thead>
                   <tr className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.82)] text-left">
-                    {['Name', 'Email', 'Subject', 'Received', 'Status', 'Actions'].map((heading) => (
+                    {['Name', 'Email', 'Phone', 'Subject', 'Received', 'Status', 'Actions'].map((heading) => (
                       <th key={heading} className="px-4 py-2 text-[0.72rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
                         {heading}
                       </th>
@@ -275,6 +284,15 @@ export function ContactSubmissionsPanel() {
                       </td>
                       <td className="px-4 py-3 text-brand-muted">
                         <a href={`mailto:${item.email}`} className="text-brand-blue">{item.email}</a>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-brand-muted">
+                        {item.phone?.trim() ? (
+                          <a href={`tel:+91${item.phone}`} className="text-brand-blue">
+                            +91 {item.phone}
+                          </a>
+                        ) : (
+                          '—'
+                        )}
                       </td>
                       <td className="max-w-[280px] truncate px-4 py-3 text-brand-muted" title={item.subject}>{item.subject}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-brand-muted">{formatDateTime(item.createdAt)}</td>
@@ -313,7 +331,7 @@ export function ContactSubmissionsPanel() {
                   ))}
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-brand-muted">
+                      <td colSpan={7} className="px-4 py-8 text-center text-brand-muted">
                         No contact submissions match the current filters.
                       </td>
                     </tr>

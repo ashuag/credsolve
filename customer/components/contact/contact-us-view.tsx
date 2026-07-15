@@ -3,6 +3,7 @@
 import { type FormEvent, useState } from 'react';
 import { submitContactMessage } from '@/lib/api';
 import { ApiRequestError } from '@/lib/api/client';
+import { isValidCustomerMobile, normalizeCustomerMobile } from '@/lib/mobile';
 import { isValidEmail } from '@/lib/validators';
 import {
   FORM_FIELD_CLASS,
@@ -22,19 +23,24 @@ const CONTACT_MAP_EMBED = `https://www.google.com/maps?q=${encodeURIComponent(CO
 type FormState = {
   name: string;
   email: string;
+  phone: string;
   subject: string;
   message: string;
 };
 
 type FieldErrors = Partial<Record<keyof FormState, string>>;
 
-const EMPTY_FORM: FormState = { name: '', email: '', subject: '', message: '' };
+const EMPTY_FORM: FormState = { name: '', email: '', phone: '', subject: '', message: '' };
 
 function validate(form: FormState): FieldErrors {
   const errors: FieldErrors = {};
   if (!form.name.trim()) errors.name = 'Please enter your name.';
   if (!form.email.trim()) errors.email = 'Please enter your email.';
   else if (!isValidEmail(form.email)) errors.email = 'Please enter a valid email address.';
+  if (!form.phone.trim()) errors.phone = 'Please enter your phone number.';
+  else if (!isValidCustomerMobile(form.phone)) {
+    errors.phone = 'Please enter a valid 10-digit mobile number.';
+  }
   if (!form.subject.trim()) errors.subject = 'Please enter a subject.';
   if (form.message.trim().length < 5) errors.message = 'Please enter a message (at least 5 characters).';
   return errors;
@@ -67,6 +73,7 @@ export function ContactUsView() {
       await submitContactMessage({
         name: form.name.trim(),
         email: form.email.trim(),
+        phone: normalizeCustomerMobile(form.phone),
         subject: form.subject.trim(),
         message: form.message.trim(),
       });
@@ -199,6 +206,32 @@ export function ContactUsView() {
                   autoComplete="email"
                 />
                 {errors.email ? <span className="text-[0.8rem] font-[600] text-[#c1392b]">{errors.email}</span> : null}
+              </label>
+
+              <label className={cn(FORM_FIELD_CLASS, errors.phone ? FORM_FIELD_ERROR_CLASS : FORM_FIELD_NORMAL_CLASS, 'group')}>
+                <span className={FORM_LABEL_CLASS}>Phone number</span>
+                <div
+                  className={cn(
+                    FORM_INPUT_CLASS,
+                    'grid items-center gap-0 p-0 focus-within:border-[rgba(20,150,243,0.45)]',
+                  )}
+                  style={{ gridTemplateColumns: '72px 1fr' }}
+                >
+                  <span className="inline-flex h-full items-center justify-center border-r border-[rgba(18,36,79,0.1)] text-[1.05rem] font-[800] text-brand-navy">
+                    +91
+                  </span>
+                  <input
+                    className="h-full w-full border-0 bg-transparent px-4 py-[14px] text-brand-navy caret-brand-blue outline-none placeholder:text-[rgba(94,103,130,0.86)]"
+                    type="tel"
+                    inputMode="numeric"
+                    value={form.phone}
+                    onChange={(e) => updateField('phone', normalizeCustomerMobile(e.target.value))}
+                    placeholder="9876543210"
+                    maxLength={10}
+                    autoComplete="tel-national"
+                  />
+                </div>
+                {errors.phone ? <span className="text-[0.8rem] font-[600] text-[#c1392b]">{errors.phone}</span> : null}
               </label>
 
               <label className={cn(FORM_FIELD_CLASS, errors.subject ? FORM_FIELD_ERROR_CLASS : FORM_FIELD_NORMAL_CLASS, 'group')}>

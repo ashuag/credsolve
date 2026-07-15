@@ -10,6 +10,7 @@ model ContactSubmission {
   uuid      String   @unique @default(uuid()) @db.Char(36)
   name      String   @db.VarChar(150)
   email     String   @db.VarChar(190)
+  phone     String   @db.VarChar(15)
   subject   String   @db.VarChar(200)
   message   String   @db.Text
   ipAddress String?  @map("ip_address") @db.VarChar(45)

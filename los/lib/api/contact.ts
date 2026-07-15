@@ -5,6 +5,7 @@ export type LosContactSubmission = {
   uuid: string;
   name: string;
   email: string;
+  phone: string;
   subject: string;
   message: string;
   isRead: boolean;

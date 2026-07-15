@@ -284,6 +284,55 @@ export class EmailService {
       audit: { serviceName: 'email-final-sanction-letter', leadId: audit?.leadId ?? null },
     });
   }
+
+  async sendContactUsNotificationEmail(
+    to: string,
+    submission: {
+      name: string;
+      email: string;
+      phone: string;
+      subject: string;
+      message: string;
+      uuid: string;
+    },
+  ): Promise<void> {
+    const subject = `Contact Us: ${submission.subject}`;
+    const phoneDisplay = submission.phone ? `+91 ${submission.phone}` : '—';
+    const text = [
+      'New Contact Us form submission',
+      '',
+      `Name: ${submission.name}`,
+      `Email: ${submission.email}`,
+      `Phone: ${phoneDisplay}`,
+      `Subject: ${submission.subject}`,
+      '',
+      'Message:',
+      submission.message,
+      '',
+      `Reference: ${submission.uuid}`,
+    ].join('\n');
+
+    const html = `
+      <p><strong>New Contact Us form submission</strong></p>
+      <table style="border-collapse:collapse;font-size:14px;line-height:1.5;">
+        <tr><td style="padding:4px 12px 4px 0;color:#555;font-weight:600;">Name</td><td>${escapeHtml(submission.name)}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#555;font-weight:600;">Email</td><td><a href="mailto:${escapeHtml(submission.email)}">${escapeHtml(submission.email)}</a></td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#555;font-weight:600;">Phone</td><td>${escapeHtml(phoneDisplay)}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#555;font-weight:600;">Subject</td><td>${escapeHtml(submission.subject)}</td></tr>
+      </table>
+      <p style="margin:16px 0 6px;color:#555;font-weight:600;">Message</p>
+      <div style="white-space:pre-wrap;border:1px solid #e5e7eb;border-radius:8px;padding:12px;background:#f8fafc;">${escapeHtml(submission.message)}</div>
+      <p style="margin-top:16px;color:#888;font-size:12px;">Reference: ${escapeHtml(submission.uuid)}</p>
+    `.trim();
+
+    await this.sendEmail({
+      to,
+      subject,
+      text,
+      html,
+      audit: { serviceName: 'email-contact-us' },
+    });
+  }
 }
 
 function serializeNodemailerResponse(info: SentMessageInfo): Record<string, unknown> {

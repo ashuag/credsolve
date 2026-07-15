@@ -3,6 +3,7 @@ import { apiPost } from './client';
 export type ContactSubmissionInput = {
   name: string;
   email: string;
+  phone: string;
   subject: string;
   message: string;
 };
