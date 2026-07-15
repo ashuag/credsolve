@@ -1,7 +1,30 @@
 import type { NextConfig } from 'next';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { withSentryConfig } from '@sentry/nextjs';
+
+const require = createRequire(import.meta.url);
+
+function withOptionalSentry(config: NextConfig): NextConfig {
+  try {
+    // Optional until `npm install` has pulled `@sentry/nextjs` into node_modules.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { withSentryConfig } = require('@sentry/nextjs') as {
+      withSentryConfig: (cfg: NextConfig, opts: Record<string, unknown>) => NextConfig;
+    };
+    return withSentryConfig(config, {
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      silent: !process.env.CI,
+      tunnelRoute: '/sentry-tunnel',
+      widenClientFileUpload: true,
+      disableLogger: true,
+    });
+  } catch {
+    return config;
+  }
+}
 
 const configDir = path.dirname(fileURLToPath(import.meta.url));
 const envDistDir = process.env.NEXT_DIST_DIR?.trim();
@@ -50,12 +73,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  authToken: process.env.SENTRY_AUTH_TOKEN,
-  silent: !process.env.CI,
-  tunnelRoute: '/sentry-tunnel',
-  widenClientFileUpload: true,
-  disableLogger: true,
-});
+export default withOptionalSentry(nextConfig);

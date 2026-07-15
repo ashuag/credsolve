@@ -1,6 +1,5 @@
 'use client';
 
-import * as Sentry from '@sentry/nextjs';
 import Link from 'next/link';
 import { useEffect } from 'react';
 
@@ -18,7 +17,9 @@ export default function LosRouteError({
   reset: () => void;
 }) {
   useEffect(() => {
-    Sentry.captureException(error);
+    void import('@sentry/nextjs')
+      .then((Sentry) => Sentry.captureException(error))
+      .catch(() => undefined);
     // eslint-disable-next-line no-console
     console.error('[LOS] route error', error);
   }, [error]);

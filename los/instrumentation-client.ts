@@ -1,22 +1,37 @@
-import * as Sentry from '@sentry/nextjs';
 import { sentryDsn, sentryEnvironment, sentryTracesSampleRate } from './lib/sentry-env';
 
 const dsn = sentryDsn();
 
-Sentry.init({
-  dsn,
-  enabled: Boolean(dsn),
-  environment: sentryEnvironment(),
-  tracesSampleRate: sentryTracesSampleRate(),
-  sendDefaultPii: false,
-  integrations: [
-    Sentry.replayIntegration({
-      maskAllText: true,
-      blockAllMedia: true,
-    }),
-  ],
-  replaysSessionSampleRate: 0,
-  replaysOnErrorSampleRate: dsn ? 1 : 0,
-});
+async function initSentryClient() {
+  try {
+    const Sentry = await import('@sentry/nextjs');
+    Sentry.init({
+      dsn,
+      enabled: Boolean(dsn),
+      environment: sentryEnvironment(),
+      tracesSampleRate: sentryTracesSampleRate(),
+      sendDefaultPii: false,
+      integrations: [
+        Sentry.replayIntegration({
+          maskAllText: true,
+          blockAllMedia: true,
+        }),
+      ],
+      replaysSessionSampleRate: 0,
+      replaysOnErrorSampleRate: dsn ? 1 : 0,
+    });
+    return Sentry.captureRouterTransitionStart;
+  } catch {
+    return undefined;
+  }
+}
 
-export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
+const routerTransitionPromise = initSentryClient();
+
+export const onRouterTransitionStart = (...args: unknown[]) => {
+  void routerTransitionPromise.then((fn) => {
+    if (typeof fn === 'function') {
+      (fn as (...a: unknown[]) => void)(...args);
+    }
+  });
+};

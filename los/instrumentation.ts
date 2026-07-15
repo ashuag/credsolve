@@ -1,12 +1,26 @@
-import * as Sentry from '@sentry/nextjs';
-
 export async function register() {
-  if (process.env.NEXT_RUNTIME === 'nodejs') {
-    await import('./sentry.server.config');
-  }
-  if (process.env.NEXT_RUNTIME === 'edge') {
-    await import('./sentry.edge.config');
+  try {
+    if (process.env.NEXT_RUNTIME === 'nodejs') {
+      await import('./sentry.server.config');
+    }
+    if (process.env.NEXT_RUNTIME === 'edge') {
+      await import('./sentry.edge.config');
+    }
+  } catch (error) {
+    // `@sentry/nextjs` may not be installed yet (fresh clone / pending npm install).
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[sentry] skipped server init:', error instanceof Error ? error.message : error);
+    }
   }
 }
 
-export const onRequestError = Sentry.captureRequestError;
+export async function onRequestError(
+  ...args: Parameters<typeof import('@sentry/nextjs').captureRequestError>
+) {
+  try {
+    const Sentry = await import('@sentry/nextjs');
+    return Sentry.captureRequestError(...args);
+  } catch {
+    // no-op when Sentry is not installed
+  }
+}
