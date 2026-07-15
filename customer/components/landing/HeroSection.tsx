@@ -1,9 +1,9 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { buildHrefWithSearch } from '@/lib/navigation';
-import { HomeCalculator } from '@/components/landing/HomeCalculator';
 import { BRAND_TAGLINE, BRAND_TRUST_STRIP, BRAND_VALUE_PILLS, MAX_LOAN_DISPLAY } from '@/lib/brand';
 
 export function HeroSection() {
@@ -184,18 +184,20 @@ export function HeroSection() {
             </div>
           </div>
 
-          {/* Calculator column */}
+          {/* App preview */}
           <div
-            className="relative flex min-w-0 items-center animate-fade-in-up lg:justify-self-stretch"
+            className="relative flex min-w-0 items-center justify-center animate-fade-in-up lg:justify-self-stretch"
             style={{ animationDelay: '80ms' }}
           >
-            {/* Glow halo */}
-            <div
-              className="absolute -inset-4 rounded-[40px] bg-gradient-to-br from-brand-blue/8 via-transparent to-brand-gold/6 blur-2xl lg:-inset-6"
-              aria-hidden
-            />
-            <div className="relative w-full animate-float-slow">
-              <HomeCalculator embed />
+            <div className="relative w-full max-w-[420px] animate-float-slow lg:max-w-none">
+              <Image
+                src="/images/hero-app-preview.png"
+                alt="MoneyCash app showing instant loan offer and eligibility confirmation"
+                width={763}
+                height={963}
+                priority
+                className="h-auto w-full drop-shadow-[0_20px_40px_rgba(18,36,79,0.12)]"
+              />
             </div>
           </div>
         </div>
