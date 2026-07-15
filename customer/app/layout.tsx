@@ -20,9 +20,14 @@ export const metadata: Metadata = {
     },
     description: 'MoneyCash customer portal for secure OTP login, account access, payments, and loan application progress.',
     icons: {
-        icon: '/icons/icon-192.png',
-        shortcut: '/icons/icon-192.png',
-        apple: '/icons/apple-touch-icon.png',
+        icon: [
+            { url: '/icons/favicon-48x48.png', sizes: '48x48', type: 'image/png' },
+            { url: '/icons/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+            { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+            { url: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+        ],
+        shortcut: '/favicon.ico',
+        apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
     },
     appleWebApp: {
         capable: true,
