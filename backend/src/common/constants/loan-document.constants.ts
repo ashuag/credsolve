@@ -14,18 +14,18 @@ export const RECOVERY_AGENT_NAME = 'CREDSOLVE TECHNOLOGIES PRIVATE LIMITED';
 export const PAYABLE_TO = 'Aasra Fincorp Pvt. Ltd.';
 
 /** Grievance / nodal contacts shown on KFS (LSP = NBFC/MoneyCash, RE = Lender). */
-export const LSP_GRO_NAME = 'Uvaid Malik';
-export const LSP_GRO_PHONE = '+91-8826370278';
-export const LSP_GRO_EMAIL = 'uvaid@moneycash.in';
-export const LSP_NODAL_NAME = 'Uvaid Malik';
-export const LSP_NODAL_PHONE = '+91-8826370278';
-export const LSP_NODAL_EMAIL = 'uvaid@moneycash.in';
+export const LSP_GRO_NAME = 'saurabh Agarwal';
+export const LSP_GRO_PHONE = '+91-8882911939';
+export const LSP_GRO_EMAIL = 'saurabh@moneycash.in';
+export const LSP_NODAL_NAME = 'saurabh Agarwal';
+export const LSP_NODAL_PHONE = '+91-8882911939';
+export const LSP_NODAL_EMAIL = 'saurabh@moneycash.in';
 export const LENDER_GRO_NAME = 'Subash Patel';
 export const LENDER_GRO_PHONE = '+91-7318066022';
-export const LENDER_GRO_EMAIL = 'support@aasrafincorp.com';
+export const LENDER_GRO_EMAIL = 'grievance.nodal@aasrafincorp.com';
 export const LENDER_NODAL_NAME = 'Subash Patel';
 export const LENDER_NODAL_PHONE = '+91-7318066022';
-export const LENDER_NODAL_EMAIL = 'support@aasrafincorp.com';
+export const LENDER_NODAL_EMAIL = 'grievance.nodal@aasrafincorp.com';
 export const LENDER_REGISTERED_OFFICE =
   '16/3/8B A N Jha Marg George Town Prayagraj-211002 U.P';
 
