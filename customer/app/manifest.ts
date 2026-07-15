@@ -3,12 +3,12 @@ import type { MetadataRoute } from 'next';
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'MoneyCash',
-    short_name: 'MoneyCash',
+    short_name: 'MCash',
     description: 'Instant digital loans — secure OTP login, account access, and loan journey.',
     start_url: '/',
     display: 'standalone',
-    background_color: '#fffdf8',
-    theme_color: '#12244f',
+    background_color: '#ffffff',
+    theme_color: '#1C347D',
     orientation: 'portrait',
     categories: ['finance'],
     icons: [
