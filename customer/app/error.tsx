@@ -1,6 +1,5 @@
 'use client';
 
-import * as Sentry from '@sentry/nextjs';
 import { useEffect } from 'react';
 
 type ErrorPageProps = {
@@ -10,7 +9,9 @@ type ErrorPageProps = {
 
 export default function ErrorPage({ error, reset }: ErrorPageProps) {
   useEffect(() => {
-    Sentry.captureException(error);
+    void import('@sentry/nextjs')
+      .then((Sentry) => Sentry.captureException(error))
+      .catch(() => undefined);
     console.error(error);
   }, [error]);
 

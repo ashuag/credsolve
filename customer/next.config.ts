@@ -1,8 +1,32 @@
 import type { NextConfig } from 'next';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { withSentryConfig } from '@sentry/nextjs';
 import { getCustomerServerApiBase } from './lib/nest-api-base';
+
+const require = createRequire(import.meta.url);
+
+function withOptionalSentry(config: NextConfig): NextConfig {
+  try {
+    // Optional until `npm install` has pulled `@sentry/nextjs` into node_modules.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { withSentryConfig } = require('@sentry/nextjs') as {
+      withSentryConfig: (cfg: NextConfig, opts: Record<string, unknown>) => NextConfig;
+    };
+    return withSentryConfig(config, {
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      silent: !process.env.CI,
+      // Tunnel through Next to reduce ad-blocker drops of browser events.
+      tunnelRoute: '/sentry-tunnel',
+      widenClientFileUpload: true,
+      disableLogger: true,
+    });
+  } catch {
+    return config;
+  }
+}
 
 const allowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? '')
   .split(',')
@@ -63,13 +87,4 @@ const nextConfig: NextConfig = {
   }
 };
 
-export default withSentryConfig(nextConfig, {
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  authToken: process.env.SENTRY_AUTH_TOKEN,
-  silent: !process.env.CI,
-  // Tunnel through Next to reduce ad-blocker drops of browser events.
-  tunnelRoute: '/sentry-tunnel',
-  widenClientFileUpload: true,
-  disableLogger: true,
-});
+export default withOptionalSentry(nextConfig);
