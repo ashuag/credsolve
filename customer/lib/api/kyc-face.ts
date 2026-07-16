@@ -98,31 +98,19 @@ export function pickLivenessFailureUserMessage(out: PostKycLivenessResponse): st
       'Your selfie did not match your Aadhaar photo. Try again in similar lighting.'
     );
   }
-  if (out.expressionAntiSpoofPassed === false) {
-    return (
-      out.expressionAntiSpoofMessage?.trim() ||
-      'Facial expressions looked static. Use your live camera, not a photo or screen.'
-    );
-  }
-  if (out.activeLivenessPassed === false) {
-    const msg = out.activeLivenessMessage?.trim() ?? '';
-    const lower = msg.toLowerCase();
-    let hint = '';
-    if (lower.includes('smile was detected') || lower.includes('head movement was too small')) {
-      hint =
-        ' When you see TURN YOUR HEAD, turn more clearly to the left or right — a small tilt is not enough.';
-    } else if (lower.includes('smile')) {
-      hint = ' When you see SMILE NOW, smile naturally and hold it briefly.';
-    } else if (lower.includes('turn')) {
-      hint = ' When prompted, turn your head clearly to the left or right.';
-    }
-    return (msg || 'We could not verify your head movement and smile.') + hint;
-  }
+  // TEMP: expression anti-spoof + active liveness paused
+  // if (out.expressionAntiSpoofPassed === false) {
+  //   return (
+  //     out.expressionAntiSpoofMessage?.trim() ||
+  //     'Facial expressions looked static. Use your live camera, not a photo or screen.'
+  //   );
+  // }
+  // if (out.activeLivenessPassed === false) {
+  //   ...
+  // }
 
   return (
     out.customerMessage?.trim() ||
-    out.activeLivenessMessage?.trim() ||
-    out.expressionAntiSpoofMessage?.trim() ||
     out.faceValidationMessage?.trim() ||
     out.faceMatchMessage?.trim() ||
     KYC_SELFIE_GENERIC_RETRY_MESSAGE

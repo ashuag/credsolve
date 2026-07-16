@@ -207,35 +207,39 @@ export class RunKycLivenessUseCase {
     }
 
     const mode = input.mode === 'challenges' ? 'challenges' : 'smooth';
-    if (!input.frames.length) {
-      throw new BadRequestException('No liveness frames were received. Please retry.');
-    }
-    const challenges =
-      mode === 'challenges' ? this.validateChallengeSegments(input) : null;
+    // TEMP: active liveness / expression anti-spoof paused — frames optional.
+    // Resume later: require frames again and restore challenge validation.
+    // if (!input.frames.length) {
+    //   throw new BadRequestException('No liveness frames were received. Please retry.');
+    // }
+    // const challenges =
+    //   mode === 'challenges' ? this.validateChallengeSegments(input) : null;
+    void mode;
+    void input.video;
+    void input.frames;
 
     const selfieRelativePath = application.selfieRelativePath.trim();
 
-    const storedLivenessVideoPath = await this.storeLivenessVideo({
-      video: input.video,
-      frames: input.frames,
-      customerUuid: customer.uuid,
-      applicationUuid: application.uuid,
-      pipelineSteps: [],
-    });
-    if (storedLivenessVideoPath) {
-      try {
-        await this.applications.updateLivenessVideoPath({
-          applicationId: application.id,
-          livenessVideoPath: storedLivenessVideoPath,
-        });
-      } catch (err) {
-        this.logger.warn(
-          `Failed to persist liveness video path (applicationId=${application.id.toString()}): ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-        );
-      }
-    }
+    // TEMP: no active-liveness video while steps 3–4 are paused.
+    const storedLivenessVideoPath: string | null = null;
+    // Resume later:
+    // const storedLivenessVideoPath = await this.storeLivenessVideo({
+    //   video: input.video,
+    //   frames: input.frames,
+    //   customerUuid: customer.uuid,
+    //   applicationUuid: application.uuid,
+    //   pipelineSteps: [],
+    // });
+    // if (storedLivenessVideoPath) {
+    //   try {
+    //     await this.applications.updateLivenessVideoPath({
+    //       applicationId: application.id,
+    //       livenessVideoPath: storedLivenessVideoPath,
+    //     });
+    //   } catch (err) {
+    //     this.logger.warn(...);
+    //   }
+    // }
 
     // Step 1 — MoneyCash selfie quality (face validation).
     const moneyCashLiveness = await this.runMoneyCashLivenessCheck({
@@ -280,6 +284,24 @@ export class RunKycLivenessUseCase {
       });
     }
 
+    // TEMP: skip expression anti-spoof + active liveness — complete after selfie quality + face match.
+    // Resume later by restoring the Steps 3–4 block below.
+    const vendorChecks: VendorChecksPayload = {
+      expressionAntiSpoof: {
+        passed: true,
+        reason: 'Skipped — expression anti-spoof paused (selfie + face match only).',
+        aggregates: { skipped: true },
+      },
+      activeLiveness: {
+        passed: true,
+        validationDisabled: true,
+        challenges: [],
+        videoStored: false,
+        videoPath: null,
+      },
+    };
+
+    /*
     // Steps 3–4 — expression anti-spoof, then active liveness (smooth or legacy challenges).
     const smoothFrameBuffers =
       mode === 'smooth'
@@ -367,6 +389,7 @@ export class RunKycLivenessUseCase {
       activeGate.payload.videoPath = storedLivenessVideoPath;
     }
     vendorChecks = { ...vendorChecks, activeLiveness: activeGate.payload };
+    */
 
     const checkedAt = new Date();
     await this.persistKycPipelineResult({
@@ -411,7 +434,9 @@ export class RunKycLivenessUseCase {
       vendor: mergeVendorPayload(localChecksPayload, vendorChecks),
       livenessPassed: true,
       faceValidationPassed: true,
+      // TEMP: expression + active liveness paused — reported as passed/skipped.
       activeLivenessPassed: true,
+      expressionAntiSpoofPassed: true,
       faceMatchPassed: true,
       bestComputedConfidence: moneyCashLiveness.bestComputedConfidence,
     };

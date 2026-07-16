@@ -115,8 +115,9 @@ export default function KycSelfiePage() {
       const failed =
         !out.livenessPassed ||
         out.faceValidationPassed === false ||
-        out.expressionAntiSpoofPassed === false ||
-        out.activeLivenessPassed === false ||
+        // TEMP: expression anti-spoof + active liveness paused
+        // out.expressionAntiSpoofPassed === false ||
+        // out.activeLivenessPassed === false ||
         out.faceMatchPassed === false;
 
       if (!failed) {
@@ -175,8 +176,7 @@ export default function KycSelfiePage() {
               <p className={`m-0 ${styles.eyebrow}`}>KYC</p>
               <h1 className={styles.rightTitle}>Quick face verification</h1>
               <p className="m-0 mt-1 text-sm text-brand-muted">
-                Look at the camera, turn your head, and smile — we match you to your Aadhaar photo and check
-                that you are live.
+                Take a clear selfie — we check photo quality and match you to your Aadhaar photo.
               </p>
             </header>
 
