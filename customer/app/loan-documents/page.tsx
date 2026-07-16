@@ -126,7 +126,7 @@ export default function LoanDocumentsPage() {
   }
 
   const journeyPanel = (
-    <div className="flex h-full min-h-0 w-full flex-col">
+    <div className="flex w-full min-w-0 flex-col">
       {loading ? (
         <div className="flex flex-col items-center gap-4 py-16">
           <Spinner size={48} />
@@ -175,10 +175,10 @@ export default function LoanDocumentsPage() {
           </button>
         </form>
       ) : current ? (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="shrink-0">
-            <h1 className="text-2xl font-black text-brand-navy mb-2">Sanction letter cum Key Fact Statement</h1>
-            <p className="text-sm text-slate-500 mb-4">
+        <div className="flex w-full min-w-0 flex-col gap-4 pb-2">
+          <div>
+            <h1 className="mb-2 text-2xl font-black text-brand-navy">Sanction letter cum Key Fact Statement</h1>
+            <p className="mb-2 text-sm text-slate-500">
               Read the full loan document below. When you are ready, confirm your agreement and we will send an OTP to
               your mobile. After verification, the signed PDF will be emailed to your registered email address.
             </p>
@@ -193,22 +193,20 @@ export default function LoanDocumentsPage() {
               setAgreedByType((prev) => ({ ...prev, [current.type]: next }))
             }
           />
-          <div className="mt-4 shrink-0">
-            <button
-              type="button"
-              disabled={!allAgreed || isSendingOtp}
-              onClick={() => void goToOtpStep()}
-              className="mc-btn-primary w-full py-4"
-            >
-              {isSendingOtp ? (
-                <span className="inline-flex items-center justify-center gap-2">
-                  <Spinner size={20} /> Sending OTP…
-                </span>
-              ) : (
-                'I agree — send OTP'
-              )}
-            </button>
-          </div>
+          <button
+            type="button"
+            disabled={!allAgreed || isSendingOtp}
+            onClick={() => void goToOtpStep()}
+            className="mc-btn-primary w-full shrink-0 py-4"
+          >
+            {isSendingOtp ? (
+              <span className="inline-flex items-center justify-center gap-2">
+                <Spinner size={20} /> Sending OTP…
+              </span>
+            ) : (
+              'I agree — send OTP'
+            )}
+          </button>
         </div>
       ) : (
         <AlertBanner variant="error">{error || 'No documents available.'}</AlertBanner>
