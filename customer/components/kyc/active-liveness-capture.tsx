@@ -11,12 +11,9 @@ import {
 import { openUserCamera, openUserCameraErrorMessage } from '@/lib/media/open-user-camera';
 
 /** Neutral baseline before head turns — no capture until hold completes. */
-const PREP_HOLD_MS = 2000;
+const PREP_HOLD_MS = 1500;
 const PREP_BASELINE_FRAMES = 4;
 const PREP_BASELINE_INTERVAL_MS = 500;
-
-const COUNTDOWN_SECONDS = 3;
-const COUNTDOWN_TICK_MS = 1000;
 
 /** Dense burst while turning — captures yaw motion clearly. */
 const TURN_BURST_FRAMES = 12;
@@ -39,19 +36,15 @@ type Phase = 'idle' | 'running' | 'submitting';
 type GuidedStep =
   | 'prepare'
   | 'turn-ready'
-  | 'turn-countdown'
   | 'turn-capture'
   | 'smile-ready'
-  | 'smile-countdown'
   | 'smile-capture';
 
 const STEP_LABELS: Record<GuidedStep, string> = {
   prepare: 'Get ready',
   'turn-ready': 'Turn head next',
-  'turn-countdown': 'Turn head soon',
   'turn-capture': 'Turn head now',
   'smile-ready': 'Smile next',
-  'smile-countdown': 'Smile soon',
   'smile-capture': 'Smile now',
 };
 
@@ -124,7 +117,6 @@ export function ActiveLivenessCapture({
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [guidedStep, setGuidedStep] = useState<GuidedStep>('prepare');
-  const [countdown, setCountdown] = useState<number | null>(null);
   const [progress, setProgress] = useState(0);
 
   const [faceStatus, setFaceStatus] = useState<FacePositionStatus>('unknown');
@@ -215,14 +207,6 @@ export function ActiveLivenessCapture({
     [captureOneFrame],
   );
 
-  const runCountdown = useCallback(async (step: GuidedStep): Promise<void> => {
-    setGuidedStep(step);
-    for (let n = COUNTDOWN_SECONDS; n >= 1; n -= 1) {
-      setCountdown(n);
-      await sleep(COUNTDOWN_TICK_MS);
-    }
-    setCountdown(null);
-  }, []);
 
   useEffect(() => {
     if (!cameraReady || phase !== 'idle') return;
@@ -288,7 +272,6 @@ export function ActiveLivenessCapture({
     runningRef.current = true;
     setPhase('running');
     setProgress(0);
-    setCountdown(null);
     setGuidedStep('prepare');
 
     const chunks: Blob[] = [];
@@ -399,10 +382,9 @@ export function ActiveLivenessCapture({
         () => bumpProgress(),
       );
 
-      // Step 2 — turn head (left or right): instruction, countdown, then dense capture.
+      // Step 2 — turn head (left or right): instruction then dense capture.
       setGuidedStep('turn-ready');
-      await sleep(600);
-      await runCountdown('turn-countdown');
+      await sleep(800);
 
       setGuidedStep('turn-capture');
       const turnFrames = await captureBurst(
@@ -412,10 +394,9 @@ export function ActiveLivenessCapture({
         () => bumpProgress(),
       );
 
-      // Step 3 — smile: instruction, countdown, capture.
+      // Step 3 — smile: instruction then capture.
       setGuidedStep('smile-ready');
-      await sleep(500);
-      await runCountdown('smile-countdown');
+      await sleep(800);
 
       setGuidedStep('smile-capture');
       const smileFrames = await captureBurst(
@@ -430,14 +411,12 @@ export function ActiveLivenessCapture({
         setRequestError('Could not capture enough frames. Please try again.');
         setPhase('idle');
         setGuidedStep('prepare');
-        setCountdown(null);
         runningRef.current = false;
         return;
       }
 
       setPhase('submitting');
       setProgress(100);
-      setCountdown(null);
       const video = await stopRecording();
 
       const selfieOut = await postKycSelfie(selfieFile);
@@ -480,48 +459,43 @@ export function ActiveLivenessCapture({
       setRequestError(err instanceof Error ? err.message : 'Liveness check failed. Please try again.');
       setPhase('idle');
       setGuidedStep('prepare');
-      setCountdown(null);
       setProgress(0);
     } finally {
       runningRef.current = false;
     }
-  }, [cameraReady, captureBurst, captureOneFrame, onComplete, runCountdown]);
+  }, [cameraReady, captureBurst, captureOneFrame, onComplete]);
 
   const busy = phase !== 'idle';
   const activeStep = phase === 'running' ? guidedStepIndex(guidedStep) : -1;
 
   const overlayTitle =
-    phase === 'running' && countdown != null
-      ? String(countdown)
-      : phase === 'running'
-        ? guidedStep === 'prepare'
-          ? 'Look at the camera'
-          : guidedStep === 'turn-ready'
-            ? 'Get ready to turn'
-            : guidedStep === 'turn-capture'
-              ? 'TURN YOUR HEAD'
-              : guidedStep === 'smile-ready'
-                ? 'Get ready to smile'
-                : guidedStep === 'smile-capture'
-                  ? 'SMILE NOW'
-                  : guidedStep === 'turn-countdown'
-                    ? 'Turn in…'
-                    : 'Smile in…'
-        : null;
+    phase === 'running'
+      ? guidedStep === 'prepare'
+        ? 'Look at the camera'
+        : guidedStep === 'turn-ready'
+          ? 'Get ready to turn'
+          : guidedStep === 'turn-capture'
+            ? 'TURN YOUR HEAD'
+            : guidedStep === 'smile-ready'
+              ? 'Get ready to smile'
+              : guidedStep === 'smile-capture'
+                ? 'SMILE NOW'
+                : null
+      : null;
 
   const overlayHint =
     phase === 'running'
       ? guidedStep === 'prepare'
         ? 'Keep your face in the oval. Look straight ahead.'
-        : guidedStep === 'turn-ready' || guidedStep === 'turn-countdown'
-          ? 'We will count down — turn your head to the left or right when you see TURN YOUR HEAD.'
+        : guidedStep === 'turn-ready'
+          ? 'Turn your head to the left or right when you see TURN YOUR HEAD.'
           : guidedStep === 'turn-capture'
             ? 'Turn slowly — either direction is fine. Keep your face in the oval.'
-            : guidedStep === 'smile-ready' || guidedStep === 'smile-countdown'
-                  ? 'Relax your face — smile naturally when you see SMILE NOW.'
-                  : guidedStep === 'smile-capture'
-                    ? 'Hold your smile for a moment.'
-                    : null
+            : guidedStep === 'smile-ready'
+              ? 'Relax your face — smile naturally when you see SMILE NOW.'
+              : guidedStep === 'smile-capture'
+                ? 'Hold your smile for a moment.'
+                : null
       : null;
 
   return (
@@ -580,22 +554,16 @@ export function ActiveLivenessCapture({
 
             {phase === 'running' && overlayTitle ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center">
-                {countdown != null ? (
-                  <span className="text-[3.5rem] font-black leading-none text-white drop-shadow-lg">
-                    {countdown}
-                  </span>
-                ) : (
-                  <span
-                    className={cx(
-                      'text-[1.35rem] font-extrabold uppercase tracking-wide text-white drop-shadow-md',
-                      guidedStep === 'turn-capture' || guidedStep === 'smile-capture'
-                        ? 'text-[1.55rem]'
-                        : undefined,
-                    )}
-                  >
-                    {overlayTitle}
-                  </span>
-                )}
+                <span
+                  className={cx(
+                    'text-[1.35rem] font-extrabold uppercase tracking-wide text-white drop-shadow-md',
+                    guidedStep === 'turn-capture' || guidedStep === 'smile-capture'
+                      ? 'text-[1.55rem]'
+                      : undefined,
+                  )}
+                >
+                  {overlayTitle}
+                </span>
                 {overlayHint ? (
                   <span className="max-w-[280px] text-[0.82rem] font-semibold text-white/90">
                     {overlayHint}
