@@ -78,7 +78,7 @@ export function CTASection() {
             href={applyHref}
             className="group relative inline-flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-brand-gold px-10 py-4 text-lg font-[900] text-[#0a1628] glow-gold transition-all active:scale-[0.97] sm:w-auto sm:px-12 sm:py-5 sm:text-xl"
           >
-            Apply Now — It&apos;s Free
+            Apply Now
             <svg viewBox="0 0 20 20" className="h-5 w-5 transition-transform group-hover:translate-x-1" fill="currentColor">
               <path d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" />
             </svg>

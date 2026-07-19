@@ -168,9 +168,8 @@ export function HeroSection() {
             >
               {[
                 { label: 'Happy Customers', value: '5,000+' },
-                { label: 'Disbursed', value: '₹500Cr+' },
+                { label: 'Disbursed', value: '₹5Cr+' },
                 { label: 'Avg. Approval', value: '2 min' },
-                { label: 'Approval Rate', value: '98%' },
               ].map((stat) => (
                 <div key={stat.label} className="flex flex-col">
                   <span className="text-[0.62rem] font-[800] uppercase tracking-[0.14em] text-[#12244f]/40">

@@ -19,6 +19,7 @@ const NAV_LINKS = [
   { label: 'Home', href: '/', active: true },
   { label: 'How It Works', href: '#how-it-works' },
   { label: 'Loans', href: '#loans' },
+  { label: 'EMI Calculator', href: '/emi-calculator' },
   { label: 'About Us', href: '/about-us' },
   { label: 'Contact', href: '/contact-us' },
 ];

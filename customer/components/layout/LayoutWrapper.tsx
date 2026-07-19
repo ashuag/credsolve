@@ -12,6 +12,7 @@ const SELF_CONTAINED_LEGAL_ROUTES = new Set([
   '/policies',
   '/about-us',
   '/contact-us',
+  '/emi-calculator',
   '/terms-and-conditions',
   '/privacy-policy',
   '/fair-practices-code',

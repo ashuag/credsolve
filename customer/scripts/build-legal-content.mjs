@@ -12,16 +12,16 @@ const outDir = path.resolve(__dirname, '../content/legal');
 
 function rebrand(text) {
   return text
-    .replaceAll('My Money Bazaar India Private Limited', 'MoneyCash')
-    .replaceAll('My Money Bazaar', 'MoneyCash')
+    .replaceAll('Moneycash India Private Limited', 'MoneyCash')
+    .replaceAll('Moneycash', 'MoneyCash')
     .replaceAll('https://www.moneycash.in/privacy-policy', '/privacy-policy')
     .replaceAll('https://www.moneycash.in', 'https://www.moneycash.in')
     .replaceAll('www.moneycash.in', 'www.moneycash.in')
     .replaceAll('moneycash.in', 'moneycash.in')
     .replaceAll('saurabh@moneycash.in', 'legal@moneycash.in')
     .replace(/\(\s*Hereinafter\s*[“"]MoneyCash[”"]\s*\)/gi, '')
-    .replace(/\bMMB's\b/g, "MoneyCash's")
-    .replace(/\bMMB\b/g, 'MoneyCash')
+    .replace(/\bMoneycash's\b/g, "MoneyCash's")
+    .replace(/\bMoneycash\b/g, 'MoneyCash')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
@@ -86,7 +86,7 @@ function buildDoc(sourceFile, slug, meta) {
 }
 
 const docs = [
-  buildDoc('Terms and Conditions_MMB.txt', 'terms-and-conditions', {
+  buildDoc('Terms and Conditions_Moneycash.txt', 'terms-and-conditions', {
     kind: 'terms',
     description:
       'Terms governing use of the MoneyCash website and mobile application, including digital lending services through partner NBFCs.',
@@ -94,7 +94,7 @@ const docs = [
       'CREDSOLVE Technologies Private Limited, Flat No. E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh — 201009',
     contactEmail: 'legal@moneycash.in',
   }),
-  buildDoc('Privacy Policy_MMB.txt', 'privacy-policy', {
+  buildDoc('Privacy Policy_Moneycash.txt', 'privacy-policy', {
     kind: 'privacy',
     description:
       'How MoneyCash collects, uses, stores, and protects personal information on the website and app.',

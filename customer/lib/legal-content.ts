@@ -51,9 +51,8 @@ export const LEGAL_DOCUMENTS = {
 
 export type LegalDocumentSlug = keyof typeof LEGAL_DOCUMENTS;
 
-/** Ordered list used for the policies index page and header navigation. */
+/** Ordered list used for the policies index page and header Legal menu. */
 export const LEGAL_DOCUMENT_ORDER: LegalDocumentSlug[] = [
-  'about-us',
   'terms-and-conditions',
   'privacy-policy',
   'fair-practices-code',
