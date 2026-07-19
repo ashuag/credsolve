@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { computeInterestAmountFromLoanDetail } from '../../../../common/loan/loan-calculation.util';
 import { computeFeeAmountsFromLoanDetail } from '../../../../common/loan/loan-disbursement-view.util';
+import { getLiveLoanFeeRates } from '../../../../common/loan/live-loan-rates.cache';
 import {
   LOAN_DOCUMENT_PDF_FILES,
   LOAN_DOCUMENT_TYPE,
@@ -171,7 +172,9 @@ export class LoanDocumentApplicationService {
       loanMaturityDate: appDetails?.expectedRepaymentDate ?? null,
       applicationUuid: params.application.uuid,
       applicationNumber: params.application.applicationNumber,
-      processingFeePercent: toNumber(appDetails?.processingFeePercentage?.toString() ?? null),
+      processingFeePercent:
+        getLiveLoanFeeRates()?.processingFeePercent ??
+        toNumber(appDetails?.processingFeePercentage?.toString() ?? null),
       acceptanceIpAddress:
         params.acceptanceIpAddress?.trim()
         ?? params.application.loanDocumentsAcceptedIp?.trim()

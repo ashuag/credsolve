@@ -292,7 +292,7 @@ function MoneyCashSidebarLogo({ isIcons }: { isIcons: boolean }) {
       <div
         className={cx(
           'rounded-[4px] bg-[rgba(23,44,113,0.07)]',
-          isIcons ? 'mx-auto aspect-square w-9' : 'aspect-[540/168] w-[min(190px,100%)] max-w-full',
+          isIcons ? 'mx-auto aspect-square w-9' : 'aspect-[957/379] w-[min(190px,100%)] max-w-full',
         )}
         aria-hidden
       />
@@ -301,10 +301,10 @@ function MoneyCashSidebarLogo({ isIcons }: { isIcons: boolean }) {
 
   return (
     <Image
-      src="/images/moneycash-logo.jpeg"
+      src="/images/moneycash-logo.png"
       alt="MoneyCash"
-      width={540}
-      height={168}
+      width={957}
+      height={379}
       sizes="190px"
       className={cx('h-auto block', isIcons ? 'w-9' : 'w-[min(190px,100%)]')}
       priority

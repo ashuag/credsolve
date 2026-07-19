@@ -13,6 +13,7 @@ import { resolveLivenessVideoRelativePath } from '../../../common/kyc/kyc-livene
 import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
 import { LoanDocumentApplicationService } from '../../auth/application/services/loan-document-application.service';
+import { getLiveLoanFeeRates } from '../../../common/loan/live-loan-rates.cache';
 import { LOAN_DOCUMENT_ACCEPTANCE_NAME, LOAN_DOCUMENT_TYPE, type LoanDocumentType } from '../../../common/constants/loan-document.constants';
 import {
   computeFeeAmountsFromLoanDetail,
@@ -241,7 +242,10 @@ export class LosApplicationService {
           : appDetails?.expectedRepaymentDate?.toISOString().slice(0, 10) ?? null,
         repaymentAmount,
         emi: repaymentAmount,
-        processingFeePercent: appDetails?.processingFeePercentage?.toString() ?? null,
+        processingFeePercent:
+          getLiveLoanFeeRates()?.processingFeePercent?.toString() ??
+          appDetails?.processingFeePercentage?.toString() ??
+          null,
         processingFeeAmount: fees.processingFeeAmount != null ? fees.processingFeeAmount.toFixed(2) : null,
         bankDetails: maskBankDetails(
           appDetails?.bankName,

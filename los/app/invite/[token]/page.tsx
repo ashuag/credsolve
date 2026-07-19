@@ -14,10 +14,10 @@ export default async function InvitePage({
       <section className={styles.card}>
         <div className={styles.logoPlate}>
           <Image
-            src="/images/moneycash-logo.jpeg"
+            src="/images/moneycash-logo.png"
             alt="MoneyCash"
-            width={540}
-            height={168}
+            width={957}
+            height={379}
             sizes="(max-width: 640px) 60vw, 230px"
             className={styles.logoImage}
             priority

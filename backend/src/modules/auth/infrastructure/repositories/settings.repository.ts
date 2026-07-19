@@ -1,4 +1,5 @@
-import {Injectable, Logger} from '@nestjs/common';
+import {Injectable, Logger, type OnModuleInit} from '@nestjs/common';
+import {registerLiveLoanFeeRatesLoader} from '../../../../common/loan/live-loan-rates.cache';
 import {LOOKUP_CACHE_TTL_SECONDS} from '../../../../common/constants/app.constants';
 import {ELIGIBILITY_CRITERIA as EC} from '../../../../common/constants/eligibility-criteria.constants';
 import {
@@ -111,7 +112,7 @@ function breSettingMeta(id: BreSettingKeyId): { key: string; default: string } {
 }
 
 @Injectable()
-export class SettingsRepository {
+export class SettingsRepository implements OnModuleInit {
   private readonly logger = new Logger(SettingsRepository.name);
   private authOtpCache: { value: AuthOtpSettings; expiresAt: number } | null = null;
   private authOtpInflight: Promise<AuthOtpSettings> | null = null;
@@ -122,6 +123,21 @@ export class SettingsRepository {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
   ) {}
+
+  /**
+   * Prime the process-wide loan fee rates cache so `computeFeeAmountsFromLoanDetail`
+   * (sync, used across LOS / documents / disbursement / customer dashboard) always
+   * reflects the current DB `setting` values — PF/GST changes apply on the fly.
+   */
+  onModuleInit(): void {
+    registerLiveLoanFeeRatesLoader(async () => {
+      const s = await this.loadLoanCalculationSettings();
+      return {
+        processingFeePercent: s.processingFeePercent,
+        processingFeeGstPercent: s.processingFeeGstPercent,
+      };
+    });
+  }
 
   /**
    * Whether PAN NSDL verification should run. Redis first (`setting:PAN_VERIFICATION_ENABLED`),

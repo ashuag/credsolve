@@ -106,7 +106,7 @@ export function HeroSection() {
                 href={applyHref}
                 className="group relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-[#f4b400] to-[#e5a800] px-8 py-3.5 text-[0.95rem] font-[900] text-[#12244f] shadow-[0_12px_32px_rgba(244,180,0,0.22)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_44px_rgba(244,180,0,0.35)] active:scale-[0.98]"
               >
-                Apply Now — It&apos;s Free
+                Apply Now
                 <svg viewBox="0 0 20 20" className="h-4 w-4 transition-transform group-hover:translate-x-0.5" fill="currentColor" aria-hidden>
                   <path d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" />
                 </svg>
