@@ -1,5 +1,10 @@
 'use client';
 
+import {
+  DataTable,
+  isoDateTimestamp,
+  type DataTableColumn,
+} from '@/components/ui/data-table';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   getContactSubmissions,
@@ -9,7 +14,10 @@ import {
 import { getLosToken } from '@/lib/auth';
 import { cx } from '@/lib/cx';
 
-type ReadFilter = 'all' | 'unread' | 'read';
+const READ_FILTER_OPTIONS = [
+  { value: 'unread', label: 'Unread' },
+  { value: 'read', label: 'Read' },
+] as const;
 
 function formatDateTime(iso: string): string {
   const date = new Date(iso);
@@ -122,8 +130,6 @@ export function ContactSubmissionsPanel() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [readFilter, setReadFilter] = useState<ReadFilter>('all');
   const [viewing, setViewing] = useState<LosContactSubmission | null>(null);
 
   const load = useCallback(async (tokenOverride?: string) => {
@@ -171,27 +177,125 @@ export function ContactSubmissionsPanel() {
     if (!item.isRead) void handleToggleRead(item, true);
   }
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return submissions.filter((item) => {
-      if (readFilter === 'read' && !item.isRead) return false;
-      if (readFilter === 'unread' && item.isRead) return false;
-      if (term === '') return true;
-      return (
-        item.name.toLowerCase().includes(term) ||
-        item.email.toLowerCase().includes(term) ||
-        (item.phone ?? '').toLowerCase().includes(term) ||
-        item.subject.toLowerCase().includes(term) ||
-        item.message.toLowerCase().includes(term)
-      );
-    });
-  }, [submissions, search, readFilter]);
-
   const summary = useMemo(() => {
     const total = submissions.length;
     const unread = submissions.filter((item) => !item.isRead).length;
     return { total, unread, read: total - unread };
   }, [submissions]);
+
+  const columns = useMemo((): DataTableColumn<LosContactSubmission>[] => [
+    {
+      key: 'name',
+      label: 'Name',
+      getFilterValue: (item) => item.name,
+      getSortValue: (item) => item.name.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search name…' },
+      render: (item) => (
+        <span className="inline-flex items-center gap-2 font-bold">
+          {!item.isRead ? <span className="h-2 w-2 shrink-0 rounded-full bg-brand-blue" aria-hidden /> : null}
+          {item.name}
+        </span>
+      ),
+    },
+    {
+      key: 'email',
+      label: 'Email',
+      getFilterValue: (item) => item.email,
+      getSortValue: (item) => item.email.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search email…' },
+      cellClassName: 'text-brand-muted',
+      render: (item) => (
+        <a href={`mailto:${item.email}`} className="text-brand-blue">{item.email}</a>
+      ),
+    },
+    {
+      key: 'phone',
+      label: 'Phone',
+      getFilterValue: (item) => item.phone ?? '',
+      getSortValue: (item) => item.phone ?? '',
+      filter: { type: 'text', placeholder: 'Search phone…' },
+      cellClassName: 'whitespace-nowrap text-brand-muted',
+      render: (item) => (
+        item.phone?.trim() ? (
+          <a href={`tel:+91${item.phone}`} className="text-brand-blue">
+            +91 {item.phone}
+          </a>
+        ) : (
+          '—'
+        )
+      ),
+    },
+    {
+      key: 'subject',
+      label: 'Subject',
+      getFilterValue: (item) => item.subject,
+      getSortValue: (item) => item.subject.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search subject…' },
+      cellClassName: 'max-w-[280px] truncate text-brand-muted',
+      render: (item) => <span title={item.subject}>{item.subject}</span>,
+    },
+    {
+      key: 'received',
+      label: 'Received',
+      getFilterValue: (item) => item.createdAt,
+      getSortValue: (item) => isoDateTimestamp(item.createdAt),
+      filter: { type: 'date' },
+      cellClassName: 'whitespace-nowrap text-brand-muted',
+      render: (item) => formatDateTime(item.createdAt),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      getFilterValue: (item) => (item.isRead ? 'read' : 'unread'),
+      getSortValue: (item) => (item.isRead ? 1 : 0),
+      filter: {
+        type: 'select',
+        options: [...READ_FILTER_OPTIONS],
+        matches: (item, value) => {
+          if (value === 'read') return item.isRead;
+          if (value === 'unread') return !item.isRead;
+          return true;
+        },
+      },
+      render: (item) => (
+        <span
+          className={cx(
+            'inline-flex items-center rounded-full px-2.5 py-1 text-[0.72rem] font-bold',
+            item.isRead
+              ? 'bg-[rgba(23,44,113,0.08)] text-brand-muted'
+              : 'bg-[rgba(20,150,243,0.12)] text-brand-blue',
+          )}
+        >
+          {item.isRead ? 'Read' : 'Unread'}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      filter: false,
+      render: (item) => (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => openDetail(item)}
+            className="min-h-[32px] cursor-pointer rounded-[8px] border border-[rgba(20,150,243,0.28)] bg-[rgba(20,150,243,0.08)] px-3 text-[0.8rem] font-bold text-brand-blue"
+          >
+            View
+          </button>
+          <button
+            type="button"
+            disabled={busyKey === item.uuid}
+            onClick={() => void handleToggleRead(item, !item.isRead)}
+            className="min-h-[32px] cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text disabled:opacity-50"
+          >
+            {busyKey === item.uuid ? '...' : item.isRead ? 'Mark unread' : 'Mark read'}
+          </button>
+        </div>
+      ),
+    },
+  ], [busyKey]);
 
   return (
     <>
@@ -208,139 +312,27 @@ export function ContactSubmissionsPanel() {
           </div>
         ) : null}
 
-        {fetchError ? (
-          <div className="rounded-[12px] border border-[rgba(231,95,95,0.22)] bg-[rgba(255,241,241,0.92)] p-6 text-[0.9rem] text-[#8d3434]">
-            {fetchError}
-          </div>
-        ) : loading ? (
-          <div className="rounded-[12px] border border-[rgba(23,44,113,0.08)] bg-[rgba(255,255,255,0.9)] p-8 text-center text-[0.88rem] text-brand-muted">
-            Loading contact submissions...
-          </div>
-        ) : (
-          <section
-            className="overflow-hidden rounded-[16px] border border-[rgba(23,44,113,0.1)]"
-            style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(240,246,255,0.95))' }}
-          >
-            <div className="border-b border-[rgba(23,44,113,0.07)] px-5 py-4">
-              <h2 className="m-0 text-[1.15rem] font-extrabold tracking-[-0.03em]">Contact Us Messages</h2>
-              <p className="m-0 mt-1 max-w-[70ch] text-[0.86rem] leading-[1.5] text-brand-muted">
-                Messages submitted from the public Contact Us form on the customer website.
-              </p>
-            </div>
+        <div>
+          <h2 className="m-0 text-[1.15rem] font-extrabold tracking-[-0.03em]">Contact Us Messages</h2>
+          <p className="m-0 mt-1 max-w-[70ch] text-[0.86rem] leading-[1.5] text-brand-muted">
+            Messages submitted from the public Contact Us form on the customer website.
+          </p>
+        </div>
 
-            <div className="grid gap-3 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.72)] px-5 py-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-              <input
-                type="search"
-                placeholder="Search name, email, phone, subject, message..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                className="los-input"
-              />
-              <div className="flex flex-wrap gap-2">
-                {(['all', 'unread', 'read'] as ReadFilter[]).map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setReadFilter(value)}
-                    className={cx(
-                      'min-h-[34px] cursor-pointer rounded-full border px-3 py-1 text-[0.78rem] font-bold capitalize transition-colors',
-                      readFilter === value
-                        ? 'border-[rgba(20,150,243,0.28)] bg-[rgba(20,150,243,0.1)] text-brand-blue'
-                        : 'border-[rgba(23,44,113,0.1)] bg-[rgba(255,255,255,0.85)] text-brand-muted',
-                    )}
-                  >
-                    {value}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-[0.88rem]">
-                <thead>
-                  <tr className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.82)] text-left">
-                    {['Name', 'Email', 'Phone', 'Subject', 'Received', 'Status', 'Actions'].map((heading) => (
-                      <th key={heading} className="px-4 py-2 text-[0.72rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-                        {heading}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((item, index) => (
-                    <tr
-                      key={item.uuid}
-                      className={cx(
-                        'border-b border-[rgba(23,44,113,0.05)]',
-                        index === filtered.length - 1 && 'border-b-0',
-                        !item.isRead && 'bg-[rgba(20,150,243,0.04)]',
-                      )}
-                    >
-                      <td className="px-4 py-3 font-bold">
-                        <span className="inline-flex items-center gap-2">
-                          {!item.isRead ? <span className="h-2 w-2 shrink-0 rounded-full bg-brand-blue" aria-hidden /> : null}
-                          {item.name}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-brand-muted">
-                        <a href={`mailto:${item.email}`} className="text-brand-blue">{item.email}</a>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-brand-muted">
-                        {item.phone?.trim() ? (
-                          <a href={`tel:+91${item.phone}`} className="text-brand-blue">
-                            +91 {item.phone}
-                          </a>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td className="max-w-[280px] truncate px-4 py-3 text-brand-muted" title={item.subject}>{item.subject}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-brand-muted">{formatDateTime(item.createdAt)}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={cx(
-                            'inline-flex items-center rounded-full px-2.5 py-1 text-[0.72rem] font-bold',
-                            item.isRead
-                              ? 'bg-[rgba(23,44,113,0.08)] text-brand-muted'
-                              : 'bg-[rgba(20,150,243,0.12)] text-brand-blue',
-                          )}
-                        >
-                          {item.isRead ? 'Read' : 'Unread'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openDetail(item)}
-                            className="min-h-[32px] cursor-pointer rounded-[8px] border border-[rgba(20,150,243,0.28)] bg-[rgba(20,150,243,0.08)] px-3 text-[0.8rem] font-bold text-brand-blue"
-                          >
-                            View
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busyKey === item.uuid}
-                            onClick={() => void handleToggleRead(item, !item.isRead)}
-                            className="min-h-[32px] cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text disabled:opacity-50"
-                          >
-                            {busyKey === item.uuid ? '...' : item.isRead ? 'Mark unread' : 'Mark read'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {filtered.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-brand-muted">
-                        No contact submissions match the current filters.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
+        <DataTable
+          items={submissions}
+          columns={columns}
+          getRowKey={(item) => item.uuid}
+          entityLabel="messages"
+          loading={loading}
+          error={fetchError}
+          onRetry={() => void load()}
+          emptyMessage="No contact submissions available right now."
+          noResultsMessage="No contact submissions match your filters."
+          renderRowClassName={(item) => (!item.isRead ? 'bg-[rgba(20,150,243,0.04)]' : undefined)}
+          tableClassName="text-[0.88rem]"
+          initialSort={{ key: 'received', dir: 'desc' }}
+        />
       </div>
 
       {viewing ? <DetailModal item={viewing} onClose={() => setViewing(null)} /> : null}

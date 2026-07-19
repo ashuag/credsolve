@@ -2,6 +2,13 @@
 
 import Link from 'next/link';
 import {
+  ACTIVE_INACTIVE_FILTER_OPTIONS,
+  DataTable,
+  DataTableStatusPill,
+  matchesActiveInactiveFilter,
+  type DataTableColumn,
+} from '@/components/ui/data-table';
+import {
   LOS_LEAD_SOURCE_TYPES,
   createBank,
   createCity,
@@ -34,10 +41,6 @@ import { cx } from '@/lib/cx';
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { getMasterDefinition, type MasterSlug } from './master-definitions';
 
-const CITY_PAGE_SIZE = 10;
-
-type StatusFilter = 'all' | 'active' | 'inactive';
-
 type ModalState =
   | { kind: 'leadStatus'; item: LosStatusMaster }
   | { kind: 'applicationStatus'; item: LosStatusMaster }
@@ -57,31 +60,8 @@ function formatLeadSourceType(type: LosLeadSourceType) {
     .join(' ');
 }
 
-function statusBadge(isActive: boolean) {
-  return isActive
-    ? 'bg-[rgba(34,197,94,0.12)] text-[#166534]'
-    : 'bg-[rgba(239,68,68,0.1)] text-[#991b1b]';
-}
+const StatusPill = DataTableStatusPill;
 
-function applyStatusFilter<T extends { isActive: boolean }>(items: T[], filter: StatusFilter) {
-  if (filter === 'active') return items.filter((item) => item.isActive);
-  if (filter === 'inactive') return items.filter((item) => !item.isActive);
-  return items;
-}
-
-function StatusPill({ isActive }: { isActive: boolean }) {
-  return (
-    <span
-      className={cx(
-        'inline-flex items-center gap-[6px] rounded-full px-3 py-1 text-[0.78rem] font-extrabold',
-        statusBadge(isActive),
-      )}
-    >
-      <span className={cx('h-[7px] w-[7px] rounded-full', isActive ? 'bg-[#22c55e]' : 'bg-[#ef4444]')} aria-hidden />
-      {isActive ? 'Active' : 'Inactive'}
-    </span>
-  );
-}
 
 function IconButton({
   title,
@@ -515,60 +495,22 @@ function NamedMasterModal({
   );
 }
 
-function FilterChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cx(
-        'min-h-[34px] cursor-pointer rounded-full border px-3 py-1 text-[0.78rem] font-bold transition-colors',
-        active
-          ? 'border-[rgba(20,150,243,0.28)] bg-[rgba(20,150,243,0.1)] text-brand-blue'
-          : 'border-[rgba(23,44,113,0.1)] bg-[rgba(255,255,255,0.85)] text-brand-muted',
-      )}
-    >
-      {label}
-    </button>
-  );
-}
-
-function PageShell({
+function MasterSection({
   title,
   description,
-  search,
-  onSearchChange,
-  searchPlaceholder,
-  statusFilter,
-  onStatusFilterChange,
   actionLabel,
   onAction,
   children,
 }: {
   title: string;
   description: string;
-  search: string;
-  onSearchChange: (value: string) => void;
-  searchPlaceholder: string;
-  statusFilter: StatusFilter;
-  onStatusFilterChange: (value: StatusFilter) => void;
   actionLabel?: string;
   onAction?: () => void;
   children: ReactNode;
 }) {
   return (
-    <section
-      className="overflow-hidden rounded-[16px] border border-[rgba(23,44,113,0.1)]"
-      style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(240,246,255,0.95))' }}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[rgba(23,44,113,0.07)] px-5 py-4">
+    <section className="grid gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="m-0 text-[1.15rem] font-extrabold tracking-[-0.03em]">{title}</h2>
           <p className="m-0 mt-1 max-w-[62ch] text-[0.86rem] leading-[1.5] text-brand-muted">
@@ -581,60 +523,8 @@ function PageShell({
           </button>
         ) : null}
       </div>
-
-      <div className="grid gap-3 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.72)] px-5 py-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-        <input
-          type="search"
-          placeholder={searchPlaceholder}
-          value={search}
-          onChange={(event) => onSearchChange(event.target.value)}
-          className="los-input"
-        />
-        <div className="flex flex-wrap gap-2">
-          <FilterChip label="All" active={statusFilter === 'all'} onClick={() => onStatusFilterChange('all')} />
-          <FilterChip label="Active" active={statusFilter === 'active'} onClick={() => onStatusFilterChange('active')} />
-          <FilterChip label="Inactive" active={statusFilter === 'inactive'} onClick={() => onStatusFilterChange('inactive')} />
-        </div>
-      </div>
-
-      <div className="overflow-x-auto">{children}</div>
+      {children}
     </section>
-  );
-}
-
-function PaginationControls({
-  currentPage,
-  totalPages,
-  onPrevious,
-  onNext,
-}: {
-  currentPage: number;
-  totalPages: number;
-  onPrevious: () => void;
-  onNext: () => void;
-}) {
-  return (
-    <div className="flex items-center justify-end gap-2 border-t border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.72)] px-4 py-3">
-      <button
-        type="button"
-        onClick={onPrevious}
-        disabled={currentPage <= 1}
-        className="min-h-[34px] cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.82rem] font-bold text-brand-text disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        Previous
-      </button>
-      <span className="text-[0.8rem] font-bold text-brand-muted">
-        Page {currentPage} of {totalPages}
-      </span>
-      <button
-        type="button"
-        onClick={onNext}
-        disabled={currentPage >= totalPages}
-        className="min-h-[34px] cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.82rem] font-bold text-brand-text disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        Next
-      </button>
-    </div>
   );
 }
 
@@ -661,6 +551,83 @@ function SummaryCards({ total, active, inactive }: { total: number; active: numb
   );
 }
 
+const EditIcon = (
+  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+  </svg>
+);
+
+const DeactivateIcon = (
+  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6l-1 14H6L5 6" />
+    <path d="M10 11v6" />
+    <path d="M14 11v6" />
+    <path d="M9 6V4h6v2" />
+  </svg>
+);
+
+const ActivateIcon = (
+  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+    <path d="M3 3v5h5" />
+  </svg>
+);
+
+function ToggleActions({
+  busy,
+  isActive,
+  editTitle,
+  onEdit,
+  activateTitle,
+  deactivateTitle,
+  onToggle,
+  extra,
+}: {
+  busy: boolean;
+  isActive: boolean;
+  editTitle: string;
+  onEdit: () => void;
+  activateTitle: string;
+  deactivateTitle: string;
+  onToggle: (nextActive: boolean) => void;
+  extra?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <IconButton title={editTitle} onClick={onEdit} disabled={busy}>
+        {EditIcon}
+      </IconButton>
+      {isActive ? (
+        <IconButton title={deactivateTitle} tone="danger" disabled={busy} onClick={() => onToggle(false)}>
+          {DeactivateIcon}
+        </IconButton>
+      ) : (
+        <IconButton title={activateTitle} tone="success" disabled={busy} onClick={() => onToggle(true)}>
+          {ActivateIcon}
+        </IconButton>
+      )}
+      {extra}
+    </div>
+  );
+}
+
+function statusColumn<T extends { isActive: boolean }>(): DataTableColumn<T, 'status'> {
+  return {
+    key: 'status',
+    label: 'Status',
+    getFilterValue: (item) => (item.isActive ? 'active' : 'inactive'),
+    getSortValue: (item) => (item.isActive ? 0 : 1),
+    filter: {
+      type: 'select',
+      options: [...ACTIVE_INACTIVE_FILTER_OPTIONS],
+      matches: (item, value) => matchesActiveInactiveFilter(item.isActive, value),
+    },
+    render: (item) => <StatusPill isActive={item.isActive} />,
+  };
+}
+
 export function MasterDetailPanel({ master }: { master: MasterSlug }) {
   const definition = getMasterDefinition(master);
   const [masters, setMasters] = useState<LosMastersPayload | null>(null);
@@ -668,9 +635,6 @@ export function MasterDetailPanel({ master }: { master: MasterSlug }) {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [cityPage, setCityPage] = useState(1);
   const [modal, setModal] = useState<ModalState | null>(null);
 
   const loadMasters = useCallback(async (tokenOverride?: string) => {
@@ -726,81 +690,6 @@ export function MasterDetailPanel({ master }: { master: MasterSlug }) {
     await runAction(key, action);
   }
 
-  const filteredLeadStatuses = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const filtered = (masters?.leadStatuses ?? []).filter((item) => (
-      term === '' || item.code.toLowerCase().includes(term) || item.displayName.toLowerCase().includes(term)
-    ));
-    return applyStatusFilter(filtered, statusFilter);
-  }, [masters?.leadStatuses, search, statusFilter]);
-
-  const filteredApplicationStatuses = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const filtered = (masters?.applicationStatuses ?? []).filter((item) => (
-      term === '' || item.code.toLowerCase().includes(term) || item.displayName.toLowerCase().includes(term)
-    ));
-    return applyStatusFilter(filtered, statusFilter);
-  }, [masters?.applicationStatuses, search, statusFilter]);
-
-  const filteredLeadSources = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const filtered = (masters?.leadSources ?? []).filter((item) => (
-      term === '' || item.name.toLowerCase().includes(term) || item.type.toLowerCase().includes(term)
-    ));
-    return applyStatusFilter(filtered, statusFilter);
-  }, [masters?.leadSources, search, statusFilter]);
-
-  const filteredStates = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const filtered = (masters?.states ?? []).filter((item) => (
-      term === '' || item.name.toLowerCase().includes(term) || item.code.toLowerCase().includes(term)
-    ));
-    return applyStatusFilter(filtered, statusFilter);
-  }, [masters?.states, search, statusFilter]);
-
-  const filteredCities = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const filtered = (masters?.cities ?? []).filter((item) => (
-      term === ''
-      || item.name.toLowerCase().includes(term)
-      || item.stateName.toLowerCase().includes(term)
-      || item.stateCode.toLowerCase().includes(term)
-    ));
-    return applyStatusFilter(filtered, statusFilter);
-  }, [masters?.cities, search, statusFilter]);
-
-  const filteredOccupations = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const filtered = (masters?.occupations ?? []).filter((item) => (
-      term === '' || item.name.toLowerCase().includes(term)
-    ));
-    return applyStatusFilter(filtered, statusFilter);
-  }, [masters?.occupations, search, statusFilter]);
-
-  const filteredReasonsForLoan = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const filtered = (masters?.reasonsForLoan ?? []).filter((item) => (
-      term === '' || item.name.toLowerCase().includes(term)
-    ));
-    return applyStatusFilter(filtered, statusFilter);
-  }, [masters?.reasonsForLoan, search, statusFilter]);
-
-  const filteredGenders = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const filtered = (masters?.genders ?? []).filter((item) => (
-      term === '' || item.name.toLowerCase().includes(term)
-    ));
-    return applyStatusFilter(filtered, statusFilter);
-  }, [masters?.genders, search, statusFilter]);
-
-  const filteredBanks = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const filtered = (masters?.banks ?? []).filter((item) => (
-      term === '' || item.name.toLowerCase().includes(term)
-    ));
-    return applyStatusFilter(filtered, statusFilter);
-  }, [masters?.banks, search, statusFilter]);
-
   const currentItems = useMemo(() => {
     switch (master) {
       case 'lead-statuses':
@@ -826,33 +715,314 @@ export function MasterDetailPanel({ master }: { master: MasterSlug }) {
     }
   }, [master, masters]);
 
-  const totalCityPages = Math.max(1, Math.ceil(filteredCities.length / CITY_PAGE_SIZE));
-
-  const paginatedCities = useMemo(() => {
-    const startIndex = (cityPage - 1) * CITY_PAGE_SIZE;
-    return filteredCities.slice(startIndex, startIndex + CITY_PAGE_SIZE);
-  }, [cityPage, filteredCities]);
-
-  const cityRange = useMemo(() => {
-    if (filteredCities.length === 0) return { start: 0, end: 0 };
-    const start = ((cityPage - 1) * CITY_PAGE_SIZE) + 1;
-    const end = Math.min(cityPage * CITY_PAGE_SIZE, filteredCities.length);
-    return { start, end };
-  }, [cityPage, filteredCities.length]);
-
-  useEffect(() => {
-    setCityPage(1);
-  }, [search, statusFilter]);
-
-  useEffect(() => {
-    setCityPage((currentPage) => Math.min(currentPage, totalCityPages));
-  }, [totalCityPages]);
-
   const summary = useMemo(() => {
     const total = currentItems.length;
     const active = currentItems.filter((item) => item.isActive).length;
     return { total, active, inactive: total - active };
   }, [currentItems]);
+
+  const leadStatusColumns = useMemo((): DataTableColumn<LosStatusMaster>[] => [
+    {
+      key: 'code',
+      label: 'Code',
+      getFilterValue: (item) => item.code,
+      getSortValue: (item) => item.code.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search code…' },
+      render: (item) => <strong>{item.code}</strong>,
+    },
+    {
+      key: 'displayName',
+      label: 'Display label',
+      getFilterValue: (item) => item.displayName,
+      getSortValue: (item) => item.displayName.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search label…' },
+      cellClassName: 'text-brand-muted',
+      render: (item) => item.displayName,
+    },
+    statusColumn<LosStatusMaster>(),
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      filter: false,
+      render: (item) => (
+        <ToggleActions
+          busy={busyKey === `lead-status-${item.id}`}
+          isActive={item.isActive}
+          editTitle="Edit lead status label"
+          onEdit={() => setModal({ kind: 'leadStatus', item })}
+          activateTitle="Activate lead status"
+          deactivateTitle="Deactivate lead status"
+          onToggle={(next) => {
+            void handleSoftToggle(
+              `lead-status-${item.id}`,
+              (token) => updateLeadStatus(token, item.id, { isActive: next }),
+              `Mark ${item.code} as ${next ? 'active' : 'inactive'}?`,
+            );
+          }}
+        />
+      ),
+    },
+  ], [busyKey]);
+
+  const applicationStatusColumns = useMemo((): DataTableColumn<LosStatusMaster>[] => [
+    {
+      key: 'code',
+      label: 'Code',
+      getFilterValue: (item) => item.code,
+      getSortValue: (item) => item.code.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search code…' },
+      render: (item) => <strong>{item.code}</strong>,
+    },
+    {
+      key: 'displayName',
+      label: 'Display label',
+      getFilterValue: (item) => item.displayName,
+      getSortValue: (item) => item.displayName.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search label…' },
+      cellClassName: 'text-brand-muted',
+      render: (item) => item.displayName,
+    },
+    statusColumn<LosStatusMaster>(),
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      filter: false,
+      render: (item) => (
+        <ToggleActions
+          busy={busyKey === `application-status-${item.id}`}
+          isActive={item.isActive}
+          editTitle="Edit application status label"
+          onEdit={() => setModal({ kind: 'applicationStatus', item })}
+          activateTitle="Activate application status"
+          deactivateTitle="Deactivate application status"
+          onToggle={(next) => {
+            void handleSoftToggle(
+              `application-status-${item.id}`,
+              (token) => updateApplicationStatus(token, item.id, { isActive: next }),
+              `Mark ${item.code} as ${next ? 'active' : 'inactive'}?`,
+            );
+          }}
+        />
+      ),
+    },
+  ], [busyKey]);
+
+  const leadSourceColumns = useMemo((): DataTableColumn<LosLeadSourceMaster>[] => [
+    {
+      key: 'name',
+      label: 'Name',
+      getFilterValue: (item) => item.name,
+      getSortValue: (item) => item.name.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search name…' },
+      render: (item) => <strong>{item.name}</strong>,
+    },
+    {
+      key: 'type',
+      label: 'Type',
+      getFilterValue: (item) => item.type,
+      getSortValue: (item) => item.type.toLowerCase(),
+      filter: {
+        type: 'select',
+        options: LOS_LEAD_SOURCE_TYPES.map((type) => ({ value: type, label: formatLeadSourceType(type) })),
+        matches: (item, value) => item.type === value,
+      },
+      cellClassName: 'text-brand-muted',
+      render: (item) => formatLeadSourceType(item.type),
+    },
+    statusColumn<LosLeadSourceMaster>(),
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      filter: false,
+      render: (item) => (
+        <ToggleActions
+          busy={busyKey === `lead-source-${item.id}`}
+          isActive={item.isActive}
+          editTitle="Edit lead source"
+          onEdit={() => setModal({ kind: 'leadSource', item })}
+          activateTitle="Activate lead source"
+          deactivateTitle="Deactivate lead source"
+          onToggle={(next) => {
+            void handleSoftToggle(
+              `lead-source-${item.id}`,
+              (token) => updateLeadSource(token, item.id, { isActive: next }),
+              `Mark ${item.name} as ${next ? 'active' : 'inactive'}?`,
+            );
+          }}
+        />
+      ),
+    },
+  ], [busyKey]);
+
+  const stateColumns = useMemo((): DataTableColumn<LosStateMaster>[] => [
+    {
+      key: 'name',
+      label: 'State',
+      getFilterValue: (item) => item.name,
+      getSortValue: (item) => item.name.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search state…' },
+      render: (item) => <strong>{item.name}</strong>,
+    },
+    {
+      key: 'code',
+      label: 'Code',
+      getFilterValue: (item) => item.code,
+      getSortValue: (item) => item.code.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search code…' },
+      cellClassName: 'text-brand-muted',
+      render: (item) => item.code,
+    },
+    statusColumn<LosStateMaster>(),
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      filter: false,
+      render: (item) => (
+        <ToggleActions
+          busy={busyKey === `state-${item.id}`}
+          isActive={item.isActive}
+          editTitle="Edit state"
+          onEdit={() => setModal({ kind: 'state', item })}
+          activateTitle="Activate state"
+          deactivateTitle="Deactivate state"
+          onToggle={(next) => {
+            void handleSoftToggle(
+              `state-${item.id}`,
+              (token) => updateState(token, item.id, { isActive: next }),
+              `Mark ${item.name} as ${next ? 'active' : 'inactive'}?`,
+            );
+          }}
+        />
+      ),
+    },
+  ], [busyKey]);
+
+  const cityColumns = useMemo((): DataTableColumn<LosCityMaster>[] => [
+    {
+      key: 'name',
+      label: 'City',
+      getFilterValue: (item) => item.name,
+      getSortValue: (item) => item.name.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search city…' },
+      render: (item) => <strong>{item.name}</strong>,
+    },
+    {
+      key: 'state',
+      label: 'State',
+      getFilterValue: (item) => `${item.stateName} ${item.stateCode}`,
+      getSortValue: (item) => item.stateName.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search state…' },
+      cellClassName: 'text-brand-muted',
+      render: (item) => `${item.stateName} (${item.stateCode})${item.stateIsActive ? '' : ' - Inactive state'}`,
+    },
+    statusColumn<LosCityMaster>(),
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      filter: false,
+      render: (item) => (
+        <ToggleActions
+          busy={busyKey === `city-${item.id}`}
+          isActive={item.isActive}
+          editTitle="Edit city"
+          onEdit={() => setModal({ kind: 'city', item })}
+          activateTitle="Activate city"
+          deactivateTitle="Deactivate city"
+          onToggle={(next) => {
+            void handleSoftToggle(
+              `city-${item.id}`,
+              (token) => updateCity(token, item.id, { isActive: next }),
+              `Mark ${item.name} as ${next ? 'active' : 'inactive'}?`,
+            );
+          }}
+        />
+      ),
+    },
+  ], [busyKey]);
+
+  function namedColumns(
+    noun: string,
+    kind: 'occupation' | 'reasonForLoan' | 'gender' | 'bank',
+    busyPrefix: string,
+    updateFn: (token: string, id: number, data: { isActive: boolean }) => Promise<unknown>,
+    withDelete = false,
+  ): DataTableColumn<LosNamedMaster>[] {
+    return [
+      {
+        key: 'name',
+        label: noun,
+        getFilterValue: (item) => item.name,
+        getSortValue: (item) => item.name.toLowerCase(),
+        filter: { type: 'text', placeholder: `Search ${noun.toLowerCase()}…` },
+        render: (item) => <strong>{item.name}</strong>,
+      },
+      statusColumn<LosNamedMaster>(),
+      {
+        key: 'actions',
+        label: 'Actions',
+        sortable: false,
+        filter: false,
+        render: (item) => (
+          <ToggleActions
+            busy={busyKey === `${busyPrefix}-${item.id}` || busyKey === `${busyPrefix}-delete-${item.id}`}
+            isActive={item.isActive}
+            editTitle={`Edit ${noun.toLowerCase()}`}
+            onEdit={() => setModal({ kind, item })}
+            activateTitle={`Activate ${noun.toLowerCase()}`}
+            deactivateTitle={`Deactivate ${noun.toLowerCase()}`}
+            onToggle={(next) => {
+              void handleSoftToggle(
+                `${busyPrefix}-${item.id}`,
+                (token) => updateFn(token, item.id, { isActive: next }),
+                `Mark ${item.name} as ${next ? 'active' : 'inactive'}?`,
+              );
+            }}
+            extra={
+              withDelete ? (
+                <IconButton
+                  title="Delete bank permanently"
+                  tone="danger"
+                  disabled={busyKey === `bank-${item.id}` || busyKey === `bank-delete-${item.id}`}
+                  onClick={() => {
+                    if (!window.confirm(`Permanently delete "${item.name}"? Existing applications that reference this name are unchanged, but the bank will no longer appear in the master list.`)) return;
+                    void runAction(`bank-delete-${item.id}`, (token) => deleteBank(token, item.id));
+                  }}
+                >
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <circle cx="12" cy="12" r="9" />
+                    <line x1="15" y1="9" x2="9" y2="15" />
+                    <line x1="9" y1="9" x2="15" y2="15" />
+                  </svg>
+                </IconButton>
+              ) : null
+            }
+          />
+        ),
+      },
+    ];
+  }
+
+  const occupationColumns = useMemo(
+    () => namedColumns('Occupation', 'occupation', 'occupation', updateOccupation),
+    [busyKey],
+  );
+  const reasonColumns = useMemo(
+    () => namedColumns('Reason for Loan', 'reasonForLoan', 'reason-for-loan', updateReasonForLoan),
+    [busyKey],
+  );
+  const genderColumns = useMemo(
+    () => namedColumns('Gender', 'gender', 'gender', updateGender),
+    [busyKey],
+  );
+  const bankColumns = useMemo(
+    () => namedColumns('Bank', 'bank', 'bank', updateBank, true),
+    [busyKey],
+  );
 
   if (!definition) return null;
 
@@ -883,849 +1053,177 @@ export function MasterDetailPanel({ master }: { master: MasterSlug }) {
           </div>
         ) : null}
 
-        {fetchError ? (
-          <div className="rounded-[12px] border border-[rgba(231,95,95,0.22)] bg-[rgba(255,241,241,0.92)] p-6 text-[0.9rem] text-[#8d3434]">
-            {fetchError}
-          </div>
-        ) : loading && !masters ? (
-          <div className="rounded-[12px] border border-[rgba(23,44,113,0.08)] bg-[rgba(255,255,255,0.9)] p-8 text-center text-[0.88rem] text-brand-muted">
-            Loading master data...
-          </div>
-        ) : (
-          <>
-            {master === 'lead-statuses' ? (
-              <PageShell
-                title="Lead Status"
-                description="Manage active and inactive lead workflow statuses while keeping the system codes unchanged."
-                search={search}
-                onSearchChange={setSearch}
-                searchPlaceholder={definition.searchPlaceholder}
-                statusFilter={statusFilter}
-                onStatusFilterChange={setStatusFilter}
-              >
-                <table className="w-full border-collapse text-[0.88rem]">
-                  <thead>
-                    <tr className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.82)] text-left">
-                      {['Code', 'Display label', 'Status', 'Actions'].map((heading) => (
-                        <th key={heading} className="px-4 py-2 text-[0.72rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-                          {heading}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredLeadStatuses.map((item, index) => (
-                      <tr key={item.id} className={cx('border-b border-[rgba(23,44,113,0.05)]', index === filteredLeadStatuses.length - 1 && 'border-b-0')}>
-                        <td className="px-4 py-3"><strong>{item.code}</strong></td>
-                        <td className="px-4 py-3 text-brand-muted">{item.displayName}</td>
-                        <td className="px-4 py-3"><StatusPill isActive={item.isActive} /></td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <IconButton title="Edit lead status label" onClick={() => setModal({ kind: 'leadStatus', item })} disabled={busyKey === `lead-status-${item.id}`}>
-                              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                              </svg>
-                            </IconButton>
-                            {item.isActive ? (
-                              <IconButton
-                                title="Deactivate lead status"
-                                tone="danger"
-                                disabled={busyKey === `lead-status-${item.id}`}
-                                onClick={() => {
-                                  void handleSoftToggle(
-                                    `lead-status-${item.id}`,
-                                    (token) => updateLeadStatus(token, item.id, { isActive: false }),
-                                    `Mark ${item.code} as inactive?`,
-                                  );
-                                }}
-                              >
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <polyline points="3 6 5 6 21 6" />
-                                  <path d="M19 6l-1 14H6L5 6" />
-                                  <path d="M10 11v6" />
-                                  <path d="M14 11v6" />
-                                  <path d="M9 6V4h6v2" />
-                                </svg>
-                              </IconButton>
-                            ) : (
-                              <IconButton
-                                title="Activate lead status"
-                                tone="success"
-                                disabled={busyKey === `lead-status-${item.id}`}
-                                onClick={() => {
-                                  void handleSoftToggle(
-                                    `lead-status-${item.id}`,
-                                    (token) => updateLeadStatus(token, item.id, { isActive: true }),
-                                    `Mark ${item.code} as active?`,
-                                  );
-                                }}
-                              >
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                                  <path d="M3 3v5h5" />
-                                </svg>
-                              </IconButton>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredLeadStatuses.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-4 py-8 text-center text-brand-muted">No lead statuses match the current search.</td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </PageShell>
-            ) : null}
+        {master === 'lead-statuses' ? (
+          <MasterSection title="Lead Status" description="Manage active and inactive lead workflow statuses while keeping the system codes unchanged.">
+            <DataTable
+              items={masters?.leadStatuses ?? []}
+              columns={leadStatusColumns}
+              getRowKey={(item) => item.id}
+              entityLabel="lead statuses"
+              loading={loading && !masters}
+              error={fetchError}
+              onRetry={() => void loadMasters()}
+              emptyMessage="No lead statuses available."
+              pageSize={20}
+            />
+          </MasterSection>
+        ) : null}
 
-            {master === 'application-statuses' ? (
-              <PageShell
-                title="Application Status"
-                description="Manage active and inactive application stages while keeping the underlying workflow codes fixed."
-                search={search}
-                onSearchChange={setSearch}
-                searchPlaceholder={definition.searchPlaceholder}
-                statusFilter={statusFilter}
-                onStatusFilterChange={setStatusFilter}
-              >
-                <table className="w-full border-collapse text-[0.88rem]">
-                  <thead>
-                    <tr className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.82)] text-left">
-                      {['Code', 'Display label', 'Status', 'Actions'].map((heading) => (
-                        <th key={heading} className="px-4 py-2 text-[0.72rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-                          {heading}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredApplicationStatuses.map((item, index) => (
-                      <tr key={item.id} className={cx('border-b border-[rgba(23,44,113,0.05)]', index === filteredApplicationStatuses.length - 1 && 'border-b-0')}>
-                        <td className="px-4 py-3"><strong>{item.code}</strong></td>
-                        <td className="px-4 py-3 text-brand-muted">{item.displayName}</td>
-                        <td className="px-4 py-3"><StatusPill isActive={item.isActive} /></td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <IconButton title="Edit application status label" onClick={() => setModal({ kind: 'applicationStatus', item })} disabled={busyKey === `application-status-${item.id}`}>
-                              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                              </svg>
-                            </IconButton>
-                            {item.isActive ? (
-                              <IconButton
-                                title="Deactivate application status"
-                                tone="danger"
-                                disabled={busyKey === `application-status-${item.id}`}
-                                onClick={() => {
-                                  void handleSoftToggle(
-                                    `application-status-${item.id}`,
-                                    (token) => updateApplicationStatus(token, item.id, { isActive: false }),
-                                    `Mark ${item.code} as inactive?`,
-                                  );
-                                }}
-                              >
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <polyline points="3 6 5 6 21 6" />
-                                  <path d="M19 6l-1 14H6L5 6" />
-                                  <path d="M10 11v6" />
-                                  <path d="M14 11v6" />
-                                  <path d="M9 6V4h6v2" />
-                                </svg>
-                              </IconButton>
-                            ) : (
-                              <IconButton
-                                title="Activate application status"
-                                tone="success"
-                                disabled={busyKey === `application-status-${item.id}`}
-                                onClick={() => {
-                                  void handleSoftToggle(
-                                    `application-status-${item.id}`,
-                                    (token) => updateApplicationStatus(token, item.id, { isActive: true }),
-                                    `Mark ${item.code} as active?`,
-                                  );
-                                }}
-                              >
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                                  <path d="M3 3v5h5" />
-                                </svg>
-                              </IconButton>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredApplicationStatuses.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-4 py-8 text-center text-brand-muted">No application statuses match the current search.</td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </PageShell>
-            ) : null}
+        {master === 'application-statuses' ? (
+          <MasterSection title="Application Status" description="Manage active and inactive application stages while keeping the underlying workflow codes fixed.">
+            <DataTable
+              items={masters?.applicationStatuses ?? []}
+              columns={applicationStatusColumns}
+              getRowKey={(item) => item.id}
+              entityLabel="application statuses"
+              loading={loading && !masters}
+              error={fetchError}
+              onRetry={() => void loadMasters()}
+              emptyMessage="No application statuses available."
+            />
+          </MasterSection>
+        ) : null}
 
-            {master === 'lead-sources' ? (
-              <PageShell
-                title="Lead Sources"
-                description="Add, edit, activate, and deactivate lead sources used for attribution and routing."
-                search={search}
-                onSearchChange={setSearch}
-                searchPlaceholder={definition.searchPlaceholder}
-                statusFilter={statusFilter}
-                onStatusFilterChange={setStatusFilter}
-                actionLabel="+ Add Lead Source"
-                onAction={() => setModal({ kind: 'leadSource' })}
-              >
-                <table className="w-full border-collapse text-[0.88rem]">
-                  <thead>
-                    <tr className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.82)] text-left">
-                      {['Name', 'Type', 'Status', 'Actions'].map((heading) => (
-                        <th key={heading} className="px-4 py-2 text-[0.72rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-                          {heading}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredLeadSources.map((item, index) => (
-                      <tr key={item.id} className={cx('border-b border-[rgba(23,44,113,0.05)]', index === filteredLeadSources.length - 1 && 'border-b-0')}>
-                        <td className="px-4 py-3"><strong>{item.name}</strong></td>
-                        <td className="px-4 py-3 text-brand-muted">{formatLeadSourceType(item.type)}</td>
-                        <td className="px-4 py-3"><StatusPill isActive={item.isActive} /></td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <IconButton title="Edit lead source" onClick={() => setModal({ kind: 'leadSource', item })} disabled={busyKey === `lead-source-${item.id}`}>
-                              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                              </svg>
-                            </IconButton>
-                            {item.isActive ? (
-                              <IconButton
-                                title="Deactivate lead source"
-                                tone="danger"
-                                disabled={busyKey === `lead-source-${item.id}`}
-                                onClick={() => {
-                                  void handleSoftToggle(
-                                    `lead-source-${item.id}`,
-                                    (token) => updateLeadSource(token, item.id, { isActive: false }),
-                                    `Mark ${item.name} as inactive?`,
-                                  );
-                                }}
-                              >
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <polyline points="3 6 5 6 21 6" />
-                                  <path d="M19 6l-1 14H6L5 6" />
-                                  <path d="M10 11v6" />
-                                  <path d="M14 11v6" />
-                                  <path d="M9 6V4h6v2" />
-                                </svg>
-                              </IconButton>
-                            ) : (
-                              <IconButton
-                                title="Activate lead source"
-                                tone="success"
-                                disabled={busyKey === `lead-source-${item.id}`}
-                                onClick={() => {
-                                  void handleSoftToggle(
-                                    `lead-source-${item.id}`,
-                                    (token) => updateLeadSource(token, item.id, { isActive: true }),
-                                    `Mark ${item.name} as active?`,
-                                  );
-                                }}
-                              >
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                                  <path d="M3 3v5h5" />
-                                </svg>
-                              </IconButton>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredLeadSources.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-4 py-8 text-center text-brand-muted">No lead sources match the current search.</td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </PageShell>
-            ) : null}
+        {master === 'lead-sources' ? (
+          <MasterSection
+            title="Lead Sources"
+            description="Add, edit, activate, and deactivate lead sources used for attribution and routing."
+            actionLabel="+ Add Lead Source"
+            onAction={() => setModal({ kind: 'leadSource' })}
+          >
+            <DataTable
+              items={masters?.leadSources ?? []}
+              columns={leadSourceColumns}
+              getRowKey={(item) => item.id}
+              entityLabel="lead sources"
+              loading={loading && !masters}
+              error={fetchError}
+              onRetry={() => void loadMasters()}
+              emptyMessage="No lead sources available."
+            />
+          </MasterSection>
+        ) : null}
 
-            {master === 'states' ? (
-              <PageShell
-                title="States"
-                description="Maintain state names, codes, and active state used by location masters."
-                search={search}
-                onSearchChange={setSearch}
-                searchPlaceholder={definition.searchPlaceholder}
-                statusFilter={statusFilter}
-                onStatusFilterChange={setStatusFilter}
-                actionLabel="+ Add State"
-                onAction={() => setModal({ kind: 'state' })}
-              >
-                <table className="w-full border-collapse text-[0.88rem]">
-                  <thead>
-                    <tr className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.82)] text-left">
-                      {['State', 'Code', 'Status', 'Actions'].map((heading) => (
-                        <th key={heading} className="px-4 py-2 text-[0.72rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-                          {heading}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredStates.map((item, index) => (
-                      <tr key={item.id} className={cx('border-b border-[rgba(23,44,113,0.05)]', index === filteredStates.length - 1 && 'border-b-0')}>
-                        <td className="px-4 py-3"><strong>{item.name}</strong></td>
-                        <td className="px-4 py-3 text-brand-muted">{item.code}</td>
-                        <td className="px-4 py-3"><StatusPill isActive={item.isActive} /></td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <IconButton title="Edit state" onClick={() => setModal({ kind: 'state', item })} disabled={busyKey === `state-${item.id}`}>
-                              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                              </svg>
-                            </IconButton>
-                            {item.isActive ? (
-                              <IconButton
-                                title="Deactivate state"
-                                tone="danger"
-                                disabled={busyKey === `state-${item.id}`}
-                                onClick={() => {
-                                  void handleSoftToggle(
-                                    `state-${item.id}`,
-                                    (token) => updateState(token, item.id, { isActive: false }),
-                                    `Mark ${item.name} as inactive?`,
-                                  );
-                                }}
-                              >
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <polyline points="3 6 5 6 21 6" />
-                                  <path d="M19 6l-1 14H6L5 6" />
-                                  <path d="M10 11v6" />
-                                  <path d="M14 11v6" />
-                                  <path d="M9 6V4h6v2" />
-                                </svg>
-                              </IconButton>
-                            ) : (
-                              <IconButton
-                                title="Activate state"
-                                tone="success"
-                                disabled={busyKey === `state-${item.id}`}
-                                onClick={() => {
-                                  void handleSoftToggle(
-                                    `state-${item.id}`,
-                                    (token) => updateState(token, item.id, { isActive: true }),
-                                    `Mark ${item.name} as active?`,
-                                  );
-                                }}
-                              >
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                                  <path d="M3 3v5h5" />
-                                </svg>
-                              </IconButton>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredStates.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-4 py-8 text-center text-brand-muted">No states match the current search.</td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </PageShell>
-            ) : null}
+        {master === 'states' ? (
+          <MasterSection
+            title="States"
+            description="Maintain state names, codes, and active state used by location masters."
+            actionLabel="+ Add State"
+            onAction={() => setModal({ kind: 'state' })}
+          >
+            <DataTable
+              items={masters?.states ?? []}
+              columns={stateColumns}
+              getRowKey={(item) => item.id}
+              entityLabel="states"
+              loading={loading && !masters}
+              error={fetchError}
+              onRetry={() => void loadMasters()}
+              emptyMessage="No states available."
+            />
+          </MasterSection>
+        ) : null}
 
-            {master === 'cities' ? (
-              <PageShell
-                title="Cities"
-                description="Manage city names, state mappings, and active state used by onboarding and LOS lookup flows."
-                search={search}
-                onSearchChange={setSearch}
-                searchPlaceholder={definition.searchPlaceholder}
-                statusFilter={statusFilter}
-                onStatusFilterChange={setStatusFilter}
-                actionLabel="+ Add City"
-                onAction={() => setModal({ kind: 'city' })}
-              >
-                <table className="w-full border-collapse text-[0.88rem]">
-                  <thead>
-                    <tr className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.82)] text-left">
-                      {['City', 'State', 'Status', 'Actions'].map((heading) => (
-                        <th key={heading} className="px-4 py-2 text-[0.72rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-                          {heading}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedCities.map((item, index) => (
-                      <tr key={item.id} className={cx('border-b border-[rgba(23,44,113,0.05)]', index === paginatedCities.length - 1 && 'border-b-0')}>
-                        <td className="px-4 py-3"><strong>{item.name}</strong></td>
-                        <td className="px-4 py-3 text-brand-muted">
-                          {item.stateName} ({item.stateCode}){item.stateIsActive ? '' : ' - Inactive state'}
-                        </td>
-                        <td className="px-4 py-3"><StatusPill isActive={item.isActive} /></td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <IconButton title="Edit city" onClick={() => setModal({ kind: 'city', item })} disabled={busyKey === `city-${item.id}`}>
-                              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                              </svg>
-                            </IconButton>
-                            {item.isActive ? (
-                              <IconButton
-                                title="Deactivate city"
-                                tone="danger"
-                                disabled={busyKey === `city-${item.id}`}
-                                onClick={() => {
-                                  void handleSoftToggle(
-                                    `city-${item.id}`,
-                                    (token) => updateCity(token, item.id, { isActive: false }),
-                                    `Mark ${item.name} as inactive?`,
-                                  );
-                                }}
-                              >
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <polyline points="3 6 5 6 21 6" />
-                                  <path d="M19 6l-1 14H6L5 6" />
-                                  <path d="M10 11v6" />
-                                  <path d="M14 11v6" />
-                                  <path d="M9 6V4h6v2" />
-                                </svg>
-                              </IconButton>
-                            ) : (
-                              <IconButton
-                                title="Activate city"
-                                tone="success"
-                                disabled={busyKey === `city-${item.id}`}
-                                onClick={() => {
-                                  void handleSoftToggle(
-                                    `city-${item.id}`,
-                                    (token) => updateCity(token, item.id, { isActive: true }),
-                                    `Mark ${item.name} as active?`,
-                                  );
-                                }}
-                              >
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                                  <path d="M3 3v5h5" />
-                                </svg>
-                              </IconButton>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {paginatedCities.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-4 py-8 text-center text-brand-muted">No cities match the current search.</td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-                {filteredCities.length > 0 ? (
-                  <div className="grid gap-0">
-                    <div className="border-t border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.72)] px-4 py-2.5 text-[0.8rem] text-brand-muted">
-                      Showing {cityRange.start}-{cityRange.end} of {filteredCities.length} cities
-                    </div>
-                    <PaginationControls
-                      currentPage={cityPage}
-                      totalPages={totalCityPages}
-                      onPrevious={() => setCityPage((currentPage) => Math.max(1, currentPage - 1))}
-                      onNext={() => setCityPage((currentPage) => Math.min(totalCityPages, currentPage + 1))}
-                    />
-                  </div>
-                ) : null}
-              </PageShell>
-            ) : null}
+        {master === 'cities' ? (
+          <MasterSection
+            title="Cities"
+            description="Manage city names, state mappings, and active state used by onboarding and LOS lookup flows."
+            actionLabel="+ Add City"
+            onAction={() => setModal({ kind: 'city' })}
+          >
+            <DataTable
+              items={masters?.cities ?? []}
+              columns={cityColumns}
+              getRowKey={(item) => item.id}
+              entityLabel="cities"
+              loading={loading && !masters}
+              error={fetchError}
+              onRetry={() => void loadMasters()}
+              emptyMessage="No cities available."
+              pageSize={10}
+            />
+          </MasterSection>
+        ) : null}
 
-            {master === 'occupations' ? (
-              <PageShell
-                title="Occupations"
-                description="Manage occupation values shown in customer and LOS forms, including active and inactive options."
-                search={search}
-                onSearchChange={setSearch}
-                searchPlaceholder={definition.searchPlaceholder}
-                statusFilter={statusFilter}
-                onStatusFilterChange={setStatusFilter}
-                actionLabel="+ Add Occupation"
-                onAction={() => setModal({ kind: 'occupation' })}
-              >
-                <table className="w-full border-collapse text-[0.88rem]">
-                  <thead>
-                    <tr className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.82)] text-left">
-                      {['Occupation', 'Status', 'Actions'].map((heading) => (
-                        <th key={heading} className="px-4 py-2 text-[0.72rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-                          {heading}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredOccupations.map((item, index) => (
-                      <tr key={item.id} className={cx('border-b border-[rgba(23,44,113,0.05)]', index === filteredOccupations.length - 1 && 'border-b-0')}>
-                        <td className="px-4 py-3"><strong>{item.name}</strong></td>
-                        <td className="px-4 py-3"><StatusPill isActive={item.isActive} /></td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <IconButton title="Edit occupation" onClick={() => setModal({ kind: 'occupation', item })} disabled={busyKey === `occupation-${item.id}`}>
-                              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                              </svg>
-                            </IconButton>
-                            {item.isActive ? (
-                              <IconButton
-                                title="Deactivate occupation"
-                                tone="danger"
-                                disabled={busyKey === `occupation-${item.id}`}
-                                onClick={() => {
-                                  void handleSoftToggle(
-                                    `occupation-${item.id}`,
-                                    (token) => updateOccupation(token, item.id, { isActive: false }),
-                                    `Mark ${item.name} as inactive?`,
-                                  );
-                                }}
-                              >
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <polyline points="3 6 5 6 21 6" />
-                                  <path d="M19 6l-1 14H6L5 6" />
-                                  <path d="M10 11v6" />
-                                  <path d="M14 11v6" />
-                                  <path d="M9 6V4h6v2" />
-                                </svg>
-                              </IconButton>
-                            ) : (
-                              <IconButton
-                                title="Activate occupation"
-                                tone="success"
-                                disabled={busyKey === `occupation-${item.id}`}
-                                onClick={() => {
-                                  void handleSoftToggle(
-                                    `occupation-${item.id}`,
-                                    (token) => updateOccupation(token, item.id, { isActive: true }),
-                                    `Mark ${item.name} as active?`,
-                                  );
-                                }}
-                              >
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                                  <path d="M3 3v5h5" />
-                                </svg>
-                              </IconButton>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredOccupations.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-4 py-8 text-center text-brand-muted">No occupations match the current search.</td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </PageShell>
-            ) : null}
+        {master === 'occupations' ? (
+          <MasterSection
+            title="Occupations"
+            description="Manage occupation values shown in customer and LOS forms, including active and inactive options."
+            actionLabel="+ Add Occupation"
+            onAction={() => setModal({ kind: 'occupation' })}
+          >
+            <DataTable
+              items={masters?.occupations ?? []}
+              columns={occupationColumns}
+              getRowKey={(item) => item.id}
+              entityLabel="occupations"
+              loading={loading && !masters}
+              error={fetchError}
+              onRetry={() => void loadMasters()}
+              emptyMessage="No occupations available."
+            />
+          </MasterSection>
+        ) : null}
 
-            {master === 'reasons-for-loan' ? (
-              <PageShell
-                title="Reason for Loan"
-                description="Maintain reason for loan values used across LOS application journeys, including active and inactive options."
-                search={search}
-                onSearchChange={setSearch}
-                searchPlaceholder={definition.searchPlaceholder}
-                statusFilter={statusFilter}
-                onStatusFilterChange={setStatusFilter}
-                actionLabel="+ Add Reason for Loan"
-                onAction={() => setModal({ kind: 'reasonForLoan' })}
-              >
-                <table className="w-full border-collapse text-[0.88rem]">
-                  <thead>
-                    <tr className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.82)] text-left">
-                      {['Reason for Loan', 'Status', 'Actions'].map((heading) => (
-                        <th key={heading} className="px-4 py-2 text-[0.72rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-                          {heading}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredReasonsForLoan.map((item, index) => (
-                      <tr key={item.id} className={cx('border-b border-[rgba(23,44,113,0.05)]', index === filteredReasonsForLoan.length - 1 && 'border-b-0')}>
-                        <td className="px-4 py-3"><strong>{item.name}</strong></td>
-                        <td className="px-4 py-3"><StatusPill isActive={item.isActive} /></td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <IconButton title="Edit reason for loan" onClick={() => setModal({ kind: 'reasonForLoan', item })} disabled={busyKey === `reason-for-loan-${item.id}`}>
-                              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                              </svg>
-                            </IconButton>
-                            {item.isActive ? (
-                              <IconButton
-                                title="Deactivate reason for loan"
-                                tone="danger"
-                                disabled={busyKey === `reason-for-loan-${item.id}`}
-                                onClick={() => {
-                                  void handleSoftToggle(
-                                    `reason-for-loan-${item.id}`,
-                                    (token) => updateReasonForLoan(token, item.id, { isActive: false }),
-                                    `Mark ${item.name} as inactive?`,
-                                  );
-                                }}
-                              >
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <polyline points="3 6 5 6 21 6" />
-                                  <path d="M19 6l-1 14H6L5 6" />
-                                  <path d="M10 11v6" />
-                                  <path d="M14 11v6" />
-                                  <path d="M9 6V4h6v2" />
-                                </svg>
-                              </IconButton>
-                            ) : (
-                              <IconButton
-                                title="Activate reason for loan"
-                                tone="success"
-                                disabled={busyKey === `reason-for-loan-${item.id}`}
-                                onClick={() => {
-                                  void handleSoftToggle(
-                                    `reason-for-loan-${item.id}`,
-                                    (token) => updateReasonForLoan(token, item.id, { isActive: true }),
-                                    `Mark ${item.name} as active?`,
-                                  );
-                                }}
-                              >
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                                  <path d="M3 3v5h5" />
-                                </svg>
-                              </IconButton>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredReasonsForLoan.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-4 py-8 text-center text-brand-muted">No reason for loan values match the current search.</td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </PageShell>
-            ) : null}
+        {master === 'reasons-for-loan' ? (
+          <MasterSection
+            title="Reason for Loan"
+            description="Maintain reason for loan values used across LOS application journeys, including active and inactive options."
+            actionLabel="+ Add Reason for Loan"
+            onAction={() => setModal({ kind: 'reasonForLoan' })}
+          >
+            <DataTable
+              items={masters?.reasonsForLoan ?? []}
+              columns={reasonColumns}
+              getRowKey={(item) => item.id}
+              entityLabel="reasons for loan"
+              loading={loading && !masters}
+              error={fetchError}
+              onRetry={() => void loadMasters()}
+              emptyMessage="No reason for loan values available."
+            />
+          </MasterSection>
+        ) : null}
 
-            {master === 'genders' ? (
-              <PageShell
-                title="Genders"
-                description="Maintain gender options used in onboarding and application details, including active and inactive values."
-                search={search}
-                onSearchChange={setSearch}
-                searchPlaceholder={definition.searchPlaceholder}
-                statusFilter={statusFilter}
-                onStatusFilterChange={setStatusFilter}
-                actionLabel="+ Add Gender"
-                onAction={() => setModal({ kind: 'gender' })}
-              >
-                <table className="w-full border-collapse text-[0.88rem]">
-                  <thead>
-                    <tr className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.82)] text-left">
-                      {['Gender', 'Status', 'Actions'].map((heading) => (
-                        <th key={heading} className="px-4 py-2 text-[0.72rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-                          {heading}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredGenders.map((item, index) => (
-                      <tr key={item.id} className={cx('border-b border-[rgba(23,44,113,0.05)]', index === filteredGenders.length - 1 && 'border-b-0')}>
-                        <td className="px-4 py-3"><strong>{item.name}</strong></td>
-                        <td className="px-4 py-3"><StatusPill isActive={item.isActive} /></td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <IconButton title="Edit gender" onClick={() => setModal({ kind: 'gender', item })} disabled={busyKey === `gender-${item.id}`}>
-                              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                              </svg>
-                            </IconButton>
-                            {item.isActive ? (
-                              <IconButton
-                                title="Deactivate gender"
-                                tone="danger"
-                                disabled={busyKey === `gender-${item.id}`}
-                                onClick={() => {
-                                  void handleSoftToggle(
-                                    `gender-${item.id}`,
-                                    (token) => updateGender(token, item.id, { isActive: false }),
-                                    `Mark ${item.name} as inactive?`,
-                                  );
-                                }}
-                              >
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <polyline points="3 6 5 6 21 6" />
-                                  <path d="M19 6l-1 14H6L5 6" />
-                                  <path d="M10 11v6" />
-                                  <path d="M14 11v6" />
-                                  <path d="M9 6V4h6v2" />
-                                </svg>
-                              </IconButton>
-                            ) : (
-                              <IconButton
-                                title="Activate gender"
-                                tone="success"
-                                disabled={busyKey === `gender-${item.id}`}
-                                onClick={() => {
-                                  void handleSoftToggle(
-                                    `gender-${item.id}`,
-                                    (token) => updateGender(token, item.id, { isActive: true }),
-                                    `Mark ${item.name} as active?`,
-                                  );
-                                }}
-                              >
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                                  <path d="M3 3v5h5" />
-                                </svg>
-                              </IconButton>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredGenders.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-4 py-8 text-center text-brand-muted">No genders match the current search.</td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </PageShell>
-            ) : null}
+        {master === 'genders' ? (
+          <MasterSection
+            title="Genders"
+            description="Maintain gender options used in onboarding and application details, including active and inactive values."
+            actionLabel="+ Add Gender"
+            onAction={() => setModal({ kind: 'gender' })}
+          >
+            <DataTable
+              items={masters?.genders ?? []}
+              columns={genderColumns}
+              getRowKey={(item) => item.id}
+              entityLabel="genders"
+              loading={loading && !masters}
+              error={fetchError}
+              onRetry={() => void loadMasters()}
+              emptyMessage="No genders available."
+            />
+          </MasterSection>
+        ) : null}
 
-            {master === 'banks' ? (
-              <PageShell
-                title="Banks"
-                description="Manage banks offered in the customer bank-details step. Inactive banks are hidden from the dropdown; delete removes the row permanently."
-                search={search}
-                onSearchChange={setSearch}
-                searchPlaceholder={definition.searchPlaceholder}
-                statusFilter={statusFilter}
-                onStatusFilterChange={setStatusFilter}
-                actionLabel="+ Add Bank"
-                onAction={() => setModal({ kind: 'bank' })}
-              >
-                <table className="w-full border-collapse text-[0.88rem]">
-                  <thead>
-                    <tr className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.82)] text-left">
-                      {['Bank', 'Status', 'Actions'].map((heading) => (
-                        <th key={heading} className="px-4 py-2 text-[0.72rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-                          {heading}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredBanks.map((item, index) => (
-                      <tr key={item.id} className={cx('border-b border-[rgba(23,44,113,0.05)]', index === filteredBanks.length - 1 && 'border-b-0')}>
-                        <td className="px-4 py-3"><strong>{item.name}</strong></td>
-                        <td className="px-4 py-3"><StatusPill isActive={item.isActive} /></td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <IconButton title="Edit bank" onClick={() => setModal({ kind: 'bank', item })} disabled={busyKey === `bank-${item.id}` || busyKey === `bank-delete-${item.id}`}>
-                              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                              </svg>
-                            </IconButton>
-                            {item.isActive ? (
-                              <IconButton
-                                title="Deactivate bank"
-                                tone="danger"
-                                disabled={busyKey === `bank-${item.id}` || busyKey === `bank-delete-${item.id}`}
-                                onClick={() => {
-                                  void handleSoftToggle(
-                                    `bank-${item.id}`,
-                                    (token) => updateBank(token, item.id, { isActive: false }),
-                                    `Mark ${item.name} as inactive?`,
-                                  );
-                                }}
-                              >
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <polyline points="3 6 5 6 21 6" />
-                                  <path d="M19 6l-1 14H6L5 6" />
-                                  <path d="M10 11v6" />
-                                  <path d="M14 11v6" />
-                                  <path d="M9 6V4h6v2" />
-                                </svg>
-                              </IconButton>
-                            ) : (
-                              <IconButton
-                                title="Activate bank"
-                                tone="success"
-                                disabled={busyKey === `bank-${item.id}` || busyKey === `bank-delete-${item.id}`}
-                                onClick={() => {
-                                  void handleSoftToggle(
-                                    `bank-${item.id}`,
-                                    (token) => updateBank(token, item.id, { isActive: true }),
-                                    `Mark ${item.name} as active?`,
-                                  );
-                                }}
-                              >
-                                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                                  <path d="M3 3v5h5" />
-                                </svg>
-                              </IconButton>
-                            )}
-                            <IconButton
-                              title="Delete bank permanently"
-                              tone="danger"
-                              disabled={busyKey === `bank-${item.id}` || busyKey === `bank-delete-${item.id}`}
-                              onClick={() => {
-                                if (!window.confirm(`Permanently delete "${item.name}"? Existing applications that reference this name are unchanged, but the bank will no longer appear in the master list.`)) return;
-                                void runAction(`bank-delete-${item.id}`, (token) => deleteBank(token, item.id));
-                              }}
-                            >
-                              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                <circle cx="12" cy="12" r="9" />
-                                <line x1="15" y1="9" x2="9" y2="15" />
-                                <line x1="9" y1="9" x2="15" y2="15" />
-                              </svg>
-                            </IconButton>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredBanks.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-4 py-8 text-center text-brand-muted">No banks match the current search.</td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </PageShell>
-            ) : null}
-          </>
-        )}
+        {master === 'banks' ? (
+          <MasterSection
+            title="Banks"
+            description="Manage banks offered in the customer bank-details step. Inactive banks are hidden from the dropdown; delete removes the row permanently."
+            actionLabel="+ Add Bank"
+            onAction={() => setModal({ kind: 'bank' })}
+          >
+            <DataTable
+              items={masters?.banks ?? []}
+              columns={bankColumns}
+              getRowKey={(item) => item.id}
+              entityLabel="banks"
+              loading={loading && !masters}
+              error={fetchError}
+              onRetry={() => void loadMasters()}
+              emptyMessage="No banks available."
+            />
+          </MasterSection>
+        ) : null}
       </div>
 
       {modal?.kind === 'leadStatus' ? (

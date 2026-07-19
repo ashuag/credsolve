@@ -1,11 +1,15 @@
 'use client';
 
-import { DataTablePagination, LOS_TABLE_PAGE_SIZE, paginateItems } from '@/components/ui/data-table';
+import {
+  DataTable,
+  isoDateTimestamp,
+  type DataTableColumn,
+} from '@/components/ui/data-table';
 import { getLoans, type LosLoan } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -91,14 +95,10 @@ function StatCard({ label, value, sub, color }: { label: string; value: number |
   );
 }
 
-const PAGE_SIZE = LOS_TABLE_PAGE_SIZE;
-
 export function LoansPanel() {
   const [loans, setLoans] = useState<LosLoan[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
 
   const loadLoans = useCallback(async () => {
     setLoading(true);
@@ -122,32 +122,99 @@ export function LoansPanel() {
     void loadLoans();
   }, [loadLoans]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search]);
-
-  const filtered = loans.filter((loan) => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    const haystack = [
-      loan.fullName,
-      loan.mobileNumber,
-      loan.loanNumber,
-      loan.applicationNumber,
-      loan.loanStatusLabel,
-      loan.email,
-    ]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase();
-    return haystack.includes(q);
-  });
-
-  const { paginated, safePage, totalPages, rangeStart, rangeEnd, count } = paginateItems(
-    filtered,
-    currentPage,
-    PAGE_SIZE,
-  );
+  const columns = useMemo((): DataTableColumn<LosLoan>[] => [
+    {
+      key: 'loan',
+      label: 'Loan',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => `${row.loanNumber} ${row.applicationNumber}`,
+      getSortValue: (row) => (row.loanNumber ?? '').toUpperCase(),
+      filter: { type: 'text', placeholder: 'Search loan no…' },
+      render: (loan) => (
+        <Link href={`/loans/${loan.uuid}`} className="no-underline group">
+          <div className="font-extrabold text-brand-navy group-hover:text-brand-blue">
+            {loan.loanNumber}
+          </div>
+          <div className="text-[0.72rem] text-brand-muted mt-0.5">
+            App {loan.applicationNumber}
+          </div>
+        </Link>
+      ),
+    },
+    {
+      key: 'borrower',
+      label: 'Borrower',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) =>
+        [row.fullName, row.mobileNumber, row.email].filter(Boolean).join(' '),
+      getSortValue: (row) => (row.fullName ?? '').toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search name, mobile…' },
+      render: (loan) => {
+        const name = formatPersonName(loan.fullName, 'Borrower (name pending)');
+        return (
+          <>
+            <div className="font-bold text-brand-text">{name}</div>
+            <div className="text-[0.72rem] text-brand-muted mt-0.5">{loan.mobileNumber}</div>
+          </>
+        );
+      },
+    },
+    {
+      key: 'principal',
+      label: 'Principal',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.principalAmount ?? '',
+      getSortValue: (row) => {
+        const n = Number(row.principalAmount);
+        return Number.isFinite(n) ? n : null;
+      },
+      filter: false,
+      cellClassName: 'font-bold text-brand-text whitespace-nowrap',
+      render: (loan) => formatINR(loan.principalAmount),
+    },
+    {
+      key: 'netDisbursed',
+      label: 'Net disbursed',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.netDisbursedAmount ?? '',
+      getSortValue: (row) => {
+        const n = Number(row.netDisbursedAmount);
+        return Number.isFinite(n) ? n : null;
+      },
+      filter: false,
+      cellClassName: 'font-bold text-[#047857] whitespace-nowrap',
+      render: (loan) => formatINR(loan.netDisbursedAmount),
+    },
+    {
+      key: 'repayBy',
+      label: 'Repay by',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.loanMaturityDate ?? '',
+      getSortValue: (row) => isoDateTimestamp(row.loanMaturityDate),
+      filter: { type: 'date' },
+      cellClassName: 'whitespace-nowrap text-brand-text',
+      render: (loan) => formatDate(loan.loanMaturityDate),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.loanStatusLabel,
+      getSortValue: (row) => row.loanStatusLabel.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search status…' },
+      render: (loan) => <StatusPill label={loan.loanStatusLabel} code={loan.loanStatusCode} />,
+    },
+    {
+      key: 'disbursed',
+      label: 'Disbursed',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.disbursedAt ?? '',
+      getSortValue: (row) => isoDateTimestamp(row.disbursedAt),
+      filter: { type: 'date' },
+      cellClassName: 'whitespace-nowrap text-brand-muted',
+      render: (loan) => formatDateTime(loan.disbursedAt),
+    },
+  ], []);
 
   const totalDisbursed = loans.reduce((sum, loan) => sum + (Number(loan.netDisbursedAmount) || 0), 0);
   const activeCount = loans.filter((loan) => loan.loanStatusCode.toUpperCase() === 'ACTIVE').length;
@@ -169,130 +236,26 @@ export function LoansPanel() {
         </div>
       ) : null}
 
-      <div
-        className="rounded-[14px] border border-[rgba(23,44,113,0.1)] overflow-hidden"
-        style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,246,255,0.94))' }}
-      >
-        <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-[rgba(23,44,113,0.07)]">
-          <div className="flex-1 min-w-[180px]">
-            <input
-              type="search"
-              placeholder="Search loan no, name, mobile, application…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="los-input h-[36px] text-[0.84rem]"
-            />
-          </div>
+      <DataTable
+        items={loans}
+        columns={columns}
+        getRowKey={(loan) => loan.uuid}
+        entityLabel="loans"
+        loading={loading}
+        error={fetchError}
+        onRetry={() => void loadLoans()}
+        emptyMessage="No disbursed loans yet. Approve and disburse an application to see it here."
+        noResultsMessage="No loans match your filters."
+        toolbarActions={
           <button
             type="button"
             onClick={() => void loadLoans()}
-            className="h-[36px] px-4 rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent text-[0.84rem] font-bold text-brand-text cursor-pointer hover:bg-[rgba(20,150,243,0.06)] transition-colors whitespace-nowrap"
+            className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
           >
             ↺ Refresh
           </button>
-        </div>
-
-        {fetchError ? (
-          <div className="p-8 text-center text-[#8d3434] text-[0.88rem]">{fetchError}</div>
-        ) : loading ? (
-          <div className="p-10 text-center text-brand-muted text-[0.88rem]">
-            <span className="inline-block animate-pulse">Loading loans…</span>
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-[0.84rem]">
-                <thead>
-                  <tr className="text-left border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)]">
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">
-                      Loan
-                    </th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">
-                      Borrower
-                    </th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">
-                      Principal
-                    </th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">
-                      Net disbursed
-                    </th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">
-                      Repay by
-                    </th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">
-                      Status
-                    </th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">
-                      Disbursed
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginated.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-4 py-12 text-center text-brand-muted text-[0.86rem]">
-                        {search
-                          ? 'No loans match your search.'
-                          : 'No disbursed loans yet. Approve and disburse an application to see it here.'}
-                      </td>
-                    </tr>
-                  ) : (
-                    paginated.map((loan, idx) => {
-                      const name = formatPersonName(loan.fullName, 'Borrower (name pending)');
-                      return (
-                        <tr
-                          key={loan.uuid}
-                          className={`border-b transition-colors hover:bg-[rgba(20,150,243,0.025)] ${idx === paginated.length - 1 ? 'border-b-0' : 'border-[rgba(23,44,113,0.05)]'}`}
-                        >
-                          <td className="px-4 py-2.5">
-                            <Link href={`/loans/${loan.uuid}`} className="no-underline group">
-                              <div className="font-extrabold text-brand-navy group-hover:text-brand-blue">
-                                {loan.loanNumber}
-                              </div>
-                              <div className="text-[0.72rem] text-brand-muted mt-0.5">
-                                App {loan.applicationNumber}
-                              </div>
-                            </Link>
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <div className="font-bold text-brand-text">{name}</div>
-                            <div className="text-[0.72rem] text-brand-muted mt-0.5">{loan.mobileNumber}</div>
-                          </td>
-                          <td className="px-4 py-2.5 font-bold text-brand-text whitespace-nowrap">
-                            {formatINR(loan.principalAmount)}
-                          </td>
-                          <td className="px-4 py-2.5 font-bold text-[#047857] whitespace-nowrap">
-                            {formatINR(loan.netDisbursedAmount)}
-                          </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap text-brand-text">
-                            {formatDate(loan.loanMaturityDate)}
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <StatusPill label={loan.loanStatusLabel} code={loan.loanStatusCode} />
-                          </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap text-brand-muted">
-                            {formatDateTime(loan.disbursedAt)}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <DataTablePagination
-              page={safePage}
-              total={totalPages}
-              start={rangeStart}
-              end={rangeEnd}
-              count={count}
-              entityLabel="loans"
-              onPrev={() => setCurrentPage(Math.max(1, safePage - 1))}
-              onNext={() => setCurrentPage(Math.min(totalPages, safePage + 1))}
-            />
-          </>
-        )}
-      </div>
+        }
+      />
     </div>
   );
 }

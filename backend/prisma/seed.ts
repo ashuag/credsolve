@@ -15,6 +15,7 @@ import { seedBank } from './seeds/bank.seed';
 import { seedRejectionReason } from './seeds/rejection-reason.seed';
 import { seedReferenceRelation } from './seeds/reference-relation.seed';
 import { seedSmsTemplate } from './seeds/sms-template.seed';
+import { seedVendorApiConfig } from './seeds/vendor-api-config.seed';
 import { seedLoanStatus } from './seeds/loan_status.seed';
 
 async function assertMigrationsApplied(prisma: ReturnType<typeof createPrismaClient>) {
@@ -81,6 +82,7 @@ async function main() {
         await seedRejectionReason(prisma);
         await seedReferenceRelation(prisma);
         await seedSmsTemplate(prisma);
+        await seedVendorApiConfig(prisma);
 
         console.log(`Seed completed in ${Date.now() - start}ms`);
     } catch (error) {

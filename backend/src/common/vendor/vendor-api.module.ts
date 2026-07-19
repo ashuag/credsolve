@@ -6,7 +6,9 @@ import { DigilockerVendorService } from './digilocker-vendor.service';
 import { LivenessVendorService } from './liveness-vendor.service';
 import { KycTenacioVendorService } from './kyc-tenacio-vendor.service';
 import { PanVerificationService } from './pan-verification.service';
+import { SurepassCibilModule } from './surepass/surepass-cibil.module';
 import { VendorApiService } from './vendor-api.service';
+import { VendorApiConfigService } from './vendor-api-config.service';
 import { VendorInternalErrorService } from './vendor-internal-error.service';
 
 /**
@@ -20,8 +22,10 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
  */
 @Global()
 @Module({
+  imports: [SurepassCibilModule],
   providers: [
     VendorApiService,
+    VendorApiConfigService,
     VendorInternalErrorService,
     PanVerificationService,
     BureauFetchService,
@@ -33,6 +37,7 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
   ],
   exports: [
     VendorApiService,
+    VendorApiConfigService,
     VendorInternalErrorService,
     PanVerificationService,
     BureauFetchService,
@@ -41,6 +46,7 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
     BankTenacioVendorService,
     KycTenacioVendorService,
     EasebuzzWireService,
+    SurepassCibilModule,
   ],
 })
 export class VendorApiModule {}

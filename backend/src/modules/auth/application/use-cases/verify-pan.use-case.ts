@@ -557,9 +557,10 @@ export class VerifyPanUseCase {
   }
 
   /**
-   * Tenacio bureau soft-pull after PAN is verified, when `BUREAU_FETCH_ENABLED`
-   * is on, the lead is not terminal-negative, and the customer has bureau
-   * consent on `lead_detail`. Outcome is written to `lead_detail.bureau_fetched` /
+   * Bureau soft-pull after PAN is verified (Tenacio primary; on any Tenacio
+   * error the pull automatically falls back to Surepass), when
+   * `BUREAU_FETCH_ENABLED` is on, the lead is not terminal-negative, and the
+   * customer has bureau consent on `lead_detail`. Outcome is written to `lead_detail.bureau_fetched` /
    * `bureau_fetched_at` / `bureau_fetched_note`. Returns `failed` when the vendor
    * HTTP status is not 200 (caller shows thank-you and rejects the lead).
    */

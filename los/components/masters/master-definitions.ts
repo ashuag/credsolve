@@ -99,6 +99,16 @@ export const MASTER_DEFINITIONS = [
     searchPlaceholder: 'Search SMS templates...',
     canCreate: false,
   },
+  {
+    slug: 'vendor-apis',
+    label: 'Vendor APIs',
+    eyebrow: 'Integrations',
+    description: 'Switch primary and backup vendor APIs on or off, and add new API/vendor registrations.',
+    pageTitle: 'Vendor APIs',
+    pageSubtitle: 'Control which vendor is ACTIVE for each logical API (e.g. CIBIL fetch).',
+    searchPlaceholder: 'Search vendor APIs...',
+    canCreate: true,
+  },
 ] as const;
 
 export type MasterSlug = (typeof MASTER_DEFINITIONS)[number]['slug'];

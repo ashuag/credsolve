@@ -1,19 +1,21 @@
 'use client';
 
 import {
+  ACTIVE_INACTIVE_FILTER_OPTIONS,
+  DataTable,
+  matchesActiveInactiveFilter,
+  type DataTableColumn,
+} from '@/components/ui/data-table';
+import {
   getEligibilityCriteria,
   type LosEligibilityCriterion,
   updateEligibilityCriterion,
 } from '@/lib/api';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  applyStatusFilter,
-  cx,
   getLosToken,
   IconButton,
   ModalShell,
-  PageShell,
-  type StatusFilter,
   StatusPill,
   SummaryCards,
 } from './eligibility-ui';
@@ -109,8 +111,6 @@ export function ProfileEligibilityPanel({
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [editing, setEditing] = useState<LosEligibilityCriterion | null>(null);
 
   const loadCriteria = useCallback(async (tokenOverride?: string) => {
@@ -164,26 +164,16 @@ export function ProfileEligibilityPanel({
     await runAction(`criterion-${item.id}`, (token) => updateEligibilityCriterion(token, item.id, { isActive }));
   }
 
-  const filteredCriteria = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const scoped = breType ? criteria.filter((item) => item.breType === breType) : criteria;
-    const filtered = scoped.filter((item) => (
-      term === ''
-      || item.key.toLowerCase().includes(term)
-      || item.label.toLowerCase().includes(term)
-      || item.value.toLowerCase().includes(term)
-      || item.description?.toLowerCase().includes(term)
-    ));
-
-    return applyStatusFilter(filtered, statusFilter);
-  }, [breType, criteria, search, statusFilter]);
+  const scopedCriteria = useMemo(
+    () => (breType ? criteria.filter((item) => item.breType === breType) : criteria),
+    [breType, criteria],
+  );
 
   const summary = useMemo(() => {
-    const scoped = breType ? criteria.filter((item) => item.breType === breType) : criteria;
-    const total = scoped.length;
-    const active = scoped.filter((item) => item.isActive).length;
+    const total = scopedCriteria.length;
+    const active = scopedCriteria.filter((item) => item.isActive).length;
     return { total, active, inactive: total - active };
-  }, [breType, criteria]);
+  }, [scopedCriteria]);
 
   const pageCopy =
     breType === 'POST_BRE'
@@ -191,21 +181,106 @@ export function ProfileEligibilityPanel({
           title: 'Post BRE',
           description:
             'Manage post-bureau eligibility thresholds used after CIBIL pull, including score floors, DPD windows, enquiry limits, and tradeline rules.',
-          loading: 'Loading post-BRE criteria...',
         }
       : breType === 'PRE_BRE'
         ? {
             title: 'Pre BRE',
             description:
               'Manage pre-bureau eligibility rules applied before CIBIL pull, including age, occupation, gender, and negative serviceability enforcement.',
-            loading: 'Loading pre-BRE criteria...',
           }
         : {
             title: 'Profile Eligibility Check',
             description:
               'Manage profile-level eligibility rules used during screening, including stored threshold values and whether each rule is currently enforced.',
-            loading: 'Loading profile eligibility criteria...',
           };
+
+  const columns = useMemo((): DataTableColumn<LosEligibilityCriterion>[] => [
+    {
+      key: 'rule',
+      label: 'Rule',
+      getFilterValue: (item) => [item.label, item.key, item.description ?? ''].join(' '),
+      getSortValue: (item) => item.label.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search rules, labels, keys…' },
+      render: (item) => (
+        <div className="grid gap-0.5">
+          <strong>{item.label}</strong>
+          <span className="text-[0.78rem] uppercase tracking-[0.08em] text-brand-muted">{item.key}</span>
+          {item.description ? (
+            <span className="text-[0.8rem] leading-[1.45] text-brand-muted">{item.description}</span>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: 'value',
+      label: 'Value',
+      getFilterValue: (item) => item.value,
+      getSortValue: (item) => item.value.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search values…' },
+      cellClassName: 'text-brand-muted',
+      render: (item) => item.value,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      getFilterValue: (item) => (item.isActive ? 'active' : 'inactive'),
+      getSortValue: (item) => (item.isActive ? 0 : 1),
+      filter: {
+        type: 'select',
+        options: [...ACTIVE_INACTIVE_FILTER_OPTIONS],
+        matches: (item, value) => matchesActiveInactiveFilter(item.isActive, value),
+      },
+      render: (item) => <StatusPill isActive={item.isActive} />,
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      filter: false,
+      render: (item) => (
+        <div className="flex items-center gap-2">
+          <IconButton title="Edit profile eligibility rule" onClick={() => setEditing(item)} disabled={busyKey === `criterion-${item.id}`}>
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+          </IconButton>
+          {item.isActive ? (
+            <IconButton
+              title="Deactivate profile eligibility rule"
+              tone="danger"
+              disabled={busyKey === `criterion-${item.id}`}
+              onClick={() => {
+                void handleSoftToggle(item, false);
+              }}
+            >
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v6" />
+                <path d="M14 11v6" />
+                <path d="M9 6V4h6v2" />
+              </svg>
+            </IconButton>
+          ) : (
+            <IconButton
+              title="Activate profile eligibility rule"
+              tone="success"
+              disabled={busyKey === `criterion-${item.id}`}
+              onClick={() => {
+                void handleSoftToggle(item, true);
+              }}
+            >
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                <path d="M3 3v5h5" />
+              </svg>
+            </IconButton>
+          )}
+        </div>
+      ),
+    },
+  ], [busyKey]);
 
   return (
     <>
@@ -218,101 +293,25 @@ export function ProfileEligibilityPanel({
           </div>
         ) : null}
 
-        {fetchError ? (
-          <div className="rounded-[12px] border border-[rgba(231,95,95,0.22)] bg-[rgba(255,241,241,0.92)] p-6 text-[0.9rem] text-[#8d3434]">
-            {fetchError}
-          </div>
-        ) : loading ? (
-          <div className="rounded-[12px] border border-[rgba(23,44,113,0.08)] bg-[rgba(255,255,255,0.9)] p-8 text-center text-[0.88rem] text-brand-muted">
-            {pageCopy.loading}
-          </div>
-        ) : (
-          <PageShell
-            title={pageCopy.title}
-            description={pageCopy.description}
-            search={search}
-            onSearchChange={setSearch}
-            searchPlaceholder="Search rules, labels, keys, values..."
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
-          >
-            <table className="w-full border-collapse text-[0.88rem]">
-              <thead>
-                <tr className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.82)] text-left">
-                  {['Rule', 'Value', 'Status', 'Actions'].map((heading) => (
-                    <th key={heading} className="px-4 py-2 text-[0.72rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-                      {heading}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCriteria.map((item, index) => (
-                  <tr key={item.id} className={cx('border-b border-[rgba(23,44,113,0.05)]', index === filteredCriteria.length - 1 && 'border-b-0')}>
-                    <td className="px-4 py-3">
-                      <div className="grid gap-0.5">
-                        <strong>{item.label}</strong>
-                        <span className="text-[0.78rem] uppercase tracking-[0.08em] text-brand-muted">{item.key}</span>
-                        {item.description ? (
-                          <span className="text-[0.8rem] leading-[1.45] text-brand-muted">{item.description}</span>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-brand-muted">{item.value}</td>
-                    <td className="px-4 py-3"><StatusPill isActive={item.isActive} /></td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <IconButton title="Edit profile eligibility rule" onClick={() => setEditing(item)} disabled={busyKey === `criterion-${item.id}`}>
-                          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                          </svg>
-                        </IconButton>
-                        {item.isActive ? (
-                          <IconButton
-                            title="Deactivate profile eligibility rule"
-                            tone="danger"
-                            disabled={busyKey === `criterion-${item.id}`}
-                            onClick={() => {
-                              void handleSoftToggle(item, false);
-                            }}
-                          >
-                            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                              <polyline points="3 6 5 6 21 6" />
-                              <path d="M19 6l-1 14H6L5 6" />
-                              <path d="M10 11v6" />
-                              <path d="M14 11v6" />
-                              <path d="M9 6V4h6v2" />
-                            </svg>
-                          </IconButton>
-                        ) : (
-                          <IconButton
-                            title="Activate profile eligibility rule"
-                            tone="success"
-                            disabled={busyKey === `criterion-${item.id}`}
-                            onClick={() => {
-                              void handleSoftToggle(item, true);
-                            }}
-                          >
-                            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                              <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                              <path d="M3 3v5h5" />
-                            </svg>
-                          </IconButton>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {filteredCriteria.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-brand-muted">No profile eligibility criteria match the current search.</td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </PageShell>
-        )}
+        <div>
+          <h2 className="m-0 text-[1.15rem] font-extrabold tracking-[-0.03em]">{pageCopy.title}</h2>
+          <p className="m-0 mt-1 max-w-[70ch] text-[0.86rem] leading-[1.5] text-brand-muted">
+            {pageCopy.description}
+          </p>
+        </div>
+
+        <DataTable
+          items={scopedCriteria}
+          columns={columns}
+          getRowKey={(item) => item.id}
+          entityLabel="rules"
+          loading={loading}
+          error={fetchError}
+          onRetry={() => void loadCriteria()}
+          emptyMessage="No profile eligibility criteria available right now."
+          noResultsMessage="No profile eligibility criteria match your filters."
+          tableClassName="text-[0.88rem]"
+        />
       </div>
 
       {editing ? (

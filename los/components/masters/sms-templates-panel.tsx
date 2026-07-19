@@ -1,20 +1,22 @@
 'use client';
 
 import {
+  ACTIVE_INACTIVE_FILTER_OPTIONS,
+  DataTable,
+  DataTableStatusPill,
+  matchesActiveInactiveFilter,
+  type DataTableColumn,
+} from '@/components/ui/data-table';
+import {
   getSmsTemplates,
   type LosSmsTemplate,
   updateSmsTemplate,
 } from '@/lib/api';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  applyStatusFilter,
-  cx,
   getLosToken,
   IconButton,
   ModalShell,
-  PageShell,
-  type StatusFilter,
-  StatusPill,
   SummaryCards,
 } from '@/components/eligibility/eligibility-ui';
 
@@ -147,8 +149,6 @@ export function SmsTemplatesPanel() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [editing, setEditing] = useState<LosSmsTemplate | null>(null);
 
   const loadTemplates = useCallback(async (tokenOverride?: string) => {
@@ -202,28 +202,122 @@ export function SmsTemplatesPanel() {
     await runAction(`sms-template-${item.id}`, (token) => updateSmsTemplate(token, item.id, { isActive: nextActive }));
   }
 
-  const filteredTemplates = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const filtered = templates.filter((item) => (
-      term === ''
-      || item.product.toLowerCase().includes(term)
-      || item.templateId.toLowerCase().includes(term)
-      || item.message.toLowerCase().includes(term)
-    ));
-
-    return applyStatusFilter(filtered, statusFilter);
-  }, [templates, search, statusFilter]);
-
   const summary = useMemo(() => {
     const total = templates.length;
     const active = templates.filter((item) => item.isActive).length;
     return { total, active, inactive: total - active };
   }, [templates]);
 
+  const columns = useMemo((): DataTableColumn<LosSmsTemplate>[] => [
+    {
+      key: 'product',
+      label: 'Product',
+      getFilterValue: (item) => item.product,
+      getSortValue: (item) => item.product.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search product…' },
+      cellClassName: 'font-bold',
+      render: (item) => item.product,
+    },
+    {
+      key: 'templateId',
+      label: 'Template ID',
+      getFilterValue: (item) => item.templateId,
+      getSortValue: (item) => item.templateId.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search template ID…' },
+      cellClassName: 'text-brand-muted',
+      render: (item) => item.templateId,
+    },
+    {
+      key: 'message',
+      label: 'Message',
+      getFilterValue: (item) => item.message,
+      getSortValue: (item) => item.message.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search message…' },
+      cellClassName: 'text-brand-muted',
+      render: (item) => item.message,
+    },
+    {
+      key: 'bearerToken',
+      label: 'Bearer token',
+      getFilterValue: (item) => item.bearerToken,
+      getSortValue: (item) => item.bearerToken.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search token…' },
+      cellClassName: 'text-brand-muted',
+      render: (item) => item.bearerToken,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      getFilterValue: (item) => (item.isActive ? 'active' : 'inactive'),
+      getSortValue: (item) => (item.isActive ? 0 : 1),
+      filter: {
+        type: 'select',
+        options: [...ACTIVE_INACTIVE_FILTER_OPTIONS],
+        matches: (item, value) => matchesActiveInactiveFilter(item.isActive, value),
+      },
+      render: (item) => <DataTableStatusPill isActive={item.isActive} />,
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      filter: false,
+      render: (item) => (
+        <div className="flex items-center gap-2">
+          <IconButton title="Edit SMS template" onClick={() => setEditing(item)} disabled={busyKey === `sms-template-${item.id}`}>
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+          </IconButton>
+          {item.isActive ? (
+            <IconButton
+              title="Deactivate SMS template"
+              tone="danger"
+              disabled={busyKey === `sms-template-${item.id}`}
+              onClick={() => {
+                void handleSoftToggle(item, false);
+              }}
+            >
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v6" />
+                <path d="M14 11v6" />
+                <path d="M9 6V4h6v2" />
+              </svg>
+            </IconButton>
+          ) : (
+            <IconButton
+              title="Activate SMS template"
+              tone="success"
+              disabled={busyKey === `sms-template-${item.id}`}
+              onClick={() => {
+                void handleSoftToggle(item, true);
+              }}
+            >
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                <path d="M3 3v5h5" />
+              </svg>
+            </IconButton>
+          )}
+        </div>
+      ),
+    },
+  ], [busyKey]);
+
   return (
     <>
       <div className="grid gap-3">
         <SummaryCards total={summary.total} active={summary.active} inactive={summary.inactive} />
+
+        <div>
+          <h2 className="m-0 text-[1.15rem] font-extrabold tracking-[-0.03em]">SMS Templates</h2>
+          <p className="m-0 mt-1 max-w-[70ch] text-[0.86rem] leading-[1.5] text-brand-muted">
+            Manage SMS provider templates used for OTP and other outbound messages.
+          </p>
+        </div>
 
         {actionError ? (
           <div className="rounded-[10px] border border-[rgba(231,95,95,0.22)] bg-[rgba(255,241,241,0.92)] p-[10px_14px] text-[0.86rem] text-[#8d3434]">
@@ -231,95 +325,16 @@ export function SmsTemplatesPanel() {
           </div>
         ) : null}
 
-        {fetchError ? (
-          <div className="rounded-[12px] border border-[rgba(231,95,95,0.22)] bg-[rgba(255,241,241,0.92)] p-6 text-[0.9rem] text-[#8d3434]">
-            {fetchError}
-          </div>
-        ) : loading ? (
-          <div className="rounded-[12px] border border-[rgba(23,44,113,0.08)] bg-[rgba(255,255,255,0.9)] p-8 text-center text-[0.88rem] text-brand-muted">
-            Loading SMS templates...
-          </div>
-        ) : (
-          <PageShell
-            title="SMS Templates"
-            description="Manage SMS provider templates used for OTP and other outbound messages."
-            search={search}
-            onSearchChange={setSearch}
-            searchPlaceholder="Search product, template ID, message..."
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
-          >
-            <table className="w-full border-collapse text-[0.88rem]">
-              <thead>
-                <tr className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.82)] text-left">
-                  {['Product', 'Template ID', 'Message', 'Bearer token', 'Status', 'Actions'].map((heading) => (
-                    <th key={heading} className="px-4 py-2 text-[0.72rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-                      {heading}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTemplates.map((item, index) => (
-                  <tr key={item.id} className={cx('border-b border-[rgba(23,44,113,0.05)]', index === filteredTemplates.length - 1 && 'border-b-0')}>
-                    <td className="px-4 py-3 font-bold">{item.product}</td>
-                    <td className="px-4 py-3 text-brand-muted">{item.templateId}</td>
-                    <td className="px-4 py-3 text-brand-muted">{item.message}</td>
-                    <td className="px-4 py-3 text-brand-muted">{item.bearerToken}</td>
-                    <td className="px-4 py-3"><StatusPill isActive={item.isActive} /></td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <IconButton title="Edit SMS template" onClick={() => setEditing(item)} disabled={busyKey === `sms-template-${item.id}`}>
-                          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                          </svg>
-                        </IconButton>
-                        {item.isActive ? (
-                          <IconButton
-                            title="Deactivate SMS template"
-                            tone="danger"
-                            disabled={busyKey === `sms-template-${item.id}`}
-                            onClick={() => {
-                              void handleSoftToggle(item, false);
-                            }}
-                          >
-                            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                              <polyline points="3 6 5 6 21 6" />
-                              <path d="M19 6l-1 14H6L5 6" />
-                              <path d="M10 11v6" />
-                              <path d="M14 11v6" />
-                              <path d="M9 6V4h6v2" />
-                            </svg>
-                          </IconButton>
-                        ) : (
-                          <IconButton
-                            title="Activate SMS template"
-                            tone="success"
-                            disabled={busyKey === `sms-template-${item.id}`}
-                            onClick={() => {
-                              void handleSoftToggle(item, true);
-                            }}
-                          >
-                            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                              <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                              <path d="M3 3v5h5" />
-                            </svg>
-                          </IconButton>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {filteredTemplates.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-brand-muted">No SMS templates match the current search.</td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </PageShell>
-        )}
+        <DataTable
+          items={templates}
+          columns={columns}
+          getRowKey={(item) => item.id}
+          entityLabel="SMS templates"
+          loading={loading}
+          error={fetchError}
+          onRetry={() => void loadTemplates()}
+          emptyMessage="No SMS templates available."
+        />
       </div>
 
       {editing ? (

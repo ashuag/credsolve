@@ -1,11 +1,15 @@
 'use client';
 
-import { DataTablePagination, LOS_TABLE_PAGE_SIZE, paginateItems } from '@/components/ui/data-table';
+import {
+  DataTable,
+  isoDateTimestamp,
+  type DataTableColumn,
+} from '@/components/ui/data-table';
 import { getCustomers, type LosCustomer } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -83,14 +87,10 @@ function StatCard({ label, value, sub, color }: { label: string; value: number |
   );
 }
 
-const PAGE_SIZE = LOS_TABLE_PAGE_SIZE;
-
 export function CustomersPanel() {
   const [customers, setCustomers] = useState<LosCustomer[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
 
   const loadCustomers = useCallback(async () => {
     setLoading(true);
@@ -114,25 +114,111 @@ export function CustomersPanel() {
     void loadCustomers();
   }, [loadCustomers]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search]);
-
-  const filtered = customers.filter((customer) => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    const haystack = [customer.fullName, customer.mobileNumber, customer.latestLeadStatusLabel]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase();
-    return haystack.includes(q);
-  });
-
-  const { paginated, safePage, totalPages, rangeStart, rangeEnd, count } = paginateItems(
-    filtered,
-    currentPage,
-    PAGE_SIZE,
-  );
+  const columns = useMemo((): DataTableColumn<LosCustomer>[] => [
+    {
+      key: 'customer',
+      label: 'Customer',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.fullName ?? '',
+      getSortValue: (row) => (row.fullName ?? '').toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search name…' },
+      render: (customer) => {
+        const name = formatPersonName(customer.fullName, 'Customer (name pending)');
+        const [c1, c2] = avatarColor(name);
+        return (
+          <Link href={`/customers/${customer.uuid}`} className="flex items-center gap-2.5 no-underline group">
+            <span
+              className="flex-shrink-0 grid place-items-center w-8 h-8 rounded-[9px] text-white text-[0.7rem] font-extrabold"
+              style={{ background: `linear-gradient(135deg,${c1},${c2})` }}
+            >
+              {getInitials(customer.fullName)}
+            </span>
+            <span className="text-brand-blue font-semibold text-[0.84rem] group-hover:underline whitespace-nowrap">
+              {name}
+            </span>
+            {customer.isBlacklisted ? (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[0.65rem] font-bold bg-[rgba(239,68,68,0.1)] text-[#ef4444] border border-[rgba(239,68,68,0.2)]">
+                Blacklisted
+              </span>
+            ) : null}
+          </Link>
+        );
+      },
+    },
+    {
+      key: 'mobile',
+      label: 'Mobile',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.mobileNumber,
+      filter: { type: 'text', placeholder: 'Search mobile…' },
+      cellClassName: 'text-brand-text whitespace-nowrap',
+      render: (customer) => customer.mobileNumber,
+    },
+    {
+      key: 'leads',
+      label: 'Leads',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.leadCount,
+      getSortValue: (row) => row.leadCount,
+      filter: false,
+      cellClassName: 'text-brand-text whitespace-nowrap',
+      render: (customer) => customer.leadCount,
+    },
+    {
+      key: 'applications',
+      label: 'Applications',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.applicationCount,
+      getSortValue: (row) => row.applicationCount,
+      filter: false,
+      cellClassName: 'text-brand-text whitespace-nowrap',
+      render: (customer) => customer.applicationCount,
+    },
+    {
+      key: 'latestLead',
+      label: 'Latest lead',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.latestLeadStatusLabel ?? '',
+      getSortValue: (row) => (row.latestLeadStatusLabel ?? '').toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search status…' },
+      render: (customer) =>
+        customer.latestLeadStatusLabel ? (
+          <StatusPill
+            label={customer.latestLeadStatusLabel}
+            code={customer.latestLeadStatusCode ?? undefined}
+          />
+        ) : (
+          <span className="text-brand-muted">—</span>
+        ),
+    },
+    {
+      key: 'kyc',
+      label: 'KYC',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => (row.kycVerifiedAt ? 'verified' : 'pending'),
+      getSortValue: (row) => (row.kycVerifiedAt ? 0 : 1),
+      filter: false,
+      cellClassName: 'whitespace-nowrap',
+      render: (customer) =>
+        customer.kycVerifiedAt ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[0.7rem] font-bold bg-[rgba(16,185,129,0.1)] text-[#10b981] border border-[rgba(16,185,129,0.2)]">
+            Verified
+          </span>
+        ) : (
+          <span className="text-brand-muted">Pending</span>
+        ),
+    },
+    {
+      key: 'created',
+      label: 'Created',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.createdAt,
+      getSortValue: (row) => isoDateTimestamp(row.createdAt),
+      filter: { type: 'date' },
+      cellClassName: 'text-brand-muted text-[0.78rem] whitespace-nowrap',
+      render: (customer) => formatDateTime(customer.createdAt),
+    },
+  ], []);
 
   const withApplications = customers.filter((customer) => customer.applicationCount > 0).length;
   const kycVerified = customers.filter((customer) => customer.kycVerifiedAt).length;
@@ -152,130 +238,26 @@ export function CustomersPanel() {
         </div>
       ) : null}
 
-      <div
-        className="rounded-[14px] border border-[rgba(23,44,113,0.1)] overflow-hidden"
-        style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,246,255,0.94))' }}
-      >
-        <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-[rgba(23,44,113,0.07)]">
-          <div className="flex-1 min-w-[180px]">
-            <input
-              type="search"
-              placeholder="Search name, mobile, status…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="los-input h-[36px] text-[0.84rem]"
-            />
-          </div>
+      <DataTable
+        items={customers}
+        columns={columns}
+        getRowKey={(customer) => customer.uuid}
+        entityLabel="customers"
+        loading={loading}
+        error={fetchError}
+        onRetry={() => void loadCustomers()}
+        emptyMessage="No customers available right now."
+        noResultsMessage="No customers match your filters."
+        toolbarActions={
           <button
             type="button"
             onClick={() => void loadCustomers()}
-            className="h-[36px] px-4 rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent text-[0.84rem] font-bold text-brand-text cursor-pointer hover:bg-[rgba(20,150,243,0.06)] transition-colors whitespace-nowrap"
+            className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
           >
             ↺ Refresh
           </button>
-        </div>
-
-        {fetchError ? (
-          <div className="p-8 text-center text-[#8d3434] text-[0.88rem]">{fetchError}</div>
-        ) : loading ? (
-          <div className="p-10 text-center text-brand-muted text-[0.88rem]">
-            <span className="inline-block animate-pulse">Loading customers…</span>
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-[0.84rem]">
-                <thead>
-                  <tr className="text-left border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)]">
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">Customer</th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">Mobile</th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">Leads</th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">Applications</th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">Latest lead</th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">KYC</th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginated.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-4 py-12 text-center text-brand-muted text-[0.86rem]">
-                        {search ? 'No customers match your search.' : 'No customers available right now.'}
-                      </td>
-                    </tr>
-                  ) : (
-                    paginated.map((customer, idx) => {
-                      const name = formatPersonName(customer.fullName, 'Customer (name pending)');
-                      const [c1, c2] = avatarColor(name);
-                      return (
-                        <tr
-                          key={customer.uuid}
-                          className={`border-b transition-colors hover:bg-[rgba(20,150,243,0.025)] ${idx === paginated.length - 1 ? 'border-b-0' : 'border-[rgba(23,44,113,0.05)]'}`}
-                        >
-                          <td className="px-4 py-2.5">
-                            <Link href={`/customers/${customer.uuid}`} className="flex items-center gap-2.5 no-underline group">
-                              <span
-                                className="flex-shrink-0 grid place-items-center w-8 h-8 rounded-[9px] text-white text-[0.7rem] font-extrabold"
-                                style={{ background: `linear-gradient(135deg,${c1},${c2})` }}
-                              >
-                                {getInitials(customer.fullName)}
-                              </span>
-                              <span className="text-brand-blue font-semibold text-[0.84rem] group-hover:underline whitespace-nowrap">
-                                {name}
-                              </span>
-                              {customer.isBlacklisted ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[0.65rem] font-bold bg-[rgba(239,68,68,0.1)] text-[#ef4444] border border-[rgba(239,68,68,0.2)]">
-                                  Blacklisted
-                                </span>
-                              ) : null}
-                            </Link>
-                          </td>
-                          <td className="px-4 py-2.5 text-brand-text whitespace-nowrap">{customer.mobileNumber}</td>
-                          <td className="px-4 py-2.5 text-brand-text whitespace-nowrap">{customer.leadCount}</td>
-                          <td className="px-4 py-2.5 text-brand-text whitespace-nowrap">{customer.applicationCount}</td>
-                          <td className="px-4 py-2.5">
-                            {customer.latestLeadStatusLabel ? (
-                              <StatusPill
-                                label={customer.latestLeadStatusLabel}
-                                code={customer.latestLeadStatusCode ?? undefined}
-                              />
-                            ) : (
-                              <span className="text-brand-muted">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap">
-                            {customer.kycVerifiedAt ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[0.7rem] font-bold bg-[rgba(16,185,129,0.1)] text-[#10b981] border border-[rgba(16,185,129,0.2)]">
-                                Verified
-                              </span>
-                            ) : (
-                              <span className="text-brand-muted">Pending</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-2.5 text-brand-muted text-[0.78rem] whitespace-nowrap">
-                            {formatDateTime(customer.createdAt)}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <DataTablePagination
-              page={safePage}
-              total={totalPages}
-              start={rangeStart}
-              end={rangeEnd}
-              count={count}
-              entityLabel="customers"
-              onPrev={() => setCurrentPage(Math.max(1, safePage - 1))}
-              onNext={() => setCurrentPage(Math.min(totalPages, safePage + 1))}
-            />
-          </>
-        )}
-      </div>
+        }
+      />
     </div>
   );
 }

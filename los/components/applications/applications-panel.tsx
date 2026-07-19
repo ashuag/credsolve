@@ -1,12 +1,17 @@
 'use client';
 
+import {
+  DataTable,
+  isoDateTimestamp,
+  type DataTableColumn,
+} from '@/components/ui/data-table';
 import { getApplications, getMasters, type LosApplication } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { APPLICATION_JOURNEY_STAGE_FILTER_OPTIONS } from '@/lib/constants/application-journey-stages';
 import { resolveApplicationStageLabel } from '@/lib/customer-journey';
 import { formatPersonName } from '@/lib/format-person-name';
 import Link from 'next/link';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -153,268 +158,6 @@ function RejectionReasonCell({ app }: { app: LosApplication }) {
   );
 }
 
-const TABLE_HEADERS = [
-  { key: 'app-id', label: 'Application ID', className: 'whitespace-nowrap' },
-  { key: 'name', label: 'Name', className: 'min-w-[140px]' },
-  { key: 'mobile', label: 'Mobile', className: 'whitespace-nowrap' },
-  { key: 'email', label: 'Email', className: 'min-w-[160px]' },
-  { key: 'cibil', label: 'CIBIL score', className: 'whitespace-nowrap' },
-  { key: 'loan', label: 'Loan amount', className: 'whitespace-nowrap' },
-  { key: 'stage', label: 'Stage', className: 'min-w-[120px]' },
-  { key: 'status', label: 'Status', className: 'whitespace-nowrap' },
-  { key: 'reason', label: 'Rejection reason', className: 'min-w-[160px]' },
-  { key: 'created', label: 'Created', className: 'whitespace-nowrap' },
-  { key: 'modified', label: 'Last modified', className: 'whitespace-nowrap' },
-] as const;
-
-const COLUMNS: ReadonlyArray<{ key: string; label: string }> = TABLE_HEADERS.map((h) => ({
-  key: h.key,
-  label: h.label,
-}));
-
-const PAGE_SIZE = 20;
-type ColFilters = Partial<Record<(typeof COLUMNS)[number]['key'], string>>;
-type SortDir = 'asc' | 'desc';
-type SortState = { key: (typeof TABLE_HEADERS)[number]['key']; dir: SortDir } | null;
-
-const DATE_FILTER_KEYS = new Set(['created', 'modified']);
-const NUMERIC_FILTER_KEYS = new Set(['cibil', 'loan']);
-
-function appDateKey(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const d = new Date(iso.includes('T') ? iso : `${iso}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return null;
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function appDateTimestamp(iso: string | null | undefined): number | null {
-  if (!iso) return null;
-  const d = new Date(iso.includes('T') ? iso : `${iso}T12:00:00`);
-  return Number.isNaN(d.getTime()) ? null : d.getTime();
-}
-
-function getAppText(app: LosApplication, key: string): string {
-  switch (key) {
-    case 'app-id':
-      return app.applicationNumber?.trim() || '';
-    case 'name':
-      return app.fullName?.trim() || 'Details pending';
-    case 'mobile':
-      return app.mobileNumber;
-    case 'email':
-      return app.email ?? '';
-    case 'cibil':
-      return app.cibilScore != null ? String(app.cibilScore) : '';
-    case 'loan':
-      return app.selectedLoanAmount ?? '';
-    case 'stage':
-      return applicationStageLabel(app);
-    case 'created':
-      return formatDateTime(app.createdAt);
-    case 'modified':
-      return formatDateTime(app.updatedAt);
-    case 'status':
-      return `${app.statusCode} ${app.statusLabel} ${app.leadStatusCode} ${app.leadStatusLabel}`;
-    case 'reason':
-      return app.leadRejectionReason?.label ?? '';
-    default:
-      return '';
-  }
-}
-
-function appMatchesFilters(app: LosApplication, filters: ColFilters): boolean {
-  for (const col of COLUMNS) {
-    const raw = filters[col.key]?.trim() ?? '';
-    if (!raw) continue;
-    if (col.key === 'status') {
-      const status = applicationRowStatus(app);
-      if (raw === 'REJECTED') {
-        if (!status.code.toUpperCase().includes('REJECT')) return false;
-      } else if (status.code !== raw) {
-        return false;
-      }
-      continue;
-    }
-    if (col.key === 'stage') {
-      if (applicationStageLabel(app) !== raw) return false;
-      continue;
-    }
-    if (col.key === 'reason') {
-      const reasonText = [app.leadRejectionReason?.code, app.leadRejectionReason?.label]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      if (!reasonText.includes(raw.toLowerCase())) return false;
-      continue;
-    }
-    if (DATE_FILTER_KEYS.has(col.key)) {
-      const iso = col.key === 'created' ? app.createdAt : app.updatedAt;
-      if (appDateKey(iso) !== raw) return false;
-      continue;
-    }
-    if (NUMERIC_FILTER_KEYS.has(col.key)) {
-      const target = Number(raw);
-      if (!Number.isFinite(target)) continue;
-      const actual =
-        col.key === 'cibil' ? app.cibilScore : Number(app.selectedLoanAmount);
-      if (actual == null || !Number.isFinite(actual) || actual !== target) return false;
-      continue;
-    }
-    if (!getAppText(app, col.key).toLowerCase().includes(raw.toLowerCase())) return false;
-  }
-  return true;
-}
-
-function getAppSortValue(app: LosApplication, key: string): string | number | null {
-  switch (key) {
-    case 'app-id':
-      return (app.applicationNumber ?? '').toUpperCase();
-    case 'name':
-      return (app.fullName?.trim() || 'Details pending').toLowerCase();
-    case 'mobile':
-      return app.mobileNumber;
-    case 'email':
-      return (app.email ?? '').toLowerCase();
-    case 'cibil':
-      return app.cibilScore;
-    case 'loan': {
-      const n = Number(app.selectedLoanAmount);
-      return Number.isFinite(n) ? n : null;
-    }
-    case 'stage':
-      return applicationStageLabel(app).toLowerCase();
-    case 'created':
-      return appDateTimestamp(app.createdAt);
-    case 'modified':
-      return appDateTimestamp(app.updatedAt);
-    case 'status':
-      return applicationRowStatus(app).label.toLowerCase();
-    case 'reason':
-      return (app.leadRejectionReason?.label ?? '').toLowerCase();
-    default:
-      return null;
-  }
-}
-
-function compareSortValues(a: string | number | null, b: string | number | null): number {
-  if (a == null && b == null) return 0;
-  if (a == null) return 1;
-  if (b == null) return -1;
-  if (typeof a === 'number' && typeof b === 'number') return a - b;
-  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
-}
-
-function sortApplications(apps: LosApplication[], sort: SortState): LosApplication[] {
-  if (!sort) return apps;
-  const dir = sort.dir === 'asc' ? 1 : -1;
-  return [...apps].sort((a, b) => compareSortValues(getAppSortValue(a, sort.key), getAppSortValue(b, sort.key)) * dir);
-}
-
-const FILTER_CONTROL_CLASS =
-  'mt-1.5 w-full min-w-[72px] h-[28px] rounded-[6px] border border-[rgba(23,44,113,0.12)] bg-white px-1.5 text-[0.72rem] font-medium text-brand-text';
-
-function ColumnFilterInput({
-  value,
-  onChange,
-  placeholder,
-  type = 'text',
-  options,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  type?: 'text' | 'select' | 'date' | 'number';
-  options?: Array<{ value: string; label: string }>;
-}) {
-  if (type === 'select') {
-    return (
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={FILTER_CONTROL_CLASS}>
-        <option value="">All</option>
-        {options?.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    );
-  }
-
-  if (type === 'date') {
-    return (
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={FILTER_CONTROL_CLASS}
-        aria-label={placeholder ?? 'Filter by date'}
-      />
-    );
-  }
-
-  if (type === 'number') {
-    return (
-      <input
-        type="number"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder ?? 'Value…'}
-        className={`${FILTER_CONTROL_CLASS} placeholder:text-brand-muted/70`}
-      />
-    );
-  }
-
-  return (
-    <input
-      type="search"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder ?? 'Search…'}
-      className={`${FILTER_CONTROL_CLASS} placeholder:text-brand-muted/70`}
-    />
-  );
-}
-
-function ColumnHeader({
-  label,
-  sortKey,
-  sort,
-  onSort,
-  children,
-}: {
-  label: string;
-  sortKey: (typeof TABLE_HEADERS)[number]['key'];
-  sort: SortState;
-  onSort: (key: (typeof TABLE_HEADERS)[number]['key']) => void;
-  children: ReactNode;
-}) {
-  const active = sort?.key === sortKey;
-  const icon = !active ? '↕' : sort.dir === 'asc' ? '↑' : '↓';
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => onSort(sortKey)}
-        className={`flex w-full items-center gap-1 border-0 bg-transparent p-0 text-left text-[0.68rem] font-extrabold tracking-[0.08em] uppercase cursor-pointer ${
-          active ? 'text-brand-blue' : 'text-brand-muted hover:text-brand-text'
-        }`}
-        title={`Sort by ${label}`}
-      >
-        <span className="min-w-0 flex-1">{label}</span>
-        <span className="shrink-0 text-[0.62rem] leading-none opacity-80">{icon}</span>
-      </button>
-      {children}
-    </>
-  );
-}
-
-function hasActiveColumnFilters(filters: ColFilters): boolean {
-  return Object.values(filters).some((value) => value?.trim());
-}
-
 function StatCard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color: string }) {
   return (
     <div className="flex flex-col gap-1 px-4 py-3 rounded-[14px] border" style={{ background: `${color}09`, borderColor: `${color}22` }}>
@@ -425,60 +168,11 @@ function StatCard({ label, value, sub, color }: { label: string; value: string |
   );
 }
 
-function Pagination({ page, total, start, end, count, onPrev, onNext }: {
-  page: number; total: number; start: number; end: number; count: number;
-  onPrev: () => void; onNext: () => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.6)]">
-      <span className="text-[0.78rem] text-brand-muted">
-        {count === 0 ? 'No applications found' : `${start}–${end} of ${count} applications`}
-      </span>
-      <div className="flex items-center gap-2">
-        <button type="button" onClick={onPrev} disabled={page <= 1}
-          className="min-h-[32px] px-3 rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent text-[0.8rem] font-bold text-brand-text cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[rgba(20,150,243,0.05)] transition-colors">
-          ← Prev
-        </button>
-        <span className="text-[0.78rem] font-bold text-brand-muted">{page} / {total}</span>
-        <button type="button" onClick={onNext} disabled={page >= total}
-          className="min-h-[32px] px-3 rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent text-[0.8rem] font-bold text-brand-text cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[rgba(20,150,243,0.05)] transition-colors">
-          Next →
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export function ApplicationsPanel() {
   const [applications, setApplications] = useState<LosApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [columnFilters, setColumnFilters] = useState<ColFilters>({});
-  const [sort, setSort] = useState<SortState>(null);
-  const [currentPage, setCurrentPage] = useState(1);
   const [statuses, setStatuses] = useState<Array<{ code: string; displayName: string }>>([]);
-
-  const setColumnFilter = useCallback((key: string, value: string) => {
-    setColumnFilters((prev) => {
-      if (!value.trim()) {
-        const { [key]: _removed, ...rest } = prev;
-        return rest;
-      }
-      return { ...prev, [key]: value };
-    });
-  }, []);
-
-  const clearColumnFilters = useCallback(() => {
-    setColumnFilters({});
-  }, []);
-
-  const toggleSort = useCallback((key: (typeof TABLE_HEADERS)[number]['key']) => {
-    setSort((prev) => {
-      if (prev?.key !== key) return { key, dir: 'asc' };
-      if (prev.dir === 'asc') return { key, dir: 'desc' };
-      return null;
-    });
-  }, []);
 
   const loadApplications = useCallback(async () => {
     setLoading(true);
@@ -494,19 +188,160 @@ export function ApplicationsPanel() {
     } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { loadApplications(); }, [loadApplications]);
-  useEffect(() => { setCurrentPage(1); }, [columnFilters, sort]);
+  useEffect(() => { void loadApplications(); }, [loadApplications]);
 
-  const filtered = sortApplications(
-    applications.filter((a) => appMatchesFilters(a, columnFilters)),
-    sort,
-  );
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(currentPage, totalPages);
-  const pageStart = (safePage - 1) * PAGE_SIZE;
-  const paginated = filtered.slice(pageStart, pageStart + PAGE_SIZE);
-  const rangeStart = filtered.length === 0 ? 0 : pageStart + 1;
-  const rangeEnd = Math.min(pageStart + PAGE_SIZE, filtered.length);
+  const columns = useMemo((): DataTableColumn<LosApplication>[] => [
+    {
+      key: 'app-id',
+      label: 'Application ID',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.applicationNumber?.trim() ?? '',
+      getSortValue: (row) => (row.applicationNumber ?? '').toUpperCase(),
+      filter: { type: 'text', placeholder: 'Search…' },
+      render: (app) => (
+        <Link
+          href={`/applications/${app.uuid}`}
+          className="font-mono text-[0.82rem] font-semibold text-brand-blue no-underline hover:underline whitespace-nowrap"
+          title={app.applicationNumber}
+        >
+          {app.applicationNumber}
+        </Link>
+      ),
+    },
+    {
+      key: 'name',
+      label: 'Name',
+      headerClassName: 'min-w-[140px]',
+      getFilterValue: (row) => row.fullName?.trim() || 'Details pending',
+      getSortValue: (row) => (row.fullName?.trim() || 'Details pending').toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search name…' },
+      render: (app) => {
+        const name = formatPersonName(app.fullName, 'Details pending');
+        return (
+          <Link href={`/applications/${app.uuid}`} className="font-semibold text-brand-navy no-underline hover:underline whitespace-nowrap">
+            {name}
+          </Link>
+        );
+      },
+    },
+    {
+      key: 'mobile',
+      label: 'Mobile',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.mobileNumber,
+      filter: { type: 'text', placeholder: 'Search mobile…' },
+      cellClassName: 'font-mono text-[0.82rem] text-brand-text whitespace-nowrap',
+      render: (app) => app.mobileNumber,
+    },
+    {
+      key: 'email',
+      label: 'Email',
+      headerClassName: 'min-w-[160px]',
+      getFilterValue: (row) => row.email ?? '',
+      getSortValue: (row) => (row.email ?? '').toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search email…' },
+      cellClassName: 'text-brand-muted text-[0.82rem]',
+      render: (app) => (
+        <span className="block max-w-[180px] truncate" title={app.email ?? undefined}>{app.email ?? '—'}</span>
+      ),
+    },
+    {
+      key: 'cibil',
+      label: 'CIBIL score',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.cibilScore,
+      getSortValue: (row) => row.cibilScore,
+      filter: { type: 'number', placeholder: 'Score…' },
+      render: (app) => <CibilBadge score={app.cibilScore} />,
+    },
+    {
+      key: 'loan',
+      label: 'Loan amount',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.selectedLoanAmount ?? '',
+      getSortValue: (row) => {
+        const n = Number(row.selectedLoanAmount);
+        return Number.isFinite(n) ? n : null;
+      },
+      filter: { type: 'number', placeholder: 'Amount…' },
+      cellClassName: 'font-extrabold text-brand-navy whitespace-nowrap',
+      render: (app) => formatINR(app.selectedLoanAmount),
+    },
+    {
+      key: 'stage',
+      label: 'Stage',
+      headerClassName: 'min-w-[120px]',
+      getFilterValue: (row) => applicationStageLabel(row),
+      getSortValue: (row) => applicationStageLabel(row).toLowerCase(),
+      filter: {
+        type: 'select',
+        options: [...APPLICATION_JOURNEY_STAGE_FILTER_OPTIONS],
+        matches: (row, value) => applicationStageLabel(row) === value,
+      },
+      render: (app) => <StageCell app={app} />,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => applicationRowStatus(row).code,
+      getSortValue: (row) => applicationRowStatus(row).label.toLowerCase(),
+      filter: {
+        type: 'select',
+        options: statuses.map((s) => ({ value: s.code, label: s.displayName })),
+        matches: (row, value) => {
+          const status = applicationRowStatus(row);
+          if (value === 'REJECTED') {
+            return status.code.toUpperCase().includes('REJECT');
+          }
+          return status.code === value;
+        },
+      },
+      render: (app) => {
+        const status = applicationRowStatus(app);
+        return <StatusPill label={status.label} code={status.code} />;
+      },
+    },
+    {
+      key: 'reason',
+      label: 'Rejection reason',
+      headerClassName: 'min-w-[160px]',
+      getFilterValue: (row) => row.leadRejectionReason?.label ?? '',
+      getSortValue: (row) => (row.leadRejectionReason?.label ?? '').toLowerCase(),
+      filter: {
+        type: 'text',
+        placeholder: 'Search reason…',
+        matches: (row, value) => {
+          const reasonText = [row.leadRejectionReason?.code, row.leadRejectionReason?.label]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          return reasonText.includes(value.toLowerCase());
+        },
+      },
+      render: (app) => <RejectionReasonCell app={app} />,
+    },
+    {
+      key: 'created',
+      label: 'Created',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.createdAt,
+      getSortValue: (row) => isoDateTimestamp(row.createdAt),
+      filter: { type: 'date' },
+      cellClassName: 'text-brand-muted whitespace-nowrap text-[0.78rem]',
+      render: (app) => formatDateTime(app.createdAt),
+    },
+    {
+      key: 'modified',
+      label: 'Last modified',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.updatedAt,
+      getSortValue: (row) => isoDateTimestamp(row.updatedAt),
+      filter: { type: 'date' },
+      cellClassName: 'text-brand-muted whitespace-nowrap text-[0.78rem]',
+      render: (app) => formatDateTime(app.updatedAt),
+    },
+  ], [statuses]);
 
   const withLoan = applications.filter((a) => a.selectedLoanAmount != null).length;
   const totalDisbursed = applications.reduce((sum, a) => sum + (Number(a.selectedLoanAmount) || 0), 0);
@@ -523,171 +358,32 @@ export function ApplicationsPanel() {
         </div>
       )}
 
-      <div
-        className="rounded-[14px] border border-[rgba(23,44,113,0.1)] overflow-hidden"
-        style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,246,255,0.94))' }}
-      >
-        <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-[rgba(23,44,113,0.07)]">
-          <p className="m-0 flex-1 min-w-[180px] text-[0.78rem] text-brand-muted">
-            Click a column title to sort. Use the search boxes below each column to filter.
-          </p>
-          {hasActiveColumnFilters(columnFilters) || sort ? (
-            <button
-              type="button"
-              onClick={clearColumnFilters}
-              className="h-[36px] px-4 rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent text-[0.84rem] font-bold text-brand-text cursor-pointer hover:bg-[rgba(20,150,243,0.06)] transition-colors whitespace-nowrap"
-            >
-              Clear filters
-            </button>
-          ) : null}
+      <DataTable
+        items={applications}
+        columns={columns}
+        getRowKey={(app) => app.uuid}
+        entityLabel="applications"
+        loading={loading}
+        error={fetchError}
+        onRetry={() => void loadApplications()}
+        emptyMessage="No applications available right now."
+        noResultsMessage="No applications match your filters or sort."
+        minWidth="1280px"
+        renderRowClassName={(app) =>
+          isApplicationRowRejected(app)
+            ? 'border-l-[3px] border-l-[#ef4444] bg-[rgba(254,242,242,0.55)] hover:bg-[rgba(254,226,226,0.65)]'
+            : undefined
+        }
+        toolbarActions={
           <button
             type="button"
-            onClick={loadApplications}
-            className="h-[36px] px-4 rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent text-[0.84rem] font-bold text-brand-text cursor-pointer hover:bg-[rgba(20,150,243,0.06)] transition-colors whitespace-nowrap"
+            onClick={() => void loadApplications()}
+            className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
           >
             ↺ Refresh
           </button>
-        </div>
-
-        {fetchError ? (
-          <div className="p-8 text-center text-[#8d3434] text-[0.88rem]">{fetchError}</div>
-        ) : loading ? (
-          <div className="p-10 text-center text-brand-muted text-[0.88rem]">
-            <span className="inline-block animate-pulse">Loading applications…</span>
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1280px] border-collapse text-[0.84rem]">
-                <thead>
-                  <tr className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] text-left align-top">
-                    {TABLE_HEADERS.map((header) => (
-                      <th
-                        key={header.key}
-                        className={`px-3 py-2 align-top ${header.className}`}
-                      >
-                        <ColumnHeader
-                          label={header.label}
-                          sortKey={header.key}
-                          sort={sort}
-                          onSort={toggleSort}
-                        >
-                          {header.key === 'status' ? (
-                            <ColumnFilterInput
-                              type="select"
-                              value={columnFilters.status ?? ''}
-                              onChange={(value) => setColumnFilter('status', value)}
-                              options={statuses.map((s) => ({ value: s.code, label: s.displayName }))}
-                            />
-                          ) : header.key === 'stage' ? (
-                            <ColumnFilterInput
-                              type="select"
-                              value={columnFilters.stage ?? ''}
-                              onChange={(value) => setColumnFilter('stage', value)}
-                              options={[...APPLICATION_JOURNEY_STAGE_FILTER_OPTIONS]}
-                            />
-                          ) : DATE_FILTER_KEYS.has(header.key) ? (
-                            <ColumnFilterInput
-                              type="date"
-                              value={columnFilters[header.key] ?? ''}
-                              onChange={(value) => setColumnFilter(header.key, value)}
-                            />
-                          ) : NUMERIC_FILTER_KEYS.has(header.key) ? (
-                            <ColumnFilterInput
-                              type="number"
-                              value={columnFilters[header.key] ?? ''}
-                              onChange={(value) => setColumnFilter(header.key, value)}
-                              placeholder={
-                                header.key === 'cibil'
-                                  ? 'Score…'
-                                  : 'Amount…'
-                              }
-                            />
-                          ) : (
-                            <ColumnFilterInput
-                              value={columnFilters[header.key] ?? ''}
-                              onChange={(value) => setColumnFilter(header.key, value)}
-                              placeholder={
-                                header.key === 'name'
-                                  ? 'Search name…'
-                                  : header.key === 'mobile'
-                                    ? 'Search mobile…'
-                                    : header.key === 'email'
-                                      ? 'Search email…'
-                                      : header.key === 'reason'
-                                        ? 'Search reason…'
-                                        : 'Search…'
-                              }
-                            />
-                          )}
-                        </ColumnHeader>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginated.length === 0 ? (
-                    <tr>
-                      <td colSpan={TABLE_HEADERS.length} className="px-4 py-12 text-center text-brand-muted text-[0.86rem]">
-                        {hasActiveColumnFilters(columnFilters) || sort ? 'No applications match your filters or sort.' : 'No applications available right now.'}
-                      </td>
-                    </tr>
-                  ) : paginated.map((app, idx) => {
-                    const name = formatPersonName(app.fullName, 'Details pending');
-                    const rejected = isApplicationRowRejected(app);
-                    const status = applicationRowStatus(app);
-                    return (
-                      <tr
-                        key={app.uuid}
-                        className={`border-b align-middle transition-colors ${
-                          rejected
-                            ? 'border-l-[3px] border-l-[#ef4444] bg-[rgba(254,242,242,0.55)] hover:bg-[rgba(254,226,226,0.65)]'
-                            : 'hover:bg-[rgba(20,150,243,0.025)]'
-                        } ${idx === paginated.length - 1 ? 'border-b-0' : 'border-[rgba(23,44,113,0.05)]'}`}
-                      >
-                        <td className="px-3 py-2.5">
-                          <Link
-                            href={`/applications/${app.uuid}`}
-                            className="font-mono text-[0.82rem] font-semibold text-brand-blue no-underline hover:underline whitespace-nowrap"
-                            title={app.applicationNumber}
-                          >
-                            {app.applicationNumber}
-                          </Link>
-                        </td>
-                        <td className="px-3 py-2.5">
-                          <Link href={`/applications/${app.uuid}`} className="font-semibold text-brand-navy no-underline hover:underline whitespace-nowrap">
-                            {name}
-                          </Link>
-                        </td>
-                        <td className="px-3 py-2.5 font-mono text-[0.82rem] text-brand-text whitespace-nowrap">{app.mobileNumber}</td>
-                        <td className="px-3 py-2.5 text-brand-muted text-[0.82rem]">
-                          <span className="block max-w-[180px] truncate" title={app.email ?? undefined}>{app.email ?? '—'}</span>
-                        </td>
-                        <td className="px-3 py-2.5"><CibilBadge score={app.cibilScore} /></td>
-                        <td className="px-3 py-2.5 font-extrabold text-brand-navy whitespace-nowrap">{formatINR(app.selectedLoanAmount)}</td>
-                        <td className="px-3 py-2.5"><StageCell app={app} /></td>
-                        <td className="px-3 py-2.5"><StatusPill label={status.label} code={status.code} /></td>
-                        <td className="px-3 py-2.5"><RejectionReasonCell app={app} /></td>
-                        <td className="px-3 py-2.5 text-brand-muted whitespace-nowrap text-[0.78rem]">{formatDateTime(app.createdAt)}</td>
-                        <td className="px-3 py-2.5 text-brand-muted whitespace-nowrap text-[0.78rem]">{formatDateTime(app.updatedAt)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <Pagination
-              page={safePage}
-              total={totalPages}
-              start={rangeStart}
-              end={rangeEnd}
-              count={filtered.length}
-              onPrev={() => setCurrentPage(Math.max(1, safePage - 1))}
-              onNext={() => setCurrentPage(Math.min(totalPages, safePage + 1))}
-            />
-          </>
-        )}
-      </div>
+        }
+      />
     </div>
   );
 }

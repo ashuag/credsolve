@@ -77,7 +77,10 @@ const navGroups: { section: string; color: string; items: NavItem[] }[] = [
         href: '/masters',
         label: 'Masters',
         icon: 'masters',
-        children: [{ href: '/masters/sms-templates', label: 'SMS Templates' }],
+        children: [
+          { href: '/masters/sms-templates', label: 'SMS Templates' },
+          { href: '/masters/vendor-apis', label: 'Vendor APIs' },
+        ],
       },
     ],
   },

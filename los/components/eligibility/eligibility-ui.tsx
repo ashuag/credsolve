@@ -3,18 +3,10 @@
 import { ReactNode, useEffect } from 'react';
 import { cx } from '@/lib/cx';
 
-export type StatusFilter = 'all' | 'active' | 'inactive';
-
 // Re-exported from canonical homes so existing importers continue to work.
 // Prefer importing directly from `@/lib/auth` / `@/lib/cx` in new code.
 export { getLosToken } from '@/lib/auth';
 export { cx };
-
-export function applyStatusFilter<T extends { isActive: boolean }>(items: T[], filter: StatusFilter) {
-  if (filter === 'active') return items.filter((item) => item.isActive);
-  if (filter === 'inactive') return items.filter((item) => !item.isActive);
-  return items;
-}
 
 function statusBadge(isActive: boolean) {
   return isActive
@@ -133,82 +125,6 @@ export function ModalShell({
         {children}
       </div>
     </div>
-  );
-}
-
-function FilterChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cx(
-        'min-h-[34px] cursor-pointer rounded-full border px-3 py-1 text-[0.78rem] font-bold transition-colors',
-        active
-          ? 'border-[rgba(20,150,243,0.28)] bg-[rgba(20,150,243,0.1)] text-brand-blue'
-          : 'border-[rgba(23,44,113,0.1)] bg-[rgba(255,255,255,0.85)] text-brand-muted',
-      )}
-    >
-      {label}
-    </button>
-  );
-}
-
-export function PageShell({
-  title,
-  description,
-  search,
-  onSearchChange,
-  searchPlaceholder,
-  statusFilter,
-  onStatusFilterChange,
-  children,
-}: {
-  title: string;
-  description: string;
-  search: string;
-  onSearchChange: (value: string) => void;
-  searchPlaceholder: string;
-  statusFilter: StatusFilter;
-  onStatusFilterChange: (value: StatusFilter) => void;
-  children: ReactNode;
-}) {
-  return (
-    <section
-      className="overflow-hidden rounded-[16px] border border-[rgba(23,44,113,0.1)]"
-      style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(240,246,255,0.95))' }}
-    >
-      <div className="border-b border-[rgba(23,44,113,0.07)] px-5 py-4">
-        <h2 className="m-0 text-[1.15rem] font-extrabold tracking-[-0.03em]">{title}</h2>
-        <p className="m-0 mt-1 max-w-[70ch] text-[0.86rem] leading-[1.5] text-brand-muted">
-          {description}
-        </p>
-      </div>
-
-      <div className="grid gap-3 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.72)] px-5 py-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-        <input
-          type="search"
-          placeholder={searchPlaceholder}
-          value={search}
-          onChange={(event) => onSearchChange(event.target.value)}
-          className="los-input"
-        />
-        <div className="flex flex-wrap gap-2">
-          <FilterChip label="All" active={statusFilter === 'all'} onClick={() => onStatusFilterChange('all')} />
-          <FilterChip label="Active" active={statusFilter === 'active'} onClick={() => onStatusFilterChange('active')} />
-          <FilterChip label="Inactive" active={statusFilter === 'inactive'} onClick={() => onStatusFilterChange('inactive')} />
-        </div>
-      </div>
-
-      <div className="overflow-x-auto">{children}</div>
-    </section>
   );
 }
 

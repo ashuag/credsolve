@@ -21,13 +21,19 @@ import { UpdateBankMasterDto } from './dto/update-bank-master.dto';
 import { UpdateEligibilityCriterionDto } from './dto/update-eligibility-criterion.dto';
 import { UpdateCreditLimitTierDto } from './dto/update-credit-limit-tier.dto';
 import { UpdateSmsTemplateDto } from './dto/update-sms-template.dto';
+import { CreateVendorApiConfigDto } from './dto/create-vendor-api-config.dto';
+import { UpdateVendorApiConfigDto } from './dto/update-vendor-api-config.dto';
 import { LosMasterService } from './services/los-master.service';
+import { VendorApiConfigService } from '../../common/vendor/vendor-api-config.service';
 
 @ApiTags('LOS Masters')
 @Controller('los/masters')
 @UseGuards(LosAuthGuard)
 export class LosMastersController {
-  constructor(private readonly losMaster: LosMasterService) {}
+  constructor(
+    private readonly losMaster: LosMasterService,
+    private readonly vendorApiConfig: VendorApiConfigService,
+  ) {}
 
   @Get('eligibility-criteria')
   @ApiOperation({ summary: 'List profile eligibility criteria for LOS' })
@@ -113,5 +119,24 @@ export class LosMastersController {
   @ApiOperation({ summary: 'Update SMS template fields and/or active flag' })
   smsTemplatePatch(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateSmsTemplateDto) {
     return this.losMaster.updateSmsTemplate(id, body);
+  }
+
+  @Get('vendor-api-configs')
+  @ApiOperation({ summary: 'List vendor API configs (primary/backup on/off registry)' })
+  async vendorApiConfigsList() {
+    const vendorApiConfigs = await this.vendorApiConfig.list();
+    return { vendorApiConfigs };
+  }
+
+  @Post('vendor-api-configs')
+  @ApiOperation({ summary: 'Add a vendor API config row' })
+  vendorApiConfigsCreate(@Body() body: CreateVendorApiConfigDto) {
+    return this.vendorApiConfig.create(body);
+  }
+
+  @Patch('vendor-api-configs/:id')
+  @ApiOperation({ summary: 'Update vendor API config (status switch, priority, notes)' })
+  vendorApiConfigsPatch(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateVendorApiConfigDto) {
+    return this.vendorApiConfig.update(id, body);
   }
 }

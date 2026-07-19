@@ -1,8 +1,15 @@
 'use client';
 
+import {
+  ACTIVE_INACTIVE_FILTER_OPTIONS,
+  DataTable,
+  DataTableStatusPill,
+  matchesActiveInactiveFilter,
+  type DataTableColumn,
+} from '@/components/ui/data-table';
 import { createRole, getRoles, toggleRoleStatus, updateRole, type LosRole } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
-import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -13,10 +20,6 @@ function getToken(): string | null {
   } catch {
     return null;
   }
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 function isAdminRoleName(name: string) {
@@ -87,7 +90,6 @@ function RoleModal({
         className="w-full max-w-[420px] rounded-[20px] border border-[rgba(23,44,113,0.12)] shadow-[0_32px_64px_rgba(23,44,113,0.22)] p-6"
         style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(241,247,255,0.96))' }}
       >
-        {/* Header */}
         <div className="flex items-start justify-between gap-4 mb-5">
           <div>
             <span className="block text-[0.68rem] font-extrabold tracking-[0.16em] uppercase text-brand-blue mb-1">
@@ -175,7 +177,6 @@ export function RolesPanel() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [modal, setModal] = useState<{ role?: LosRole } | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
-  const [search, setSearch] = useState('');
 
   const loadRoles = useCallback(async () => {
     setLoading(true);
@@ -213,15 +214,99 @@ export function RolesPanel() {
     setModal(null);
   }
 
-  const filtered = roles.filter(
-    (r) => search === '' || r.name.toLowerCase().includes(search.toLowerCase())
-  );
-
   const totalActive = roles.filter((r) => r.isActive).length;
+
+  const columns = useMemo((): DataTableColumn<LosRole>[] => [
+    {
+      key: 'id',
+      label: '#',
+      getFilterValue: (role) => role.id,
+      getSortValue: (role) => role.id,
+      filter: { type: 'number', placeholder: 'ID…' },
+      cellClassName: 'text-brand-muted text-[0.8rem] w-12',
+      render: (role) => `#${role.id}`,
+    },
+    {
+      key: 'name',
+      label: 'Role Name',
+      getFilterValue: (role) => role.name,
+      getSortValue: (role) => role.name.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search roles…' },
+      render: (role) => <strong className="text-[0.9rem]">{role.name}</strong>,
+    },
+    {
+      key: 'level',
+      label: 'Level',
+      getFilterValue: (role) => role.hierarchyLevel,
+      getSortValue: (role) => role.hierarchyLevel,
+      filter: { type: 'number', placeholder: 'Level…' },
+      render: (role) => (
+        <span className="inline-flex items-center rounded-full bg-[rgba(20,150,243,0.08)] px-3 py-1 text-[0.8rem] font-extrabold text-brand-blue">
+          L{role.hierarchyLevel}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      getFilterValue: (role) => (role.isActive ? 'active' : 'inactive'),
+      getSortValue: (role) => (role.isActive ? 0 : 1),
+      filter: {
+        type: 'select',
+        options: [...ACTIVE_INACTIVE_FILTER_OPTIONS],
+        matches: (role, value) => matchesActiveInactiveFilter(role.isActive, value),
+      },
+      render: (role) => <DataTableStatusPill isActive={role.isActive} />,
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      filter: false,
+      render: (role) => (
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setModal({ role })}
+            title="Edit role"
+            className="inline-flex items-center justify-center w-7 h-7 rounded-[6px] border border-[rgba(23,44,113,0.12)] bg-[rgba(255,255,255,0.9)] text-brand-navy cursor-pointer hover:border-[rgba(20,150,243,0.24)] transition-colors"
+          >
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+            <span className="sr-only">Edit</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void handleToggle(role)}
+            disabled={togglingId === role.id}
+            title={role.isActive ? 'Deactivate role' : 'Activate role'}
+            className={`inline-flex items-center justify-center w-7 h-7 rounded-[6px] border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-wait ${
+              role.isActive
+                ? 'border-[rgba(239,68,68,0.2)] bg-[rgba(255,241,241,0.9)] text-[#991b1b] hover:border-[rgba(239,68,68,0.36)]'
+                : 'border-[rgba(34,197,94,0.2)] bg-[rgba(240,253,244,0.9)] text-[#166534] hover:border-[rgba(34,197,94,0.36)]'
+            }`}
+          >
+            {role.isActive ? (
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="12" cy="12" r="10" /><line x1="8" y1="12" x2="16" y2="12" />
+              </svg>
+            ) : (
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
+              </svg>
+            )}
+            <span className="sr-only">{role.isActive ? 'Deactivate' : 'Activate'}</span>
+          </button>
+        </div>
+      ),
+    },
+  ], [togglingId]);
 
   return (
     <>
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-2 mb-3">
         {[
           { label: 'Total roles', value: roles.length },
@@ -241,13 +326,8 @@ export function RolesPanel() {
         ))}
       </div>
 
-      {/* Main card */}
-      <div
-        className="rounded-[10px] border border-[rgba(23,44,113,0.1)] overflow-hidden"
-        style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.97), rgba(240,246,255,0.94))' }}
-      >
-        {/* Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-[rgba(23,44,113,0.07)]">
+      <div className="grid gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <span className="block text-[0.72rem] font-extrabold tracking-[0.14em] uppercase text-brand-blue">
               Role directory
@@ -256,138 +336,26 @@ export function RolesPanel() {
               All Roles
             </h2>
           </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="search"
-              placeholder="Search roles…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="los-input w-[180px]"
-            />
-            <button
-              type="button"
-              onClick={() => setModal({})}
-              className="los-btn-primary whitespace-nowrap"
-            >
-              + Add Role
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setModal({})}
+            className="los-btn-primary whitespace-nowrap"
+          >
+            + Add Role
+          </button>
         </div>
 
-        {/* Body */}
-        {fetchError ? (
-          <div className="p-6 text-center text-[#8d3434] text-[0.88rem]">{fetchError}</div>
-        ) : loading ? (
-          <div className="p-8 text-center text-brand-muted text-[0.88rem]">Loading roles…</div>
-        ) : filtered.length === 0 ? (
-          <div className="p-8 text-center text-brand-muted text-[0.88rem]">
-            {search ? 'No roles match your search.' : 'No roles yet — add the first one.'}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-[0.88rem]">
-              <thead>
-                <tr className="text-left border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.8)]">
-                  {['#', 'Role Name', 'Level', 'Status', 'Actions'].map((h) => (
-                    <th
-                      key={h}
-                      className="px-4 py-2 text-[0.72rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((role, idx) => (
-                  <tr
-                    key={role.id}
-                    className={`border-b border-[rgba(23,44,113,0.05)] transition-colors hover:bg-[rgba(20,150,243,0.03)] ${
-                      idx === filtered.length - 1 ? 'border-b-0' : ''
-                    }`}
-                  >
-                    {/* ID */}
-                    <td className="px-4 py-2.5 text-brand-muted text-[0.8rem] w-12">
-                      #{role.id}
-                    </td>
-
-                    {/* Name */}
-                    <td className="px-4 py-2.5">
-                      <strong className="text-[0.9rem]">{role.name}</strong>
-                    </td>
-
-                    {/* Level */}
-                    <td className="px-4 py-2.5">
-                      <span className="inline-flex items-center rounded-full bg-[rgba(20,150,243,0.08)] px-3 py-1 text-[0.8rem] font-extrabold text-brand-blue">
-                        L{role.hierarchyLevel}
-                      </span>
-                    </td>
-
-                    {/* Status */}
-                    <td className="px-4 py-2.5">
-                      <span
-                        className={`inline-flex items-center gap-[6px] px-3 py-1 rounded-full text-[0.82rem] font-extrabold ${
-                          role.isActive
-                            ? 'bg-[rgba(34,197,94,0.12)] text-[#166534]'
-                            : 'bg-[rgba(239,68,68,0.1)] text-[#991b1b]'
-                        }`}
-                      >
-                        <span
-                          className={`w-[7px] h-[7px] rounded-full ${role.isActive ? 'bg-[#22c55e]' : 'bg-[#ef4444]'}`}
-                          aria-hidden
-                        />
-                        {role.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-1.5">
-                        {/* Edit */}
-                        <button
-                          type="button"
-                          onClick={() => setModal({ role })}
-                          title="Edit role"
-                          className="inline-flex items-center justify-center w-7 h-7 rounded-[6px] border border-[rgba(23,44,113,0.12)] bg-[rgba(255,255,255,0.9)] text-brand-navy cursor-pointer hover:border-[rgba(20,150,243,0.24)] transition-colors"
-                        >
-                          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                          </svg>
-                          <span className="sr-only">Edit</span>
-                        </button>
-
-                        {/* Toggle status */}
-                        <button
-                          type="button"
-                          onClick={() => handleToggle(role)}
-                          disabled={togglingId === role.id}
-                          title={role.isActive ? 'Deactivate role' : 'Activate role'}
-                          className={`inline-flex items-center justify-center w-7 h-7 rounded-[6px] border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-wait ${
-                            role.isActive
-                              ? 'border-[rgba(239,68,68,0.2)] bg-[rgba(255,241,241,0.9)] text-[#991b1b] hover:border-[rgba(239,68,68,0.36)]'
-                              : 'border-[rgba(34,197,94,0.2)] bg-[rgba(240,253,244,0.9)] text-[#166534] hover:border-[rgba(34,197,94,0.36)]'
-                          }`}
-                        >
-                          {role.isActive ? (
-                            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                              <circle cx="12" cy="12" r="10" /><line x1="8" y1="12" x2="16" y2="12" />
-                            </svg>
-                          ) : (
-                            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                              <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
-                            </svg>
-                          )}
-                          <span className="sr-only">{role.isActive ? 'Deactivate' : 'Activate'}</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable
+          items={roles}
+          columns={columns}
+          getRowKey={(role) => role.id}
+          entityLabel="roles"
+          loading={loading}
+          error={fetchError}
+          onRetry={() => void loadRoles()}
+          emptyMessage="No roles yet — add the first one."
+          tableClassName="text-[0.88rem]"
+        />
       </div>
 
       {modal !== null ? (

@@ -4,6 +4,8 @@ export const DEVELOPER_TOOL_LINKS = [
   { href: '/developer-tools/post-bureau-check', label: 'Post BRE Check' },
   { href: '/developer-tools/post-bre-html', label: 'Post BRE thru HTML' },
   { href: '/developer-tools/cibil-report-download', label: 'Bureau Report Generate' },
+  { href: '/developer-tools/cibil-tenacio-fetch', label: 'Tenacio CIBIL Fetch' },
+  { href: '/developer-tools/cibil-surepass-fetch', label: 'Surepass CIBIL Fetch' },
   { href: '/developer-tools/post-bre-rules', label: 'Post BRE Rules' },
   { href: '/developer-tools/kyc-selfie-face-check', label: 'KYC Selfie Face Check' },
   { href: '/developer-tools/kyc-face-match-check', label: 'KYC Face Match Check' },

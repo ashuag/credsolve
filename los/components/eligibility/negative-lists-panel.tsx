@@ -1,18 +1,11 @@
 'use client';
 
 import {
-  DataTableColumnFilter,
-  DataTableColumnHeader,
-  DataTablePagination,
-  LOS_TABLE_PAGE_SIZE,
-  hasActiveColumnFilters,
-  isoDateKey,
+  ACTIVE_INACTIVE_FILTER_OPTIONS,
+  DataTable,
+  matchesActiveInactiveFilter,
   isoDateTimestamp,
-  paginateItems,
-  sortItems,
-  useColumnTableState,
-  type ColumnFilters,
-  type SortState,
+  type DataTableColumn,
 } from '@/components/ui/data-table';
 import {
   addNegativeCity,
@@ -36,8 +29,6 @@ import {
   StatusPill,
   SummaryCards,
 } from './eligibility-ui';
-
-type AuditColumnKey = 'primary' | 'status' | 'added' | 'addedBy' | 'removed' | 'removedBy';
 
 type AuditUser = { fullName: string; email: string } | null;
 
@@ -66,65 +57,86 @@ function formatUserLabel(user: AuditUser) {
   return user.fullName?.trim() || user.email;
 }
 
-function getAuditSortValue(item: AuditListItem, key: AuditColumnKey, primaryText: string): string | number | null {
-  switch (key) {
-    case 'primary':
-      return primaryText.toLowerCase();
-    case 'status':
-      return item.isActive ? 'active' : 'inactive';
-    case 'added':
-      return isoDateTimestamp(item.addedAt);
-    case 'addedBy':
-      return formatUserLabel(item.addedBy).toLowerCase();
-    case 'removed':
-      return isoDateTimestamp(item.removedAt);
-    case 'removedBy':
-      return formatUserLabel(item.removedBy).toLowerCase();
-    default:
-      return null;
-  }
-}
-
-function matchesAuditFilters(
-  item: AuditListItem,
-  filters: ColumnFilters,
-  primaryText: string,
-): boolean {
-  for (const [key, rawValue] of Object.entries(filters)) {
-    const raw = rawValue?.trim() ?? '';
-    if (!raw) continue;
-
-    if (key === 'status') {
-      const active = item.isActive;
-      if (raw === 'active' && !active) return false;
-      if (raw === 'inactive' && active) return false;
-      continue;
-    }
-
-    if (key === 'added') {
-      if (isoDateKey(item.addedAt) !== raw) return false;
-      continue;
-    }
-
-    if (key === 'removed') {
-      if (isoDateKey(item.removedAt) !== raw) return false;
-      continue;
-    }
-
-    if (key === 'addedBy') {
-      if (!formatUserLabel(item.addedBy).toLowerCase().includes(raw.toLowerCase())) return false;
-      continue;
-    }
-
-    if (key === 'removedBy') {
-      if (!formatUserLabel(item.removedBy).toLowerCase().includes(raw.toLowerCase())) return false;
-      continue;
-    }
-
-    if (key === 'primary' && !primaryText.toLowerCase().includes(raw.toLowerCase())) return false;
-  }
-
-  return true;
+function buildAuditColumns<T extends AuditListItem>({
+  primaryLabel,
+  primaryPlaceholder,
+  getPrimaryText,
+  renderPrimaryCell,
+  renderActionCell,
+}: {
+  primaryLabel: string;
+  primaryPlaceholder: string;
+  getPrimaryText: (item: T) => string;
+  renderPrimaryCell: (item: T) => ReactNode;
+  renderActionCell: (item: T) => ReactNode;
+}): DataTableColumn<T>[] {
+  return [
+    {
+      key: 'primary',
+      label: primaryLabel,
+      getFilterValue: (item) => getPrimaryText(item),
+      getSortValue: (item) => getPrimaryText(item).toLowerCase(),
+      filter: { type: 'text', placeholder: primaryPlaceholder },
+      render: (item) => renderPrimaryCell(item),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      getFilterValue: (item) => (item.isActive ? 'active' : 'inactive'),
+      getSortValue: (item) => (item.isActive ? 0 : 1),
+      filter: {
+        type: 'select',
+        options: [...ACTIVE_INACTIVE_FILTER_OPTIONS],
+        matches: (item, value) => matchesActiveInactiveFilter(item.isActive, value),
+      },
+      render: (item) => <StatusPill isActive={item.isActive} />,
+    },
+    {
+      key: 'added',
+      label: 'Added',
+      getFilterValue: (item) => item.addedAt,
+      getSortValue: (item) => isoDateTimestamp(item.addedAt),
+      filter: { type: 'date' },
+      cellClassName: 'text-[0.78rem] whitespace-nowrap text-brand-muted',
+      render: (item) => formatDateTime(item.addedAt),
+    },
+    {
+      key: 'addedBy',
+      label: 'Added by',
+      getFilterValue: (item) => formatUserLabel(item.addedBy),
+      getSortValue: (item) => formatUserLabel(item.addedBy).toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search user…' },
+      cellClassName: 'text-[0.78rem] text-brand-navy',
+      render: (item) => formatUserLabel(item.addedBy),
+    },
+    {
+      key: 'removed',
+      label: 'Removed',
+      getFilterValue: (item) => item.removedAt,
+      getSortValue: (item) => isoDateTimestamp(item.removedAt),
+      filter: { type: 'date' },
+      cellClassName: 'text-[0.78rem] whitespace-nowrap text-brand-muted',
+      render: (item) => formatDateTime(item.removedAt),
+    },
+    {
+      key: 'removedBy',
+      label: 'Removed by',
+      getFilterValue: (item) => formatUserLabel(item.removedBy),
+      getSortValue: (item) => formatUserLabel(item.removedBy).toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search user…' },
+      cellClassName: 'text-[0.78rem] text-brand-navy',
+      render: (item) => formatUserLabel(item.removedBy),
+    },
+    {
+      key: 'actions',
+      label: 'Action',
+      sortable: false,
+      filter: false,
+      headerClassName: 'text-right',
+      cellClassName: 'text-right',
+      render: (item) => renderActionCell(item),
+    },
+  ];
 }
 
 function AuditDataTable<T extends AuditListItem>({
@@ -146,187 +158,29 @@ function AuditDataTable<T extends AuditListItem>({
   renderPrimaryCell: (item: T) => ReactNode;
   renderActionCell: (item: T) => ReactNode;
 }) {
-  const {
-    columnFilters,
-    sort,
-    currentPage,
-    setCurrentPage,
-    setColumnFilter,
-    clearColumnFilters,
-    toggleSort,
-  } = useColumnTableState([items.length]);
-
-  const filtered = useMemo(
-    () => sortItems(
-      items.filter((item) => matchesAuditFilters(item, columnFilters, getPrimaryText(item))),
-      sort as SortState<AuditColumnKey>,
-      (item, key) => getAuditSortValue(item, key, getPrimaryText(item)),
-    ),
-    [items, columnFilters, sort, getPrimaryText],
+  const columns = useMemo(
+    () => buildAuditColumns({
+      primaryLabel,
+      primaryPlaceholder,
+      getPrimaryText,
+      renderPrimaryCell,
+      renderActionCell,
+    }),
+    [getPrimaryText, primaryLabel, primaryPlaceholder, renderActionCell, renderPrimaryCell],
   );
-
-  const { paginated, safePage, totalPages, rangeStart, rangeEnd, count } = paginateItems(
-    filtered,
-    currentPage,
-    LOS_TABLE_PAGE_SIZE,
-  );
-
-  const hasFilters = hasActiveColumnFilters(columnFilters) || sort != null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex flex-wrap items-center gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.72)] px-4 py-2.5">
-        <p className="m-0 min-w-[180px] flex-1 text-[0.76rem] text-brand-muted">
-          Click a column title to sort. Use the search boxes below each column to filter.
-        </p>
-        {hasFilters ? (
-          <button
-            type="button"
-            onClick={clearColumnFilters}
-            className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
-          >
-            Clear filters
-          </button>
-        ) : null}
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full min-w-[760px] border-collapse text-left">
-          <thead className="sticky top-0 z-[1] bg-[rgba(248,250,255,0.96)] align-top">
-            <tr className="border-b border-[rgba(23,44,113,0.07)]">
-              <th className="px-3 py-2 align-top">
-                <DataTableColumnHeader
-                  label={primaryLabel}
-                  sortKey="primary"
-                  sort={sort as SortState<AuditColumnKey>}
-                  onSort={toggleSort}
-                >
-                  <DataTableColumnFilter
-                    value={columnFilters.primary ?? ''}
-                    onChange={(value) => setColumnFilter('primary', value)}
-                    placeholder={primaryPlaceholder}
-                  />
-                </DataTableColumnHeader>
-              </th>
-              <th className="px-3 py-2 align-top">
-                <DataTableColumnHeader
-                  label="Status"
-                  sortKey="status"
-                  sort={sort as SortState<AuditColumnKey>}
-                  onSort={toggleSort}
-                >
-                  <DataTableColumnFilter
-                    type="select"
-                    value={columnFilters.status ?? ''}
-                    onChange={(value) => setColumnFilter('status', value)}
-                    options={[
-                      { value: 'active', label: 'Active' },
-                      { value: 'inactive', label: 'Inactive' },
-                    ]}
-                  />
-                </DataTableColumnHeader>
-              </th>
-              <th className="px-3 py-2 align-top">
-                <DataTableColumnHeader
-                  label="Added"
-                  sortKey="added"
-                  sort={sort as SortState<AuditColumnKey>}
-                  onSort={toggleSort}
-                >
-                  <DataTableColumnFilter
-                    type="date"
-                    value={columnFilters.added ?? ''}
-                    onChange={(value) => setColumnFilter('added', value)}
-                  />
-                </DataTableColumnHeader>
-              </th>
-              <th className="px-3 py-2 align-top">
-                <DataTableColumnHeader
-                  label="Added by"
-                  sortKey="addedBy"
-                  sort={sort as SortState<AuditColumnKey>}
-                  onSort={toggleSort}
-                >
-                  <DataTableColumnFilter
-                    value={columnFilters.addedBy ?? ''}
-                    onChange={(value) => setColumnFilter('addedBy', value)}
-                    placeholder="Search user…"
-                  />
-                </DataTableColumnHeader>
-              </th>
-              <th className="px-3 py-2 align-top">
-                <DataTableColumnHeader
-                  label="Removed"
-                  sortKey="removed"
-                  sort={sort as SortState<AuditColumnKey>}
-                  onSort={toggleSort}
-                >
-                  <DataTableColumnFilter
-                    type="date"
-                    value={columnFilters.removed ?? ''}
-                    onChange={(value) => setColumnFilter('removed', value)}
-                  />
-                </DataTableColumnHeader>
-              </th>
-              <th className="px-3 py-2 align-top">
-                <DataTableColumnHeader
-                  label="Removed by"
-                  sortKey="removedBy"
-                  sort={sort as SortState<AuditColumnKey>}
-                  onSort={toggleSort}
-                >
-                  <DataTableColumnFilter
-                    value={columnFilters.removedBy ?? ''}
-                    onChange={(value) => setColumnFilter('removedBy', value)}
-                    placeholder="Search user…"
-                  />
-                </DataTableColumnHeader>
-              </th>
-              <th className="px-3 py-2 text-right align-top">
-                <DataTableColumnHeader
-                  label="Action"
-                  sortKey="primary"
-                  sort={sort as SortState<AuditColumnKey>}
-                  onSort={toggleSort}
-                  sortable={false}
-                />
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginated.map((item) => (
-              <tr key={item.id} className="border-t border-[rgba(23,44,113,0.06)]">
-                <td className="px-3 py-2.5">{renderPrimaryCell(item)}</td>
-                <td className="px-3 py-2.5">
-                  <StatusPill isActive={item.isActive} />
-                </td>
-                <td className="px-3 py-2.5 text-[0.78rem] whitespace-nowrap text-brand-muted">{formatDateTime(item.addedAt)}</td>
-                <td className="px-3 py-2.5 text-[0.78rem] text-brand-navy">{formatUserLabel(item.addedBy)}</td>
-                <td className="px-3 py-2.5 text-[0.78rem] whitespace-nowrap text-brand-muted">{formatDateTime(item.removedAt)}</td>
-                <td className="px-3 py-2.5 text-[0.78rem] text-brand-navy">{formatUserLabel(item.removedBy)}</td>
-                <td className="px-3 py-2.5 text-right">{renderActionCell(item)}</td>
-              </tr>
-            ))}
-            {paginated.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-[0.84rem] text-brand-muted">
-                  {hasFilters ? 'No rows match your filters or sort.' : emptyMessage}
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
-
-      <DataTablePagination
-        page={safePage}
-        total={totalPages}
-        start={rangeStart}
-        end={rangeEnd}
-        count={count}
+      <DataTable
+        items={items}
+        columns={columns}
+        getRowKey={(item) => item.id}
         entityLabel={entityLabel}
-        onPrev={() => setCurrentPage(Math.max(1, safePage - 1))}
-        onNext={() => setCurrentPage(Math.min(totalPages, safePage + 1))}
+        emptyMessage={emptyMessage}
+        stickyHeader
+        bordered={false}
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        minWidth="760px"
       />
     </div>
   );

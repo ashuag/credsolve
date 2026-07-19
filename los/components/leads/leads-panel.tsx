@@ -1,12 +1,15 @@
 'use client';
 
-import { DataTablePagination, LOS_TABLE_PAGE_SIZE, paginateItems } from '@/components/ui/data-table';
-import { getNewLeads, type LosLead } from '@/lib/api';
-import { getMasters } from '@/lib/api';
+import {
+  DataTable,
+  isoDateTimestamp,
+  type DataTableColumn,
+} from '@/components/ui/data-table';
+import { getNewLeads, getMasters, type LosLead } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -84,59 +87,12 @@ function PanPill({ lead }: { lead: LosLead }) {
   );
 }
 
-const LEAD_TABLE_COLUMNS: ReadonlyArray<{ key: string; label: string }> = [
-  { key: 'customer',         label: 'Customer'        },
-  { key: 'pan-number',       label: 'PAN'             },
-  { key: 'mobile',           label: 'Mobile'          },
-  { key: 'occupation',       label: 'Occupation'      },
-  { key: 'city',             label: 'City'            },
-  { key: 'cibil',            label: 'CIBIL'           },
-  { key: 'pan-verified',     label: 'PAN'             },
-  { key: 'status',           label: 'Status'          },
-  { key: 'rejection-reason', label: 'Rejection'       },
-  { key: 'source',           label: 'Source'          },
-  { key: 'created',          label: 'Date'            },
+const PAN_VERIFIED_FILTER_OPTIONS = [
+  { value: '0', label: 'Not checked' },
+  { value: '1', label: 'Verified' },
+  { value: '2', label: 'Not verified' },
+  { value: '3', label: 'API failure' },
 ];
-
-const LEADS_PAGE_SIZE = LOS_TABLE_PAGE_SIZE;
-type ColumnFilters = Partial<Record<(typeof LEAD_TABLE_COLUMNS)[number]['key'], string>>;
-
-function getLeadText(lead: LosLead, key: string): string {
-  switch (key) {
-    case 'customer':         return lead.fullName?.trim() || '';
-    case 'pan-number':       return lead.panNumber ?? '';
-    case 'mobile':           return lead.mobileNumber;
-    case 'occupation':       return lead.occupation ?? '';
-    case 'city':             return lead.city ?? '';
-    case 'cibil':            return lead.cibilScore != null ? String(lead.cibilScore) : '';
-    case 'pan-verified':     return lead.panVerifiedLabel;
-    case 'status':           return `${lead.statusCode} ${lead.statusLabel}`;
-    case 'rejection-reason': return lead.rejectionReason ? `${lead.rejectionReason.code} ${lead.rejectionReason.label}` : '';
-    case 'lead-status-note': return lead.leadStatusNote ?? '';
-    case 'source':           return sourceLabel(lead);
-    case 'campaign':         return lead.utmCampaign ?? '';
-    case 'created':          return formatDateTime(lead.createdAt);
-    default:                 return '';
-  }
-}
-
-function leadMatchesFilters(lead: LosLead, filters: ColumnFilters, search: string): boolean {
-  if (search) {
-    const q = search.toLowerCase();
-    const fullText = [lead.fullName, lead.mobileNumber, lead.panNumber, lead.city, lead.occupation]
-      .filter(Boolean).join(' ').toLowerCase();
-    if (!fullText.includes(q)) return false;
-  }
-  for (const col of LEAD_TABLE_COLUMNS) {
-    const raw = filters[col.key]?.trim() ?? '';
-    if (!raw) continue;
-    if (col.key === 'status')           { if (lead.statusCode !== raw) return false; continue; }
-    if (col.key === 'pan-verified')     { if (String(lead.panVerified) !== raw) return false; continue; }
-    if (col.key === 'rejection-reason') { if ((lead.rejectionReason?.code ?? '') !== raw) return false; continue; }
-    if (!getLeadText(lead, col.key).toLowerCase().includes(raw.toLowerCase())) return false;
-  }
-  return true;
-}
 
 function StatCard({ label, value, sub, color }: { label: string; value: number | string; sub?: string; color: string }) {
   return (
@@ -155,12 +111,7 @@ export function LeadsPanel() {
   const [leads,            setLeads]            = useState<LosLead[]>([]);
   const [loading,          setLoading]          = useState(true);
   const [fetchError,       setFetchError]       = useState<string | null>(null);
-  const [search,           setSearch]           = useState('');
-  const [statusFilter,     setStatusFilter]     = useState('');
-  const [panFilter,        setPanFilter]        = useState('');
-  const [currentPage,      setCurrentPage]      = useState(1);
   const [statuses,         setStatuses]         = useState<Array<{ code: string; displayName: string }>>([]);
-  const [rejectionReasons, setRejectionReasons] = useState<Array<{ code: string; label: string }>>([]);
 
   const loadLeads = useCallback(async () => {
     setLoading(true);
@@ -171,7 +122,6 @@ export function LeadsPanel() {
       const [leadsRes, masters] = await Promise.all([getNewLeads(token), getMasters(token)]);
       setLeads(leadsRes);
       setStatuses(masters.leadStatuses.filter((s) => s.isActive).map((s) => ({ code: s.code, displayName: s.displayName })));
-      setRejectionReasons((masters.rejectionReasons ?? []).filter((r) => r.isActive).map((r) => ({ code: r.name, label: r.name.replace(/_/g, ' ') })));
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Failed to load leads');
     } finally {
@@ -179,21 +129,146 @@ export function LeadsPanel() {
     }
   }, []);
 
-  useEffect(() => { loadLeads(); }, [loadLeads]);
-  useEffect(() => { setCurrentPage(1); }, [search, statusFilter, panFilter]);
+  useEffect(() => { void loadLeads(); }, [loadLeads]);
 
-  const colFilters: ColumnFilters = {};
-  if (statusFilter) colFilters['status']       = statusFilter;
-  if (panFilter)    colFilters['pan-verified']  = panFilter;
+  const columns = useMemo((): DataTableColumn<LosLead>[] => [
+    {
+      key: 'customer',
+      label: 'Customer',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.fullName?.trim() ?? '',
+      getSortValue: (row) => (row.fullName?.trim() ?? '').toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search name…' },
+      render: (lead) => {
+        const name = formatPersonName(lead.fullName);
+        const inits = getInitials(lead.fullName);
+        const [c1, c2] = avatarColor(name);
+        return (
+          <Link href={`/leads/${lead.uuid}`} className="flex items-center gap-2.5 no-underline group">
+            <span
+              className="flex-shrink-0 grid place-items-center w-8 h-8 rounded-[9px] text-white text-[0.7rem] font-extrabold"
+              style={{ background: `linear-gradient(135deg,${c1},${c2})` }}
+            >
+              {inits}
+            </span>
+            <span className="text-brand-blue font-semibold text-[0.84rem] group-hover:underline whitespace-nowrap">{name}</span>
+          </Link>
+        );
+      },
+    },
+    {
+      key: 'pan-number',
+      label: 'PAN',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.panNumber ?? '',
+      getSortValue: (row) => (row.panNumber ?? '').toUpperCase(),
+      filter: { type: 'text', placeholder: 'Search PAN…' },
+      cellClassName: 'font-mono text-[0.82rem] text-brand-text whitespace-nowrap tracking-wide',
+      render: (lead) => lead.panNumber ?? '—',
+    },
+    {
+      key: 'mobile',
+      label: 'Mobile',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.mobileNumber,
+      filter: { type: 'text', placeholder: 'Search mobile…' },
+      cellClassName: 'text-brand-text whitespace-nowrap',
+      render: (lead) => lead.mobileNumber,
+    },
+    {
+      key: 'occupation',
+      label: 'Occupation',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.occupation ?? '',
+      getSortValue: (row) => (row.occupation ?? '').toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search…' },
+      cellClassName: 'text-brand-muted whitespace-nowrap text-[0.82rem]',
+      render: (lead) => lead.occupation ?? '—',
+    },
+    {
+      key: 'city',
+      label: 'City',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.city ?? '',
+      getSortValue: (row) => (row.city ?? '').toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search city…' },
+      cellClassName: 'text-brand-muted text-[0.82rem]',
+      render: (lead) => <span className="block min-w-[100px]">{lead.city ?? '—'}</span>,
+    },
+    {
+      key: 'cibil',
+      label: 'CIBIL',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.cibilScore,
+      getSortValue: (row) => row.cibilScore,
+      filter: { type: 'number', placeholder: 'Score…' },
+      cellClassName: 'whitespace-nowrap',
+      render: (lead) =>
+        lead.cibilScore != null ? (
+          <span
+            className="inline-flex items-center justify-center min-w-[46px] h-7 px-2 rounded-[7px] text-[0.8rem] font-extrabold"
+            style={
+              lead.cibilScore >= 750
+                ? { background: 'rgba(16,185,129,0.1)', color: '#10b981' }
+                : lead.cibilScore >= 650
+                ? { background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }
+                : { background: 'rgba(239,68,68,0.1)', color: '#ef4444' }
+            }
+          >
+            {lead.cibilScore}
+          </span>
+        ) : (
+          <span className="text-brand-muted">—</span>
+        ),
+    },
+    {
+      key: 'pan-verified',
+      label: 'PAN',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => String(row.panVerified),
+      getSortValue: (row) => row.panVerified,
+      filter: {
+        type: 'select',
+        options: PAN_VERIFIED_FILTER_OPTIONS,
+        matches: (row, value) => String(row.panVerified) === value,
+      },
+      render: (lead) => <PanPill lead={lead} />,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.statusCode,
+      getSortValue: (row) => row.statusLabel.toLowerCase(),
+      filter: {
+        type: 'select',
+        options: statuses.map((s) => ({ value: s.code, label: s.displayName })),
+        matches: (row, value) => row.statusCode === value,
+      },
+      render: (lead) => <StatusPill label={lead.statusLabel} code={lead.statusCode} />,
+    },
+    {
+      key: 'source',
+      label: 'Source',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => sourceLabel(row),
+      getSortValue: (row) => sourceLabel(row).toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search source…' },
+      cellClassName: 'text-brand-muted text-[0.8rem]',
+      render: (lead) => <span className="block min-w-[120px]">{sourceLabel(lead)}</span>,
+    },
+    {
+      key: 'created',
+      label: 'Date',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.createdAt,
+      getSortValue: (row) => isoDateTimestamp(row.createdAt),
+      filter: { type: 'date' },
+      cellClassName: 'text-brand-muted text-[0.78rem] whitespace-nowrap',
+      render: (lead) => formatDateTime(lead.createdAt),
+    },
+  ], [statuses]);
 
-  const filtered    = leads.filter((l) => leadMatchesFilters(l, colFilters, search));
-  const { paginated, safePage, totalPages, rangeStart, rangeEnd, count } = paginateItems(
-    filtered,
-    currentPage,
-    LEADS_PAGE_SIZE,
-  );
-
-  // Stat counts
   const verified    = leads.filter((l) => l.panVerified === 1).length;
   const highCibil   = leads.filter((l) => (l.cibilScore ?? 0) >= 700).length;
   const todayLeads  = leads.filter((l) => {
@@ -204,8 +279,6 @@ export function LeadsPanel() {
 
   return (
     <div className="flex flex-col gap-4">
-
-      {/* ── Stat cards ─────────────────────────────────────────────────────── */}
       {!loading && !fetchError && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard label="Total Leads"    value={leads.length}  color="#1496f3" />
@@ -215,161 +288,27 @@ export function LeadsPanel() {
         </div>
       )}
 
-      {/* ── Table card ─────────────────────────────────────────────────────── */}
-      <div
-        className="rounded-[14px] border border-[rgba(23,44,113,0.1)] overflow-hidden"
-        style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,246,255,0.94))' }}
-      >
-        {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-[rgba(23,44,113,0.07)]">
-          <div className="flex-1 min-w-[180px]">
-            <input
-              type="search"
-              placeholder="Search name, mobile, PAN, city…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="los-input h-[36px] text-[0.84rem]"
-            />
-          </div>
-          <select
-            className="los-input h-[36px] w-auto min-w-[140px] text-[0.84rem]"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">All statuses</option>
-            {statuses.map((s) => <option key={s.code} value={s.code}>{s.displayName}</option>)}
-          </select>
-          <select
-            className="los-input h-[36px] w-auto min-w-[140px] text-[0.84rem]"
-            value={panFilter}
-            onChange={(e) => setPanFilter(e.target.value)}
-          >
-            <option value="">All PAN status</option>
-            <option value="0">Not checked</option>
-            <option value="1">Verified</option>
-            <option value="2">Not verified</option>
-            <option value="3">API failure</option>
-          </select>
+      <DataTable
+        items={leads}
+        columns={columns}
+        getRowKey={(lead) => lead.uuid}
+        entityLabel="leads"
+        loading={loading}
+        error={fetchError}
+        onRetry={() => void loadLeads()}
+        emptyMessage="No leads available right now."
+        noResultsMessage="No leads match your filters."
+        minWidth="1100px"
+        toolbarActions={
           <button
             type="button"
-            onClick={loadLeads}
-            className="h-[36px] px-4 rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent text-[0.84rem] font-bold text-brand-text cursor-pointer hover:bg-[rgba(20,150,243,0.06)] transition-colors whitespace-nowrap"
+            onClick={() => void loadLeads()}
+            className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
           >
             ↺ Refresh
           </button>
-        </div>
-
-        {fetchError ? (
-          <div className="p-8 text-center text-[#8d3434] text-[0.88rem]">{fetchError}</div>
-        ) : loading ? (
-          <div className="p-10 text-center text-brand-muted text-[0.88rem]">
-            <span className="inline-block animate-pulse">Loading leads…</span>
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-[0.84rem]">
-                <thead>
-                  <tr className="text-left border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)]">
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">Customer</th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">PAN</th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">Mobile</th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">Occupation</th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">City</th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">CIBIL</th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">PAN</th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">Status</th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">Source</th>
-                    <th className="px-4 py-2.5 text-[0.68rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted whitespace-nowrap">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginated.length === 0 ? (
-                    <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center text-brand-muted text-[0.86rem]">
-                        {search || statusFilter || panFilter ? 'No leads match your filters.' : 'No leads available right now.'}
-                      </td>
-                    </tr>
-                  ) : paginated.map((lead, idx) => {
-                    const name  = formatPersonName(lead.fullName);
-                    const inits = getInitials(lead.fullName);
-                    const [c1, c2] = avatarColor(name);
-                    return (
-                      <tr
-                        key={lead.uuid}
-                        className={`border-b transition-colors hover:bg-[rgba(20,150,243,0.025)] ${idx === paginated.length - 1 ? 'border-b-0' : 'border-[rgba(23,44,113,0.05)]'}`}
-                      >
-                        {/* Customer */}
-                        <td className="px-4 py-2.5">
-                          <Link href={`/leads/${lead.uuid}`} className="flex items-center gap-2.5 no-underline group">
-                            <span
-                              className="flex-shrink-0 grid place-items-center w-8 h-8 rounded-[9px] text-white text-[0.7rem] font-extrabold"
-                              style={{ background: `linear-gradient(135deg,${c1},${c2})` }}
-                            >
-                              {inits}
-                            </span>
-                            <span className="text-brand-blue font-semibold text-[0.84rem] group-hover:underline whitespace-nowrap">{name}</span>
-                          </Link>
-                        </td>
-                        {/* PAN number */}
-                        <td className="px-4 py-2.5 font-mono text-[0.82rem] text-brand-text whitespace-nowrap tracking-wide">
-                          {lead.panNumber ?? '—'}
-                        </td>
-                        {/* Mobile */}
-                        <td className="px-4 py-2.5 text-brand-text whitespace-nowrap">{lead.mobileNumber}</td>
-                        {/* Occupation */}
-                        <td className="px-4 py-2.5 text-brand-muted whitespace-nowrap text-[0.82rem]">{lead.occupation ?? '—'}</td>
-                        {/* City */}
-                        <td className="px-4 py-2.5 text-brand-muted text-[0.82rem]">
-                          <span className="block min-w-[100px]">{lead.city ?? '—'}</span>
-                        </td>
-                        {/* CIBIL */}
-                        <td className="px-4 py-2.5 whitespace-nowrap">
-                          {lead.cibilScore != null ? (
-                            <span
-                              className="inline-flex items-center justify-center min-w-[46px] h-7 px-2 rounded-[7px] text-[0.8rem] font-extrabold"
-                              style={
-                                lead.cibilScore >= 750
-                                  ? { background: 'rgba(16,185,129,0.1)', color: '#10b981' }
-                                  : lead.cibilScore >= 650
-                                  ? { background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }
-                                  : { background: 'rgba(239,68,68,0.1)', color: '#ef4444' }
-                              }
-                            >
-                              {lead.cibilScore}
-                            </span>
-                          ) : <span className="text-brand-muted">—</span>}
-                        </td>
-                        {/* PAN verified */}
-                        <td className="px-4 py-2.5"><PanPill lead={lead} /></td>
-                        {/* Status */}
-                        <td className="px-4 py-2.5">
-                          <StatusPill label={lead.statusLabel} code={lead.statusCode} />
-                        </td>
-                        {/* Source */}
-                        <td className="px-4 py-2.5 text-brand-muted text-[0.8rem]">
-                          <span className="block min-w-[120px]">{sourceLabel(lead)}</span>
-                        </td>
-                        {/* Date */}
-                        <td className="px-4 py-2.5 text-brand-muted text-[0.78rem] whitespace-nowrap">
-                          {formatDateTime(lead.createdAt)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <DataTablePagination
-              page={safePage} total={totalPages}
-              start={rangeStart} end={rangeEnd} count={count}
-              entityLabel="leads"
-              onPrev={() => setCurrentPage(Math.max(1, safePage - 1))}
-              onNext={() => setCurrentPage(Math.min(totalPages, safePage + 1))}
-            />
-          </>
-        )}
-      </div>
+        }
+      />
     </div>
   );
 }

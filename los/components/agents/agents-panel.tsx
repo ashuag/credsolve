@@ -1,9 +1,20 @@
 'use client';
 
+import {
+  DataTable,
+  isoDateTimestamp,
+  type DataTableColumn,
+} from '@/components/ui/data-table';
 import { createUser, getRoles, getUsers, toggleUserStatus, updateUser, type LosRole, type LosUser } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import Link from 'next/link';
-import { FormEvent, Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+const AGENT_STATUS_FILTER_OPTIONS = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+] as const;
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -44,14 +55,6 @@ function getToken(): string | null {
 type ModalMode = 'create' | 'edit';
 type SaveMeta = { mode: ModalMode; invitationResent?: boolean };
 type AgentStatus = 'pending' | 'active' | 'inactive';
-type AgentStatusFilter = AgentStatus | 'all';
-type AgentSortField = 'fullName' | 'email' | 'role' | 'manager' | 'status' | 'lastLoginAt' | 'createdAt';
-type SortDirection = 'asc' | 'desc';
-type AgentSort = { field: AgentSortField; direction: SortDirection };
-type AgentStatCard =
-  | { label: string; value: number; kind: 'status'; filterStatus: AgentStatusFilter }
-  | { label: string; value: number; kind: 'today' }
-  | { label: string; value: number; kind: 'info' };
 
 type FormState = {
   fullName: string;
@@ -88,22 +91,6 @@ function compareText(a: string, b: string) {
   return a.localeCompare(b, 'en', { sensitivity: 'base' });
 }
 
-function getStatusRank(status: AgentStatus) {
-  return {
-    pending: 0,
-    active: 1,
-    inactive: 2,
-  }[status];
-}
-
-function getDefaultAgentSort(): AgentSort {
-  return { field: 'createdAt', direction: 'desc' };
-}
-
-function getDefaultSortDirection(field: AgentSortField): SortDirection {
-  return field === 'createdAt' || field === 'lastLoginAt' ? 'desc' : 'asc';
-}
-
 function getDirectReportsByManager(agents: LosUser[]) {
   const reports: Record<string, LosUser[]> = {};
 
@@ -120,49 +107,6 @@ function getDirectReportsByManager(agents: LosUser[]) {
 
 function teamMemberLabel(count: number) {
   return count === 1 ? '1 team member' : `${count} team members`;
-}
-
-function sortAgents(agents: LosUser[], sortBy: AgentSort) {
-  const sorted = [...agents];
-  const directionFactor = sortBy.direction === 'asc' ? 1 : -1;
-
-  sorted.sort((left, right) => {
-    let comparison = 0;
-
-    switch (sortBy.field) {
-      case 'fullName':
-        comparison = compareText(left.fullName, right.fullName);
-        break;
-      case 'email':
-        comparison = compareText(left.email, right.email);
-        break;
-      case 'role':
-        comparison = compareText(left.userRole?.name ?? '', right.userRole?.name ?? '');
-        break;
-      case 'manager':
-        comparison = compareText(left.manager?.fullName ?? '', right.manager?.fullName ?? '');
-        break;
-      case 'status':
-        comparison = getStatusRank(getAgentStatus(left)) - getStatusRank(getAgentStatus(right));
-        break;
-      case 'lastLoginAt': {
-        const missingLoginComparison = Number(!left.lastLoginAt) - Number(!right.lastLoginAt);
-        if (missingLoginComparison !== 0) return missingLoginComparison;
-        comparison = new Date(left.lastLoginAt!).getTime() - new Date(right.lastLoginAt!).getTime();
-        break;
-      }
-      case 'createdAt':
-      default:
-        comparison = new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
-        break;
-    }
-
-    if (comparison !== 0) return comparison * directionFactor;
-
-    return compareText(left.fullName, right.fullName) || new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
-  });
-
-  return sorted;
 }
 
 // ─── sub-components ──────────────────────────────────────────────────────────
@@ -202,39 +146,6 @@ function StatusBadge({ status }: { status: AgentStatus }) {
   );
 }
 
-function SortIndicator({ active, direction }: { active: boolean; direction: SortDirection }) {
-  return (
-    <span className="inline-flex flex-col justify-center leading-none" aria-hidden>
-      <svg
-        width={11}
-        height={11}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2.2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className={active && direction === 'asc' ? 'text-brand-blue' : 'text-[rgba(23,44,113,0.24)]'}
-      >
-        <polyline points="18 15 12 9 6 15" />
-      </svg>
-      <svg
-        width={11}
-        height={11}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2.2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className={`${active && direction === 'desc' ? 'text-brand-blue' : 'text-[rgba(23,44,113,0.24)]'} -mt-1`}
-      >
-        <polyline points="6 9 12 15 18 9" />
-      </svg>
-    </span>
-  );
-}
-
 function TeamToggleIcon({ expanded }: { expanded: boolean }) {
   return (
     <svg
@@ -251,36 +162,6 @@ function TeamToggleIcon({ expanded }: { expanded: boolean }) {
     >
       <polyline points="9 6 15 12 9 18" />
     </svg>
-  );
-}
-
-function SortHeader({
-  label,
-  field,
-  sortBy,
-  onSort,
-}: {
-  label: string;
-  field: AgentSortField;
-  sortBy: AgentSort;
-  onSort: (field: AgentSortField) => void;
-}) {
-  const isActive = sortBy.field === field;
-
-  return (
-    <th
-      aria-sort={isActive ? (sortBy.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
-      className="px-4 py-2 text-[0.72rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted"
-    >
-      <button
-        type="button"
-        onClick={() => onSort(field)}
-        className="inline-flex items-center gap-1 rounded-[6px] bg-transparent p-0 text-left text-inherit transition-colors hover:text-brand-text"
-      >
-        <span>{label}</span>
-        <SortIndicator active={isActive} direction={sortBy.direction} />
-      </button>
-    </th>
   );
 }
 
@@ -568,6 +449,7 @@ function AgentModal({
   );
 }
 
+
 // ─── main panel ──────────────────────────────────────────────────────────────
 
 export function AgentsPanel() {
@@ -578,12 +460,8 @@ export function AgentsPanel() {
   const [notice, setNotice] = useState<string | null>(null);
   const [modal, setModal] = useState<{ mode: ModalMode; agent?: LosUser } | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<AgentStatusFilter>('all');
-  const [roleFilter, setRoleFilter] = useState<number | 'all'>('all');
-  const [sortBy, setSortBy] = useState<AgentSort>(getDefaultAgentSort);
-  const [todayOnly, setTodayOnly] = useState(false);
   const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null);
+  const [signedInTodayOnly, setSignedInTodayOnly] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -601,7 +479,7 @@ export function AgentsPanel() {
     }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { void loadData(); }, [loadData]);
 
   async function handleToggle(agent: LosUser) {
     const token = getToken();
@@ -630,467 +508,300 @@ export function AgentsPanel() {
     setModal(null);
   }
 
-  function resetView() {
-    setSearch('');
-    setStatusFilter('all');
-    setRoleFilter('all');
-    setSortBy(getDefaultAgentSort());
-    setTodayOnly(false);
-    setExpandedAgentId(null);
-  }
-
-  function handleSort(field: AgentSortField) {
-    setSortBy((current) => (
-      current.field === field
-        ? { field, direction: current.direction === 'asc' ? 'desc' : 'asc' }
-        : { field, direction: getDefaultSortDirection(field) }
-    ));
-  }
-
-  function handleStatFilter(nextStatus: AgentStatusFilter) {
-    setSearch('');
-    setRoleFilter('all');
-    setTodayOnly(false);
-    setStatusFilter((current) => (current === nextStatus ? 'all' : nextStatus));
-  }
-
-  function handleTodayAgentsFilter() {
-    setSearch('');
-    setRoleFilter('all');
-    setStatusFilter('all');
-    setTodayOnly((current) => !current);
-  }
-
-  const searchTerm = search.trim().toLowerCase();
-
-  const filtered = agents.filter((agent) => {
-    const status = getAgentStatus(agent);
-    const matchesSearch = searchTerm === ''
-      || agent.fullName.toLowerCase().includes(searchTerm)
-      || agent.email.toLowerCase().includes(searchTerm)
-      || (agent.userRole?.name ?? '').toLowerCase().includes(searchTerm)
-      || (agent.manager?.fullName ?? '').toLowerCase().includes(searchTerm)
-      || (agent.manager?.email ?? '').toLowerCase().includes(searchTerm);
-    const matchesStatus = statusFilter === 'all' || status === statusFilter;
-    const matchesRole = roleFilter === 'all' || agent.roleId === roleFilter;
-    const matchesToday = !todayOnly || signedInToday(agent);
-
-    return matchesSearch && matchesStatus && matchesRole && matchesToday;
-  });
-  const visibleAgents = sortAgents(filtered, sortBy);
-  const directReportsByManager = getDirectReportsByManager(agents);
-  const sortedRoles = [...roles].sort((left, right) => (
-    left.hierarchyLevel - right.hierarchyLevel || compareText(left.name, right.name)
-  ));
-  const hasNarrowingFilters = searchTerm !== '' || statusFilter !== 'all' || roleFilter !== 'all' || todayOnly;
-  const hasViewChanges = hasNarrowingFilters || sortBy.field !== 'createdAt' || sortBy.direction !== 'desc';
+  const directReportsByManager = useMemo(() => getDirectReportsByManager(agents), [agents]);
+  const sortedRoles = useMemo(
+    () => [...roles].sort((left, right) => left.hierarchyLevel - right.hierarchyLevel || compareText(left.name, right.name)),
+    [roles],
+  );
+  const roleFilterOptions = useMemo(
+    () => sortedRoles.map((role) => ({ value: String(role.id), label: role.name })),
+    [sortedRoles],
+  );
 
   const totalPending = agents.filter((a) => getAgentStatus(a) === 'pending').length;
   const totalActive = agents.filter((a) => getAgentStatus(a) === 'active').length;
   const totalInactive = agents.filter((a) => getAgentStatus(a) === 'inactive').length;
   const totalSignedInToday = agents.filter(signedInToday).length;
-  const statCards: AgentStatCard[] = [
-    { label: 'Total agents', value: agents.length, kind: 'status', filterStatus: 'all' },
-    { label: 'Pending', value: totalPending, kind: 'status', filterStatus: 'pending' },
-    { label: 'Active', value: totalActive, kind: 'status', filterStatus: 'active' },
-    { label: 'Inactive', value: totalInactive, kind: 'status', filterStatus: 'inactive' },
-    { label: "Today's agents", value: totalSignedInToday, kind: 'today' },
-  ];
+
+  const tableItems = useMemo(
+    () => (signedInTodayOnly ? agents.filter(signedInToday) : agents),
+    [agents, signedInTodayOnly],
+  );
+
+  const columns = useMemo((): DataTableColumn<LosUser>[] => [
+    {
+      key: 'name',
+      label: 'Name',
+      getFilterValue: (agent) => agent.fullName,
+      getSortValue: (agent) => agent.fullName.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search name…' },
+      headerClassName: 'min-w-[180px]',
+      render: (agent) => {
+        const directReports = directReportsByManager[agent.id] ?? [];
+        const isExpanded = expandedAgentId === agent.id;
+        return (
+          <div className="flex items-center gap-2 min-w-0">
+            <span
+              className="flex-shrink-0 w-7 h-7 rounded-[6px] grid place-items-center font-extrabold text-[0.75rem] text-[#fff8df]"
+              style={{ background: 'linear-gradient(145deg, #1496f3, #172c71)' }}
+              aria-hidden
+            >
+              {initials(agent.fullName)}
+            </span>
+            <span className="min-w-0">
+              <button
+                type="button"
+                onClick={() => setExpandedAgentId((current) => (current === agent.id ? null : agent.id))}
+                className="inline-flex max-w-[220px] items-center gap-1 bg-transparent p-0 text-left text-[0.88rem] font-extrabold text-brand-text underline-offset-2 transition-colors hover:text-brand-blue hover:underline"
+                title={isExpanded ? 'Hide direct reports' : 'Show direct reports'}
+              >
+                <span className="truncate">{agent.fullName}</span>
+                <TeamToggleIcon expanded={isExpanded} />
+              </button>
+              <span className="block text-brand-muted text-[0.73rem]">
+                #{agent.id} · {directReports.length > 0 ? teamMemberLabel(directReports.length) : 'No team'}
+              </span>
+              {isExpanded ? (
+                <div className="mt-2 rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.95)] p-3">
+                  {directReports.length === 0 ? (
+                    <p className="m-0 text-[0.8rem] text-brand-muted">No direct reports assigned.</p>
+                  ) : (
+                    <div className="grid gap-2">
+                      {directReports.map((member) => (
+                        <div key={member.id} className="flex flex-wrap items-center gap-2">
+                          <strong className="text-[0.82rem] text-brand-text">{member.fullName}</strong>
+                          <span className="text-[0.75rem] text-brand-muted">{member.email}</span>
+                          <RoleBadge name={member.userRole?.name} />
+                          <StatusBadge status={getAgentStatus(member)} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'email',
+      label: 'Email',
+      getFilterValue: (agent) => agent.email,
+      getSortValue: (agent) => agent.email.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search email…' },
+      cellClassName: 'text-brand-muted text-[0.82rem]',
+      render: (agent) => <span className="block min-w-[180px] whitespace-normal break-all">{agent.email}</span>,
+    },
+    {
+      key: 'role',
+      label: 'Role',
+      getFilterValue: (agent) => (agent.roleId != null ? String(agent.roleId) : ''),
+      getSortValue: (agent) => (agent.userRole?.name ?? '').toLowerCase(),
+      filter: {
+        type: 'select',
+        options: roleFilterOptions,
+        matches: (agent, value) => String(agent.roleId ?? '') === value,
+      },
+      render: (agent) => <RoleBadge name={agent.userRole?.name} />,
+    },
+    {
+      key: 'manager',
+      label: 'Reporting manager',
+      getFilterValue: (agent) => agent.manager ? `${agent.manager.fullName} ${agent.manager.email}` : 'Top level',
+      getSortValue: (agent) => (agent.manager?.fullName ?? 'Top level').toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search manager…' },
+      cellClassName: 'text-brand-muted text-[0.82rem]',
+      render: (agent) => agent.manager ? (
+        <div className="min-w-0">
+          <strong className="block whitespace-normal break-words text-brand-text text-[0.84rem]">
+            {agent.manager.fullName}
+          </strong>
+          <span className="block whitespace-normal break-all">{agent.manager.email}</span>
+        </div>
+      ) : (
+        <span className="block whitespace-nowrap">Top level</span>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      getFilterValue: (agent) => getAgentStatus(agent),
+      getSortValue: (agent) => getAgentStatus(agent),
+      filter: {
+        type: 'select',
+        options: [...AGENT_STATUS_FILTER_OPTIONS],
+        matches: (agent, value) => getAgentStatus(agent) === value,
+      },
+      render: (agent) => <StatusBadge status={getAgentStatus(agent)} />,
+    },
+    {
+      key: 'lastLogin',
+      label: 'Last logged in',
+      getFilterValue: (agent) => agent.lastLoginAt ?? '',
+      getSortValue: (agent) => isoDateTimestamp(agent.lastLoginAt),
+      filter: { type: 'date' },
+      cellClassName: 'text-brand-muted text-[0.8rem] whitespace-nowrap',
+      render: (agent) => (agent.lastLoginAt ? formatDateTime(agent.lastLoginAt) : 'Not signed in'),
+    },
+    {
+      key: 'created',
+      label: 'Added',
+      getFilterValue: (agent) => agent.createdAt,
+      getSortValue: (agent) => isoDateTimestamp(agent.createdAt),
+      filter: { type: 'date' },
+      cellClassName: 'text-brand-muted text-[0.8rem] whitespace-nowrap',
+      render: (agent) => formatDate(agent.createdAt),
+    },
+    {
+      key: 'actions',
+      label: 'Action',
+      sortable: false,
+      filter: false,
+      render: (agent) => {
+        const status = getAgentStatus(agent);
+        return (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setModal({ mode: 'edit', agent })}
+              title="Edit agent"
+              className="inline-flex items-center justify-center w-7 h-7 rounded-[6px] border border-[rgba(23,44,113,0.12)] bg-[rgba(255,255,255,0.9)] text-brand-navy cursor-pointer hover:border-[rgba(20,150,243,0.24)] transition-colors"
+            >
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+              <span className="sr-only">Edit agent</span>
+            </button>
+            {status === 'pending' ? (
+              <button
+                type="button"
+                disabled
+                title="Pending invitation"
+                className="inline-flex items-center justify-center w-7 h-7 rounded-[6px] border border-[rgba(245,158,11,0.2)] bg-[rgba(255,247,237,0.95)] text-[#9a6700] opacity-80"
+              >
+                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 7 12 12 15 15" />
+                </svg>
+                <span className="sr-only">Pending invitation</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleToggle(agent)}
+                disabled={togglingId === agent.id}
+                title={agent.isActive ? 'Deactivate agent' : 'Activate agent'}
+                className={`inline-flex items-center justify-center w-7 h-7 rounded-[6px] border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-wait ${
+                  agent.isActive
+                    ? 'border-[rgba(239,68,68,0.2)] bg-[rgba(255,241,241,0.9)] text-[#991b1b] hover:border-[rgba(239,68,68,0.36)]'
+                    : 'border-[rgba(34,197,94,0.2)] bg-[rgba(240,253,244,0.9)] text-[#166534] hover:border-[rgba(34,197,94,0.36)]'
+                }`}
+              >
+                {agent.isActive ? (
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="8" y1="12" x2="16" y2="12" />
+                  </svg>
+                ) : (
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="16" />
+                    <line x1="8" y1="12" x2="16" y2="12" />
+                  </svg>
+                )}
+                <span className="sr-only">{agent.isActive ? 'Deactivate agent' : 'Activate agent'}</span>
+              </button>
+            )}
+          </div>
+        );
+      },
+    },
+  ], [directReportsByManager, expandedAgentId, roleFilterOptions, togglingId]);
 
   return (
     <>
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-2 mb-3 sm:grid-cols-3 xl:grid-cols-5">
-        {statCards.map((stat) => {
-          const isFilterCard = stat.kind !== 'info';
-          const isSelected = stat.kind === 'status'
-            ? statusFilter === stat.filterStatus
-            : stat.kind === 'today'
-            ? todayOnly
-            : false;
-
-          const cardClassName = `rounded-[8px] border px-4 py-3 text-left transition-colors ${
-            isSelected
-              ? 'border-[rgba(20,150,243,0.4)] bg-[rgba(20,150,243,0.08)]'
-              : 'border-[rgba(23,44,113,0.1)]'
-          } ${
-            isFilterCard
-              ? 'cursor-pointer hover:border-[rgba(20,150,243,0.24)] hover:bg-[rgba(20,150,243,0.04)]'
-              : ''
-          }`;
-
-          const cardBody = (
-            <>
-              <span className="block text-[0.78rem] text-brand-muted">{stat.label}</span>
-              <strong className="block mt-0.5 text-[1.6rem] font-extrabold tracking-[-0.03em] leading-none">
-                {loading ? '—' : stat.value}
-              </strong>
-            </>
-          );
-
-          if (stat.kind === 'info') {
-            return (
-              <div
-                key={stat.label}
-                className={cardClassName}
-                style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.97), rgba(240,246,255,0.94))' }}
-              >
-                {cardBody}
-              </div>
-            );
-          }
-
-          return (
-            <button
-              key={stat.label}
-              type="button"
-              onClick={() => {
-                if (stat.kind === 'status') {
-                  handleStatFilter(stat.filterStatus);
-                  return;
-                }
-
-                handleTodayAgentsFilter();
-              }}
-              className={cardClassName}
-              style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.97), rgba(240,246,255,0.94))' }}
-              aria-pressed={isSelected}
-            >
-              {cardBody}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Main card */}
-      <div
-        className="rounded-[10px] border border-[rgba(23,44,113,0.1)] overflow-hidden"
-        style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.97), rgba(240,246,255,0.94))' }}
-      >
-        {/* Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-[rgba(23,44,113,0.07)]">
+      <div className="grid gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <span className="block text-[0.72rem] font-extrabold tracking-[0.14em] uppercase text-brand-blue">
-              Agent directory
-            </span>
-            <h2 className="m-0 text-[1.15rem] font-extrabold leading-tight tracking-[-0.02em]">
-              All Agents
-            </h2>
+            <h2 className="m-0 text-[1.2rem] font-extrabold tracking-[-0.03em]">Agents</h2>
+            <p className="m-0 mt-1 text-[0.86rem] text-brand-muted">
+              Manage LOS agents, roles, and reporting hierarchy.
+            </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => setModal({ mode: 'create' })}
-              className="los-btn-primary whitespace-nowrap"
-            >
-              + Add Agent
-            </button>
-          </div>
-        </div>
-
-        <div className="grid gap-3 px-4 py-3 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.72)] md:grid-cols-2 xl:grid-cols-[minmax(0,1.7fr)_repeat(2,minmax(0,0.95fr))_auto]">
-          <label className="grid gap-1">
-            <span className="text-[0.72rem] font-extrabold tracking-[0.08em] uppercase text-brand-muted">
-              Search
-            </span>
-            <input
-              type="search"
-              placeholder="Name, email, role or manager…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="los-input"
-            />
-          </label>
-
-          <label className="grid gap-1">
-            <span className="text-[0.72rem] font-extrabold tracking-[0.08em] uppercase text-brand-muted">
-              Status
-            </span>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as AgentStatusFilter)}
-              className="los-input appearance-none cursor-pointer"
-            >
-              <option value="all">All statuses</option>
-              <option value="pending">Pending</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </label>
-
-          <label className="grid gap-1">
-            <span className="text-[0.72rem] font-extrabold tracking-[0.08em] uppercase text-brand-muted">
-              Role
-            </span>
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-              className="los-input appearance-none cursor-pointer"
-            >
-              <option value="all">All roles</option>
-              {sortedRoles.map((role) => (
-                <option key={role.id} value={role.id}>{role.name}</option>
-              ))}
-            </select>
-          </label>
-
-          <div className="flex items-end">
-            <button
-              type="button"
-              onClick={resetView}
-              disabled={!hasViewChanges}
-              className="min-h-[42px] w-full rounded-[10px] border border-[rgba(23,44,113,0.12)] bg-[rgba(255,255,255,0.9)] px-4 font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Reset View
-            </button>
-          </div>
+          <button type="button" className="los-btn-primary" onClick={() => setModal({ mode: 'create' })}>
+            + Add Agent
+          </button>
         </div>
 
         {!loading && !fetchError ? (
-          <div className="px-4 py-2 border-b border-[rgba(23,44,113,0.07)] text-[0.8rem] text-brand-muted">
-            Showing {visibleAgents.length} of {agents.length} agents
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { label: 'Active', value: totalActive, color: '#10b981', onClick: undefined as undefined | (() => void) },
+              { label: 'Pending', value: totalPending, color: '#f59e0b', onClick: undefined },
+              { label: 'Inactive', value: totalInactive, color: '#ef4444', onClick: undefined },
+              {
+                label: 'Signed in today',
+                value: totalSignedInToday,
+                color: '#1496f3',
+                onClick: () => setSignedInTodayOnly((v) => !v),
+              },
+            ].map((card) => (
+              <button
+                key={card.label}
+                type="button"
+                onClick={card.onClick}
+                className={`flex flex-col gap-1 rounded-[14px] border px-4 py-3 text-left ${card.onClick ? 'cursor-pointer' : 'cursor-default'} ${
+                  card.label === 'Signed in today' && signedInTodayOnly ? 'ring-2 ring-[rgba(20,150,243,0.35)]' : ''
+                }`}
+                style={{ background: `${card.color}09`, borderColor: `${card.color}22` }}
+              >
+                <span className="text-[0.68rem] font-extrabold uppercase tracking-[0.14em]" style={{ color: `${card.color}cc` }}>
+                  {card.label}
+                </span>
+                <span className="text-[1.6rem] font-extrabold leading-none tracking-tight" style={{ color: card.color }}>
+                  {card.value}
+                </span>
+              </button>
+            ))}
           </div>
         ) : null}
 
         {notice ? (
-          <div className="mx-4 mt-4 rounded-[10px] border border-[rgba(34,197,94,0.18)] bg-[rgba(240,253,244,0.9)] px-4 py-3 text-[0.86rem] text-[#166534]">
+          <div className="rounded-[10px] border border-[rgba(34,197,94,0.22)] bg-[rgba(240,253,244,0.92)] p-[10px_14px] text-[0.86rem] text-[#166534]">
             {notice}
+            <button type="button" className="ml-3 underline" onClick={() => setNotice(null)}>Dismiss</button>
           </div>
         ) : null}
 
-        {/* Body */}
-        {fetchError ? (
-          <div className="p-6 text-center text-[#8d3434] text-[0.88rem]">{fetchError}</div>
-        ) : loading ? (
-          <div className="p-8 text-center text-brand-muted text-[0.88rem]">Loading agents…</div>
-        ) : visibleAgents.length === 0 ? (
-          <div className="p-8 text-center text-brand-muted text-[0.88rem]">
-            {hasNarrowingFilters ? 'No agents match the current filters.' : 'No agents yet — add the first one.'}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-[0.88rem]">
-              <thead>
-                <tr className="text-left border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.8)]">
-                  <SortHeader label="Name" field="fullName" sortBy={sortBy} onSort={handleSort} />
-                  <SortHeader label="Email" field="email" sortBy={sortBy} onSort={handleSort} />
-                  <SortHeader label="Role" field="role" sortBy={sortBy} onSort={handleSort} />
-                  <SortHeader label="Reporting manager" field="manager" sortBy={sortBy} onSort={handleSort} />
-                  <SortHeader label="Status" field="status" sortBy={sortBy} onSort={handleSort} />
-                  <SortHeader label="Last logged in" field="lastLoginAt" sortBy={sortBy} onSort={handleSort} />
-                  <SortHeader label="Added" field="createdAt" sortBy={sortBy} onSort={handleSort} />
-                  <th className="px-4 py-2 text-[0.72rem] font-extrabold tracking-[0.1em] uppercase text-brand-muted">
-                    Action
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleAgents.map((agent, idx) => {
-                  const directReports = directReportsByManager[agent.id] ?? [];
-                  const isExpanded = expandedAgentId === agent.id;
-                  const status = getAgentStatus(agent);
-
-                  return (
-                    <Fragment key={agent.id}>
-                      <tr
-                        className={`border-b border-[rgba(23,44,113,0.05)] transition-colors ${
-                          isExpanded ? 'border-b-0 bg-[rgba(20,150,243,0.03)]' : 'hover:bg-[rgba(20,150,243,0.03)]'
-                        } ${!isExpanded && idx === visibleAgents.length - 1 ? 'border-b-0' : ''}`}
-                      >
-                        {/* Name */}
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span
-                              className="flex-shrink-0 w-7 h-7 rounded-[6px] grid place-items-center font-extrabold text-[0.75rem] text-[#fff8df]"
-                              style={{ background: 'linear-gradient(145deg, #1496f3, #172c71)' }}
-                              aria-hidden
-                            >
-                              {initials(agent.fullName)}
-                            </span>
-                            <span className="min-w-0">
-                              <button
-                                type="button"
-                                onClick={() => setExpandedAgentId((current) => (current === agent.id ? null : agent.id))}
-                                className="inline-flex max-w-[220px] items-center gap-1 bg-transparent p-0 text-left text-[0.88rem] font-extrabold text-brand-text underline-offset-2 transition-colors hover:text-brand-blue hover:underline"
-                                title={isExpanded ? 'Hide direct reports' : 'Show direct reports'}
-                              >
-                                <span className="truncate">{agent.fullName}</span>
-                                <TeamToggleIcon expanded={isExpanded} />
-                              </button>
-                              <span className="block text-brand-muted text-[0.73rem]">
-                                #{agent.id} · {directReports.length > 0 ? teamMemberLabel(directReports.length) : 'No team'}
-                              </span>
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Email */}
-                        <td className="px-4 py-2.5 text-brand-muted text-[0.82rem]">
-                          <span className="block min-w-[220px] whitespace-normal break-all">{agent.email}</span>
-                        </td>
-
-                        {/* Role */}
-                        <td className="px-4 py-2.5">
-                          <RoleBadge name={agent.userRole?.name} />
-                        </td>
-
-                        {/* Reporting manager */}
-                        <td className="px-4 py-2.5 text-brand-muted text-[0.82rem]">
-                          {agent.manager ? (
-                            <div className="min-w-0">
-                              <strong className="block whitespace-normal break-words text-brand-text text-[0.84rem]">
-                                {agent.manager.fullName}
-                              </strong>
-                              <span className="block whitespace-normal break-all">{agent.manager.email}</span>
-                            </div>
-                          ) : (
-                            <span className="block whitespace-nowrap">Top level</span>
-                          )}
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-4 py-2.5">
-                          <StatusBadge status={status} />
-                        </td>
-
-                        {/* Last logged in */}
-                        <td className="px-4 py-2.5 text-brand-muted text-[0.8rem] whitespace-nowrap">
-                          {agent.lastLoginAt ? formatDateTime(agent.lastLoginAt) : 'Not signed in'}
-                        </td>
-
-                        {/* Added */}
-                        <td className="px-4 py-2.5 text-brand-muted text-[0.8rem] whitespace-nowrap">
-                          {formatDate(agent.createdAt)}
-                        </td>
-
-                        {/* Action */}
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => setModal({ mode: 'edit', agent })}
-                              title="Edit agent"
-                              className="inline-flex items-center justify-center w-7 h-7 rounded-[6px] border border-[rgba(23,44,113,0.12)] bg-[rgba(255,255,255,0.9)] text-brand-navy cursor-pointer hover:border-[rgba(20,150,243,0.24)] transition-colors"
-                            >
-                              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                              </svg>
-                              <span className="sr-only">Edit agent</span>
-                            </button>
-
-                            {status === 'pending' ? (
-                              <button
-                                type="button"
-                                disabled
-                                title="Pending invitation"
-                                className="inline-flex items-center justify-center w-7 h-7 rounded-[6px] border border-[rgba(245,158,11,0.2)] bg-[rgba(255,247,237,0.95)] text-[#9a6700] opacity-80"
-                              >
-                                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <circle cx="12" cy="12" r="10" />
-                                  <polyline points="12 7 12 12 15 15" />
-                                </svg>
-                                <span className="sr-only">Pending invitation</span>
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleToggle(agent)}
-                                disabled={togglingId === agent.id}
-                                title={agent.isActive ? 'Deactivate agent' : 'Activate agent'}
-                                className={`inline-flex items-center justify-center w-7 h-7 rounded-[6px] border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-wait ${
-                                  agent.isActive
-                                    ? 'border-[rgba(239,68,68,0.2)] bg-[rgba(255,241,241,0.9)] text-[#991b1b] hover:border-[rgba(239,68,68,0.36)]'
-                                    : 'border-[rgba(34,197,94,0.2)] bg-[rgba(240,253,244,0.9)] text-[#166534] hover:border-[rgba(34,197,94,0.36)]'
-                                }`}
-                              >
-                                {agent.isActive ? (
-                                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                    <circle cx="12" cy="12" r="10" />
-                                    <line x1="8" y1="12" x2="16" y2="12" />
-                                  </svg>
-                                ) : (
-                                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                    <circle cx="12" cy="12" r="10" />
-                                    <line x1="12" y1="8" x2="12" y2="16" />
-                                    <line x1="8" y1="12" x2="16" y2="12" />
-                                  </svg>
-                                )}
-                                <span className="sr-only">{agent.isActive ? 'Deactivate agent' : 'Activate agent'}</span>
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-
-                      {isExpanded ? (
-                        <tr className={`border-b border-[rgba(23,44,113,0.05)] ${idx === visibleAgents.length - 1 ? 'border-b-0' : ''}`}>
-                          <td colSpan={8} className="px-4 pb-4">
-                            <div className="rounded-[12px] border border-[rgba(23,44,113,0.08)] bg-[rgba(255,255,255,0.75)] p-4">
-                              <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                                <div>
-                                  <span className="block text-[0.68rem] font-extrabold tracking-[0.12em] uppercase text-brand-blue">
-                                    Under team
-                                  </span>
-                                  <h3 className="m-0 text-[1rem] font-extrabold tracking-[-0.02em] text-brand-text">
-                                    {agent.fullName}
-                                  </h3>
-                                </div>
-                                <span className="inline-flex items-center rounded-full bg-[rgba(20,150,243,0.08)] px-3 py-1 text-[0.8rem] font-extrabold text-brand-blue">
-                                  {teamMemberLabel(directReports.length)}
-                                </span>
-                              </div>
-
-                              {directReports.length === 0 ? (
-                                <p className="m-0 text-[0.84rem] text-brand-muted">
-                                  No direct reports are assigned to this agent yet.
-                                </p>
-                              ) : (
-                                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                                  {directReports.map((member) => (
-                                    <div
-                                      key={member.id}
-                                      className="rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.9)] px-3 py-3"
-                                    >
-                                      <div className="flex items-center gap-2 min-w-0">
-                                        <span
-                                          className="flex-shrink-0 w-8 h-8 rounded-[8px] grid place-items-center font-extrabold text-[0.75rem] text-[#fff8df]"
-                                          style={{ background: 'linear-gradient(145deg, #1496f3, #172c71)' }}
-                                          aria-hidden
-                                        >
-                                          {initials(member.fullName)}
-                                        </span>
-                                        <div className="min-w-0">
-                                          <strong className="block whitespace-normal break-words text-[0.88rem] text-brand-text">
-                                            {member.fullName}
-                                          </strong>
-                                          <span className="block whitespace-normal break-all text-[0.8rem] text-brand-muted">
-                                            {member.email}
-                                          </span>
-                                        </div>
-                                      </div>
-                                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                                        <RoleBadge name={member.userRole?.name} />
-                                        <StatusBadge status={getAgentStatus(member)} />
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ) : null}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable
+          items={tableItems}
+          columns={columns}
+          getRowKey={(agent) => agent.id}
+          entityLabel="agents"
+          loading={loading}
+          error={fetchError}
+          onRetry={() => void loadData()}
+          emptyMessage="No agents available."
+          minWidth="1100px"
+          toolbarActions={
+            <button
+              type="button"
+              onClick={() => void loadData()}
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text"
+            >
+              ↺ Refresh
+            </button>
+          }
+          renderRowClassName={(agent) =>
+            expandedAgentId === agent.id
+              ? 'border-b border-[rgba(23,44,113,0.05)] bg-[rgba(20,150,243,0.03)]'
+              : undefined
+          }
+        />
       </div>
 
-      {/* Modal */}
       {modal ? (
         <AgentModal
           mode={modal.mode}

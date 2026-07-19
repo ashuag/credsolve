@@ -56,3 +56,21 @@ model SmsTemplate {
 
   @@map("sms_template")
 }
+
+/// Registry of vendor APIs (primary + backup) with on/off status for LOS control.
+model VendorApiConfig {
+  id         Int      @id @default(autoincrement())
+  apiCode    String   @map("api_code") @db.VarChar(64)
+  apiName    String   @map("api_name") @db.VarChar(120)
+  vendorName String   @map("vendor_name") @db.VarChar(80)
+  priority   Int      @default(1) @db.SmallInt
+  status     String   @default("ACTIVE") @db.VarChar(20)
+  notes      String?  @db.VarChar(255)
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([apiCode, vendorName], map: "vendor_api_config_api_vendor_uq")
+  @@index([apiCode, status, priority], map: "vendor_api_config_api_status_priority_idx")
+  @@map("vendor_api_config")
+}

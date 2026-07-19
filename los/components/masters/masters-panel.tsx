@@ -10,7 +10,13 @@ export function MastersPanel() {
       {MASTER_DEFINITIONS.map((master) => (
         <Link
           key={master.slug}
-          href={master.slug === 'sms-templates' ? '/masters/sms-templates' : `/masters/${master.slug}`}
+          href={
+            master.slug === 'sms-templates'
+              ? '/masters/sms-templates'
+              : master.slug === 'vendor-apis'
+                ? '/masters/vendor-apis'
+                : `/masters/${master.slug}`
+          }
           className={cx(
             'group rounded-[18px] border border-[rgba(23,44,113,0.1)] p-5 no-underline transition-transform',
             'hover:-translate-y-[1px] hover:border-[rgba(20,150,243,0.26)]',
