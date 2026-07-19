@@ -8,8 +8,8 @@ import { useScrollReveal } from '@/lib/hooks/use-scroll-reveal';
 const STEPS = [
   {
     number: '01',
-    title: 'Enter Your Details',
-    description: 'Fill in your mobile number, name, and loan requirement. Takes just 30 seconds.',
+    title: 'Apply in 30 Seconds',
+    description: 'Enter your mobile number, verify with OTP, and tell us how much you need.',
     badge: '30 Seconds',
     color: '#1496f3',
     glow: 'rgba(20,150,243,0.22)',
@@ -29,9 +29,9 @@ const STEPS = [
   },
   {
     number: '02',
-    title: 'Complete e-KYC',
-    description: 'Verify identity with PAN & Aadhaar OTP. 100% paperless — no scanning, no uploads needed.',
-    badge: '100% Paperless',
+    title: 'Get Instant Approval',
+    description: 'Your application is evaluated instantly by our RBI-registered lending partner.',
+    badge: 'Approval in ~2 Min',
     color: '#f59e0b',
     glow: 'rgba(245,158,11,0.22)',
     hoverBorder: 'group-hover:border-[#f59e0b]/30',
@@ -39,12 +39,34 @@ const STEPS = [
     cardGlow: 'rgba(245,158,11,0.03)',
     icon: (
       <svg viewBox="0 0 80 80" fill="none" className="h-[4.5rem] w-[4.5rem] sm:h-20 sm:w-20 transition-transform duration-500 group-hover:scale-110" aria-hidden>
-        <circle cx="36" cy="39" r="30" fill="rgba(245,158,11,0.06)" className="transition-all duration-500 group-hover:fill-[rgba(245,158,11,0.12)]" />
-        <rect x="12" y="22" width="48" height="34" rx="8" stroke="#f59e0b" strokeWidth="3" className="transition-all duration-300 group-hover:stroke-[#e5a800]" />
-        <rect x="18" y="28" width="14" height="14" rx="3" fill="rgba(245,158,11,0.15)" stroke="#f59e0b" strokeWidth="1.5" />
-        <circle cx="25" cy="33" r="2.5" fill="#f59e0b" />
-        <path d="M20 41a5 5 0 0 1 10 0" stroke="#f59e0b" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M38 29h16M38 35h10M38 41h14" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
+        <circle cx="40" cy="42" r="30" fill="rgba(245,158,11,0.06)" className="transition-all duration-500 group-hover:fill-[rgba(245,158,11,0.12)]" />
+        <circle cx="40" cy="46" r="20" stroke="#f59e0b" strokeWidth="3" className="transition-all duration-300 group-hover:stroke-[#e5a800]" />
+        <path d="M40 26v-8M34 16h12" stroke="#f59e0b" strokeWidth="3" strokeLinecap="round" />
+        <path d="M55 22l4 4" stroke="#f59e0b" strokeWidth="3" strokeLinecap="round" />
+        <circle cx="40" cy="46" r="14" fill="rgba(245,158,11,0.08)" />
+        <path d="M33 46l5 5 10-11" stroke="#f59e0b" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="transition-all duration-300 group-hover:stroke-[#e5a800]" />
+        <circle cx="59" cy="58" r="2" fill="#f59e0b" className="animate-pulse" />
+      </svg>
+    ),
+  },
+  {
+    number: '03',
+    title: 'Complete e-KYC',
+    description: 'Verify your identity with PAN & Aadhaar OTP and accept your offer with an e-sign — 100% paperless, no scanning, no uploads.',
+    badge: '100% Paperless',
+    color: '#8b5cf6',
+    glow: 'rgba(139,92,246,0.22)',
+    hoverBorder: 'group-hover:border-[#8b5cf6]/30',
+    hoverGlow: 'group-hover:shadow-[0_20px_50px_rgba(139,92,246,0.15)]',
+    cardGlow: 'rgba(139,92,246,0.03)',
+    icon: (
+      <svg viewBox="0 0 80 80" fill="none" className="h-[4.5rem] w-[4.5rem] sm:h-20 sm:w-20 transition-transform duration-500 group-hover:scale-110" aria-hidden>
+        <circle cx="36" cy="39" r="30" fill="rgba(139,92,246,0.06)" className="transition-all duration-500 group-hover:fill-[rgba(139,92,246,0.12)]" />
+        <rect x="12" y="22" width="48" height="34" rx="8" stroke="#8b5cf6" strokeWidth="3" className="transition-all duration-300 group-hover:stroke-[#7c3aed]" />
+        <rect x="18" y="28" width="14" height="14" rx="3" fill="rgba(139,92,246,0.15)" stroke="#8b5cf6" strokeWidth="1.5" />
+        <circle cx="25" cy="33" r="2.5" fill="#8b5cf6" />
+        <path d="M20 41a5 5 0 0 1 10 0" stroke="#8b5cf6" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M38 29h16M38 35h10M38 41h14" stroke="#8b5cf6" strokeWidth="2.5" strokeLinecap="round" />
         <circle cx="58" cy="52" r="11" fill="#10b981" className="transition-transform duration-300 group-hover:scale-110" />
         <circle cx="58" cy="52" r="11" stroke="#10b981" strokeWidth="2" className="animate-ping" style={{ transformOrigin: '58px 52px' }} />
         <path d="M54 52l3 3 6-7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -52,10 +74,10 @@ const STEPS = [
     ),
   },
   {
-    number: '03',
-    title: 'Get Instant Approval',
-    description: 'Our AI engine evaluates your application instantly. Money in your bank account in under 10 minutes.',
-    badge: 'Money in 10 Min',
+    number: '04',
+    title: 'Get Money in Your Bank',
+    description: 'The loan is disbursed by the lending partner straight to your bank account in about 10 minutes.',
+    badge: 'Money in ~10 Min',
     color: '#10b981',
     glow: 'rgba(16,185,129,0.22)',
     hoverBorder: 'group-hover:border-[#10b981]/30',
@@ -120,7 +142,7 @@ export function ProcessSteps() {
           <div className="reveal mx-auto mb-5 inline-flex items-center gap-2.5 rounded-full bg-[#1496f3]/10 px-5 py-2.5 shadow-[0_4px_20px_rgba(20,150,243,0.06)]">
             <span className="flex h-2 w-2 animate-pulse rounded-full bg-[#1496f3]" />
             <span className="text-[0.65rem] font-black uppercase tracking-[0.24em] text-[#1496f3]">
-              Simple 3-Step Process
+              Simple 4-Step Process
             </span>
           </div>
           <h2 className="reveal text-[clamp(2.15rem,4.5vw,3.4rem)] font-[900] leading-tight tracking-tight text-brand-navy">
@@ -140,7 +162,7 @@ export function ProcessSteps() {
           <div className="absolute top-[28%] left-[12%] right-[12%] hidden lg:block z-0 pointer-events-none">
             <svg className="w-full h-24 overflow-visible" fill="none" viewBox="0 0 800 100" preserveAspectRatio="none">
               <path
-                d="M 10 50 Q 200 -15 400 50 T 790 50"
+                d="M 10 50 Q 140 -10 270 50 T 530 50 T 790 50"
                 stroke="url(#step-line-gradient)"
                 strokeWidth="3.5"
                 fill="none"
@@ -150,7 +172,8 @@ export function ProcessSteps() {
               <defs>
                 <linearGradient id="step-line-gradient" x1="0" y1="0" x2="1" y2="0">
                   <stop offset="0%" stopColor="#1496f3" />
-                  <stop offset="50%" stopColor="#f59e0b" />
+                  <stop offset="33%" stopColor="#f59e0b" />
+                  <stop offset="66%" stopColor="#8b5cf6" />
                   <stop offset="100%" stopColor="#10b981" />
                 </linearGradient>
               </defs>
@@ -158,15 +181,15 @@ export function ProcessSteps() {
           </div>
 
           {/* Grid of Steps */}
-          <div className="relative z-10 grid grid-cols-1 gap-14 sm:gap-16 lg:grid-cols-3 lg:gap-10">
+          <div className="relative z-10 grid grid-cols-1 gap-14 sm:grid-cols-2 sm:gap-16 lg:grid-cols-4 lg:gap-8">
             {STEPS.map((step, idx) => (
               <div
                 key={step.number}
-                className={`reveal group relative flex flex-col items-center text-center stagger-${idx + 1}`}
+                className={`reveal group relative flex h-full flex-col items-center text-center stagger-${idx + 1}`}
               >
                 {/* Process Card */}
                 <div
-                  className={`relative w-full flex flex-col items-center bg-white/75 backdrop-blur-md border border-white/80 rounded-[2rem] p-8 pb-9 shadow-[0_12px_36px_rgba(18,36,79,0.03)] transition-all duration-500 hover:-translate-y-2.5 ${step.hoverBorder} ${step.hoverGlow}`}
+                  className={`relative w-full h-full flex flex-col items-center bg-white/75 backdrop-blur-md border border-white/80 rounded-[2rem] p-8 pb-9 shadow-[0_12px_36px_rgba(18,36,79,0.03)] transition-all duration-500 hover:-translate-y-2.5 ${step.hoverBorder} ${step.hoverGlow}`}
                   style={{
                     background: `radial-gradient(circle at top right, ${step.cardGlow}, transparent 55%), linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.85))`
                   }}
@@ -231,7 +254,7 @@ export function ProcessSteps() {
         </div>
 
         {/* CTA Button */}
-        <div className="reveal mt-16 flex justify-center lg:mt-24 stagger-4">
+        <div className="reveal mt-16 flex justify-center lg:mt-24 stagger-5">
           <Link
             href={applyHref}
             className="group relative overflow-hidden inline-flex items-center gap-3 rounded-2xl bg-gradient-to-r from-brand-navy to-[#12244f] px-10 py-4 text-base font-[900] text-brand-gold shadow-[0_16px_40px_rgba(18,36,79,0.22)] transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-[0_24px_56px_rgba(18,36,79,0.32)] active:scale-95 sm:px-12 sm:py-5 sm:text-lg"

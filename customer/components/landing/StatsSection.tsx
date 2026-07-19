@@ -35,7 +35,7 @@ const STATS: Stat[] = [
     ),
   },
   {
-    to: 50,
+    to: 5,
     prefix: '₹',
     suffix: 'Cr+',
     progress: 90,

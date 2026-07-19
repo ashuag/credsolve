@@ -5,6 +5,7 @@ import {ReactNode} from 'react';
 import {CustomerUtmBootstrap} from '@/components/auth/customer-utm-bootstrap';
 import { LayoutWrapper } from '@/components/layout/LayoutWrapper';
 import {CustomerSessionProvider} from '@/components/providers/customer-session-provider';
+import { MAX_LOAN_DISPLAY } from '@/lib/brand';
 
 const inter = Inter({
     subsets: ['latin'],
@@ -15,7 +16,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
     title: {
-        default: 'Get Instant Loan Up to ₹50,000 | MoneyCash',
+        default: `Get Instant Loan Up to ${MAX_LOAN_DISPLAY} | MoneyCash`,
         template: '%s | MoneyCash'
     },
     description: 'MoneyCash customer portal for secure OTP login, account access, payments, and loan application progress.',

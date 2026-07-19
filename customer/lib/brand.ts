@@ -26,4 +26,4 @@ export const BRAND_VALUE_PILLS = [
   'Safe & Secure Transactions',
 ] as const;
 
-export const MAX_LOAN_DISPLAY = '₹50,000';
+export const MAX_LOAN_DISPLAY = '₹2,00,000';

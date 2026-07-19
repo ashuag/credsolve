@@ -120,12 +120,14 @@ export function LandingNavbar() {
                     : 'text-[#12244f]/70 hover:bg-[#12244f]/5 hover:text-[#12244f]'
                 }`}
               >
-                {link.label}
-                <span
-                  className={`absolute -bottom-0.5 left-1/2 h-0.5 -translate-x-1/2 rounded-full bg-[#1496f3] transition-all duration-300 ${
-                    link.active ? 'w-5' : 'w-0 group-hover:w-5'
-                  }`}
-                />
+                <span className="relative inline-block">
+                  {link.label}
+                  <span
+                    className={`absolute -bottom-0.5 left-0 h-0.5 w-full origin-center rounded-full bg-[#1496f3] transition-transform duration-300 ${
+                      link.active ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
+                    }`}
+                  />
+                </span>
               </Link>
             ))}
 

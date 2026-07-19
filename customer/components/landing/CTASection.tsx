@@ -109,7 +109,7 @@ export function CTASection() {
         <div className="reveal mt-12 flex items-center justify-center gap-6 stagger-6">
           {[
             { value: '5,000+', label: 'Happy customers' },
-            { value: '₹50Cr+', label: 'Disbursed' },
+            { value: '₹5Cr+', label: 'Disbursed' },
             { value: '98%', label: 'Approval rate' },
           ].map((s) => (
             <div key={s.label} className="flex flex-col items-center gap-1">
