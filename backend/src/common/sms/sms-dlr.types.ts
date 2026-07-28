@@ -1,6 +1,6 @@
 /**
- * Cerf / SmsGateway delivery-report (DLR) webhook body.
- * Configure the gateway callback URL to: POST /api/webhooks/sms/dlr
+ * Cerf / SmsGateway delivery-report (DLR) webhook body / query params.
+ * Configure the gateway callback URL to: GET or POST /api/webhooks/sms/dlr
  */
 export type SmsDlrWebhookPayload = {
   message_id?: string | null;

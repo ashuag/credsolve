@@ -1,5 +1,4 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { SmsDlrWebhookPayload } from './sms-dlr.types';
@@ -26,28 +25,7 @@ function asTrimmedString(value: unknown): string | null {
 export class SmsDlrWebhookService {
   private readonly logger = new Logger(SmsDlrWebhookService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
-  ) {}
-
-  assertAuthorized(providedSecret: string | undefined): void {
-    const expected = this.config.get<string>('SMS_DLR_WEBHOOK_SECRET')?.trim();
-    const isProd = (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
-
-    if (!expected) {
-      if (isProd) {
-        throw new UnauthorizedException('SMS DLR webhook is not configured.');
-      }
-      this.logger.warn(
-        '[sms-dlr] SMS_DLR_WEBHOOK_SECRET is not set; accepting webhook without auth (set secret before production).',
-      );
-      return;
-    }
-    if (!providedSecret || providedSecret !== expected) {
-      throw new UnauthorizedException('Invalid SMS DLR webhook secret.');
-    }
-  }
+  constructor(private readonly prisma: PrismaService) {}
 
   async handleDeliveryReport(rawBody: unknown): Promise<{ matched: boolean; otpRequestUuid?: string }> {
     const payload = this.normalizePayload(rawBody);
