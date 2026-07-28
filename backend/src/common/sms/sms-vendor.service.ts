@@ -12,6 +12,8 @@ export type SmsGatewayRequestBody = {
   product: string;
   template_id: string;
   entity_id: string;
+  /** Our reference (otp_request.uuid) echoed back on DLR webhooks. */
+  correlation_id?: string;
 };
 
 export type SmsVendorSendInput = {
@@ -19,10 +21,36 @@ export type SmsVendorSendInput = {
   text: string;
   template: Pick<SmsTemplate, 'templateId' | 'bearerToken' | 'product'>;
   leadId?: bigint | null;
+  /** Stored on send and matched from DLR `correlation_id`. Prefer otp_request.uuid. */
+  correlationId?: string | null;
 };
 
 function maskOtpInText(text: string): string {
   return text.replace(/\d{4,8}/g, (match) => `${match.slice(0, 2)}****`);
+}
+
+function extractGatewayMessageId(body: unknown): string | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return null;
+  }
+  const root = body as Record<string, unknown>;
+  const candidates = [
+    root.message_id,
+    root.messageId,
+    root.id,
+    typeof root.data === 'object' && root.data && !Array.isArray(root.data)
+      ? (root.data as Record<string, unknown>).message_id
+      : null,
+    typeof root.data === 'object' && root.data && !Array.isArray(root.data)
+      ? (root.data as Record<string, unknown>).messageId
+      : null,
+  ];
+  for (const value of candidates) {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+  return null;
 }
 
 export type SmsVendorSendResult = {
@@ -30,6 +58,8 @@ export type SmsVendorSendResult = {
   skipReason?: string;
   ok: boolean;
   httpStatus: number | null;
+  /** Gateway message id when present in the send response. */
+  messageId: string | null;
 };
 
 @Injectable()
@@ -54,6 +84,7 @@ export class SmsVendorService {
         ok: false,
         configured: false,
         httpStatus: null,
+        messageId: null,
         skipReason: 'SMS_API_URL (or SMS_URL) is not configured',
       };
     }
@@ -71,6 +102,7 @@ export class SmsVendorService {
       product: input.template.product,
       template_id: input.template.templateId,
       entity_id: entityId,
+      ...(input.correlationId?.trim() ? { correlation_id: input.correlationId.trim() } : {}),
     };
 
     const result = await this.vendorApi.request<unknown, SmsGatewayRequestBody>({
@@ -94,6 +126,7 @@ export class SmsVendorService {
       configured: true,
       ok: result.ok,
       httpStatus: result.httpStatus,
+      messageId: extractGatewayMessageId(result.body),
     };
   }
 }

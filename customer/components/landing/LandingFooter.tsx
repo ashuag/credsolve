@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
 import { BRAND_TAGLINE, BRAND_TRUST_STRIP, MAX_LOAN_DISPLAY } from '@/lib/brand';
+import { resolveLandingLoanPurpose } from '@/lib/loan-purpose-selection';
 import { buildHrefWithSearch } from '@/lib/navigation';
 import { useScrollReveal } from '@/lib/hooks/use-scroll-reveal';
 
@@ -34,12 +35,12 @@ const SOCIAL_ICONS = {
   ),
 };
 
-const LOAN_LINKS = [
-  { label: 'Payday Advance', href: '#loans' },
-  { label: 'Short Personal Loan', href: '#loans' },
-  { label: 'Medical Emergency Loan', href: '#loans' },
-  { label: 'Education Fee Advance', href: '#loans' },
-];
+const LOAN_PRODUCTS = [
+  { label: 'Payday Advance', productId: 'payday' },
+  { label: 'Short Personal Loan', productId: 'emergency' },
+  { label: 'Medical Emergency Loan', productId: 'medical' },
+  { label: 'Education Fee Advance', productId: 'education' },
+] as const;
 
 const COMPANY_LINKS = [
   { label: 'How It Works', href: '#how-it-works' },
@@ -91,6 +92,17 @@ function FooterLinkColumn({
 export function LandingFooter() {
   const searchParams = useSearchParams();
   const applyHref = buildHrefWithSearch('/apply-for-loan', searchParams);
+  const loanLinks = LOAN_PRODUCTS.map(({ label, productId }) => {
+    const loanPurpose = resolveLandingLoanPurpose(productId);
+    return {
+      label,
+      href: buildHrefWithSearch(
+        '/apply-for-loan',
+        searchParams,
+        loanPurpose ? { loanPurpose } : undefined,
+      ),
+    };
+  });
   const footerRef = useScrollReveal();
 
   return (
@@ -229,7 +241,7 @@ export function LandingFooter() {
 
           {/* Link columns */}
           <div className="reveal stagger-1 grid grid-cols-2 gap-8 sm:grid-cols-3 lg:col-span-7 lg:gap-6">
-            <FooterLinkColumn title="Loan Products" links={LOAN_LINKS} />
+            <FooterLinkColumn title="Loan Products" links={loanLinks} />
             <FooterLinkColumn title="Company" links={COMPANY_LINKS} />
             <FooterLinkColumn title="Support" links={SUPPORT_LINKS} className="col-span-2 sm:col-span-1" />
           </div>

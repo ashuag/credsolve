@@ -4,6 +4,11 @@ import { SMS_PRODUCT, SMS_TEMPLATE_ID, type SmsProduct } from '../constants/sms.
 import { shouldDeliverSmsViaApi } from './sms-delivery.util';
 import { SmsVendorService } from './sms-vendor.service';
 
+export type SmsSendResult = {
+  /** Gateway message id when the send API returned one; otherwise null. */
+  messageId: string | null;
+};
+
 @Injectable()
 export class SmsService {
   private readonly logger = new Logger(SmsService.name);
@@ -22,19 +27,25 @@ export class SmsService {
     otpCode: string,
     leadId?: bigint | null,
     templateId: string = SMS_TEMPLATE_ID.LOGIN_OTP,
-  ): Promise<void> {
-    await this.sendProductSms(
+    correlationId?: string | null,
+  ): Promise<SmsSendResult> {
+    return this.sendProductSms(
       mobile,
       SMS_PRODUCT.OTP,
       leadId,
       { '<OTP>': otpCode },
-      { throwOnFailure: true, templateId },
+      { throwOnFailure: true, templateId, correlationId },
     );
   }
 
   /** Loan document eSign acceptance OTP (gateway product `OTP`, separate DLT template). */
-  async sendEsignOtpSms(mobile: string, otpCode: string, leadId?: bigint | null): Promise<void> {
-    await this.sendOtpSms(mobile, otpCode, leadId, SMS_TEMPLATE_ID.ESIGN_OTP);
+  async sendEsignOtpSms(
+    mobile: string,
+    otpCode: string,
+    leadId?: bigint | null,
+    correlationId?: string | null,
+  ): Promise<SmsSendResult> {
+    return this.sendOtpSms(mobile, otpCode, leadId, SMS_TEMPLATE_ID.ESIGN_OTP, correlationId);
   }
 
   /** Loan / application rejection SMS (Transactional product template). */
@@ -63,8 +74,8 @@ export class SmsService {
     product: SmsProduct,
     leadId?: bigint | null,
     replacements?: Record<string, string>,
-    options?: { templateId?: string; throwOnFailure?: boolean },
-  ): Promise<void> {
+    options?: { templateId?: string; throwOnFailure?: boolean; correlationId?: string | null },
+  ): Promise<SmsSendResult> {
     const template = options?.templateId
       ? await this.prisma.client.smsTemplate.findFirst({
           where: { templateId: options.templateId, isActive: true },
@@ -80,7 +91,7 @@ export class SmsService {
         throw new Error(message);
       }
       this.logger.warn(`[sms] ${message}`);
-      return;
+      return { messageId: null };
     }
 
     let text = template.message;
@@ -98,7 +109,7 @@ export class SmsService {
           `[sms] product=${template.product} templateId=${template.templateId} to=****${mobile.slice(-4)} message=${text}`,
         );
       }
-      return;
+      return { messageId: null };
     }
 
     if (!this.smsVendor.isConfigured()) {
@@ -107,7 +118,7 @@ export class SmsService {
         throw new Error(message);
       }
       this.logger.warn(`[sms] ${message} product=${template.product} to=****${mobile.slice(-4)}`);
-      return;
+      return { messageId: null };
     }
 
     const result = await this.smsVendor.send({
@@ -115,6 +126,7 @@ export class SmsService {
       text,
       template,
       leadId,
+      correlationId: options?.correlationId,
     });
 
     if (!result.configured || !result.ok) {
@@ -125,6 +137,9 @@ export class SmsService {
         throw new Error(message);
       }
       this.logger.error(`[sms] ${message} product=${template.product} to=****${mobile.slice(-4)}`);
+      return { messageId: null };
     }
+
+    return { messageId: result.messageId };
   }
 }

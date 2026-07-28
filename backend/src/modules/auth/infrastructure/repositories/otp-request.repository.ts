@@ -42,6 +42,19 @@ export class OtpRequestRepository {
     });
   }
 
+  updateSmsSendMeta(
+    tx: DbClient | undefined,
+    id: number,
+    data: { smsMessageId?: string | null },
+  ) {
+    return this.db(tx).otpRequest.update({
+      where: { id },
+      data: {
+        ...(data.smsMessageId !== undefined ? { smsMessageId: data.smsMessageId } : {}),
+      },
+    });
+  }
+
   deleteById(tx: DbClient | undefined, id: number) {
     return this.db(tx).otpRequest.delete({ where: { id } });
   }

@@ -21,6 +21,18 @@ model OtpRequest {
   utmTerm      String?   @map("utm_term") @db.VarChar(100)
   utmContent   String?   @map("utm_content") @db.VarChar(100)
   verifiedAt   DateTime? @map("verified_at")
+  /// Gateway message id from SMS send / DLR webhook (`message_id`).
+  smsMessageId String?   @map("sms_message_id") @db.VarChar(64)
+  /// Latest DLR status from gateway (e.g. DELIVRD, UNDELIV, EXPIRED).
+  smsDeliveryStatus String? @map("sms_delivery_status") @db.VarChar(32)
+  /// Gateway DLR status code (e.g. "000" = delivered).
+  smsDeliveryCode   String? @map("sms_delivery_code") @db.VarChar(16)
+  /// Gateway submit timestamp from DLR (`submit_at`).
+  smsSubmitAt       DateTime? @map("sms_submit_at")
+  /// When the DLR webhook was received / gateway `dlr_received_at`.
+  smsDlrReceivedAt  DateTime? @map("sms_dlr_received_at")
+  /// Full SMS DLR webhook JSON for audit / debugging.
+  smsDlrPayload     Json?     @map("sms_dlr_payload")
   createdAt    DateTime  @default(now()) @map("created_at")
 
   type OtpType @relation(fields: [typeId], references: [id])
@@ -28,5 +40,7 @@ model OtpRequest {
   @@index([value, typeId])
   @@index([expiresAt])
   @@index([verifiedAt])
+  @@index([smsMessageId])
+  @@index([smsDeliveryStatus])
   @@map("otp_request")
 }

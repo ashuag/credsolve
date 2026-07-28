@@ -145,12 +145,18 @@ export class SendOtpUseCase {
 
     if (dto.type === OTP_TYPE.MOBILE && shouldDeliverSmsViaApi()) {
       try {
-        await this.smsService.sendOtpSms(
+        const smsResult = await this.smsService.sendOtpSms(
           canonical,
           otpCode,
           options?.leadId ?? null,
           options?.smsTemplateId ?? SMS_TEMPLATE_ID.LOGIN_OTP,
+          row.uuid,
         );
+        if (smsResult.messageId) {
+          await this.otpRequests.updateSmsSendMeta(undefined, row.id, {
+            smsMessageId: smsResult.messageId,
+          });
+        }
       } catch (error) {
         this.logger.error(`Failed to send OTP SMS to ${masked}`, error instanceof Error ? error.stack : error);
         await this.otpRequests.deleteById(undefined, row.id);
