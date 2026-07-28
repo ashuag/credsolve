@@ -1,6 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { APPLICATION_STATUS } from '../../../common/constants/application.constants';
 import { mapEasebuzzTransferLog } from '../../../common/easebuzz/easebuzz-transfer-log.util';
+import {
+  calendarDaysBetween,
+  computeAmountDueNowInr,
+  decimalToNumber,
+} from '../../../common/loan/loan-calculation.util';
 import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbursement-view.util';
 import { formatLosPersonName } from '../format-los-person-name';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -221,6 +226,23 @@ export class LosLoanService {
         ? 0
         : Math.max(Number(loan.totalRepaymentAmount) - totalPaid, 0);
 
+    const principal = decimalToNumber(loan.principalAmount);
+    const dailyRate = decimalToNumber(loan.interestRate);
+    let daysOutstanding: number | null = null;
+    let interestTillToday: string | null = null;
+    let amountDueToday: string | null = null;
+
+    if (loan.closedAt == null && principal != null && dailyRate != null) {
+      const due = computeAmountDueNowInr(principal, dailyRate, loan.disbursedAt);
+      daysOutstanding = due.daysOutstanding;
+      interestTillToday = due.interestAmount.toFixed(2);
+      amountDueToday = due.amountDue.toFixed(2);
+    } else if (loan.closedAt != null) {
+      daysOutstanding = calendarDaysBetween(loan.disbursedAt, loan.closedAt) + 1;
+      interestTillToday = loan.interestAmount.toFixed(2);
+      amountDueToday = loan.totalRepaymentAmount.toFixed(2);
+    }
+
     return {
       uuid: loan.uuid,
       loanNumber,
@@ -245,6 +267,8 @@ export class LosLoanService {
       totalRepaymentAmount: loan.totalRepaymentAmount.toString(),
       processingFeeAmount: fees.processingFeeAmount != null ? fees.processingFeeAmount.toFixed(2) : null,
       gstAmount: fees.gstAmount != null ? fees.gstAmount.toFixed(2) : null,
+      processingFeePercentage: details?.processingFeePercentage?.toString() ?? null,
+      gstPercentage: details?.gstPercentage?.toString() ?? null,
       expectedRepaymentDays: details?.expectedRepaymentDays ?? null,
       disbursedAt: loan.disbursedAt.toISOString(),
       loanMaturityDate: loan.loanMaturityDate.toISOString().slice(0, 10),
@@ -267,6 +291,9 @@ export class LosLoanService {
       closedAt: loan.closedAt?.toISOString() ?? null,
       totalPaidAmount: totalPaid.toFixed(2),
       outstandingAmount: outstanding.toFixed(2),
+      daysOutstanding,
+      interestTillToday,
+      amountDueToday,
       isDisbursedApplication: loan.application.applicationStatus.name === APPLICATION_STATUS.DISBURSED,
       repayments: repaymentRows.map((row) => ({
         uuid: row.uuid,

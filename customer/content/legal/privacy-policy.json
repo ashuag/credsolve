@@ -7,8 +7,8 @@
   "registeredOffice": "CREDSOLVE Technologies Private Limited, Flat No. E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh — 201009",
   "contactEmail": "legal@moneycash.in",
   "grievanceOfficer": {
-    "name": "Ms. saurabh Agarwal",
-    "email": "saurabh@moneycash.in",
+    "name": "Mr. Saurabh Agarwal",
+    "email": "grievance@moneycash.in",
     "phone": "+91-8882911939"
   },
   "title": "Privacy Policy",
@@ -82,7 +82,11 @@
       "id": "4",
       "title": "Retention of Data",
       "paragraphs": [
-        "4.1. After termination of user account, MoneyCash shall destroy the data collected from user, except the records and the data pertaining to the transactions undertaken using MoneyCash’s services on the App/web, and where required to ensure compliance with applicable laws. Please note that under the applicable laws, MoneyCash shall maintain record of the transactions with MoneyCash, including personal data such as username, contact details, etc. Subject to the above, MoneyCash will delete all other Personal Information including the banking details (debit/credit card), and passwords of user when user account is terminated. The termination of an account is defined wherein consumer has no dues, uninstalled the APP and has no interaction with the service provider for more than 90 days.",
+        "4.1. MoneyCash retains Personal Information only for as long as necessary for the purposes described in this Privacy Policy and as required under applicable law.",
+        "4.1.1. Account and profile data: After termination of a user account, MoneyCash shall delete Personal Information that is no longer required, except records that must be retained for legal or regulatory compliance. An account is treated as terminated where the consumer has no dues, has uninstalled the App, and has had no interaction with MoneyCash for more than 90 days.",
+        "4.1.2. Transaction and loan records: Records of transactions, loan applications, sanction letters, repayments, and related financial data are retained for the periods prescribed under applicable financial services, RBI, and anti-money laundering laws (including the Prevention of Money Laundering Act, 2002), and thereafter deleted or anonymised where legally permitted.",
+        "4.1.3. KYC and identity records: KYC documents and identity verification data collected for onboarding are retained for the period prescribed under PMLA, RBI regulations, and other applicable laws after the end of the customer relationship.",
+        "4.1.4. Banking credentials: Subject to the above legal retention requirements, MoneyCash will delete banking details (debit/credit card information) and passwords when a user account is terminated and such data is no longer required.",
         "4.2. Please note that MoneyCash will not require user to disclose users personal, financial or security details vide email or other communication, except through the App/web, unless otherwise explicitly specified by MoneyCash. If user receive any email/ phone call/ SMS or other communication requesting user to share their security/financial information, please do not respond to such requests, and delete such requests. Please however forward such requests to grievance@moneycash.in for notifying MoneyCash of the same, prior to deletion of such requests.",
         "4.3. “Phishing” is an attempt to steal personal details and financial account details from any app/web user. Such “Phishers” use fake emails to lead users to counterfeit app/web s where the user is tricked into entering their personal details such as credit card numbers, passwords, PIN etc. Users are abstained from providing their details on such app/web and immediately report such requests to MoneyCash at grievance@moneycash.in MoneyCash shall not be held responsible for any loss, damage etc. caused to users by responding to such emails and sharing information with authorized and industry approved service providers parties specified under Sections 4.2 and 4.3."
       ]
@@ -92,10 +96,10 @@
       "title": "Disclosure of Information",
       "paragraphs": [
         "5.1. MoneyCash shall not be liable for disclosure of the Personal Information when done in accordance with this Privacy Policy or after otherwise obtaining users’ prior permission in this regard.",
-        "5.2. By using the App/web, user consents to the collection, transfer, use, storage, sharing and disclosure of user information as described in this Privacy Policy, including to the transfer of user information outside of user country of residence. MoneyCash may disclose user information to MoneyCash’s employees, consultants, affiliates, agents, contractors, business partners, associates, subsidiaries, investors, merchants, service providers and other persons with whom MoneyCash is required to share such information as per applicable laws and/or on a need-to-know basis. The purpose of such sharing of information shall be limited to fulfillment of consumer’s financial need from MoneyCash and its consultants, affiliates, agents, contractors, business partners, associates, subsidiaries, investors, merchants, service providers.",
+        "5.2. By using the App/web, user consents to the collection, transfer, use, storage, sharing and disclosure of user information as described in this Privacy Policy, including to the transfer of user information outside of user country of residence. We share personal information only on a need-to-know basis with our RBI-regulated lending partners (currently Aasra Fincorp Pvt. Ltd.), credit information companies, KYC and payment service providers, and authorities where required by law. MoneyCash may also disclose user information to MoneyCash’s employees, consultants, affiliates, agents, contractors, business partners, associates, subsidiaries, investors, merchants, service providers and other persons with whom MoneyCash is required to share such information as per applicable laws and/or on a need-to-know basis. The purpose of such sharing of information shall be limited to fulfillment of consumer’s financial need from MoneyCash and its consultants, affiliates, agents, contractors, business partners, associates, subsidiaries, investors, merchants, service providers.",
         "5.3. However, MoneyCash may disclose the personal data, or any other information collected from user to any statutory, lawful enforcement body, regulatory body or court if MoneyCash is under legal obligation if required by law/authority to disclose or share user personal data or any other information collected from user or in relation to user transactions on the App/web.",
         "5.4. To protect MoneyCash financial interests and avoid money laundering or fraudulent activities, MoneyCash may, if MoneyCash deem necessary, share user information, including user Account details, financial and transactional history with banks, payment facilitator partners, identity verification service providers, and credit reference agencies and other agencies to identify and verify Users and limit exposure to criminal activity and financial risk. When conducting the audit/checks, the relevant authorized and industry approved service providers parties may retain information regarding MoneyCash query and user information and may share this information with other fraud prevention agencies.",
-        "5.6. To prevent money laundering activities and comply with applicable regulations, MoneyCash may report suspicious transactions to law enforcement agencies. User hereby authorize MoneyCash the right to share user information with such law enforcement agencies in the event of any activity that may seem suspicious in MoneyCash’s sole discretion. In the event MoneyCash notices any suspicious activity on the App/web, MoneyCash may, without prior intimation to user:",
+        "5.5. To prevent money laundering activities and comply with applicable regulations, MoneyCash may report suspicious transactions to law enforcement agencies. User hereby authorize MoneyCash the right to share user information with such law enforcement agencies in the event of any activity that may seem suspicious in MoneyCash’s sole discretion. In the event MoneyCash notices any suspicious activity on the App/web, MoneyCash may, without prior intimation to user:",
         "report such instance to the law enforcement agency and share all relevant information that may be required for investigation.",
         "suspend user Account during the period of investigation; and/or",
         "block user use of the Account."
@@ -107,8 +111,8 @@
       "paragraphs": [
         "6.1. MoneyCash strives to ensure the security, integrity and privacy of users’ Personal Information from unauthorized access or unauthorized alteration, disclosure or destruction. MoneyCash adopt adequate measures to prevent unauthorized access to user Personal Information.",
         "6.2. MoneyCash reserve the right to conduct a security review at any time to verify user identity/details. User consents to provide MoneyCash all the information that MoneyCash requests for the security review. If user fails to comply with any security request, MoneyCash reserve the right to terminate /suspend access to/use of user Account, and/or prohibit user access to the App/web.",
-        "6.3. MoneyCash is not liable and cannot be held liable for any breach of security or for any actions of any authorized and industry approved service providers parties that receive user Personal Information.",
-        "6.4. Notwithstanding anything contained in this Privacy Policy or elsewhere, MoneyCash shall not be held responsible for any loss, damage or misuse of user Personal Information, if such loss, damage or misuse is attributable to a Force Majeure Event (as defined below). A \"Force Majeure Event\" shall mean any event that is beyond Our reasonable control and shall include, without limitation, sabotage, fire, flood, explosion, acts of God, civil commotion, strikes or industrial action of any kind, riots, insurrection, war, acts of government, computer hacking, unauthorized access to computer data and storage device, computer crashes, breach of security and encryption, etc."
+        "6.3. MoneyCash implements reasonable security safeguards, as required under applicable law including the Digital Personal Data Protection Act, 2023, to protect user information from unauthorised access, disclosure, alteration, or destruction. Where MoneyCash engages authorised service providers to process Personal Information, MoneyCash requires such providers to maintain comparable security standards appropriate to the nature of the processing.",
+        "6.4. Notwithstanding anything contained in this Privacy Policy or elsewhere, MoneyCash shall not be held responsible for any loss, damage or misuse of user Personal Information, if such loss, damage or misuse is attributable to a Force Majeure Event (as defined below). A \"Force Majeure Event\" shall mean any event that is beyond Our reasonable control and shall include, without limitation, sabotage, fire, flood, explosion, acts of God, civil commotion, strikes or industrial action of any kind, riots, insurrection, war, and acts of government. This clause does not limit MoneyCash’s obligation to implement and maintain reasonable security safeguards under applicable law."
       ]
     },
     {
@@ -150,18 +154,30 @@
       "id": "11",
       "title": "Revision of the Privacy Policy",
       "paragraphs": [
-        "11.1. This Privacy Policy is subject to change at any time without prior notice to users, and MoneyCash does not bear any responsibility for notifying user on the same. Any changes will be effective upon posting of the revisions on the App/web.",
-        "11.2. Any changes made to the privacy policy will take effect on immediate basis and will be binding on the users, unless otherwise specified by MoneyCash. If user do not agree with the revised Privacy Policy, the user shall have right to discontinue accessing MoneyCash App/web and can terminate their account. Hence users are advised to go through the Privacy Policy from time to time to be well versed about any changes that may have been made."
+        "11.1. MoneyCash may update this Privacy Policy from time to time. Material changes will be notified by email, in-app notice, and/or on the website at least 15 days before they take effect. The revised Privacy Policy will also be posted on the App/web.",
+        "11.2. Subject to Section 11.1, changes will become binding on users on the stated effective date. If user does not agree with the revised Privacy Policy, the user shall have the right to discontinue accessing MoneyCash App/web and can terminate their account. Users are advised to review the Privacy Policy from time to time."
+      ]
+    },
+    {
+      "id": "12",
+      "title": "Your Rights under the Digital Personal Data Protection Act, 2023",
+      "paragraphs": [
+        "You have the right to access, correct, and request deletion of your personal data, the right to withdraw consent at any time, and the right to grievance redressal. To exercise any of these rights, write to grievance@moneycash.in. Withdrawal of consent may affect our ability to provide services but will not affect processing already carried out.",
+        "12.1. Right to access: You may request confirmation of whether MoneyCash processes your personal data and a summary of such data.",
+        "12.2. Right to correction: You may request correction of inaccurate or incomplete personal data.",
+        "12.3. Right to erasure: You may request deletion of personal data that is no longer necessary for the purpose for which it was collected, subject to legal and regulatory retention requirements.",
+        "12.4. Right to withdraw consent: You may withdraw consent for processing that relies on consent by writing to grievance@moneycash.in or through available account settings. Withdrawal does not affect the lawfulness of processing before withdrawal.",
+        "12.5. Right to grievance redressal: You may raise privacy-related grievances as described in Section 13."
       ]
     },
     {
       "id": "13",
       "title": "Grievances",
       "paragraphs": [
-        "MoneyCash shall address users’ grievances with respect to processing of information provided in relation to this Privacy Policy in a time bound manner. For this purpose, MoneyCash hereby designate a grievance officer to redress to any of user’s grievances in a timely manner and within 1 (One) month from the date of receipt of grievance.",
-        "Grievance Officer: Mr. saurabh Agarwal",
-        "Email Address: saurabh@moneycash.in",
-        "Phone Number: 8882911939"
+        "MoneyCash shall address users’ grievances with respect to processing of information provided in relation to this Privacy Policy in a time bound manner. We acknowledge complaints within 48 hours and resolve them within 30 days.",
+        "Grievance Officer: Mr. Saurabh Agarwal",
+        "Email Address: grievance@moneycash.in",
+        "Phone Number: +91-8882911939"
       ]
     },
     {
@@ -169,9 +185,9 @@
       "title": "Governing law and dispute resolution",
       "paragraphs": [
         "This Privacy Policy shall be governed by and construed in accordance with the laws of India. All disputes in relation to the Privacy Policy will be adjudicated exclusively before a competent court in Delhi, India only.",
-        "NOTWITHSTANDING ANYTHING SPECIFIED IN THIS PRIVACY POLICY, ALL PERMISSIONS GRANTED HEREIN, USE OF DATA / INFORMATION SHARED WITH Moneycash SHALL BE SUBJECT TO APPLICABLE LAWS AND REGULATIONS INCLUDING RULES/GUIDELINES FRAMED BY SECTOR SPECIFIC REGULATORS SUCH AS RBI, UIDAI etc."
+        "NOTWITHSTANDING ANYTHING SPECIFIED IN THIS PRIVACY POLICY, ALL PERMISSIONS GRANTED HEREIN, USE OF DATA / INFORMATION SHARED WITH MONEYCASH (CREDSOLVE TECHNOLOGIES PRIVATE LIMITED) SHALL BE SUBJECT TO APPLICABLE LAWS AND REGULATIONS INCLUDING RULES/GUIDELINES FRAMED BY SECTOR SPECIFIC REGULATORS SUCH AS RBI, UIDAI etc."
       ]
     }
   ],
-  "generatedAt": "2026-06-08"
+  "generatedAt": "2026-07-28"
 }

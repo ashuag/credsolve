@@ -34,21 +34,14 @@ function todayYmdIst(): string {
   }).format(new Date());
 }
 
-function addDaysYmdIst(days: number): string {
-  const base = new Date(`${todayYmdIst()}T00:00:00+05:30`);
-  base.setTime(base.getTime() + days * 86_400_000);
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Kolkata',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(base);
-}
-
 function buildUniqueCode(loanNumber: string, loanAccountUuid: string): string {
   const stamp = todayYmdIst().replace(/-/g, '').slice(2);
-  const compact = loanNumber.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 12);
-  const salt = createHash('sha256').update(loanAccountUuid).digest('hex').slice(0, 4).toUpperCase();
+  const compact = loanNumber.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 10);
+  const salt = createHash('sha256')
+    .update(`${loanAccountUuid}:${Date.now()}:${randomUUID()}`)
+    .digest('hex')
+    .slice(0, 6)
+    .toUpperCase();
   return `MCREP${compact}${stamp}${salt}`.slice(0, 40);
 }
 
@@ -77,9 +70,10 @@ export class InitiateCustomerRepaymentUseCase {
     loanAccountUuid: string;
     loanNumber: string;
     amountInr: string;
-    repaymentUuid: string;
+    repaymentUuid: string | null;
     loanStatus: string;
     redirectPath: string;
+    paymentUrl: string | null;
     vendor: 'easebuzz' | 'skipped';
   }> {
     const session = req.customerSession;
@@ -166,6 +160,7 @@ export class InitiateCustomerRepaymentUseCase {
 
     let vendor: 'easebuzz' | 'skipped' = 'skipped';
     let vendorRef: string | null = uniqueCode;
+    let paymentUrl: string | null = null;
 
     if (this.easebuzzWire.isPayoutLinkSkipped()) {
       this.logger.warn(
@@ -181,20 +176,22 @@ export class InitiateCustomerRepaymentUseCase {
         );
       }
 
-      const expiryDate = addDaysYmdIst(3);
       try {
+        // Amount = principal + interest accrued till today, always 2 decimal places.
         const created = await this.easebuzzWire.createPayoutLink({
-          payeeName,
-          payeeEmail,
-          payeePhone: payeePhone.slice(-10),
-          uniqueCode,
+          beneficiaryName: payeeName,
+          email: payeeEmail,
+          phone: payeePhone.slice(-10),
+          uniqueRequestNumber: uniqueCode,
           amountInr: due.amountDue,
-          expiryDateYmd: expiryDate,
-          description: `Loan repayment ${loan.loanNumber}`,
+          scheduledForYmd: todayYmdIst(),
+          narration: `Repay ${loan.loanNumber}`.slice(0, 50),
           leadId: application.leadId,
+          upiHandle: '',
         });
         vendor = 'easebuzz';
-        vendorRef = (created.payoutLinkId ?? created.uniqueCode).slice(0, 50);
+        vendorRef = (created.payoutLinkId ?? created.uniqueRequestNumber).slice(0, 50);
+        paymentUrl = created.paymentUrl;
       } catch (error) {
         const message =
           error instanceof Error
@@ -213,6 +210,25 @@ export class InitiateCustomerRepaymentUseCase {
         throw new BadGatewayException(
           'Payment was unsuccessful. Please try again or contact support. The failure has been recorded on your loan.',
         );
+      }
+
+      // Hosted payout / payment URL — customer must complete payment; do not close the loan yet.
+      if (paymentUrl) {
+        this.logger.log(
+          `[repay] Payout link created loan=${loan.loanNumber} amount=${amountInr} — awaiting customer payment`,
+        );
+        return {
+          success: true as const,
+          applicationUuid: application.uuid,
+          loanAccountUuid: loan.uuid,
+          loanNumber: loan.loanNumber,
+          amountInr,
+          repaymentUuid: null,
+          loanStatus: loan.loanStatus.name,
+          redirectPath: '/my-account',
+          paymentUrl,
+          vendor,
+        };
       }
     }
 
@@ -302,6 +318,7 @@ export class InitiateCustomerRepaymentUseCase {
       repaymentUuid,
       loanStatus: LOAN_STATUS.CLOSED,
       redirectPath: '/my-account',
+      paymentUrl: null,
       vendor,
     };
   }

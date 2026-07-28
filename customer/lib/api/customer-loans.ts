@@ -40,9 +40,11 @@ export type InitiateRepaymentResult = {
   loanAccountUuid: string;
   loanNumber: string;
   amountInr: string;
-  repaymentUuid: string;
+  repaymentUuid: string | null;
   loanStatus: string;
   redirectPath: string;
+  /** Easebuzz hosted payout / payment URL — open this to complete Pay Now. */
+  paymentUrl: string | null;
   vendor: 'easebuzz' | 'skipped';
 };
 

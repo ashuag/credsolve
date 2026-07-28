@@ -12,7 +12,7 @@ import {
   isCustomerPortalSignedIn,
 } from '@/lib/api/customer-session';
 import { buildHrefWithSearch } from '@/lib/navigation';
-import { BRAND_TAGLINE, MAX_LOAN_DISPLAY } from '@/lib/brand';
+import { MAX_LOAN_DISPLAY } from '@/lib/brand';
 import { LEGAL_NAV_ITEMS } from '@/lib/legal-content';
 
 const NAV_LINKS = [
@@ -24,12 +24,12 @@ const NAV_LINKS = [
   { label: 'Contact', href: '/contact-us' },
 ];
 
-const ANNOUNCEMENTS = [
-  `⚡  Instant Digital Loans up to ${MAX_LOAN_DISPLAY}`,
-  '🔒  100% Secure • Paperless • Quick Approval',
-  '✅  Approval in 2 Minutes — No Branch Visit',
-  BRAND_TAGLINE,
-];
+const TICKER_TAGS = [
+  `Instant digital loans up to ${MAX_LOAN_DISPLAY}`,
+  '100% paperless',
+  'Approval in ~2 minutes',
+  'Loans by an RBI-registered NBFC',
+] as const;
 
 export function LandingNavbar() {
   const searchParams = useSearchParams();
@@ -65,21 +65,17 @@ export function LandingNavbar() {
 
   return (
     <header className="sticky top-0 z-50 w-full">
-      <div className="group relative overflow-hidden bg-[linear-gradient(90deg,#1c347d_0%,#2388e5_50%,#1c347d_100%)] py-2 shadow-[inset_0_-1px_0_rgba(255,255,255,0.12)]">
-        <div
-          className="flex animate-marquee-scroll whitespace-nowrap [animation-play-state:running] group-hover:[animation-play-state:paused]"
-          style={{
-            maskImage: 'linear-gradient(to right, transparent, #000 6%, #000 94%, transparent)',
-            WebkitMaskImage: 'linear-gradient(to right, transparent, #000 6%, #000 94%, transparent)',
-          }}
-        >
-          {[...ANNOUNCEMENTS, ...ANNOUNCEMENTS].map((text, i) => (
-            <span key={i} className="flex shrink-0 items-center text-[0.7rem] font-[800] uppercase tracking-[0.18em] text-white/95">
-              <span className="mx-6 h-1 w-1 shrink-0 rounded-full bg-[#ffc519]" aria-hidden="true" />
-              {text}
-            </span>
+      <div className="bg-[linear-gradient(90deg,#1c347d_0%,#2388e5_50%,#1c347d_100%)] px-4 py-2.5 shadow-[inset_0_-1px_0_rgba(255,255,255,0.12)] sm:px-6 lg:px-8">
+        <ul className="mx-auto flex max-w-7xl list-none flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-[0.68rem] font-[700] leading-snug tracking-[0.02em] text-white/95 sm:grid sm:grid-cols-4 sm:gap-x-6 sm:text-[0.75rem] sm:tracking-[0.03em]">
+          {TICKER_TAGS.map((tag) => (
+            <li
+              key={tag}
+              className="flex items-center justify-center gap-2 whitespace-nowrap text-center before:text-white/40 before:content-['·'] first:before:hidden sm:before:hidden"
+            >
+              {tag}
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
 
       <nav

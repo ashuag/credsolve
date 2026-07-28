@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { logoutCustomer } from '@/lib/api/auth';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { Spinner } from '@/components/ui/spinner';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
@@ -12,7 +11,6 @@ export default function ThankYouInterestPage() {
   const { loading, session } = useCustomerSession();
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const loggedOut = useRef(false);
 
   useEffect(() => {
     if (loading) return;
@@ -22,14 +20,7 @@ export default function ThankYouInterestPage() {
       return;
     }
 
-    const name = session.profile?.fullName?.trim() || null;
-    setCustomerName(name);
-
-    if (!loggedOut.current) {
-      loggedOut.current = true;
-      logoutCustomer().catch(() => {});
-    }
-
+    setCustomerName(session.profile?.fullName?.trim() || null);
     setReady(true);
   }, [loading, session, router]);
 
@@ -83,13 +74,22 @@ export default function ThankYouInterestPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => router.push('/')}
-          className="mc-btn-primary block w-full py-4 text-center text-[1rem]"
-        >
-          Back to Home
-        </button>
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={() => router.push('/my-account')}
+            className="mc-btn-primary block w-full py-4 text-center text-[1rem]"
+          >
+            Go to My Account
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/')}
+            className="mc-btn-secondary block w-full py-4 text-center text-[1rem]"
+          >
+            Back to Home
+          </button>
+        </div>
       </div>
     </div>
   );

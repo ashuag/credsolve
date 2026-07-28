@@ -30,21 +30,23 @@ export type EasebuzzQuickTransferResult = {
 };
 
 export type EasebuzzPayoutLinkInput = {
-  payeeName: string;
-  payeeEmail: string;
-  payeePhone: string;
-  uniqueCode: string;
+  beneficiaryName: string;
+  email: string;
+  phone: string;
+  uniqueRequestNumber: string;
   amountInr: number;
-  expiryDateYmd: string;
-  description: string;
+  /** YYYY-MM-DD — when the payout link / collection is scheduled for. */
+  scheduledForYmd: string;
+  narration: string;
   leadId: bigint | null;
-  allowedBeneficiaryTypes?: Array<'upi' | 'bank_account'>;
+  /** Optional UPI VPA; left blank in Authorization hash per Easebuzz UPI pattern. */
+  upiHandle?: string;
 };
 
 export type EasebuzzPayoutLinkResult = {
   ok: true;
   httpStatus: number | null;
-  uniqueCode: string;
+  uniqueRequestNumber: string;
   payoutLinkId: string | null;
   paymentUrl: string | null;
   vendorStatus: string | null;
@@ -60,8 +62,8 @@ type EasebuzzWireTransferConfig = {
 };
 
 type EasebuzzWirePayoutLinkConfig = {
-  authorization: string;
   key: string;
+  salt: string;
   payoutLinksUrl: string;
   timeoutMs: number;
 };
@@ -210,14 +212,14 @@ export class EasebuzzWireService {
 
   assertPayoutLinkConfiguredOrThrow(): EasebuzzWirePayoutLinkConfig {
     const missing: string[] = [];
-    const authorization = envTrim(this.config, 'EASEBUZZ_WIRE_AUTHORIZATION');
     const key = envTrim(this.config, 'EASEBUZZ_WIRE_KEY');
+    const salt = envTrim(this.config, 'EASEBUZZ_WIRE_SALT');
     const payoutLinksUrl =
       envTrim(this.config, 'EASEBUZZ_WIRE_PAYOUT_LINKS_URL') ||
       'https://wire.easebuzz.in/api/v1/payout_links/';
 
-    if (!authorization) missing.push('EASEBUZZ_WIRE_AUTHORIZATION');
     if (!key) missing.push('EASEBUZZ_WIRE_KEY');
+    if (!salt) missing.push('EASEBUZZ_WIRE_SALT');
 
     if (missing.length > 0) {
       throw new ServiceUnavailableException(
@@ -230,8 +232,8 @@ export class EasebuzzWireService {
     const timeoutMs = Number.isFinite(timeoutRaw) && timeoutRaw > 0 ? timeoutRaw : 45_000;
 
     return {
-      authorization,
       key,
+      salt,
       payoutLinksUrl,
       timeoutMs,
     };
@@ -334,6 +336,11 @@ export class EasebuzzWireService {
   /**
    * Create an Easebuzz Wire payout link (customer repayment / Pay Now).
    * Docs: POST /api/v1/payout_links/
+   *
+   * Authorization = SHA-512 of
+   *   {key}|{account_number}|{ifsc}|{upi_handle}|{unique_request_number}|{amount}|{salt}
+   * For UPI, account_number / ifsc / upi_handle are blank:
+   *   e.g. KX3XY|||URX12XN|2500.00|SAX5XLT
    */
   async createPayoutLink(input: EasebuzzPayoutLinkInput): Promise<EasebuzzPayoutLinkResult> {
     const cfg = this.assertPayoutLinkConfiguredOrThrow();
@@ -342,33 +349,48 @@ export class EasebuzzWireService {
       throw new BadGatewayException('Repayment amount must be a positive number.');
     }
 
-    const amount = Math.round(input.amountInr * 100) / 100;
-    const phone = input.payeePhone.replace(/\D/g, '').slice(-10);
+    const amountStr = formatWireAmountInr(input.amountInr);
+    const phone = input.phone.replace(/\D/g, '').slice(-10);
     if (phone.length !== 10) {
       throw new BadGatewayException('Payee phone must be a 10-digit mobile number.');
     }
 
+    const uniqueRequestNumber = input.uniqueRequestNumber.trim().slice(0, 64);
+    // UPI auth pattern leaves upi_handle blank in the hash even when a handle is sent in the body.
+    const upiHandle = (input.upiHandle ?? '').trim();
+
     const body: Record<string, unknown> = {
       key: cfg.key,
-      payee_name: input.payeeName.trim().slice(0, 100),
-      payee_email: input.payeeEmail.trim().slice(0, 120),
-      payee_phone: phone,
-      unique_code: input.uniqueCode.trim().slice(0, 40),
-      allowed_beneficiary_types: input.allowedBeneficiaryTypes ?? ['upi', 'bank_account'],
-      amount,
-      expiry_date: input.expiryDateYmd,
-      description: input.description.trim().slice(0, 100) || 'loan repayment',
+      beneficiary_type: 'upi',
+      beneficiary_name: input.beneficiaryName.trim().slice(0, 100),
+      upi_handle: upiHandle,
+      unique_request_number: uniqueRequestNumber,
+      payment_mode: 'UPI',
+      amount: Number(amountStr),
+      email: input.email.trim().slice(0, 120),
+      phone,
+      narration: input.narration.trim().slice(0, 50) || 'loan repay',
+      scheduled_for: input.scheduledForYmd,
     };
+
+    const authorization = buildQuickTransferAuthorization({
+      key: cfg.key,
+      accountNumber: '',
+      ifscCode: '',
+      upiHandle: '',
+      uniqueRequestNumber,
+      amountStr,
+      salt: cfg.salt,
+    });
 
     const headers: Record<string, string> = {
       Accept: 'application/json',
-      Authorization: cfg.authorization,
-      // Easebuzz expects the merchant key as the header name (not "WIRE-API-KEY").
-      [cfg.key]: '',
+      Authorization: authorization,
+      'WIRE-API-KEY': cfg.key,
     };
 
     this.logger.log(
-      `[easebuzz] Creating payout link unique=${body.unique_code} amount=${amount} phone=${maskPhone(phone)}`,
+      `[easebuzz] Creating payout link unique=${uniqueRequestNumber} amount=${amountStr} phone=${maskPhone(phone)}`,
     );
 
     const result = await this.vendorApi.request<unknown, Record<string, unknown>>({
@@ -381,7 +403,7 @@ export class EasebuzzWireService {
       leadId: input.leadId,
       timeoutMs: cfg.timeoutMs,
       redactRequest: (payload) => this.redactPayoutLinkRequest(payload),
-      sensitiveHeaderNames: [cfg.key],
+      sensitiveHeaderNames: ['WIRE-API-KEY', 'Authorization'],
     });
 
     if (!result.ok) {
@@ -390,7 +412,7 @@ export class EasebuzzWireService {
           ? result.rawText.slice(0, 280)
           : result.error?.message ?? 'unknown error';
       this.logger.error(
-        `[easebuzz] Payout link failed http=${result.httpStatus ?? 'n/a'} unique=${input.uniqueCode}: ${snippet}`,
+        `[easebuzz] Payout link failed http=${result.httpStatus ?? 'n/a'} unique=${uniqueRequestNumber}: ${snippet}`,
       );
       throw new BadGatewayException(
         'Could not create repayment payout link at Easebuzz. Please try again shortly.',
@@ -400,7 +422,7 @@ export class EasebuzzWireService {
     const parsed = this.parsePayoutLinkSuccess(result.body);
     if (!parsed.accepted) {
       this.logger.error(
-        `[easebuzz] Payout link rejected unique=${input.uniqueCode} status=${parsed.vendorStatus ?? 'n/a'}`,
+        `[easebuzz] Payout link rejected unique=${uniqueRequestNumber} status=${parsed.vendorStatus ?? 'n/a'}`,
       );
       throw new BadGatewayException(
         parsed.message ?? 'Easebuzz did not accept the repayment payout link.',
@@ -410,7 +432,7 @@ export class EasebuzzWireService {
     return {
       ok: true,
       httpStatus: result.httpStatus,
-      uniqueCode: input.uniqueCode,
+      uniqueRequestNumber,
       payoutLinkId: parsed.payoutLinkId,
       paymentUrl: parsed.paymentUrl,
       vendorStatus: parsed.vendorStatus,
@@ -439,6 +461,12 @@ export class EasebuzzWireService {
     return {
       ...body,
       key: typeof body.key === 'string' ? `[REDACTED:${body.key.length} chars]` : body.key,
+      email: typeof body.email === 'string' ? maskEmail(body.email) : body.email,
+      phone: typeof body.phone === 'string' ? maskPhone(body.phone) : body.phone,
+      upi_handle:
+        typeof body.upi_handle === 'string' && body.upi_handle
+          ? `[REDACTED:${body.upi_handle.length} chars]`
+          : body.upi_handle,
       payee_email: typeof body.payee_email === 'string' ? maskEmail(body.payee_email) : body.payee_email,
       payee_phone: typeof body.payee_phone === 'string' ? maskPhone(body.payee_phone) : body.payee_phone,
     };

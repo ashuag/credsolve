@@ -230,7 +230,7 @@ export function TestimonialsSection() {
           <div className="reveal mt-5 flex items-center justify-center gap-3 stagger-2">
             <StarRating count={5} />
             <span className="text-sm font-[800] text-[#12244f]">4.9 / 5</span>
-            <span className="text-sm font-[600] text-[#12244f]/60">from 12,400+ reviews</span>
+            <span className="text-sm font-[600] text-[#12244f]/60">from 300+ reviews</span>
           </div>
         </div>
 

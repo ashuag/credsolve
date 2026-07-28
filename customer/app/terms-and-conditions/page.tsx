@@ -3,7 +3,7 @@ import { LegalPageShell } from '@/components/legal/legal-page-shell';
 import { TermsDocument } from './terms-document';
 
 export const metadata: Metadata = {
-  title: 'Terms & Conditions | MoneyCash',
+  title: 'Terms & Conditions',
   description:
     'Official Terms & Conditions for the MoneyCash customer portal and digital lending Services.',
   openGraph: {

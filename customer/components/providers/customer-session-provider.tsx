@@ -51,12 +51,14 @@ export function CustomerSessionProvider({ children }: { children: ReactNode }) {
       }
       let applied = next;
       setSession((prev) => {
-        // Never let a stale anonymous payload wipe a known signed-in session.
+        // Cookie race after OTP: authenticated payload may briefly omit lead — keep previous lead.
+        // Do NOT preserve when next is unauthenticated (logout / expired cookie).
         if (
           prev &&
           prev.authenticated === true &&
           prev.lead &&
-          (next.authenticated !== true || !next.lead)
+          next.authenticated === true &&
+          !next.lead
         ) {
           applied = prev;
           return prev;
@@ -71,7 +73,7 @@ export function CustomerSessionProvider({ children }: { children: ReactNode }) {
       // Keep an existing signed-in session if a transient fetch fails.
       let preserved: CustomerSessionResponse = { authenticated: false };
       setSession((prev) => {
-        if (prev && prev.authenticated === true && prev.lead) {
+        if (prev && prev.authenticated === true) {
           preserved = prev;
           return prev;
         }

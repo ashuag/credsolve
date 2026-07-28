@@ -291,6 +291,10 @@ function ActiveLoanCard({
         setPayError('Payment was unsuccessful. Please try again.');
         return;
       }
+      if (result.paymentUrl) {
+        window.location.assign(result.paymentUrl);
+        return;
+      }
       await refresh();
       onPaid?.();
       router.push(result.redirectPath || '/payments');
@@ -387,7 +391,7 @@ function ActiveLoanCard({
                 value={loan.loanAmount ? formatInr(loan.loanAmount) : '—'}
               />
               <DetailRow
-                label="Interest"
+                label="Interest at due date"
                 value={loan.interestAmount ? formatInr(loan.interestAmount) : '—'}
               />
               <DetailRow
@@ -678,9 +682,13 @@ function TabButton({
   );
 }
 
-export function MyAccountSection() {
+export function MyAccountSection({
+  onSessionExpired,
+}: {
+  onSessionExpired?: () => void;
+}) {
   const router = useRouter();
-  const { session, loading: sessionLoading, signOut, refresh } = useCustomerSession();
+  const { session, loading: sessionLoading, refresh } = useCustomerSession();
   const [data, setData] = useState<CustomerLoansDashboard | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [fetching, setFetching] = useState(true);
@@ -702,26 +710,21 @@ export function MyAccountSection() {
         },
       );
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : 'Unable to load dashboard.');
+      const message = e instanceof Error ? e.message : 'Unable to load dashboard.';
+      setLoadError(message);
       setData(null);
+      if (isCustomerSessionRequiredMessage(message)) {
+        onSessionExpired?.();
+      }
     } finally {
       setFetching(false);
     }
-  }, []);
+  }, [onSessionExpired]);
 
   const onLoadErrorRetry = useCallback(async () => {
-    if (loadError && isCustomerSessionRequiredMessage(loadError)) {
-      try {
-        await signOut();
-      } catch {
-        // Cookie may already be gone; still show login.
-      }
-      router.replace('/my-account?mode=login');
-      return;
-    }
     await refresh();
     await loadLoans();
-  }, [loadError, signOut, router, refresh, loadLoans]);
+  }, [refresh, loadLoans]);
 
   // Session is already loaded by CustomerSessionProvider — do not refresh() here
   // (that updates `session` and re-fires this effect in a loop).
@@ -755,6 +758,15 @@ export function MyAccountSection() {
   }, [tabInitialized, fetching, showIncompleteJourney, dash]);
 
   if ((fetching && !data) || sessionLoading) {
+    return (
+      <div className="flex min-h-[320px] items-center justify-center">
+        <Spinner size={40} />
+      </div>
+    );
+  }
+
+  // Session-expired UI is owned by the parent page (countdown modal).
+  if (loadError && isCustomerSessionRequiredMessage(loadError)) {
     return (
       <div className="flex min-h-[320px] items-center justify-center">
         <Spinner size={40} />

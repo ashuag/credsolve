@@ -5,10 +5,10 @@
   "title": "Grievance Redressal Policy",
   "description": "How MoneyCash receives, handles, and escalates customer complaints in a fair, time-bound, and transparent manner.",
   "registeredOffice": "CREDSOLVE Technologies Private Limited, Flat No. E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh — 201009",
-  "contactEmail": "saurabh@moneycash.in",
+  "contactEmail": "grievance@moneycash.in",
   "grievanceOfficer": {
-    "name": "saurabh Agarwal",
-    "email": "saurabh@moneycash.in",
+    "name": "Mr. Saurabh Agarwal",
+    "email": "grievance@moneycash.in",
     "phone": "+91-8882911939"
   },
   "sections": [
@@ -85,8 +85,8 @@
       "title": "Channels for Lodging Complaints",
       "paragraphs": [
         "Customers may submit grievances through any of the following channels:",
-        "Email: saurabh@moneycash.in",
-        "Customer Support: saurabh@moneycash.in",
+        "Email: grievance@moneycash.in",
+        "Customer Support: support@moneycash.in",
         "Phone: +91-8882911939",
         "Website: www.moneycash.in",
         "Written Communication: MoneyCash, E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh — 201009"
@@ -137,8 +137,8 @@
       "title": "Resolution Timelines & Escalation Matrix",
       "paragraphs": [
         "Level 1: Customers can raise a complaint by creating a support ticket by going to www.moneycash.in Our support team will respond during business hours, which are Monday to Friday, 10:00 AM to 6:00 PM.",
-        "Level 2: In the event that the complaint remains pending at Level 1 for a period of more than 5 working days, or if the customer is not satisfied with the outcome of Level 1 resolution, the customer can mail on: saurabh@moneycash.in",
-        "Level 3: In the event that the complaint remains pending at Level 2 for a period of more than 5 working days, or if the customer is not satisfied with the outcome of Level 2 resolution, the customer can contact saurabh@moneycash.in",
+        "Level 2: In the event that the complaint remains pending at Level 1 for a period of more than 5 working days, or if the customer is not satisfied with the outcome of Level 1 resolution, the customer can mail on: support@moneycash.in",
+        "Level 3: In the event that the complaint remains pending at Level 2 for a period of more than 5 working days, or if the customer is not satisfied with the outcome of Level 2 resolution, the customer can contact grievance@moneycash.in",
         "Level 4: In the event that the complaint remains pending at Level 3 for a period of more than 5 working days, or if the customer is not satisfied with the outcome of Level 3 resolution, the customer can contact the Regional Office of the Reserve Bank of India (or via RBI’s website www.rbi.org.in )."
       ]
     },

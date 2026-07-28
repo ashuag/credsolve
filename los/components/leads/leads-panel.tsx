@@ -87,6 +87,31 @@ function PanPill({ lead }: { lead: LosLead }) {
   );
 }
 
+function RejectionReasonCell({ lead }: { lead: LosLead }) {
+  const reason = lead.rejectionReason?.label?.trim() || null;
+  const note = lead.leadStatusNote?.trim() || null;
+  if (!reason && !note) {
+    return <span className="text-brand-muted">—</span>;
+  }
+
+  const title = [reason, note].filter(Boolean).join(' — ');
+
+  return (
+    <div className="min-w-[140px] max-w-[240px]" title={title}>
+      {reason ? (
+        <p className="m-0 text-[0.72rem] font-extrabold uppercase tracking-[0.04em] text-[#991b1b] line-clamp-2">
+          {reason}
+        </p>
+      ) : null}
+      {note ? (
+        <p className={`m-0 text-[0.72rem] font-semibold leading-snug text-brand-muted line-clamp-2 ${reason ? 'mt-0.5' : ''}`}>
+          {note}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 const PAN_VERIFIED_FILTER_OPTIONS = [
   { value: '0', label: 'Not checked' },
   { value: '1', label: 'Verified' },
@@ -248,6 +273,31 @@ export function LeadsPanel() {
       render: (lead) => <StatusPill label={lead.statusLabel} code={lead.statusCode} />,
     },
     {
+      key: 'reason',
+      label: 'Rejection reason',
+      headerClassName: 'min-w-[160px]',
+      getFilterValue: (row) =>
+        [row.rejectionReason?.label, row.leadStatusNote].filter(Boolean).join(' '),
+      getSortValue: (row) =>
+        (row.rejectionReason?.label ?? row.leadStatusNote ?? '').toLowerCase(),
+      filter: {
+        type: 'text',
+        placeholder: 'Search reason…',
+        matches: (row, value) => {
+          const reasonText = [
+            row.rejectionReason?.code,
+            row.rejectionReason?.label,
+            row.leadStatusNote,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          return reasonText.includes(value.toLowerCase());
+        },
+      },
+      render: (lead) => <RejectionReasonCell lead={lead} />,
+    },
+    {
       key: 'source',
       label: 'Source',
       headerClassName: 'whitespace-nowrap',
@@ -298,7 +348,7 @@ export function LeadsPanel() {
         onRetry={() => void loadLeads()}
         emptyMessage="No leads available right now."
         noResultsMessage="No leads match your filters."
-        minWidth="1100px"
+        minWidth="1280px"
         toolbarActions={
           <button
             type="button"

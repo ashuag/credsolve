@@ -10,6 +10,7 @@ import {
 } from '@/lib/api/customer-loans';
 import { isCustomerPortalSignedIn } from '@/lib/api/customer-session';
 import { isCustomerSessionRequiredMessage } from '@/lib/customer-session-required';
+import { LoggedOutRedirectModal } from '@/components/auth/logged-out-redirect-modal';
 import { formatInr } from '@/lib/format-inr';
 import { cn } from '@/lib/cn';
 import { useRouter } from 'next/navigation';
@@ -84,11 +85,12 @@ function PaymentCard({ payment }: { payment: CustomerPaymentHistoryItem }) {
 
 export default function PaymentsPage() {
   const router = useRouter();
-  const { session, loading: sessionLoading, signOut, refresh } = useCustomerSession();
+  const { session, loading: sessionLoading, refresh } = useCustomerSession();
   const signedIn = isCustomerPortalSignedIn(session);
   const [payments, setPayments] = useState<CustomerPaymentHistoryItem[]>([]);
   const [fetching, setFetching] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const load = useCallback(async () => {
     setFetching(true);
@@ -97,35 +99,35 @@ export default function PaymentsPage() {
       const res = await fetchCustomerPaymentHistory();
       setPayments(res?.payments ?? []);
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : 'Unable to load payment history.');
+      const message = e instanceof Error ? e.message : 'Unable to load payment history.';
+      setLoadError(message);
       setPayments([]);
+      if (isCustomerSessionRequiredMessage(message)) {
+        setSessionExpired(true);
+      }
     } finally {
       setFetching(false);
     }
   }, []);
 
   useEffect(() => {
+    if (sessionExpired) return;
     if (sessionLoading) return;
     if (!signedIn) {
       router.replace('/my-account?mode=login');
       return;
     }
     void load();
-  }, [sessionLoading, signedIn, router, load]);
+  }, [sessionLoading, signedIn, router, load, sessionExpired]);
 
   const onRetry = async () => {
-    if (loadError && isCustomerSessionRequiredMessage(loadError)) {
-      try {
-        await signOut();
-      } catch {
-        /* ignore */
-      }
-      router.replace('/my-account?mode=login');
-      return;
-    }
     await refresh();
     await load();
   };
+
+  if (sessionExpired) {
+    return <LoggedOutRedirectModal />;
+  }
 
   if (sessionLoading || (fetching && payments.length === 0 && !loadError)) {
     return (

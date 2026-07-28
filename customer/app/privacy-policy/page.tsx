@@ -3,7 +3,7 @@ import { LegalPageShell } from '@/components/legal/legal-page-shell';
 import { PrivacyDocument } from './privacy-document';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy | MoneyCash',
+  title: 'Privacy Policy',
   description:
     'Official Privacy Policy for MoneyCash — how we collect, use, retain, and protect your personal information on the website and app.',
   openGraph: {

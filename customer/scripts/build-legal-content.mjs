@@ -18,7 +18,7 @@ function rebrand(text) {
     .replaceAll('https://www.moneycash.in', 'https://www.moneycash.in')
     .replaceAll('www.moneycash.in', 'www.moneycash.in')
     .replaceAll('moneycash.in', 'moneycash.in')
-    .replaceAll('saurabh@moneycash.in', 'legal@moneycash.in')
+    .replaceAll('saurabh@moneycash.in', 'grievance@moneycash.in')
     .replace(/\(\s*Hereinafter\s*[“"]MoneyCash[”"]\s*\)/gi, '')
     .replace(/\bMoneycash's\b/g, "MoneyCash's")
     .replace(/\bMoneycash\b/g, 'MoneyCash')
@@ -100,10 +100,10 @@ const docs = [
       'How MoneyCash collects, uses, stores, and protects personal information on the website and app.',
     registeredOffice:
       'CREDSOLVE Technologies Private Limited, Flat No. E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh — 201009',
-    contactEmail: 'saurabh@moneycash.in',
+    contactEmail: 'legal@moneycash.in',
     grievanceOfficer: {
-      name: 'Mr. saurabh Agarwal',
-      email: 'saurabh@moneycash.in',
+      name: 'Mr. Saurabh Agarwal',
+      email: 'grievance@moneycash.in',
       phone: '+91-8882911939',
     },
   }),

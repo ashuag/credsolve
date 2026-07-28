@@ -4,7 +4,7 @@ import { LegalPageShell } from '@/components/legal/legal-page-shell';
 import { LEGAL_DOCUMENTS, LEGAL_NAV_ITEMS } from '@/lib/legal-content';
 
 export const metadata: Metadata = {
-  title: 'Policies & Disclosures | MoneyCash',
+  title: 'Policies & Disclosures',
   description:
     'All MoneyCash legal documents, policies, and regulatory disclosures — terms, privacy, fair practices, grievance redressal, KYC & AML, governance, and information security.',
   openGraph: {

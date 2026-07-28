@@ -1,9 +1,10 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useState } from 'react';
 import { AccountLoginInfographic } from '@/components/account/account-login-infographic';
 import { CustomerLoginPanel } from '@/components/account/customer-login-panel';
 import { MyAccountSection } from '@/components/account/my-account-section';
+import { LoggedOutRedirectModal } from '@/components/auth/logged-out-redirect-modal';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { LandingNavbar } from '@/components/landing/LandingNavbar';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
@@ -22,6 +23,11 @@ const LOGIN_LEFT_TITLE = (
 export function MyAccountClientPage() {
   const { loading, session } = useCustomerSession();
   const signedIn = isCustomerPortalSignedIn(session);
+  const [sessionExpired, setSessionExpired] = useState(false);
+
+  if (sessionExpired) {
+    return <LoggedOutRedirectModal />;
+  }
 
   if (loading) {
     return (
@@ -40,7 +46,7 @@ export function MyAccountClientPage() {
           <div className="absolute top-1/3 -left-20 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(28,52,125,0.06),transparent_70%)]" />
         </div>
         <div className="relative">
-          <MyAccountSection />
+          <MyAccountSection onSessionExpired={() => setSessionExpired(true)} />
         </div>
       </div>
     );

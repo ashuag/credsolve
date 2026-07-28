@@ -6,7 +6,7 @@ import { legalDocumentBySlug } from '@/lib/legal-content';
 const doc = legalDocumentBySlug('about-us');
 
 export const metadata: Metadata = {
-  title: `${doc.title} | MoneyCash`,
+  title: doc.title,
   description: doc.description,
   openGraph: {
     title: `${doc.title} | MoneyCash`,

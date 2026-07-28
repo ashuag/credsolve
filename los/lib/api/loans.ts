@@ -66,6 +66,16 @@ export type LosLoanDetails = LosLoan & {
   keyFactReady: boolean;
   totalPaidAmount: string;
   outstandingAmount: string;
+  /** Processing fee % saved on the application at selection. */
+  processingFeePercentage: string | null;
+  /** GST % on processing fee saved on the application. */
+  gstPercentage: string | null;
+  /** Inclusive days from disbursement through today (or closedAt if closed). */
+  daysOutstanding: number | null;
+  /** Interest accrued through today (principal × daily rate × days). */
+  interestTillToday: string | null;
+  /** Principal + interest till today. */
+  amountDueToday: string | null;
   isDisbursedApplication: boolean;
   disbursementTransfer: LosLoanDisbursementTransfer | null;
   repayments: Array<{

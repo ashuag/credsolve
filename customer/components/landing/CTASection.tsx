@@ -110,7 +110,7 @@ export function CTASection() {
           {[
             { value: '5,000+', label: 'Happy customers' },
             { value: '₹5Cr+', label: 'Disbursed' },
-            { value: '98%', label: 'Approval rate' },
+            { value: '2 min', label: 'Avg. approval' },
           ].map((s) => (
             <div key={s.label} className="flex flex-col items-center gap-1">
               <span className="text-[1.5rem] font-[900] text-brand-gold">{s.value}</span>
