@@ -40,6 +40,9 @@ function createPoolConfig(databaseUrl: string): PrismaMariaDbConfig {
     user: decodeURIComponent(url.username),
     password: decodeURIComponent(url.password),
     database,
+    // MySQL 8 caching_sha2_password over non-TLS needs the server RSA key;
+    // without this, every connect fails and the pool times out at idle=0.
+    allowPublicKeyRetrieval: process.env.DB_ALLOW_PUBLIC_KEY_RETRIEVAL !== 'false',
     connectTimeout: Number(process.env.DB_CONNECT_TIMEOUT_MS ?? 10_000),
     acquireTimeout: Number(process.env.DB_ACQUIRE_TIMEOUT_MS ?? 60_000),
     initializationTimeout: Number(process.env.DB_INITIALIZATION_TIMEOUT_MS ?? 60_000),
