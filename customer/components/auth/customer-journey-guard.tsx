@@ -43,7 +43,7 @@ function stageFromSession(session: ReturnType<typeof useCustomerSession>['sessio
   if (!isLoanDocumentsJourneyComplete(session)) return 'loanDocuments';
   if (!j.kycCompleted) return 'kyc';
   if (!j.bankDetailsCompleted) return 'bankDetails';
-  if (!j.referencesCompleted) return 'references';
+  if (!j.referencesCompleted || !j.loanDocumentsAccepted) return 'references';
   return 'done';
 }
 

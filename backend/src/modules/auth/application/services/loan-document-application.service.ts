@@ -22,6 +22,8 @@ type ApplicationDetailsRow = {
   emailVerificationType: string | null;
   loanDocumentsAcceptedAt: Date | null;
   loanDocumentsAcceptedIp: string | null;
+  loanDocumentsReviewedAt?: Date | null;
+  loanDocumentsReviewedIp?: string | null;
   keyFactPdfRelativePath: string | null;
   keyFactDisbursementPdfRelativePath?: string | null;
   loanAgreementPdfRelativePath: string | null;
@@ -42,6 +44,8 @@ export type LoanDocumentApplicationContext = {
   emailVerificationType: string | null;
   loanDocumentsAcceptedAt: Date | null;
   loanDocumentsAcceptedIp: string | null;
+  loanDocumentsReviewedAt: Date | null;
+  loanDocumentsReviewedIp: string | null;
   keyFactPdfRelativePath: string | null;
   keyFactDisbursementPdfRelativePath?: string | null;
   loanAgreementPdfRelativePath: string | null;
@@ -92,7 +96,28 @@ export class LoanDocumentApplicationService {
     });
     if (!applicationRow) throw new NotFoundException('No application found for this lead.');
 
-    const details = applicationRow.details;
+    const reviewedRows = await this.prisma.client.$queryRaw<
+      Array<{ loanDocumentsReviewedAt: Date | null; loanDocumentsReviewedIp: string | null }>
+    >`
+      SELECT
+        loan_documents_reviewed_at AS loanDocumentsReviewedAt,
+        loan_documents_reviewed_ip AS loanDocumentsReviewedIp
+      FROM application_detail
+      WHERE application_id = ${applicationRow.id}
+      LIMIT 1
+    `;
+    const reviewed = reviewedRows[0] ?? {
+      loanDocumentsReviewedAt: null,
+      loanDocumentsReviewedIp: null,
+    };
+
+    const details = applicationRow.details
+      ? {
+          ...applicationRow.details,
+          loanDocumentsReviewedAt: reviewed.loanDocumentsReviewedAt,
+          loanDocumentsReviewedIp: reviewed.loanDocumentsReviewedIp,
+        }
+      : null;
     const application: LoanDocumentApplicationContext = {
       id: applicationRow.id,
       uuid: applicationRow.uuid,
@@ -101,6 +126,8 @@ export class LoanDocumentApplicationService {
       emailVerificationType: details?.emailVerificationType ?? null,
       loanDocumentsAcceptedAt: details?.loanDocumentsAcceptedAt ?? null,
       loanDocumentsAcceptedIp: details?.loanDocumentsAcceptedIp ?? null,
+      loanDocumentsReviewedAt: reviewed.loanDocumentsReviewedAt,
+      loanDocumentsReviewedIp: reviewed.loanDocumentsReviewedIp,
       keyFactPdfRelativePath: details?.keyFactPdfRelativePath ?? null,
       keyFactDisbursementPdfRelativePath: details?.keyFactDisbursementPdfRelativePath ?? null,
       loanAgreementPdfRelativePath: details?.loanAgreementPdfRelativePath ?? null,

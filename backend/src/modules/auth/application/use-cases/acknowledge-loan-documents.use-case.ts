@@ -1,14 +1,20 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
-import { LOAN_DOCUMENT_TYPE } from '../../../../common/constants/loan-document.constants';
+import { readClientIp } from '../../../../common/http/client-ip.util';
 import { isLeadEmailVerifiedForPortal } from '../../../../common/mappers/customer-portal-profile.mapper';
+import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { LoanDocumentApplicationService } from '../services/loan-document-application.service';
 
+/**
+ * Records that the customer reviewed and agreed to loan documents on /loan-documents.
+ * No OTP and no email — OTP + sanctioned letter happen after references.
+ */
 @Injectable()
-export class GetLoanDocumentsUseCase {
+export class AcknowledgeLoanDocumentsUseCase {
   constructor(
+    private readonly prisma: PrismaService,
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
     private readonly loanDocs: LoanDocumentApplicationService,
@@ -29,6 +35,13 @@ export class GetLoanDocumentsUseCase {
     const ctx = await this.loanDocs.loadApplicationContext(customer.uuid, lead.id);
     const app = ctx.application;
 
+    if (app.loanDocumentsReviewedAt) {
+      return {
+        success: true as const,
+        reviewedAt: app.loanDocumentsReviewedAt.toISOString(),
+      };
+    }
+
     const emailVerified = isLeadEmailVerifiedForPortal(
       lead.leadStatus.name,
       app.email,
@@ -42,23 +55,17 @@ export class GetLoanDocumentsUseCase {
       throw new BadRequestException('Complete loan selection before reviewing documents.');
     }
 
-    const merge = this.loanDocs.buildMergeInput({ customer: ctx.customer, lead: ctx.lead, application: app });
-    const docType = LOAN_DOCUMENT_TYPE.KEY_FACT;
-    const existing = this.loanDocs.relativePathForType(docType, app);
-    await this.loanDocs.ensurePdf(docType, customer.uuid, app.uuid, app.id, merge, existing);
+    const reviewedAt = new Date();
+    const ip = readClientIp(req);
 
-    const documents = [docType].map((type) => ({
-      type,
-      title: this.loanDocs.documentTitle(type),
-      pdfUrl: this.loanDocs.pdfUrlFragment(type),
-    }));
+    await this.prisma.client.$executeRaw`
+      UPDATE application_detail
+      SET
+        loan_documents_reviewed_at = ${reviewedAt},
+        loan_documents_reviewed_ip = ${ip ?? null}
+      WHERE application_id = ${app.id}
+    `;
 
-    return {
-      accepted: app.loanDocumentsAcceptedAt != null,
-      acceptedAt: app.loanDocumentsAcceptedAt?.toISOString() ?? null,
-      reviewed: app.loanDocumentsReviewedAt != null,
-      reviewedAt: app.loanDocumentsReviewedAt?.toISOString() ?? null,
-      documents,
-    };
+    return { success: true as const, reviewedAt: reviewedAt.toISOString() };
   }
 }

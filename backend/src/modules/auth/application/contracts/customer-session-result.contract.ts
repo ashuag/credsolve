@@ -33,8 +33,10 @@ export type CustomerPortalJourneySnapshot = {
   detailsCompleted: boolean;
   /** Customer has selected a loan amount + tenure (`application_detail` populated). */
   loanSelectionCompleted: boolean;
-  /** Key Fact Statement + Loan Agreement accepted (mobile OTP) before KYC. */
+  /** Key Fact Statement reviewed/agreed on /loan-documents (no OTP). */
   loanDocumentsCompleted: boolean;
+  /** Mobile OTP acceptance after references — signed sanctioned letter emailed. */
+  loanDocumentsAccepted: boolean;
   /** Customer has completed KYC (documents uploaded / verified). */
   kycCompleted: boolean;
   /** Two personal references saved after bank details. */

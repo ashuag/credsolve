@@ -7,21 +7,14 @@ import { LoanDocumentScrollPanel } from '@/components/loan-documents/loan-docume
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { LoanCalculationLeftRail } from '@/components/loan/loan-calculation-left-rail';
 import { AlertBanner } from '@/components/ui/alert-banner';
-import { OtpInputGrid } from '@/components/ui/otp-input-grid';
 import { Spinner } from '@/components/ui/spinner';
 import {
-  acceptLoanDocuments,
+  acknowledgeLoanDocuments,
   fetchLoanDocuments,
-  sendLoanDocumentsOtp,
   type LoanDocumentItem,
-  type SendLoanDocumentsOtpResponse,
 } from '@/lib/api/loan-documents';
 import { CUSTOMER_EMAIL_JOURNEY_PATH, getCustomerJourneyResumePath } from '@/lib/api/customer-session';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
-import { useCountdown } from '@/lib/hooks/use-countdown';
-import { useOtpInput } from '@/lib/hooks/use-otp-input';
-
-const OTP_LENGTH = 6;
 
 export default function LoanDocumentsPage() {
   const router = useRouter();
@@ -31,18 +24,7 @@ export default function LoanDocumentsPage() {
   const [error, setError] = useState('');
   const [documents, setDocuments] = useState<LoanDocumentItem[]>([]);
   const [agreedByType, setAgreedByType] = useState<Record<string, boolean>>({});
-  const [phase, setPhase] = useState<'review' | 'otp'>('review');
-  const [otpRequest, setOtpRequest] = useState<SendLoanDocumentsOtpResponse | null>(null);
-  const [otpError, setOtpError] = useState('');
-  const [otpStatus, setOtpStatus] = useState('');
-  const [isSendingOtp, setIsSendingOtp] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
-
-  const otp = useOtpInput(() => {
-    setOtpError('');
-    setOtpStatus('');
-  });
-  const resendCountdown = useCountdown(otpRequest?.resendAvailableAt);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -50,7 +32,7 @@ export default function LoanDocumentsPage() {
       try {
         const data = await fetchLoanDocuments();
         if (!active) return;
-        if (data.accepted) {
+        if (data.reviewed || data.accepted) {
           const updated = await refreshSession();
           router.replace(getCustomerJourneyResumePath(updated));
           return;
@@ -71,57 +53,18 @@ export default function LoanDocumentsPage() {
   const allAgreed =
     documents.length > 0 && documents.every((d) => agreedByType[d.type] === true);
 
-  async function goToOtpStep() {
+  async function handleAgreeAndContinue() {
     if (!allAgreed) return;
     setError('');
-    setIsSendingOtp(true);
+    setIsSubmitting(true);
     try {
-      const req = await sendLoanDocumentsOtp();
-      setOtpRequest(req);
-      setPhase('otp');
-      setOtpStatus(
-        req.debugOtp
-          ? `Development OTP: ${req.debugOtp}`
-          : `We sent a 6-digit code to ${req.maskedMobile}.`,
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to send OTP.');
-    } finally {
-      setIsSendingOtp(false);
-    }
-  }
-
-  async function handleResendOtp() {
-    if (resendCountdown > 0 || isSendingOtp) return;
-    otp.clear();
-    setIsSendingOtp(true);
-    setOtpError('');
-    setOtpStatus('');
-    try {
-      const req = await sendLoanDocumentsOtp();
-      setOtpRequest(req);
-      setOtpStatus(req.debugOtp ? `Development OTP: ${req.debugOtp}` : 'A new code has been sent.');
-      otp.inputRefs.current[0]?.focus();
-    } catch (e) {
-      setOtpError(e instanceof Error ? e.message : 'Unable to resend OTP.');
-    } finally {
-      setIsSendingOtp(false);
-    }
-  }
-
-  async function handleVerifyOtp(e: React.FormEvent) {
-    e.preventDefault();
-    if (!otpRequest || otp.joined.length !== OTP_LENGTH) return;
-    setIsVerifying(true);
-    setOtpError('');
-    try {
-      await acceptLoanDocuments(otpRequest.requestId, otp.joined);
+      await acknowledgeLoanDocuments();
       const updated = await refreshSession();
       router.push(getCustomerJourneyResumePath(updated));
-    } catch (err) {
-      setOtpError(err instanceof Error ? err.message : 'Incorrect OTP. Please try again.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to continue.');
     } finally {
-      setIsVerifying(false);
+      setIsSubmitting(false);
     }
   }
 
@@ -132,55 +75,14 @@ export default function LoanDocumentsPage() {
           <Spinner size={48} />
           <p className="text-slate-500 font-medium">Preparing your loan documents…</p>
         </div>
-      ) : phase === 'otp' ? (
-        <form onSubmit={handleVerifyOtp} className="flex w-full min-w-0 max-w-full flex-col gap-6 overflow-x-hidden overflow-y-auto">
-          <h1 className="text-2xl font-black text-brand-navy">Confirm with OTP</h1>
-          <p className="text-slate-500 text-sm">
-            Enter the code sent to your registered mobile number to accept the Loan Sanction letter cum Key Fact
-            Statement. We will email the document to your registered email address after verification.
-          </p>
-          {otpStatus ? <p className="text-sm text-emerald-700 font-medium">{otpStatus}</p> : null}
-          {otpError ? <AlertBanner variant="error">{otpError}</AlertBanner> : null}
-          <OtpInputGrid
-            digits={otp.digits}
-            inputRefs={otp.inputRefs}
-            onDigitChange={otp.updateDigit}
-            onKeyDown={otp.handleKeyDown}
-            onPaste={otp.handlePaste}
-          />
-          <button
-            type="submit"
-            disabled={isVerifying || otp.joined.length !== OTP_LENGTH}
-            className="mc-btn-primary w-full py-4"
-          >
-            {isVerifying ? 'Verifying…' : 'Verify & continue to KYC'}
-          </button>
-          <button
-            type="button"
-            disabled={resendCountdown > 0 || isSendingOtp}
-            onClick={() => void handleResendOtp()}
-            className="text-sm font-semibold text-brand-blue disabled:text-slate-400"
-          >
-            {resendCountdown > 0 ? `Resend in ${resendCountdown}s` : 'Resend OTP'}
-          </button>
-          <button
-            type="button"
-            className="text-sm text-slate-500"
-            onClick={() => {
-              setPhase('review');
-              setOtpError('');
-            }}
-          >
-            Back to documents
-          </button>
-        </form>
       ) : current ? (
         <div className="flex w-full min-w-0 flex-col gap-4 pb-2">
           <div>
-            <h1 className="mb-2 text-2xl font-black text-brand-navy">Sanction letter cum Key Fact Statement</h1>
+            <h1 className="mb-2 text-2xl font-black text-brand-navy">KYC letter cum Key Fact Statement</h1>
             <p className="mb-2 text-sm text-slate-500">
-              Read the full loan document below. When you are ready, confirm your agreement and we will send an OTP to
-              your mobile. After verification, the signed PDF will be emailed to your registered email address.
+              Read the full document below. Confirm your agreement to continue to KYC. No OTP is sent here and
+              nothing is emailed yet — after references you will verify one OTP to receive your signed sanctioned
+              letter.
             </p>
             {error ? <AlertBanner variant="error">{error}</AlertBanner> : null}
           </div>
@@ -195,16 +97,16 @@ export default function LoanDocumentsPage() {
           />
           <button
             type="button"
-            disabled={!allAgreed || isSendingOtp}
-            onClick={() => void goToOtpStep()}
+            disabled={!allAgreed || isSubmitting}
+            onClick={() => void handleAgreeAndContinue()}
             className="mc-btn-primary w-full shrink-0 py-4"
           >
-            {isSendingOtp ? (
+            {isSubmitting ? (
               <span className="inline-flex items-center justify-center gap-2">
-                <Spinner size={20} /> Sending OTP…
+                <Spinner size={20} /> Continuing…
               </span>
             ) : (
-              'I agree — send OTP'
+              'I agree — continue to KYC'
             )}
           </button>
         </div>
@@ -222,12 +124,12 @@ export default function LoanDocumentsPage() {
           journeyPanel={journeyPanel}
           leftTitle={
             <>
-              Sanction <span className="text-[#60a5fa]">letter</span>
+              KYC <span className="text-[#60a5fa]">letter</span>
             </>
           }
-          leftDescription="Review your sanction letter and Key Fact Statement before KYC."
+          leftDescription="Review your KYC letter and Key Fact Statement, then continue to KYC."
           leftInfographic={<LoanCalculationLeftRail loanSelection={loanSelection} />}
-          mobileStepLabel="Sanction letter"
+          mobileStepLabel="KYC letter"
           mobileOnBack={() => router.push(CUSTOMER_EMAIL_JOURNEY_PATH)}
           showSpeedometer={false}
         />

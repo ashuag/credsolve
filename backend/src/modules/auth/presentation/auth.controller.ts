@@ -34,6 +34,7 @@ import { GetLoanDocumentsUseCase } from '../application/use-cases/get-loan-docum
 import { ServeLoanDocumentPdfUseCase } from '../application/use-cases/serve-loan-document-pdf.use-case';
 import { SendLoanDocumentsOtpUseCase } from '../application/use-cases/send-loan-documents-otp.use-case';
 import { AcceptLoanDocumentsUseCase } from '../application/use-cases/accept-loan-documents.use-case';
+import { AcknowledgeLoanDocumentsUseCase } from '../application/use-cases/acknowledge-loan-documents.use-case';
 import { AcceptLoanDocumentsDto } from '../application/dto/accept-loan-documents.dto';
 import { InitDigilockerDto } from '../application/dto/init-digilocker.dto';
 import { DownloadAadhaarDigilockerDto } from '../application/dto/download-aadhaar-digilocker.dto';
@@ -71,6 +72,7 @@ export class AuthController {
     private readonly serveLoanDocumentPdfFlow: ServeLoanDocumentPdfUseCase,
     private readonly sendLoanDocumentsOtpFlow: SendLoanDocumentsOtpUseCase,
     private readonly acceptLoanDocumentsFlow: AcceptLoanDocumentsUseCase,
+    private readonly acknowledgeLoanDocumentsFlow: AcknowledgeLoanDocumentsUseCase,
   ) {}
 
   @Post('send-otp')
@@ -175,11 +177,22 @@ export class AuthController {
     await this.serveLoanDocumentPdfFlow.execute(req, res, docType);
   }
 
+  @Post('loan-documents/acknowledge')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @RateLimitByRoute('loan-documents')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Record loan-document review agreement (no OTP; continues to KYC)',
+  })
+  acknowledgeLoanDocumentsRoute(@Req() req: Request) {
+    return this.acknowledgeLoanDocumentsFlow.execute(req);
+  }
+
   @Post('loan-documents/send-otp')
   @UseGuards(RequiredCustomerSessionGuard)
   @RateLimitByRoute('loan-documents-otp')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Send mobile OTP to accept loan documents after review' })
+  @ApiOperation({ summary: 'Send mobile OTP after references to accept sanctioned letter' })
   sendLoanDocumentsOtpRoute(@Req() req: Request) {
     return this.sendLoanDocumentsOtpFlow.execute(req);
   }
@@ -188,7 +201,9 @@ export class AuthController {
   @UseGuards(RequiredCustomerSessionGuard)
   @RateLimitByRoute('loan-documents-otp')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Verify mobile OTP and record loan document acceptance' })
+  @ApiOperation({
+    summary: 'Verify mobile OTP after references; email signed sanctioned letter',
+  })
   acceptLoanDocumentsRoute(@Req() req: Request, @Body() body: AcceptLoanDocumentsDto) {
     return this.acceptLoanDocumentsFlow.execute(req, body);
   }

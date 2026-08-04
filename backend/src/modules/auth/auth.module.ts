@@ -40,6 +40,7 @@ import { GetLoanDocumentsUseCase } from './application/use-cases/get-loan-docume
 import { ServeLoanDocumentPdfUseCase } from './application/use-cases/serve-loan-document-pdf.use-case';
 import { SendLoanDocumentsOtpUseCase } from './application/use-cases/send-loan-documents-otp.use-case';
 import { AcceptLoanDocumentsUseCase } from './application/use-cases/accept-loan-documents.use-case';
+import { AcknowledgeLoanDocumentsUseCase } from './application/use-cases/acknowledge-loan-documents.use-case';
 import { SaveKycDocumentsUseCase } from './application/use-cases/save-kyc-documents.use-case';
 import { SaveBankDetailsUseCase } from './application/use-cases/save-bank-details.use-case';
 import { LookupIfscUseCase } from './application/use-cases/lookup-ifsc.use-case';
@@ -122,6 +123,7 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     ServeLoanDocumentPdfUseCase,
     SendLoanDocumentsOtpUseCase,
     AcceptLoanDocumentsUseCase,
+    AcknowledgeLoanDocumentsUseCase,
     GetCustomerSessionUseCase,
     GetCustomerLoansDashboardUseCase,
     GetCustomerPaymentHistoryUseCase,

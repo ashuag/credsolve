@@ -4,12 +4,14 @@ import { SMS_TEMPLATE_ID } from '../../../../common/constants/sms.constants';
 import { OTP_TYPE } from '../../../../common/constants/otp.constants';
 import { readClientIp } from '../../../../common/http/client-ip.util';
 import { isLeadEmailVerifiedForPortal } from '../../../../common/mappers/customer-portal-profile.mapper';
+import { PrismaService } from '../../../../prisma/prisma.service';
 import { SendOtpDto } from '../dto/send-otp.dto';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { SendOtpUseCase } from './send-otp.use-case';
 import { LoanDocumentApplicationService } from '../services/loan-document-application.service';
 
+/** Sends eSign OTP after references are saved (not on /loan-documents). */
 @Injectable()
 export class SendLoanDocumentsOtpUseCase {
   constructor(
@@ -17,6 +19,7 @@ export class SendLoanDocumentsOtpUseCase {
     private readonly leads: LeadRepository,
     private readonly loanDocs: LoanDocumentApplicationService,
     private readonly sendOtp: SendOtpUseCase,
+    private readonly prisma: PrismaService,
   ) {}
 
   async execute(req: Request) {
@@ -36,6 +39,21 @@ export class SendLoanDocumentsOtpUseCase {
 
     if (app.loanDocumentsAcceptedAt) {
       throw new BadRequestException('Loan documents are already accepted.');
+    }
+
+    if (!app.loanDocumentsReviewedAt) {
+      throw new BadRequestException('Review and agree to loan documents before requesting OTP.');
+    }
+
+    const refsCount = await this.prisma.client.applicationReference.count({
+      where: {
+        applicationId: app.id,
+        fullName: { not: '' },
+        mobileNumber: { not: '' },
+      },
+    });
+    if (refsCount < 2) {
+      throw new BadRequestException('Add two personal references before requesting OTP.');
     }
 
     const emailVerified = isLeadEmailVerifiedForPortal(

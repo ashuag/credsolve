@@ -12,6 +12,8 @@ export type LoanDocumentItem = {
 export type LoanDocumentsResponse = {
   accepted: boolean;
   acceptedAt: string | null;
+  reviewed: boolean;
+  reviewedAt: string | null;
   documents: LoanDocumentItem[];
 };
 
@@ -45,6 +47,18 @@ export function loanDocumentPdfAbsoluteUrl(pdfUrlFragment: string): string {
   }
 
   return `${getApiUrl()}${fragment}`;
+}
+
+export async function acknowledgeLoanDocuments(): Promise<{ success: boolean; reviewedAt: string }> {
+  const data = await apiPost<{ success: boolean; reviewedAt: string }>(
+    '/auth/loan-documents/acknowledge',
+    {},
+    'Unable to confirm loan documents.',
+  );
+  if (!data) {
+    throw new Error('Unable to confirm loan documents.');
+  }
+  return data;
 }
 
 export async function sendLoanDocumentsOtp(): Promise<SendLoanDocumentsOtpResponse> {

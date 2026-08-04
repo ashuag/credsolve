@@ -15,6 +15,7 @@ export type ApplicationKycSnapshotRow = {
   /** `application_kyc.liveness_attempts` — failed pipeline runs so far. */
   livenessAttempts: number;
   loanDocumentsAcceptedAt: Date | null;
+  loanDocumentsReviewedAt: Date | null;
 };
 
 export async function fetchLatestApplicationKycSnapshot(
@@ -38,7 +39,8 @@ export async function fetchLatestApplicationKycSnapshot(
             COALESCE(ak.liveness_passed, false) AS livenessPassed,
             COALESCE(ak.is_liveness, false) AS livenessCheckCompleted,
             COALESCE(ak.liveness_attempts, 0) AS livenessAttempts,
-            ad.loan_documents_accepted_at AS loanDocumentsAcceptedAt
+            ad.loan_documents_accepted_at AS loanDocumentsAcceptedAt,
+            ad.loan_documents_reviewed_at AS loanDocumentsReviewedAt
           FROM application a
           LEFT JOIN application_detail ad ON ad.application_id = a.id
           LEFT JOIN application_kyc ak ON ak.application_id = a.id
@@ -60,7 +62,8 @@ export async function fetchLatestApplicationKycSnapshot(
             COALESCE(ak.liveness_passed, false) AS livenessPassed,
             COALESCE(ak.is_liveness, false) AS livenessCheckCompleted,
             COALESCE(ak.liveness_attempts, 0) AS livenessAttempts,
-            ad.loan_documents_accepted_at AS loanDocumentsAcceptedAt
+            ad.loan_documents_accepted_at AS loanDocumentsAcceptedAt,
+            ad.loan_documents_reviewed_at AS loanDocumentsReviewedAt
           FROM application a
           LEFT JOIN application_detail ad ON ad.application_id = a.id
           LEFT JOIN application_kyc ak ON ak.application_id = a.id

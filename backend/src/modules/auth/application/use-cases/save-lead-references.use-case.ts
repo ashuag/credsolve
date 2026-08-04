@@ -20,7 +20,10 @@ export class SaveLeadReferencesUseCase {
     private readonly prisma: PrismaService,
   ) {}
 
-  async execute(req: Request, dto: SaveLeadReferencesDto): Promise<{ success: true; leadUuid: string }> {
+  async execute(
+    req: Request,
+    dto: SaveLeadReferencesDto,
+  ): Promise<{ success: true; leadUuid: string; needsSanctionOtp: boolean }> {
     const session = req.customerSession;
     if (!session) {
       throw new UnauthorizedException('Sign in with mobile OTP before continuing.');
@@ -71,14 +74,31 @@ export class SaveLeadReferencesUseCase {
       throw new BadRequestException('One or more relation options are invalid.');
     }
 
-    await this.prisma.client.$transaction(async (tx) => {
+    const { accepted } = await this.prisma.client.$transaction(async (tx) => {
       const application = await tx.application.findFirst({
         where: { leadId: leadRow.id, customerId: customer.id },
         orderBy: { createdAt: 'desc' },
-        select: { id: true },
+        select: {
+          id: true,
+          details: {
+            select: {
+              loanDocumentsAcceptedAt: true,
+            },
+          },
+        },
       });
       if (!application) {
         throw new BadRequestException('Complete loan selection before adding references.');
+      }
+
+      const reviewedRows = await tx.$queryRaw<Array<{ loanDocumentsReviewedAt: Date | null }>>`
+        SELECT loan_documents_reviewed_at AS loanDocumentsReviewedAt
+        FROM application_detail
+        WHERE application_id = ${application.id}
+        LIMIT 1
+      `;
+      if (!reviewedRows[0]?.loanDocumentsReviewedAt) {
+        throw new BadRequestException('Review and agree to loan documents before adding references.');
       }
 
       await Promise.all(
@@ -105,8 +125,12 @@ export class SaveLeadReferencesUseCase {
           }),
         ),
       );
+
+      return {
+        accepted: application.details?.loanDocumentsAcceptedAt != null,
+      };
     });
 
-    return { success: true, leadUuid: leadRow.uuid };
+    return { success: true, leadUuid: leadRow.uuid, needsSanctionOtp: !accepted };
   }
 }

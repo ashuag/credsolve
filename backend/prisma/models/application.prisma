@@ -57,6 +57,9 @@ model ApplicationDetail {
   loanAgreementPdfRelativePath String?                @map("loan_agreement_pdf_relative_path") @db.VarChar(512)
   loanDocumentsAcceptedAt      DateTime?              @map("loan_documents_accepted_at") @db.DateTime(3)
   loanDocumentsAcceptedIp      String?                @map("loan_documents_accepted_ip") @db.VarChar(45)
+  /// Customer agreed to loan docs on /loan-documents (no OTP). OTP acceptance is loanDocumentsAcceptedAt.
+  loanDocumentsReviewedAt      DateTime?              @map("loan_documents_reviewed_at") @db.DateTime(3)
+  loanDocumentsReviewedIp      String?                @map("loan_documents_reviewed_ip") @db.VarChar(45)
   pennyDropAttempts            Int                    @default(0) @map("penny_drop_attempts") @db.SmallInt
   pennyDropVendorJson          Json?                  @map("penny_drop_vendor_json")
   createdAt                    DateTime               @default(now()) @map("created_at") @db.DateTime(3)

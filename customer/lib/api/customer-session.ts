@@ -84,6 +84,8 @@ export type CustomerSessionResponse =
         detailsCompleted: boolean;
         loanSelectionCompleted: boolean;
         loanDocumentsCompleted: boolean;
+        /** True after post-references mobile OTP (sanctioned letter emailed). */
+        loanDocumentsAccepted: boolean;
         kycCompleted: boolean;
         referencesCompleted: boolean;
         bankDetailsCompleted: boolean;
@@ -234,7 +236,8 @@ export function isCustomerJourneyIncomplete(
     j.loanDocumentsCompleted &&
     j.kycCompleted &&
     j.bankDetailsCompleted &&
-    j.referencesCompleted
+    j.referencesCompleted &&
+    j.loanDocumentsAccepted
   );
 }
 
@@ -292,7 +295,7 @@ export function getCustomerJourneyResumePath(
 
   if (!journey.kycCompleted) return resolveKycStagePath(session);
   if (!journey.bankDetailsCompleted) return '/bank-details';
-  if (!journey.referencesCompleted) return '/references';
+  if (!journey.referencesCompleted || !journey.loanDocumentsAccepted) return '/references';
   return '/thank-you';
 }
 

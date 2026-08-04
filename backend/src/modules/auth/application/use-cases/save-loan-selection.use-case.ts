@@ -127,6 +127,14 @@ export class SaveLoanSelectionUseCase {
         },
       });
 
+      await tx.$executeRaw`
+        UPDATE application_detail
+        SET
+          loan_documents_reviewed_at = NULL,
+          loan_documents_reviewed_ip = NULL
+        WHERE application_id = ${application.id}
+      `;
+
       await tx.applicationReference.deleteMany({
         where: { applicationId: application.id },
       });

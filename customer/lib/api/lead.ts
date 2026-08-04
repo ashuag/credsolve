@@ -340,12 +340,16 @@ export type SaveLeadReferencesPayload = {
   references: [LeadReferenceInput, LeadReferenceInput];
 };
 
-export async function saveLeadReferences(payload: SaveLeadReferencesPayload): Promise<{ success: boolean; leadUuid?: string }> {
-  return (await apiPost<{ success: boolean; leadUuid?: string }>(
-    '/auth/lead-references',
-    payload,
-    'Unable to save your references right now. Please try again.',
-  )) ?? { success: true };
+export async function saveLeadReferences(
+  payload: SaveLeadReferencesPayload,
+): Promise<{ success: boolean; leadUuid?: string; needsSanctionOtp?: boolean }> {
+  return (
+    (await apiPost<{ success: boolean; leadUuid?: string; needsSanctionOtp?: boolean }>(
+      '/auth/lead-references',
+      payload,
+      'Unable to save your references right now. Please try again.',
+    )) ?? { success: true, needsSanctionOtp: true }
+  );
 }
 
 export async function saveBankDetails(payload: SaveBankDetailsPayload): Promise<{ success: boolean }> {

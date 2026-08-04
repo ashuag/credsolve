@@ -26,6 +26,9 @@ import { PrismaService } from '../../../../prisma/prisma.service';
 import type { AcceptLoanDocumentsDto } from '../dto/accept-loan-documents.dto';
 import { LoanDocumentApplicationService } from '../services/loan-document-application.service';
 
+/**
+ * After references: verify mobile OTP, record acceptance, email signed sanctioned letter.
+ */
 @Injectable()
 export class AcceptLoanDocumentsUseCase {
   private readonly logger = new Logger(AcceptLoanDocumentsUseCase.name);
@@ -59,6 +62,21 @@ export class AcceptLoanDocumentsUseCase {
 
     if (app.loanDocumentsAcceptedAt) {
       return { success: true, acceptedAt: app.loanDocumentsAcceptedAt.toISOString() };
+    }
+
+    if (!app.loanDocumentsReviewedAt) {
+      throw new BadRequestException('Review and agree to loan documents before accepting with OTP.');
+    }
+
+    const refsCount = await this.prisma.client.applicationReference.count({
+      where: {
+        applicationId: app.id,
+        fullName: { not: '' },
+        mobileNumber: { not: '' },
+      },
+    });
+    if (refsCount < 2) {
+      throw new BadRequestException('Add two personal references before accepting with OTP.');
     }
 
     const emailVerified = isLeadEmailVerifiedForPortal(
@@ -134,48 +152,52 @@ export class AcceptLoanDocumentsUseCase {
       true,
     );
 
-    await this.sendAcceptedDocumentsEmail(ctx, customer.uuid, lead.id);
+    await this.sendSanctionedLetterEmail(ctx, lead.id);
 
     return { success: true, acceptedAt: acceptedAt.toISOString() };
   }
 
-  private async sendAcceptedDocumentsEmail(
+  private async sendSanctionedLetterEmail(
     ctx: Awaited<ReturnType<LoanDocumentApplicationService['loadApplicationContext']>>,
-    _customerUuid: string,
     leadId: bigint,
   ): Promise<void> {
     const email = ctx.application.email?.trim();
     if (!email) {
-      this.logger.warn(`Loan documents accepted for application ${ctx.application.uuid} but no email is stored.`);
+      this.logger.warn(
+        `Sanctioned letter ready for application ${ctx.application.uuid} but no email is stored.`,
+      );
       return;
     }
 
     if (!this.emailService.isConfigured()) {
       this.logger.warn(
-        `[loan-docs] SMTP not configured; skipping email with PDF attachments to ${maskEmail(email)}.`,
+        `[loan-docs] SMTP not configured; skipping sanctioned letter email to ${maskEmail(email)}.`,
       );
       return;
     }
-
-    const attachments = [];
 
     try {
       const docType = LOAN_DOCUMENT_TYPE.KEY_FACT;
       const rel = this.loanDocs.relativePathForType(docType, ctx.application)?.trim() || null;
       if (!rel || !(await this.kycFiles.exists(rel))) {
         this.logger.warn(
-          `[loan-docs] PDF not found for application ${ctx.application.uuid}; omitting from email.`,
+          `[loan-docs] Signed PDF not found for application ${ctx.application.uuid}; omitting from email.`,
         );
-      } else {
-        const content = await this.kycFiles.readBytes(rel);
-        attachments.push({ filename: LOAN_DOCUMENT_PDF_FILES[docType], content });
+        return;
       }
 
-      await this.emailService.sendLoanDocumentsEmail(email, attachments, { leadId });
-      this.logger.log(`Loan document PDFs emailed to ${maskEmail(email)} for application ${ctx.application.uuid}.`);
+      const content = await this.kycFiles.readBytes(rel);
+      await this.emailService.sendSanctionedLetterEmail(
+        email,
+        [{ filename: LOAN_DOCUMENT_PDF_FILES[docType], content }],
+        { leadId },
+      );
+      this.logger.log(
+        `Sanctioned letter emailed to ${maskEmail(email)} for application ${ctx.application.uuid}.`,
+      );
     } catch (error) {
       this.logger.error(
-        `Failed to email loan documents to ${maskEmail(email)} for application ${ctx.application.uuid}`,
+        `Failed to email sanctioned letter to ${maskEmail(email)} for application ${ctx.application.uuid}`,
         error instanceof Error ? error.stack : error,
       );
     }

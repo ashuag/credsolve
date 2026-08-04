@@ -255,6 +255,74 @@ export class EmailService {
     });
   }
 
+  /** Unsigned Key Fact emailed after references are saved (before eSign OTP). */
+  async sendKycLetterEmail(
+    to: string,
+    attachments: EmailAttachment[],
+    audit?: Pick<SendEmailAuditContext, 'leadId'>,
+  ): Promise<void> {
+    const subject = 'Your MoneyCash KYC letter — Key Fact Statement';
+    const text = [
+      'Thank you for completing your references.',
+      '',
+      'Attached is your KYC letter (Key Fact Statement) for your records.',
+      '',
+      'Please verify the OTP sent to your registered mobile number to receive your signed sanctioned letter.',
+      '',
+      'If you did not submit this application, please contact support.',
+    ].join('\n');
+
+    const html = `
+      <p>Thank you for completing your references.</p>
+      <p>Attached is your <strong>KYC letter (Key Fact Statement)</strong> for your records.</p>
+      <p style="color:#555;font-size:0.9em;">Please verify the OTP sent to your registered mobile number to receive your signed sanctioned letter.</p>
+      <p style="color:#555;font-size:0.85em;">If you did not submit this application, please contact support.</p>
+    `.trim();
+
+    await this.sendEmail({
+      to,
+      subject,
+      text,
+      html,
+      attachments,
+      audit: { serviceName: 'email-kyc-letter', leadId: audit?.leadId ?? null },
+    });
+  }
+
+  /** Signed Key Fact emailed after post-references eSign OTP. */
+  async sendSanctionedLetterEmail(
+    to: string,
+    attachments: EmailAttachment[],
+    audit?: Pick<SendEmailAuditContext, 'leadId'>,
+  ): Promise<void> {
+    const subject = 'Your MoneyCash sanctioned letter';
+    const text = [
+      'Thank you for verifying your OTP.',
+      '',
+      'Attached is your signed Sanction letter cum Key Fact Statement for your records.',
+      '',
+      'Your application has been submitted for review.',
+      '',
+      'If you did not request this, please contact support.',
+    ].join('\n');
+
+    const html = `
+      <p>Thank you for verifying your OTP.</p>
+      <p>Attached is your signed <strong>Sanction letter cum Key Fact Statement</strong> for your records.</p>
+      <p style="color:#555;font-size:0.9em;">Your application has been submitted for review.</p>
+      <p style="color:#555;font-size:0.85em;">If you did not request this, please contact support.</p>
+    `.trim();
+
+    await this.sendEmail({
+      to,
+      subject,
+      text,
+      html,
+      attachments,
+      audit: { serviceName: 'email-sanctioned-letter', leadId: audit?.leadId ?? null },
+    });
+  }
+
   async sendFinalSanctionLetterEmail(
     to: string,
     attachments: EmailAttachment[],

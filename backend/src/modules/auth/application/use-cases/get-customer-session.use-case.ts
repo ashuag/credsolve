@@ -76,6 +76,7 @@ export class GetCustomerSessionUseCase {
         detailsCompleted: false,
         loanSelectionCompleted: false,
         loanDocumentsCompleted: false,
+        loanDocumentsAccepted: false,
         kycCompleted: false,
         referencesCompleted: false,
         bankDetailsCompleted: false,
@@ -261,7 +262,8 @@ export class GetCustomerSessionUseCase {
         appDetails?.reasonForLoanId != null,
     );
 
-    const loanDocumentsCompleted = Boolean(application?.loanDocumentsAcceptedAt);
+    const loanDocumentsCompleted = Boolean(application?.loanDocumentsReviewedAt);
+    const loanDocumentsAccepted = Boolean(application?.loanDocumentsAcceptedAt);
 
     const kycDocsCount = countUploadedKycDocuments(latestCustomerKyc?.aadhaarData);
     const livenessOptional = isActiveLivenessDisabled();
@@ -389,6 +391,7 @@ export class GetCustomerSessionUseCase {
         detailsCompleted,
         loanSelectionCompleted,
         loanDocumentsCompleted,
+        loanDocumentsAccepted,
         kycCompleted,
         referencesCompleted,
         bankDetailsCompleted,
