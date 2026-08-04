@@ -620,7 +620,9 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
               {formatINRExact(row.amountDueToday)}
             </p>
             <p className="m-0 mt-1 text-[0.72rem] font-semibold text-brand-muted">
-              Principal + interest till today
+              {Number(row.bounceFeeInr) > 0
+                ? `Principal + interest + bounce (${formatINRExact(row.bounceFeeInr)})`
+                : 'Principal + interest till today'}
             </p>
           </div>
           <div className="rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[#fbfcff] px-4 py-3.5">

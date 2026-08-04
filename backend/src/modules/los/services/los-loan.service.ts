@@ -1,11 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { APPLICATION_STATUS } from '../../../common/constants/application.constants';
+import { LOAN_STATUS } from '../../../common/constants/loan.constants';
 import { mapEasebuzzTransferLog } from '../../../common/easebuzz/easebuzz-transfer-log.util';
 import {
   calendarDaysBetween,
   computeAmountDueNowInr,
   decimalToNumber,
 } from '../../../common/loan/loan-calculation.util';
+import { isRepaymentPastDue } from '../../../common/loan/bounce-charge.util';
+import { BounceChargeTierResolverService } from '../../../common/loan/bounce-charge-tier.resolver';
 import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbursement-view.util';
 import { formatLosPersonName } from '../format-los-person-name';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -23,7 +26,10 @@ function maskAccountNumber(value: string | null | undefined): string | null {
 
 @Injectable()
 export class LosLoanService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly bounceChargeTiers: BounceChargeTierResolverService,
+  ) {}
 
   async listLoans() {
     const loans = await this.prisma.client.loanAccount.findMany({
@@ -73,6 +79,7 @@ export class LosLoanService {
               expectedRepaymentDays: details.expectedRepaymentDays,
             }
           : null,
+        { preferStoredTenure: true },
       );
       const loanNumber = this.resolveLoanNumber(loan);
 
@@ -208,8 +215,10 @@ export class LosLoanService {
             processingFeePercentage: details.processingFeePercentage,
             gstPercentage: details.gstPercentage,
             expectedRepaymentDays: details.expectedRepaymentDays,
+            expectedRepaymentDate: details.expectedRepaymentDate,
           }
         : null,
+      { preferStoredTenure: true },
     );
     const profile = loan.application.lead.leadDetail;
     const loanNumber = this.resolveLoanNumber(loan);
@@ -231,12 +240,19 @@ export class LosLoanService {
     let daysOutstanding: number | null = null;
     let interestTillToday: string | null = null;
     let amountDueToday: string | null = null;
+    let bounceFeeInr: string | null = null;
 
     if (loan.closedAt == null && principal != null && dailyRate != null) {
       const due = computeAmountDueNowInr(principal, dailyRate, loan.disbursedAt);
       daysOutstanding = due.daysOutstanding;
       interestTillToday = due.interestAmount.toFixed(2);
-      amountDueToday = due.amountDue.toFixed(2);
+      const pastDue =
+        loan.loanStatus.name === LOAN_STATUS.OVERDUE || isRepaymentPastDue(loan.loanMaturityDate);
+      const bounce = pastDue
+        ? await this.bounceChargeTiers.resolveFeeForAmount(principal)
+        : 0;
+      bounceFeeInr = bounce.toFixed(2);
+      amountDueToday = (Math.round((due.amountDue + bounce) * 100) / 100).toFixed(2);
     } else if (loan.closedAt != null) {
       daysOutstanding = calendarDaysBetween(loan.disbursedAt, loan.closedAt) + 1;
       interestTillToday = loan.interestAmount.toFixed(2);
@@ -294,6 +310,7 @@ export class LosLoanService {
       daysOutstanding,
       interestTillToday,
       amountDueToday,
+      bounceFeeInr,
       isDisbursedApplication: loan.application.applicationStatus.name === APPLICATION_STATUS.DISBURSED,
       repayments: repaymentRows.map((row) => ({
         uuid: row.uuid,

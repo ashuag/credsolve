@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
@@ -8,6 +8,8 @@ import Redis from 'ioredis';
  */
 @Injectable()
 export class RedisService implements OnModuleDestroy {
+  private readonly logger = new Logger(RedisService.name);
+  private lastErrorLogAt = 0;
   readonly client: Redis;
 
   constructor(private readonly config: ConfigService) {
@@ -16,6 +18,16 @@ export class RedisService implements OnModuleDestroy {
       throw new InternalServerErrorException('REDIS_URL is not configured');
     }
     this.client = new Redis(url, { maxRetriesPerRequest: 2, enableReadyCheck: true });
+    // Required: without this, ioredis emits "Unhandled error event" on every reconnect failure.
+    this.client.on('error', (err) => {
+      const now = Date.now();
+      if (now - this.lastErrorLogAt < 30_000) return;
+      this.lastErrorLogAt = now;
+      this.logger.error(`Redis connection error: ${err.message}`);
+    });
+    this.client.on('connect', () => {
+      this.logger.log('Redis connected');
+    });
   }
 
   onModuleDestroy(): void {

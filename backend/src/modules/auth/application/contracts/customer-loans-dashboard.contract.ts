@@ -26,8 +26,10 @@ export type CustomerLoanCard = {
   daysOutstanding: number | null;
   /** Interest accrued from disbursement through today (min 1 day on disbursement day). */
   interestTillToday: string | null;
-  /** Principal + interest till today (pay-now amount). */
+  /** Principal + interest till today (pay-now amount). Includes bounce fee when past due. */
   amountDueToday: string | null;
+  /** Bounce fee included in amountDueToday when repayment is past maturity (else `0.00` / null). */
+  bounceFeeInr: string | null;
   processingFeeAmount: string | null;
   gstAmount: string | null;
   /**

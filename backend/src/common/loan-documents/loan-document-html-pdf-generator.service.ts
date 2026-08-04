@@ -5,13 +5,20 @@ import puppeteer from 'puppeteer';
 import { resolvePuppeteerExecutablePath } from '../utils/puppeteer-executable.util';
 import { renderLoanDocumentHtml } from './loan-document-html-render.util';
 import type { LoanDocumentMergeInput } from './loan-document.types';
+import { BounceChargeTierResolverService } from '../loan/bounce-charge-tier.resolver';
 
 @Injectable()
 export class LoanDocumentHtmlPdfGeneratorService {
   private readonly logger = new Logger(LoanDocumentHtmlPdfGeneratorService.name);
 
+  constructor(private readonly bounceChargeTiers: BounceChargeTierResolverService) {}
+
   async generatePdf(merge: LoanDocumentMergeInput): Promise<Buffer> {
-    const html = await renderLoanDocumentHtml(merge);
+    const tiers =
+      merge.bounceChargeTiers != null
+        ? merge.bounceChargeTiers
+        : await this.bounceChargeTiers.listActiveTiers();
+    const html = await renderLoanDocumentHtml({ ...merge, bounceChargeTiers: tiers });
     let rawPdf: Buffer;
     try {
       rawPdf = await this.htmlToPdfBuffer(html);

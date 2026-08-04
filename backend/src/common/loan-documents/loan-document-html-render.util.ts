@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { LOAN_DOCUMENT_HTML_TEMPLATE, LENDER_LOGO_FILE } from '../constants/loan-document.constants';
+import { renderBounceChargeTierHtmlRows } from '../loan/bounce-charge.util';
 import { buildLoanDocumentHtmlFieldValues } from './loan-document-html-field-map.util';
 import type { LoanDocumentMergeInput } from './loan-document.types';
 
@@ -76,6 +77,14 @@ export async function renderLoanDocumentHtml(merge: LoanDocumentMergeInput): Pro
   const fields = buildLoanDocumentHtmlFieldValues(merge);
   for (const [id, value] of Object.entries(fields)) {
     html = fillInputById(html, id, value);
+  }
+
+  if (merge.bounceChargeTiers != null && merge.bounceChargeTiers.length > 0) {
+    const rows = renderBounceChargeTierHtmlRows(merge.bounceChargeTiers);
+    html = html.replace(
+      /<tbody\b([^>]*\bdata-bounce-charge-tiers\b[^>]*)>[\s\S]*?<\/tbody>/gi,
+      `<tbody$1>\n      ${rows}\n    </tbody>`,
+    );
   }
 
   if (fields.lender_dsc_date || fields.lender_dsc_serial) {

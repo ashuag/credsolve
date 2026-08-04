@@ -13,7 +13,6 @@ import { resolveLivenessVideoRelativePath } from '../../../common/kyc/kyc-livene
 import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
 import { LoanDocumentApplicationService } from '../../auth/application/services/loan-document-application.service';
-import { getLiveLoanFeeRates } from '../../../common/loan/live-loan-rates.cache';
 import { LOAN_DOCUMENT_ACCEPTANCE_NAME, LOAN_DOCUMENT_TYPE, type LoanDocumentType } from '../../../common/constants/loan-document.constants';
 import {
   computeFeeAmountsFromLoanDetail,
@@ -42,6 +41,8 @@ const loanDocumentApplicationSelect = {
       loanDocumentsAcceptedIp: true,
       keyFactPdfRelativePath: true,
       keyFactEsigned: true,
+      keyFactDisbursementPdfRelativePath: true,
+      keyFactDisbursementEsigned: true,
       loanAgreementPdfRelativePath: true,
       selectedLoanAmount: true,
       interestRate: true,
@@ -219,7 +220,9 @@ export class LosApplicationService {
     return applications.map((application) => {
       const appDetails = application.details;
       const loanAccount = application.loanAccount;
-      const fees = computeFeeAmountsFromLoanDetail(appDetails);
+      const fees = computeFeeAmountsFromLoanDetail(appDetails, {
+        preferStoredTenure: loanAccount != null,
+      });
       const kycStatus = application.kyc?.kycStatus ?? 0;
       const repaymentAmount =
         loanAccount?.totalRepaymentAmount?.toString()
@@ -242,10 +245,7 @@ export class LosApplicationService {
           : appDetails?.expectedRepaymentDate?.toISOString().slice(0, 10) ?? null,
         repaymentAmount,
         emi: repaymentAmount,
-        processingFeePercent:
-          getLiveLoanFeeRates()?.processingFeePercent?.toString() ??
-          appDetails?.processingFeePercentage?.toString() ??
-          null,
+        processingFeePercent: appDetails?.processingFeePercentage?.toString() ?? null,
         processingFeeAmount: fees.processingFeeAmount != null ? fees.processingFeeAmount.toFixed(2) : null,
         bankDetails: maskBankDetails(
           appDetails?.bankName,
@@ -485,7 +485,9 @@ export class LosApplicationService {
       })),
       aadhaarDetail: buildLosAadhaarDetail(customerKyc?.aadhaarData),
       details: application.details
-        ? mapLosLoanDetailsFromStaging(application.details)
+        ? mapLosLoanDetailsFromStaging(application.details, {
+            preferStoredTenure: application.loanAccount != null,
+          })
         : null,
       bureauReport: bureauReportRow
         ? {
@@ -522,6 +524,8 @@ export class LosApplicationService {
       loanDocuments: {
         keyFactReady: !!application.details?.keyFactPdfRelativePath?.trim(),
         keyFactEsigned: application.details?.keyFactEsigned ?? false,
+        keyFactDisbursementReady: !!application.details?.keyFactDisbursementPdfRelativePath?.trim(),
+        keyFactDisbursementEsigned: application.details?.keyFactDisbursementEsigned ?? false,
         loanAgreementReady: !!application.details?.loanAgreementPdfRelativePath?.trim(),
         acceptedAt: application.details?.loanDocumentsAcceptedAt?.toISOString() ?? null,
       },
@@ -589,7 +593,10 @@ export class LosApplicationService {
   }
 
   async serveApplicationLoanDocument(applicationUuid: string, docTypeRaw: string, res: Response): Promise<void> {
-    const allowed: LoanDocumentType[] = [LOAN_DOCUMENT_TYPE.KEY_FACT];
+    const allowed: LoanDocumentType[] = [
+      LOAN_DOCUMENT_TYPE.KEY_FACT,
+      LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT,
+    ];
     if (!allowed.includes(docTypeRaw as LoanDocumentType)) {
       throw new BadRequestException('Unknown loan document type.');
     }
@@ -603,6 +610,31 @@ export class LosApplicationService {
 
     const docCtx = toLoanDocumentContext(application);
     const existing = this.loanDocs.relativePathForType(docType, docCtx);
+
+    // Disbursement KFS is only served from stored file (never auto-regenerate acceptance overwrite).
+    if (docType === LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT) {
+      const rel = existing?.trim() ?? '';
+      if (!rel) throw new NotFoundException('Disbursement sanction letter has not been generated yet.');
+      if (!(await this.kycFiles.exists(rel))) {
+        throw new NotFoundException('Disbursement document file is missing from storage.');
+      }
+      let buf: Buffer;
+      try {
+        buf = await this.kycFiles.readBytes(rel);
+      } catch (err) {
+        if (isStorageObjectMissing(err)) {
+          throw new NotFoundException('Disbursement document file is missing from storage.');
+        }
+        throw err;
+      }
+      const title = this.loanDocs.documentTitle(docType);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${title}.pdf"`);
+      res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+      res.send(buf);
+      return;
+    }
+
     const canGenerate = Boolean(
       application.details?.selectedLoanAmount && application.details?.expectedRepaymentDays,
     );
@@ -768,6 +800,7 @@ export class LosApplicationService {
       throw new NotFoundException('Loan selection is incomplete — cannot generate documents.');
     }
 
+    // Always compute from application_detail snapshots (PF/GST/ROI/tenure), never live settings.
     const docCtx = toLoanDocumentContext(application);
     const merge = this.loanDocs.buildMergeInput({
       customer: application.customer,
@@ -775,19 +808,70 @@ export class LosApplicationService {
       application: docCtx,
     });
 
+    const generated: LoanDocumentType[] = [];
+    const customerUuid = application.customer.uuid;
+    const digitallySignAcceptance = docCtx.loanDocumentsAcceptedAt != null;
+
+    // Never overwrite an existing acceptance KFS object on disk.
     const docType = LOAN_DOCUMENT_TYPE.KEY_FACT;
-    const existing = this.loanDocs.relativePathForType(docType, docCtx);
-    await this.loanDocs.ensurePdf(
-      docType,
-      application.customer.uuid,
-      application.uuid,
-      application.id,
-      merge,
-      existing,
-      true,
-      docCtx.loanDocumentsAcceptedAt != null,
-    );
-    const generated = [docType];
+    const existingKeyFact = this.loanDocs.relativePathForType(docType, docCtx);
+    const keyFactExists =
+      Boolean(existingKeyFact?.trim()) && (await this.kycFiles.exists(existingKeyFact!.trim()));
+
+    if (!keyFactExists) {
+      await this.loanDocs.ensurePdf(
+        docType,
+        customerUuid,
+        application.uuid,
+        application.id,
+        merge,
+        null,
+        false,
+        digitallySignAcceptance,
+        false,
+      );
+      generated.push(docType);
+    } else if (!digitallySignAcceptance) {
+      // Pre-acceptance refresh: write a new uniquely named file; keep the prior object in storage.
+      await this.loanDocs.ensurePdf(
+        docType,
+        customerUuid,
+        application.uuid,
+        application.id,
+        merge,
+        existingKeyFact,
+        true,
+        false,
+        true,
+      );
+      generated.push(docType);
+    }
+
+    const isDisbursed =
+      Boolean(docCtx.keyFactDisbursementPdfRelativePath?.trim()) ||
+      (await this.prisma.client.loanAccount.findUnique({
+        where: { applicationId: application.id },
+        select: { id: true },
+      })) != null;
+
+    // After customer acceptance (or once disbursed), mint a separate revised KFS as a NEW file —
+    // never replace the acceptance PDF or a prior disbursement PDF object.
+    if (digitallySignAcceptance || isDisbursed) {
+      const disbType = LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT;
+      const disbExisting = this.loanDocs.relativePathForType(disbType, docCtx);
+      await this.loanDocs.ensurePdf(
+        disbType,
+        customerUuid,
+        application.uuid,
+        application.id,
+        merge,
+        disbExisting,
+        true,
+        true,
+        true,
+      );
+      generated.push(disbType);
+    }
 
     return { applicationUuid, generated };
   }
@@ -958,6 +1042,7 @@ function toLoanDocumentContext(
       loanDocumentsAcceptedAt: Date | null;
       loanDocumentsAcceptedIp: string | null;
       keyFactPdfRelativePath: string | null;
+      keyFactDisbursementPdfRelativePath?: string | null;
       loanAgreementPdfRelativePath: string | null;
       selectedLoanAmount: { toString(): string } | null;
       interestRate: { toString(): string } | null;
@@ -979,7 +1064,13 @@ function toLoanDocumentContext(
     loanDocumentsAcceptedAt: details?.loanDocumentsAcceptedAt ?? null,
     loanDocumentsAcceptedIp: details?.loanDocumentsAcceptedIp ?? null,
     keyFactPdfRelativePath: details?.keyFactPdfRelativePath ?? null,
+    keyFactDisbursementPdfRelativePath: details?.keyFactDisbursementPdfRelativePath ?? null,
     loanAgreementPdfRelativePath: details?.loanAgreementPdfRelativePath ?? null,
-    details,
+    details: details
+      ? {
+          ...details,
+          keyFactDisbursementPdfRelativePath: details.keyFactDisbursementPdfRelativePath ?? null,
+        }
+      : null,
   };
 }

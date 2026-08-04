@@ -51,6 +51,9 @@ model ApplicationDetail {
   bankName                     String?                @map("bank_name") @db.VarChar(100)
   keyFactPdfRelativePath       String?                @map("key_fact_pdf_relative_path") @db.VarChar(512)
   keyFactEsigned               Boolean                @default(false) @map("key_fact_esigned")
+  /// Final revised KFS written at disbursement (acceptance copy stays in keyFactPdfRelativePath).
+  keyFactDisbursementPdfRelativePath String?          @map("key_fact_disbursement_pdf_relative_path") @db.VarChar(512)
+  keyFactDisbursementEsigned   Boolean                @default(false) @map("key_fact_disbursement_esigned")
   loanAgreementPdfRelativePath String?                @map("loan_agreement_pdf_relative_path") @db.VarChar(512)
   loanDocumentsAcceptedAt      DateTime?              @map("loan_documents_accepted_at") @db.DateTime(3)
   loanDocumentsAcceptedIp      String?                @map("loan_documents_accepted_ip") @db.VarChar(45)

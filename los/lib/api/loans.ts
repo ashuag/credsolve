@@ -76,6 +76,7 @@ export type LosLoanDetails = LosLoan & {
   interestTillToday: string | null;
   /** Principal + interest till today. */
   amountDueToday: string | null;
+  bounceFeeInr: string | null;
   isDisbursedApplication: boolean;
   disbursementTransfer: LosLoanDisbursementTransfer | null;
   repayments: Array<{

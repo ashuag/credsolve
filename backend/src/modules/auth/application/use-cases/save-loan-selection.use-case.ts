@@ -8,6 +8,7 @@ import { PrismaService } from '../../../../prisma/prisma.service';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
 import { CheckLoanEligibilityUseCase } from './check-loan-eligibility.use-case';
 import type { SaveLoanSelectionDto } from '../dto/save-loan-selection.dto';
+import { computeTenureDays, istCalendarDateUtc } from '../../../../common/loan/loan-calculation.util';
 
 function parseDateOnlyUtc(raw: string): Date {
   const [y, m, d] = raw.split('-').map((v) => Number.parseInt(v, 10));
@@ -15,14 +16,6 @@ function parseDateOnlyUtc(raw: string): Date {
     throw new BadRequestException('Invalid tenure end date.');
   }
   return new Date(Date.UTC(y, m - 1, d));
-}
-
-function daysFromToday(endDateUtc: Date): number {
-  const now = new Date();
-  const startUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  const endUtc = Date.UTC(endDateUtc.getUTCFullYear(), endDateUtc.getUTCMonth(), endDateUtc.getUTCDate());
-  const ms = endUtc - startUtc;
-  return Math.max(1, Math.ceil(ms / (24 * 60 * 60 * 1000)));
 }
 
 @Injectable()
@@ -62,7 +55,8 @@ export class SaveLoanSelectionUseCase {
     }
 
     const tenureEndDate = parseDateOnlyUtc(dto.tenureEndDate);
-    const tenureDays = daysFromToday(tenureEndDate);
+    // Inclusive IST day count (selection day = day 1), matching disbursement / accrual.
+    const tenureDays = computeTenureDays(istCalendarDateUtc(), tenureEndDate);
     if (tenureDays > 62) {
       throw new BadRequestException('Tenure end date must be within the next 2 months.');
     }
@@ -111,6 +105,8 @@ export class SaveLoanSelectionUseCase {
           keyFactPdfRelativePath: null,
           loanAgreementPdfRelativePath: null,
           keyFactEsigned: false,
+          keyFactDisbursementPdfRelativePath: null,
+          keyFactDisbursementEsigned: false,
           pennyDropAttempts: 0,
           pennyDropVendorJson: Prisma.JsonNull,
         },
@@ -124,6 +120,8 @@ export class SaveLoanSelectionUseCase {
           keyFactPdfRelativePath: null,
           loanAgreementPdfRelativePath: null,
           keyFactEsigned: false,
+          keyFactDisbursementPdfRelativePath: null,
+          keyFactDisbursementEsigned: false,
           pennyDropAttempts: 0,
           pennyDropVendorJson: Prisma.JsonNull,
         },

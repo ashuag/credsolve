@@ -29,28 +29,62 @@ export type EasebuzzQuickTransferResult = {
   rawBody: unknown;
 };
 
-export type EasebuzzPayoutLinkInput = {
-  beneficiaryName: string;
+/** Customer repayment via Easebuzz EasyCollect (payment link + SMS/email/WhatsApp). */
+export type EasebuzzEasyCollectInput = {
+  name: string;
   email: string;
   phone: string;
-  uniqueRequestNumber: string;
+  /** Customer loan id (`loan_number`) — sent as `merchant_txn` and included in the hash. */
+  merchantTxn: string;
   amountInr: number;
-  /** YYYY-MM-DD — when the payout link / collection is scheduled for. */
-  scheduledForYmd: string;
-  narration: string;
+  /** Optional note shown on the collect link / included in hash as `message`. */
+  message?: string;
   leadId: bigint | null;
-  /** Optional UPI VPA; left blank in Authorization hash per Easebuzz UPI pattern. */
-  upiHandle?: string;
+  udf1?: string;
+  udf2?: string;
+  udf3?: string;
+  udf4?: string;
+  udf5?: string;
 };
 
-export type EasebuzzPayoutLinkResult = {
+export type EasebuzzEasyCollectResult = {
   ok: true;
   httpStatus: number | null;
-  uniqueRequestNumber: string;
-  payoutLinkId: string | null;
+  merchantTxn: string;
+  collectId: string | null;
   paymentUrl: string | null;
   vendorStatus: string | null;
   rawBody: unknown;
+};
+
+/** @deprecated Use EasebuzzEasyCollectInput */
+export type EasebuzzPayoutLinkInput = {
+  email: string;
+  phone: string;
+  amountInr: number;
+  leadId: bigint | null;
+  name?: string;
+  merchantTxn?: string;
+  message?: string;
+  udf1?: string;
+  udf2?: string;
+  udf3?: string;
+  udf4?: string;
+  udf5?: string;
+  /** @deprecated Prefer `name` */
+  beneficiaryName?: string;
+  /** @deprecated Prefer `merchantTxn` */
+  uniqueRequestNumber?: string;
+  /** @deprecated Prefer `message` */
+  narration?: string;
+  scheduledForYmd?: string;
+  upiHandle?: string;
+};
+
+/** @deprecated Use EasebuzzEasyCollectResult */
+export type EasebuzzPayoutLinkResult = EasebuzzEasyCollectResult & {
+  uniqueRequestNumber?: string;
+  payoutLinkId?: string | null;
 };
 
 type EasebuzzWireTransferConfig = {
@@ -61,11 +95,12 @@ type EasebuzzWireTransferConfig = {
   timeoutMs: number;
 };
 
-type EasebuzzWirePayoutLinkConfig = {
+type EasebuzzEasyCollectConfig = {
   key: string;
   salt: string;
-  payoutLinksUrl: string;
+  createUrl: string;
   timeoutMs: number;
+  operations: Array<{ type: string; template: string }>;
 };
 
 function envTrim(config: ConfigService, key: string): string {
@@ -98,7 +133,7 @@ function maskEmail(email: string): string {
   return `${local.slice(0, Math.min(2, local.length))}***@${domain}`;
 }
 
-/** Round INR to paise and format as `"12.34"` for Wire Authorization hash. */
+/** Round INR to paise and format as `"12.34"` for Wire / EasyCollect amounts. */
 function formatWireAmountInr(amountInr: number): string {
   return (Math.round(amountInr * 100) / 100).toFixed(2);
 }
@@ -130,6 +165,70 @@ function buildQuickTransferAuthorization(input: {
     input.salt,
   ].join('|');
   return createHash('sha512').update(payload, 'utf8').digest('hex');
+}
+
+/**
+ * Easebuzz EasyCollect create hash (SHA-512, lowercase hex):
+ *   key|merchant_txn|name|email|phone|amount|udf1|udf2|udf3|udf4|udf5|message|salt
+ * Empty optional fields still contribute pipe separators.
+ */
+function buildEasyCollectHash(input: {
+  key: string;
+  merchantTxn: string;
+  name: string;
+  email: string;
+  phone: string;
+  amountStr: string;
+  udf1?: string;
+  udf2?: string;
+  udf3?: string;
+  udf4?: string;
+  udf5?: string;
+  message?: string;
+  salt: string;
+}): string {
+  const payload = [
+    input.key,
+    input.merchantTxn,
+    input.name,
+    input.email,
+    input.phone,
+    input.amountStr,
+    input.udf1 ?? '',
+    input.udf2 ?? '',
+    input.udf3 ?? '',
+    input.udf4 ?? '',
+    input.udf5 ?? '',
+    input.message ?? '',
+    input.salt,
+  ].join('|');
+  return createHash('sha512').update(payload, 'utf8').digest('hex');
+}
+
+function parseEasyCollectOperations(raw: string): Array<{ type: string; template: string }> {
+  const defaults: Record<string, string> = {
+    sms: 'Default sms template',
+    email: 'Default email template',
+    whatsapp: 'Default whatsapp template',
+  };
+  const parts = raw
+    .split(',')
+    .map((p) => p.trim().toLowerCase())
+    .filter(Boolean);
+  const types = parts.length > 0 ? parts : ['sms', 'email', 'whatsapp'];
+  const ops: Array<{ type: string; template: string }> = [];
+  for (const type of types) {
+    if (type === 'sms' || type === 'email' || type === 'whatsapp') {
+      ops.push({ type, template: defaults[type] });
+    }
+  }
+  return ops.length > 0
+    ? ops
+    : [
+        { type: 'sms', template: defaults.sms },
+        { type: 'email', template: defaults.email },
+        { type: 'whatsapp', template: defaults.whatsapp },
+      ];
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -166,12 +265,19 @@ export class EasebuzzWireService {
     return raw === '1' || raw === 'true' || raw === 'yes';
   }
 
-  /** When true, customer repay returns a dry-run link without calling Easebuzz. */
-  isPayoutLinkSkipped(): boolean {
-    const raw = envTrim(this.config, 'EASEBUZZ_WIRE_SKIP_PAYOUT_LINK').toLowerCase();
-    if (raw === '1' || raw === 'true' || raw === 'yes') return true;
+  /** When true, customer repay settles locally without calling Easebuzz EasyCollect. */
+  isEasyCollectSkipped(): boolean {
+    const easy = envTrim(this.config, 'EASEBUZZ_EASYCOLLECT_SKIP').toLowerCase();
+    if (easy === '1' || easy === 'true' || easy === 'yes') return true;
+    const legacy = envTrim(this.config, 'EASEBUZZ_WIRE_SKIP_PAYOUT_LINK').toLowerCase();
+    if (legacy === '1' || legacy === 'true' || legacy === 'yes') return true;
     // Fall back to transfer skip so local env with one flag still works.
     return this.isTransferSkipped();
+  }
+
+  /** @deprecated Prefer isEasyCollectSkipped */
+  isPayoutLinkSkipped(): boolean {
+    return this.isEasyCollectSkipped();
   }
 
   assertTransferConfiguredOrThrow(): EasebuzzWireTransferConfig {
@@ -210,33 +316,49 @@ export class EasebuzzWireService {
     return this.assertTransferConfiguredOrThrow();
   }
 
-  assertPayoutLinkConfiguredOrThrow(): EasebuzzWirePayoutLinkConfig {
+  assertEasyCollectConfiguredOrThrow(): EasebuzzEasyCollectConfig {
     const missing: string[] = [];
-    const key = envTrim(this.config, 'EASEBUZZ_WIRE_KEY');
-    const salt = envTrim(this.config, 'EASEBUZZ_WIRE_SALT');
-    const payoutLinksUrl =
-      envTrim(this.config, 'EASEBUZZ_WIRE_PAYOUT_LINKS_URL') ||
-      'https://wire.easebuzz.in/api/v1/payout_links/';
+    const key =
+      envTrim(this.config, 'EASEBUZZ_EASYCOLLECT_KEY') || envTrim(this.config, 'EASEBUZZ_WIRE_KEY');
+    const salt =
+      envTrim(this.config, 'EASEBUZZ_EASYCOLLECT_SALT') || envTrim(this.config, 'EASEBUZZ_WIRE_SALT');
+    const createUrl =
+      envTrim(this.config, 'EASEBUZZ_EASYCOLLECT_CREATE_URL') ||
+      'https://testdashboard.easebuzz.in/easycollect/v1/create';
 
-    if (!key) missing.push('EASEBUZZ_WIRE_KEY');
-    if (!salt) missing.push('EASEBUZZ_WIRE_SALT');
+    if (!key) missing.push('EASEBUZZ_EASYCOLLECT_KEY (or EASEBUZZ_WIRE_KEY)');
+    if (!salt) missing.push('EASEBUZZ_EASYCOLLECT_SALT (or EASEBUZZ_WIRE_SALT)');
 
     if (missing.length > 0) {
       throw new ServiceUnavailableException(
-        `Easebuzz Wire payout links are not configured. Missing: ${missing.join(', ')}. ` +
-          'Set these in backend/.env, or set EASEBUZZ_WIRE_SKIP_PAYOUT_LINK=true for local dry-run.',
+        `Easebuzz EasyCollect is not configured. Missing: ${missing.join(', ')}. ` +
+          'Set these in backend/.env, or set EASEBUZZ_EASYCOLLECT_SKIP=true for local dry-run.',
       );
     }
 
-    const timeoutRaw = Number.parseInt(envTrim(this.config, 'EASEBUZZ_WIRE_TIMEOUT_MS') || '45000', 10);
+    const timeoutRaw = Number.parseInt(
+      envTrim(this.config, 'EASEBUZZ_EASYCOLLECT_TIMEOUT_MS') ||
+        envTrim(this.config, 'EASEBUZZ_WIRE_TIMEOUT_MS') ||
+        '45000',
+      10,
+    );
     const timeoutMs = Number.isFinite(timeoutRaw) && timeoutRaw > 0 ? timeoutRaw : 45_000;
+    const operations = parseEasyCollectOperations(
+      envTrim(this.config, 'EASEBUZZ_EASYCOLLECT_OPERATIONS') || 'sms,email,whatsapp',
+    );
 
     return {
       key,
       salt,
-      payoutLinksUrl,
+      createUrl,
       timeoutMs,
+      operations,
     };
+  }
+
+  /** @deprecated Prefer assertEasyCollectConfiguredOrThrow */
+  assertPayoutLinkConfiguredOrThrow(): EasebuzzEasyCollectConfig {
+    return this.assertEasyCollectConfiguredOrThrow();
   }
 
   async initiateQuickTransfer(input: EasebuzzQuickTransferInput): Promise<EasebuzzQuickTransferResult> {
@@ -334,16 +456,14 @@ export class EasebuzzWireService {
   }
 
   /**
-   * Create an Easebuzz Wire payout link (customer repayment / Pay Now).
-   * Docs: POST /api/v1/payout_links/
+   * Create an Easebuzz EasyCollect payment link (customer repayment / Pay Now).
+   * Docs: POST /easycollect/v1/create
    *
-   * Authorization = SHA-512 of
-   *   {key}|{account_number}|{ifsc}|{upi_handle}|{unique_request_number}|{amount}|{salt}
-   * For UPI, account_number / ifsc / upi_handle are blank:
-   *   e.g. KX3XY|||URX12XN|2500.00|SAX5XLT
+   * Hash (body field) = SHA-512 of
+   *   key|merchant_txn|name|email|phone|amount|udf1|udf2|udf3|udf4|udf5|message|salt
    */
-  async createPayoutLink(input: EasebuzzPayoutLinkInput): Promise<EasebuzzPayoutLinkResult> {
-    const cfg = this.assertPayoutLinkConfiguredOrThrow();
+  async createEasyCollect(input: EasebuzzEasyCollectInput): Promise<EasebuzzEasyCollectResult> {
+    const cfg = this.assertEasyCollectConfiguredOrThrow();
 
     if (!(input.amountInr > 0) || !Number.isFinite(input.amountInr)) {
       throw new BadGatewayException('Repayment amount must be a positive number.');
@@ -355,55 +475,73 @@ export class EasebuzzWireService {
       throw new BadGatewayException('Payee phone must be a 10-digit mobile number.');
     }
 
-    const uniqueRequestNumber = input.uniqueRequestNumber.trim().slice(0, 64);
-    // UPI auth pattern leaves upi_handle blank in the hash even when a handle is sent in the body.
-    const upiHandle = (input.upiHandle ?? '').trim();
+    const name = input.name.trim().slice(0, 100);
+    const email = input.email.trim().slice(0, 120);
+    const merchantTxn = input.merchantTxn.trim().slice(0, 40);
+    if (!merchantTxn) {
+      throw new BadGatewayException('merchant_txn (customer loan id) is required for EasyCollect.');
+    }
+    // Hash always includes udf1–udf5 + message even when empty (pipe separators still present).
+    const message = (input.message ?? '').trim().slice(0, 200);
+    const udf1 = (input.udf1 ?? '').trim();
+    const udf2 = (input.udf2 ?? '').trim();
+    const udf3 = (input.udf3 ?? '').trim();
+    const udf4 = (input.udf4 ?? '').trim();
+    const udf5 = (input.udf5 ?? '').trim();
 
-    const body: Record<string, unknown> = {
+    const hash = buildEasyCollectHash({
       key: cfg.key,
-      beneficiary_type: 'upi',
-      beneficiary_name: input.beneficiaryName.trim().slice(0, 100),
-      upi_handle: upiHandle,
-      unique_request_number: uniqueRequestNumber,
-      payment_mode: 'UPI',
-      amount: Number(amountStr),
-      email: input.email.trim().slice(0, 120),
+      merchantTxn,
+      name,
+      email,
       phone,
-      narration: input.narration.trim().slice(0, 50) || 'loan repay',
-      scheduled_for: input.scheduledForYmd,
-    };
-
-    const authorization = buildQuickTransferAuthorization({
-      key: cfg.key,
-      accountNumber: '',
-      ifscCode: '',
-      upiHandle: '',
-      uniqueRequestNumber,
       amountStr,
+      udf1,
+      udf2,
+      udf3,
+      udf4,
+      udf5,
+      message,
       salt: cfg.salt,
     });
 
+    // Body matches Easebuzz EasyCollect create sample (amount as "1.00" string).
+    const body: Record<string, unknown> = {
+      key: cfg.key,
+      merchant_txn: merchantTxn,
+      name,
+      email,
+      amount: amountStr,
+      phone,
+      operation: cfg.operations,
+      hash,
+    };
+    if (message) body.message = message;
+    if (udf1) body.udf1 = udf1;
+    if (udf2) body.udf2 = udf2;
+    if (udf3) body.udf3 = udf3;
+    if (udf4) body.udf4 = udf4;
+    if (udf5) body.udf5 = udf5;
+
     const headers: Record<string, string> = {
       Accept: 'application/json',
-      Authorization: authorization,
-      'WIRE-API-KEY': cfg.key,
+      'Content-Type': 'application/json',
     };
 
     this.logger.log(
-      `[easebuzz] Creating payout link unique=${uniqueRequestNumber} amount=${amountStr} phone=${maskPhone(phone)}`,
+      `[easebuzz] Creating EasyCollect txn=${merchantTxn || '(auto)'} amount=${amountStr} phone=${maskPhone(phone)}`,
     );
 
     const result = await this.vendorApi.request<unknown, Record<string, unknown>>({
       providerName: 'Easebuzz',
-      serviceName: 'payout-link-create',
+      serviceName: 'easycollect-create',
       method: 'POST',
-      absoluteUrl: cfg.payoutLinksUrl,
+      absoluteUrl: cfg.createUrl,
       headers,
       body,
       leadId: input.leadId,
       timeoutMs: cfg.timeoutMs,
-      redactRequest: (payload) => this.redactPayoutLinkRequest(payload),
-      sensitiveHeaderNames: ['WIRE-API-KEY', 'Authorization'],
+      redactRequest: (payload) => this.redactEasyCollectRequest(payload),
     });
 
     if (!result.ok) {
@@ -412,31 +550,54 @@ export class EasebuzzWireService {
           ? result.rawText.slice(0, 280)
           : result.error?.message ?? 'unknown error';
       this.logger.error(
-        `[easebuzz] Payout link failed http=${result.httpStatus ?? 'n/a'} unique=${uniqueRequestNumber}: ${snippet}`,
+        `[easebuzz] EasyCollect failed http=${result.httpStatus ?? 'n/a'} txn=${merchantTxn}: ${snippet}`,
       );
       throw new BadGatewayException(
-        'Could not create repayment payout link at Easebuzz. Please try again shortly.',
+        'Could not create repayment payment link at Easebuzz. Please try again shortly.',
       );
     }
 
-    const parsed = this.parsePayoutLinkSuccess(result.body);
+    const parsed = this.parseEasyCollectSuccess(result.body);
     if (!parsed.accepted) {
       this.logger.error(
-        `[easebuzz] Payout link rejected unique=${uniqueRequestNumber} status=${parsed.vendorStatus ?? 'n/a'}`,
+        `[easebuzz] EasyCollect rejected txn=${merchantTxn} status=${parsed.vendorStatus ?? 'n/a'}`,
       );
       throw new BadGatewayException(
-        parsed.message ?? 'Easebuzz did not accept the repayment payout link.',
+        parsed.message ?? 'Easebuzz did not accept the repayment EasyCollect request.',
       );
     }
 
     return {
       ok: true,
       httpStatus: result.httpStatus,
-      uniqueRequestNumber,
-      payoutLinkId: parsed.payoutLinkId,
+      merchantTxn: parsed.merchantTxn ?? merchantTxn,
+      collectId: parsed.collectId,
       paymentUrl: parsed.paymentUrl,
       vendorStatus: parsed.vendorStatus,
       rawBody: result.body,
+    };
+  }
+
+  /** @deprecated Prefer createEasyCollect */
+  async createPayoutLink(input: EasebuzzPayoutLinkInput): Promise<EasebuzzPayoutLinkResult> {
+    const created = await this.createEasyCollect({
+      name: (input.name || input.beneficiaryName || '').trim(),
+      email: input.email,
+      phone: input.phone,
+      merchantTxn: (input.merchantTxn || input.uniqueRequestNumber || '').trim(),
+      amountInr: input.amountInr,
+      message: input.message || input.narration,
+      leadId: input.leadId,
+      udf1: input.udf1,
+      udf2: input.udf2,
+      udf3: input.udf3,
+      udf4: input.udf4,
+      udf5: input.udf5,
+    });
+    return {
+      ...created,
+      uniqueRequestNumber: created.merchantTxn,
+      payoutLinkId: created.collectId,
     };
   }
 
@@ -456,25 +617,21 @@ export class EasebuzzWireService {
     };
   }
 
-  private redactPayoutLinkRequest(body: Record<string, unknown> | undefined): unknown {
+  private redactEasyCollectRequest(body: Record<string, unknown> | undefined): unknown {
     if (!body) return body;
     return {
       ...body,
       key: typeof body.key === 'string' ? `[REDACTED:${body.key.length} chars]` : body.key,
+      hash: typeof body.hash === 'string' ? `[REDACTED:${body.hash.length} chars]` : body.hash,
       email: typeof body.email === 'string' ? maskEmail(body.email) : body.email,
       phone: typeof body.phone === 'string' ? maskPhone(body.phone) : body.phone,
-      upi_handle:
-        typeof body.upi_handle === 'string' && body.upi_handle
-          ? `[REDACTED:${body.upi_handle.length} chars]`
-          : body.upi_handle,
-      payee_email: typeof body.payee_email === 'string' ? maskEmail(body.payee_email) : body.payee_email,
-      payee_phone: typeof body.payee_phone === 'string' ? maskPhone(body.payee_phone) : body.payee_phone,
     };
   }
 
-  private parsePayoutLinkSuccess(body: unknown): {
+  private parseEasyCollectSuccess(body: unknown): {
     accepted: boolean;
-    payoutLinkId: string | null;
+    collectId: string | null;
+    merchantTxn: string | null;
     paymentUrl: string | null;
     vendorStatus: string | null;
     message: string | null;
@@ -483,7 +640,8 @@ export class EasebuzzWireService {
     if (!root) {
       return {
         accepted: false,
-        payoutLinkId: null,
+        collectId: null,
+        merchantTxn: null,
         paymentUrl: null,
         vendorStatus: null,
         message: 'Empty Easebuzz response.',
@@ -498,13 +656,13 @@ export class EasebuzzWireService {
       data.link_status,
     )?.toLowerCase() ?? null;
 
-    const successFlag = root.success;
+    const successFlag = root.status ?? root.success;
     const acceptedByFlag =
       successFlag === true ||
       successFlag === 1 ||
       successFlag === 'true' ||
       successFlag === '1' ||
-      String(root.status ?? '').toLowerCase() === 'success';
+      String(successFlag ?? '').toLowerCase() === 'success';
 
     const acceptedStatuses = new Set([
       'success',
@@ -513,35 +671,42 @@ export class EasebuzzWireService {
       'active',
       'created',
       'pending',
+      'unpaid',
     ]);
     const acceptedByStatus = vendorStatus != null && acceptedStatuses.has(vendorStatus);
-    const accepted = acceptedByFlag || acceptedByStatus;
-
     const paymentUrl = pickString(
+      data.pay_hash_url,
       data.payment_url,
       data.payout_link,
       data.payout_link_url,
       data.link,
       data.url,
       data.short_url,
+      root.pay_hash_url,
       root.payment_url,
       root.payout_link,
       root.payout_link_url,
       root.link,
       root.url,
     );
+    // A payment URL alone means the collect link was created successfully.
+    const accepted = acceptedByFlag || acceptedByStatus || Boolean(paymentUrl);
 
-    const payoutLinkId = pickString(
+    const collectId = pickString(
       data.id,
+      data.collect_id,
       data.payout_link_id,
       data.link_id,
       root.id,
+      root.collect_id,
       root.payout_link_id,
     );
 
+    const merchantTxn = pickString(data.merchant_txn, root.merchant_txn);
+
     const message = pickString(root.message, root.error, data.message, data.error);
 
-    return { accepted, payoutLinkId, paymentUrl, vendorStatus, message };
+    return { accepted, collectId, merchantTxn, paymentUrl, vendorStatus, message };
   }
 
   private parseSuccess(body: unknown): {

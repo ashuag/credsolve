@@ -24,6 +24,43 @@ export function calendarDaysBetween(from: Date, to: Date): number {
   return Math.max(0, Math.round((end - start) / 86_400_000));
 }
 
+/** Calendar date in Asia/Kolkata as a UTC midnight `Date` (for DATE / day-count math). */
+export function istCalendarDateUtc(at: Date = new Date()): Date {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(at);
+  const y = Number(parts.find((p) => p.type === 'year')?.value);
+  const m = Number(parts.find((p) => p.type === 'month')?.value);
+  const d = Number(parts.find((p) => p.type === 'day')?.value);
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
+/**
+ * Inclusive tenure day count (disbursement / selection day = day 1).
+ * e.g. 29 Jul → 31 Aug = 34 days; 13 Jul → 31 Jul = 19 days.
+ */
+export function computeTenureDays(from: Date, to: Date): number {
+  return Math.max(1, calendarDaysBetween(from, to) + 1);
+}
+
+/**
+ * Live tenure from `asOf` (IST calendar day) through the expected repay date.
+ * Falls back to a stored day count when no repay date is available.
+ */
+export function resolveLiveTenureDays(
+  expectedRepaymentDate: Date | null | undefined,
+  asOf: Date = new Date(),
+  fallbackStored?: number | null,
+): number | null {
+  if (expectedRepaymentDate) {
+    return computeTenureDays(istCalendarDateUtc(asOf), expectedRepaymentDate);
+  }
+  return fallbackStored ?? null;
+}
+
 function roundInr2(n: number): number {
   return Math.round(n * 100) / 100;
 }

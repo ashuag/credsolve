@@ -18,6 +18,7 @@ export type CustomerLoanCard = {
   daysOutstanding: number | null;
   interestTillToday: string | null;
   amountDueToday: string | null;
+  bounceFeeInr: string | null;
   processingFeeAmount: string | null;
   gstAmount: string | null;
   totalRepayment: string | null;
@@ -40,6 +41,7 @@ export type InitiateRepaymentResult = {
   loanAccountUuid: string;
   loanNumber: string;
   amountInr: string;
+  bounceFeeInr: string;
   repaymentUuid: string | null;
   loanStatus: string;
   redirectPath: string;

@@ -320,6 +320,8 @@ export type LosApplicationDetails = {
   loanDocuments: {
     keyFactReady: boolean;
     keyFactEsigned: boolean;
+    keyFactDisbursementReady: boolean;
+    keyFactDisbursementEsigned: boolean;
     loanAgreementReady: boolean;
     acceptedAt: string | null;
   };
@@ -424,7 +426,7 @@ export async function createApplicationCibilReport(
 export async function fetchApplicationLoanDocumentBlob(
   token: string,
   applicationUuid: string,
-  docType: 'key-fact',
+  docType: 'key-fact' | 'key-fact-disbursement',
 ): Promise<Blob> {
   return fetchLosAuthenticatedBlob(
     token,

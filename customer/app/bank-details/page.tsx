@@ -213,6 +213,7 @@ export default function BankDetailsPage() {
         verifiedBankName: bankName,
       });
       if (!res) {
+        setConfirmOpen(false);
         setError('Empty response from bank verification.');
         return;
       }
@@ -222,6 +223,8 @@ export default function BankDetailsPage() {
         retryLimitReached: res.retryLimitReached,
       });
       if (!res.success || !res.pennyDropOk) {
+        // Close confirm so the form shows the mismatch / failure message.
+        setConfirmOpen(false);
         setError(res.message ?? 'Bank verification did not succeed. Please check your details.');
         return;
       }
@@ -229,6 +232,7 @@ export default function BankDetailsPage() {
       await refresh();
       router.replace('/references');
     } catch (e) {
+      setConfirmOpen(false);
       setError(e instanceof Error ? e.message : 'Verification failed.');
     } finally {
       setBusy(false);

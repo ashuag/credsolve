@@ -81,7 +81,7 @@ export class LoanDocumentPdfGeneratorService {
       });
     }
 
-    if (docType === LOAN_DOCUMENT_TYPE.KEY_FACT) {
+    if (docType === LOAN_DOCUMENT_TYPE.KEY_FACT || docType === LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT) {
       await this.embedNbfcLogo(pdfDoc, pages[0]);
     }
 

@@ -17,6 +17,8 @@ import {
   computeAmountDueNowInr,
   decimalToNumber,
 } from '../../../../common/loan/loan-calculation.util';
+import { isRepaymentPastDue } from '../../../../common/loan/bounce-charge.util';
+import { BounceChargeTierResolverService } from '../../../../common/loan/bounce-charge-tier.resolver';
 import { canDeactivateConvertedLeadForReapply } from '../../../../common/loan/customer-open-loan.util';
 import { RedisService } from '../../../../common/redis/redis.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
@@ -25,17 +27,16 @@ import { LeadRepository } from '../../infrastructure/repositories/lead.repositor
 
 const REPAY_LOCK_TTL_SEC = 90;
 
-function todayYmdIst(): string {
-  return new Intl.DateTimeFormat('en-CA', {
+function buildUniqueCode(loanNumber: string, loanAccountUuid: string): string {
+  const stamp = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Kolkata',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(new Date());
-}
-
-function buildUniqueCode(loanNumber: string, loanAccountUuid: string): string {
-  const stamp = todayYmdIst().replace(/-/g, '').slice(2);
+  })
+    .format(new Date())
+    .replace(/-/g, '')
+    .slice(2);
   const compact = loanNumber.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 10);
   const salt = createHash('sha256')
     .update(`${loanAccountUuid}:${Date.now()}:${randomUUID()}`)
@@ -59,6 +60,7 @@ export class InitiateCustomerRepaymentUseCase {
     private readonly prisma: PrismaService,
     private readonly easebuzzWire: EasebuzzWireService,
     private readonly redis: RedisService,
+    private readonly bounceChargeTiers: BounceChargeTierResolverService,
   ) {}
 
   async execute(
@@ -70,6 +72,7 @@ export class InitiateCustomerRepaymentUseCase {
     loanAccountUuid: string;
     loanNumber: string;
     amountInr: string;
+    bounceFeeInr: string;
     repaymentUuid: string | null;
     loanStatus: string;
     redirectPath: string;
@@ -118,6 +121,7 @@ export class InitiateCustomerRepaymentUseCase {
             principalAmount: true,
             interestRate: true,
             disbursedAt: true,
+            loanMaturityDate: true,
             closedAt: true,
             loanStatus: { select: { name: true } },
           },
@@ -154,7 +158,16 @@ export class InitiateCustomerRepaymentUseCase {
       throw new BadRequestException('Nothing due on this loan right now.');
     }
 
-    const amountInr = due.amountDue.toFixed(2);
+    // Late repayment (after maturity / OVERDUE): add bounce fee from schedule by principal band.
+    const pastDue =
+      loan.loanStatus.name === LOAN_STATUS.OVERDUE || isRepaymentPastDue(loan.loanMaturityDate);
+    const bounceFeeInr = pastDue
+      ? await this.bounceChargeTiers.resolveFeeForAmount(principal)
+      : 0;
+    const totalDue = Math.round((due.amountDue + bounceFeeInr) * 100) / 100;
+
+    const amountInr = totalDue.toFixed(2);
+    const bounceFeeInrStr = bounceFeeInr.toFixed(2);
     const uniqueCode = buildUniqueCode(loan.loanNumber, loan.uuid);
     const paidAt = new Date();
 
@@ -162,9 +175,10 @@ export class InitiateCustomerRepaymentUseCase {
     let vendorRef: string | null = uniqueCode;
     let paymentUrl: string | null = null;
 
-    if (this.easebuzzWire.isPayoutLinkSkipped()) {
+    if (this.easebuzzWire.isEasyCollectSkipped()) {
       this.logger.warn(
-        `[repay] EASEBUZZ_WIRE_SKIP_PAYOUT_LINK — settling loan=${loan.loanNumber} amount=${amountInr} without vendor call`,
+        `[repay] EASEBUZZ_EASYCOLLECT_SKIP — settling loan=${loan.loanNumber} amount=${amountInr} ` +
+          `bounce=${bounceFeeInrStr} without vendor call`,
       );
     } else {
       const payeeName = application.lead.leadDetail?.fullName?.trim();
@@ -177,20 +191,18 @@ export class InitiateCustomerRepaymentUseCase {
       }
 
       try {
-        // Amount = principal + interest accrued till today, always 2 decimal places.
-        const created = await this.easebuzzWire.createPayoutLink({
-          beneficiaryName: payeeName,
+        // Amount = principal + interest (+ bounce fee when past due), always 2 decimal places.
+        // merchant_txn = customer loan id (loan_number), per Easebuzz EasyCollect contract.
+        const created = await this.easebuzzWire.createEasyCollect({
+          name: payeeName,
           email: payeeEmail,
           phone: payeePhone.slice(-10),
-          uniqueRequestNumber: uniqueCode,
-          amountInr: due.amountDue,
-          scheduledForYmd: todayYmdIst(),
-          narration: `Repay ${loan.loanNumber}`.slice(0, 50),
+          merchantTxn: loan.loanNumber.trim().slice(0, 40),
+          amountInr: totalDue,
           leadId: application.leadId,
-          upiHandle: '',
         });
         vendor = 'easebuzz';
-        vendorRef = (created.payoutLinkId ?? created.uniqueRequestNumber).slice(0, 50);
+        vendorRef = (created.collectId ?? created.merchantTxn).slice(0, 50);
         paymentUrl = created.paymentUrl;
       } catch (error) {
         const message =
@@ -212,10 +224,10 @@ export class InitiateCustomerRepaymentUseCase {
         );
       }
 
-      // Hosted payout / payment URL — customer must complete payment; do not close the loan yet.
+      // Hosted EasyCollect payment URL — customer must complete payment; do not close the loan yet.
       if (paymentUrl) {
         this.logger.log(
-          `[repay] Payout link created loan=${loan.loanNumber} amount=${amountInr} — awaiting customer payment`,
+          `[repay] EasyCollect created loan=${loan.loanNumber} amount=${amountInr} — awaiting customer payment`,
         );
         return {
           success: true as const,
@@ -223,6 +235,7 @@ export class InitiateCustomerRepaymentUseCase {
           loanAccountUuid: loan.uuid,
           loanNumber: loan.loanNumber,
           amountInr,
+          bounceFeeInr: bounceFeeInrStr,
           repaymentUuid: null,
           loanStatus: loan.loanStatus.name,
           redirectPath: '/my-account',
@@ -315,6 +328,7 @@ export class InitiateCustomerRepaymentUseCase {
       loanAccountUuid: loan.uuid,
       loanNumber: loan.loanNumber,
       amountInr,
+      bounceFeeInr: bounceFeeInrStr,
       repaymentUuid,
       loanStatus: LOAN_STATUS.CLOSED,
       redirectPath: '/my-account',

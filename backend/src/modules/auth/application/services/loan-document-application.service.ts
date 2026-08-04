@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { computeInterestAmountFromLoanDetail } from '../../../../common/loan/loan-calculation.util';
 import { computeFeeAmountsFromLoanDetail } from '../../../../common/loan/loan-disbursement-view.util';
-import { getLiveLoanFeeRates } from '../../../../common/loan/live-loan-rates.cache';
 import {
   LOAN_DOCUMENT_PDF_FILES,
   LOAN_DOCUMENT_TYPE,
@@ -24,6 +23,7 @@ type ApplicationDetailsRow = {
   loanDocumentsAcceptedAt: Date | null;
   loanDocumentsAcceptedIp: string | null;
   keyFactPdfRelativePath: string | null;
+  keyFactDisbursementPdfRelativePath?: string | null;
   loanAgreementPdfRelativePath: string | null;
   selectedLoanAmount: { toString(): string } | null;
   interestRate: { toString(): string } | null;
@@ -43,6 +43,7 @@ export type LoanDocumentApplicationContext = {
   loanDocumentsAcceptedAt: Date | null;
   loanDocumentsAcceptedIp: string | null;
   keyFactPdfRelativePath: string | null;
+  keyFactDisbursementPdfRelativePath?: string | null;
   loanAgreementPdfRelativePath: string | null;
   details: ApplicationDetailsRow | null;
 };
@@ -76,6 +77,7 @@ export class LoanDocumentApplicationService {
             loanDocumentsAcceptedAt: true,
             loanDocumentsAcceptedIp: true,
             keyFactPdfRelativePath: true,
+            keyFactDisbursementPdfRelativePath: true,
             loanAgreementPdfRelativePath: true,
             selectedLoanAmount: true,
             interestRate: true,
@@ -100,6 +102,7 @@ export class LoanDocumentApplicationService {
       loanDocumentsAcceptedAt: details?.loanDocumentsAcceptedAt ?? null,
       loanDocumentsAcceptedIp: details?.loanDocumentsAcceptedIp ?? null,
       keyFactPdfRelativePath: details?.keyFactPdfRelativePath ?? null,
+      keyFactDisbursementPdfRelativePath: details?.keyFactDisbursementPdfRelativePath ?? null,
       loanAgreementPdfRelativePath: details?.loanAgreementPdfRelativePath ?? null,
       details,
     };
@@ -147,8 +150,8 @@ export class LoanDocumentApplicationService {
   }): LoanDocumentMergeInput {
     const detail = params.lead?.leadDetail;
     const appDetails = params.application.details;
-    const tenureDays = appDetails?.expectedRepaymentDays ?? null;
     const fees = computeFeeAmountsFromLoanDetail(appDetails);
+    const tenureDays = fees.tenureDays;
     const interestAmount =
       fees.interestAmount
       ?? computeInterestAmountFromLoanDetail(appDetails, tenureDays);
@@ -172,9 +175,7 @@ export class LoanDocumentApplicationService {
       loanMaturityDate: appDetails?.expectedRepaymentDate ?? null,
       applicationUuid: params.application.uuid,
       applicationNumber: params.application.applicationNumber,
-      processingFeePercent:
-        getLiveLoanFeeRates()?.processingFeePercent ??
-        toNumber(appDetails?.processingFeePercentage?.toString() ?? null),
+      processingFeePercent: toNumber(appDetails?.processingFeePercentage?.toString() ?? null),
       acceptanceIpAddress:
         params.acceptanceIpAddress?.trim()
         ?? params.application.loanDocumentsAcceptedIp?.trim()
@@ -188,6 +189,11 @@ export class LoanDocumentApplicationService {
     };
   }
 
+  /**
+   * Ensures a loan-document PDF exists in storage and is recorded on application_detail.
+   * @param createNewFile When true, always write a uniquely named file (never overwrite an existing path).
+   *   The DB pointer is updated to the new path; prior files remain in storage.
+   */
   async ensurePdf(
     docType: LoanDocumentType,
     customerUuid: string,
@@ -197,17 +203,21 @@ export class LoanDocumentApplicationService {
     existingRelativePath: string | null,
     forceRegenerate = false,
     digitallySign = false,
+    createNewFile = false,
   ): Promise<string> {
-    const pdfName = this.generator.pdfFileName(docType) as 'key-fact-statement.pdf' | 'loan-agreement.pdf';
-    const rel =
-      existingRelativePath?.trim() ||
-      this.kycFiles.loanDocumentPdfRelativePath(customerUuid, applicationUuid, pdfName);
+    const pdfName = this.generator.pdfFileName(docType);
+    const existing = existingRelativePath?.trim() || null;
 
-    if (!forceRegenerate && existingRelativePath?.trim()) {
-      if (await this.kycFiles.exists(rel)) {
-        return rel;
+    if (!createNewFile && !forceRegenerate && existing) {
+      if (await this.kycFiles.exists(existing)) {
+        return existing;
       }
     }
+
+    const rel = createNewFile
+      ? this.uniqueLoanDocumentPdfRelativePath(customerUuid, applicationUuid, pdfName)
+      : existing ||
+        this.kycFiles.loanDocumentPdfRelativePath(customerUuid, applicationUuid, pdfName);
 
     const { pdf, esigned } = await this.generator.generatePdf(docType, merge, digitallySign);
     await this.kycFiles.writeBytes(rel, pdf);
@@ -215,7 +225,9 @@ export class LoanDocumentApplicationService {
     const data =
       docType === LOAN_DOCUMENT_TYPE.KEY_FACT
         ? { keyFactPdfRelativePath: rel, keyFactEsigned: esigned }
-        : { loanAgreementPdfRelativePath: rel };
+        : docType === LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT
+          ? { keyFactDisbursementPdfRelativePath: rel, keyFactDisbursementEsigned: esigned }
+          : { loanAgreementPdfRelativePath: rel };
 
     await this.prisma.client.applicationDetail.upsert({
       where: { applicationId },
@@ -226,11 +238,33 @@ export class LoanDocumentApplicationService {
     return rel;
   }
 
+  /** Timestamped path so regenerate never clobbers a prior PDF object. */
+  private uniqueLoanDocumentPdfRelativePath(
+    customerUuid: string,
+    applicationUuid: string,
+    pdfFileName: string,
+  ): string {
+    const base = pdfFileName.replace(/\.pdf$/i, '');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    return this.kycFiles.loanDocumentPdfRelativePath(
+      customerUuid,
+      applicationUuid,
+      `${base}-${stamp}.pdf`,
+    );
+  }
+
   relativePathForType(
     docType: LoanDocumentType,
-    application: { keyFactPdfRelativePath: string | null; loanAgreementPdfRelativePath: string | null },
+    application: {
+      keyFactPdfRelativePath: string | null;
+      keyFactDisbursementPdfRelativePath?: string | null;
+      loanAgreementPdfRelativePath: string | null;
+    },
   ): string | null {
     if (docType === LOAN_DOCUMENT_TYPE.KEY_FACT) return application.keyFactPdfRelativePath?.trim() ?? null;
+    if (docType === LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT) {
+      return application.keyFactDisbursementPdfRelativePath?.trim() ?? null;
+    }
     return application.loanAgreementPdfRelativePath?.trim() ?? null;
   }
 
@@ -239,9 +273,13 @@ export class LoanDocumentApplicationService {
   }
 
   documentTitle(docType: LoanDocumentType): string {
-    return docType === LOAN_DOCUMENT_TYPE.KEY_FACT
-      ? 'Sanction letter cum Key Fact Statement'
-      : 'Loan Agreement';
+    if (docType === LOAN_DOCUMENT_TYPE.KEY_FACT) {
+      return 'Sanction letter cum Key Fact Statement (acceptance)';
+    }
+    if (docType === LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT) {
+      return 'Sanction letter cum Key Fact Statement (disbursement)';
+    }
+    return 'Loan Agreement';
   }
 
   allPdfNames(): typeof LOAN_DOCUMENT_PDF_FILES {

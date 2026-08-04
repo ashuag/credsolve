@@ -11,6 +11,7 @@ import {seedLoanReason} from "./seeds/loanReason.seed";
 import {seedSetting} from "./seeds/setting.seed";
 import {seedEligibilityCriteria} from './seeds/eligibility-criteria.seed';
 import {seedCreditLimitTier} from './seeds/credit-limit-tier.seed';
+import { seedBounceChargeTier } from './seeds/bounce-charge-tier.seed';
 import { seedBank } from './seeds/bank.seed';
 import { seedRejectionReason } from './seeds/rejection-reason.seed';
 import { seedReferenceRelation } from './seeds/reference-relation.seed';
@@ -78,6 +79,7 @@ async function main() {
         await seedSetting(prisma);
         await seedEligibilityCriteria(prisma);
         await seedCreditLimitTier(prisma);
+        await seedBounceChargeTier(prisma);
         await seedBank(prisma);
         await seedRejectionReason(prisma);
         await seedReferenceRelation(prisma);

@@ -1,10 +1,10 @@
 import type { Prisma } from '@prisma/client';
-import { getLiveLoanFeeRates } from './live-loan-rates.cache';
 import {
   computeDisburseAmountInr,
   computeInterestAmountFromLoanDetail,
   computeRepaymentAmountInr,
   decimalToNumber,
+  resolveLiveTenureDays,
   type DecimalLike,
 } from './loan-calculation.util';
 
@@ -63,22 +63,37 @@ function isoDateOnly(d: Date | null | undefined): string | null {
   return d.toISOString().slice(0, 10);
 }
 
-export function computeFeeAmountsFromLoanDetail(loanDetail: LoanDetailStagingRow): {
+export function computeFeeAmountsFromLoanDetail(
+  loanDetail: LoanDetailStagingRow,
+  opts: Date | { asOf?: Date; preferStoredTenure?: boolean } = {},
+): {
   processingFeeAmount: number | null;
   gstAmount: number | null;
   disburseAmount: number | null;
   repaymentAmount: number | null;
   interestAmount: number | null;
+  tenureDays: number | null;
 } {
+  const normalized = opts instanceof Date ? { asOf: opts } : opts;
   const principal = decimalToNumber(loanDetail?.selectedLoanAmount);
-  const tenureDays = loanDetail?.expectedRepaymentDays ?? null;
-  // PF / GST come from the live DB settings so an admin change applies on the
-  // fly everywhere; the percentages stored on the row at selection time are
-  // only a fallback for when the cache has never been primed.
-  const liveRates = getLiveLoanFeeRates();
-  const processingFeePct =
-    liveRates?.processingFeePercent ?? decimalToNumber(loanDetail?.processingFeePercentage);
-  const gstPct = liveRates?.processingFeeGstPercent ?? decimalToNumber(loanDetail?.gstPercentage);
+  // Pre-disbursement: recompute from as-of → repay date so delayed funding does not
+  // keep the selection-day tenure. After disbursement: use the frozen stored days.
+  const tenureDays = normalized.preferStoredTenure
+    ? (loanDetail?.expectedRepaymentDays ??
+      resolveLiveTenureDays(
+        loanDetail?.expectedRepaymentDate,
+        normalized.asOf ?? new Date(),
+        null,
+      ))
+    : resolveLiveTenureDays(
+        loanDetail?.expectedRepaymentDate,
+        normalized.asOf ?? new Date(),
+        loanDetail?.expectedRepaymentDays,
+      );
+  // Fee % must come from application_detail (snapshotted at loan selection).
+  // Live settings must not override — otherwise LOS / KFS diverge when admin changes rates.
+  const processingFeePct = decimalToNumber(loanDetail?.processingFeePercentage);
+  const gstPct = decimalToNumber(loanDetail?.gstPercentage);
   if (principal == null || tenureDays == null || processingFeePct == null || gstPct == null) {
     return {
       processingFeeAmount: null,
@@ -86,6 +101,7 @@ export function computeFeeAmountsFromLoanDetail(loanDetail: LoanDetailStagingRow
       disburseAmount: null,
       repaymentAmount: null,
       interestAmount: null,
+      tenureDays,
     };
   }
   const interestAmount = computeInterestAmountFromLoanDetail(loanDetail, tenureDays);
@@ -99,6 +115,7 @@ export function computeFeeAmountsFromLoanDetail(loanDetail: LoanDetailStagingRow
     disburseAmount,
     repaymentAmount,
     interestAmount,
+    tenureDays,
   };
 }
 
@@ -137,7 +154,7 @@ export function mapLosDisbursementApiView(
     processingFeeAmount: fees.processingFeeAmount != null ? fees.processingFeeAmount.toFixed(2) : null,
     gstAmount: fees.gstAmount != null ? fees.gstAmount.toFixed(2) : null,
     disburseAmount: fees.disburseAmount != null ? fees.disburseAmount.toFixed(2) : null,
-    expectedRepaymentDays: loanDetail.expectedRepaymentDays,
+    expectedRepaymentDays: fees.tenureDays,
     expectedRepaymentDate: isoDateOnly(loanDetail.expectedRepaymentDate),
     actualRepaymentDate: null,
     actualRepaymentDays: null,
@@ -155,6 +172,7 @@ export function mapLosDisbursementApiView(
 
 export function mapLosLoanDetailsFromStaging(
   loanDetail: NonNullable<LoanDetailStagingRow> & { reasonForLoan?: { name: string } | null },
+  opts?: { preferStoredTenure?: boolean },
 ): {
   reasonForLoan: string | null;
   loanAmount: string | null;
@@ -169,20 +187,18 @@ export function mapLosLoanDetailsFromStaging(
   repaymentAmount: string | null;
   loanMaturityDate: string | null;
 } {
-  const fees = computeFeeAmountsFromLoanDetail(loanDetail);
-  // Percent labels must match the live rates the amounts were computed with.
-  const liveRates = getLiveLoanFeeRates();
+  const fees = computeFeeAmountsFromLoanDetail(loanDetail, {
+    preferStoredTenure: opts?.preferStoredTenure === true,
+  });
   return {
     reasonForLoan: loanDetail.reasonForLoan?.name ?? null,
     loanAmount: dec(loanDetail.selectedLoanAmount),
-    loanTenure: loanDetail.expectedRepaymentDays,
+    loanTenure: fees.tenureDays,
     interestRate: dec(loanDetail.interestRate),
     interestAmount: fees.interestAmount != null ? fees.interestAmount.toFixed(2) : null,
-    processingFee:
-      liveRates != null ? String(liveRates.processingFeePercent) : dec(loanDetail.processingFeePercentage),
+    processingFee: dec(loanDetail.processingFeePercentage),
     processingFeeAmount: fees.processingFeeAmount != null ? fees.processingFeeAmount.toFixed(2) : null,
-    gstPercent:
-      liveRates != null ? String(liveRates.processingFeeGstPercent) : dec(loanDetail.gstPercentage),
+    gstPercent: dec(loanDetail.gstPercentage),
     gstAmount: fees.gstAmount != null ? fees.gstAmount.toFixed(2) : null,
     disbursedAmount: fees.disburseAmount != null ? fees.disburseAmount.toFixed(2) : null,
     repaymentAmount: fees.repaymentAmount != null ? fees.repaymentAmount.toFixed(2) : null,

@@ -40,7 +40,8 @@ function diffDays(from: Date, to: Date): number {
   const msPerDay = 24 * 60 * 60 * 1000;
   const start = new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime();
   const end = new Date(to.getFullYear(), to.getMonth(), to.getDate()).getTime();
-  return Math.max(1, Math.ceil((end - start) / msPerDay));
+  // Inclusive: selection / disbursement day = day 1 (e.g. 29 Jul → 31 Aug = 34).
+  return Math.max(1, Math.round((end - start) / msPerDay) + 1);
 }
 
 function formatInr(amount: number): string {

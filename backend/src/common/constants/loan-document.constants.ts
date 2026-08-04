@@ -50,6 +50,8 @@ export const LOAN_DOCUMENT_HTML_TEMPLATE = 'MoneyCash_Loan_Document.html';
 
 export const LOAN_DOCUMENT_TYPE = {
   KEY_FACT: 'key-fact',
+  /** Revised sanction letter generated at disbursement (separate from customer acceptance copy). */
+  KEY_FACT_DISBURSEMENT: 'key-fact-disbursement',
   LOAN_AGREEMENT: 'loan-agreement',
 } as const;
 
@@ -58,15 +60,18 @@ export type LoanDocumentType = (typeof LOAN_DOCUMENT_TYPE)[keyof typeof LOAN_DOC
 /** Source Word files (dev-only; see assets/loan-documents/README.md). */
 export const LOAN_DOCUMENT_TEMPLATE_DOCX_FILES: Record<LoanDocumentType, string> = {
   [LOAN_DOCUMENT_TYPE.KEY_FACT]: 'key-fact-statement.docx',
+  [LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT]: 'key-fact-statement.docx',
   [LOAN_DOCUMENT_TYPE.LOAN_AGREEMENT]: 'loan-agreement.docx',
 };
 
 export const LOAN_DOCUMENT_TEMPLATE_PDF_FILES: Record<LoanDocumentType, string> = {
   [LOAN_DOCUMENT_TYPE.KEY_FACT]: 'key-fact-statement.template.pdf',
+  [LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT]: 'key-fact-statement.template.pdf',
   [LOAN_DOCUMENT_TYPE.LOAN_AGREEMENT]: 'loan-agreement.template.pdf',
 };
 
 export const LOAN_DOCUMENT_PDF_FILES: Record<LoanDocumentType, string> = {
   [LOAN_DOCUMENT_TYPE.KEY_FACT]: 'key-fact-statement.pdf',
+  [LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT]: 'key-fact-statement-disbursement.pdf',
   [LOAN_DOCUMENT_TYPE.LOAN_AGREEMENT]: 'loan-agreement.pdf',
 };

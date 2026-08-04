@@ -2,12 +2,19 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
+import { LOAN_STATUS } from '../../../../common/constants/loan.constants';
 import {
   computeAmountDueNowInr,
   computeInterestAmountInr,
   calendarDaysBetween,
   decimalToNumber,
 } from '../../../../common/loan/loan-calculation.util';
+import {
+  isRepaymentPastDue,
+  resolveBounceFeeInr,
+  type BounceChargeTierRow,
+} from '../../../../common/loan/bounce-charge.util';
+import { BounceChargeTierResolverService } from '../../../../common/loan/bounce-charge-tier.resolver';
 import { computeFeeAmountsFromLoanDetail } from '../../../../common/loan/loan-disbursement-view.util';
 import type {
   CustomerLoanCard,
@@ -56,42 +63,47 @@ function isDisbursedRow(disbursedAt: Date | null | undefined, statusName: string
   return disbursedAt != null || statusName === APPLICATION_STATUS.DISBURSED;
 }
 
-function mapRow(r: {
-  uuid: string;
-  applicationStatus: { name: string };
-  details: {
-    selectedLoanAmount: Prisma.Decimal | null;
-    expectedRepaymentDays: number | null;
-    expectedRepaymentDate: Date | null;
-    bankAccountNumber: string | null;
-    bankName: string | null;
-    interestRate: Prisma.Decimal | null;
-    processingFeePercentage: Prisma.Decimal | null;
-    gstPercentage: Prisma.Decimal | null;
-  } | null;
-  loanAccount: {
-    loanNumber: string;
-    principalAmount: Prisma.Decimal;
-    interestRate: Prisma.Decimal;
-    interestAmount: Prisma.Decimal;
-    totalRepaymentAmount: Prisma.Decimal;
-    loanMaturityDate: Date;
-    disbursedAt: Date;
-    closedAt: Date | null;
-    bankAccountNumber: string | null;
-    loanStatus: { name: string };
-  } | null;
-}): CustomerLoanCard {
+function mapRow(
+  r: {
+    uuid: string;
+    applicationStatus: { name: string };
+    details: {
+      selectedLoanAmount: Prisma.Decimal | null;
+      expectedRepaymentDays: number | null;
+      expectedRepaymentDate: Date | null;
+      bankAccountNumber: string | null;
+      bankName: string | null;
+      interestRate: Prisma.Decimal | null;
+      processingFeePercentage: Prisma.Decimal | null;
+      gstPercentage: Prisma.Decimal | null;
+    } | null;
+    loanAccount: {
+      loanNumber: string;
+      principalAmount: Prisma.Decimal;
+      interestRate: Prisma.Decimal;
+      interestAmount: Prisma.Decimal;
+      totalRepaymentAmount: Prisma.Decimal;
+      loanMaturityDate: Date;
+      disbursedAt: Date;
+      closedAt: Date | null;
+      bankAccountNumber: string | null;
+      loanStatus: { name: string };
+    } | null;
+  },
+  bounceTiers: BounceChargeTierRow[],
+): CustomerLoanCard {
   const loanDetail = r.details;
   const loanAccount = r.loanAccount;
-  const fees = computeFeeAmountsFromLoanDetail(loanDetail);
+  const fees = computeFeeAmountsFromLoanDetail(loanDetail, {
+    preferStoredTenure: loanAccount != null,
+  });
 
   const principal =
     decimalToNumber(loanAccount?.principalAmount) ??
     decimalToNumber(loanDetail?.selectedLoanAmount);
   const dailyRate =
     decimalToNumber(loanAccount?.interestRate) ?? decimalToNumber(loanDetail?.interestRate);
-  const tenureDays = loanDetail?.expectedRepaymentDays ?? null;
+  const tenureDays = fees.tenureDays ?? loanDetail?.expectedRepaymentDays ?? null;
 
   // Full-tenure interest / amount due on maturity (KFS / scheduled).
   let interestAtMaturity =
@@ -115,24 +127,31 @@ function mapRow(r: {
   let daysOutstanding: number | null = null;
   let interestTillToday: number | null = null;
   let amountDueToday: number | null = null;
+  let bounceFeeInr: number | null = null;
 
   if (loanAccount && loanAccount.closedAt == null && principal != null && dailyRate != null) {
     const due = computeAmountDueNowInr(principal, dailyRate, loanAccount.disbursedAt);
     daysOutstanding = due.daysOutstanding;
     interestTillToday = due.interestAmount;
-    amountDueToday = due.amountDue;
+    const pastDue =
+      loanAccount.loanStatus.name === LOAN_STATUS.OVERDUE ||
+      isRepaymentPastDue(loanAccount.loanMaturityDate);
+    bounceFeeInr = pastDue ? resolveBounceFeeInr(principal, bounceTiers) : 0;
+    amountDueToday = Math.round((due.amountDue + bounceFeeInr) * 100) / 100;
   } else if (loanAccount?.closedAt != null) {
     // Inclusive days from disbursement through repayment (disbursement day = day 1).
     daysOutstanding = calendarDaysBetween(loanAccount.disbursedAt, loanAccount.closedAt) + 1;
     interestTillToday = decimalToNumber(loanAccount.interestAmount);
     amountDueToday = decimalToNumber(loanAccount.totalRepaymentAmount);
     amountDueAtMaturity = amountDueToday ?? amountDueAtMaturity;
+    bounceFeeInr = null;
   }
 
   const interestAmountStr = interestAtMaturity != null ? interestAtMaturity.toFixed(2) : null;
   const amountDueAtMaturityStr = amountDueAtMaturity != null ? amountDueAtMaturity.toFixed(2) : null;
   const interestTillTodayStr = interestTillToday != null ? interestTillToday.toFixed(2) : null;
   const amountDueTodayStr = amountDueToday != null ? amountDueToday.toFixed(2) : null;
+  const bounceFeeStr = bounceFeeInr != null ? bounceFeeInr.toFixed(2) : null;
 
   const displayStatus =
     loanAccount != null
@@ -154,6 +173,7 @@ function mapRow(r: {
     daysOutstanding,
     interestTillToday: interestTillTodayStr,
     amountDueToday: amountDueTodayStr,
+    bounceFeeInr: bounceFeeStr,
     processingFeeAmount: fees.processingFeeAmount != null ? fees.processingFeeAmount.toFixed(2) : null,
     gstAmount: fees.gstAmount != null ? fees.gstAmount.toFixed(2) : null,
     totalRepayment: amountDueTodayStr ?? amountDueAtMaturityStr,
@@ -173,7 +193,8 @@ function mapRow(r: {
 export class GetCustomerLoansDashboardUseCase {
   constructor(
     private readonly customers: CustomerRepository,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
+    private readonly bounceChargeTiers: BounceChargeTierResolverService,
   ) {}
 
   async execute(req: Request): Promise<CustomerLoansDashboardResult> {
@@ -223,8 +244,9 @@ export class GetCustomerLoansDashboardUseCase {
       },
     });
 
+    const bounceTiers = await this.bounceChargeTiers.listActiveTiers();
     const todayStart = startOfTodayUtc();
-    const cards = rows.map(mapRow);
+    const cards = rows.map((row) => mapRow(row, bounceTiers));
 
     const maturityFor = (raw: (typeof rows)[number]) =>
       raw.loanAccount?.loanMaturityDate ?? raw.details?.expectedRepaymentDate ?? null;

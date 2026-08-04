@@ -26,4 +26,12 @@ export type LoanDocumentMergeInput = {
   lenderDscSignerName?: string | null;
   lenderDscSignedAt?: Date | string | null;
   lenderDscSerial?: string | null;
+  /** Active bounce charge schedule rows for sanction letter / KFS tables. */
+  bounceChargeTiers?: Array<{
+    minAmountInr: number;
+    maxAmountInr: number | null;
+    bounceFeeInr: { toNumber(): number } | number | string;
+    sortOrder?: number;
+    isActive?: boolean;
+  }> | null;
 };

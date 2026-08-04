@@ -21,7 +21,7 @@ import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import { isCustomerJourneyComplete } from '../../../common/loan/customer-journey-complete.util';
 import { resolveLoanAccountNumberAtDisbursement } from '../../../common/loan/loan-account-number.util';
 import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbursement-view.util';
-import { decimalToNumber } from '../../../common/loan/loan-calculation.util';
+import { decimalToNumber, resolveLiveTenureDays } from '../../../common/loan/loan-calculation.util';
 import { RedisService } from '../../../common/redis/redis.service';
 import { LoanDocumentApplicationService } from '../../auth/application/services/loan-document-application.service';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -179,7 +179,17 @@ export class LosDisbursementService {
       throw new BadRequestException('Borrower mobile number is invalid for disbursement.');
     }
 
-    const fees = computeFeeAmountsFromLoanDetail(details);
+    // Freeze tenure/interest from disbursement day → repay date (not selection day).
+    const disbursedAt = new Date();
+    const liveTenureDays = resolveLiveTenureDays(
+      details.expectedRepaymentDate,
+      disbursedAt,
+      details.expectedRepaymentDays,
+    );
+    if (liveTenureDays == null) {
+      throw new BadRequestException('Unable to compute tenure for disbursement.');
+    }
+    const fees = computeFeeAmountsFromLoanDetail(details, disbursedAt);
     const principal = decimalToNumber(details.selectedLoanAmount);
     const interestRate = decimalToNumber(details.interestRate);
     if (
@@ -252,7 +262,6 @@ export class LosDisbursementService {
     }
 
     const totalRepayment = principal + fees.interestAmount;
-    const disbursedAt = new Date();
     const loanUuid = randomUUID();
     const utrForDb = transferUtr;
 
@@ -346,6 +355,12 @@ export class LosDisbursementService {
               applicationStatusId: disbursedStatus.id,
               applicationStatusNote: null,
             },
+          });
+
+          // Persist the disbursement-day tenure so LOS / docs match the loan account.
+          await tx.applicationDetail.update({
+            where: { applicationId: application.id },
+            data: { expectedRepaymentDays: liveTenureDays },
           });
 
           return {
@@ -461,6 +476,7 @@ export class LosDisbursementService {
             loanDocumentsAcceptedAt: true,
             loanDocumentsAcceptedIp: true,
             keyFactPdfRelativePath: true,
+            keyFactDisbursementPdfRelativePath: true,
             loanAgreementPdfRelativePath: true,
             reasonForLoan: { select: { name: true } },
           },
@@ -527,19 +543,22 @@ export class LosDisbursementService {
         },
       });
 
-      const existing = this.loanDocs.relativePathForType(LOAN_DOCUMENT_TYPE.KEY_FACT, {
+      const existing = this.loanDocs.relativePathForType(LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT, {
         keyFactPdfRelativePath: application.details?.keyFactPdfRelativePath ?? null,
+        keyFactDisbursementPdfRelativePath:
+          application.details?.keyFactDisbursementPdfRelativePath ?? null,
         loanAgreementPdfRelativePath: application.details?.loanAgreementPdfRelativePath ?? null,
       });
 
-      // Force regenerate revised sanction letter after disbursement.
+      // Revised sanction letter at disbursement — keep acceptance PDF untouched; never overwrite prior disbursement PDF.
       const rel = await this.loanDocs.ensurePdf(
-        LOAN_DOCUMENT_TYPE.KEY_FACT,
+        LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT,
         application.customer.uuid,
         application.uuid,
         application.id,
         merge,
         existing,
+        true,
         true,
         true,
       );
@@ -554,7 +573,7 @@ export class LosDisbursementService {
       const content = await this.kycFiles.readBytes(rel);
       await this.emailService.sendFinalSanctionLetterEmail(
         email,
-        [{ filename: LOAN_DOCUMENT_PDF_FILES[LOAN_DOCUMENT_TYPE.KEY_FACT], content }],
+        [{ filename: LOAN_DOCUMENT_PDF_FILES[LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT], content }],
         { leadId: application.leadId },
       );
       this.logger.log(

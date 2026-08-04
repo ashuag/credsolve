@@ -487,7 +487,7 @@ function LoanDocumentCard({
   label: string;
   ready: boolean;
   esigned: boolean;
-  docType: 'key-fact';
+  docType: 'key-fact' | 'key-fact-disbursement';
   applicationUuid: string;
   token: string | null;
 }) {
@@ -576,7 +576,7 @@ function LoanDetailsPanel({
                 value: details.loanTenure != null ? `${details.loanTenure} days` : '—',
               },
               { label: 'Repay date', value: formatDateOnly(details.loanMaturityDate) },
-              { label: 'Disbursed amount', value: formatInr(details.disbursedAmount) },
+              { label: 'Net to bank', value: formatInr(details.disbursedAmount) },
               { label: 'Repay amount', value: formatInr(details.repaymentAmount) },
             ]}
           />
@@ -644,7 +644,7 @@ function LoanDetailsPanel({
         </div>
         <div className="mt-3 grid gap-2">
           <LoanDocumentCard
-            label="Sanction letter cum KFS"
+            label="Sanction letter cum KFS (KYC / acceptance)"
             ready={row.loanDocuments.keyFactReady}
             esigned={row.loanDocuments.keyFactEsigned}
             docType="key-fact"
@@ -656,6 +656,16 @@ function LoanDetailsPanel({
               <span className="block text-[0.72rem] font-extrabold text-brand-muted">Accepted by customer</span>
               <span className="block text-[0.78rem] font-bold text-[#14523a]">{formatDateTime(row.loanDocuments.acceptedAt)}</span>
             </div>
+          ) : null}
+          {row.loanDocuments.keyFactDisbursementReady || row.statusCode === 'DISBURSED' || row.loanAccount ? (
+            <LoanDocumentCard
+              label="Sanction letter cum KFS (disbursement)"
+              ready={row.loanDocuments.keyFactDisbursementReady}
+              esigned={row.loanDocuments.keyFactDisbursementEsigned}
+              docType="key-fact-disbursement"
+              applicationUuid={applicationUuid}
+              token={authToken}
+            />
           ) : null}
         </div>
       </ProfileSection>

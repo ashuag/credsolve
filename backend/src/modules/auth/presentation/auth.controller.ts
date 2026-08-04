@@ -208,7 +208,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Collect loan repayment via Easebuzz Wire (principal + interest till today). On success closes the loan and records payment history.',
+      'Collect loan repayment via Easebuzz EasyCollect (principal + interest till today). Returns a payment URL; loan closes after successful payment.',
   })
   repayLoan(@Req() req: Request, @Param('applicationUuid') applicationUuid: string) {
     return this.initiateCustomerRepayment.execute(req, applicationUuid);

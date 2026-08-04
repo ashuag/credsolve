@@ -27,7 +27,7 @@ export class LoanDocumentGeneratorService {
     merge: LoanDocumentMergeInput,
     digitallySign = false,
   ): Promise<{ pdf: Buffer; esigned: boolean }> {
-    if (docType !== LOAN_DOCUMENT_TYPE.KEY_FACT) {
+    if (docType !== LOAN_DOCUMENT_TYPE.KEY_FACT && docType !== LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT) {
       throw new BadRequestException('Only the sanction letter cum Key Fact Statement PDF is generated.');
     }
 

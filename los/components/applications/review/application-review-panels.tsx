@@ -108,6 +108,7 @@ export function ReviewLoanPanel({
   const [generatingDocs, setGeneratingDocs] = useState(false);
   const [docsActionResult, setDocsActionResult] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
+  const [openingDisbursement, setOpeningDisbursement] = useState(false);
   const details = row.details;
 
   if (!details) {
@@ -174,7 +175,7 @@ export function ReviewLoanPanel({
               </div>
             ) : null}
             <div className="mrow total green">
-              <span className="mlab">Disbursed to bank</span>
+              <span className="mlab">Net to bank</span>
               <span className="mamt">{formatReviewInr(disbursed)}</span>
             </div>
           </div>
@@ -242,27 +243,12 @@ export function ReviewLoanPanel({
         }
         title="Amounts, interest & fees"
       >
-        <ReviewSectionLabel first>Amounts</ReviewSectionLabel>
         <div className="fgrid thirds">
           <ReviewField label="Pre-approved" value={<span className="mono">{formatReviewInr(row.preApprovedLoanAmount)}</span>} />
-          <ReviewField label="Selected" value={<span className="mono">{formatReviewInr(details.loanAmount)}</span>} />
-          <ReviewField label="Tenure" value={details.loanTenure != null ? `${details.loanTenure} days` : '—'} />
-          <ReviewField label="Disbursed" value={<span className="mono">{formatReviewInr(details.disbursedAmount)}</span>} tone="accent" />
+          <ReviewField label="Selected loan amount" value={<span className="mono">{formatReviewInr(details.loanAmount)}</span>} />
           <ReviewField label="Repay date" value={formatReviewDateOnly(details.loanMaturityDate)} />
-          <ReviewField label="Repay amount" value={<span className="mono">{formatReviewInr(details.repaymentAmount)}</span>} />
-        </div>
-        <ReviewSectionLabel>Interest &amp; fees</ReviewSectionLabel>
-        <div className="fgrid thirds">
           <ReviewField
-            label="ROI"
-            value={
-              details.interestRate != null
-                ? `${details.interestRate}% · ${formatReviewInr(details.interestAmount)}`
-                : '—'
-            }
-          />
-          <ReviewField
-            label="Processing fee"
+            label="Processing fees"
             value={
               details.processingFee != null
                 ? `${details.processingFee}% · ${formatReviewInr(details.processingFeeAmount)}`
@@ -270,13 +256,24 @@ export function ReviewLoanPanel({
             }
           />
           <ReviewField
-            label="GST"
+            label="GST on processing fees"
             value={
               details.gstPercent != null
                 ? `${details.gstPercent}% · ${formatReviewInr(details.gstAmount)}`
                 : '—'
             }
           />
+          <ReviewField label="Net to bank loan amount" value={<span className="mono">{formatReviewInr(details.disbursedAmount)}</span>} tone="accent" />
+          <ReviewField label="Repayment days" value={details.loanTenure != null ? `${details.loanTenure} days` : '—'} />
+          <ReviewField
+            label="ROI/Interest Rate"
+            value={
+              details.interestRate != null
+                ? `${details.interestRate}% · ${formatReviewInr(details.interestAmount)}`
+                : '—'
+            }
+          />
+          <ReviewField label="Repay amount" value={<span className="mono">{formatReviewInr(details.repaymentAmount)}</span>} />
         </div>
       </ReviewCard>
 
@@ -321,8 +318,8 @@ export function ReviewLoanPanel({
               </svg>
             </span>
             <div>
-              <div className="doc-name">Sanction letter cum KFS</div>
-              <div className="doc-sub">Key Fact Statement · PKCS#7 e-signed when available</div>
+              <div className="doc-name">Sanction letter cum KFS (KYC / acceptance)</div>
+              <div className="doc-sub">Signed at customer acceptance · PKCS#7 e-signed when available</div>
             </div>
             <div className="doc-actions">
               {row.loanDocuments.keyFactEsigned ? <span className="badge signed">✓ E-signed</span> : null}
@@ -367,6 +364,55 @@ export function ReviewLoanPanel({
             </div>
           ) : null}
         </div>
+        {row.loanDocuments.keyFactDisbursementReady || row.statusCode === 'DISBURSED' || row.loanAccount ? (
+          <div className="doc" style={{ marginTop: 12 }}>
+            <div className="doc-top">
+              <span className="doc-ic">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <path d="M14 2v6h6M9 13h6M9 17h4" />
+                </svg>
+              </span>
+              <div>
+                <div className="doc-name">Sanction letter cum KFS (disbursement)</div>
+                <div className="doc-sub">Revised final copy generated at disbursement</div>
+              </div>
+              <div className="doc-actions">
+                {row.loanDocuments.keyFactDisbursementEsigned ? <span className="badge signed">✓ E-signed</span> : null}
+                {row.loanDocuments.keyFactDisbursementReady ? (
+                  <span className="badge ready">Ready</span>
+                ) : (
+                  <span className="badge" style={{ background: 'var(--mute-bg)', color: 'var(--ink-3)', borderColor: 'var(--line)' }}>
+                    Not generated
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="btn-sm link"
+                  disabled={!row.loanDocuments.keyFactDisbursementReady || openingDisbursement || !authToken}
+                  onClick={async () => {
+                    if (!authToken) return;
+                    setOpeningDisbursement(true);
+                    try {
+                      const blob = await fetchApplicationLoanDocumentBlob(
+                        authToken,
+                        applicationUuid,
+                        'key-fact-disbursement',
+                      );
+                      const url = URL.createObjectURL(blob);
+                      window.open(url, '_blank', 'noopener');
+                      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+                    } finally {
+                      setOpeningDisbursement(false);
+                    }
+                  }}
+                >
+                  {openingDisbursement ? 'Opening…' : 'View PDF'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
         {docsActionResult ? (
           <p style={{ margin: '12px 0 0', fontSize: '12px', color: docsActionResult.startsWith('Generated') ? 'var(--ok)' : 'var(--bad)' }}>
             {docsActionResult}

@@ -91,7 +91,7 @@ export class KycFilesService {
   loanDocumentPdfRelativePath(
     customerUuid: string,
     applicationUuid: string,
-    fileName: 'key-fact-statement.pdf' | 'loan-agreement.pdf',
+    fileName: string,
   ): string {
     return `customer/${customerUuid}/loan-documents/${applicationUuid}/${fileName}`;
   }

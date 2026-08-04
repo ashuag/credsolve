@@ -30,6 +30,7 @@ import {
 } from '../../../../common/constants/kyc.constants';
 import { isActiveLivenessDisabled } from '../../../../common/kyc/kyc-active-liveness.util';
 import { VendorInternalErrorService } from '../../../../common/vendor/vendor-internal-error.service';
+import { resolveLiveTenureDays } from '../../../../common/loan/loan-calculation.util';
 import { fetchLatestApplicationKycSnapshot } from '../../../../prisma/application-kyc-snapshot.query';
 import { PrismaService } from '../../../../prisma/prisma.service';
 
@@ -302,7 +303,14 @@ export class GetCustomerSessionUseCase {
         ? {
             amountInr:
               appDetails.selectedLoanAmount != null ? appDetails.selectedLoanAmount.toString() : null,
-            tenureDays: appDetails.expectedRepaymentDays ?? null,
+            // Before disbursement, show tenure as-of today → repay date (not selection-day freeze).
+            tenureDays: loanAccount
+              ? (appDetails.expectedRepaymentDays ?? null)
+              : resolveLiveTenureDays(
+                  appDetails.expectedRepaymentDate,
+                  new Date(),
+                  appDetails.expectedRepaymentDays,
+                ),
             maturityDate: loanAccount?.loanMaturityDate
               ? loanAccount.loanMaturityDate.toISOString().slice(0, 10)
               : appDetails.expectedRepaymentDate

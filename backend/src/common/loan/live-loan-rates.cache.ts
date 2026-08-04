@@ -1,14 +1,13 @@
 /**
- * Module-level cache of the current loan fee rates from the DB `setting`
- * table (PROCESSING_FEE, PROCESSING_FEE_GST). It exists so the synchronous
- * fee computation in `loan-disbursement-view.util.ts` can use live DB values
- * without every consumer having to load settings — admin changes apply
- * "on the fly" across the customer portal, LOS, loan documents, and
- * disbursement without touching call sites.
+ * Module-level cache of current loan fee rates from the DB `setting` table
+ * (PROCESSING_FEE, PROCESSING_FEE_GST).
+ *
+ * Used only when creating a new loan selection (snapshot into application_detail).
+ * After that, all fee math (LOS, KFS, disbursement) must use the snapshotted
+ * percentages on the application — never these live values.
  *
  * `SettingsRepository` registers the loader and primes the cache at boot.
- * Reads are stale-while-revalidate: an expired value is still returned while
- * a background refresh runs, so callers never block on the DB.
+ * Reads are stale-while-revalidate.
  */
 
 export type LiveLoanFeeRates = {
@@ -49,8 +48,8 @@ export function registerLiveLoanFeeRatesLoader(fn: () => Promise<LiveLoanFeeRate
 }
 
 /**
- * Current DB fee rates, or `null` when the cache was never primed (unit
- * tests, very early boot) — callers then fall back to row snapshots.
+ * Current DB fee rates, or `null` when the cache was never primed.
+ * Do not use for amounts on an existing application — use application_detail.
  */
 export function getLiveLoanFeeRates(): LiveLoanFeeRates | null {
   if (!cached) {

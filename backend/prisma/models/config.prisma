@@ -44,6 +44,21 @@ model CreditLimitTier {
   @@map("credit_limit_tier")
 }
 
+/// Bounce fee schedule (sanction letter / overdue repayment) by amount band.
+/// `maxAmountInr = null` means open upper bound (e.g. ₹10,001 and above).
+model BounceChargeTier {
+  id           Int      @id @default(autoincrement()) @db.SmallInt
+  minAmountInr Int      @map("min_amount_inr")
+  maxAmountInr Int?     @map("max_amount_inr")
+  bounceFeeInr Decimal  @map("bounce_fee_inr") @db.Decimal(12, 2)
+  sortOrder    Int      @default(0) @map("sort_order") @db.SmallInt
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("bounce_charge_tier")
+}
+
 model SmsTemplate {
   id          Int      @id @default(autoincrement()) @db.SmallInt
   templateId  String   @unique @map("template_id") @db.VarChar(40)
