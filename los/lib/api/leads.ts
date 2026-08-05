@@ -54,7 +54,9 @@ export type LosApplication = {
   kycCompleted: boolean;
   kycCompletedAt: string | null;
   emailVerifiedAt: string | null;
+  loanDocumentsReviewedAt: string | null;
   loanDocumentsAcceptedAt: string | null;
+  livenessPassed: boolean;
   referencesCount: number;
   bankAccountNumber: string | null;
   disbursedAt: string | null;
@@ -218,6 +220,8 @@ export type LosApplicationDetails = {
   };
   /** True when LOS ops may grant one more customer KYC liveness attempt. */
   canGrantKycLivenessRetry: boolean;
+  /** True when LOS ops may enable full re-KYC (reset face pipeline / reopen KYC). */
+  canEnableReKyc?: boolean;
   preApprovedLoanAmount: string | null;
   createdAt: string;
   updatedAt: string;
@@ -323,6 +327,9 @@ export type LosApplicationDetails = {
     keyFactDisbursementReady: boolean;
     keyFactDisbursementEsigned: boolean;
     loanAgreementReady: boolean;
+    /** Customer agreed on /loan-documents (no OTP). */
+    reviewedAt: string | null;
+    /** Mobile OTP after references. */
     acceptedAt: string | null;
   };
 };

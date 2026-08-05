@@ -8,7 +8,6 @@ import {
   isInternalErrorLead,
   canResumeKycAfterInternalError,
   resolveKycStagePath,
-  shouldResumeKycSelfie,
   CUSTOMER_EMAIL_JOURNEY_PATH,
   hasOpenCustomerLoan,
 } from '@/lib/api/customer-session';
@@ -190,19 +189,14 @@ export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
 
     if (isInternalErrorLead(session.lead)) {
       if (canResumeKycAfterInternalError(session)) {
-        if (pathname !== '/kyc/selfie' && !pathname.startsWith('/kyc/selfie/')) {
-          router.replace('/kyc/selfie');
+        if (pathname !== '/kyc' && !pathname.startsWith('/kyc/')) {
+          router.replace('/kyc');
         }
         return;
       }
       if (pathname !== '/thank-you') {
         router.replace('/thank-you');
       }
-      return;
-    }
-
-    if (stage === 'kyc' && pathname === '/kyc' && shouldResumeKycSelfie(session)) {
-      router.replace('/kyc/selfie');
       return;
     }
 

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 import { startDigilockerLoginFlow } from '@/lib/api/digilocker';
-import { getKycHubBackPath, shouldResumeKycSelfie } from '@/lib/api/customer-session';
+import { getKycHubBackPath } from '@/lib/api/customer-session';
 import { isLoanDocumentsJourneyComplete } from '@/lib/loan-documents-journey';
 import { kycJourneyProgressFromSession } from '@/lib/kyc-journey-progress';
 import { KycJourneyLeftPanel } from '@/components/kyc/kyc-journey-left-panel';
@@ -77,12 +77,6 @@ export function KycHubFlow() {
   useEffect(() => {
     if (session?.authenticated === true && session.lead && !isLoanDocumentsJourneyComplete(session)) {
       router.replace('/loan-documents');
-    }
-  }, [router, session]);
-
-  useEffect(() => {
-    if (session?.authenticated === true && shouldResumeKycSelfie(session)) {
-      router.replace('/kyc/selfie');
     }
   }, [router, session]);
 

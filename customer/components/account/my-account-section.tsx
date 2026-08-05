@@ -18,66 +18,18 @@ import {
   isCustomerPortalSignedIn,
   hasOpenCustomerLoan,
 } from '@/lib/api/customer-session';
+import {
+  buildCustomerJourneyProgress,
+  CUSTOMER_JOURNEY_PROGRESS_STEPS,
+  type CustomerJourneyProgressStep,
+} from '@/lib/customer-journey-progress';
 import { isCustomerSessionRequiredMessage } from '@/lib/customer-session-required';
 import { cn } from '@/lib/cn';
 import { formatIsoDateDdMmYyyy } from '@/lib/format-date';
 
-type JourneyStepState = 'done' | 'current' | 'todo';
 type AccountTab = 'overview' | 'history';
 
-type JourneyStep = {
-  key: string;
-  label: string;
-  shortLabel: string;
-  state: JourneyStepState;
-};
-
-const ALL_STEPS: Array<{ key: string; label: string; shortLabel: string }> = [
-  { key: 'mobile', label: 'Mobile verified', shortLabel: 'Mobile' },
-  { key: 'details', label: 'Personal details', shortLabel: 'Details' },
-  { key: 'loan', label: 'Loan selection', shortLabel: 'Loan' },
-  { key: 'kyc', label: 'KYC documents', shortLabel: 'KYC' },
-  { key: 'bank', label: 'Bank details', shortLabel: 'Bank' },
-  { key: 'references', label: 'References', shortLabel: 'Refs' },
-];
-
 const COMPLETE_JOURNEY_HREF = '/apply-for-loan';
-
-function buildJourneySteps(
-  session: ReturnType<typeof useCustomerSession>['session'],
-): { steps: JourneyStep[]; nextLabel: string; completed: number; total: number } {
-  const total = ALL_STEPS.length;
-  const flags: Record<string, boolean> = {
-    mobile: Boolean(session?.authenticated),
-    details: Boolean(session?.authenticated && session.journey.detailsCompleted),
-    loan: Boolean(session?.authenticated && session.journey.loanSelectionCompleted),
-    kyc: Boolean(session?.authenticated && session.journey.kycCompleted),
-    references: Boolean(session?.authenticated && session.journey.referencesCompleted),
-    bank: Boolean(session?.authenticated && session.journey.bankDetailsCompleted),
-  };
-
-  let foundCurrent = false;
-  let completed = 0;
-  const steps: JourneyStep[] = ALL_STEPS.map((s) => {
-    if (flags[s.key]) {
-      completed += 1;
-      return { ...s, state: 'done' as const };
-    }
-    if (!foundCurrent) {
-      foundCurrent = true;
-      return { ...s, state: 'current' as const };
-    }
-    return { ...s, state: 'todo' as const };
-  });
-
-  const next = steps.find((s) => s.state === 'current');
-  return {
-    steps,
-    nextLabel: next ? next.label : 'All steps complete',
-    completed,
-    total,
-  };
-}
 
 function statusBadgeClass(status: string): string {
   const s = status.toUpperCase();
@@ -130,7 +82,15 @@ function CheckIcon() {
   );
 }
 
-function JourneyTracker({ steps, completed, total }: { steps: JourneyStep[]; completed: number; total: number }) {
+function JourneyTracker({
+  steps,
+  completed,
+  total,
+}: {
+  steps: CustomerJourneyProgressStep[];
+  completed: number;
+  total: number;
+}) {
   const pct = Math.max(6, Math.round((completed / total) * 100));
   return (
     <div className="space-y-3">
@@ -146,10 +106,12 @@ function JourneyTracker({ steps, completed, total }: { steps: JourneyStep[]; com
           style={{ width: `${pct}%` }}
         />
       </div>
-      <ol className="flex items-start justify-between gap-1">
+      <ol className="flex items-start justify-between gap-0.5 sm:gap-1">
         {steps.map((step) => {
           const done = step.state === 'done';
           const current = step.state === 'current';
+          const stepNumber =
+            CUSTOMER_JOURNEY_PROGRESS_STEPS.findIndex((s) => s.key === step.key) + 1;
           return (
             <li key={step.key} className="flex min-w-0 flex-1 flex-col items-center gap-1.5 text-center">
               <span
@@ -163,11 +125,11 @@ function JourneyTracker({ steps, completed, total }: { steps: JourneyStep[]; com
                 )}
                 aria-current={current ? 'step' : undefined}
               >
-                {done ? <CheckIcon /> : ALL_STEPS.findIndex((s) => s.key === step.key) + 1}
+                {done ? <CheckIcon /> : stepNumber}
               </span>
               <span
                 className={cn(
-                  'truncate text-[0.62rem] font-bold uppercase tracking-wider',
+                  'truncate text-[0.55rem] font-bold uppercase tracking-wider sm:text-[0.62rem]',
                   done ? 'text-emerald-700' : current ? 'text-brand-navy' : 'text-slate-400',
                 )}
               >
@@ -202,12 +164,15 @@ function CompleteJourneyCard({
   completed,
   total,
   nextLabel,
+  resumeHref,
 }: {
-  steps: JourneyStep[];
+  steps: CustomerJourneyProgressStep[];
   completed: number;
   total: number;
   nextLabel: string;
+  resumeHref: string;
 }) {
+  const pctDone = Math.round((completed / total) * 100);
   return (
     <div className="relative overflow-hidden rounded-[28px] border border-[rgba(20,150,243,0.22)] bg-[linear-gradient(135deg,#ffffff_0%,#f0f7ff_45%,#e8f2ff_100%)] p-6 shadow-[0_28px_70px_rgba(23,44,113,0.14)]">
       <div
@@ -236,7 +201,7 @@ function CompleteJourneyCard({
           </div>
         </div>
         <span className="rounded-full bg-white/90 px-3 py-1 text-[0.68rem] font-extrabold uppercase tracking-wider text-brand-blue ring-1 ring-[rgba(20,150,243,0.2)]">
-          {Math.round((completed / total) * 100)}% done
+          {pctDone}% done
         </span>
       </div>
 
@@ -250,7 +215,7 @@ function CompleteJourneyCard({
           <p className="text-[0.95rem] font-extrabold text-brand-navy">{nextLabel}</p>
         </div>
         <Link
-          href={COMPLETE_JOURNEY_HREF}
+          href={resumeHref}
           className="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#1c347d] via-[#12244f] to-[#0a1628] px-6 py-3.5 text-[0.95rem] font-extrabold text-[#fff8df] shadow-[0_14px_32px_rgba(23,44,113,0.35)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_42px_rgba(23,44,113,0.45)]"
         >
           Complete your journey
@@ -737,7 +702,11 @@ export function MyAccountSection({
     void loadLoans();
   }, [sessionLoading, signedIn, router, loadLoans]);
 
-  const journeySteps = useMemo(() => buildJourneySteps(session), [session]);
+  const journeySteps = useMemo(() => buildCustomerJourneyProgress(session), [session]);
+  const resumeHref =
+    session && isCustomerPortalSignedIn(session)
+      ? getCustomerJourneyResumePath(session)
+      : COMPLETE_JOURNEY_HREF;
   const dash = data ?? { activeLoans: [], pastLoans: [], inProgress: [], repaymentSchedule: [] };
   const hasOpenLoan =
     hasOpenCustomerLoan(session) || dash.activeLoans.length > 0;
@@ -791,7 +760,7 @@ export function MyAccountSection({
       : null;
   const mobileNumber =
     session && session.authenticated ? session.mobileNumber.replace(/^\+?91/, '') : null;
-  const journeyPct = Math.round((journeySteps.completed / journeySteps.total) * 100);
+  const journeyPct = journeySteps.percent;
   const overviewBadge =
     (showIncompleteJourney ? 1 : 0) + dash.activeLoans.length + dash.inProgress.length;
   const primaryDueToday =
@@ -831,6 +800,7 @@ export function MyAccountSection({
                 completed={journeySteps.completed}
                 total={journeySteps.total}
                 nextLabel={journeySteps.nextLabel}
+                resumeHref={resumeHref}
               />
             ) : null}
 
@@ -915,10 +885,7 @@ export function MyAccountSection({
             Continue from{' '}
             <span className="font-semibold text-brand-navy">{journeySteps.nextLabel}</span>
             {' · '}
-            <Link
-              href={getCustomerJourneyResumePath(session)}
-              className="font-bold text-brand-blue hover:underline"
-            >
+            <Link href={resumeHref} className="font-bold text-brand-blue hover:underline">
               Jump to current step
             </Link>
           </p>

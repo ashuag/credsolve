@@ -45,36 +45,32 @@ export type CustomerPortalJourneySnapshot = {
   bankDetailsCompleted: boolean;
 };
 
-/** DigiLocker Aadhaar + selfie + Tenacio liveness progress for the active application. */
+/** DigiLocker Aadhaar progress for the active application (selfie/liveness stubs retained for older clients). */
 export type CustomerKycFaceProgressSnapshot = {
   /** `application.kyc_status` (0–3); `1` = completed. */
   applicationKycStatus: number;
   digilockerAadhaarCaptured: boolean;
+  /** @deprecated Selfie/liveness removed pending rewrite. */
   selfieCaptured: boolean;
+  /** @deprecated Selfie/liveness removed pending rewrite. */
   livenessPassed: boolean;
-  /**
-   * When `true`, the KYC face pipeline finished (pass or fail). Failed pipelines must not resume selfie.
-   */
+  /** @deprecated Selfie/liveness removed pending rewrite. */
   livenessCheckCompleted: boolean;
-  /**
-   * When `false`, the journey does not require `POST .../kyc/liveness` (outbound Tenacio liveness skipped:
-   * `KYC_LIVENESS_PAUSED`, `TENACIO_LIVENESS_DISABLED`, or no configured liveness POST URL / service).
-   * Omitted only in older clients; server always sends a boolean.
-   */
+  /** @deprecated Selfie/liveness removed pending rewrite. Always `false` until rewrite. */
   livenessRequired: boolean;
   digilockerAadhaarForm: unknown | null;
   /** Path fragment for `GET {API}/auth/kyc/digilocker-aadhaar-photo` (cookie auth). */
   digilockerAadhaarPhotoUrl: string | null;
-  /** Path fragment for `GET {API}/auth/kyc/selfie-photo` when a selfie file exists. */
+  /** @deprecated Selfie endpoint removed. */
   kycSelfiePhotoUrl: string | null;
-  /** Changes when a new selfie is saved — use as `?v=` cache buster on photo URLs. */
+  /** @deprecated Selfie/liveness removed pending rewrite. */
   selfieUpdatedAt: string | null;
   /** Failed DigiLocker Aadhaar download attempts for the active lead. */
   digilockerAadhaarDownloadAttempts: number;
   digilockerAadhaarDownloadMaxAttempts: number;
-  /** Failed KYC liveness / face-match pipeline runs for the active application. */
+  /** @deprecated Selfie/liveness removed pending rewrite. */
   livenessAttempts: number;
-  /** Total allowed liveness runs before the lead is escalated to thank-you. */
+  /** @deprecated Selfie/liveness removed pending rewrite. */
   livenessMaxAttempts: number;
 };
 

@@ -1,38 +1,33 @@
 import type { CustomerSessionResponse } from '@/lib/api/customer-session';
 import { isCustomerPortalSignedIn } from '@/lib/api/customer-session';
+import {
+  buildCustomerJourneyProgress,
+  CUSTOMER_JOURNEY_PROGRESS_STEPS,
+} from '@/lib/customer-journey-progress';
 
-export const KYC_JOURNEY_STEPS = ['PROFILE', 'APPLY', 'EMAIL', 'LETTER', 'KYC', 'BANK', 'REFS'] as const;
+/** Uppercase short labels for KYC left-rail dots — same 9 steps as Overview. */
+export const KYC_JOURNEY_STEPS = CUSTOMER_JOURNEY_PROGRESS_STEPS.map((s) =>
+  s.shortLabel.toUpperCase(),
+);
 
-export function milestonesCompleted(session: CustomerSessionResponse | null | undefined): number {
-  if (!session || session.authenticated !== true) return 0;
-  const j = session.journey;
-  const emailVerified = session.lead?.emailVerified ?? false;
-  let m = 1;
-  if (j.detailsCompleted) m++;
-  if (j.loanSelectionCompleted) m++;
-  if (emailVerified) m++;
-  if (j.loanDocumentsCompleted) m++;
-  if (j.kycCompleted) m++;
-  if (j.bankDetailsCompleted) m++;
-  if (j.referencesCompleted) m++;
-  return Math.min(KYC_JOURNEY_STEPS.length, m);
-}
+const KYC_STEP_INDEX = CUSTOMER_JOURNEY_PROGRESS_STEPS.findIndex((s) => s.key === 'kyc');
 
-export function kycProgressPercent(milestones: number): number {
-  const stepPct = 100 / KYC_JOURNEY_STEPS.length;
-  return Math.min(100, Math.max(0, Math.round(milestones * stepPct)));
-}
-
-export function stepIndexFromMilestones(milestones: number): number {
-  if (milestones <= 0) return 0;
-  return Math.min(KYC_JOURNEY_STEPS.length - 1, milestones - 1);
-}
-
+/** Thin wrapper so KYC hub pages stay in sync with Overview %. */
 export function kycJourneyProgressFromSession(session: CustomerSessionResponse | null | undefined): {
   progressPct: number;
   activeStepIndex: number;
 } {
-  const m = milestonesCompleted(session);
-  const idx = isCustomerPortalSignedIn(session) ? stepIndexFromMilestones(m) : 5;
-  return { progressPct: kycProgressPercent(m), activeStepIndex: idx };
+  const progress = buildCustomerJourneyProgress(session);
+  if (!isCustomerPortalSignedIn(session)) {
+    return {
+      progressPct: 0,
+      activeStepIndex: KYC_STEP_INDEX >= 0 ? KYC_STEP_INDEX : 5,
+    };
+  }
+
+  const currentIdx = progress.steps.findIndex((s) => s.state === 'current');
+  return {
+    progressPct: progress.percent,
+    activeStepIndex: currentIdx >= 0 ? currentIdx : progress.steps.length - 1,
+  };
 }

@@ -190,6 +190,114 @@
   overflow: hidden;
 }
 
+.calcSlotCompact {
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: 180px;
+  margin-top: 12px;
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.verificationSlot {
+  position: relative;
+  z-index: 1;
+  margin-top: 14px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.verificationEyebrow {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9fb1d4;
+}
+
+.afterLoanSlot {
+  position: relative;
+  z-index: 1;
+  margin-top: 14px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.aadhaarCard {
+  display: grid;
+  grid-template-columns: minmax(0, 0.42fr) 1fr;
+  gap: 10px;
+  align-items: stretch;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 10px;
+}
+
+.aadhaarCardTitle {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9fb1d4;
+}
+
+.aadhaarPhoto {
+  width: 100%;
+  max-height: 140px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.aadhaarPhotoEmpty {
+  display: flex;
+  height: 120px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #9fb1d4;
+  font-size: 0.8rem;
+}
+
+.aadhaarDetails {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.aadhaarDetailRow {
+  display: grid;
+  grid-template-columns: minmax(0, 0.42fr) 1fr;
+  gap: 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 6px 8px;
+  font-size: 0.78rem;
+}
+
+.aadhaarDetailLabel {
+  color: #9fb1d4;
+  font-weight: 600;
+}
+
+.aadhaarDetailValue {
+  margin: 0;
+  color: #fff;
+  font-weight: 700;
+  word-break: break-word;
+}
+
 .pills {
   position: relative;
   z-index: 1;

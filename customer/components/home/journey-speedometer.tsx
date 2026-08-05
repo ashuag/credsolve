@@ -5,55 +5,33 @@ import { usePathname } from 'next/navigation';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { isCustomerPortalSignedIn } from '@/lib/api/customer-session';
+import {
+  buildCustomerJourneyProgress,
+  CUSTOMER_JOURNEY_PROGRESS_STEPS,
+} from '@/lib/customer-journey-progress';
 
-const JOURNEY_STEPS = ['Profile', 'Apply', 'Email', 'Letter', 'KYC', 'Bank', 'Refs'] as const;
-
-/**
- * Milestones: mobile OTP → profile → loan → email → sanction letter → KYC → bank → references.
- */
-function milestonesCompleted(session: ReturnType<typeof useCustomerSession>['session']): number {
-  if (!session || session.authenticated !== true) return 0;
-  const j = session.journey;
-  const emailVerified = session.lead?.emailVerified ?? false;
-  let m = 1;
-  if (j.detailsCompleted) m++;
-  if (j.loanSelectionCompleted) m++;
-  if (emailVerified) m++;
-  if (j.loanDocumentsCompleted) m++;
-  if (j.kycCompleted) m++;
-  if (j.bankDetailsCompleted) m++;
-  if (j.referencesCompleted) m++;
-  return Math.min(JOURNEY_STEPS.length, m);
-}
-
-function progressPercentFromMilestones(m: number): number {
-  const stepPct = 100 / JOURNEY_STEPS.length;
-  return Math.min(100, Math.max(0, Math.round(m * stepPct)));
-}
-
-/** Active stage index 0…4 for the dot row — aligns with milestones after mobile verify. */
-function stepIndexFromMilestones(m: number): number {
-  if (m <= 0) return 0;
-  return Math.min(JOURNEY_STEPS.length - 1, m - 1);
-}
+const JOURNEY_STEPS = CUSTOMER_JOURNEY_PROGRESS_STEPS.map((s) => s.shortLabel);
+const STEP_COUNT = JOURNEY_STEPS.length;
 
 /**
- * Order matters: first match wins. Labels always match `JOURNEY_STEPS[stepIndex]`.
- * Journey: profile → loan → email → sanction letter → KYC → bank → references.
+ * Path → stage index for guests / deep links.
+ * Thank-you is not a progress dot — maps to the final OTP stage (100%).
  */
 function getStepIndexFromPathname(pathname: string): number {
   const p = pathname || '';
-  const last = JOURNEY_STEPS.length - 1;
-  if (p.includes('/thank-you-interest') || p.includes('/thank-you') || p.includes('/active-loan')) return last;
-  if (p.includes('/references')) return last;
-  if (p.includes('/bank-details')) return 5;
-  if (p.includes('/kyc')) return 4;
-  if (p.includes('/loan-documents')) return 3;
-  if (p.includes('/email-verify')) return 2;
-  if (p.includes('/pre-approved-loan') || p.includes('/loan-selection') || p.includes('/loan-offer')) {
-    return 1;
+  const last = STEP_COUNT - 1;
+  if (p.includes('/thank-you-interest') || p.includes('/thank-you') || p.includes('/active-loan')) {
+    return last;
   }
-  if (p.includes('/onboarding')) return 0;
+  if (p.includes('/references')) return 7;
+  if (p.includes('/bank-details')) return 6;
+  if (p.includes('/kyc')) return 5;
+  if (p.includes('/loan-documents')) return 4;
+  if (p.includes('/email-verify')) return 3;
+  if (p.includes('/pre-approved-loan') || p.includes('/loan-selection') || p.includes('/loan-offer')) {
+    return 2;
+  }
+  if (p.includes('/onboarding')) return 1;
   if (p.includes('/apply-for-loan')) return 0;
   return 0;
 }
@@ -63,13 +41,15 @@ export function JourneySpeedometer({ compact = false }: { compact?: boolean }) {
   const pathname = usePathname() || '';
   const { session } = useCustomerSession();
   const journeyInline = useJourneyProgressOptional();
+  const journey = buildCustomerJourneyProgress(session);
 
   const pathStep = getStepIndexFromPathname(pathname);
-  const m = milestonesCompleted(session);
+  const m = journey.completed;
+  const currentFromSession = journey.steps.findIndex((s) => s.state === 'current');
 
   /** Guests: 0% until OTP succeeds; stage dots follow URL (usually Onboarding). */
-  let progress = progressPercentFromMilestones(m);
-  let stepIndex = m > 0 ? stepIndexFromMilestones(m) : pathStep;
+  let progress = journey.percent;
+  let stepIndex = currentFromSession >= 0 ? currentFromSession : STEP_COUNT - 1;
 
   if (
     pathname.includes('/thank-you-interest') ||
@@ -77,7 +57,7 @@ export function JourneySpeedometer({ compact = false }: { compact?: boolean }) {
     pathname.includes('/active-loan')
   ) {
     progress = 100;
-    stepIndex = JOURNEY_STEPS.length - 1;
+    stepIndex = STEP_COUNT - 1;
   } else if (!isCustomerPortalSignedIn(session)) {
     progress = 0;
     stepIndex = pathStep;
@@ -86,9 +66,10 @@ export function JourneySpeedometer({ compact = false }: { compact?: boolean }) {
     if (pathStep > stepIndex) {
       stepIndex = pathStep;
     }
-    /** Onboarding form: smooth 20%→39% while completing profile after mobile verify (milestone 1). */
+    /** Onboarding form: fill the current step's share while completing profile after mobile verify. */
     if ((pathname.includes('/onboarding') || pathname.includes('/email-verify')) && journeyInline && m === 1) {
-      progress = Math.round(20 + journeyInline.completion01 * 19);
+      const stepShare = 100 / STEP_COUNT;
+      progress = Math.round(m * stepShare + journeyInline.completion01 * stepShare);
     }
   }
 

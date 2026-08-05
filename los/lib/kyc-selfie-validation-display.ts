@@ -143,68 +143,9 @@ export function explainKycNotDone(row: KycIncompleteInput): string | null {
     return row.kycStatusLabel?.trim() || 'KYC is incomplete due to a technical issue.';
   }
 
-  const hasSelfie = Boolean(row.kycPhotos.selfiePath?.trim());
   const hasAadhaarPhoto = Boolean(row.kycPhotos.aadhaarPhotoPath?.trim());
-  const face = row.selfieFaceValidation;
-  const faceMatch = row.moneyCashFaceMatch;
-  const liveness = row.livenessSummary;
-  const livenessChecked = Boolean(row.livenessCheckedAt || liveness?.checkedAt);
-  const faceMatchRan = Boolean(
-    faceMatch?.matchScore != null ||
-      (faceMatch?.checkedAt &&
-        faceMatch?.reason &&
-        !isFaceMatchPending(faceMatch) &&
-        !isFaceMatchSkipped(faceMatch)),
-  );
-
-  if (!hasSelfie) {
-    return 'KYC is not done because the customer has not captured a selfie yet.';
-  }
-
-  if (face?.checkedAt && face.passed === false) {
-    const detail = face.reason?.trim();
-    return detail
-      ? `KYC is not done because selfie quality check failed: ${detail}`
-      : 'KYC is not done because the selfie did not pass quality checks.';
-  }
-
-  if (faceMatchRan && faceMatch?.passed === false) {
-    const detail = faceMatch.reason?.trim();
-    return detail
-      ? `KYC is not done because Aadhaar face match failed: ${detail}`
-      : 'KYC is not done because the selfie does not match the Aadhaar photo.';
-  }
-
-  if (!hasAadhaarPhoto && faceMatchRan) {
-    return 'KYC is not done because the Aadhaar reference photo is missing.';
-  }
-
-  if (!livenessChecked) {
-    return face?.passed
-      ? 'KYC is not done because the customer has not completed the live face verification yet.'
-      : 'KYC is not done because live face verification has not been completed yet.';
-  }
-
-  if (liveness?.expressionAntiSpoofPassed === false) {
-    const expr = liveness.expressionAntiSpoofReason?.trim();
-    return expr
-      ? `KYC is not done because expression anti-spoof failed: ${expr}`
-      : 'KYC is not done because facial expressions looked static or unnatural.';
-  }
-
-  const activePassed = liveness?.activeLivenessPassed ?? row.livenessPassed;
-  if (!activePassed) {
-    const detail = liveness?.activeLivenessReason?.trim();
-    if (detail) return `KYC is not done because active liveness failed: ${detail}`;
-    return 'KYC is not done because active liveness (head turn + smile) did not pass.';
-  }
-
   if (!hasAadhaarPhoto) {
-    return 'KYC is not done because the Aadhaar reference photo is missing.';
-  }
-
-  if (!row.livenessPassed) {
-    return 'KYC is not done because the full liveness pipeline has not passed yet.';
+    return 'KYC is not done because DigiLocker Aadhaar has not been captured yet.';
   }
 
   return row.kycStatusLabel?.trim()

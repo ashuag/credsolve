@@ -27,8 +27,8 @@ import {
   type CibilReportData,
   type LosApplicationDetails,
 } from '@/lib/api';
-import { KycGrantRetryButton } from '@/components/applications/kyc-grant-retry-button';
-import { canGrantKycLivenessRetryFromRow } from '@/lib/kyc-grant-retry-eligibility';
+import { KycEnableReKycButton } from '@/components/applications/kyc-enable-re-kyc-button';
+import { canEnableReKycFromRow } from '@/lib/kyc-grant-retry-eligibility';
 import { KycPipelineSteps } from '@/components/applications/kyc-pipeline-steps';
 import { KycPhotoGallery } from '@/components/shared/kyc-photo-gallery';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
@@ -556,6 +556,7 @@ function LoanDetailsPanel({
   const [generatingDocs, setGeneratingDocs] = useState(false);
   const [docsActionResult, setDocsActionResult] = useState<string | null>(null);
   const details = row.details;
+  const sanctionReviewed = Boolean(row.loanDocuments.reviewedAt ?? row.loanDocuments.acceptedAt);
   const sanctionAccepted = Boolean(row.loanDocuments.acceptedAt);
 
   if (!details) {
@@ -600,8 +601,10 @@ function LoanDetailsPanel({
           <DetailGrid
             columns={2}
             rows={[
-              { label: 'Sanction letter accepted', value: sanctionAccepted ? 'Yes' : 'No' },
-              { label: 'Sanction letter accepted at', value: formatDateTime(row.loanDocuments.acceptedAt) },
+              { label: 'Letter reviewed', value: sanctionReviewed ? 'Yes' : 'No' },
+              { label: 'Letter reviewed at', value: formatDateTime(row.loanDocuments.reviewedAt) },
+              { label: 'Sanction OTP verified', value: sanctionAccepted ? 'Yes' : 'No' },
+              { label: 'Sanction OTP verified at', value: formatDateTime(row.loanDocuments.acceptedAt) },
             ]}
           />
         </ProfileSection>
@@ -651,9 +654,15 @@ function LoanDetailsPanel({
             applicationUuid={applicationUuid}
             token={authToken}
           />
+          {row.loanDocuments.reviewedAt ? (
+            <div className="rounded-[10px] border border-[rgba(29,157,112,0.2)] bg-[rgba(29,157,112,0.06)] px-3 py-2.5">
+              <span className="block text-[0.72rem] font-extrabold text-brand-muted">Reviewed by customer</span>
+              <span className="block text-[0.78rem] font-bold text-[#14523a]">{formatDateTime(row.loanDocuments.reviewedAt)}</span>
+            </div>
+          ) : null}
           {row.loanDocuments.acceptedAt ? (
             <div className="rounded-[10px] border border-[rgba(29,157,112,0.2)] bg-[rgba(29,157,112,0.06)] px-3 py-2.5">
-              <span className="block text-[0.72rem] font-extrabold text-brand-muted">Accepted by customer</span>
+              <span className="block text-[0.72rem] font-extrabold text-brand-muted">Sanction OTP verified</span>
               <span className="block text-[0.78rem] font-bold text-[#14523a]">{formatDateTime(row.loanDocuments.acceptedAt)}</span>
             </div>
           ) : null}
@@ -713,8 +722,7 @@ function KycDetailPanel({
   onRefresh?: () => void;
 }) {
   const kycNotDoneReason = explainKycNotDone(row);
-  const showGrantKycRetry =
-    row.canGrantKycLivenessRetry || canGrantKycLivenessRetryFromRow(row);
+  const showEnableReKyc = row.canEnableReKyc || canEnableReKycFromRow(row);
   return (
     <div className="grid gap-4">
       {kycNotDoneReason ? (
@@ -722,13 +730,15 @@ function KycDetailPanel({
           {kycNotDoneReason}
         </p>
       ) : null}
-      {showGrantKycRetry ? (
-        <KycGrantRetryButton
-          row={row}
-          applicationUuid={applicationUuid}
-          authToken={authToken}
-          onSuccess={onRefresh}
-        />
+      {showEnableReKyc ? (
+        <div className="grid gap-2.5">
+          <KycEnableReKycButton
+            row={row}
+            applicationUuid={applicationUuid}
+            authToken={authToken}
+            onSuccess={onRefresh}
+          />
+        </div>
       ) : null}
       <div>
         <p className="m-0 mb-2 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">

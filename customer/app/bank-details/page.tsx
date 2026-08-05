@@ -394,13 +394,6 @@ export default function BankDetailsPage() {
             >
               Submit details
             </button>
-            <button
-              type="button"
-              onClick={() => router.push('/kyc')}
-              className="py-4 px-6 rounded-xl font-bold text-[1rem] text-slate-600 bg-white hover:bg-slate-50 transition-colors text-center border border-slate-200"
-            >
-              Back
-            </button>
           </div>
         </div>
       </div>

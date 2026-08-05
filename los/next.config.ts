@@ -42,8 +42,7 @@ const securityHeaders: { key: string; value: string }[] = [
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   {
     key: 'Permissions-Policy',
-    // Developer selfie face-check tool needs camera on this origin.
-    value: 'camera=(self), microphone=(), geolocation=(), payment=()',
+    value: 'camera=(), microphone=(), geolocation=(), payment=()',
   },
 ];
 

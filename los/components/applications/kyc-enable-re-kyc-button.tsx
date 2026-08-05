@@ -1,10 +1,10 @@
 'use client';
 
-import { grantKycLivenessRetry, type LosApplicationDetails } from '@/lib/api';
-import { canGrantKycLivenessRetryFromRow } from '@/lib/kyc-grant-retry-eligibility';
+import { enableReKyc, type LosApplicationDetails } from '@/lib/api';
+import { canEnableReKycFromRow } from '@/lib/kyc-grant-retry-eligibility';
 import { useState } from 'react';
 
-export function KycGrantRetryButton({
+export function KycEnableReKycButton({
   row,
   applicationUuid,
   authToken,
@@ -13,7 +13,7 @@ export function KycGrantRetryButton({
 }: {
   row: Pick<
     LosApplicationDetails,
-    | 'canGrantKycLivenessRetry'
+    | 'canEnableReKyc'
     | 'kycStatus'
     | 'livenessPassed'
     | 'livenessCheckCompleted'
@@ -21,6 +21,7 @@ export function KycGrantRetryButton({
     | 'livenessCheckedAt'
     | 'statusCode'
     | 'lead'
+    | 'kycPhotos'
   >;
   applicationUuid: string;
   authToken: string | null;
@@ -31,15 +32,14 @@ export function KycGrantRetryButton({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const eligible =
-    row.canGrantKycLivenessRetry || canGrantKycLivenessRetryFromRow(row);
+  const eligible = row.canEnableReKyc || canEnableReKycFromRow(row);
 
   if (!eligible) return null;
 
-  const handleGrant = async () => {
+  const handleEnable = async () => {
     if (!authToken || busy) return;
     const confirmed = window.confirm(
-      'Grant this customer one more KYC liveness attempt? They will be able to return to the selfie step and try again.',
+      'Enable re-KYC for this customer? This resets KYC so they can redo DigiLocker / document verification. DigiLocker is cleared only when KYC previously failed identity checks.',
     );
     if (!confirmed) return;
 
@@ -47,15 +47,18 @@ export function KycGrantRetryButton({
     setError(null);
     setMessage(null);
     try {
-      const result = await grantKycLivenessRetry(authToken, applicationUuid);
-      setMessage(
-        result.leadRecovered
-          ? 'Retry granted. Lead moved back to in progress — customer can resume KYC.'
-          : 'Retry granted — customer can resume KYC from the selfie step.',
-      );
+      const result = await enableReKyc(authToken, applicationUuid);
+      const parts = ['Re-KYC enabled — customer can redo KYC from the app.'];
+      if (result.digilockerCleared) {
+        parts.push('DigiLocker Aadhaar was cleared; they must reconnect DigiLocker.');
+      }
+      if (result.leadRecovered || result.applicationRecovered) {
+        parts.push('Lead/application moved back to in progress.');
+      }
+      setMessage(parts.join(' '));
       onSuccess?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to grant KYC retry.');
+      setError(e instanceof Error ? e.message : 'Failed to enable re-KYC.');
     } finally {
       setBusy(false);
     }
@@ -67,9 +70,9 @@ export function KycGrantRetryButton({
         type="button"
         className="los-btn-primary min-h-[38px] px-4 text-[0.82rem]"
         disabled={!authToken || busy}
-        onClick={() => void handleGrant()}
+        onClick={() => void handleEnable()}
       >
-        {busy ? 'Granting…' : 'Grant customer 1 KYC retry'}
+        {busy ? 'Enabling…' : 'Enable re-KYC'}
       </button>
       {message ? (
         <p className="m-0 mt-2 text-[0.82rem] leading-[1.45] text-[var(--ok,#15803d)]">{message}</p>

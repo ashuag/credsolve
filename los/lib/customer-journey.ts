@@ -95,6 +95,16 @@ export function buildLeadIntakeJourney(lead: LosLeadDetails): JourneyStep[] {
   return markActiveStep(steps);
 }
 
+/** KYC step is done when DigiLocker / docs KYC status is completed (selfie/liveness removed pending rewrite). */
+function isKycAndLivenessDone(row: LosApplicationDetails): boolean {
+  return row.kycStatus === KYC_COMPLETED && row.kycCompletedAt != null;
+}
+
+function kycJourneyDetail(row: LosApplicationDetails, kycDone: boolean): string | undefined {
+  if (kycDone) return 'Completed';
+  return row.kycStatusLabel && row.kycStatusLabel !== 'Not started' ? row.kycStatusLabel : undefined;
+}
+
 /** Full customer journey on an application workspace (matches customer portal order). */
 export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep[] {
   const profile = row.lead.profile;
@@ -109,8 +119,11 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
   const loanDone = Boolean(row.details?.loanAmount);
   const refsDone = (row.referencesCount ?? 0) >= 2;
   const emailDone = Boolean(row.emailVerifiedAt);
-  const docsDone = Boolean(row.loanDocuments.acceptedAt);
-  const kycDone = row.kycStatus === KYC_COMPLETED && row.kycCompletedAt != null;
+  /** Agree on /loan-documents (no OTP). */
+  const letterReviewed = Boolean(row.loanDocuments.reviewedAt ?? row.loanDocuments.acceptedAt);
+  /** Mobile OTP after references. */
+  const letterAccepted = Boolean(row.loanDocuments.acceptedAt);
+  const kycDone = isKycAndLivenessDone(row);
   const bankDone = Boolean(row.disbursement?.accountNumber || row.disbursement?.disbursedAt);
 
   const rejectionDetail =
@@ -123,10 +136,11 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
     credit: panDone && bureauDone,
     loan: loanDone,
     email: emailDone,
-    letter: docsDone,
+    letter: letterReviewed,
     kyc: kycDone,
     bank: bankDone,
     refs: refsDone,
+    esign: letterAccepted,
   } as const;
   const failedById = {
     profile: false,
@@ -137,13 +151,15 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
     kyc: kycFailed,
     bank: false,
     refs: false,
+    esign: false,
   } as const;
   const detailById: Partial<Record<(typeof APPLICATION_JOURNEY_STAGES)[number]['id'], string | undefined>> = {
     credit: row.bureauReport?.cibilScore != null ? `CIBIL ${row.bureauReport.cibilScore}` : undefined,
     loan: row.details?.loanAmount ? `₹${row.details.loanAmount}` : undefined,
-    letter: row.loanDocuments.acceptedAt ? 'Accepted' : undefined,
-    kyc: row.kycStatusLabel,
+    letter: letterAccepted ? 'Accepted' : letterReviewed ? 'Reviewed' : undefined,
+    kyc: kycJourneyDetail(row, kycDone),
     refs: refsDone ? `${row.referencesCount} saved` : undefined,
+    esign: letterAccepted ? 'Verified' : undefined,
   };
 
   const steps: JourneyStep[] = APPLICATION_JOURNEY_STAGES.map((stage) =>
@@ -178,7 +194,10 @@ export type ApplicationListStageInput = {
   kycStatusLabel: string;
   kycCompletedAt: string | null;
   emailVerifiedAt: string | null;
+  loanDocumentsReviewedAt: string | null;
   loanDocumentsAcceptedAt: string | null;
+  /** Kept for API compat; KYC stage no longer requires liveness. */
+  livenessPassed: boolean;
   selectedLoanAmount: string | null;
   referencesCount: number;
   bankAccountNumber: string | null;
@@ -209,7 +228,8 @@ export function resolveApplicationStageLabel(input: ApplicationListStageInput): 
   const bureauDone = input.bureauFetched === BUREAU_FETCHED.SUCCESS;
   const loanDone = Boolean(input.selectedLoanAmount);
   const emailDone = Boolean(input.emailVerifiedAt);
-  const docsDone = Boolean(input.loanDocumentsAcceptedAt);
+  const letterReviewed = Boolean(input.loanDocumentsReviewedAt ?? input.loanDocumentsAcceptedAt);
+  const letterAccepted = Boolean(input.loanDocumentsAcceptedAt);
   const kycDone = input.kycStatus === KYC_COMPLETED && input.kycCompletedAt != null;
   const bankDone = Boolean(input.bankAccountNumber || input.disbursedAt);
   const refsDone = input.referencesCount >= 2;
@@ -219,10 +239,11 @@ export function resolveApplicationStageLabel(input: ApplicationListStageInput): 
     credit: panDone && bureauDone,
     loan: loanDone,
     email: emailDone,
-    letter: docsDone,
+    letter: letterReviewed,
     kyc: kycDone,
     bank: bankDone,
     refs: refsDone,
+    esign: letterAccepted,
   } as const;
 
   const active = APPLICATION_JOURNEY_STAGES.find((stage) => !doneById[stage.id]);

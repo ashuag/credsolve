@@ -36,10 +36,6 @@ const DEFAULTS: Record<RateLimitRouteId, { max: number; windowSec: number }> = {
   'bank-details': { max: 20, windowSec: 3600 },
   'bank-ifsc-lookup': { max: 40, windowSec: 3600 },
   'bank-submit-verified': { max: 15, windowSec: 3600 },
-  'kyc-selfie': { max: 30, windowSec: 3600 },
-  'kyc-liveness': { max: 25, windowSec: 3600 },
-  // Polled ~once/second by the active-liveness UI while aligning the face — keep generous.
-  'kyc-face-position': { max: 240, windowSec: 60 },
   'loan-documents': { max: 60, windowSec: 3600 },
   'loan-documents-otp': { max: 20, windowSec: 3600 },
   'loan-repay': { max: 20, windowSec: 3600 },

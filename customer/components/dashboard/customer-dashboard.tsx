@@ -15,66 +15,14 @@ import { formatInr } from '@/lib/format-inr';
 import {
   getCustomerJourneyResumePath,
   isCustomerPortalSignedIn,
-  type CustomerSessionResponse,
 } from '@/lib/api/customer-session';
+import {
+  buildCustomerJourneyProgress,
+  CUSTOMER_JOURNEY_PROGRESS_STEPS,
+  type CustomerJourneyProgressStep,
+} from '@/lib/customer-journey-progress';
 import { cn } from '@/lib/cn';
 import { formatIsoDateDdMmYyyy } from '@/lib/format-date';
-
-type JourneyStepState = 'done' | 'current' | 'todo';
-
-type JourneyStep = {
-  key: string;
-  label: string;
-  shortLabel: string;
-  state: JourneyStepState;
-};
-
-const ALL_STEPS: Array<{ key: string; label: string; shortLabel: string }> = [
-  { key: 'mobile', label: 'Mobile verified', shortLabel: 'Mobile' },
-  { key: 'details', label: 'Personal details', shortLabel: 'Details' },
-  { key: 'loan', label: 'Loan selection', shortLabel: 'Loan' },
-  { key: 'kyc', label: 'KYC documents', shortLabel: 'KYC' },
-  { key: 'bank', label: 'Bank details', shortLabel: 'Bank' },
-  { key: 'references', label: 'References', shortLabel: 'Refs' },
-];
-
-function buildJourneySteps(
-  session: CustomerSessionResponse | null
-): { steps: JourneyStep[]; nextLabel: string; completed: number; total: number } {
-  const total = ALL_STEPS.length;
-
-  const flags: Record<string, boolean> = {
-    mobile: Boolean(session?.authenticated),
-    details: Boolean(session?.authenticated && session.journey.detailsCompleted),
-    loan: Boolean(session?.authenticated && session.journey.loanSelectionCompleted),
-    kyc: Boolean(session?.authenticated && session.journey.kycCompleted),
-    references: Boolean(session?.authenticated && session.journey.referencesCompleted),
-    bank: Boolean(session?.authenticated && session.journey.bankDetailsCompleted),
-  };
-
-  let foundCurrent = false;
-  let completed = 0;
-  const steps: JourneyStep[] = ALL_STEPS.map((s) => {
-    const isDone = flags[s.key];
-    if (isDone) {
-      completed += 1;
-      return { ...s, state: 'done' as const };
-    }
-    if (!foundCurrent) {
-      foundCurrent = true;
-      return { ...s, state: 'current' as const };
-    }
-    return { ...s, state: 'todo' as const };
-  });
-
-  const next = steps.find((s) => s.state === 'current');
-  return {
-    steps,
-    nextLabel: next ? next.label : 'All steps complete',
-    completed,
-    total,
-  };
-}
 
 function statusBadgeClass(status: string): string {
   const s = status.toUpperCase();
@@ -134,7 +82,7 @@ function JourneyTracker({
   completed,
   total,
 }: {
-  steps: JourneyStep[];
+  steps: CustomerJourneyProgressStep[];
   completed: number;
   total: number;
 }) {
@@ -153,10 +101,12 @@ function JourneyTracker({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <ol className="flex items-start justify-between gap-1">
+      <ol className="flex items-start justify-between gap-0.5 sm:gap-1">
         {steps.map((step) => {
           const done = step.state === 'done';
           const current = step.state === 'current';
+          const stepNumber =
+            CUSTOMER_JOURNEY_PROGRESS_STEPS.findIndex((s) => s.key === step.key) + 1;
           return (
             <li key={step.key} className="flex min-w-0 flex-1 flex-col items-center gap-1.5 text-center">
               <span
@@ -170,11 +120,11 @@ function JourneyTracker({
                 )}
                 aria-current={current ? 'step' : undefined}
               >
-                {done ? <CheckIcon /> : ALL_STEPS.findIndex((s) => s.key === step.key) + 1}
+                {done ? <CheckIcon /> : stepNumber}
               </span>
               <span
                 className={cn(
-                  'truncate text-[0.62rem] font-bold uppercase tracking-wider',
+                  'truncate text-[0.55rem] font-bold uppercase tracking-wider sm:text-[0.62rem]',
                   done ? 'text-emerald-700' : current ? 'text-brand-navy' : 'text-slate-400'
                 )}
               >
@@ -207,7 +157,7 @@ function ResumeJourneyCard({
 }: {
   loan: CustomerLoanCard;
   resumeHref: string;
-  steps: JourneyStep[];
+  steps: CustomerJourneyProgressStep[];
   completed: number;
   total: number;
   nextLabel: string;
@@ -467,7 +417,7 @@ export function CustomerDashboard() {
   const resumeHref =
     session && isCustomerPortalSignedIn(session) ? getCustomerJourneyResumePath(session) : '/apply-for-loan';
 
-  const journey = useMemo(() => buildJourneySteps(session), [session]);
+  const journey = useMemo(() => buildCustomerJourneyProgress(session), [session]);
 
   if (sessionLoading || (!sessionLoading && !isCustomerPortalSignedIn(session))) {
     return (

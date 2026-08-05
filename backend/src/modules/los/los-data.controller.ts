@@ -87,12 +87,13 @@ export class LosDataController {
     return this.losDisbursement.disburseApplication(applicationUuid);
   }
 
-  @Post('applications/:applicationUuid/kyc/grant-retry')
+  @Post('applications/:applicationUuid/kyc/enable-re-kyc')
   @ApiOperation({
-    summary: 'Grant the customer one more KYC liveness attempt after failure or INTERNAL_ERROR escalation',
+    summary:
+      'Enable re-KYC: reset DigiLocker / KYC status so the customer can redo identity verification',
   })
-  grantKycLivenessRetry(@Param('applicationUuid') applicationUuid: string) {
-    return this.losApplication.grantKycLivenessRetry(applicationUuid);
+  enableReKyc(@Param('applicationUuid') applicationUuid: string) {
+    return this.losApplication.enableReKyc(applicationUuid);
   }
 
   @Get('applications/:applicationUuid/kyc/selfie-photo')

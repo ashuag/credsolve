@@ -30,8 +30,8 @@ const DEFAULT_MAX_ATTEMPTS = 3;
 type DownloadFailureKind = 'retryable' | 'identity_mismatch' | 'missing_token' | 'not_configured';
 
 function describeContinueStep(href: string): string {
-  if (href.startsWith('/kyc/selfie')) {
-    return 'Next: save a selfie and complete face verification for this application.';
+  if (href.startsWith('/bank')) {
+    return 'Next: add your bank details to continue your application.';
   }
   if (href.startsWith('/kyc')) {
     return 'Return to the KYC hub to pick up where you left off.';
@@ -272,11 +272,7 @@ function DigilockerCallbackContent() {
             : '/apply-for-loan';
         setContinueHref(href);
         setStatus('done');
-        setMessage(
-          href.startsWith('/kyc/selfie')
-            ? 'Aadhaar details were saved. Next, take a selfie to finish identity verification.'
-            : 'Aadhaar details were saved. Continue to the next step.',
-        );
+        setMessage('Aadhaar details were saved. Continue to the next step.');
     } catch (e) {
       setStatus('error');
       setFailureKind('retryable');
@@ -332,11 +328,7 @@ function DigilockerCallbackContent() {
             : '/apply-for-loan';
         setContinueHref(href);
         setStatus('done');
-        setMessage(
-          href.startsWith('/kyc/selfie')
-            ? 'Aadhaar details were saved. Next, take a selfie to finish identity verification.'
-            : 'Aadhaar details were saved. Continue to the next step.',
-        );
+        setMessage('Aadhaar details were saved. Continue to the next step.');
         return;
       }
 

@@ -20,9 +20,8 @@ import {
   mapLosLoanDetailsFromStaging,
 } from '../../../common/loan/loan-disbursement-view.util';
 import { APPLICATION_KYC_STATUS, APPLICATION_STATUS } from '../../../common/constants/application.constants';
-import { KYC_LIVENESS_MAX_ATTEMPTS } from '../../../common/constants/kyc.constants';
 import { LEAD_STATUS } from '../../../common/constants/lead.constants';
-import { canGrantKycLivenessRetry } from '../kyc-grant-retry.util';
+import { canEnableReKyc } from '../kyc-grant-retry.util';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -199,10 +198,11 @@ export class LosApplicationService {
             interestRate: true,
             emailId: true,
             emailVerifiedAt: true,
+            loanDocumentsReviewedAt: true,
             loanDocumentsAcceptedAt: true,
           },
         },
-        kyc: { select: { kycStatus: true, kycCompletedAt: true } },
+        kyc: { select: { kycStatus: true, kycCompletedAt: true, livenessPassed: true } },
         _count: { select: { references: true } },
         loanAccount: {
           select: {
@@ -268,7 +268,9 @@ export class LosApplicationService {
         kycCompleted: kycStatus === 1,
         kycCompletedAt: application.kyc?.kycCompletedAt?.toISOString() ?? null,
         emailVerifiedAt: appDetails?.emailVerifiedAt?.toISOString() ?? null,
+        loanDocumentsReviewedAt: appDetails?.loanDocumentsReviewedAt?.toISOString() ?? null,
         loanDocumentsAcceptedAt: appDetails?.loanDocumentsAcceptedAt?.toISOString() ?? null,
+        livenessPassed: application.kyc?.livenessPassed ?? false,
         referencesCount: application._count.references,
         bankAccountNumber: appDetails?.bankAccountNumber ?? null,
         disbursedAt: loanAccount?.disbursedAt?.toISOString() ?? null,
@@ -417,7 +419,8 @@ export class LosApplicationService {
             ? `/applications/${application.uuid}/kyc/liveness-video`
             : null),
       },
-      canGrantKycLivenessRetry: canGrantKycLivenessRetry({
+      canGrantKycLivenessRetry: false,
+      canEnableReKyc: canEnableReKyc({
         kycStatus: application.kyc?.kycStatus ?? 0,
         livenessPassed: application.kyc?.livenessPassed ?? false,
         livenessCheckCompleted: application.kyc?.isLiveness ?? false,
@@ -425,6 +428,7 @@ export class LosApplicationService {
         livenessCheckedAt: application.kyc?.livenessCheckedAt ?? null,
         applicationStatusCode: application.applicationStatus.name,
         leadStatusCode: lead.leadStatus.name,
+        hasKycArtifacts: Boolean(selfieRelativePath?.trim() || aadhaarPhotoRelativePath?.trim()),
       }),
       preApprovedLoanAmount: application.preApprovedLoanAmount?.toString() ?? null,
       createdAt: application.createdAt.toISOString(),
@@ -527,6 +531,7 @@ export class LosApplicationService {
         keyFactDisbursementReady: !!application.details?.keyFactDisbursementPdfRelativePath?.trim(),
         keyFactDisbursementEsigned: application.details?.keyFactDisbursementEsigned ?? false,
         loanAgreementReady: !!application.details?.loanAgreementPdfRelativePath?.trim(),
+        reviewedAt: application.details?.loanDocumentsReviewedAt?.toISOString() ?? null,
         acceptedAt: application.details?.loanDocumentsAcceptedAt?.toISOString() ?? null,
       },
     };
@@ -877,10 +882,10 @@ export class LosApplicationService {
   }
 
   /**
-   * Grants the customer one more KYC liveness attempt after attempts are exhausted
-   * or the lead was escalated to INTERNAL_ERROR. Keeps prior audit JSON for LOS review.
+   * Enables full re-KYC: resets DigiLocker / KYC status so the customer can redo
+   * identity verification. Selfie/liveness pipeline removed pending rewrite.
    */
-  async grantKycLivenessRetry(applicationUuid: string) {
+  async enableReKyc(applicationUuid: string) {
     const application = await this.prisma.client.application.findUnique({
       where: { uuid: applicationUuid },
       include: {
@@ -917,12 +922,11 @@ export class LosApplicationService {
       livenessCheckedAt: kyc.livenessCheckedAt,
       applicationStatusCode: application.applicationStatus.name,
       leadStatusCode: application.lead.leadStatus.name,
+      hasKycArtifacts: Boolean(kyc.livenessSelfiePath?.trim()),
     };
 
-    if (!canGrantKycLivenessRetry(snapshot)) {
-      throw new BadRequestException(
-        'This application is not eligible for a KYC liveness retry grant.',
-      );
+    if (!canEnableReKyc(snapshot)) {
+      throw new BadRequestException('This application is not eligible for re-KYC.');
     }
 
     const loanSelectionCompleted = Boolean(
@@ -953,37 +957,69 @@ export class LosApplicationService {
       loanSelectionCompleted && convertedLeadStatus ? convertedLeadStatus : inProgressLeadStatus;
 
     const leadWasInternalError = application.lead.leadStatus.name === LEAD_STATUS.INTERNAL_ERROR;
+    const leadWasRejected = application.lead.leadStatus.name === LEAD_STATUS.REJECTED;
     const appWasInternalError = application.applicationStatus.name === APPLICATION_STATUS.INTERNAL_ERROR;
-    const retryAttempts = Math.max(0, KYC_LIVENESS_MAX_ATTEMPTS - 1);
+    const appWasKycFailed = application.applicationStatus.name === APPLICATION_STATUS.KYC_FAILED;
+    const clearDigilockerIdentity =
+      kyc.kycStatus === APPLICATION_KYC_STATUS.FAILED || appWasKycFailed;
 
     await this.prisma.client.$transaction(async (tx) => {
       await tx.applicationKyc.update({
         where: { applicationId: application.id },
         data: {
+          kycStatus: APPLICATION_KYC_STATUS.NOT_DONE,
+          kycCompletedAt: null,
+          livenessSelfiePath: null,
           isLiveness: false,
+          livenessCheckedAt: null,
           livenessDoneAt: null,
           livenessPassed: false,
-          livenessAttempts: retryAttempts,
-          ...(kyc.kycStatus === APPLICATION_KYC_STATUS.TECHNICAL_ISSUE
-            ? { kycStatus: APPLICATION_KYC_STATUS.NOT_DONE }
-            : {}),
+          livenessVendorJson: Prisma.JsonNull,
+          livenessVideoPath: null,
+          faceMatchCheckedAt: null,
+          selfieFaceValidationJson: Prisma.JsonNull,
+          selfieFaceValidationPassed: false,
+          livenessAttempts: 0,
+          ...(clearDigilockerIdentity ? { digilockerAadhaarDownloadAttempts: 0 } : {}),
         },
       });
 
-      if (leadWasInternalError) {
+      if (clearDigilockerIdentity) {
+        const customerKyc = await tx.customerKyc.findFirst({
+          where: { customerId: application.customerId },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true },
+        });
+        if (customerKyc) {
+          await tx.customerKyc.update({
+            where: { id: customerKyc.id },
+            data: {
+              aadhaarVerifiedAt: null,
+              aadhaarData: Prisma.JsonNull,
+              aadhaarPhotoPath: null,
+            },
+          });
+        }
+      }
+
+      if (leadWasInternalError || leadWasRejected) {
         await tx.lead.update({
           where: { id: application.leadId },
           data: {
             leadStatusId: recoveryLeadStatus.id,
             leadStatusNote: null,
+            rejectionReasonId: null,
           },
         });
       }
 
-      if (appWasInternalError && inReviewAppStatus) {
+      if ((appWasInternalError || appWasKycFailed) && inReviewAppStatus) {
         await tx.application.update({
           where: { id: application.id },
-          data: { applicationStatusId: inReviewAppStatus.id },
+          data: {
+            applicationStatusId: inReviewAppStatus.id,
+            rejectionReasonId: null,
+          },
         });
       }
     });
@@ -992,9 +1028,9 @@ export class LosApplicationService {
       success: true as const,
       applicationUuid,
       leadUuid: application.lead.uuid,
-      livenessAttemptsRemaining: 1,
-      leadRecovered: leadWasInternalError,
-      applicationRecovered: appWasInternalError,
+      digilockerCleared: clearDigilockerIdentity,
+      leadRecovered: leadWasInternalError || leadWasRejected,
+      applicationRecovered: appWasInternalError || appWasKycFailed,
     };
   }
 

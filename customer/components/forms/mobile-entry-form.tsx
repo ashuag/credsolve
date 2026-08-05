@@ -56,7 +56,7 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
         className="text-[0.95rem] font-extrabold text-brand-navy transition-colors duration-[180ms] group-focus-within/form:text-brand-blue group-focus-within/form:-translate-y-px"
         htmlFor="mobile"
       >
-        Mobile number
+        Mobile number linked with aadhaar number
       </label>
 
       <div className={mobileFieldClassName} style={{ gridTemplateColumns: '78px 1fr' }}>

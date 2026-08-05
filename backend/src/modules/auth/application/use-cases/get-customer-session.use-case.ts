@@ -26,9 +26,7 @@ import { LeadRepository } from '../../infrastructure/repositories/lead.repositor
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
 import {
   DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS,
-  KYC_LIVENESS_MAX_ATTEMPTS,
 } from '../../../../common/constants/kyc.constants';
-import { isActiveLivenessDisabled } from '../../../../common/kyc/kyc-active-liveness.util';
 import { VendorInternalErrorService } from '../../../../common/vendor/vendor-internal-error.service';
 import { resolveLiveTenureDays } from '../../../../common/loan/loan-calculation.util';
 import { fetchLatestApplicationKycSnapshot } from '../../../../prisma/application-kyc-snapshot.query';
@@ -266,22 +264,11 @@ export class GetCustomerSessionUseCase {
     const loanDocumentsAccepted = Boolean(application?.loanDocumentsAcceptedAt);
 
     const kycDocsCount = countUploadedKycDocuments(latestCustomerKyc?.aadhaarData);
-    const livenessOptional = isActiveLivenessDisabled();
-    const hasSavedSelfie = Boolean(application?.selfieRelativePath?.trim());
     const hasDigilockerForm = isDigilockerAadhaarCaptureComplete(application?.digilockerAadhaarFormJson ?? null);
-    /** Active liveness can be disabled by env (dev/calibration); DigiLocker + a stored selfie are always required for this path. */
-    const faceStepCompleteForJourney = Boolean(
-      application &&
-        hasDigilockerForm &&
-        hasSavedSelfie &&
-        (application.livenessPassed === true || livenessOptional),
-    );
-
+    /** Selfie/liveness removed pending rewrite — DigiLocker Aadhaar or manual docs complete KYC. */
     const kycCompleted = Boolean(
-      faceStepCompleteForJourney ||
-        (application?.kycStatus === APPLICATION_KYC_STATUS.COMPLETED &&
-          hasDigilockerForm &&
-          hasSavedSelfie) ||
+      hasDigilockerForm ||
+        application?.kycStatus === APPLICATION_KYC_STATUS.COMPLETED ||
         (latestCustomerKyc && kycDocsCount >= 3),
     );
 
@@ -338,23 +325,21 @@ export class GetCustomerSessionUseCase {
             digilockerAadhaarCaptured: isDigilockerAadhaarCaptureComplete(
               application.digilockerAadhaarFormJson,
             ),
-            selfieCaptured: Boolean(application.selfieRelativePath?.trim()),
-            livenessPassed: application.livenessPassed === true,
-            livenessCheckCompleted: application.livenessCheckCompleted === true,
-            livenessRequired: !livenessOptional,
+            // Selfie/liveness fields retained as stubs for older clients until rewrite.
+            selfieCaptured: false,
+            livenessPassed: false,
+            livenessCheckCompleted: false,
+            livenessRequired: false,
             digilockerAadhaarForm: application.digilockerAadhaarFormJson ?? null,
             digilockerAadhaarPhotoUrl: application.aadhaarPhotoRelativePath?.trim()
               ? '/auth/kyc/digilocker-aadhaar-photo'
               : null,
-            kycSelfiePhotoUrl: application.selfieRelativePath?.trim() ? '/auth/kyc/selfie-photo' : null,
-            selfieUpdatedAt:
-              application.selfieRelativePath?.trim() && applicationExtras?.updatedAt
-                ? applicationExtras.updatedAt.toISOString()
-                : null,
+            kycSelfiePhotoUrl: null,
+            selfieUpdatedAt: null,
             digilockerAadhaarDownloadAttempts,
             digilockerAadhaarDownloadMaxAttempts: DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS,
-            livenessAttempts: application.livenessAttempts ?? 0,
-            livenessMaxAttempts: KYC_LIVENESS_MAX_ATTEMPTS,
+            livenessAttempts: 0,
+            livenessMaxAttempts: 0,
           }
         : null;
 

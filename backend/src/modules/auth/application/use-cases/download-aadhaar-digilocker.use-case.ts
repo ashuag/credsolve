@@ -16,6 +16,7 @@ import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
 import { DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS } from '../../../../common/constants/kyc.constants';
 import { KycDigilockerDownloadFailureService } from '../../../../common/kyc/kyc-digilocker-download-failure.service';
 import { KycIdentityRejectionService } from '../../../../common/kyc/kyc-identity-rejection.service';
+import { KycCompletionService } from '../../../../common/kyc/kyc-completion.service';
 import { assertApplicationKycNotCompleted } from '../../../../common/kyc/application-kyc-guard.util';
 import { assertActiveApplicationLoanDocumentsAccepted } from '../../../../common/loan-documents/application-loan-documents-guard.util';
 import { PrismaService } from '../../../../prisma/prisma.service';
@@ -57,6 +58,7 @@ export class DownloadAadhaarDigilockerUseCase {
     private readonly kycFiles: KycFilesService,
     private readonly kycIdentityRejection: KycIdentityRejectionService,
     private readonly kycDigilockerDownloadFailure: KycDigilockerDownloadFailureService,
+    private readonly kycCompletion: KycCompletionService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -211,7 +213,14 @@ export class DownloadAadhaarDigilockerUseCase {
       });
       persisted = true;
       await this.digilockerSession.clear(application.uuid);
-      // KYC is completed only after selfie (+ liveness when required), not on Aadhaar download alone.
+      // Selfie/liveness removed pending rewrite — DigiLocker Aadhaar completes KYC.
+      await this.kycCompletion.completeFromDigilockerAadhaar({
+        applicationId: application.id,
+        customerId: customer.id,
+        digilockerAadhaarFormJson: formJson as Prisma.JsonValue,
+        aadhaarPhotoRelativePath: photoRel,
+        verifiedAt: new Date(),
+      });
     } catch (err) {
       this.logger.error(
         `Failed to persist DigiLocker Aadhaar artifacts: ${err instanceof Error ? err.message : String(err)}`,

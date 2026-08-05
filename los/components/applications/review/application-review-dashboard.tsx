@@ -236,7 +236,9 @@ export function ApplicationReviewDashboard({
                 <span className={`pc-pct${isRejected ? ' rejected' : ''}`}>{isRejected ? 'Rejected' : `${progressPct}%`}</span>
               </div>
               <div className="pc-sub">
-                {isRejected ? 'This application will not move forward in the pipeline' : 'Intake through KYC, bank details, and references'}
+                {isRejected
+                  ? 'This application will not move forward in the pipeline'
+                  : 'Letter review through KYC, bank, references, and sanction OTP'}
               </div>
               <div className="pbar">
                 <i style={{ width: isRejected ? '100%' : `${progressPct}%` }} className={isRejected ? 'rejected' : undefined} />

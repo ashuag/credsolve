@@ -27,7 +27,6 @@ import { LosTeamService } from './los-team.service';
 import { LosRejectionService } from './services/los-rejection.service';
 import { LosDisbursementService } from './services/los-disbursement.service';
 import { LosLoanService } from './services/los-loan.service';
-import { LosKycDevToolsService } from './services/los-kyc-dev-tools.service';
 import { LosCibilDevToolsService } from './services/los-cibil-dev-tools.service';
 
 @Module({
@@ -56,7 +55,6 @@ import { LosCibilDevToolsService } from './services/los-cibil-dev-tools.service'
     LosRejectionService,
     LosDisbursementService,
     LosLoanService,
-    LosKycDevToolsService,
     LosCibilDevToolsService,
   ],
   exports: [LosSessionService],

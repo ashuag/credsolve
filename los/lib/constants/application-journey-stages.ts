@@ -1,6 +1,6 @@
 /**
  * Canonical customer-journey stages for an application.
- * Keep list order identical to the customer portal / application review journey.
+ * Order matches customer portal: letter review → KYC → bank → refs → sanction OTP.
  */
 export const APPLICATION_JOURNEY_STAGES = [
   { id: 'profile', label: 'Profile' },
@@ -8,9 +8,10 @@ export const APPLICATION_JOURNEY_STAGES = [
   { id: 'loan', label: 'Loan offer' },
   { id: 'email', label: 'Email OTP' },
   { id: 'letter', label: 'Sanction letter' },
-  { id: 'kyc', label: 'KYC & liveness' },
+  { id: 'kyc', label: 'KYC' },
   { id: 'bank', label: 'Bank details' },
   { id: 'refs', label: 'References' },
+  { id: 'esign', label: 'Sanction OTP' },
 ] as const;
 
 export type ApplicationJourneyStageId = (typeof APPLICATION_JOURNEY_STAGES)[number]['id'];

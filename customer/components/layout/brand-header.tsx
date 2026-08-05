@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CustomerAccountMenu } from '@/components/layout/customer-account-menu';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import {
@@ -16,6 +16,11 @@ import { buildHrefWithSearch } from '@/lib/navigation';
 export function BrandHeader() {
   const searchParams = useSearchParams();
   const { loading, session } = useCustomerSession();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const applyHref = buildHrefWithSearch('/apply-for-loan', searchParams);
   const loginHref = buildHrefWithSearch('/my-account', searchParams, { mode: 'login' });
@@ -34,16 +39,20 @@ export function BrandHeader() {
     <header className="sticky top-0 z-20 border-b border-b-[rgba(18,36,79,0.09)] bg-[rgba(255,253,248,0.95)] backdrop-blur-[24px] shadow-[0_4px_32px_rgba(23,44,113,0.08)]">
       <div className="mx-auto flex h-[72px] max-w-[min(1280px,calc(100%-32px))] items-center justify-between gap-3 sm:gap-6 sm:h-20">
         <Link href="/" className="inline-flex h-full items-center shrink-0 transition-transform duration-200 hover:scale-[1.02]" aria-label="MoneyCash home">
-          <Image
-            src="/images/moneycash-logo.png"
-            alt="MoneyCash — Instant Digital Loans"
-            width={957}
-            height={379}
-            sizes="(max-width: 640px) 150px, 175px"
-            quality={95}
-            priority
-            className="block h-14 w-auto object-contain sm:h-16"
-          />
+          {!mounted ? (
+            <div className="block h-14 sm:h-16 aspect-[957/379]" aria-hidden />
+          ) : (
+            <Image
+              src="/images/moneycash-logo.png"
+              alt="MoneyCash — Instant Digital Loans"
+              width={957}
+              height={379}
+              sizes="(max-width: 640px) 150px, 175px"
+              quality={95}
+              priority
+              className="block h-14 w-auto object-contain sm:h-16"
+            />
+          )}
         </Link>
 
         <nav className="flex shrink-0 items-center justify-end gap-2 sm:gap-4" aria-label="Primary">

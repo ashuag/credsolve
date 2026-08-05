@@ -48,22 +48,25 @@ export type CustomerLeadReferenceSnapshot = {
 export type CustomerKycFaceProgress = {
   applicationKycStatus: number;
   digilockerAadhaarCaptured: boolean;
-  selfieCaptured: boolean;
-  livenessPassed: boolean;
-  /** When `true`, KYC face pipeline finished (pass or fail) — do not resume selfie on failure. */
+  /** @deprecated Selfie/liveness removed — field kept optional for older API payloads. */
+  selfieCaptured?: boolean;
+  /** @deprecated Selfie/liveness removed — field kept optional for older API payloads. */
+  livenessPassed?: boolean;
+  /** @deprecated Selfie/liveness removed. */
   livenessCheckCompleted?: boolean;
-  /** When `false`, face step does not require calling the liveness API (server pause). */
+  /** @deprecated Selfie/liveness removed. */
   livenessRequired?: boolean;
   digilockerAadhaarForm: unknown | null;
   digilockerAadhaarPhotoUrl: string | null;
-  /** Cookie-auth `GET …/auth/kyc/selfie-photo` when a selfie exists. */
+  /** @deprecated Selfie/liveness removed. */
   kycSelfiePhotoUrl?: string | null;
+  /** @deprecated Selfie/liveness removed. */
   selfieUpdatedAt?: string | null;
   digilockerAadhaarDownloadAttempts?: number;
   digilockerAadhaarDownloadMaxAttempts?: number;
-  /** Failed KYC liveness / face-match runs so far. */
+  /** @deprecated Selfie/liveness removed. */
   livenessAttempts?: number;
-  /** Total allowed liveness runs before escalation to thank-you. */
+  /** @deprecated Selfie/liveness removed. */
   livenessMaxAttempts?: number;
 };
 
@@ -158,59 +161,24 @@ export function isInternalErrorLead(
   return status === CUSTOMER_LEAD_STATUS.INTERNAL_ERROR;
 }
 
-/** True when the customer still has at least one KYC liveness attempt left (including after LOS grant). */
-export function hasKycLivenessRetryRemaining(
-  kyc: CustomerKycFaceProgress | null | undefined,
-): boolean {
-  if (!kyc || kyc.livenessPassed) return false;
-  const max = kyc.livenessMaxAttempts ?? 3;
-  const used = kyc.livenessAttempts ?? 0;
-  return used < max;
-}
-
-/**
- * Customer should continue on `/kyc/selfie` (DigiLocker done; selfie and/or liveness still pending).
- * Returns false when the face pipeline finished with no retries left (thank-you).
- */
-export function shouldResumeKycSelfie(
-  session: CustomerSessionResponse | null | undefined,
-): boolean {
-  if (!session?.authenticated || !session.lead) return false;
-  if (isLeadRejectedAndLocked(session.lead)) return false;
-
-  const journey = session.journey;
-  if (!journey.detailsCompleted || !journey.loanSelectionCompleted) return false;
-  if (!session.lead.emailVerified) return false;
-  if (!isLoanDocumentsJourneyComplete(session)) return false;
-
-  const kyc = session.kycFaceProgress;
-  if (!kyc?.digilockerAadhaarCaptured) return false;
-  if (kyc.livenessPassed) return false;
-
-  if (kyc.livenessCheckCompleted && !hasKycLivenessRetryRemaining(kyc)) {
-    return false;
-  }
-
-  const livenessNeeded = kyc.livenessRequired !== false;
-  return !kyc.selfieCaptured || (livenessNeeded && !kyc.livenessPassed);
-}
-
-/** Entry route for the KYC stage: selfie capture when face verification is pending, else DigiLocker hub. */
+/** Entry route for the KYC stage (DigiLocker / docs hub). Selfie/liveness removed pending rewrite. */
 export function resolveKycStagePath(
-  session: CustomerSessionResponse | null | undefined,
+  _session?: CustomerSessionResponse | null,
 ): string {
-  return shouldResumeKycSelfie(session) ? '/kyc/selfie' : '/kyc';
+  return '/kyc';
 }
 
 /**
- * Resume `/kyc/selfie` when the face pipeline is incomplete or LOS granted another attempt.
+ * After DigiLocker / vendor INTERNAL_ERROR, resume KYC hub when DigiLocker is still incomplete.
+ * Selfie/liveness resume paths removed pending rewrite.
  */
 export function canResumeKycAfterInternalError(
   session: CustomerSessionResponse | null | undefined,
 ): boolean {
   if (!session?.authenticated || !session.lead) return false;
   if (!isInternalErrorLead(session.lead)) return false;
-  return shouldResumeKycSelfie(session);
+  const kyc = session.kycFaceProgress;
+  return !kyc?.digilockerAadhaarCaptured;
 }
 
 /** Returns `true` when the lead is REJECTED or BLACKLISTED and the reapply window hasn't elapsed yet. */
@@ -271,7 +239,7 @@ export function getCustomerJourneyResumePath(
   }
 
   if (isInternalErrorLead(session.lead)) {
-    if (canResumeKycAfterInternalError(session)) return '/kyc/selfie';
+    if (canResumeKycAfterInternalError(session)) return '/kyc';
     return '/thank-you';
   }
 
@@ -280,18 +248,6 @@ export function getCustomerJourneyResumePath(
   if (!journey.loanSelectionCompleted) return '/pre-approved-loan';
   if (!session.lead.emailVerified) return CUSTOMER_EMAIL_JOURNEY_PATH;
   if (!isLoanDocumentsJourneyComplete(session)) return '/loan-documents';
-
-  const kyc = session.kycFaceProgress;
-  if (
-    kyc?.livenessCheckCompleted &&
-    !kyc.livenessPassed &&
-    !hasKycLivenessRetryRemaining(kyc)
-  ) {
-    return '/thank-you';
-  }
-  if (shouldResumeKycSelfie(session)) {
-    return '/kyc/selfie';
-  }
 
   if (!journey.kycCompleted) return resolveKycStagePath(session);
   if (!journey.bankDetailsCompleted) return '/bank-details';
@@ -346,7 +302,7 @@ export function getCustomerPostMobileOtpRedirectPath(
   }
 
   if (isInternalErrorLead(lead, otpLeadStatus)) {
-    if (canResumeKycAfterInternalError(session)) return '/kyc/selfie';
+    if (canResumeKycAfterInternalError(session)) return '/kyc';
     return '/thank-you';
   }
 
@@ -411,9 +367,6 @@ export function getCustomerPostAuthResumePath(
 export function getPostDigilockerAadhaarContinuePath(
   session: Extract<CustomerSessionResponse, { authenticated: true }>
 ): string {
-  if (shouldResumeKycSelfie(session)) {
-    return '/kyc/selfie';
-  }
   return getCustomerJourneyResumePath(session);
 }
 

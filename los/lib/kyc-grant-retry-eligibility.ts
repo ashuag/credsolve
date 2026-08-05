@@ -1,21 +1,16 @@
 import type { LosApplicationDetails } from '@/lib/api';
 
-const KYC_LIVENESS_MAX_ATTEMPTS = 3;
-
-const BLOCKED_APPLICATION_STATUSES = new Set([
+const RE_KYC_BLOCKED_APPLICATION_STATUSES = new Set([
   'REJECTED',
   'DISBURSED',
-  'KYC_FAILED',
   'CANCELLED',
+  'ACTIVE',
 ]);
 
-const BLOCKED_LEAD_STATUSES = new Set(['REJECTED', 'BLACKLISTED']);
-
 /**
- * Mirrors backend `canGrantKycLivenessRetry` — used client-side so the LOS button
- * stays correct even when the API flag is stale.
+ * Mirrors backend `canEnableReKyc` — DigiLocker / docs reset (selfie/liveness grant-retry removed).
  */
-export function canGrantKycLivenessRetryFromRow(
+export function canEnableReKycFromRow(
   row: Pick<
     LosApplicationDetails,
     | 'kycStatus'
@@ -25,25 +20,25 @@ export function canGrantKycLivenessRetryFromRow(
     | 'livenessCheckedAt'
     | 'statusCode'
     | 'lead'
+    | 'kycPhotos'
   >,
 ): boolean {
-  if (row.kycStatus === 1) return false;
-  if (row.kycStatus === 2) return false;
-  if (row.livenessPassed) return false;
+  if (RE_KYC_BLOCKED_APPLICATION_STATUSES.has(row.statusCode)) return false;
+  if (row.lead.statusCode === 'BLACKLISTED') return false;
+  if (row.lead.statusCode === 'REJECTED' && row.statusCode !== 'KYC_FAILED') return false;
 
-  if (BLOCKED_APPLICATION_STATUSES.has(row.statusCode)) return false;
-  if (BLOCKED_LEAD_STATUSES.has(row.lead.statusCode)) return false;
+  const hasArtifacts = Boolean(
+    row.kycPhotos?.selfiePath?.trim() || row.kycPhotos?.aadhaarPhotoPath?.trim(),
+  );
+  const hasProgress =
+    row.kycStatus === 1 ||
+    row.kycStatus === 2 ||
+    row.kycStatus === 3 ||
+    row.livenessPassed ||
+    row.livenessCheckCompleted ||
+    row.livenessAttempts > 0 ||
+    Boolean(row.livenessCheckedAt) ||
+    hasArtifacts;
 
-  const escalated =
-    row.lead.statusCode === 'INTERNAL_ERROR' || row.statusCode === 'INTERNAL_ERROR';
-  const attemptsExhausted = row.livenessAttempts >= KYC_LIVENESS_MAX_ATTEMPTS;
-  const hasFailedLiveness =
-    !row.livenessPassed && (row.livenessAttempts > 0 || Boolean(row.livenessCheckedAt));
-
-  if (!hasFailedLiveness) return false;
-
-  const customerCanSelfRetry =
-    !attemptsExhausted && !row.livenessCheckCompleted && !escalated;
-
-  return !customerCanSelfRetry;
+  return hasProgress;
 }

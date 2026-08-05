@@ -7,9 +7,6 @@ export const DEVELOPER_TOOL_LINKS = [
   { href: '/developer-tools/cibil-tenacio-fetch', label: 'Tenacio CIBIL Fetch' },
   { href: '/developer-tools/cibil-surepass-fetch', label: 'Surepass CIBIL Fetch' },
   { href: '/developer-tools/post-bre-rules', label: 'Post BRE Rules' },
-  { href: '/developer-tools/kyc-selfie-face-check', label: 'KYC Selfie Face Check' },
-  { href: '/developer-tools/kyc-face-match-check', label: 'KYC Face Match Check' },
-  { href: '/developer-tools/active-liveness-check', label: 'Active Liveness Check' },
 ] as const;
 
 export function isDeveloperToolsPath(pathname: string): boolean {

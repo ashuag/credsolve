@@ -49,8 +49,8 @@ import {
   explainKycNotDone,
 } from '@/lib/kyc-selfie-validation-display';
 import { KycPhotoGallery } from '@/components/shared/kyc-photo-gallery';
-import { KycGrantRetryButton } from '@/components/applications/kyc-grant-retry-button';
-import { canGrantKycLivenessRetryFromRow } from '@/lib/kyc-grant-retry-eligibility';
+import { KycEnableReKycButton } from '@/components/applications/kyc-enable-re-kyc-button';
+import { canEnableReKycFromRow } from '@/lib/kyc-grant-retry-eligibility';
 import { KycPipelineSteps } from '@/components/applications/kyc-pipeline-steps';
 import { LosStatusPill } from '@/components/shared/los-status-pill';
 import { formatPersonName } from '@/lib/format-person-name';
@@ -319,7 +319,7 @@ export function ReviewLoanPanel({
             </span>
             <div>
               <div className="doc-name">Sanction letter cum KFS (KYC / acceptance)</div>
-              <div className="doc-sub">Signed at customer acceptance · PKCS#7 e-signed when available</div>
+              <div className="doc-sub">Reviewed before KYC · OTP-signed after references</div>
             </div>
             <div className="doc-actions">
               {row.loanDocuments.keyFactEsigned ? <span className="badge signed">✓ E-signed</span> : null}
@@ -351,6 +351,18 @@ export function ReviewLoanPanel({
               </button>
             </div>
           </div>
+          {row.loanDocuments.reviewedAt ? (
+            <div className="accept-note">
+              <span className="an-ic">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </span>
+              <span>
+                Reviewed by customer · <b>{formatReviewDateTime(row.loanDocuments.reviewedAt)}</b>
+              </span>
+            </div>
+          ) : null}
           {row.loanDocuments.acceptedAt ? (
             <div className="accept-note">
               <span className="an-ic">
@@ -359,7 +371,7 @@ export function ReviewLoanPanel({
                 </svg>
               </span>
               <span>
-                Accepted by customer · <b>{formatReviewDateTime(row.loanDocuments.acceptedAt)}</b>
+                Sanction OTP verified · <b>{formatReviewDateTime(row.loanDocuments.acceptedAt)}</b>
               </span>
             </div>
           ) : null}
@@ -437,16 +449,7 @@ export function ReviewKycPanel({
   const kycDone = row.kycStatus === 1;
   const isCurrentStep = isApplicationJourneyStepActive(row, 'kyc');
   const kycNotDoneReason = explainKycNotDone(row);
-  const showGrantKycRetry =
-    row.canGrantKycLivenessRetry || canGrantKycLivenessRetryFromRow(row);
-  const livenessMaxAttempts = 3;
-  const customerSelfRetriesLeft = Math.max(0, livenessMaxAttempts - row.livenessAttempts);
-  const customerCanSelfRetry =
-    !row.livenessPassed &&
-    customerSelfRetriesLeft > 0 &&
-    !row.livenessCheckCompleted &&
-    row.lead.statusCode !== 'INTERNAL_ERROR' &&
-    row.statusCode !== 'INTERNAL_ERROR';
+  const showEnableReKyc = row.canEnableReKyc || canEnableReKycFromRow(row);
   return (
     <>
       <ReviewCard
@@ -456,7 +459,7 @@ export function ReviewKycPanel({
             <path d="m9 12 2 2 4-4" />
           </svg>
         }
-        title="KYC & liveness"
+        title="KYC"
         iconTone={kycDone ? 'ok' : 'default'}
         right={
           kycDone ? (
@@ -484,27 +487,9 @@ export function ReviewKycPanel({
             {kycNotDoneReason}
           </p>
         ) : null}
-        {!showGrantKycRetry && kycNotDoneReason && customerCanSelfRetry ? (
-          <p
-            style={{
-              margin: '0 0 14px',
-              padding: '10px 12px',
-              borderRadius: 10,
-              border: '1px solid rgba(20, 150, 243, 0.25)',
-              background: 'rgba(240, 249, 255, 0.9)',
-              fontSize: '12px',
-              lineHeight: 1.45,
-              color: '#0c4a6e',
-            }}
-          >
-            Customer can retry from the selfie step on their own ({customerSelfRetriesLeft} attempt
-            {customerSelfRetriesLeft === 1 ? '' : 's'} left). Use &quot;Grant customer 1 KYC retry&quot;
-            after attempts are exhausted or the lead is in INTERNAL_ERROR.
-          </p>
-        ) : null}
-        {showGrantKycRetry ? (
-          <div style={{ marginBottom: 16 }}>
-            <KycGrantRetryButton
+        {showEnableReKyc ? (
+          <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <KycEnableReKycButton
               row={row}
               applicationUuid={applicationUuid}
               authToken={authToken}
