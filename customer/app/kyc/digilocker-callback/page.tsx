@@ -30,11 +30,8 @@ const DEFAULT_MAX_ATTEMPTS = 3;
 type DownloadFailureKind = 'retryable' | 'identity_mismatch' | 'missing_token' | 'not_configured';
 
 function describeContinueStep(href: string): string {
-  if (href.startsWith('/bank')) {
-    return 'Next: add your bank details to continue your application.';
-  }
   if (href.startsWith('/kyc')) {
-    return 'Return to the KYC hub to pick up where you left off.';
+    return 'Continue to complete your KYC.';
   }
   if (href === '/apply-for-loan') {
     return 'Start or resume your loan application from the apply page.';
@@ -42,7 +39,7 @@ function describeContinueStep(href: string): string {
   if (href.startsWith('/loan-selection') || href.startsWith('/pre-approved')) {
     return 'Continue setting up your loan.';
   }
-  return 'Continue your application.';
+  return 'Continue to the next step in your application.';
 }
 
 function readTokenFromSearchParams(params: URLSearchParams | ReadonlyURLSearchParams | null): string {
@@ -50,6 +47,8 @@ function readTokenFromSearchParams(params: URLSearchParams | ReadonlyURLSearchPa
   return (
     params.get('sessionToken') ??
     params.get('session_token') ??
+    params.get('client_id') ??
+    params.get('clientId') ??
     params.get('token') ??
     params.get('sessionId') ??
     params.get('session_id') ??
@@ -216,18 +215,14 @@ function DigilockerCallbackContent() {
     setFailureKind(null);
     setMessage('Fetching your Aadhaar from DigiLocker…');
 
+    // Token may be empty: backend recovers the DigiLocker client_id / session from Redis
+    // (saved at init). That lets local resume after Surepass redirects to a public callback.
     const token = sessionTokenRef.current.trim();
-    if (!token) {
-      setStatus('error');
-      setFailureKind('missing_token');
-      setError(
-        'Missing session token. Open DigiLocker from this app (KYC → Login with DigiLocker) so the session is saved, then try again.',
-      );
-      return;
-    }
 
     try {
-      const out = await downloadDigilockerAadhaar({ sessionToken: token, consent: true });
+      const out = await downloadDigilockerAadhaar(
+        token ? { sessionToken: token, consent: true } : { consent: true },
+      );
       const { used, allowed } = applyAttemptCounts(
         out,
         session?.authenticated === true ? session.kycFaceProgress?.digilockerAadhaarDownloadAttempts : undefined,
@@ -264,21 +259,22 @@ function DigilockerCallbackContent() {
         return;
       }
 
-        clearDigilockerSessionTokenFromStorage();
-        const next = await refresh();
-        const href =
-          next.authenticated === true && next.lead
-            ? getPostDigilockerAadhaarContinuePath(next)
-            : '/apply-for-loan';
-        setContinueHref(href);
-        setStatus('done');
-        setMessage('Aadhaar details were saved. Continue to the next step.');
+      clearDigilockerSessionTokenFromStorage();
+      const next = await refresh();
+      const href =
+        next.authenticated === true && next.lead
+          ? getPostDigilockerAadhaarContinuePath(next)
+          : '/apply-for-loan';
+      setContinueHref(href);
+      setStatus('done');
+      setMessage('Aadhaar details were saved. Continuing…');
+      router.replace(href);
     } catch (e) {
       setStatus('error');
       setFailureKind('retryable');
       setError(e instanceof Error ? e.message : 'Something went wrong.');
     }
-  }, [applyAttemptCounts, handleTerminalFailure, refresh, session]);
+  }, [applyAttemptCounts, handleTerminalFailure, refresh, router, session]);
 
   runDownloadRef.current = runDownload;
   refreshRef.current = refresh;
@@ -352,13 +348,10 @@ function DigilockerCallbackContent() {
       if (cancelled) return;
 
       sessionTokenRef.current = token;
+      // Even without a browser token, try download — local backend Redis still has
+      // the client_id from init after you manually switch back from the public callback.
       if (!token) {
-        setStatus('error');
-        setFailureKind('missing_token');
-        setError(
-          'Missing session token. Open DigiLocker from this app (KYC → Login with DigiLocker) so the session is saved, then try again.',
-        );
-        return;
+        setMessage('Resuming DigiLocker from your saved session…');
       }
 
       await runDownloadRef.current();
@@ -440,9 +433,7 @@ function DigilockerCallbackContent() {
                       )}
                     </button>
                   ) : null}
-                  <Link href="/kyc" className={styles.callbackCardLink}>
-                    Back to KYC
-                  </Link>
+                 
                 </div>
               </CallbackStatusCard>
             ) : status === 'done' ? (

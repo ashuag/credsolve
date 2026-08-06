@@ -261,6 +261,11 @@ export type LosApplicationDetails = {
     address: string | null;
     maskedAadhaar: string | null;
   } | null;
+  /** DigiLocker PAN from Surepass (`customer_kyc.pan_card_number`). */
+  digilockerPan: {
+    panCardNumber: string;
+    panCardVerifiedAt: string | null;
+  } | null;
   details: {
     reasonForLoan: string | null;
     loanAmount: string | null;

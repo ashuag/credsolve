@@ -7,6 +7,7 @@ export const DEVELOPER_TOOL_LINKS = [
   { href: '/developer-tools/cibil-tenacio-fetch', label: 'Tenacio CIBIL Fetch' },
   { href: '/developer-tools/cibil-surepass-fetch', label: 'Surepass CIBIL Fetch' },
   { href: '/developer-tools/post-bre-rules', label: 'Post BRE Rules' },
+  { href: '/developer-tools/vendor-api-logs', label: 'Vendor API Logs' },
 ] as const;
 
 export function isDeveloperToolsPath(pathname: string): boolean {

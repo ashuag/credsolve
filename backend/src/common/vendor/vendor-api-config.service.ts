@@ -72,6 +72,32 @@ export class VendorApiConfigService {
   }
 
   /**
+   * Primary ACTIVE vendor for an `api_name` (lowest priority first).
+   * Used by DigiLocker (`kyc_digilocker`) where selection is by name, not code.
+   */
+  async resolveActiveByApiName(apiName: string): Promise<VendorApiConfigRow | null> {
+    const rows = await this.listActiveByApiName(apiName);
+    return rows[0] ?? null;
+  }
+
+  /**
+   * All ACTIVE vendors for an `api_name` ordered by priority (primary first).
+   */
+  async listActiveByApiName(apiName: string): Promise<VendorApiConfigRow[]> {
+    const name = apiName.trim();
+    if (!name) return [];
+    const rows = await this.prisma.client.vendorApiConfig.findMany({
+      where: {
+        apiName: name,
+        status: VENDOR_API_STATUS.ACTIVE,
+        isActive: true,
+      },
+      orderBy: [{ priority: 'asc' }, { id: 'asc' }],
+    });
+    return rows.map(toRow);
+  }
+
+  /**
    * All ACTIVE vendors for an API code ordered by priority (primary first,
    * then fallbacks). Empty when none are ACTIVE (or no rows).
    */

@@ -125,7 +125,8 @@ export function extractAadhaarPhotoString(vendor: unknown): string | null {
     }
     const rec = node as Record<string, unknown>;
     for (const [k, v] of Object.entries(rec)) {
-      if (k.toLowerCase() === 'photo' && typeof v === 'string') {
+      const key = k.toLowerCase();
+      if ((key === 'photo' || key === 'profile_image' || key === 'profileimage') && typeof v === 'string') {
         const d = decodeOnePhoto(v);
         if (d) return v.trim();
       }
@@ -311,6 +312,38 @@ export function extractFaceMatchPassed(vendor: unknown): boolean | null {
   ]);
 }
 
+export function extractDeepfakeDetected(vendor: unknown): boolean | null {
+  const deepfake = extractBooleanFlag(vendor, [
+    'isDeepfake',
+    'is_deepfake',
+    'deepfakeDetected',
+    'deepfake_detected',
+    'syntheticDetected',
+    'synthetic_detected',
+    'isSynthetic',
+    'is_synthetic',
+  ]);
+  if (deepfake !== null) return deepfake;
+
+  const authentic = extractBooleanFlag(vendor, ['isAuthentic', 'is_authentic', 'authentic', 'isReal', 'is_real']);
+  if (authentic !== null) return !authentic;
+
+  return null;
+}
+
+/** Deepfake / authenticity score when provided (higher = more likely real). */
+export function extractDeepfakeScore(vendor: unknown): number | null {
+  return extractNumericScore(vendor, [
+    'authenticityScore',
+    'authenticity_score',
+    'deepfakeScore',
+    'deepfake_score',
+    'realScore',
+    'real_score',
+    'score',
+  ]);
+}
+
 export function extractLivenessMultipleFacesDetected(vendor: unknown): boolean | null {
   if (!isRecord(vendor)) return null;
 
@@ -352,6 +385,9 @@ export function buildDigilockerAadhaarFormJson(
   const base: Record<string, unknown> = { ...data };
   if (typeof base.photo === 'string') {
     base.photo = photoRelativePath ? { storedFile: photoRelativePath } : null;
+  }
+  if (typeof base.profile_image === 'string') {
+    base.profile_image = photoRelativePath ? { storedFile: photoRelativePath } : null;
   }
   return base;
 }

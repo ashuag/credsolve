@@ -45,7 +45,20 @@ export function extractAadhaarIdentityFromVendor(vendor: unknown): {
     return { fullName: null, dateOfBirth: null };
   }
   const data = isRecord(vendor.data) ? vendor.data : vendor;
-  return extractProfileFromDigilockerFormJson(data);
+  const fromData = extractProfileFromDigilockerFormJson(data);
+  if (fromData.fullName && fromData.dateOfBirth) {
+    return fromData;
+  }
+  // Surepass DigiLocker nests identity under `aadhaar_xml_data` when not flattened.
+  const xmlData = isRecord(data) ? data.aadhaar_xml_data : null;
+  if (isRecord(xmlData)) {
+    const fromXml = extractProfileFromDigilockerFormJson(xmlData);
+    return {
+      fullName: fromData.fullName ?? fromXml.fullName,
+      dateOfBirth: fromData.dateOfBirth ?? fromXml.dateOfBirth,
+    };
+  }
+  return fromData;
 }
 
 export type AadhaarLeadIdentityMatchResult =

@@ -1,6 +1,36 @@
-/** Parse persisted selfie-face validation JSON for LOS historical display (execution stack removed). */
+import type { Prisma } from '@prisma/client';
+import type { KycSelfieFaceInspection } from './kyc-selfie-face-validation.util';
+import { KYC_SELFIE_MIN_LAPLACIAN_VARIANCE } from './kyc-selfie-face-blur.util';
 
-const KYC_SELFIE_MIN_LAPLACIAN_VARIANCE = 80;
+export const KYC_SELFIE_FACE_RETRY_HINT =
+  'Please try one more time — keep your full face visible and do not cover your eyes, nose, or mouth.';
+
+export function toPersistedSelfieFaceInspection(
+  inspection: KycSelfieFaceInspection,
+): Prisma.InputJsonObject {
+  const topScore =
+    inspection.detections.length > 0
+      ? Math.max(...inspection.detections.map((d) => d.score))
+      : null;
+
+  return {
+    ok: inspection.ok,
+    reason: inspection.reason ?? null,
+    bestComputedConfidence: inspection.bestComputedConfidence,
+    confidenceBreakdown: inspection.confidenceBreakdown,
+    minComputedConfidenceRequired: inspection.minComputedConfidenceRequired,
+    minConfidenceRequired: inspection.minConfidenceRequired,
+    rawDetectionCount: inspection.rawDetectionCount,
+    qualifyingDetectionCount: inspection.qualifyingDetectionCount,
+    imageWidth: inspection.imageWidth,
+    imageHeight: inspection.imageHeight,
+    laplacianVariance: inspection.laplacianVariance,
+    minLaplacianVarianceRequired: inspection.minLaplacianVarianceRequired,
+    blurPassed: inspection.blurPassed,
+    topDetectionScore: topScore,
+    checkedAt: new Date().toISOString(),
+  };
+}
 
 export type PersistedSelfieFaceValidation = {
   passed: boolean;

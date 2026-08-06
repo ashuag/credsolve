@@ -16,6 +16,7 @@ import { GetCustomerSessionUseCase } from './application/use-cases/get-customer-
 import { GetCustomerLoansDashboardUseCase } from './application/use-cases/get-customer-loans-dashboard.use-case';
 import { GetCustomerPaymentHistoryUseCase } from './application/use-cases/get-customer-payment-history.use-case';
 import { InitiateCustomerRepaymentUseCase } from './application/use-cases/initiate-customer-repayment.use-case';
+import { HandleEasebuzzRepaymentCallbackUseCase } from './application/use-cases/handle-easebuzz-repayment-callback.use-case';
 import { LogoutUseCase } from './application/use-cases/logout.use-case';
 import { SendOtpUseCase } from './application/use-cases/send-otp.use-case';
 import { SaveLeadDetailsUseCase } from './application/use-cases/save-lead-details.use-case';
@@ -32,12 +33,16 @@ import { InitDigilockerUseCase } from './application/use-cases/init-digilocker.u
 import { DownloadAadhaarDigilockerUseCase } from './application/use-cases/download-aadhaar-digilocker.use-case';
 import { GetPendingDigilockerSessionUseCase } from './application/use-cases/get-pending-digilocker-session.use-case';
 import { ServeDigilockerAadhaarPhotoUseCase } from './application/use-cases/serve-digilocker-aadhaar-photo.use-case';
+import { ServeKycSelfiePhotoUseCase } from './application/use-cases/serve-kyc-selfie-photo.use-case';
+import { ServeKycLivenessSelfieVendorUseCase } from './application/use-cases/serve-kyc-liveness-selfie-vendor.use-case';
 import { GetLoanDocumentsUseCase } from './application/use-cases/get-loan-documents.use-case';
 import { ServeLoanDocumentPdfUseCase } from './application/use-cases/serve-loan-document-pdf.use-case';
 import { SendLoanDocumentsOtpUseCase } from './application/use-cases/send-loan-documents-otp.use-case';
 import { AcceptLoanDocumentsUseCase } from './application/use-cases/accept-loan-documents.use-case';
 import { AcknowledgeLoanDocumentsUseCase } from './application/use-cases/acknowledge-loan-documents.use-case';
 import { SaveKycDocumentsUseCase } from './application/use-cases/save-kyc-documents.use-case';
+import { SaveKycSelfieUseCase } from './application/use-cases/save-kyc-selfie.use-case';
+import { RunKycLivenessUseCase } from './application/use-cases/run-kyc-liveness.use-case';
 import { SaveBankDetailsUseCase } from './application/use-cases/save-bank-details.use-case';
 import { LookupIfscUseCase } from './application/use-cases/lookup-ifsc.use-case';
 import { SubmitVerifiedBankUseCase } from './application/use-cases/submit-verified-bank.use-case';
@@ -56,6 +61,7 @@ import { CustomerSessionService } from './infrastructure/session/customer-sessio
 import { AuthController } from './presentation/auth.controller';
 import { CustomerLeadsController } from './presentation/customer-leads.controller';
 import { ApplicationsController } from './presentation/applications.controller';
+import { VendorKycController } from './presentation/vendor-kyc.controller';
 import { LoansController } from './presentation/loans.controller';
 import { LookupController } from './presentation/lookup.controller';
 import { OptionalCustomerSessionGuard } from './presentation/guards/optional-customer-session.guard';
@@ -66,6 +72,7 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
   controllers: [
     AuthController,
     ApplicationsController,
+    VendorKycController,
     CustomerLeadsController,
     LoansController,
     LookupController,
@@ -80,9 +87,9 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     BankRepository,
     LeadRepository,
     ApplicationRepository,
+    SettingsRepository,
     BureauReportRepository,
     LeadStatusRepository,
-    SettingsRepository,
     OptionalCustomerSessionGuard,
     RequiredCustomerSessionGuard,
     CustomerGoogleOauthService,
@@ -96,6 +103,8 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     SubmitProfessionalApplicationUseCase,
     SaveLoanSelectionUseCase,
     SaveKycDocumentsUseCase,
+    SaveKycSelfieUseCase,
+    RunKycLivenessUseCase,
     SaveBankDetailsUseCase,
     LookupIfscUseCase,
     SubmitVerifiedBankUseCase,
@@ -111,6 +120,8 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     KycDigilockerDownloadFailureService,
     KycCompletionService,
     ServeDigilockerAadhaarPhotoUseCase,
+    ServeKycSelfiePhotoUseCase,
+    ServeKycLivenessSelfieVendorUseCase,
     GetLoanDocumentsUseCase,
     ServeLoanDocumentPdfUseCase,
     SendLoanDocumentsOtpUseCase,
@@ -120,6 +131,7 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     GetCustomerLoansDashboardUseCase,
     GetCustomerPaymentHistoryUseCase,
     InitiateCustomerRepaymentUseCase,
+    HandleEasebuzzRepaymentCallbackUseCase,
     LogoutUseCase,
   ],
   exports: [CustomerSessionService, BureauReportRepository],

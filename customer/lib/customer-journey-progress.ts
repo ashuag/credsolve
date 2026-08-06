@@ -11,14 +11,14 @@ import { isLoanDocumentsJourneyComplete } from '@/lib/loan-documents-journey';
  */
 export const CUSTOMER_JOURNEY_PROGRESS_STEPS = [
   { key: 'mobile', label: 'Mobile verified', shortLabel: 'Mobile' },
-  { key: 'details', label: 'Personal details', shortLabel: 'Details' },
+  { key: 'details', label: 'Details', shortLabel: 'Details' },
   { key: 'loan', label: 'Loan selection', shortLabel: 'Loan' },
   { key: 'email', label: 'Email verification', shortLabel: 'Email' },
   { key: 'letter', label: 'Sanction letter review', shortLabel: 'Letter' },
   { key: 'kyc', label: 'KYC', shortLabel: 'KYC' },
   { key: 'bank', label: 'Bank details', shortLabel: 'Bank' },
   { key: 'references', label: 'References', shortLabel: 'Refs' },
-  { key: 'esign', label: 'Sanction OTP', shortLabel: 'OTP' },
+  { key: 'esign', label: 'eSign', shortLabel: 'eSign' },
 ] as const;
 
 export type CustomerJourneyProgressStepKey =

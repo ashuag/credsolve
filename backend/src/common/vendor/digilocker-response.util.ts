@@ -15,7 +15,15 @@ function pickString(obj: Record<string, unknown>, keys: string[]): string | null
 function findSessionTokenDeep(vendor: unknown, depth = 0): string | null {
   if (depth > 8 || vendor == null) return null;
   if (!isRecord(vendor)) return null;
-  const direct = pickString(vendor, ['sessionToken', 'session_token', 'sessionId', 'session_id']);
+  const direct = pickString(vendor, [
+    'sessionToken',
+    'session_token',
+    'sessionId',
+    'session_id',
+    // Surepass DigiLocker initialize / download envelopes
+    'client_id',
+    'clientId',
+  ]);
   if (direct) return direct;
   for (const value of Object.values(vendor)) {
     const found = findSessionTokenDeep(value, depth + 1);

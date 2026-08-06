@@ -2,9 +2,13 @@ import { Global, Module } from '@nestjs/common';
 import { EasebuzzWireService } from '../easebuzz/easebuzz-wire.service';
 import { BureauFetchService } from './bureau-fetch.service';
 import { BankTenacioVendorService } from './bank-tenacio-vendor.service';
+import { DigilockerFetchService } from './digilocker-fetch.service';
 import { DigilockerVendorService } from './digilocker-vendor.service';
+import { LivenessVendorService } from './liveness-vendor.service';
+import { KycTenacioVendorService } from './kyc-tenacio-vendor.service';
 import { PanVerificationService } from './pan-verification.service';
 import { SurepassCibilModule } from './surepass/surepass-cibil.module';
+import { SurepassDigilockerModule } from './surepass/surepass-digilocker.module';
 import { VendorApiService } from './vendor-api.service';
 import { VendorApiConfigService } from './vendor-api-config.service';
 import { VendorInternalErrorService } from './vendor-internal-error.service';
@@ -20,7 +24,7 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
  */
 @Global()
 @Module({
-  imports: [SurepassCibilModule],
+  imports: [SurepassCibilModule, SurepassDigilockerModule],
   providers: [
     VendorApiService,
     VendorApiConfigService,
@@ -28,7 +32,10 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
     PanVerificationService,
     BureauFetchService,
     DigilockerVendorService,
+    DigilockerFetchService,
+    LivenessVendorService,
     BankTenacioVendorService,
+    KycTenacioVendorService,
     EasebuzzWireService,
   ],
   exports: [
@@ -38,9 +45,13 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
     PanVerificationService,
     BureauFetchService,
     DigilockerVendorService,
+    DigilockerFetchService,
+    LivenessVendorService,
     BankTenacioVendorService,
+    KycTenacioVendorService,
     EasebuzzWireService,
     SurepassCibilModule,
+    SurepassDigilockerModule,
   ],
 })
 export class VendorApiModule {}

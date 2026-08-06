@@ -517,6 +517,19 @@ export function ReviewKycPanel({
             tone={row.livenessPassed ? 'accent' : row.livenessCheckedAt || row.livenessSummary?.checkedAt ? 'flag' : undefined}
           />
           <ReviewField label="KYC completed at" value={formatReviewDateTime(row.kycCompletedAt)} />
+          <ReviewField
+            label="DigiLocker PAN"
+            value={row.digilockerPan?.panCardNumber ?? '—'}
+            tone={row.digilockerPan?.panCardNumber ? 'accent' : undefined}
+          />
+          <ReviewField
+            label="DigiLocker PAN verified at"
+            value={formatReviewDateTime(row.digilockerPan?.panCardVerifiedAt ?? null)}
+          />
+          <ReviewField
+            label="DigiLocker Aadhaar"
+            value={row.aadhaarDetail?.maskedAadhaar ?? '—'}
+          />
           <ReviewField label="Selfie quality checked at" value={formatReviewDateTime(row.selfieFaceValidation?.checkedAt ?? null)} />
           <ReviewField label="Liveness checked at" value={formatReviewDateTime(row.livenessCheckedAt)} />
           <ReviewField

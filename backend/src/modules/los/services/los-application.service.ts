@@ -352,7 +352,12 @@ export class LosApplicationService {
     const customerKyc = await this.prisma.client.customerKyc.findFirst({
       where: { customerId: application.customerId },
       orderBy: { createdAt: 'desc' },
-      select: { aadhaarData: true, aadhaarPhotoPath: true },
+      select: {
+        aadhaarData: true,
+        aadhaarPhotoPath: true,
+        panCardNumber: true,
+        panCardVerifiedAt: true,
+      },
     });
 
     const selfieRelativePath = application.kyc?.livenessSelfiePath?.trim() || null;
@@ -488,6 +493,12 @@ export class LosApplicationService {
         relation: ref.relation.name,
       })),
       aadhaarDetail: buildLosAadhaarDetail(customerKyc?.aadhaarData),
+      digilockerPan: customerKyc?.panCardNumber
+        ? {
+            panCardNumber: customerKyc.panCardNumber,
+            panCardVerifiedAt: customerKyc.panCardVerifiedAt?.toISOString() ?? null,
+          }
+        : null,
       details: application.details
         ? mapLosLoanDetailsFromStaging(application.details, {
             preferStoredTenure: application.loanAccount != null,
@@ -960,15 +971,16 @@ export class LosApplicationService {
     const leadWasRejected = application.lead.leadStatus.name === LEAD_STATUS.REJECTED;
     const appWasInternalError = application.applicationStatus.name === APPLICATION_STATUS.INTERNAL_ERROR;
     const appWasKycFailed = application.applicationStatus.name === APPLICATION_STATUS.KYC_FAILED;
-    const clearDigilockerIdentity =
-      kyc.kycStatus === APPLICATION_KYC_STATUS.FAILED || appWasKycFailed;
 
     await this.prisma.client.$transaction(async (tx) => {
+      // Always clear DigiLocker / docs so session `kycCompleted` becomes false and
+      // the customer journey guard routes them back to /kyc.
       await tx.applicationKyc.update({
         where: { applicationId: application.id },
         data: {
           kycStatus: APPLICATION_KYC_STATUS.NOT_DONE,
           kycCompletedAt: null,
+          digilockerAadhaarDownloadAttempts: 0,
           livenessSelfiePath: null,
           isLiveness: false,
           livenessCheckedAt: null,
@@ -980,26 +992,23 @@ export class LosApplicationService {
           selfieFaceValidationJson: Prisma.JsonNull,
           selfieFaceValidationPassed: false,
           livenessAttempts: 0,
-          ...(clearDigilockerIdentity ? { digilockerAadhaarDownloadAttempts: 0 } : {}),
         },
       });
 
-      if (clearDigilockerIdentity) {
-        const customerKyc = await tx.customerKyc.findFirst({
-          where: { customerId: application.customerId },
-          orderBy: { createdAt: 'desc' },
-          select: { id: true },
+      const customerKyc = await tx.customerKyc.findFirst({
+        where: { customerId: application.customerId },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+      if (customerKyc) {
+        await tx.customerKyc.update({
+          where: { id: customerKyc.id },
+          data: {
+            aadhaarVerifiedAt: null,
+            aadhaarData: Prisma.JsonNull,
+            aadhaarPhotoPath: null,
+          },
         });
-        if (customerKyc) {
-          await tx.customerKyc.update({
-            where: { id: customerKyc.id },
-            data: {
-              aadhaarVerifiedAt: null,
-              aadhaarData: Prisma.JsonNull,
-              aadhaarPhotoPath: null,
-            },
-          });
-        }
       }
 
       if (leadWasInternalError || leadWasRejected) {
@@ -1028,7 +1037,7 @@ export class LosApplicationService {
       success: true as const,
       applicationUuid,
       leadUuid: application.lead.uuid,
-      digilockerCleared: clearDigilockerIdentity,
+      digilockerCleared: true,
       leadRecovered: leadWasInternalError || leadWasRejected,
       applicationRecovered: appWasInternalError || appWasKycFailed,
     };

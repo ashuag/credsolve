@@ -48,25 +48,17 @@ export type CustomerLeadReferenceSnapshot = {
 export type CustomerKycFaceProgress = {
   applicationKycStatus: number;
   digilockerAadhaarCaptured: boolean;
-  /** @deprecated Selfie/liveness removed — field kept optional for older API payloads. */
   selfieCaptured?: boolean;
-  /** @deprecated Selfie/liveness removed — field kept optional for older API payloads. */
   livenessPassed?: boolean;
-  /** @deprecated Selfie/liveness removed. */
   livenessCheckCompleted?: boolean;
-  /** @deprecated Selfie/liveness removed. */
   livenessRequired?: boolean;
   digilockerAadhaarForm: unknown | null;
   digilockerAadhaarPhotoUrl: string | null;
-  /** @deprecated Selfie/liveness removed. */
   kycSelfiePhotoUrl?: string | null;
-  /** @deprecated Selfie/liveness removed. */
   selfieUpdatedAt?: string | null;
   digilockerAadhaarDownloadAttempts?: number;
   digilockerAadhaarDownloadMaxAttempts?: number;
-  /** @deprecated Selfie/liveness removed. */
   livenessAttempts?: number;
-  /** @deprecated Selfie/liveness removed. */
   livenessMaxAttempts?: number;
 };
 
@@ -362,12 +354,13 @@ export function getCustomerPostAuthResumePath(
 }
 
 /**
- * After DigiLocker Aadhaar fetch, send the user to the next journey step without landing on bank details.
+ * After DigiLocker Aadhaar fetch, always return to the KYC hub.
+ * DigiLocker is one KYC step — do not jump ahead to bank details while KYC may still expand.
  */
 export function getPostDigilockerAadhaarContinuePath(
-  session: Extract<CustomerSessionResponse, { authenticated: true }>
+  _session: Extract<CustomerSessionResponse, { authenticated: true }>
 ): string {
-  return getCustomerJourneyResumePath(session);
+  return '/kyc';
 }
 
 /** Back navigation from the KYC hub (avoid `getCustomerJourneyResumePath` looping to `/kyc`). */

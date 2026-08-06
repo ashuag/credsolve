@@ -6,6 +6,11 @@ import { LeadRepository } from '../../infrastructure/repositories/lead.repositor
 import { fetchLatestApplicationKycSnapshot } from '../../../../prisma/application-kyc-snapshot.query';
 import { PrismaService } from '../../../../prisma/prisma.service';
 
+export type DigilockerAadhaarPhotoData = {
+  mimeType: 'image/jpeg' | 'image/png';
+  base64: string;
+};
+
 @Injectable()
 export class ServeDigilockerAadhaarPhotoUseCase {
   constructor(
@@ -15,7 +20,7 @@ export class ServeDigilockerAadhaarPhotoUseCase {
     private readonly kycFiles: KycFilesService,
   ) {}
 
-  async execute(req: Request, res: Response): Promise<void> {
+  private async loadPhotoBuffer(req: Request): Promise<{ mimeType: DigilockerAadhaarPhotoData['mimeType']; buf: Buffer }> {
     const session = req.customerSession;
     if (!session) {
       throw new UnauthorizedException('Sign in with mobile OTP before continuing.');
@@ -41,8 +46,21 @@ export class ServeDigilockerAadhaarPhotoUseCase {
 
     const buf = await this.kycFiles.readBytes(rel);
     const lower = rel.toLowerCase();
-    const mime = lower.endsWith('.png') ? 'image/png' : 'image/jpeg';
-    res.setHeader('Content-Type', mime);
+    const mimeType: DigilockerAadhaarPhotoData['mimeType'] = lower.endsWith('.png')
+      ? 'image/png'
+      : 'image/jpeg';
+    return { mimeType, buf };
+  }
+
+  /** JSON payload for browser face-api (avoids flaky cookie auth on raw image GETs). */
+  async executeJson(req: Request): Promise<DigilockerAadhaarPhotoData> {
+    const { mimeType, buf } = await this.loadPhotoBuffer(req);
+    return { mimeType, base64: buf.toString('base64') };
+  }
+
+  async execute(req: Request, res: Response): Promise<void> {
+    const { mimeType, buf } = await this.loadPhotoBuffer(req);
+    res.setHeader('Content-Type', mimeType);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     res.send(buf);
   }

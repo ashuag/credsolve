@@ -1,18 +1,23 @@
 import { BadRequestException } from '@nestjs/common';
 import { APPLICATION_KYC_STATUS } from '../constants/application.constants';
 import { isDigilockerAadhaarCaptureComplete } from './aadhaar-vendor-parse.util';
+import { isKycLivenessOutboundSkipped } from './kyc-liveness-env.util';
 
 export type ApplicationFaceStepSnapshot = {
   kycStatus?: number | null;
+  selfieRelativePath?: string | null;
+  livenessPassed?: boolean | null;
   digilockerAadhaarFormJson?: unknown;
 };
 
-/** DigiLocker Aadhaar capture completes the KYC face step until selfie/liveness is rewritten. */
 export function isApplicationFaceStepComplete(application: ApplicationFaceStepSnapshot): boolean {
-  return isDigilockerAadhaarCaptureComplete(application.digilockerAadhaarFormJson ?? null);
+  const hasSelfie = Boolean(application.selfieRelativePath?.trim());
+  const hasAadhaar = isDigilockerAadhaarCaptureComplete(application.digilockerAadhaarFormJson ?? null);
+  const livenessOk = application.livenessPassed === true || isKycLivenessOutboundSkipped();
+  return hasAadhaar && hasSelfie && livenessOk;
 }
 
-/** Blocks when DigiLocker Aadhaar KYC is already done. */
+/** Blocks when the full face step (Aadhaar + selfie + liveness when required) is done. */
 export function assertApplicationFaceStepNotComplete(application: ApplicationFaceStepSnapshot): void {
   if (application.kycStatus === APPLICATION_KYC_STATUS.FAILED) {
     throw new BadRequestException(

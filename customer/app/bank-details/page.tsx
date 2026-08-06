@@ -68,7 +68,7 @@ function IfscDetailPanel({ details }: { details: Record<string, unknown> }) {
 
 export default function BankDetailsPage() {
   const router = useRouter();
-  const { session, refresh } = useCustomerSession();
+  const { session, refresh, loading: sessionLoading } = useCustomerSession();
 
   const [accountNumber, setAccountNumber] = useState('');
   const [confirmAccountNumber, setConfirmAccountNumber] = useState('');
@@ -99,6 +99,19 @@ export default function BankDetailsPage() {
     normalizedAccount === normalizedConfirmAccount;
   const accountMismatch =
     normalizedConfirmAccount.length >= 9 && normalizedAccount !== normalizedConfirmAccount;
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    if (sessionLoading) return;
+    if (session?.authenticated !== true) return;
+    // DigiLocker capture alone is not full KYC — keep users off bank until journey.kycCompleted.
+    if (!session.journey.kycCompleted) {
+      router.replace('/kyc');
+    }
+  }, [router, session, sessionLoading]);
 
   useEffect(() => {
     if (session?.authenticated !== true) return;
@@ -255,8 +268,7 @@ export default function BankDetailsPage() {
           Receive Money.
         </h1>
         <p className="text-[0.95rem] text-slate-500 mb-8 leading-relaxed">
-          Enter your IFSC — we fetch branch details for you to review. When you submit, we verify your account (penny
-          drop) and mark your application for review.
+          Enter your IFSC — we fetch branch details for you to review. When you submit, we verify your account.
         </p>
 
         <div className="grid gap-4">
@@ -272,53 +284,7 @@ export default function BankDetailsPage() {
               value={accountHolderDisplay}
               placeholder="From your application — complete personal details if empty"
             />
-            <p className="mt-1.5 ml-1 text-[0.75rem] text-slate-500 leading-snug">
-              Used for penny-drop verification; must match your bank records.
-            </p>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">
-                Account number
-              </label>
-              <input
-                className="w-full h-[52px] rounded-xl border border-slate-200 bg-white px-4 text-[0.95rem] font-bold text-brand-navy focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all tracking-widest"
-                type="password"
-                placeholder="9-18 digit number"
-                value={accountNumber}
-                onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 18))}
-                inputMode="numeric"
-                autoComplete="off"
-                disabled={retryLimitReached}
-              />
-            </div>
-            <div>
-              <label className="block text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">
-                Confirm account number
-              </label>
-              <input
-                className={[
-                  'w-full h-[52px] rounded-xl border bg-white px-4 text-[0.95rem] font-bold text-brand-navy focus:ring-2 outline-none transition-all',
-                  accountMismatch
-                    ? 'border-red-300 focus:ring-red-200'
-                    : 'border-slate-200 focus:ring-brand-blue/20',
-                ].join(' ')}
-                type="text"
-                placeholder="Re-enter account number"
-                value={confirmAccountNumber}
-                onChange={(e) => setConfirmAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 18))}
-                inputMode="numeric"
-                disabled={retryLimitReached}
-              />
-              {accountMismatch ? (
-                <p className="mt-1.5 ml-1 text-[0.75rem] font-semibold text-red-600">
-                  Account numbers do not match.
-                </p>
-              ) : null}
-            </div>
-          </div>
-
           <div>
             <label className="block text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">
               IFSC code
@@ -362,7 +328,47 @@ export default function BankDetailsPage() {
               <p className="mt-1.5 ml-1 text-[0.75rem] font-semibold text-emerald-600">IFSC verified — branch details loaded.</p>
             ) : null}
           </div>
-
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">
+                Account number
+              </label>
+              <input
+                className="w-full h-[52px] rounded-xl border border-slate-200 bg-white px-4 text-[0.95rem] font-bold text-brand-navy focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all tracking-widest"
+                type="password"
+                placeholder="9-18 digit number"
+                value={accountNumber}
+                onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 18))}
+                inputMode="numeric"
+                autoComplete="off"
+                disabled={retryLimitReached}
+              />
+            </div>
+            <div>
+              <label className="block text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">
+                Confirm account number
+              </label>
+              <input
+                className={[
+                  'w-full h-[52px] rounded-xl border bg-white px-4 text-[0.95rem] font-bold text-brand-navy focus:ring-2 outline-none transition-all',
+                  accountMismatch
+                    ? 'border-red-300 focus:ring-red-200'
+                    : 'border-slate-200 focus:ring-brand-blue/20',
+                ].join(' ')}
+                type="text"
+                placeholder="Re-enter account number"
+                value={confirmAccountNumber}
+                onChange={(e) => setConfirmAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 18))}
+                inputMode="numeric"
+                disabled={retryLimitReached}
+              />
+              {accountMismatch ? (
+                <p className="mt-1.5 ml-1 text-[0.75rem] font-semibold text-red-600">
+                  Account numbers do not match.
+                </p>
+              ) : null}
+            </div>
+          </div>
           {ifscLookup === 'ok' && ifscDetails ? <IfscDetailPanel details={ifscDetails} /> : null}
 
           {attemptsRemaining !== null && !retryLimitReached ? (

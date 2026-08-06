@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger, UnauthorizedException } from '
 import type { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { DigilockerSessionStore } from '../../../../common/kyc/digilocker-session.store';
-import { DigilockerVendorService } from '../../../../common/vendor/digilocker-vendor.service';
+import { DigilockerFetchService } from '../../../../common/vendor/digilocker-fetch.service';
 import {
   buildDigilockerAadhaarFormJson,
   buildDigilockerVendorAttemptJson,
@@ -31,7 +31,7 @@ export type DownloadAadhaarDigilockerResult = {
   ok: boolean;
   httpStatus: number | null;
   vendor: unknown;
-  /** When HTTP succeeded but Tenacio `status` was not `success`. */
+  /** When HTTP succeeded but vendor business status was not success. */
   businessSuccess?: boolean;
   /** When Aadhaar JSON + optional photo were written to DB / disk. */
   persisted?: boolean;
@@ -43,6 +43,9 @@ export type DownloadAadhaarDigilockerResult = {
   canRetry?: boolean;
   leadRejected?: boolean;
   terminalFailure?: boolean;
+  /** When Surepass also returned DigiLocker PAN. */
+  panFetched?: boolean;
+  panCardNumber?: string | null;
 };
 
 @Injectable()
@@ -52,7 +55,7 @@ export class DownloadAadhaarDigilockerUseCase {
   constructor(
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
-    private readonly digilocker: DigilockerVendorService,
+    private readonly digilockerFetch: DigilockerFetchService,
     private readonly digilockerSession: DigilockerSessionStore,
     private readonly applications: ApplicationRepository,
     private readonly kycFiles: KycFilesService,
@@ -107,9 +110,10 @@ export class DownloadAadhaarDigilockerUseCase {
       };
     }
 
+    const storedSession = await this.digilockerSession.readSession(applicationRow.uuid);
     let sessionToken = dto.sessionToken?.trim() ?? '';
     if (!sessionToken) {
-      sessionToken = (await this.digilockerSession.read(applicationRow.uuid)) ?? '';
+      sessionToken = storedSession?.token ?? '';
     }
     if (!sessionToken) {
       throw new BadRequestException(
@@ -117,10 +121,10 @@ export class DownloadAadhaarDigilockerUseCase {
       );
     }
 
-    const consent = dto.consent !== false;
-    const out = await this.digilocker.postAadhaarDownload(
-      { input: { sessionToken, consent } },
+    const out = await this.digilockerFetch.downloadAadhaar(
+      sessionToken,
       lead.id,
+      storedSession?.vendor,
     );
 
     const vendor = out.vendorBody ?? null;
@@ -186,6 +190,28 @@ export class DownloadAadhaarDigilockerUseCase {
       };
     }
 
+    let panCardNumber: string | null = null;
+    let panFetched = false;
+    if (out.vendorKind === 'surepass') {
+      try {
+        const panOut = await this.digilockerFetch.downloadPan(sessionToken, lead.id);
+        if (panOut.ok && panOut.panFields?.panNumber) {
+          panCardNumber = panOut.panFields.panNumber;
+          panFetched = true;
+        } else {
+          this.logger.warn(
+            `Surepass DigiLocker PAN download did not return a PAN (leadId=${lead.id.toString()}, http=${panOut.httpStatus ?? 'n/a'}).`,
+          );
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Surepass DigiLocker PAN download failed (leadId=${lead.id.toString()}): ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+
     let persisted = false;
     try {
       const application = applicationRow;
@@ -213,13 +239,14 @@ export class DownloadAadhaarDigilockerUseCase {
       });
       persisted = true;
       await this.digilockerSession.clear(application.uuid);
-      // Selfie/liveness removed pending rewrite — DigiLocker Aadhaar completes KYC.
+      // Persist DigiLocker identity; do not mark application KYC COMPLETED (more KYC steps may follow).
       await this.kycCompletion.completeFromDigilockerAadhaar({
         applicationId: application.id,
         customerId: customer.id,
         digilockerAadhaarFormJson: formJson as Prisma.JsonValue,
         aadhaarPhotoRelativePath: photoRel,
         verifiedAt: new Date(),
+        panCardNumber,
       });
     } catch (err) {
       this.logger.error(
@@ -235,6 +262,8 @@ export class DownloadAadhaarDigilockerUseCase {
       vendor,
       businessSuccess,
       persisted,
+      panFetched,
+      panCardNumber,
     };
   }
 

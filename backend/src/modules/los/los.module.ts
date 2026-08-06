@@ -28,6 +28,7 @@ import { LosRejectionService } from './services/los-rejection.service';
 import { LosDisbursementService } from './services/los-disbursement.service';
 import { LosLoanService } from './services/los-loan.service';
 import { LosCibilDevToolsService } from './services/los-cibil-dev-tools.service';
+import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
 
 @Module({
   imports: [BreModule, CibilModule, StorageModule, LoanDocumentsModule, SmsModule, ContactModule, EmailModule],
@@ -56,6 +57,7 @@ import { LosCibilDevToolsService } from './services/los-cibil-dev-tools.service'
     LosDisbursementService,
     LosLoanService,
     LosCibilDevToolsService,
+    LosVendorApiLogService,
   ],
   exports: [LosSessionService],
 })

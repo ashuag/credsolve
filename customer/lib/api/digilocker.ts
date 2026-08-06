@@ -7,10 +7,17 @@ function isRec(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
-/** Mirror backend Tenacio parsing — token may be nested under `data`. */
+/** Mirror backend DigiLocker parsing — token may be nested under `data` (Tenacio sessionToken or Surepass client_id). */
 export function extractDigilockerSessionTokenFromVendor(vendor: unknown, depth = 0): string | null {
   if (depth > 8 || vendor == null || !isRec(vendor)) return null;
-  for (const key of ['sessionToken', 'session_token', 'sessionId', 'session_id'] as const) {
+  for (const key of [
+    'sessionToken',
+    'session_token',
+    'sessionId',
+    'session_id',
+    'client_id',
+    'clientId',
+  ] as const) {
     const v = vendor[key];
     if (typeof v === 'string' && v.trim()) return v.trim();
   }
@@ -63,6 +70,7 @@ export function clearDigilockerSessionTokenFromStorage(): void {
   try {
     sessionStorage.removeItem(DIGILOCKER_SESSION_TOKEN_STORAGE_KEY);
     localStorage.removeItem(DIGILOCKER_SESSION_TOKEN_STORAGE_KEY);
+    sessionStorage.removeItem('moneycash:digilocker:hub-resume');
   } catch {
     /* ignore */
   }
@@ -96,7 +104,8 @@ export type InitDigilockerResponse = {
 };
 
 export type DownloadAadhaarDigilockerPayload = {
-  sessionToken: string;
+  /** Omit / empty when Redis still has the token from DigiLocker init (local manual callback resume). */
+  sessionToken?: string;
   consent?: boolean;
 };
 
@@ -174,7 +183,7 @@ export async function startDigilockerLoginFlow(
     return {
       ok: false,
       message:
-        'DigiLocker started, but no session token was returned. Check Tenacio configuration or try again.',
+        'DigiLocker started, but no session token was returned. Check DigiLocker configuration or try again.',
     };
   }
 
@@ -218,12 +227,13 @@ export async function initDigilockerSession(
 const DIGILOCKER_DOWNLOAD_TIMEOUT_MS = 45_000;
 
 export async function downloadDigilockerAadhaar(
-  payload: DownloadAadhaarDigilockerPayload,
+  payload: DownloadAadhaarDigilockerPayload = {},
 ): Promise<DownloadAadhaarDigilockerResponse> {
+  const sessionToken = payload.sessionToken?.trim() || undefined;
   const res = await apiPost<DownloadAadhaarDigilockerResponse>(
     '/auth/digilocker/download-aadhaar',
     {
-      sessionToken: payload.sessionToken,
+      ...(sessionToken ? { sessionToken } : {}),
       consent: payload.consent !== false,
     },
     'Unable to download Aadhaar from DigiLocker.',

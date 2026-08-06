@@ -112,8 +112,8 @@ export const SettingKey = {
     },
     MIN_LIVENESS_API_SCORE: {
         key: 'MIN_LIVENESS_API_SCORE',
-        default: '0.8',
-        description: 'Minimum liveness score from third-party API to pass liveness check',  
+        default: '0.65',
+        description: 'Minimum liveness/face-match score to pass liveness check',
     },
     PAN_VALIDATION_ATTEMPTS: {
         key: 'PAN_VALIDATION_ATTEMPTS',

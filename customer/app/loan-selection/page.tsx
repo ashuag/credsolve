@@ -366,12 +366,6 @@ export default function LoanSelectionPage() {
           >
             {isSaving ? 'Processing...' : 'Confirm Loan Details'}
           </button>
-          <Link
-            href="/pre-approved-loan"
-            className="py-4 px-6 rounded-xl font-bold text-[1rem] text-slate-600 bg-white hover:bg-slate-50 transition-colors text-center border border-slate-200"
-          >
-            Back
-          </Link>
         </div>
       </div>
     </div>

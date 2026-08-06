@@ -1,5 +1,5 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Req, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
-import { AnyFilesInterceptor } from '@nestjs/platform-express';
+import { Body, Controller, HttpCode, HttpStatus, Post, Req, UploadedFile, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { AnyFilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import type { UploadedFileLike } from '../../../common/types/uploaded-file';
@@ -14,6 +14,8 @@ import { LookupIfscUseCase } from '../application/use-cases/lookup-ifsc.use-case
 import { SubmitVerifiedBankUseCase } from '../application/use-cases/submit-verified-bank.use-case';
 import { SaveBankDetailsUseCase } from '../application/use-cases/save-bank-details.use-case';
 import { SaveKycDocumentsUseCase } from '../application/use-cases/save-kyc-documents.use-case';
+import { SaveKycSelfieUseCase } from '../application/use-cases/save-kyc-selfie.use-case';
+import { RunKycLivenessUseCase } from '../application/use-cases/run-kyc-liveness.use-case';
 import { SaveLoanSelectionUseCase } from '../application/use-cases/save-loan-selection.use-case';
 import { SaveProfessionalDetailsDto } from '../application/dto/save-professional-details.dto';
 import { SubmitProfessionalApplicationUseCase } from '../application/use-cases/submit-professional-application.use-case';
@@ -27,6 +29,8 @@ export class ApplicationsController {
     private readonly submitProfessionalApplication: SubmitProfessionalApplicationUseCase,
     private readonly saveLoanSelection: SaveLoanSelectionUseCase,
     private readonly saveKycDocuments: SaveKycDocumentsUseCase,
+    private readonly saveKycSelfie: SaveKycSelfieUseCase,
+    private readonly runKycLiveness: RunKycLivenessUseCase,
     private readonly saveBankDetails: SaveBankDetailsUseCase,
     private readonly lookupIfsc: LookupIfscUseCase,
     private readonly submitVerifiedBank: SubmitVerifiedBankUseCase,
@@ -67,6 +71,34 @@ export class ApplicationsController {
   @ApiOkResponse({ description: 'KYC document references stored' })
   kycDocumentsRoute(@Req() req: Request, @UploadedFiles() files: Array<UploadedFileLike>) {
     return this.saveKycDocuments.execute(req, files ?? []);
+  }
+
+  @Post('kyc/selfie')
+  @RateLimitByRoute('kyc-selfie')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    FileInterceptor('selfie', {
+      limits: { fileSize: 6 * 1024 * 1024 },
+    }),
+  )
+  @ApiOperation({
+    summary: 'Store customer selfie JPEG for the active application (webcam / camera)',
+  })
+  @ApiOkResponse({ description: 'Selfie stored under customer UUID / selfie / application UUID' })
+  kycSelfieRoute(@Req() req: Request, @UploadedFile() selfie: UploadedFileLike | undefined) {
+    return this.saveKycSelfie.execute(req, selfie);
+  }
+
+  @Post('kyc/liveness')
+  @RateLimitByRoute('kyc-liveness')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Run MoneyCash local KYC checks (selfie face validation, Aadhaar face match, authenticity), then Tenacio liveness on the stored selfie URL when outbound is enabled.',
+  })
+  @ApiOkResponse({ description: 'Vendor outcome; updates application when HTTP call completes' })
+  kycLivenessRoute(@Req() req: Request) {
+    return this.runKycLiveness.execute(req);
   }
 
   @Post('bank/ifsc-lookup')

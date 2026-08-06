@@ -101,9 +101,11 @@ function isPathAllowedForStage(stage: JourneyStage, path: string): boolean {
     case 'loanDocuments':
       return path === '/loan-documents';
     case 'bankDetails':
-      return path === '/bank-details';
+      // DigiLocker can complete identity capture before the rest of KYC moves;
+      // keep /kyc reachable so the hub is not skipped after DigiLocker.
+      return path === '/bank-details' || path === '/kyc' || path.startsWith('/kyc/');
     case 'references':
-      return path === '/references';
+      return path === '/references' || path === '/kyc' || path.startsWith('/kyc/');
     case 'done':
       return true;
   }
@@ -197,6 +199,12 @@ export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
       if (pathname !== '/thank-you') {
         router.replace('/thank-you');
       }
+      return;
+    }
+
+    // Bank details require completed KYC — never stay on /bank-details while KYC is open.
+    if (pathname === '/bank-details' && !session.journey.kycCompleted) {
+      router.replace(resolveKycStagePath(session));
       return;
     }
 

@@ -133,7 +133,7 @@ function JourneyTracker({
                   done ? 'text-emerald-700' : current ? 'text-brand-navy' : 'text-slate-400',
                 )}
               >
-                {step.shortLabel}
+                {step.label}
               </span>
             </li>
           );
@@ -659,7 +659,23 @@ export function MyAccountSection({
   const [fetching, setFetching] = useState(true);
   const [activeTab, setActiveTab] = useState<AccountTab>('overview');
   const [tabInitialized, setTabInitialized] = useState(false);
+  const [repayFlash, setRepayFlash] = useState<'success' | 'failed' | 'error' | null>(null);
   const signedIn = isCustomerPortalSignedIn(session);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const repay = params.get('repay');
+    if (repay === 'success' || repay === 'failed' || repay === 'error') {
+      setRepayFlash(repay);
+      params.delete('repay');
+      params.delete('txnid');
+      params.delete('msg');
+      const next = params.toString();
+      const path = `${window.location.pathname}${next ? `?${next}` : ''}`;
+      window.history.replaceState({}, '', path);
+    }
+  }, []);
 
   const loadLoans = useCallback(async () => {
     setFetching(true);
@@ -769,6 +785,25 @@ export function MyAccountSection({
   return (
     <div className="mx-auto w-full max-w-5xl animate-fade-in-up px-4 py-6 sm:px-6 sm:py-8">
       <div className="grid gap-6">
+        {repayFlash === 'success' ? (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-emerald-900">
+            <p className="font-bold">Payment successful. Your loan has been closed.</p>
+          </div>
+        ) : null}
+        {repayFlash === 'failed' ? (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-rose-900">
+            <p className="font-bold">Payment was unsuccessful. You can try Pay Now again.</p>
+          </div>
+        ) : null}
+        {repayFlash === 'error' ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-950">
+            <p className="font-bold">
+              We could not confirm this payment yet. If money was deducted, contact support with your
+              loan number.
+            </p>
+          </div>
+        ) : null}
+
         <AccountHero
           greetingName={greetingName}
           mobileNumber={mobileNumber}

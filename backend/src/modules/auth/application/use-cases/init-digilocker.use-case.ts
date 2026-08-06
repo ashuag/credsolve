@@ -6,7 +6,7 @@ import {
   extractDigilockerSessionToken,
 } from '../../../../common/vendor/digilocker-response.util';
 import { DigilockerSessionStore } from '../../../../common/kyc/digilocker-session.store';
-import { DigilockerVendorService } from '../../../../common/vendor/digilocker-vendor.service';
+import { DigilockerFetchService } from '../../../../common/vendor/digilocker-fetch.service';
 import { assertApplicationKycNotCompleted } from '../../../../common/kyc/application-kyc-guard.util';
 import { assertActiveApplicationLoanDocumentsAccepted } from '../../../../common/loan-documents/application-loan-documents-guard.util';
 import { PrismaService } from '../../../../prisma/prisma.service';
@@ -25,6 +25,8 @@ export type InitDigilockerResult = {
   digilockerLoginUrl: string | null;
   /** Parsed from vendor JSON when present — use with POST /auth/digilocker/download-aadhaar. */
   sessionToken: string | null;
+  /** Active DigiLocker vendor (`Surepass` | `Tenacio`) from `vendor_api_config`. */
+  vendorName?: string | null;
 };
 
 @Injectable()
@@ -33,7 +35,7 @@ export class InitDigilockerUseCase {
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
     private readonly applications: ApplicationRepository,
-    private readonly digilocker: DigilockerVendorService,
+    private readonly digilockerFetch: DigilockerFetchService,
     private readonly digilockerSession: DigilockerSessionStore,
     private readonly prisma: PrismaService,
   ) {}
@@ -70,15 +72,13 @@ export class InitDigilockerUseCase {
 
     const redirectUrl = resolveDigilockerRedirectUrl(dto.redirectUrl);
 
-    const out = await this.digilocker.postGenerateUrl(
-      { input: { redirectUrl, consent: true } },
-      lead.id,
-    );
+    const out = await this.digilockerFetch.initialize(redirectUrl, lead.id);
 
     const vendor = out.vendorBody ?? null;
-    const sessionToken = extractDigilockerSessionToken(vendor);
+    const sessionToken =
+      out.sessionToken ?? extractDigilockerSessionToken(vendor);
     if (out.ok && sessionToken) {
-      await this.digilockerSession.save(application.uuid, sessionToken);
+      await this.digilockerSession.save(application.uuid, sessionToken, out.vendorKind);
     }
     return {
       configured: out.configured,
@@ -86,8 +86,13 @@ export class InitDigilockerUseCase {
       ok: out.ok,
       httpStatus: out.httpStatus,
       vendor,
-      digilockerLoginUrl: extractDigilockerLoginUrl(vendor),
+      digilockerLoginUrl: out.digilockerLoginUrl ?? extractDigilockerLoginUrl(vendor),
       sessionToken,
+      vendorName: out.vendorKind
+        ? out.vendorKind === 'surepass'
+          ? 'Surepass'
+          : 'Tenacio'
+        : null,
     };
   }
 }

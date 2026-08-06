@@ -61,10 +61,16 @@ export type VendorApiCallOptions<TBody = unknown> = {
    * Use when the bureau endpoint does not compose cleanly from `VENDOR_HOST` + slug.
    */
   absoluteUrl?: string;
-  /** Extra headers (auth, vendor-specific). `Content-Type: application/json` is set automatically when sending a body. */
+  /** Extra headers (auth, vendor-specific). `Content-Type` is set automatically when sending a body. */
   headers?: Record<string, string>;
-  /** Request body. Serialised to JSON for non-GET/DELETE methods. */
+  /**
+   * Request body. Serialised per `bodyEncoding` for non-GET/DELETE methods.
+   * Default `json` → `JSON.stringify`. Use `form` for `application/x-www-form-urlencoded`
+   * (e.g. Easebuzz Payment Gateway initiateLink).
+   */
   body?: TBody;
+  /** How to serialise `body`. Defaults to `json`. */
+  bodyEncoding?: 'json' | 'form';
   /** Optional FK linking this call to a lead, for cross-table joins on the audit log. */
   leadId?: bigint | null;
   /** Override the default request timeout (ms). */
@@ -159,13 +165,16 @@ export class VendorApiService {
 
     const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const sendBody = opts.method !== 'GET' && opts.method !== 'DELETE' && opts.body !== undefined;
+    const bodyEncoding = opts.bodyEncoding ?? 'json';
 
     // `Accept: application/json` is added for body-bearing calls because
     // several Indian fintech APIs (Tenacio included) return a "Header
     // validation error" when content negotiation isn't explicit. Caller
     // overrides win.
+    const defaultContentType =
+      bodyEncoding === 'form' ? 'application/x-www-form-urlencoded' : 'application/json';
     const headers: Record<string, string> = sendBody
-      ? { 'Content-Type': 'application/json', Accept: 'application/json', ...(opts.headers ?? {}) }
+      ? { 'Content-Type': defaultContentType, Accept: 'application/json', ...(opts.headers ?? {}) }
       : { Accept: 'application/json', ...(opts.headers ?? {}) };
 
     const redactedHeadersForAudit = redactHeaders(headers, opts.sensitiveHeaderNames);
@@ -179,7 +188,11 @@ export class VendorApiService {
       const response = await fetch(url, {
         method: opts.method,
         headers,
-        body: sendBody ? JSON.stringify(opts.body) : undefined,
+        body: sendBody
+          ? bodyEncoding === 'form'
+            ? encodeFormBody(opts.body)
+            : JSON.stringify(opts.body)
+          : undefined,
         signal: AbortSignal.timeout(timeoutMs),
       });
       httpStatus = response.status;
@@ -403,6 +416,20 @@ function buildResponseAuditPayload(rawText: string, parsed: unknown, httpStatus:
     httpStatus,
     body: rawText,
   });
+}
+
+/** Serialise a plain object as `application/x-www-form-urlencoded` (skips null/undefined). */
+function encodeFormBody(body: unknown): string {
+  const params = new URLSearchParams();
+  if (body && typeof body === 'object' && !Array.isArray(body)) {
+    for (const [key, value] of Object.entries(body as Record<string, unknown>)) {
+      if (value == null) continue;
+      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        params.append(key, String(value));
+      }
+    }
+  }
+  return params.toString();
 }
 
 /** Ensures audit JSON is serializable for Prisma/MySQL (drops cycles, BigInt, etc.). */

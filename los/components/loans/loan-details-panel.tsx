@@ -291,19 +291,9 @@ function LoanLifecycle({
 
   return (
     <div className="rounded-[16px] border border-[rgba(23,44,113,0.08)] bg-gradient-to-br from-[#f7faff] to-white p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <p className="m-0 text-[0.62rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">Loan lifecycle</p>
-        <span
-          className="rounded-full px-2.5 py-1 text-[0.68rem] font-extrabold"
-          style={{
-            color: maturityMeta(daysToMaturity).color,
-            background: maturityMeta(daysToMaturity).bg,
-            border: `1px solid ${maturityMeta(daysToMaturity).border}`,
-          }}
-        >
-          {maturityMeta(daysToMaturity).label}
-        </span>
-      </div>
+      <p className="m-0 mb-3 text-[0.62rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">
+        Loan lifecycle
+      </p>
       <ol className="m-0 grid list-none grid-cols-2 gap-3 p-0 lg:grid-cols-4">
         {steps.map((step, idx) => {
           const color = step.danger ? '#b91c1c' : step.done || step.active ? '#1496f3' : '#94a3b8';
@@ -509,54 +499,102 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
     <div className="flex flex-col gap-4">
       {/* Hero */}
       <header className="overflow-hidden rounded-[18px] border border-[rgba(23,44,113,0.1)] bg-gradient-to-br from-white via-[#f7fbff] to-[#eef6ff] shadow-[0_10px_32px_rgba(23,44,113,0.05)]">
-        <div className="h-[3px] w-full" style={{ background: `linear-gradient(90deg, ${statusStyles.text}, ${statusStyles.text}55)` }} aria-hidden />
+        <div
+          className="h-[3px] w-full"
+          style={{ background: `linear-gradient(90deg, ${statusStyles.text}, ${statusStyles.text}55)` }}
+          aria-hidden
+        />
         <div className="p-5 sm:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex min-w-0 items-start gap-3.5">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex min-w-0 flex-1 items-start gap-4">
               <div
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] text-[0.9rem] font-extrabold text-white shadow-[0_8px_20px_rgba(23,44,113,0.18)]"
-                style={{ background: `linear-gradient(135deg, ${statusStyles.text}, #1c347d)` }}
+                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[16px] text-[1rem] font-extrabold text-white shadow-[0_10px_24px_rgba(23,44,113,0.2)]"
+                style={{ background: `linear-gradient(145deg, ${statusStyles.text}, #1c347d)` }}
                 aria-hidden
               >
                 {getInitials(name)}
               </div>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">Loan account</span>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                  <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">
+                    Loan account
+                  </span>
                   <LosStatusPill code={row.loanStatusCode} label={row.loanStatusLabel} />
-                  <span className="rounded-full border border-[rgba(23,44,113,0.1)] bg-white px-2.5 py-1 text-[0.68rem] font-bold text-brand-muted">
+                  <span className="text-[0.72rem] font-semibold text-brand-muted">
                     App · {row.applicationStatusLabel}
                   </span>
                 </div>
-                <h1 className="m-0 mt-1.5 font-mono text-[clamp(1.35rem,2.4vw,1.85rem)] font-extrabold tracking-tight text-brand-navy">
-                  {row.loanNumber}
+
+                <h1 className="m-0 mt-2 text-[clamp(1.35rem,2.2vw,1.75rem)] font-extrabold tracking-[-0.03em] text-brand-navy">
+                  {name}
                 </h1>
-                <p className="mt-1 mb-0 text-[0.95rem] font-bold text-brand-text">{name}</p>
-                <div className="mt-2.5 flex flex-wrap gap-1.5">
-                  <span className="inline-flex items-center rounded-full border border-[rgba(23,44,113,0.1)] bg-white px-2.5 py-1 text-[0.74rem] font-semibold text-brand-text">
-                    {row.mobileNumber}
-                  </span>
-                  {row.email ? (
-                    <span className="inline-flex items-center rounded-full border border-[rgba(23,44,113,0.1)] bg-white px-2.5 py-1 text-[0.74rem] font-semibold text-brand-text">
-                      {row.email}
-                    </span>
-                  ) : null}
-                  <span
-                    className="inline-flex items-center rounded-full px-2.5 py-1 text-[0.74rem] font-extrabold"
-                    style={{ color: maturity.color, background: maturity.bg, border: `1px solid ${maturity.border}` }}
+
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <p className="m-0 font-mono text-[0.95rem] font-bold tracking-tight text-brand-text">
+                    {row.loanNumber}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => copyText(row.loanNumber)}
+                    className="rounded-md border border-[rgba(23,44,113,0.1)] bg-white px-1.5 py-0.5 text-[0.58rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted transition-colors hover:border-brand-blue/30 hover:text-brand-blue"
+                    title="Copy loan number"
                   >
-                    {maturity.label}
-                  </span>
+                    Copy
+                  </button>
                 </div>
+
+                <p className="mt-2.5 mb-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.82rem] font-semibold text-brand-muted">
+                  <a
+                    href={`tel:${row.mobileNumber}`}
+                    className="text-brand-text no-underline transition-colors hover:text-brand-blue"
+                  >
+                    {row.mobileNumber}
+                  </a>
+                  {row.email ? (
+                    <>
+                      <span className="text-[rgba(23,44,113,0.25)]" aria-hidden>
+                        ·
+                      </span>
+                      <a
+                        href={`mailto:${row.email}`}
+                        className="min-w-0 truncate text-brand-text no-underline transition-colors hover:text-brand-blue"
+                      >
+                        {row.email}
+                      </a>
+                    </>
+                  ) : null}
+                </p>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <ActionBtn href="/loans">← All loans</ActionBtn>
-              <ActionBtn href={`/applications/${row.applicationUuid}`} variant="soft">
-                Open application
-              </ActionBtn>
-              <ActionBtn onClick={() => void load()}>Refresh</ActionBtn>
+            <div className="flex shrink-0 flex-col gap-3 sm:items-end">
+              <div
+                className="inline-flex min-w-[9.5rem] flex-col rounded-[14px] border px-3.5 py-2.5 sm:text-right"
+                style={{
+                  color: maturity.color,
+                  background: maturity.bg,
+                  borderColor: maturity.border,
+                }}
+              >
+                <span className="text-[0.58rem] font-extrabold uppercase tracking-[0.12em] opacity-80">
+                  Maturity
+                </span>
+                <span className="mt-0.5 text-[0.92rem] font-extrabold leading-tight">{maturity.label}</span>
+                {row.loanMaturityDate ? (
+                  <span className="mt-0.5 text-[0.7rem] font-semibold opacity-80">
+                    {formatDate(row.loanMaturityDate)}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap gap-2 sm:justify-end">
+                <ActionBtn href="/loans">← All loans</ActionBtn>
+                <ActionBtn href={`/applications/${row.applicationUuid}`} variant="soft">
+                  Open application
+                </ActionBtn>
+                <ActionBtn onClick={() => void load()}>Refresh</ActionBtn>
+              </div>
             </div>
           </div>
 

@@ -148,7 +148,7 @@ export class SubmitVerifiedBankUseCase {
       const retryLimitReached = nextAttemptsUsed >= attemptsAllowed;
       const baseMessage =
         pickTenacioVendorErrorMessage(vendor) ??
-        `Bank verification failed (HTTP ${pennyOut.httpStatus ?? 'n/a'}).`;
+        `Bank verification failed.`;
       return {
         success: false,
         pennyDropOk: false,

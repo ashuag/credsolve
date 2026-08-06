@@ -11,7 +11,7 @@ export const APPLICATION_JOURNEY_STAGES = [
   { id: 'kyc', label: 'KYC' },
   { id: 'bank', label: 'Bank details' },
   { id: 'refs', label: 'References' },
-  { id: 'esign', label: 'Sanction OTP' },
+  { id: 'esign', label: 'eSign' },
 ] as const;
 
 export type ApplicationJourneyStageId = (typeof APPLICATION_JOURNEY_STAGES)[number]['id'];

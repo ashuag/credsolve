@@ -755,6 +755,18 @@ function KycDetailPanel({
             label: 'KYC pipeline passed',
             value: row.livenessPassed ? 'Yes' : 'No',
           },
+          {
+            label: 'DigiLocker PAN',
+            value: row.digilockerPan?.panCardNumber ?? '—',
+          },
+          {
+            label: 'DigiLocker PAN verified at',
+            value: formatDateTime(row.digilockerPan?.panCardVerifiedAt ?? null),
+          },
+          {
+            label: 'DigiLocker Aadhaar',
+            value: row.aadhaarDetail?.maskedAadhaar ?? '—',
+          },
           { label: 'Selfie quality checked at', value: formatDateTime(row.selfieFaceValidation?.checkedAt ?? null) },
           { label: 'Liveness checked at', value: formatDateTime(row.livenessCheckedAt) },
           {

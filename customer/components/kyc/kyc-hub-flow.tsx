@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
-import { startDigilockerLoginFlow } from '@/lib/api/digilocker';
+import { startDigilockerLoginFlow, fetchPendingDigilockerSession } from '@/lib/api/digilocker';
 import { getKycHubBackPath } from '@/lib/api/customer-session';
 import { isLoanDocumentsJourneyComplete } from '@/lib/loan-documents-journey';
 import { kycJourneyProgressFromSession } from '@/lib/kyc-journey-progress';
@@ -64,6 +64,13 @@ export function KycHubFlow() {
   const [busy, setBusy] = useState(false);
 
   const loanSelection = session?.authenticated === true ? session.loanSelection : null;
+  const digilockerDone =
+    session?.authenticated === true &&
+    Boolean(session.kycFaceProgress?.digilockerAadhaarCaptured);
+  const livenessPassed =
+    session?.authenticated === true && Boolean(session.kycFaceProgress?.livenessPassed);
+  const kycCompleted =
+    session?.authenticated === true && Boolean(session.journey.kycCompleted);
 
   const { progressPct, activeStepIndex } = useMemo(
     () => kycJourneyProgressFromSession(session),
@@ -78,6 +85,43 @@ export function KycHubFlow() {
     if (session?.authenticated === true && session.lead && !isLoanDocumentsJourneyComplete(session)) {
       router.replace('/loan-documents');
     }
+  }, [router, session]);
+
+  // Local DigiLocker testing: Surepass redirects to a public callback; after you switch
+  // back to /kyc, resume Aadhaar download if init left a pending session on the server.
+  useEffect(() => {
+    if (session?.authenticated !== true) return;
+    if (session.kycFaceProgress?.digilockerAadhaarCaptured) return;
+    if (!isLoanDocumentsJourneyComplete(session)) return;
+
+    const resumeKey = 'moneycash:digilocker:hub-resume';
+    try {
+      if (sessionStorage.getItem(resumeKey) === '1') return;
+    } catch {
+      /* ignore */
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const pending = await fetchPendingDigilockerSession();
+        if (cancelled) return;
+        if (pending.sessionToken?.trim()) {
+          try {
+            sessionStorage.setItem(resumeKey, '1');
+          } catch {
+            /* ignore */
+          }
+          router.replace('/kyc/digilocker-callback');
+        }
+      } catch {
+        /* ignore — user can start DigiLocker manually */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [router, session]);
 
   async function handleDigilocker() {
@@ -118,12 +162,33 @@ export function KycHubFlow() {
           <div className={`${styles.reveal} ${styles.d1}`}>
             <span className={styles.eyebrow}>KYC</span>
           </div>
-          <h1 className={`${styles.rightTitle} ${styles.reveal} ${styles.d1}`}>Verify your identity</h1>
-          <p className={`${styles.lede} ${styles.reveal} ${styles.d2}`}>
-            We use <strong>DigiLocker</strong> to securely fetch your government-issued documents — no uploads, no
-            waiting. Here&apos;s exactly what to expect.
-          </p>
+          <h1 className={`${styles.rightTitle} ${styles.reveal} ${styles.d1}`}>
+            {digilockerDone ? 'DigiLocker verified' : 'Verify your identity'}
+          </h1>
 
+          {digilockerDone ? (
+            <div className={`${styles.reveal} ${styles.d2} grid gap-3 rounded-2xl border border-[rgba(18,36,79,0.1)] bg-white/90 p-6`}>
+              <p className="m-0 text-sm font-semibold text-emerald-800">Aadhaar verified via DigiLocker</p>
+              <p className="m-0 text-sm text-brand-muted leading-relaxed">
+                {!livenessPassed
+                  ? 'Identity capture from DigiLocker is complete. Next, verify with a selfie and liveness check.'
+                  : kycCompleted
+                    ? 'KYC is complete. You can continue to bank details.'
+                    : 'Identity capture from DigiLocker is complete. Finish any remaining KYC steps to continue.'}
+              </p>
+              {!livenessPassed ? (
+                <button
+                  type="button"
+                  className={styles.cta}
+                  onClick={() => router.push('/kyc/selfie')}
+                >
+                  Continue to selfie &amp; liveness
+                  <ArrowRightIcon />
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            <>
           <button
             type="button"
             className={`${styles.method} ${styles.reveal} ${styles.d2}`}
@@ -165,10 +230,10 @@ export function KycHubFlow() {
             <div className={`${styles.flowStep} ${styles.reveal} ${styles.d5}`}>
               <span className={styles.flowNum}>3</span>
               <div className={styles.flowBody}>
-                <h4>Allow Aadhaar access</h4>
+                <h4>Allow Aadhaar and Pan access</h4>
                 <p>
                   On the consent screen, you <span className={styles.hl}>must tap &ldquo;Allow&rdquo;</span> to let
-                  DigiLocker share your Aadhaar with us.
+                  DigiLocker share your Aadhaar and Pan with us.
                 </p>
               </div>
             </div>
@@ -179,7 +244,7 @@ export function KycHubFlow() {
             <div>
               <h5>Consent is required to finish KYC</h5>
               <p>
-                If you decline the permission on the DigiLocker screen, we can&apos;t fetch your Aadhaar — and your KYC
+                If you decline the permission on the DigiLocker screen, we can&apos;t fetch your Aadhaar and Pan — and your KYC
                 will stay <strong>incomplete</strong>. Please tap &ldquo;Allow&rdquo; when prompted.
               </p>
             </div>
@@ -210,18 +275,8 @@ export function KycHubFlow() {
               </>
             )}
           </button>
-
-          <p className={`${styles.alt} ${styles.reveal} ${styles.d6}`}>
-            Don&apos;t have DigiLocker set up?{' '}
-            <Link href="/kyc/upload-documents">Upload documents manually (CKYC)</Link>
-          </p>
-
-          <div className={`${styles.back} ${styles.reveal} ${styles.d6}`}>
-            <button type="button" className={styles.backBtn} onClick={handleBack}>
-              <ArrowLeftIcon />
-              Back
-            </button>
-          </div>
+            </>
+          )}
         </section>
       </div>
     </div>

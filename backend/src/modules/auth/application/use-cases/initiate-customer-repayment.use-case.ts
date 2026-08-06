@@ -7,9 +7,10 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type { Request } from 'express';
 import { EasebuzzWireService } from '../../../../common/easebuzz/easebuzz-wire.service';
+import { savePendingRepayIntent } from '../../../../common/easebuzz/repay-intent.util';
 import { LOAN_REPAYMENT_STATUS } from '../../../../common/constants/loan-repayment.constants';
 import { LOAN_STATUS } from '../../../../common/constants/loan.constants';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
@@ -27,23 +28,11 @@ import { LeadRepository } from '../../infrastructure/repositories/lead.repositor
 
 const REPAY_LOCK_TTL_SEC = 90;
 
-function buildUniqueCode(loanNumber: string, loanAccountUuid: string): string {
-  const stamp = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Kolkata',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
-    .format(new Date())
-    .replace(/-/g, '')
-    .slice(2);
-  const compact = loanNumber.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 10);
-  const salt = createHash('sha256')
-    .update(`${loanAccountUuid}:${Date.now()}:${randomUUID()}`)
-    .digest('hex')
-    .slice(0, 6)
-    .toUpperCase();
-  return `MCREP${compact}${stamp}${salt}`.slice(0, 40);
+/** Easebuzz txnid: loan_number + current timestamp (max 40 chars). */
+function buildPayTxnId(loanNumber: string): string {
+  const compact = loanNumber.replace(/[^a-zA-Z0-9_|\/-]/g, '').slice(0, 27);
+  const ts = String(Date.now());
+  return `${compact}${ts}`.slice(0, 40);
 }
 
 function truncateError(message: string): string {
@@ -168,16 +157,16 @@ export class InitiateCustomerRepaymentUseCase {
 
     const amountInr = totalDue.toFixed(2);
     const bounceFeeInrStr = bounceFeeInr.toFixed(2);
-    const uniqueCode = buildUniqueCode(loan.loanNumber, loan.uuid);
+    const txnid = buildPayTxnId(loan.loanNumber);
     const paidAt = new Date();
 
     let vendor: 'easebuzz' | 'skipped' = 'skipped';
-    let vendorRef: string | null = uniqueCode;
+    let vendorRef: string | null = txnid;
     let paymentUrl: string | null = null;
 
-    if (this.easebuzzWire.isEasyCollectSkipped()) {
+    if (this.easebuzzWire.isPayInitiateSkipped()) {
       this.logger.warn(
-        `[repay] EASEBUZZ_EASYCOLLECT_SKIP — settling loan=${loan.loanNumber} amount=${amountInr} ` +
+        `[repay] EASEBUZZ_PAY_SKIP — settling loan=${loan.loanNumber} amount=${amountInr} ` +
           `bounce=${bounceFeeInrStr} without vendor call`,
       );
     } else {
@@ -192,18 +181,35 @@ export class InitiateCustomerRepaymentUseCase {
 
       try {
         // Amount = principal + interest (+ bounce fee when past due), always 2 decimal places.
-        // merchant_txn = customer loan id (loan_number), per Easebuzz EasyCollect contract.
-        const created = await this.easebuzzWire.createEasyCollect({
-          name: payeeName,
+        // txnid = loan_number + current timestamp (unique per attempt).
+        const created = await this.easebuzzWire.initiatePaymentLink({
+          txnid,
+          amountInr: totalDue,
+          productinfo: `Loan repay ${loan.loanNumber}`.slice(0, 45),
+          firstname: payeeName,
           email: payeeEmail,
           phone: payeePhone.slice(-10),
-          merchantTxn: loan.loanNumber.trim().slice(0, 40),
-          amountInr: totalDue,
+          surl: '',
+          furl: '',
           leadId: application.leadId,
+          udf1: loan.uuid,
+          udf2: application.uuid,
+          udf3: loan.loanNumber,
+          udf4: amountInr,
+          udf5: bounceFeeInrStr,
         });
         vendor = 'easebuzz';
-        vendorRef = (created.collectId ?? created.merchantTxn).slice(0, 50);
+        vendorRef = created.txnid.slice(0, 50);
         paymentUrl = created.paymentUrl;
+        await savePendingRepayIntent(this.redis, created.txnid, {
+          loanAccountId: loan.id.toString(),
+          loanAccountUuid: loan.uuid,
+          applicationUuid: application.uuid,
+          loanNumber: loan.loanNumber,
+          amountInr,
+          bounceFeeInr: bounceFeeInrStr,
+          createdAt: new Date().toISOString(),
+        });
       } catch (error) {
         const message =
           error instanceof Error
@@ -212,7 +218,7 @@ export class InitiateCustomerRepaymentUseCase {
         await this.recordFailedAttempt({
           loanAccountId: loan.id,
           amountInr,
-          uniqueCode,
+          uniqueCode: txnid,
           failureMessage: message,
           paidAt,
         });
@@ -224,10 +230,10 @@ export class InitiateCustomerRepaymentUseCase {
         );
       }
 
-      // Hosted EasyCollect payment URL — customer must complete payment; do not close the loan yet.
+      // Hosted Easebuzz payment URL — customer must complete payment; do not close the loan yet.
       if (paymentUrl) {
         this.logger.log(
-          `[repay] EasyCollect created loan=${loan.loanNumber} amount=${amountInr} — awaiting customer payment`,
+          `[repay] Pay initiateLink created loan=${loan.loanNumber} txnid=${txnid} amount=${amountInr} — awaiting customer payment`,
         );
         return {
           success: true as const,
@@ -289,7 +295,7 @@ export class InitiateCustomerRepaymentUseCase {
           ${LOAN_REPAYMENT_STATUS.SUCCESS},
           ${vendorRef},
           ${null},
-          ${uniqueCode},
+          ${txnid},
           ${paidAt},
           ${paidAt}
         )

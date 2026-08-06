@@ -13,7 +13,11 @@ export class RequiredCustomerSessionGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<Request>();
     const res = context.switchToHttp().getResponse<Response>();
-    await this.customerSessions.attachCustomerSession(req, res);
+    // Skip re-attach when OptionalCustomerSessionGuard (or another guard) already bound the session.
+    // Re-attaching with rotate-on-use would delete the Redis key mid-request and cause a spurious 401.
+    if (!req.customerSession) {
+      await this.customerSessions.attachCustomerSession(req, res);
+    }
     if (!req.customerSession) {
       throw new UnauthorizedException('Sign in with mobile OTP before continuing.');
     }

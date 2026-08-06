@@ -39,7 +39,7 @@ export function KycEnableReKycButton({
   const handleEnable = async () => {
     if (!authToken || busy) return;
     const confirmed = window.confirm(
-      'Enable re-KYC for this customer? This resets KYC so they can redo DigiLocker / document verification. DigiLocker is cleared only when KYC previously failed identity checks.',
+      'Enable re-KYC for this customer? This clears DigiLocker / KYC so they must redo identity verification in the app.',
     );
     if (!confirmed) return;
 
@@ -48,10 +48,9 @@ export function KycEnableReKycButton({
     setMessage(null);
     try {
       const result = await enableReKyc(authToken, applicationUuid);
-      const parts = ['Re-KYC enabled — customer can redo KYC from the app.'];
-      if (result.digilockerCleared) {
-        parts.push('DigiLocker Aadhaar was cleared; they must reconnect DigiLocker.');
-      }
+      const parts = [
+        'Re-KYC enabled — DigiLocker was cleared; customer must redo KYC from the app.',
+      ];
       if (result.leadRecovered || result.applicationRecovered) {
         parts.push('Lead/application moved back to in progress.');
       }

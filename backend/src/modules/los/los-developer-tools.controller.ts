@@ -1,21 +1,43 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { LosAuthGuard } from './auth/los-auth.guard';
 import { CibilVendorFetchCheckDto } from './dto/cibil-vendor-fetch-check.dto';
+import { ListVendorApiLogsQueryDto } from './dto/list-vendor-api-logs-query.dto';
 import { LosCibilDevToolsService } from './services/los-cibil-dev-tools.service';
+import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
 
 @ApiTags('LOS Developer Tools')
 @Controller(['los/developer-tools', 'los/los/developer-tools'])
 @UseGuards(LosAuthGuard)
 export class LosDeveloperToolsController {
-  constructor(private readonly cibilDevTools: LosCibilDevToolsService) {}
+  constructor(
+    private readonly cibilDevTools: LosCibilDevToolsService,
+    private readonly vendorApiLogs: LosVendorApiLogService,
+  ) {}
+
+  @Get('vendor-api-logs')
+  @ApiOperation({
+    summary: 'List vendor_api_log rows (paginated, filterable, sortable)',
+  })
+  listVendorApiLogs(@Query() query: ListVendorApiLogsQueryDto) {
+    return this.vendorApiLogs.list(query);
+  }
+
+  @Get('vendor-api-logs/:uuid')
+  @ApiOperation({ summary: 'Get one vendor_api_log row including request/response payloads' })
+  getVendorApiLog(@Param('uuid') uuid: string) {
+    return this.vendorApiLogs.getByUuid(uuid);
+  }
 
   @Post('cibil-tenacio-fetch')
   @HttpCode(HttpStatus.OK)

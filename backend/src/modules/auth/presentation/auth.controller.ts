@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Logger, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { All, Body, Controller, Get, HttpCode, HttpStatus, Logger, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { RateLimitByRoute } from '../../../common/rate-limit/rate-limit-route.decorator';
@@ -15,6 +15,7 @@ import { VerifyPanDto } from '../application/dto/verify-pan.dto';
 import { GetCustomerSessionUseCase } from '../application/use-cases/get-customer-session.use-case';
 import { GetCustomerLoansDashboardUseCase } from '../application/use-cases/get-customer-loans-dashboard.use-case';
 import { GetCustomerPaymentHistoryUseCase } from '../application/use-cases/get-customer-payment-history.use-case';
+import { HandleEasebuzzRepaymentCallbackUseCase } from '../application/use-cases/handle-easebuzz-repayment-callback.use-case';
 import { InitiateCustomerRepaymentUseCase } from '../application/use-cases/initiate-customer-repayment.use-case';
 import { LogoutUseCase } from '../application/use-cases/logout.use-case';
 import { SendOtpUseCase } from '../application/use-cases/send-otp.use-case';
@@ -29,6 +30,7 @@ import { InitDigilockerUseCase } from '../application/use-cases/init-digilocker.
 import { DownloadAadhaarDigilockerUseCase } from '../application/use-cases/download-aadhaar-digilocker.use-case';
 import { GetPendingDigilockerSessionUseCase } from '../application/use-cases/get-pending-digilocker-session.use-case';
 import { ServeDigilockerAadhaarPhotoUseCase } from '../application/use-cases/serve-digilocker-aadhaar-photo.use-case';
+import { ServeKycSelfiePhotoUseCase } from '../application/use-cases/serve-kyc-selfie-photo.use-case';
 import { GetLoanDocumentsUseCase } from '../application/use-cases/get-loan-documents.use-case';
 import { ServeLoanDocumentPdfUseCase } from '../application/use-cases/serve-loan-document-pdf.use-case';
 import { SendLoanDocumentsOtpUseCase } from '../application/use-cases/send-loan-documents-otp.use-case';
@@ -55,6 +57,7 @@ export class AuthController {
     private readonly customerLoansDashboard: GetCustomerLoansDashboardUseCase,
     private readonly customerPaymentHistory: GetCustomerPaymentHistoryUseCase,
     private readonly initiateCustomerRepayment: InitiateCustomerRepaymentUseCase,
+    private readonly handleEasebuzzRepaymentCallback: HandleEasebuzzRepaymentCallbackUseCase,
     private readonly logoutFlow: LogoutUseCase,
     private readonly customerGoogleOauth: CustomerGoogleOauthService,
     private readonly saveLeadDetailsFlow: SaveLeadDetailsUseCase,
@@ -66,6 +69,7 @@ export class AuthController {
     private readonly downloadAadhaarDigilockerFlow: DownloadAadhaarDigilockerUseCase,
     private readonly getPendingDigilockerSessionFlow: GetPendingDigilockerSessionUseCase,
     private readonly serveDigilockerAadhaarPhotoFlow: ServeDigilockerAadhaarPhotoUseCase,
+    private readonly serveKycSelfiePhotoFlow: ServeKycSelfiePhotoUseCase,
     private readonly getLoanDocumentsFlow: GetLoanDocumentsUseCase,
     private readonly serveLoanDocumentPdfFlow: ServeLoanDocumentPdfUseCase,
     private readonly sendLoanDocumentsOtpFlow: SendLoanDocumentsOtpUseCase,
@@ -142,6 +146,15 @@ export class AuthController {
     await this.serveDigilockerAadhaarPhotoFlow.execute(req, res);
   }
 
+  @Get('kyc/selfie-photo')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @ApiOperation({
+    summary: 'Stream the selfie JPEG saved for the active application (requires session cookie)',
+  })
+  async kycSelfiePhoto(@Req() req: Request, @Res() res: Response): Promise<void> {
+    await this.serveKycSelfiePhotoFlow.execute(req, res);
+  }
+
   @Get('loan-documents')
   @UseGuards(RequiredCustomerSessionGuard)
   @RateLimitByRoute('loan-documents')
@@ -212,10 +225,36 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Collect loan repayment via Easebuzz EasyCollect (principal + interest till today). Returns a payment URL; loan closes after successful payment.',
+      'Collect loan repayment via Easebuzz Payment Gateway initiateLink (principal + interest till today). Returns a hosted payment URL; loan closes after Easebuzz redirects to surl.',
   })
   repayLoan(@Req() req: Request, @Param('applicationUuid') applicationUuid: string) {
     return this.initiateCustomerRepayment.execute(req, applicationUuid);
+  }
+
+  @All('repayments/easebuzz/success')
+  @ApiOperation({
+    summary: 'Easebuzz repayment success URL (surl) — verifies hash, closes loan, redirects to customer portal',
+  })
+  async easebuzzRepaySuccess(@Req() req: Request, @Res() res: Response): Promise<void> {
+    const payload = {
+      ...(typeof req.query === 'object' && req.query ? req.query : {}),
+      ...(typeof req.body === 'object' && req.body ? req.body : {}),
+    } as Record<string, unknown>;
+    const redirectUrl = await this.handleEasebuzzRepaymentCallback.execute(payload, 'success');
+    res.redirect(303, redirectUrl);
+  }
+
+  @All('repayments/easebuzz/failure')
+  @ApiOperation({
+    summary: 'Easebuzz repayment failure URL (furl) — verifies hash, records failure, redirects to customer portal',
+  })
+  async easebuzzRepayFailure(@Req() req: Request, @Res() res: Response): Promise<void> {
+    const payload = {
+      ...(typeof req.query === 'object' && req.query ? req.query : {}),
+      ...(typeof req.body === 'object' && req.body ? req.body : {}),
+    } as Record<string, unknown>;
+    const redirectUrl = await this.handleEasebuzzRepaymentCallback.execute(payload, 'failure');
+    res.redirect(303, redirectUrl);
   }
 
   @Get('my-payments')
@@ -321,7 +360,7 @@ export class AuthController {
   @RateLimitByRoute('digilocker-init')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Start Tenacio DigiLocker workflow (audited vendor call; requires mobile session cookie)',
+    summary: 'Start DigiLocker workflow (Surepass or Tenacio via vendor_api_config; requires mobile session cookie)',
   })
   initDigilockerRoute(@Req() req: Request, @Body() body: InitDigilockerDto) {
     this.logger.log(`POST /api/auth/digilocker/init ip=${readClientIp(req) ?? 'unknown'}`);
@@ -345,7 +384,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Download Aadhaar XML/KYC data from Tenacio after DigiLocker (sessionToken from generate-URL response)',
+      'Download Aadhaar (and PAN when Surepass) after DigiLocker (sessionToken / client_id from init)',
   })
   downloadAadhaarDigilockerRoute(@Req() req: Request, @Body() body: DownloadAadhaarDigilockerDto) {
     this.logger.log(`POST /api/auth/digilocker/download-aadhaar ip=${readClientIp(req) ?? 'unknown'}`);

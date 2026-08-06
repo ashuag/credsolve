@@ -1,0 +1,8 @@
+curl --location 'https://kyc-api.surepass.app/api/v1/digilocker/initialize' --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc4NDI2NTg0MSwianRpIjoiNjgxMTBiYTMtNThjOC00NzcxLTgxMjEtOThiYjg5YjcwMGRkIiwidHlwZSI6ImFjY2VzcyIsImlkZW50aXR5IjoiZGV2LnNhdXJhYmhfbW9uZXljYXNoQHN1cmVwYXNzLmlvIiwibmJmIjoxNzg0MjY1ODQxLCJleHAiOjI0MTQ5ODU4NDEsImVtYWlsIjoic2F1cmFiaF9tb25leWNhc2hAc3VyZXBhc3MuaW8iLCJ0ZW5hbnRfaWQiOiJtYWluIiwidXNlcl9jbGFpbXMiOnsic2NvcGVzIjpbInVzZXIiXX19.BVQRgg9PdU9pWLluZ0cvGSWPA_g9usVCBAybfKh0fC4' --header 'Content-Type: application/json' --data '{
+       "data": {
+           "signup_flow": true,
+           "logo_url": "https://www.moneycash.in/_next/image?url=%2Fimages%2Fmoneycash-logo.png&w=256&q=95",
+           "redirect_url": "https://google.com",
+           "skip_main_screen": false
+       }
+  }'
