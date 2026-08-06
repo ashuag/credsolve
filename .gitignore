@@ -9,6 +9,7 @@ customer/node_modules/
 out/
 dist/
 build/
+build-seed/
 coverage/
 .turbo/
 *.tsbuildinfo
