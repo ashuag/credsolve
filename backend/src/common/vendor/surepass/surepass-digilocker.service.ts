@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { VendorApiService } from '../vendor-api.service';
 import {
+  extractPanXmlFileIdFromListDocuments,
   mapSurepassDigilockerAadhaarToFormEnvelope,
   mapSurepassDigilockerInitToSessionFields,
   parseDigilockerPanCertificateXml,
@@ -12,6 +13,8 @@ export const DEFAULT_SUREPASS_DIGILOCKER_INIT_URL =
   'https://kyc-api.surepass.app/api/v1/digilocker/initialize';
 export const DEFAULT_SUREPASS_DIGILOCKER_AADHAAR_BASE_URL =
   'https://kyc-api.surepass.app/api/v1/digilocker/download-aadhaar';
+export const DEFAULT_SUREPASS_DIGILOCKER_LIST_DOCUMENTS_BASE_URL =
+  'https://kyc-api.surepass.app/api/v1/digilocker/list-documents';
 export const DEFAULT_SUREPASS_DIGILOCKER_PAN_BASE_URL =
   'https://kyc-api.surepass.app/api/v1/digilocker/download-document';
 
@@ -45,12 +48,13 @@ type SurepassInitBody = {
 };
 
 /**
- * Surepass DigiLocker: initialize → download Aadhaar → download PAN XML.
+ * Surepass DigiLocker: initialize → download Aadhaar → list-documents → download PAN XML.
  *
  * Env: `SUREPASS_TOKEN` (Bearer, required). Optional:
  * - `SUREPASS_DIGILOCKER_INIT_URL`
  * - `SUREPASS_DIGILOCKER_AADHAAR_URL` (base; `/{client_id}` appended)
- * - `SUREPASS_DIGILOCKER_PAN_URL` (base; `/{client_id}/pan` appended)
+ * - `SUREPASS_DIGILOCKER_LIST_DOCUMENTS_URL` (base; `/{client_id}` appended)
+ * - `SUREPASS_DIGILOCKER_PAN_URL` (base; `/{client_id}/{file_id}` appended)
  * - `SUREPASS_DIGILOCKER_LOGO_URL`
  * - `SUREPASS_DIGILOCKER_REDIRECT_URL` — when set, always sent as Surepass `redirect_url`
  *   (overrides client / portal callback; use a public HTTPS URL — localhost is rejected by Surepass)
@@ -175,8 +179,9 @@ export class SurepassDigilockerService {
   }
 
   /**
-   * Downloads PAN document metadata, then fetches `download_url` XML and parses
-   * certificate fields (PAN number, name, DOB, gender).
+   * Lists DigiLocker documents, selects PAN XML (`doc_type=PANCR`, `file_type=xml`),
+   * downloads that document, then fetches `download_url` XML and parses certificate
+   * fields (PAN number, name, DOB, gender).
    */
   async downloadPan(
     clientId: string,
@@ -190,10 +195,41 @@ export class SurepassDigilockerService {
       return this.fail('Surepass DigiLocker PAN download requires client_id (session token).');
     }
 
+    const listResult = await this.listDocuments(id, auth, leadId);
+    if (!listResult.ok) {
+      return {
+        configured: true,
+        ok: false,
+        httpStatus: listResult.httpStatus,
+        vendorBody: listResult.vendorBody,
+        error: listResult.error,
+        clientId: id,
+        downloadUrl: null,
+        panFields: null,
+      };
+    }
+
+    const panFileId = extractPanXmlFileIdFromListDocuments(listResult.vendorBody);
+    if (!panFileId) {
+      const msg =
+        'Surepass DigiLocker list-documents did not return a PAN XML file (doc_type=PANCR, file_type=xml).';
+      this.logger.warn(msg);
+      return {
+        configured: true,
+        ok: false,
+        httpStatus: listResult.httpStatus,
+        vendorBody: listResult.vendorBody,
+        error: new Error(msg),
+        clientId: id,
+        downloadUrl: null,
+        panFields: null,
+      };
+    }
+
     const base =
       (process.env.SUREPASS_DIGILOCKER_PAN_URL ?? '').trim() ||
       DEFAULT_SUREPASS_DIGILOCKER_PAN_BASE_URL;
-    const absoluteUrl = `${base.replace(/\/+$/, '')}/${encodeURIComponent(id)}/pan`;
+    const absoluteUrl = `${base.replace(/\/+$/, '')}/${encodeURIComponent(id)}/${encodeURIComponent(panFileId)}`;
 
     const result = await this.vendorApi.request<unknown>({
       providerName: auth.providerName,
@@ -248,6 +284,35 @@ export class SurepassDigilockerService {
       clientId: id,
       downloadUrl,
       panFields,
+    };
+  }
+
+  private async listDocuments(
+    clientId: string,
+    auth: { token: string; providerName: string },
+    leadId: bigint | null,
+  ): Promise<SurepassDigilockerCallResult> {
+    const base =
+      (process.env.SUREPASS_DIGILOCKER_LIST_DOCUMENTS_URL ?? '').trim() ||
+      DEFAULT_SUREPASS_DIGILOCKER_LIST_DOCUMENTS_BASE_URL;
+    const absoluteUrl = `${base.replace(/\/+$/, '')}/${encodeURIComponent(clientId)}`;
+
+    const result = await this.vendorApi.request<unknown>({
+      providerName: auth.providerName,
+      serviceName: 'digilocker-list-documents',
+      method: 'GET',
+      absoluteUrl,
+      headers: { Authorization: `Bearer ${auth.token}` },
+      leadId,
+    });
+
+    return {
+      configured: true,
+      ok: result.ok,
+      httpStatus: result.httpStatus,
+      vendorBody: result.body ?? this.unparsedBody(result),
+      error: result.error,
+      clientId,
     };
   }
 

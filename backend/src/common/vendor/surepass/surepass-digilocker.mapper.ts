@@ -74,6 +74,32 @@ export function mapSurepassDigilockerAadhaarToFormEnvelope(vendor: unknown): unk
 }
 
 /**
+ * From Surepass `list-documents` response, pick the DigiLocker PAN XML file_id
+ * (`doc_type=PANCR`, `file_type=xml`) used by `download-document/{client_id}/{file_id}`.
+ */
+export function extractPanXmlFileIdFromListDocuments(vendor: unknown): string | null {
+  if (!isRecord(vendor)) return null;
+  const data = isRecord(vendor.data) ? vendor.data : vendor;
+  const documents = data.documents;
+  if (!Array.isArray(documents)) return null;
+
+  for (const item of documents) {
+    if (!isRecord(item)) continue;
+    const docType = pickString(item, ['doc_type', 'docType']);
+    const fileType = pickString(item, ['file_type', 'fileType']);
+    const fileId = pickString(item, ['file_id', 'fileId']);
+    if (
+      fileId &&
+      docType?.toUpperCase() === 'PANCR' &&
+      fileType?.toLowerCase() === 'xml'
+    ) {
+      return fileId;
+    }
+  }
+  return null;
+}
+
+/**
  * Best-effort DigiLocker PAN certificate XML parse (Income Tax / DigiLocker format).
  * Avoids adding an XML dependency — attributes are stable enough for KYC storage.
  */

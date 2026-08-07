@@ -54,6 +54,17 @@ export function compareIsoDates(
   return a === b ? 'match' : 'mismatch';
 }
 
+/**
+ * Worst-case verdict across profile comparisons (Aadhaar, CIBIL, …).
+ * A mismatch against any available source wins over match / N/A.
+ */
+export function combineMatchVerdicts(...verdicts: KycMatchVerdict[]): KycMatchVerdict {
+  if (verdicts.includes('mismatch')) return 'mismatch';
+  if (verdicts.includes('partial')) return 'partial';
+  if (verdicts.includes('match')) return 'match';
+  return 'missing';
+}
+
 export function compareGenders(
   profileGender: string | null | undefined,
   aadhaarGender: string | null | undefined,

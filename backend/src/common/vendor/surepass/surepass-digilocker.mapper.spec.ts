@@ -1,4 +1,5 @@
 import {
+  extractPanXmlFileIdFromListDocuments,
   mapSurepassDigilockerAadhaarToFormEnvelope,
   mapSurepassDigilockerInitToSessionFields,
   parseDigilockerPanCertificateXml,
@@ -52,5 +53,44 @@ describe('surepass-digilocker.mapper', () => {
     expect(pan.name).toBe('RAHUL KUMAR');
     expect(pan.dob).toBe('15-05-1995');
     expect(pan.gender).toBe('M');
+  });
+
+  it('selects PANCR xml file_id from list-documents (ignores pdf / aadhaar)', () => {
+    const fileId = extractPanXmlFileIdFromListDocuments({
+      data: {
+        documents: [
+          {
+            file_id: 'digilocker_file_aadhaar_xml',
+            doc_type: 'ADHAR',
+            file_type: 'xml',
+          },
+          {
+            file_id: 'digilocker_file_pan_pdf',
+            doc_type: 'PANCR',
+            file_type: 'pdf',
+          },
+          {
+            file_id: 'pan',
+            doc_type: 'PANCR',
+            file_type: 'xml',
+          },
+        ],
+      },
+      success: true,
+    });
+    expect(fileId).toBe('pan');
+  });
+
+  it('returns null when list-documents has no PAN XML', () => {
+    expect(
+      extractPanXmlFileIdFromListDocuments({
+        data: {
+          documents: [
+            { file_id: 'aadhaar', doc_type: 'ADHAR', file_type: 'xml' },
+            { file_id: 'pan', doc_type: 'PANCR', file_type: 'pdf' },
+          ],
+        },
+      }),
+    ).toBeNull();
   });
 });
