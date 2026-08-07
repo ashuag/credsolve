@@ -26,6 +26,7 @@ import {
 import { isApplicationJourneyStepActive } from '@/lib/customer-journey';
 import { usesAnnualFinancialMetric, usesMonthlyIncomeMetric, resolveOccupationKey } from '@/lib/customer-details';
 import {
+  combineMatchVerdicts,
   compareGenders,
   compareIsoDates,
   comparePan,
@@ -869,6 +870,14 @@ export function ReviewPersonalPanel({
     Boolean(profile.fullName && cibilReport?.consumerName?.trim()),
   );
   const cibilDobVerdict = compareIsoDates(profile.dateOfBirth, cibilReport?.dateOfBirth);
+  const matrixNameVerdict = combineMatchVerdicts(
+    nameVerdict,
+    cibilReport ? cibilNameVerdict : 'missing',
+  );
+  const matrixDobVerdict = combineMatchVerdicts(
+    dobVerdict,
+    cibilReport ? cibilDobVerdict : 'missing',
+  );
 
   const hasAadhaar = Boolean(
     aadhaar?.fullName?.trim() ||
@@ -880,11 +889,10 @@ export function ReviewPersonalPanel({
 
   const allMatch =
     hasAadhaar &&
-    nameVerdict !== 'mismatch' &&
-    dobVerdict !== 'mismatch' &&
+    matrixNameVerdict !== 'mismatch' &&
+    matrixDobVerdict !== 'mismatch' &&
     genderVerdict !== 'mismatch' &&
-    panVerdict !== 'mismatch' &&
-    (!cibilReport || (cibilNameVerdict !== 'mismatch' && cibilDobVerdict !== 'mismatch'));
+    panVerdict !== 'mismatch';
 
   const otherIds =
     cibilReport?.identifiers.filter((identifier) => {
@@ -899,7 +907,7 @@ export function ReviewPersonalPanel({
       application: formatPersonName(profile.fullName),
       aadhaar: hasAadhaar ? formatPersonName(aadhaar?.fullName) : <span className="im-muted">—</span>,
       cibil: cibilReport ? formatPersonName(cibilReport.consumerName) : <span className="im-muted">—</span>,
-      verdict: nameVerdict,
+      verdict: matrixNameVerdict,
       score: nameScore,
     },
     {
@@ -907,7 +915,7 @@ export function ReviewPersonalPanel({
       application: formatDobWithAge(profile.dateOfBirth),
       aadhaar: hasAadhaar ? formatDobWithAge(aadhaar?.dateOfBirth) : <span className="im-muted">—</span>,
       cibil: cibilReport ? formatDobWithAge(cibilReport.dateOfBirth) : <span className="im-muted">—</span>,
-      verdict: dobVerdict,
+      verdict: matrixDobVerdict,
     },
     {
       field: 'Gender',
@@ -940,8 +948,8 @@ export function ReviewPersonalPanel({
           }
         >
           <div className="fgrid">
-            <ComparedField label="Full name" value={formatPersonName(profile.fullName)} verdict={nameVerdict} score={nameScore} />
-            <ComparedField label="Date of birth" value={formatDobWithAge(profile.dateOfBirth)} verdict={dobVerdict} />
+            <ComparedField label="Full name" value={formatPersonName(profile.fullName)} verdict={matrixNameVerdict} score={nameScore} />
+            <ComparedField label="Date of birth" value={formatDobWithAge(profile.dateOfBirth)} verdict={matrixDobVerdict} />
             <ComparedField label="Gender" value={profile.gender ?? '—'} verdict={genderVerdict} />
             <ReviewField
               label="PAN"

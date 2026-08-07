@@ -26,14 +26,67 @@ function dataUrlToFile(dataUrl: string, name: string): File {
   return new File([u8], name, { type: mime });
 }
 
-function shallowStringEntries(obj: unknown): Array<[string, string]> {
-  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return [];
-  const out: Array<[string, string]> = [];
-  for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
-    if (k === 'photo' || k === 'xml' || k === 'raw') continue;
-    if (typeof v === 'string' && v.length > 0 && v.length < 500) out.push([k, v]);
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+function pickFormString(obj: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = obj[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
   }
-  return out.slice(0, 12);
+  return null;
+}
+
+function digilockerAadhaarIdentityBag(form: unknown): {
+  name: string | null;
+  dob: string | null;
+  gender: string | null;
+  fullAddress: string | null;
+} {
+  if (!isRecord(form)) {
+    return { name: null, dob: null, gender: null, fullAddress: null };
+  }
+  const nested = isRecord(form.aadhaar_xml_data) ? form.aadhaar_xml_data : null;
+  const bag = nested ?? form;
+
+  const name =
+    pickFormString(bag, ['full_name', 'fullName', 'name']) ??
+    pickFormString(form, ['full_name', 'fullName', 'name']);
+  const dobRaw =
+    pickFormString(bag, ['dob', 'date_of_birth', 'dateOfBirth']) ??
+    pickFormString(form, ['dob', 'date_of_birth', 'dateOfBirth']);
+  const genderRaw =
+    pickFormString(bag, ['gender']) ?? pickFormString(form, ['gender']);
+  const fullAddress =
+    pickFormString(bag, ['full_address', 'fullAddress', 'address']) ??
+    pickFormString(form, ['full_address', 'fullAddress', 'address']);
+
+  return {
+    name,
+    dob: formatDobDdMmYyyy(dobRaw),
+    gender: formatAadhaarGenderLabel(genderRaw),
+    fullAddress,
+  };
+}
+
+/** DigiLocker / Surepass DOB → `dd-mm-yyyy`. */
+function formatDobDdMmYyyy(raw: string | null): string | null {
+  if (!raw) return null;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw.trim());
+  if (iso) return `${iso[3]}-${iso[2]}-${iso[1]}`;
+  const dmy = /^(\d{2})[-/](\d{2})[-/](\d{4})$/.exec(raw.trim());
+  if (dmy) return `${dmy[1]}-${dmy[2]}-${dmy[3]}`;
+  return raw.trim();
+}
+
+function formatAadhaarGenderLabel(raw: string | null): string | null {
+  if (!raw) return null;
+  const value = raw.trim().toUpperCase();
+  if (value === 'M' || value === 'MALE') return 'Male';
+  if (value === 'F' || value === 'FEMALE') return 'Female';
+  if (value === 'T' || value === 'O' || value === 'OTHER' || value === 'OTHERS') return 'Others';
+  return raw.trim();
 }
 
 function KycSelfieContent() {
@@ -285,7 +338,13 @@ function KycSelfieContent() {
   }
 
   const form = kyc?.digilockerAadhaarForm;
-  const entries = shallowStringEntries(form);
+  const aadhaarIdentity = digilockerAadhaarIdentityBag(form);
+  const hasAadhaarDetails = Boolean(
+    aadhaarIdentity.name ||
+      aadhaarIdentity.dob ||
+      aadhaarIdentity.gender ||
+      aadhaarIdentity.fullAddress,
+  );
 
   return (
     <div className={styles.page}>
@@ -311,23 +370,41 @@ function KycSelfieContent() {
               </AlertBanner>
             ) : null}
 
-            {photoHref ? (
-              <div className="rounded-2xl border border-[rgba(18,36,79,0.12)] p-3 bg-white/90">
-                <p className="m-0 mb-2 text-sm font-semibold text-brand-navy">Aadhaar reference photo</p>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photoHref} alt="Aadhaar reference" className="w-full max-h-56 object-contain rounded-xl" />
+            {photoHref || hasAadhaarDetails ? (
+              <div className="grid gap-3 sm:grid-cols-2 sm:items-start rounded-2xl border border-[rgba(18,36,79,0.12)] p-3 bg-white/90">
+                <div className="min-w-0">
+                  <p className="m-0 mb-2 text-sm font-semibold text-brand-navy">Aadhaar details</p>
+                  {hasAadhaarDetails ? (
+                    <dl className="m-0 grid gap-2 text-sm">
+                      <div className="grid grid-cols-[7.5rem_1fr] gap-x-2 gap-y-0.5">
+                        <dt className="text-brand-muted font-medium">Name</dt>
+                        <dd className="m-0 text-brand-navy break-words">{aadhaarIdentity.name ?? '—'}</dd>
+                        <dt className="text-brand-muted font-medium">DOB</dt>
+                        <dd className="m-0 text-brand-navy">{aadhaarIdentity.dob ?? '—'}</dd>
+                        <dt className="text-brand-muted font-medium">Gender</dt>
+                        <dd className="m-0 text-brand-navy">{aadhaarIdentity.gender ?? '—'}</dd>
+                        <dt className="text-brand-muted font-medium">Full Address</dt>
+                        <dd className="m-0 text-brand-navy break-words">{aadhaarIdentity.fullAddress ?? '—'}</dd>
+                      </div>
+                    </dl>
+                  ) : (
+                    <p className="m-0 text-sm text-brand-muted">Aadhaar details are not available yet.</p>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="m-0 mb-2 text-sm font-semibold text-brand-navy">Aadhaar photo</p>
+                  {photoHref ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={photoHref}
+                      alt="Aadhaar reference"
+                      className="w-full max-h-56 object-contain rounded-xl bg-slate-50"
+                    />
+                  ) : (
+                    <p className="m-0 text-sm text-brand-muted">Photo not available.</p>
+                  )}
+                </div>
               </div>
-            ) : null}
-
-            {entries.length > 0 ? (
-              <dl className="grid gap-1 rounded-2xl border border-[rgba(18,36,79,0.08)] p-3 bg-slate-50/80 text-sm">
-                {entries.map(([k, v]) => (
-                  <div key={k} className="grid grid-cols-[minmax(0,0.35fr)_1fr] gap-2">
-                    <dt className="text-brand-muted font-medium truncate">{k}</dt>
-                    <dd className="m-0 text-brand-navy break-words">{v}</dd>
-                  </div>
-                ))}
-              </dl>
             ) : null}
 
             {(pendingSelfiePreview ?? selfieHref) && !retakeSelfie ? (
