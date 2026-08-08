@@ -3,43 +3,39 @@ import type { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { isApplicationFaceStepComplete } from '../../../../common/kyc/application-kyc-guard.util';
 import { KycCompletionService } from '../../../../common/kyc/kyc-completion.service';
-import { LivenessVendorService } from '../../../../common/vendor/liveness-vendor.service';
-import {
-  extractLivenessFaceOccluded,
-  extractLivenessIsLive,
-  extractLivenessMultipleFacesDetected,
-  extractLivenessScore,
-  isTenacioVendorBusinessSuccess,
-  pickTenacioVendorErrorMessage,
-} from '../../../../common/kyc/aadhaar-vendor-parse.util';
-import { evaluateTenacioDeepfakeResult } from '../../../../common/kyc/kyc-deepfake-eval.util';
-import { isKycDeepfakeRequired } from '../../../../common/kyc/kyc-deepfake-env.util';
-import { KycFaceMatchService } from '../../../../common/kyc/kyc-face-match.service';
 import {
   KYC_FACE_MATCH_RETRY_HINT,
   toPersistedFaceMatchInspection,
 } from '../../../../common/kyc/kyc-face-match-inspection-persist.util';
 import type { KycFaceMatchInspection } from '../../../../common/kyc/kyc-face-match.util';
 import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
-import { KycSelfieFaceValidationService } from '../../../../common/kyc/kyc-selfie-face-validation.service';
+import {
+  readHeadMovementSnapshot,
+  type HeadMovementSnapshot,
+} from '../../../../common/kyc/kyc-head-movement.util';
+import { KycPhotoVerificationService } from '../../../../common/kyc/kyc-photo-verification.service';
 import {
   KYC_SELFIE_FACE_RETRY_HINT,
   toPersistedSelfieFaceInspection,
 } from '../../../../common/kyc/kyc-selfie-face-inspection-persist.util';
 import type { KycSelfieFaceInspection } from '../../../../common/kyc/kyc-selfie-face-validation.util';
-import { resolveKycLivenessSelfiePublicUrl } from '../../../../common/kyc/kyc-liveness-selfie-url.util';
-import { KycTenacioVendorService } from '../../../../common/vendor/kyc-tenacio-vendor.service';
+import {
+  summarizePhotoQuality,
+  type PhotoQualityChecks,
+} from '../../../../common/kyc/kyc-photo-quality-summary.util';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { ApplicationRepository } from '../../infrastructure/repositories/application.repository';
-import {
-  isKycLivenessCheckPaused,
-  isKycLivenessOutboundSkipped,
-} from '../../../../common/kyc/kyc-liveness-env.util';
+import { isKycHeadMovementRequired } from '../../../../common/kyc/kyc-liveness-env.util';
 import { assertActiveApplicationLoanDocumentsAccepted } from '../../../../common/loan-documents/application-loan-documents-guard.util';
 import { fetchLatestApplicationKycSnapshot } from '../../../../prisma/application-kyc-snapshot.query';
 import { PrismaService } from '../../../../prisma/prisma.service';
-import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
+
+/**
+ * Per-gate photo quality shown to the customer. Mirrors {@link PhotoQualityChecks} without the
+ * bulky raw `inspection`, which is persisted but not worth sending to the browser.
+ */
+export type KycPhotoQualitySummary = Omit<PhotoQualityChecks, 'inspection'>;
 
 export type RunKycLivenessResult = {
   configured: boolean;
@@ -48,9 +44,9 @@ export type RunKycLivenessResult = {
   httpStatus: number | null;
   vendor: unknown;
   livenessPassed: boolean;
-  /** From Tenacio `error.message` when the vendor rejects the request (HTTP may still be 200 via proxy). */
+  /** First failing check, surfaced when no more specific message applies. */
   vendorErrorMessage?: string;
-  /** When `application.kyc_status` was already completed (no vendor call). */
+  /** When `application.kyc_status` was already completed (no checks re-run). */
   alreadyCompleted?: boolean;
   /** On-server selfie face validation (MoneyCash liveness module). */
   faceValidationPassed?: boolean;
@@ -58,28 +54,37 @@ export type RunKycLivenessResult = {
   /** On-server Aadhaar vs selfie face match (MoneyCash face-api module). */
   faceMatchPassed?: boolean;
   faceMatchMessage?: string;
-  /** Tenacio deepfake / synthetic media check (catches AI-generated photos local ML cannot). */
-  authenticityPassed?: boolean;
-  authenticityMessage?: string;
-  deepfakeDetected?: boolean | null;
   suggestRetrySelfie?: boolean;
   bestComputedConfidence?: number | null;
+  /** Per-gate blur / lighting / dual-face / framing verdicts for the captured selfie. */
+  selfieQuality?: KycPhotoQualitySummary;
+  /** Same gates run against the DigiLocker Aadhaar photo (advisory — the customer cannot retake it). */
+  aadhaarQuality?: KycPhotoQualitySummary;
+  /** MoneyCash active liveness (head movement) recorded by `POST kyc/liveness-video`. */
+  headMovementPassed?: boolean;
+  /** False when no clip has been recorded yet, so the client shows guidance instead of an error. */
+  headMovementCaptured?: boolean;
+  headMovementScore?: number | null;
+  headMovementMessage?: string;
+  suggestRetryHeadMovement?: boolean;
 };
 
 type LocalKycChecksPayload = {
   selfieFaceValidation: ReturnType<typeof toPersistedSelfieFaceInspection>;
   faceMatch: ReturnType<typeof toPersistedFaceMatchInspection>;
-  tenacioDeepfake?: {
-    configured: boolean;
-    passed: boolean;
-    deepfakeDetected: boolean | null;
-    authenticityScore: number | null;
-    skipReason?: string;
-    vendor: unknown;
-    httpStatus: number | null;
+  /** Per-gate verdicts, the same projection the LOS developer tool renders. */
+  photoQuality?: {
+    selfie: KycPhotoQualitySummary;
+    aadhaar: KycPhotoQualitySummary | null;
   };
   localChecksCompletedAt: string;
 };
+
+/** Drops the raw inspection so the result stays small enough to ship to the browser. */
+function toQualitySummary(quality: PhotoQualityChecks): KycPhotoQualitySummary {
+  const { inspection: _inspection, ...summary } = quality;
+  return summary;
+}
 
 @Injectable()
 export class RunKycLivenessUseCase {
@@ -89,13 +94,9 @@ export class RunKycLivenessUseCase {
     private readonly customers: CustomerRepository,
     private readonly leads: LeadRepository,
     private readonly applications: ApplicationRepository,
-    private readonly liveness: LivenessVendorService,
     private readonly kycFiles: KycFilesService,
-    private readonly selfieFaceValidation: KycSelfieFaceValidationService,
-    private readonly faceMatch: KycFaceMatchService,
-    private readonly kycTenacio: KycTenacioVendorService,
+    private readonly photoVerification: KycPhotoVerificationService,
     private readonly prisma: PrismaService,
-    private readonly settings: SettingsRepository,
     private readonly kycCompletion: KycCompletionService,
   ) {}
 
@@ -143,6 +144,16 @@ export class RunKycLivenessUseCase {
     }
 
     const selfieRelativePath = application.selfieRelativePath.trim();
+
+    // Written earlier by `POST kyc/liveness-video`; re-attached below because this pass
+    // rewrites `liveness_vendor_json` wholesale.
+    const headMovement = readHeadMovementBlock(
+      await this.applications.findActiveLivenessBlock(application.id),
+    );
+
+    // Gate order mirrors the customer-facing flow: photo quality, then Aadhaar face match, then
+    // head movement. A selfie that is too dark or does not match must be reported before the
+    // customer is asked to record a clip that would be scored against it.
     const localChecks = await this.runMoneyCashLocalKycChecks({
       applicationId: application.id,
       selfieRelativePath,
@@ -160,296 +171,82 @@ export class RunKycLivenessUseCase {
         faceValidationMessage: localChecks.faceValidationMessage,
         faceMatchPassed: localChecks.faceMatchPassed,
         faceMatchMessage: localChecks.faceMatchMessage,
-        authenticityPassed: localChecks.authenticityPassed,
         suggestRetrySelfie: localChecks.suggestRetrySelfie,
         bestComputedConfidence: localChecks.bestComputedConfidence,
-        vendorErrorMessage:
-          localChecks.faceValidationMessage ??
-          localChecks.faceMatchMessage ??
-          localChecks.authenticityMessage,
+        selfieQuality: localChecks.selfieQuality,
+        aadhaarQuality: localChecks.aadhaarQuality,
+        vendorErrorMessage: localChecks.faceValidationMessage ?? localChecks.faceMatchMessage,
       };
     }
 
-    let localChecksPayload = localChecks.localChecksPayload!;
-
-    if (isKycLivenessOutboundSkipped()) {
-      const checkedAt = new Date();
-      const localVendor = {
-        ...(isKycLivenessCheckPaused()
-          ? { paused: true, localFaceCheck: true }
-          : { outboundSkipped: true, localFaceCheck: true }),
-        localChecks: localChecksPayload,
-      };
-
-      await this.applications.updateLivenessResult({
-        applicationId: application.id,
-        livenessVendorJson: localVendor as Prisma.InputJsonValue,
-        passed: true,
-        checkedAt,
-        done: true,
-        doneAt: checkedAt,
-      });
-
-      await this.kycCompletion.completeAfterFaceLiveness({
-        applicationId: application.id,
-        customerId: customer.id,
-        digilockerAadhaarFormJson: (application.digilockerAadhaarFormJson ?? null) as Prisma.JsonValue,
-        aadhaarPhotoRelativePath: application.aadhaarPhotoRelativePath,
-        selfieRelativePath,
-        verifiedAt: checkedAt,
-      });
-
+    // Photo quality and the Aadhaar match are settled; head movement is the last gate.
+    if (isKycHeadMovementRequired() && !headMovement.passed) {
+      const message =
+        headMovement.reason ??
+        'Complete the head-movement check — record a short clip while turning your head.';
       return {
         configured: true,
-        ok: true,
-        httpStatus: null,
-        vendor: localVendor,
-        livenessPassed: true,
-        faceValidationPassed: true,
-        faceMatchPassed: true,
-        authenticityPassed: true,
-        bestComputedConfidence: localChecks.bestComputedConfidence,
-      };
-    }
-
-    const applicationFresh = await this.prisma.client.application.findUnique({
-      where: { id: application.id },
-      select: { updatedAt: true },
-    });
-    const photoVersion = applicationFresh?.updatedAt?.getTime() ?? Date.now();
-
-    const selfieUrlResult = await resolveKycLivenessSelfiePublicUrl(this.kycFiles, {
-      applicationUuid: application.uuid,
-      selfieRelativePath: application.selfieRelativePath.trim(),
-      photoVersion,
-    });
-    if (!selfieUrlResult.ok) {
-      return {
-        configured: false,
-        skipReason: selfieUrlResult.error,
         ok: false,
         httpStatus: null,
-        vendor: { localChecks: localChecksPayload },
+        vendor: headMovement.block ? { activeLiveness: headMovement.block } : null,
         livenessPassed: false,
         faceValidationPassed: true,
         faceMatchPassed: true,
-        vendorErrorMessage: selfieUrlResult.error,
-      };
-    }
-
-    const deepfakeGate = await this.runTenacioDeepfakeCheck({
-      leadId: lead.id,
-      selfieUrl: selfieUrlResult.url,
-    });
-    localChecksPayload = {
-      ...localChecksPayload,
-      tenacioDeepfake: deepfakeGate.payload,
-    };
-
-    if (!deepfakeGate.ok) {
-      return {
-        configured: deepfakeGate.configured,
-        skipReason: deepfakeGate.skipReason,
-        ok: false,
-        httpStatus: deepfakeGate.httpStatus,
-        vendor: { localChecks: localChecksPayload },
-        livenessPassed: false,
-        faceValidationPassed: true,
-        faceMatchPassed: true,
-        authenticityPassed: false,
-        authenticityMessage: deepfakeGate.message,
-        deepfakeDetected: deepfakeGate.deepfakeDetected,
-        suggestRetrySelfie: true,
         bestComputedConfidence: localChecks.bestComputedConfidence,
-        vendorErrorMessage: deepfakeGate.message,
+        selfieQuality: localChecks.selfieQuality,
+        aadhaarQuality: localChecks.aadhaarQuality,
+        headMovementPassed: false,
+        headMovementCaptured: headMovement.captured,
+        headMovementScore: headMovement.score,
+        headMovementMessage: message,
+        suggestRetryHeadMovement: true,
+        vendorErrorMessage: message,
       };
     }
 
-    const selfieRelativePathForVendor = application.selfieRelativePath.trim();
-    const livenessInput = { input: { consent: true, url: selfieUrlResult.url } };
-    this.logger.log(
-      `Tenacio liveness selfiePath=${selfieRelativePathForVendor} input=${JSON.stringify(livenessInput)}`,
-    );
-
-    const out = await this.liveness.postLivenessCheck(livenessInput, lead.id, selfieRelativePathForVendor);
-
-    if (!out.configured) {
-      const vendor = out.vendorBody ?? null;
-      return {
-        configured: false,
-        skipReason: out.skipReason,
-        ok: false,
-        httpStatus: out.httpStatus,
-        vendor: mergeLocalChecksWithVendor(localChecksPayload, vendor),
-        livenessPassed: false,
-        faceValidationPassed: true,
-        faceMatchPassed: true,
-        authenticityPassed: deepfakeGate.passed,
-        bestComputedConfidence: localChecks.bestComputedConfidence,
-        vendorErrorMessage: pickTenacioVendorErrorMessage(vendor) ?? out.skipReason,
-      };
-    }
-
-    const vendor = out.vendorBody ?? null;
-    const vendorStatusOk = out.ok && isTenacioVendorBusinessSuccess(vendor);
-
-    const minScore = await this.settings.loadMinLivenessApiScore();
-    const livenessScore = extractLivenessScore(vendor);
-    const scoreOk = livenessScore === null || livenessScore >= minScore;
-
-    const isLive = extractLivenessIsLive(vendor);
-    const isLiveOk = isLive === null || isLive === true;
-
-    const multipleFaces = extractLivenessMultipleFacesDetected(vendor);
-    const multipleFacesOk = multipleFaces === null || multipleFaces === false;
-
-    const faceOccluded = extractLivenessFaceOccluded(vendor);
-    const faceOccludedOk = faceOccluded === null || faceOccluded === false;
-
-    const businessOk = vendorStatusOk && scoreOk && isLiveOk && multipleFacesOk && faceOccludedOk;
+    const localChecksPayload = localChecks.localChecksPayload!;
     const checkedAt = new Date();
+    const livenessJson = buildLocalLivenessJson(localChecksPayload, headMovement.block);
 
     await this.applications.updateLivenessResult({
       applicationId: application.id,
-      livenessVendorJson: mergeLocalChecksWithVendor(localChecksPayload, vendor) as Prisma.InputJsonValue,
-      passed: businessOk,
+      livenessVendorJson: livenessJson as Prisma.InputJsonValue,
+      passed: true,
       checkedAt,
-      done: businessOk,
-      doneAt: businessOk ? checkedAt : null,
+      done: true,
+      doneAt: checkedAt,
     });
 
-    if (businessOk) {
-      await this.kycCompletion.completeAfterFaceLiveness({
-        applicationId: application.id,
-        customerId: customer.id,
-        digilockerAadhaarFormJson: (application.digilockerAadhaarFormJson ?? null) as Prisma.JsonValue,
-        aadhaarPhotoRelativePath: application.aadhaarPhotoRelativePath,
-        selfieRelativePath: application.selfieRelativePath.trim(),
-        verifiedAt: checkedAt,
-      });
-    }
+    await this.kycCompletion.completeAfterFaceLiveness({
+      applicationId: application.id,
+      customerId: customer.id,
+      digilockerAadhaarFormJson: (application.digilockerAadhaarFormJson ?? null) as Prisma.JsonValue,
+      aadhaarPhotoRelativePath: application.aadhaarPhotoRelativePath,
+      selfieRelativePath,
+      verifiedAt: checkedAt,
+    });
 
     return {
       configured: true,
-      ok: out.ok,
-      httpStatus: out.httpStatus,
-      vendor: mergeLocalChecksWithVendor(localChecksPayload, vendor),
-      livenessPassed: businessOk,
+      ok: true,
+      httpStatus: null,
+      vendor: livenessJson,
+      livenessPassed: true,
       faceValidationPassed: true,
       faceMatchPassed: true,
-      authenticityPassed: deepfakeGate.passed,
       bestComputedConfidence: localChecks.bestComputedConfidence,
-      vendorErrorMessage: businessOk ? undefined : pickTenacioVendorErrorMessage(vendor),
-    };
-  }
-
-  private async runTenacioDeepfakeCheck(params: {
-    leadId: bigint;
-    selfieUrl: string;
-  }): Promise<{
-    ok: boolean;
-    configured: boolean;
-    passed: boolean;
-    skipReason?: string;
-    httpStatus: number | null;
-    message?: string;
-    deepfakeDetected: boolean | null;
-    payload: NonNullable<LocalKycChecksPayload['tenacioDeepfake']>;
-  }> {
-    const deepfakeRequired = isKycDeepfakeRequired();
-    const deepfakeConfigured = this.kycTenacio.isDeepfakeConfigured();
-
-    if (!deepfakeConfigured) {
-      const payload: NonNullable<LocalKycChecksPayload['tenacioDeepfake']> = {
-        configured: false,
-        passed: !deepfakeRequired,
-        deepfakeDetected: null,
-        authenticityScore: null,
-        skipReason: deepfakeRequired
-          ? 'Tenacio deepfake is required but TENACIO_DEEPFAKE_WORKFLOW_ID is not configured.'
-          : 'Tenacio deepfake not configured — local ML cannot detect AI-generated images.',
-        vendor: null,
-        httpStatus: null,
-      };
-
-      if (deepfakeRequired) {
-        return {
-          ok: false,
-          configured: false,
-          passed: false,
-          skipReason: payload.skipReason,
-          httpStatus: null,
-          message: payload.skipReason,
-          deepfakeDetected: null,
-          payload,
-        };
-      }
-
-      this.logger.warn(
-        'Tenacio deepfake skipped — AI/synthetic selfies may pass local ML only. Set TENACIO_DEEPFAKE_WORKFLOW_ID or KYC_DEEPFAKE_REQUIRED=true.',
-      );
-      return {
-        ok: true,
-        configured: false,
-        passed: true,
-        httpStatus: null,
-        deepfakeDetected: null,
-        payload,
-      };
-    }
-
-    this.logger.log('Tenacio deepfake check before liveness (selfie URL redacted in audit log)');
-    const out = await this.kycTenacio.postDeepfakeCheck(
-      { input: { consent: true, url: params.selfieUrl } },
-      params.leadId,
-    );
-
-    const evaluation = evaluateTenacioDeepfakeResult({
-      configured: out.configured,
-      httpOk: out.ok,
-      vendor: out.vendorBody,
-      skipReason: out.skipReason,
-    });
-
-    const payload: NonNullable<LocalKycChecksPayload['tenacioDeepfake']> = {
-      configured: true,
-      passed: evaluation.passed,
-      deepfakeDetected: evaluation.deepfakeDetected,
-      authenticityScore: evaluation.authenticityScore,
-      vendor: out.vendorBody ?? null,
-      httpStatus: out.httpStatus,
-    };
-
-    if (!evaluation.passed) {
-      const message =
-        evaluation.vendorErrorMessage ??
-        'This photo could not be verified as authentic. Please capture a live selfie from your camera.';
-      return {
-        ok: false,
-        configured: true,
-        passed: false,
-        httpStatus: out.httpStatus,
-        message,
-        deepfakeDetected: evaluation.deepfakeDetected,
-        payload,
-      };
-    }
-
-    return {
-      ok: true,
-      configured: true,
-      passed: true,
-      httpStatus: out.httpStatus,
-      deepfakeDetected: evaluation.deepfakeDetected,
-      payload,
+      selfieQuality: localChecks.selfieQuality,
+      aadhaarQuality: localChecks.aadhaarQuality,
+      headMovementPassed: headMovement.passed,
+      headMovementCaptured: headMovement.captured,
+      headMovementScore: headMovement.score,
     };
   }
 
   /**
-   * MoneyCash on-server KYC gates (in order):
-   * 1. Selfie liveness / face validation (face-api detection, blur, landmarks)
-   * 2. Face match vs DigiLocker Aadhaar photo (face-api descriptors)
-   * Then Tenacio deepfake (synthetic/AI detection) and Tenacio liveness when outbound is enabled.
+   * Runs {@link KycPhotoVerificationService} — the same pipeline as the LOS
+   * `/developer-tools/kyc-face-match-check` tool — against the DigiLocker Aadhaar photo and the
+   * captured selfie, then persists the results and turns the failing gate into customer copy.
    */
   private async runMoneyCashLocalKycChecks(params: {
     applicationId: bigint;
@@ -461,53 +258,86 @@ export class RunKycLivenessUseCase {
     faceValidationMessage?: string;
     faceMatchPassed?: boolean;
     faceMatchMessage?: string;
-    authenticityPassed?: boolean;
-    authenticityMessage?: string;
     suggestRetrySelfie?: boolean;
     bestComputedConfidence: number | null;
+    selfieQuality?: KycPhotoQualitySummary;
+    aadhaarQuality?: KycPhotoQualitySummary;
     localChecksPayload?: LocalKycChecksPayload;
   }> {
-    let selfieInspection: KycSelfieFaceInspection;
-    let faceMatchInspection: KycFaceMatchInspection;
-
     try {
-      const selfieBuffer = await this.kycFiles.readBytes(params.selfieRelativePath);
-
-      // Step 1 — MoneyCash liveness module (selfie face validation).
-      selfieInspection = await this.selfieFaceValidation.inspectJpegBuffer(selfieBuffer);
-      const checkedAt = new Date();
-      await this.applications.updateSelfieFaceValidation({
-        applicationId: params.applicationId,
-        selfieFaceValidationJson: toPersistedSelfieFaceInspection(selfieInspection),
-        passed: selfieInspection.ok,
-        checkedAt,
-      });
-
-      if (!selfieInspection.ok) {
-        const reason = selfieInspection.reason ?? 'Selfie face validation failed.';
-        return {
-          ok: false,
-          faceValidationPassed: false,
-          faceValidationMessage: `${reason} ${KYC_SELFIE_FACE_RETRY_HINT}`,
-          suggestRetrySelfie: true,
-          bestComputedConfidence: selfieInspection.bestComputedConfidence,
-        };
-      }
-
-      // Step 2 — MoneyCash face match module (Aadhaar reference vs selfie).
       const aadhaarPath = params.aadhaarPhotoRelativePath?.trim();
       if (!aadhaarPath) {
         return {
           ok: false,
           faceValidationPassed: true,
           faceMatchPassed: false,
-          faceMatchMessage: 'Aadhaar reference photo is missing. Complete DigiLocker Aadhaar download first.',
-          bestComputedConfidence: selfieInspection.bestComputedConfidence,
+          faceMatchMessage:
+            'Aadhaar reference photo is missing. Complete DigiLocker Aadhaar download first.',
+          bestComputedConfidence: null,
         };
       }
 
-      const aadhaarBuffer = await this.kycFiles.readBytes(aadhaarPath);
-      faceMatchInspection = await this.faceMatch.compareJpegBuffers(aadhaarBuffer, selfieBuffer);
+      const [aadhaarBuffer, selfieBuffer] = await Promise.all([
+        this.kycFiles.readBytes(aadhaarPath),
+        this.kycFiles.readBytes(params.selfieRelativePath),
+      ]);
+
+      const verification = await this.photoVerification.verifyPair({
+        referenceBuffer: aadhaarBuffer,
+        probeBuffer: selfieBuffer,
+        referenceLabel: 'Aadhaar photo',
+        probeLabel: 'Selfie',
+      });
+
+      const selfieQuality = toQualitySummary(verification.probeQuality);
+      const aadhaarQuality = toQualitySummary(verification.referenceQuality);
+      const selfieInspection = verification.probeQuality.inspection;
+      const bestComputedConfidence = selfieInspection.bestComputedConfidence;
+
+      await this.applications.updateSelfieFaceValidation({
+        applicationId: params.applicationId,
+        selfieFaceValidationJson: toPersistedSelfieFaceInspection(selfieInspection),
+        passed: verification.probeQuality.ok,
+        checkedAt: new Date(),
+      });
+
+      if (!verification.probeQuality.ok) {
+        const reason = verification.probeQuality.reason ?? 'Selfie face validation failed.';
+        return {
+          ok: false,
+          faceValidationPassed: false,
+          faceValidationMessage: `${reason} ${KYC_SELFIE_FACE_RETRY_HINT}`,
+          suggestRetrySelfie: true,
+          bestComputedConfidence,
+          selfieQuality,
+          aadhaarQuality,
+        };
+      }
+
+      // Retaking the selfie cannot fix the Aadhaar photo, so this is reported as a match failure
+      // rather than a capture problem.
+      if (!verification.referenceQuality.ok) {
+        const reason =
+          verification.referenceQuality.reason ??
+          'Your Aadhaar photo could not be read clearly enough to compare faces.';
+        return {
+          ok: false,
+          faceValidationPassed: true,
+          faceMatchPassed: false,
+          faceMatchMessage: reason,
+          bestComputedConfidence,
+          selfieQuality,
+          aadhaarQuality,
+        };
+      }
+
+      const faceMatchInspection = verification.faceMatch!;
+      const localChecksPayload = buildLocalChecksPayload(
+        selfieInspection,
+        faceMatchInspection,
+        selfieQuality,
+        aadhaarQuality,
+      );
 
       if (!faceMatchInspection.matchPassed) {
         const reason = faceMatchInspection.reason ?? 'Your selfie does not match your Aadhaar photo.';
@@ -517,15 +347,19 @@ export class RunKycLivenessUseCase {
           faceMatchPassed: false,
           faceMatchMessage: `${reason} ${KYC_FACE_MATCH_RETRY_HINT}`,
           suggestRetrySelfie: true,
-          bestComputedConfidence: selfieInspection.bestComputedConfidence,
-          localChecksPayload: buildLocalChecksPayload(selfieInspection, faceMatchInspection),
+          bestComputedConfidence,
+          selfieQuality,
+          aadhaarQuality,
+          localChecksPayload,
         };
       }
 
       return {
         ok: true,
-        bestComputedConfidence: selfieInspection.bestComputedConfidence,
-        localChecksPayload: buildLocalChecksPayload(selfieInspection, faceMatchInspection),
+        bestComputedConfidence,
+        selfieQuality,
+        aadhaarQuality,
+        localChecksPayload,
       };
     } catch (err) {
       this.logger.warn(
@@ -534,7 +368,7 @@ export class RunKycLivenessUseCase {
       return {
         ok: false,
         faceValidationPassed: false,
-        faceValidationMessage: `We could not verify your selfie before liveness. ${KYC_SELFIE_FACE_RETRY_HINT}`,
+        faceValidationMessage: `We could not verify your selfie. ${KYC_SELFIE_FACE_RETRY_HINT}`,
         suggestRetrySelfie: true,
         bestComputedConfidence: null,
       };
@@ -545,26 +379,33 @@ export class RunKycLivenessUseCase {
 function buildLocalChecksPayload(
   selfieInspection: KycSelfieFaceInspection,
   faceMatchInspection: KycFaceMatchInspection,
+  selfieQuality: KycPhotoQualitySummary,
+  aadhaarQuality: KycPhotoQualitySummary,
 ): LocalKycChecksPayload {
   return {
     selfieFaceValidation: toPersistedSelfieFaceInspection(selfieInspection),
     faceMatch: toPersistedFaceMatchInspection(faceMatchInspection),
+    photoQuality: { selfie: selfieQuality, aadhaar: aadhaarQuality },
     localChecksCompletedAt: new Date().toISOString(),
   };
 }
 
-function mergeLocalChecksWithVendor(
+/** Local-only `liveness_vendor_json`: no vendor envelope, so LOS reads it as `local-only`. */
+function buildLocalLivenessJson(
   localChecks: LocalKycChecksPayload,
-  vendor: unknown,
+  activeLiveness?: Prisma.JsonObject | null,
 ): Prisma.InputJsonObject {
-  const base =
-    vendor && typeof vendor === 'object' && !Array.isArray(vendor)
-      ? ({ ...(vendor as Record<string, unknown>) } as Record<string, unknown>)
-      : vendor != null
-        ? { tenacio: vendor }
-        : {};
   return {
-    ...base,
+    localFaceCheck: true,
+    outboundSkipped: true,
+    ...(activeLiveness ? { activeLiveness } : {}),
     localChecks,
   } as Prisma.InputJsonObject;
+}
+
+/** Reads the head-movement result stored under `liveness_vendor_json.activeLiveness`. */
+function readHeadMovementBlock(block: Prisma.JsonObject | null): HeadMovementSnapshot & {
+  block: Prisma.JsonObject | null;
+} {
+  return { ...readHeadMovementSnapshot(block), block };
 }

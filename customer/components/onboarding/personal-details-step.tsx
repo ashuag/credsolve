@@ -352,7 +352,7 @@ export function PersonalDetailsStep(
       <section className="h-full flex flex-col" aria-labelledby="details-heading">
         <div className="mb-4">
           <h2 id="details-heading" className="text-xl md:text-[1.8rem] font-extrabold text-brand-navy mb-3 tracking-tight leading-[1.1]">
-            Complete Your <span className="text-brand-blue">Profile</span> ✨
+            Complete Your <span className="text-brand-blue">Profile</span>
           </h2>
           <div className="flex items-start gap-3 p-3 rounded-2xl bg-linear-to-br from-blue-50/80 to-indigo-50/50 border border-blue-100/60">
             <div className="p-1.5 bg-white rounded-xl shadow-sm text-blue-600 shrink-0">

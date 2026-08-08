@@ -45,33 +45,36 @@ export type CustomerPortalJourneySnapshot = {
   bankDetailsCompleted: boolean;
 };
 
-/** DigiLocker Aadhaar progress for the active application (selfie/liveness stubs retained for older clients). */
+/** DigiLocker Aadhaar + selfie/liveness progress for the active application. */
 export type CustomerKycFaceProgressSnapshot = {
   /** `application.kyc_status` (0–3); `1` = completed. */
   applicationKycStatus: number;
   digilockerAadhaarCaptured: boolean;
-  /** @deprecated Selfie/liveness removed pending rewrite. */
   selfieCaptured: boolean;
-  /** @deprecated Selfie/liveness removed pending rewrite. */
   livenessPassed: boolean;
-  /** @deprecated Selfie/liveness removed pending rewrite. */
   livenessCheckCompleted: boolean;
-  /** @deprecated Selfie/liveness removed pending rewrite. Always `false` until rewrite. */
+  /** When `false`, face pipeline may be skipped (should stay `true` — Aadhaar face match is required). */
   livenessRequired: boolean;
   digilockerAadhaarForm: unknown | null;
   /** Path fragment for `GET {API}/auth/kyc/digilocker-aadhaar-photo` (cookie auth). */
   digilockerAadhaarPhotoUrl: string | null;
-  /** @deprecated Selfie endpoint removed. */
+  /** Path fragment for `GET {API}/auth/kyc/selfie-photo` (cookie auth). */
   kycSelfiePhotoUrl: string | null;
-  /** @deprecated Selfie/liveness removed pending rewrite. */
   selfieUpdatedAt: string | null;
   /** Failed DigiLocker Aadhaar download attempts for the active lead. */
   digilockerAadhaarDownloadAttempts: number;
   digilockerAadhaarDownloadMaxAttempts: number;
-  /** @deprecated Selfie/liveness removed pending rewrite. */
+  /** Failed KYC liveness / face-match runs so far. */
   livenessAttempts: number;
-  /** @deprecated Selfie/liveness removed pending rewrite. */
+  /** Total allowed liveness runs before escalation to thank-you. */
   livenessMaxAttempts: number;
+  /** When true, KYC stays open until a head-movement clip scores a pass. */
+  headMovementRequired: boolean;
+  /** Active liveness: a head-movement clip was uploaded and scored (pass or fail). */
+  headMovementCaptured: boolean;
+  headMovementPassed: boolean;
+  /** 0–1 movement strength from the last recording; null when never recorded. */
+  headMovementScore: number | null;
 };
 
 export type CustomerLoanSelectionSnapshot = {

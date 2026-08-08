@@ -10,6 +10,8 @@ export type ApplicationKycSnapshotRow = {
   aadhaarPhotoRelativePath: string | null;
   selfieRelativePath: string | null;
   livenessPassed: boolean;
+  /** `application_kyc.liveness_vendor_json` — carries the `activeLiveness` head-movement block. */
+  livenessVendorJson: unknown;
   /** `application_kyc.is_liveness` — pipeline finished (pass or fail). */
   livenessCheckCompleted: boolean;
   /** `application_kyc.liveness_attempts` — failed pipeline runs so far. */
@@ -37,6 +39,7 @@ export async function fetchLatestApplicationKycSnapshot(
             ck.aadhaar_photo_path AS aadhaarPhotoRelativePath,
             ak.liveness_selfie_path AS selfieRelativePath,
             COALESCE(ak.liveness_passed, false) AS livenessPassed,
+            ak.liveness_vendor_json AS livenessVendorJson,
             COALESCE(ak.is_liveness, false) AS livenessCheckCompleted,
             COALESCE(ak.liveness_attempts, 0) AS livenessAttempts,
             ad.loan_documents_accepted_at AS loanDocumentsAcceptedAt,
@@ -60,6 +63,7 @@ export async function fetchLatestApplicationKycSnapshot(
             ck.aadhaar_photo_path AS aadhaarPhotoRelativePath,
             ak.liveness_selfie_path AS selfieRelativePath,
             COALESCE(ak.liveness_passed, false) AS livenessPassed,
+            ak.liveness_vendor_json AS livenessVendorJson,
             COALESCE(ak.is_liveness, false) AS livenessCheckCompleted,
             COALESCE(ak.liveness_attempts, 0) AS livenessAttempts,
             ad.loan_documents_accepted_at AS loanDocumentsAcceptedAt,

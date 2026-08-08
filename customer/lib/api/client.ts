@@ -62,6 +62,9 @@ const NETWORK_USER_MESSAGE = "Couldn't reach the server. Please check your conne
 /** Backend error code returned (HTTP 403) when a VPN/proxy IP is detected. */
 export const VPN_DETECTED_ERROR_CODE = 'VPN_DETECTED';
 
+/** Next proxy detected Cloudflare/edge challenge HTML from upstream (not Nest JSON). */
+export const EDGE_CHALLENGE_ERROR_CODE = 'EDGE_CHALLENGE';
+
 /** True when the API rejected the request because the caller is on a VPN/proxy. */
 export function isVpnBlockedError(err: unknown): boolean {
   if (!(err instanceof ApiRequestError) || err.statusCode !== 403) {
@@ -69,6 +72,19 @@ export function isVpnBlockedError(err: unknown): boolean {
   }
   const body = err.body as { code?: string } | null;
   return body?.code === VPN_DETECTED_ERROR_CODE;
+}
+
+/** True when www→api proxy hit a Cloudflare JS challenge instead of Nest. */
+export function isEdgeChallengeError(err: unknown): boolean {
+  if (!(err instanceof ApiRequestError)) return false;
+  const body = err.body as { code?: string; message?: string } | null;
+  if (body?.code === EDGE_CHALLENGE_ERROR_CODE) return true;
+  if (typeof body?.message === 'string' && /edge security challenge/i.test(body.message)) {
+    return true;
+  }
+  // Legacy: CF HTML forwarded as non-JSON → extractErrorMessage falls back to caller text.
+  if (err.statusCode === 403 && err.body == null) return true;
+  return false;
 }
 
 function classifyFetchError(err: unknown): ApiClientError {

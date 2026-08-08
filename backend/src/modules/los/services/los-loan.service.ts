@@ -9,6 +9,7 @@ import {
 } from '../../../common/loan/loan-calculation.util';
 import { isRepaymentPastDue } from '../../../common/loan/bounce-charge.util';
 import { BounceChargeTierResolverService } from '../../../common/loan/bounce-charge-tier.resolver';
+import { resolveEffectiveLoanStatus } from '../../../common/loan/effective-loan-status.util';
 import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbursement-view.util';
 import { formatLosPersonName } from '../format-los-person-name';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -82,6 +83,12 @@ export class LosLoanService {
         { preferStoredTenure: true },
       );
       const loanNumber = this.resolveLoanNumber(loan);
+      const effectiveStatus = resolveEffectiveLoanStatus({
+        statusName: loan.loanStatus.name,
+        statusDisplayName: loan.loanStatus.displayName,
+        loanMaturityDate: loan.loanMaturityDate,
+        closedAt: loan.closedAt,
+      });
 
       return {
         uuid: loan.uuid,
@@ -107,8 +114,8 @@ export class LosLoanService {
         bankName: details?.bankName ?? null,
         bankAccountMasked: maskAccountNumber(loan.bankAccountNumber ?? details?.bankAccountNumber),
         ifscCode: loan.ifscCode ?? details?.ifscCode ?? null,
-        loanStatusCode: loan.loanStatus.name,
-        loanStatusLabel: displayName(loan.loanStatus.name, loan.loanStatus.displayName),
+        loanStatusCode: effectiveStatus.code,
+        loanStatusLabel: effectiveStatus.label,
         applicationStatusCode: loan.application.applicationStatus.name,
         applicationStatusLabel: displayName(
           loan.application.applicationStatus.name,
@@ -222,6 +229,12 @@ export class LosLoanService {
     );
     const profile = loan.application.lead.leadDetail;
     const loanNumber = this.resolveLoanNumber(loan);
+    const effectiveStatus = resolveEffectiveLoanStatus({
+      statusName: loan.loanStatus.name,
+      statusDisplayName: loan.loanStatus.displayName,
+      loanMaturityDate: loan.loanMaturityDate,
+      closedAt: loan.closedAt,
+    });
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const maturity = new Date(loan.loanMaturityDate);
@@ -295,8 +308,8 @@ export class LosLoanService {
       bankAccountNumber: loan.bankAccountNumber ?? details?.bankAccountNumber ?? null,
       bankAccountMasked: maskAccountNumber(loan.bankAccountNumber ?? details?.bankAccountNumber),
       ifscCode: loan.ifscCode ?? details?.ifscCode ?? null,
-      loanStatusCode: loan.loanStatus.name,
-      loanStatusLabel: displayName(loan.loanStatus.name, loan.loanStatus.displayName),
+      loanStatusCode: effectiveStatus.code,
+      loanStatusLabel: effectiveStatus.label,
       applicationStatusCode: loan.application.applicationStatus.name,
       applicationStatusLabel: displayName(
         loan.application.applicationStatus.name,

@@ -182,8 +182,13 @@ const BREADCRUMBS: Record<string, string> = {
   '/developer-tools': 'Developer Tool',
   '/developer-tools/pre-bre-check': 'Pre BRE Check',
   '/developer-tools/post-bureau-check': 'Post BRE Check',
+  '/developer-tools/post-bre-html': 'Post BRE thru HTML',
   '/developer-tools/cibil-report-download': 'Bureau Report Generate',
+  '/developer-tools/cibil-tenacio-fetch': 'Tenacio CIBIL Fetch',
+  '/developer-tools/cibil-surepass-fetch': 'Surepass CIBIL Fetch',
   '/developer-tools/post-bre-rules': 'Post BRE Rules',
+  '/developer-tools/kyc-face-match-check': 'KYC Face Match Check',
+  '/developer-tools/vendor-api-logs': 'Vendor API Logs',
   ...Object.fromEntries(ELIGIBILITY_SECTION_DEFINITIONS.map((item) => [item.href, item.label])),
   '/eligibility-criteria/credit-limit-eligibility-check': 'Credit Limit Tier',
 };

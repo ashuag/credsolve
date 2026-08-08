@@ -47,6 +47,15 @@ export type KycSelfieFaceInspection = {
   laplacianVariance: number | null;
   minLaplacianVarianceRequired: number;
   blurPassed: boolean | null;
+  meanFaceLuminance: number | null;
+  darkPixelRatio: number | null;
+  /** Face-crop luminance std-dev (skin-tone-aware lighting detail). */
+  luminanceStd: number | null;
+  /** 90th-percentile luminance — highlights still present on deep skin tones. */
+  highlightP90: number | null;
+  minMeanFaceLuminanceRequired: number;
+  maxDarkPixelRatioAllowed: number;
+  lightingPassed: boolean | null;
   rawDetectionCount: number;
   qualifyingDetectionCount: number;
   detections: SelfieFaceDetectionInput[];

@@ -43,7 +43,7 @@ export type CustomerJourneyProgress = {
 
 /**
  * KYC progress-dot is done when the session marks KYC complete
- * (DigiLocker Aadhaar / manual docs). Selfie/liveness gating removed pending rewrite.
+ * (DigiLocker Aadhaar + selfie/liveness when required).
  */
 export function isCustomerKycJourneyStepDone(
   session: CustomerSessionResponse | null | undefined,

@@ -7,6 +7,10 @@ export type KycFaceMatchSideResult = {
   detectionScore: number | null;
   imageWidth: number;
   imageHeight: number;
+  /** Faces at/above the dual-face confidence gate (may be >1). */
+  faceCount: number;
+  /** True when 2+ confident faces were found on this side. */
+  dualFaceDetected: boolean;
 };
 
 export type KycFaceMatchInspection = {
@@ -68,5 +72,7 @@ function emptySide(): KycFaceMatchSideResult {
     detectionScore: null,
     imageWidth: 0,
     imageHeight: 0,
+    faceCount: 0,
+    dualFaceDetected: false,
   };
 }

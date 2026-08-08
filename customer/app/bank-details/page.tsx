@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { lookupBankIfsc, submitVerifiedBankDetails } from '@/lib/api/lead';
+import { formatAddressForDisplay } from '@/lib/format-address';
 import { IFSC_CODE_LENGTH, getIfscValidationError, isValidIfscCode, normalizeIfscInput } from '@/lib/ifsc';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
@@ -28,6 +29,9 @@ const DETAIL_LABELS: Record<string, string> = {
   swift: 'SWIFT',
 };
 
+/** Location fields the IFSC vendor returns in ALL CAPS; codes like IFSC/MICR must stay as-is. */
+const TITLE_CASED_DETAIL_KEYS = new Set(['bankName', 'branch', 'address', 'city', 'district', 'state', 'centre']);
+
 function formatCell(v: unknown): string | null {
   if (v === null || v === undefined) return null;
   if (typeof v === 'boolean') return v ? 'Yes' : 'No';
@@ -49,7 +53,8 @@ function IfscDetailPanel({ details }: { details: Record<string, unknown> }) {
     seen.add(k);
     const label =
       DETAIL_LABELS[k] ?? k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
-    rows.push({ key: k, label, value: val });
+    const value = TITLE_CASED_DETAIL_KEYS.has(k) ? (formatAddressForDisplay(val) ?? val) : val;
+    rows.push({ key: k, label, value });
   }
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-4">

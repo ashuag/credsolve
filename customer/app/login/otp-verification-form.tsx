@@ -162,7 +162,7 @@ export function OtpVerificationForm({
         </div>
 
         <h2 className="text-2xl md:text-[1.8rem] font-extrabold text-brand-navy mb-6 tracking-tight leading-[1.1] whitespace-nowrap">
-          Verify Your <span className="text-brand-blue">Identity</span> ✨
+          Verify Your <span className="text-brand-blue">Identity</span>
         </h2>
 
         {/* Premium Info Box */}

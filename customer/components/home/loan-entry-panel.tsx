@@ -93,7 +93,7 @@ export function LoanEntryPanel() {
         </div>
 
         <h2 id="entry-heading" className="text-2xl md:text-[1.8rem] font-extrabold text-brand-navy mb-6 tracking-tight leading-[1.1] whitespace-nowrap">
-          Unlock Your <span className="text-brand-blue">Instant Loan</span> ✨
+          Unlock Your <span className="text-brand-blue">Instant Loan</span>
         </h2>
         
         {/* Premium Info Box */}

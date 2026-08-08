@@ -5,6 +5,32 @@ export type PostKycSelfieResponse = {
   selfieRelativePath: string;
 };
 
+export type PostKycLivenessVideoResponse = {
+  success: true;
+  passed: boolean;
+  /** 0–1 head-movement strength scored on the server from the sampled frames. */
+  score: number;
+  minScoreRequired: number;
+  framesAnalyzed: number;
+  framesWithFace: number;
+  directions: string[];
+  reason: string | null;
+  livenessVideoPath: string | null;
+};
+
+/** Per-gate verdicts from the on-server face-api pipeline (same checks the LOS tool reports). */
+export type KycPhotoQualitySummary = {
+  blurPassed: boolean | null;
+  lightingPassed: boolean | null;
+  fullFaceDetected: boolean;
+  faceNotCovered: boolean;
+  dualFaceDetected: boolean;
+  faceCount: number;
+  qualityScore: number | null;
+  ok: boolean;
+  reason?: string;
+};
+
 export type PostKycLivenessResponse = {
   configured: boolean;
   skipReason?: string;
@@ -17,71 +43,28 @@ export type PostKycLivenessResponse = {
   faceValidationMessage?: string;
   faceMatchPassed?: boolean;
   faceMatchMessage?: string;
-  authenticityPassed?: boolean;
-  authenticityMessage?: string;
-  deepfakeDetected?: boolean | null;
   suggestRetrySelfie?: boolean;
   bestComputedConfidence?: number | null;
+  /** Blur / lighting / dual-face / framing verdicts for the captured selfie. */
+  selfieQuality?: KycPhotoQualitySummary;
+  /** Same gates against the DigiLocker Aadhaar photo. */
+  aadhaarQuality?: KycPhotoQualitySummary;
+  /** MoneyCash active liveness (head movement) recorded before this call. */
+  headMovementPassed?: boolean;
+  /** False when no clip has been recorded yet, so the UI shows guidance instead of an error. */
+  headMovementCaptured?: boolean;
+  headMovementScore?: number | null;
+  headMovementMessage?: string;
+  suggestRetryHeadMovement?: boolean;
 };
-
-function isRec(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === 'object' && !Array.isArray(v);
-}
-
-/** Mirrors backend `pickTenacioVendorErrorMessage` so older APIs without `vendorErrorMessage` still show vendor text. */
-function extractVendorFailureLine(vendor: unknown, depth = 0): string | undefined {
-  if (depth > 6 || !isRec(vendor)) return undefined;
-
-  const nested = vendor.error;
-  if (typeof nested === 'string') {
-    const m = nested.trim();
-    if (m) return m;
-  }
-  if (isRec(nested)) {
-    for (const key of ['message', 'description', 'detail', 'title'] as const) {
-      const val = nested[key];
-      if (typeof val === 'string') {
-        const m = val.trim();
-        if (m) return m;
-      }
-    }
-  }
-
-  if (typeof vendor.message === 'string') {
-    const m = vendor.message.trim();
-    if (m) return m;
-  }
-
-  const errors = vendor.errors;
-  if (Array.isArray(errors)) {
-    for (const item of errors) {
-      if (typeof item === 'string') {
-        const m = item.trim();
-        if (m) return m;
-      }
-      if (isRec(item)) {
-        for (const key of ['message', 'msg', 'description'] as const) {
-          const val = item[key];
-          if (typeof val === 'string') {
-            const m = val.trim();
-            if (m) return m;
-          }
-        }
-      }
-    }
-  }
-
-  return extractVendorFailureLine(vendor.data, depth + 1);
-}
 
 export function pickLivenessFailureUserMessage(out: PostKycLivenessResponse): string {
   return (
-    out.authenticityMessage?.trim() ||
+    out.headMovementMessage?.trim() ||
     out.faceValidationMessage?.trim() ||
     out.faceMatchMessage?.trim() ||
     out.vendorErrorMessage?.trim() ||
-    extractVendorFailureLine(out.vendor) ||
-    'Liveness check did not pass. You can try again.'
+    'Face verification did not pass. You can try again.'
   );
 }
 
@@ -93,6 +76,24 @@ export async function postKycSelfie(file: File): Promise<PostKycSelfieResponse |
     form,
     'Unable to upload selfie.',
     { timeoutMs: 45_000 },
+  );
+}
+
+/** Uploads the head-movement clip plus the stills sampled from it; the server returns the score. */
+export async function postKycLivenessVideo(
+  videoFile: File,
+  frameFiles: File[],
+): Promise<PostKycLivenessVideoResponse | null> {
+  const form = new FormData();
+  form.set('video', videoFile, videoFile.name);
+  for (const frame of frameFiles) {
+    form.append('frames', frame, frame.name);
+  }
+  return apiPostFormData<PostKycLivenessVideoResponse>(
+    '/applications/kyc/liveness-video',
+    form,
+    'Unable to upload the head-movement recording.',
+    { timeoutMs: 90_000 },
   );
 }
 

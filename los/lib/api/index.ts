@@ -24,4 +24,5 @@ export * from './reject-record';
 export * from './disbursement';
 export * from './kyc-enable-re-kyc';
 export * from './cibil-vendor-checks';
+export * from './kyc-face-match-check';
 export * from './vendor-api-logs';

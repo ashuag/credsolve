@@ -27,10 +27,21 @@ export function formatSelfieFaceValidationSummary(row: {
         : v.laplacianVariance != null
           ? ` · sharpness ${formatLaplacianVariance(v.laplacianVariance)}`
           : '';
-    return `Passed · computed ${formatConfidencePercent(v.bestComputedConfidence)}${blur}`;
+    const lighting =
+      v.lightingPassed === false
+        ? ' · too dark'
+        : v.meanFaceLuminance != null
+          ? ` · luminance ${formatLaplacianVariance(v.meanFaceLuminance)}`
+          : '';
+    return `Passed · computed ${formatConfidencePercent(v.bestComputedConfidence)}${blur}${lighting}`;
   }
   if (v.blurPassed === false && v.laplacianVariance != null) {
     return `Failed · blurry (${formatLaplacianVariance(v.laplacianVariance)} / min ${formatLaplacianVariance(v.minLaplacianVarianceRequired)})`;
+  }
+  if (v.lightingPassed === false) {
+    const mean =
+      v.meanFaceLuminance != null ? ` (${formatLaplacianVariance(v.meanFaceLuminance)} mean luminance)` : '';
+    return `Failed · too dark${mean}`;
   }
   return `Failed · computed ${formatConfidencePercent(v.bestComputedConfidence)}`;
 }
@@ -67,23 +78,59 @@ export function formatMoneyCashFaceMatchSummary(row: {
   return m.checkedAt ? 'Failed' : 'Not run';
 }
 
-/** Active liveness only (head turns + smile) — expression anti-spoof is step 3 in the pipeline. */
+export function formatHeadMovementScore(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return '—';
+  return `${Math.round(value * 100)}%`;
+}
+
+const HEAD_MOVEMENT_DIRECTION_LABELS: Record<string, string> = {
+  left: 'left',
+  right: 'right',
+  up: 'up',
+  down: 'down',
+  tilt: 'tilt',
+};
+
+/** Directions the head actually moved in, e.g. `left, right`. */
+export function formatHeadMovementDirections(
+  s: LosLivenessSummary | null | undefined,
+): string | null {
+  const explicit = s?.headMovementDirections
+    ?.map((d) => HEAD_MOVEMENT_DIRECTION_LABELS[d] ?? d)
+    .filter(Boolean);
+  if (explicit?.length) return explicit.join(', ');
+
+  const fallback: string[] = [];
+  if (s?.headTurnLeftDetected === true) fallback.push('left');
+  if (s?.headTurnRightDetected === true) fallback.push('right');
+  if (s?.headTiltUpDetected === true) fallback.push('up');
+  if (s?.headTiltDownDetected === true) fallback.push('down');
+  return fallback.length ? fallback.join(', ') : null;
+}
+
+/** Active liveness only (head movement) — expression anti-spoof is step 3 in the pipeline. */
 export function formatActiveLivenessOnlySummary(row: {
   livenessSummary: LosLivenessSummary | null;
 }): string {
   const s = row.livenessSummary;
-  if (!s?.checkedAt) return 'Not run';
+  if (!s) return 'Not run';
+  // The head-movement recording is scored before the liveness pipeline runs, so a result
+  // can exist while `checkedAt` is still null.
+  if (!s.checkedAt && s.headMovementScore == null) return 'Not run';
+  if (s.activeLivenessPassed == null && s.headMovementScore == null) {
+    return 'Not recorded';
+  }
 
   const activePassed = s.activeLivenessPassed ?? s.passed;
   const parts = [activePassed ? 'Passed' : 'Failed'];
 
-  if (s.mode === 'smooth') parts.push('smooth session');
-  else if (s.mode === 'challenge') parts.push('challenge mode');
+  if (s.headMovementScore != null) {
+    parts.push(`movement ${formatHeadMovementScore(s.headMovementScore)}`);
+  }
 
   const signals: string[] = [];
-  if (s.headTurnLeftDetected === true || s.headTurnRightDetected === true) {
-    signals.push('head turn');
-  }
+  const directions = formatHeadMovementDirections(s);
+  if (directions) signals.push(`head ${directions}`);
   if (s.blinkDetected === true) signals.push('blink');
   if (s.smileDetected === true) signals.push('smile');
   if (signals.length) parts.push(signals.join(', '));

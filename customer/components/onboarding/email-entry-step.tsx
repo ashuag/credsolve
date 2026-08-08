@@ -102,11 +102,11 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', le
           >
             {isLogin ? (
               <>
-                Continue with <span className="text-brand-blue">email</span> ✨
+                Continue with <span className="text-brand-blue">email</span>
               </>
             ) : (
               <>
-                Verify Your <span className="text-brand-blue">Email</span> ✨
+                Verify Your <span className="text-brand-blue">Email</span>
               </>
             )}
           </h2>

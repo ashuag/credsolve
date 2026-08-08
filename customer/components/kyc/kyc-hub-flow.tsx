@@ -6,7 +6,12 @@ import { useRouter } from 'next/navigation';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 import { startDigilockerLoginFlow, fetchPendingDigilockerSession } from '@/lib/api/digilocker';
-import { getKycHubBackPath } from '@/lib/api/customer-session';
+import {
+  getCustomerJourneyResumePath,
+  getKycHubBackPath,
+  isKycHeadMovementPending,
+  shouldResumeKycSelfie,
+} from '@/lib/api/customer-session';
 import { isLoanDocumentsJourneyComplete } from '@/lib/loan-documents-journey';
 import { kycJourneyProgressFromSession } from '@/lib/kyc-journey-progress';
 import { KycJourneyLeftPanel } from '@/components/kyc/kyc-journey-left-panel';
@@ -71,6 +76,13 @@ export function KycHubFlow() {
     session?.authenticated === true && Boolean(session.kycFaceProgress?.livenessPassed);
   const kycCompleted =
     session?.authenticated === true && Boolean(session.journey.kycCompleted);
+  /** Liveness can pass while the head-movement clip is still owed — that step lives on /kyc/selfie. */
+  const headMovementPending = isKycHeadMovementPending(
+    session?.authenticated === true ? session.kycFaceProgress : null,
+  );
+  const faceStepPending = !livenessPassed || headMovementPending;
+  /** Where the journey goes once KYC is done — normally bank details. */
+  const nextJourneyPath = getCustomerJourneyResumePath(session);
 
   const { progressPct, activeStepIndex } = useMemo(
     () => kycJourneyProgressFromSession(session),
@@ -84,6 +96,12 @@ export function KycHubFlow() {
   useEffect(() => {
     if (session?.authenticated === true && session.lead && !isLoanDocumentsJourneyComplete(session)) {
       router.replace('/loan-documents');
+    }
+  }, [router, session]);
+
+  useEffect(() => {
+    if (session?.authenticated === true && shouldResumeKycSelfie(session)) {
+      router.replace('/kyc/selfie');
     }
   }, [router, session]);
 
@@ -172,17 +190,30 @@ export function KycHubFlow() {
               <p className="m-0 text-sm text-brand-muted leading-relaxed">
                 {!livenessPassed
                   ? 'Identity capture from DigiLocker is complete. Next, verify with a selfie and liveness check.'
-                  : kycCompleted
-                    ? 'KYC is complete. You can continue to bank details.'
-                    : 'Identity capture from DigiLocker is complete. Finish any remaining KYC steps to continue.'}
+                  : headMovementPending
+                    ? 'Identity capture from DigiLocker is complete. One step left — record a short head-movement clip to confirm you are live.'
+                    : kycCompleted
+                      ? 'KYC is complete. You can continue to bank details.'
+                      : 'Identity capture from DigiLocker is complete. Finish any remaining KYC steps to continue.'}
               </p>
-              {!livenessPassed ? (
+              {faceStepPending ? (
                 <button
                   type="button"
                   className={styles.cta}
                   onClick={() => router.push('/kyc/selfie')}
                 >
-                  Continue to selfie &amp; liveness
+                  {headMovementPending
+                    ? 'Continue to head movement check'
+                    : 'Continue to selfie & liveness'}
+                  <ArrowRightIcon />
+                </button>
+              ) : kycCompleted ? (
+                <button
+                  type="button"
+                  className={styles.cta}
+                  onClick={() => router.push(nextJourneyPath)}
+                >
+                  {nextJourneyPath === '/bank-details' ? 'Continue to bank details' : 'Continue'}
                   <ArrowRightIcon />
                 </button>
               ) : null}

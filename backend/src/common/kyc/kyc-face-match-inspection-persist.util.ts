@@ -11,6 +11,8 @@ export type KycFaceMatchSideResult = {
   detectionScore: number | null;
   imageWidth: number;
   imageHeight: number;
+  faceCount?: number;
+  dualFaceDetected?: boolean;
 };
 
 export type PersistedFaceMatch = {
@@ -49,6 +51,8 @@ function parseSide(value: unknown): KycFaceMatchSideResult | null {
     detectionScore: typeof row.detectionScore === 'number' ? row.detectionScore : null,
     imageWidth: typeof row.imageWidth === 'number' ? row.imageWidth : 0,
     imageHeight: typeof row.imageHeight === 'number' ? row.imageHeight : 0,
+    faceCount: typeof row.faceCount === 'number' ? row.faceCount : undefined,
+    dualFaceDetected: typeof row.dualFaceDetected === 'boolean' ? row.dualFaceDetected : undefined,
   };
 }
 

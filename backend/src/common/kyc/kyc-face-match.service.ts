@@ -11,6 +11,7 @@ import {
   type KycFaceMatchInspection,
   type KycFaceMatchSideResult,
 } from './kyc-face-match.util';
+import { KYC_SELFIE_MIN_FACE_CONFIDENCE } from './kyc-selfie-face-validation.util';
 
 type FaceApiDetectionWithDescriptor = {
   detection: {
@@ -18,6 +19,12 @@ type FaceApiDetectionWithDescriptor = {
     box: { x: number; y: number; width: number; height: number };
   };
   descriptor: Float32Array;
+};
+
+type FaceSideDetection = {
+  best: FaceApiDetectionWithDescriptor | null;
+  /** Faces at/above {@link KYC_SELFIE_MIN_FACE_CONFIDENCE} (dual-face gate). */
+  confidentFaceCount: number;
 };
 
 @Injectable()
@@ -37,8 +44,22 @@ export class KycFaceMatchService implements OnModuleDestroy {
         matchScore: null,
         distance: null,
         maxDistanceThreshold: KYC_FACE_MATCH_MAX_DISTANCE,
-        reference: { faceDetected: true, detectionScore: null, imageWidth: 0, imageHeight: 0 },
-        probe: { faceDetected: true, detectionScore: null, imageWidth: 0, imageHeight: 0 },
+        reference: {
+          faceDetected: true,
+          detectionScore: null,
+          imageWidth: 0,
+          imageHeight: 0,
+          faceCount: 1,
+          dualFaceDetected: false,
+        },
+        probe: {
+          faceDetected: true,
+          detectionScore: null,
+          imageWidth: 0,
+          imageHeight: 0,
+          faceCount: 1,
+          dualFaceDetected: false,
+        },
         productionValidationDisabled: true,
       };
     }
@@ -56,22 +77,37 @@ export class KycFaceMatchService implements OnModuleDestroy {
       referenceTensor = tf.node.decodeImage(reference, 3) as tf.Tensor3D;
       probeTensor = tf.node.decodeImage(probe, 3) as tf.Tensor3D;
 
-      const [referenceFace, probeFace] = await Promise.all([
-        this.detectBestFace(referenceTensor),
-        this.detectBestFace(probeTensor),
+      const [referenceFaces, probeFaces] = await Promise.all([
+        this.detectFaces(referenceTensor),
+        this.detectFaces(probeTensor),
       ]);
 
-      const referenceSide = toSideResult(referenceFace, referenceTensor);
-      const probeSide = toSideResult(probeFace, probeTensor);
+      const referenceSide = toSideResult(referenceFaces, referenceTensor);
+      const probeSide = toSideResult(probeFaces, probeTensor);
 
-      if (!referenceFace) {
+      if (referenceSide.dualFaceDetected) {
+        return {
+          ...emptyFaceMatchInspection('Only one person should appear in the reference image.'),
+          reference: referenceSide,
+          probe: probeSide,
+        };
+      }
+      if (probeSide.dualFaceDetected) {
+        return {
+          ...emptyFaceMatchInspection('Only one person should appear in the probe image.'),
+          reference: referenceSide,
+          probe: probeSide,
+        };
+      }
+
+      if (!referenceFaces.best) {
         return {
           ...emptyFaceMatchInspection('No face detected in the reference image.'),
           reference: referenceSide,
           probe: probeSide,
         };
       }
-      if (!probeFace) {
+      if (!probeFaces.best) {
         return {
           ...emptyFaceMatchInspection('No face detected in the probe image.'),
           reference: referenceSide,
@@ -79,7 +115,10 @@ export class KycFaceMatchService implements OnModuleDestroy {
         };
       }
 
-      const distance = faceapi.euclideanDistance(referenceFace.descriptor, probeFace.descriptor);
+      const distance = faceapi.euclideanDistance(
+        referenceFaces.best.descriptor,
+        probeFaces.best.descriptor,
+      );
       const { matchPassed, matchScore } = evaluateFaceMatch(distance);
 
       return {
@@ -108,10 +147,10 @@ export class KycFaceMatchService implements OnModuleDestroy {
     }
   }
 
-  private async detectBestFace(tensor: tf.Tensor3D): Promise<FaceApiDetectionWithDescriptor | null> {
+  private async detectFaces(tensor: tf.Tensor3D): Promise<FaceSideDetection> {
     const opts = new faceapi.SsdMobilenetv1Options({
       minConfidence: KYC_FACE_MATCH_MIN_DETECTION_SCORE,
-      maxResults: 3,
+      maxResults: 5,
     });
     const detections = (await faceapi
       .detectAllFaces(tensor, opts)
@@ -119,12 +158,21 @@ export class KycFaceMatchService implements OnModuleDestroy {
       .withFaceDescriptors()) as FaceApiDetectionWithDescriptor[];
 
     if (!detections.length) {
-      return null;
+      return { best: null, confidentFaceCount: 0 };
     }
 
-    return detections.reduce((top, current) =>
+    const confident = detections.filter(
+      (d) => d.detection.score >= KYC_SELFIE_MIN_FACE_CONFIDENCE,
+    );
+    const pool = confident.length > 0 ? confident : detections;
+    const best = pool.reduce((top, current) =>
       current.detection.score > top.detection.score ? current : top,
     );
+
+    return {
+      best,
+      confidentFaceCount: confident.length,
+    };
   }
 
   private async ensureModelsLoaded(): Promise<void> {
@@ -143,12 +191,15 @@ export class KycFaceMatchService implements OnModuleDestroy {
   }
 }
 
-function toSideResult(face: FaceApiDetectionWithDescriptor | null, tensor: tf.Tensor3D): KycFaceMatchSideResult {
+function toSideResult(faces: FaceSideDetection, tensor: tf.Tensor3D): KycFaceMatchSideResult {
   const [imageHeight, imageWidth] = tensor.shape;
+  const faceCount = faces.confidentFaceCount;
   return {
-    faceDetected: Boolean(face),
-    detectionScore: face?.detection.score ?? null,
+    faceDetected: Boolean(faces.best),
+    detectionScore: faces.best?.detection.score ?? null,
     imageWidth,
     imageHeight,
+    faceCount,
+    dualFaceDetected: faceCount > 1,
   };
 }

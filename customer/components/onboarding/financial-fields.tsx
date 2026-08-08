@@ -1,7 +1,10 @@
 import type { ChangeEvent } from 'react';
 import { SessionRequiredAlert } from '@/components/auth/session-required-alert';
 import { SearchableCityInput, type CityInputChange } from '@/components/ui/searchable-city-input';
-import { CUSTOMER_CREDIT_CONSENT_TEXT } from '@/lib/customer-details';
+import {
+  CUSTOMER_CREDIT_CONSENT_REASSURANCE,
+  CUSTOMER_CREDIT_CONSENT_TEXT,
+} from '@/lib/customer-details';
 import { FormInput, StickyActions, inputCls, secondaryBtn } from './_form-ui';
 import type { Fields, FieldError, OnChange } from './_types';
 
@@ -45,12 +48,10 @@ export function FinancialFields({
 
         <FormInput span2 id="addressLine1" label="Address line 1" error={errors.addressLine1}
           type="text" autoComplete="address-line1" placeholder="Flat / House no, Building, Street" required
-          className="uppercase placeholder:normal-case"
           value={fields.addressLine1} onChange={onFieldChange('addressLine1')} />
 
         <FormInput span2 id="addressLine2" label="Address line 2" error={errors.addressLine2}
           type="text" autoComplete="address-line2" placeholder="Landmark / Area / Apartment name"
-          className="uppercase placeholder:normal-case"
           value={fields.addressLine2} onChange={onFieldChange('addressLine2')} />
       </div>
 
@@ -61,6 +62,9 @@ export function FinancialFields({
             className="mt-1 h-5 w-5 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
           <span className="text-[0.85rem] leading-relaxed text-slate-600">{CUSTOMER_CREDIT_CONSENT_TEXT}</span>
         </label>
+        <p className="mt-2 pl-8 m-0 text-[0.8rem] font-medium text-emerald-700">
+          {CUSTOMER_CREDIT_CONSENT_REASSURANCE}
+        </p>
         {errors.creditConsentAccepted && (
           <p id="creditConsentAccepted-error" className="mt-2 text-[#b2372d] text-sm font-medium">{errors.creditConsentAccepted}</p>
         )}

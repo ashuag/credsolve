@@ -168,6 +168,7 @@ export class ApplicationRepository {
         livenessDoneAt: null,
         livenessCheckedAt: null,
         livenessVendorJson: Prisma.JsonNull,
+        livenessVideoPath: null,
         kycStatus: APPLICATION_KYC_STATUS.NOT_DONE,
       },
     });
@@ -237,6 +238,57 @@ export class ApplicationRepository {
         livenessCheckedAt: params.checkedAt,
         ...(params.done !== undefined ? { isLiveness: params.done } : {}),
         ...(params.doneAt !== undefined ? { livenessDoneAt: params.doneAt } : {}),
+      },
+    });
+  }
+
+  /** Current `liveness_vendor_json.activeLiveness` block, or null when the pipeline has not stored one. */
+  async findActiveLivenessBlock(
+    applicationId: bigint,
+    tx?: DbClient,
+  ): Promise<Prisma.JsonObject | null> {
+    const row = await this.db(tx).applicationKyc.findUnique({
+      where: { applicationId },
+      select: { livenessVendorJson: true },
+    });
+    const vendor = row?.livenessVendorJson;
+    if (!vendor || typeof vendor !== 'object' || Array.isArray(vendor)) return null;
+    const block = (vendor as Prisma.JsonObject).activeLiveness;
+    if (!block || typeof block !== 'object' || Array.isArray(block)) return null;
+    return block as Prisma.JsonObject;
+  }
+
+  /**
+   * Merges the MoneyCash active-liveness (head movement) result into `liveness_vendor_json`
+   * without disturbing vendor or local-check keys already written by the liveness pipeline.
+   */
+  async updateActiveLivenessBlock(
+    params: {
+      applicationId: bigint;
+      activeLiveness: Prisma.InputJsonObject;
+      livenessVideoPath?: string;
+    },
+    tx?: DbClient,
+  ) {
+    await this.ensureApplicationKyc(params.applicationId, tx);
+    const row = await this.db(tx).applicationKyc.findUnique({
+      where: { applicationId: params.applicationId },
+      select: { livenessVendorJson: true },
+    });
+    const current = row?.livenessVendorJson;
+    const base =
+      current && typeof current === 'object' && !Array.isArray(current)
+        ? (current as Prisma.JsonObject)
+        : {};
+
+    return this.db(tx).applicationKyc.update({
+      where: { applicationId: params.applicationId },
+      data: {
+        livenessVendorJson: {
+          ...base,
+          activeLiveness: params.activeLiveness,
+        } as Prisma.InputJsonObject,
+        ...(params.livenessVideoPath ? { livenessVideoPath: params.livenessVideoPath } : {}),
       },
     });
   }

@@ -137,7 +137,7 @@ export function EmailOtpStep({
               compact ? 'mb-3' : 'mb-4',
             )}
           >
-            {isLogin ? 'Verify to ' : 'Verify your '}<span className="text-brand-blue">{isLogin ? 'log in' : 'email'}</span> ✨
+            {isLogin ? 'Verify to ' : 'Verify your '}<span className="text-brand-blue">{isLogin ? 'log in' : 'email'}</span>
           </h2>
 
           <div

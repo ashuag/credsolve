@@ -42,6 +42,7 @@ import { AcceptLoanDocumentsUseCase } from './application/use-cases/accept-loan-
 import { AcknowledgeLoanDocumentsUseCase } from './application/use-cases/acknowledge-loan-documents.use-case';
 import { SaveKycDocumentsUseCase } from './application/use-cases/save-kyc-documents.use-case';
 import { SaveKycSelfieUseCase } from './application/use-cases/save-kyc-selfie.use-case';
+import { SaveKycLivenessVideoUseCase } from './application/use-cases/save-kyc-liveness-video.use-case';
 import { RunKycLivenessUseCase } from './application/use-cases/run-kyc-liveness.use-case';
 import { SaveBankDetailsUseCase } from './application/use-cases/save-bank-details.use-case';
 import { LookupIfscUseCase } from './application/use-cases/lookup-ifsc.use-case';
@@ -104,6 +105,7 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     SaveLoanSelectionUseCase,
     SaveKycDocumentsUseCase,
     SaveKycSelfieUseCase,
+    SaveKycLivenessVideoUseCase,
     RunKycLivenessUseCase,
     SaveBankDetailsUseCase,
     LookupIfscUseCase,

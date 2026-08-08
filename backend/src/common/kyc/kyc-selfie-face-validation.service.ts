@@ -14,11 +14,18 @@ import {
   validateKycSelfieFaceDetections,
 } from './kyc-selfie-face-validation.util';
 import { pickBestFaceConfidence } from './kyc-selfie-face-confidence.util';
+import { KYC_HEAD_MOVEMENT_MIN_FRAME_FACE_CONFIDENCE } from './kyc-head-movement.util';
 import {
   KYC_SELFIE_MIN_LAPLACIAN_VARIANCE,
   measureSelfieFaceBlur,
   validateSelfieFaceBlur,
 } from './kyc-selfie-face-blur.util';
+import {
+  KYC_SELFIE_MAX_DARK_PIXEL_RATIO,
+  KYC_SELFIE_MIN_MEAN_FACE_LUMINANCE,
+  measureSelfieFaceLighting,
+  validateSelfieFaceLighting,
+} from './kyc-selfie-face-lighting.util';
 
 type FaceApiLandmarks = {
   getLeftEye(): Array<{ x: number; y: number }>;
@@ -84,17 +91,44 @@ export class KycSelfieFaceValidationService implements OnModuleDestroy {
 
       let laplacianVariance: number | null = null;
       let blurPassed: boolean | null = null;
+      let meanFaceLuminance: number | null = null;
+      let darkPixelRatio: number | null = null;
+      let luminanceStd: number | null = null;
+      let highlightP90: number | null = null;
+      let lightingPassed: boolean | null = null;
       let finalOk = validation.ok;
       let finalReason = validation.ok ? undefined : validation.reason;
 
       if (validation.ok && qualifying.length === 1) {
-        const blur = measureSelfieFaceBlur(tensor, qualifying[0]!.box);
+        const faceBox = qualifying[0]!.box;
+        const blur = measureSelfieFaceBlur(tensor, faceBox);
         laplacianVariance = blur.laplacianVariance;
         blurPassed = blur.passed;
         const blurValidation = validateSelfieFaceBlur(blur.laplacianVariance);
         if (!blurValidation.ok) {
           finalOk = false;
           finalReason = blurValidation.reason;
+        }
+
+        const lighting = measureSelfieFaceLighting(tensor, faceBox);
+        meanFaceLuminance = lighting.meanFaceLuminance;
+        darkPixelRatio = lighting.darkPixelRatio;
+        luminanceStd = lighting.luminanceStd;
+        highlightP90 = lighting.highlightP90;
+        lightingPassed = lighting.passed;
+        if (finalOk) {
+          const lightingValidation = validateSelfieFaceLighting(
+            lighting.meanFaceLuminance,
+            lighting.darkPixelRatio,
+            KYC_SELFIE_MIN_MEAN_FACE_LUMINANCE,
+            KYC_SELFIE_MAX_DARK_PIXEL_RATIO,
+            lighting.luminanceStd,
+            lighting.highlightP90,
+          );
+          if (!lightingValidation.ok) {
+            finalOk = false;
+            finalReason = lightingValidation.reason;
+          }
         }
       }
 
@@ -112,6 +146,13 @@ export class KycSelfieFaceValidationService implements OnModuleDestroy {
         laplacianVariance,
         minLaplacianVarianceRequired: KYC_SELFIE_MIN_LAPLACIAN_VARIANCE,
         blurPassed,
+        meanFaceLuminance,
+        darkPixelRatio,
+        luminanceStd,
+        highlightP90,
+        minMeanFaceLuminanceRequired: KYC_SELFIE_MIN_MEAN_FACE_LUMINANCE,
+        maxDarkPixelRatioAllowed: KYC_SELFIE_MAX_DARK_PIXEL_RATIO,
+        lightingPassed,
         rawDetectionCount: enriched.length,
         qualifyingDetectionCount: qualifying.length,
         detections: enriched,
@@ -123,6 +164,33 @@ export class KycSelfieFaceValidationService implements OnModuleDestroy {
       return emptyInspection(
         'We could not verify the selfie. Please retake the photo in good lighting with your full face visible.',
       );
+    } finally {
+      tensor?.dispose();
+    }
+  }
+
+  /**
+   * Highest-scoring face (with landmarks) in one frame sampled from the active-liveness
+   * recording. Returns null when no face clears the frame confidence floor.
+   */
+  async detectFrameLandmarks(buffer: Buffer): Promise<SelfieFaceDetectionInput | null> {
+    if (!buffer.length) return null;
+
+    await this.ensureModelsLoaded();
+
+    let tensor: tf.Tensor3D | null = null;
+    try {
+      tensor = tf.node.decodeImage(buffer, 3) as tf.Tensor3D;
+      const detections = await this.detectFaces(tensor);
+      const best = detections
+        .filter((d) => d.score >= KYC_HEAD_MOVEMENT_MIN_FRAME_FACE_CONFIDENCE)
+        .sort((a, b) => b.score - a.score)[0];
+      return best ?? null;
+    } catch (err) {
+      this.logger.warn(
+        `KYC liveness frame detection failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return null;
     } finally {
       tensor?.dispose();
     }
@@ -200,6 +268,13 @@ function emptyInspection(reason: string): KycSelfieFaceInspection {
     laplacianVariance: null,
     minLaplacianVarianceRequired: KYC_SELFIE_MIN_LAPLACIAN_VARIANCE,
     blurPassed: null,
+    meanFaceLuminance: null,
+    darkPixelRatio: null,
+    luminanceStd: null,
+    highlightP90: null,
+    minMeanFaceLuminanceRequired: KYC_SELFIE_MIN_MEAN_FACE_LUMINANCE,
+    maxDarkPixelRatioAllowed: KYC_SELFIE_MAX_DARK_PIXEL_RATIO,
+    lightingPassed: null,
     rawDetectionCount: 0,
     qualifyingDetectionCount: 0,
     detections: [],

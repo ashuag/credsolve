@@ -53,6 +53,31 @@ function formatDateTime(iso: string | null | undefined) {
   });
 }
 
+function istCalendarYmd(asOf: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(asOf);
+}
+
+/** True when IST calendar day is after repay-by (maturity day itself is still on time). */
+function isLoanPastDue(loan: LosLoan, asOf: Date = new Date()): boolean {
+  if (loan.closedAt) return false;
+  const code = loan.loanStatusCode.toUpperCase();
+  if (code === 'CLOSED' || code.includes('WRITE')) return false;
+  if (code === 'OVERDUE') return true;
+  const maturityYmd = loan.loanMaturityDate?.slice(0, 10);
+  if (!maturityYmd || !/^\d{4}-\d{2}-\d{2}$/.test(maturityYmd)) return false;
+  return istCalendarYmd(asOf) > maturityYmd;
+}
+
+function effectiveStatusCode(loan: LosLoan): string {
+  if (isLoanPastDue(loan)) return 'OVERDUE';
+  return loan.loanStatusCode;
+}
+
 function StatusPill({ label, code }: { label: string; code?: string }) {
   const s = (code ?? label).toUpperCase();
   const isClosed = s.includes('CLOSED') || s.includes('WRITE') || s === 'PAID';
@@ -193,16 +218,29 @@ export function LoansPanel() {
       getSortValue: (row) => isoDateTimestamp(row.loanMaturityDate),
       filter: { type: 'date' },
       cellClassName: 'whitespace-nowrap text-brand-text',
-      render: (loan) => formatDate(loan.loanMaturityDate),
+      render: (loan) => {
+        const overdue = isLoanPastDue(loan);
+        return (
+          <span className={overdue ? 'font-bold text-[#b91c1c]' : undefined}>
+            {formatDate(loan.loanMaturityDate)}
+          </span>
+        );
+      },
     },
     {
       key: 'status',
       label: 'Status',
       headerClassName: 'whitespace-nowrap',
-      getFilterValue: (row) => row.loanStatusLabel,
-      getSortValue: (row) => row.loanStatusLabel.toLowerCase(),
+      getFilterValue: (row) => (isLoanPastDue(row) ? 'Overdue' : row.loanStatusLabel),
+      getSortValue: (row) =>
+        (isLoanPastDue(row) ? 'Overdue' : row.loanStatusLabel).toLowerCase(),
       filter: { type: 'text', placeholder: 'Search status…' },
-      render: (loan) => <StatusPill label={loan.loanStatusLabel} code={loan.loanStatusCode} />,
+      render: (loan) => (
+        <StatusPill
+          label={isLoanPastDue(loan) ? 'Overdue' : loan.loanStatusLabel}
+          code={effectiveStatusCode(loan)}
+        />
+      ),
     },
     {
       key: 'disbursed',
@@ -216,9 +254,9 @@ export function LoansPanel() {
     },
   ], []);
 
+  const overdueCount = loans.filter((loan) => isLoanPastDue(loan)).length;
+  const activeCount = loans.filter((loan) => effectiveStatusCode(loan).toUpperCase() === 'ACTIVE').length;
   const totalDisbursed = loans.reduce((sum, loan) => sum + (Number(loan.netDisbursedAmount) || 0), 0);
-  const activeCount = loans.filter((loan) => loan.loanStatusCode.toUpperCase() === 'ACTIVE').length;
-  const overdueCount = loans.filter((loan) => loan.loanStatusCode.toUpperCase() === 'OVERDUE').length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -246,6 +284,11 @@ export function LoansPanel() {
         onRetry={() => void loadLoans()}
         emptyMessage="No disbursed loans yet. Approve and disburse an application to see it here."
         noResultsMessage="No loans match your filters."
+        renderRowClassName={(loan) =>
+          isLoanPastDue(loan)
+            ? 'border-b border-[rgba(239,68,68,0.12)] bg-[rgba(239,68,68,0.06)] transition-colors hover:bg-[rgba(239,68,68,0.1)]'
+            : undefined
+        }
         toolbarActions={
           <button
             type="button"

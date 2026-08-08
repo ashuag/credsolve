@@ -10,6 +10,7 @@ import { AppService } from './app.service';
 import { StorageModule } from './common/storage/storage.module';
 import { RedisModule } from './common/redis/redis.module';
 import { IpReputationModule } from './common/ip-reputation/ip-reputation.module';
+import { WafModule } from './common/waf/waf.module';
 import { SmsModule } from './common/sms/sms.module';
 import { VendorApiModule } from './common/vendor/vendor-api.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -36,6 +37,7 @@ import { PrismaModule } from './prisma/prisma.module';
     StorageModule,
     RedisModule,
     IpReputationModule,
+    WafModule,
     SmsModule,
     VendorApiModule,
     AuthModule,

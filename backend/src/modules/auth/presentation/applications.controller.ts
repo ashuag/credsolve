@@ -15,6 +15,7 @@ import { SubmitVerifiedBankUseCase } from '../application/use-cases/submit-verif
 import { SaveBankDetailsUseCase } from '../application/use-cases/save-bank-details.use-case';
 import { SaveKycDocumentsUseCase } from '../application/use-cases/save-kyc-documents.use-case';
 import { SaveKycSelfieUseCase } from '../application/use-cases/save-kyc-selfie.use-case';
+import { SaveKycLivenessVideoUseCase } from '../application/use-cases/save-kyc-liveness-video.use-case';
 import { RunKycLivenessUseCase } from '../application/use-cases/run-kyc-liveness.use-case';
 import { SaveLoanSelectionUseCase } from '../application/use-cases/save-loan-selection.use-case';
 import { SaveProfessionalDetailsDto } from '../application/dto/save-professional-details.dto';
@@ -30,6 +31,7 @@ export class ApplicationsController {
     private readonly saveLoanSelection: SaveLoanSelectionUseCase,
     private readonly saveKycDocuments: SaveKycDocumentsUseCase,
     private readonly saveKycSelfie: SaveKycSelfieUseCase,
+    private readonly saveKycLivenessVideo: SaveKycLivenessVideoUseCase,
     private readonly runKycLiveness: RunKycLivenessUseCase,
     private readonly saveBankDetails: SaveBankDetailsUseCase,
     private readonly lookupIfsc: LookupIfscUseCase,
@@ -87,6 +89,23 @@ export class ApplicationsController {
   @ApiOkResponse({ description: 'Selfie stored under customer UUID / selfie / application UUID' })
   kycSelfieRoute(@Req() req: Request, @UploadedFile() selfie: UploadedFileLike | undefined) {
     return this.saveKycSelfie.execute(req, selfie);
+  }
+
+  @Post('kyc/liveness-video')
+  @RateLimitByRoute('kyc-liveness-video')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    AnyFilesInterceptor({
+      limits: { fileSize: 12 * 1024 * 1024, files: 25 },
+    }),
+  )
+  @ApiOperation({
+    summary:
+      'Store the active-liveness head-movement recording and score head pose across the JPEG frames sampled from the same capture.',
+  })
+  @ApiOkResponse({ description: 'Head-movement score persisted on the application; video stored as an audit artifact' })
+  kycLivenessVideoRoute(@Req() req: Request, @UploadedFiles() files: Array<UploadedFileLike>) {
+    return this.saveKycLivenessVideo.execute(req, files ?? []);
   }
 
   @Post('kyc/liveness')

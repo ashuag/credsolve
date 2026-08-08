@@ -6,6 +6,7 @@ import {
   formatSelfieFaceValidationSummary,
   formatConfidencePercent,
   formatDistance,
+  formatHeadMovementScore,
   formatLaplacianVariance,
 } from '@/lib/kyc-selfie-validation-display';
 
@@ -124,7 +125,9 @@ function activeLivenessStep(row: LosApplicationDetails): KycPipelineStepView {
     };
   }
 
-  if (!liveness?.checkedAt) {
+  const headMovementRecorded = liveness?.headMovementScore != null;
+
+  if (!liveness?.checkedAt && !headMovementRecorded) {
     return {
       id: 'active-liveness',
       stepNumber: 4,
@@ -135,17 +138,18 @@ function activeLivenessStep(row: LosApplicationDetails): KycPipelineStepView {
   }
 
   const summary = formatActiveLivenessOnlySummary(row);
-  let tone: KycPipelineStepTone = 'neutral';
-  if (liveness?.checkedAt) {
-    const passed = liveness.activeLivenessPassed ?? row.livenessPassed;
-    tone = passed ? 'ok' : 'warn';
-  }
+  const passed = liveness?.activeLivenessPassed ?? (liveness?.checkedAt ? row.livenessPassed : null);
+  const tone: KycPipelineStepTone = passed == null ? 'pending' : passed ? 'ok' : 'warn';
 
   let sub: string | undefined;
   if (liveness?.activeLivenessReason && !liveness.activeLivenessPassed) {
     sub = liveness.activeLivenessReason;
   } else if (liveness?.framesAnalyzed != null) {
-    sub = `${liveness.framesWithFace ?? 0}/${liveness.framesAnalyzed} frames with face`;
+    const score =
+      liveness.headMovementScore != null
+        ? `Movement ${formatHeadMovementScore(liveness.headMovementScore)} (min ${formatHeadMovementScore(liveness.headMovementMinScoreRequired)}) · `
+        : '';
+    sub = `${score}${liveness.framesWithFace ?? 0}/${liveness.framesAnalyzed} frames with face`;
   }
 
   return {

@@ -134,6 +134,11 @@ export type LosSelfieFaceValidation = {
   laplacianVariance: number | null;
   minLaplacianVarianceRequired: number;
   blurPassed: boolean | null;
+  meanFaceLuminance: number | null;
+  darkPixelRatio: number | null;
+  minMeanFaceLuminanceRequired: number;
+  maxDarkPixelRatioAllowed: number;
+  lightingPassed: boolean | null;
   confidenceBreakdown: {
     detection: number;
     faceSize: number;
@@ -155,8 +160,14 @@ export type LosLivenessSummary = {
   mode: 'smooth' | 'challenge' | null;
   activeLivenessPassed: boolean | null;
   activeLivenessReason: string | null;
+  /** 0–1 head-movement strength scored from frames sampled during the liveness recording. */
+  headMovementScore: number | null;
+  headMovementMinScoreRequired: number | null;
+  headMovementDirections: string[] | null;
   headTurnLeftDetected: boolean | null;
   headTurnRightDetected: boolean | null;
+  headTiltUpDetected: boolean | null;
+  headTiltDownDetected: boolean | null;
   blinkDetected: boolean | null;
   smileDetected: boolean | null;
   expressionAntiSpoofPassed: boolean | null;

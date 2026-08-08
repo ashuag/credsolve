@@ -1,0 +1,36 @@
+{
+  "description": "Cloudflare custom WAF rules for MoneyCash — apply via dashboard or Terraform. Rule order: skip API challenges first, then block probes.",
+  "rules": [
+    {
+      "ref": "skip-bot-challenge-api",
+      "description": "Skip bot JS challenges on /api/* so browser fetch (send-otp, etc.) is not blocked",
+      "expression": "(http.request.uri.path matches \"^/api/\")",
+      "action": "skip",
+      "action_parameters": {
+        "products": [
+          "bic",
+          "hot",
+          "securityLevel",
+          "uaBlock",
+          "zoneLockdown",
+          "sbfm"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "ref": "block-exploit-probes",
+      "description": "Block obvious path / query exploit probes",
+      "expression": "(http.request.uri.path contains \"../\") or (lower(http.request.uri.query) contains \"union select\") or (lower(http.request.uri.query) contains \"<script\") or (http.request.uri.path contains \"/wp-admin\") or (http.request.uri.path contains \"/.env\")",
+      "action": "block",
+      "enabled": true
+    },
+    {
+      "ref": "rate-limit-send-otp",
+      "description": "Edge rate limit for OTP send (tune thresholds in dashboard)",
+      "expression": "(http.request.uri.path eq \"/api/auth/send-otp\" and http.request.method eq \"POST\")",
+      "action": "managed_challenge",
+      "notes": "Prefer a Rate limiting rule (20/10m per IP) instead of managed_challenge for this path once API skip is active."
+    }
+  ]
+}

@@ -62,7 +62,8 @@ export function computeLaplacianVariance(
   return sumSq / count - mean * mean;
 }
 
-function extractGrayFaceCrop(
+/** Grayscale face crop used by blur + lighting gates (resolution-normalized). */
+export function extractGrayFaceCrop(
   tensor: tf.Tensor3D,
   box: SelfieFaceBox,
   imageWidth: number,

@@ -60,6 +60,13 @@ export type CustomerKycFaceProgress = {
   digilockerAadhaarDownloadMaxAttempts?: number;
   livenessAttempts?: number;
   livenessMaxAttempts?: number;
+  /** When true, KYC stays open until a head-movement clip scores a pass. */
+  headMovementRequired?: boolean;
+  /** Active liveness: a head-movement clip was uploaded and scored (pass or fail). */
+  headMovementCaptured?: boolean;
+  headMovementPassed?: boolean;
+  /** 0–1 movement strength from the last recording; null when never recorded. */
+  headMovementScore?: number | null;
 };
 
 export type CustomerBankVerificationProgress = {
@@ -153,22 +160,76 @@ export function isInternalErrorLead(
   return status === CUSTOMER_LEAD_STATUS.INTERNAL_ERROR;
 }
 
-/** Entry route for the KYC stage (DigiLocker / docs hub). Selfie/liveness removed pending rewrite. */
-export function resolveKycStagePath(
-  _session?: CustomerSessionResponse | null,
-): string {
-  return '/kyc';
+/** True when the customer still has at least one KYC liveness attempt left (including after LOS grant). */
+export function hasKycLivenessRetryRemaining(
+  kyc: CustomerKycFaceProgress | null | undefined,
+): boolean {
+  if (!kyc || kyc.livenessPassed) return false;
+  const max = kyc.livenessMaxAttempts ?? 3;
+  const used = kyc.livenessAttempts ?? 0;
+  return used < max;
 }
 
 /**
- * After DigiLocker / vendor INTERNAL_ERROR, resume KYC hub when DigiLocker is still incomplete.
- * Selfie/liveness resume paths removed pending rewrite.
+ * Head-movement clip still owed. A selfie saved on an earlier visit needs this too, so it is
+ * derived from the session rather than from local capture state.
+ */
+export function isKycHeadMovementPending(
+  kyc: CustomerKycFaceProgress | null | undefined,
+): boolean {
+  if (!kyc?.selfieCaptured || kyc.headMovementPassed === true) return false;
+  return kyc.headMovementRequired === true || kyc.livenessPassed !== true;
+}
+
+/**
+ * Customer should continue on `/kyc/selfie` (DigiLocker done; selfie and/or liveness still pending).
+ * Returns false when the face pipeline finished with no retries left (thank-you).
+ */
+export function shouldResumeKycSelfie(
+  session: CustomerSessionResponse | null | undefined,
+): boolean {
+  if (!session?.authenticated || !session.lead) return false;
+  if (isLeadRejectedAndLocked(session.lead)) return false;
+
+  const journey = session.journey;
+  if (!journey.detailsCompleted || !journey.loanSelectionCompleted) return false;
+  if (!session.lead.emailVerified) return false;
+  if (!isLoanDocumentsJourneyComplete(session)) return false;
+
+  const kyc = session.kycFaceProgress;
+  if (!kyc?.digilockerAadhaarCaptured) return false;
+
+  /**
+   * Liveness already passed, so the retry-exhaustion check below does not apply — it reads
+   * "attempts left" as zero for any passed application. An owed head-movement clip is the only
+   * thing that still brings the customer back to the selfie step.
+   */
+  if (kyc.livenessPassed) return isKycHeadMovementPending(kyc);
+
+  if (kyc.livenessCheckCompleted && !hasKycLivenessRetryRemaining(kyc)) {
+    return false;
+  }
+
+  return !kyc.selfieCaptured || kyc.livenessRequired !== false;
+}
+
+/** Entry route for the KYC stage: selfie when face verification is pending, else DigiLocker hub. */
+export function resolveKycStagePath(
+  session?: CustomerSessionResponse | null,
+): string {
+  return shouldResumeKycSelfie(session) ? '/kyc/selfie' : '/kyc';
+}
+
+/**
+ * Resume `/kyc/selfie` when DigiLocker face pipeline is incomplete after INTERNAL_ERROR,
+ * or DigiLocker hub when Aadhaar is still missing.
  */
 export function canResumeKycAfterInternalError(
   session: CustomerSessionResponse | null | undefined,
 ): boolean {
   if (!session?.authenticated || !session.lead) return false;
   if (!isInternalErrorLead(session.lead)) return false;
+  if (shouldResumeKycSelfie(session)) return true;
   const kyc = session.kycFaceProgress;
   return !kyc?.digilockerAadhaarCaptured;
 }
@@ -231,7 +292,9 @@ export function getCustomerJourneyResumePath(
   }
 
   if (isInternalErrorLead(session.lead)) {
-    if (canResumeKycAfterInternalError(session)) return '/kyc';
+    if (canResumeKycAfterInternalError(session)) {
+      return shouldResumeKycSelfie(session) ? '/kyc/selfie' : '/kyc';
+    }
     return '/thank-you';
   }
 
@@ -240,6 +303,18 @@ export function getCustomerJourneyResumePath(
   if (!journey.loanSelectionCompleted) return '/pre-approved-loan';
   if (!session.lead.emailVerified) return CUSTOMER_EMAIL_JOURNEY_PATH;
   if (!isLoanDocumentsJourneyComplete(session)) return '/loan-documents';
+
+  const kyc = session.kycFaceProgress;
+  if (
+    kyc?.livenessCheckCompleted &&
+    !kyc.livenessPassed &&
+    !hasKycLivenessRetryRemaining(kyc)
+  ) {
+    return '/thank-you';
+  }
+  if (shouldResumeKycSelfie(session)) {
+    return '/kyc/selfie';
+  }
 
   if (!journey.kycCompleted) return resolveKycStagePath(session);
   if (!journey.bankDetailsCompleted) return '/bank-details';
@@ -294,7 +369,9 @@ export function getCustomerPostMobileOtpRedirectPath(
   }
 
   if (isInternalErrorLead(lead, otpLeadStatus)) {
-    if (canResumeKycAfterInternalError(session)) return '/kyc';
+    if (canResumeKycAfterInternalError(session)) {
+      return shouldResumeKycSelfie(session) ? '/kyc/selfie' : '/kyc';
+    }
     return '/thank-you';
   }
 
@@ -354,13 +431,15 @@ export function getCustomerPostAuthResumePath(
 }
 
 /**
- * After DigiLocker Aadhaar fetch, always return to the KYC hub.
- * DigiLocker is one KYC step — do not jump ahead to bank details while KYC may still expand.
+ * After DigiLocker Aadhaar fetch, continue to selfie/liveness when face step is pending.
  */
 export function getPostDigilockerAadhaarContinuePath(
-  _session: Extract<CustomerSessionResponse, { authenticated: true }>
+  session: Extract<CustomerSessionResponse, { authenticated: true }>
 ): string {
-  return '/kyc';
+  if (shouldResumeKycSelfie(session)) {
+    return '/kyc/selfie';
+  }
+  return getCustomerJourneyResumePath(session);
 }
 
 /** Back navigation from the KYC hub (avoid `getCustomerJourneyResumePath` looping to `/kyc`). */

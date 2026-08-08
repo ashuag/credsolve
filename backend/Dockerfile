@@ -1,12 +1,31 @@
 # ── Stage 1: Install dependencies ──
 FROM node:22-bookworm-slim AS deps
 WORKDIR /app
+
+# Native build tools for @tensorflow/tfjs-node (face-api Aadhaar↔selfie match).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    python3 \
+    make \
+    g++ \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev
 
 # ── Stage 2: Build ──
 FROM node:22-bookworm-slim AS builder
 WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    python3 \
+    make \
+    g++ \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY package.json package-lock.json* ./
 RUN npm ci
 COPY . .
@@ -20,7 +39,7 @@ RUN npm run seed:build
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 
-# Install Chromium + fonts for PDF generation
+# Chromium + fonts for PDF generation; libstdc++ for tfjs-node / face-api.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     fonts-liberation \
@@ -28,6 +47,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-noto-color-emoji \
     fonts-indic \
     ca-certificates \
+    libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
@@ -37,7 +57,7 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 # Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser -m appuser
 
-# Copy production dependencies
+# Copy production dependencies (includes @tensorflow/tfjs-node + @vladmandic/face-api models)
 COPY --from=deps /app/node_modules ./node_modules
 
 # Copy built app (output is build/, not dist/)

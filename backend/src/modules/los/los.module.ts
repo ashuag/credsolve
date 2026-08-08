@@ -28,6 +28,7 @@ import { LosRejectionService } from './services/los-rejection.service';
 import { LosDisbursementService } from './services/los-disbursement.service';
 import { LosLoanService } from './services/los-loan.service';
 import { LosCibilDevToolsService } from './services/los-cibil-dev-tools.service';
+import { LosKycDevToolsService } from './services/los-kyc-dev-tools.service';
 import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
 
 @Module({
@@ -57,6 +58,7 @@ import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
     LosDisbursementService,
     LosLoanService,
     LosCibilDevToolsService,
+    LosKycDevToolsService,
     LosVendorApiLogService,
   ],
   exports: [LosSessionService],

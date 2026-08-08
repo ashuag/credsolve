@@ -7,14 +7,22 @@ import {
   Param,
   Post,
   Query,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { UploadedFileLike } from '../../common/types/uploaded-file';
 import { LosAuthGuard } from './auth/los-auth.guard';
 import { CibilVendorFetchCheckDto } from './dto/cibil-vendor-fetch-check.dto';
+import { KycFaceMatchCheckDto } from './dto/kyc-face-match-check.dto';
 import { ListVendorApiLogsQueryDto } from './dto/list-vendor-api-logs-query.dto';
 import { LosCibilDevToolsService } from './services/los-cibil-dev-tools.service';
+import { LosKycDevToolsService } from './services/los-kyc-dev-tools.service';
 import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
+
+const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 
 @ApiTags('LOS Developer Tools')
 @Controller(['los/developer-tools', 'los/los/developer-tools'])
@@ -22,6 +30,7 @@ import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
 export class LosDeveloperToolsController {
   constructor(
     private readonly cibilDevTools: LosCibilDevToolsService,
+    private readonly kycDevTools: LosKycDevToolsService,
     private readonly vendorApiLogs: LosVendorApiLogService,
   ) {}
 
@@ -59,5 +68,35 @@ export class LosDeveloperToolsController {
   })
   async cibilSurepassFetch(@Body() body: CibilVendorFetchCheckDto) {
     return this.cibilDevTools.runSurepassFetch(body);
+  }
+
+  @Post('kyc-face-match-check')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'reference', maxCount: 1 },
+        { name: 'probe', maxCount: 1 },
+      ],
+      { limits: { fileSize: MAX_IMAGE_BYTES } },
+    ),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Dry-run photo quality + Aadhaar↔selfie face match (local face-api only)',
+    description:
+      'Validates reference (Aadhaar) and probe (selfie) for blur, full-face visibility, uncovered landmarks, and confidence score, then compares faces with face-api embeddings. No Tenacio calls; does not update application/KYC records.',
+  })
+  async kycFaceMatchCheck(
+    @UploadedFiles()
+    files: { reference?: UploadedFileLike[]; probe?: UploadedFileLike[] } | undefined,
+    @Body() body: KycFaceMatchCheckDto,
+  ) {
+    return this.kycDevTools.runFaceMatchCheck({
+      reference: files?.reference?.[0],
+      probe: files?.probe?.[0],
+      referenceUrl: body.referenceUrl,
+      probeUrl: body.probeUrl,
+    });
   }
 }

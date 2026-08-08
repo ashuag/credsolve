@@ -1,6 +1,10 @@
 import type { Prisma } from '@prisma/client';
 import type { KycSelfieFaceInspection } from './kyc-selfie-face-validation.util';
 import { KYC_SELFIE_MIN_LAPLACIAN_VARIANCE } from './kyc-selfie-face-blur.util';
+import {
+  KYC_SELFIE_MAX_DARK_PIXEL_RATIO,
+  KYC_SELFIE_MIN_MEAN_FACE_LUMINANCE,
+} from './kyc-selfie-face-lighting.util';
 
 export const KYC_SELFIE_FACE_RETRY_HINT =
   'Please try one more time — keep your full face visible and do not cover your eyes, nose, or mouth.';
@@ -27,6 +31,13 @@ export function toPersistedSelfieFaceInspection(
     laplacianVariance: inspection.laplacianVariance,
     minLaplacianVarianceRequired: inspection.minLaplacianVarianceRequired,
     blurPassed: inspection.blurPassed,
+    meanFaceLuminance: inspection.meanFaceLuminance,
+    darkPixelRatio: inspection.darkPixelRatio,
+    luminanceStd: inspection.luminanceStd,
+    highlightP90: inspection.highlightP90,
+    minMeanFaceLuminanceRequired: inspection.minMeanFaceLuminanceRequired,
+    maxDarkPixelRatioAllowed: inspection.maxDarkPixelRatioAllowed,
+    lightingPassed: inspection.lightingPassed,
     topDetectionScore: topScore,
     checkedAt: new Date().toISOString(),
   };
@@ -41,6 +52,11 @@ export type PersistedSelfieFaceValidation = {
   laplacianVariance: number | null;
   minLaplacianVarianceRequired: number;
   blurPassed: boolean | null;
+  meanFaceLuminance: number | null;
+  darkPixelRatio: number | null;
+  minMeanFaceLuminanceRequired: number;
+  maxDarkPixelRatioAllowed: number;
+  lightingPassed: boolean | null;
   confidenceBreakdown: {
     detection: number;
     faceSize: number;
@@ -66,6 +82,11 @@ export function parsePersistedSelfieFaceValidation(
       laplacianVariance: null,
       minLaplacianVarianceRequired: KYC_SELFIE_MIN_LAPLACIAN_VARIANCE,
       blurPassed: null,
+      meanFaceLuminance: null,
+      darkPixelRatio: null,
+      minMeanFaceLuminanceRequired: KYC_SELFIE_MIN_MEAN_FACE_LUMINANCE,
+      maxDarkPixelRatioAllowed: KYC_SELFIE_MAX_DARK_PIXEL_RATIO,
+      lightingPassed: null,
       confidenceBreakdown: null,
     };
   }
@@ -98,6 +119,17 @@ export function parsePersistedSelfieFaceValidation(
         ? row.minLaplacianVarianceRequired
         : KYC_SELFIE_MIN_LAPLACIAN_VARIANCE,
     blurPassed: typeof row.blurPassed === 'boolean' ? row.blurPassed : null,
+    meanFaceLuminance: typeof row.meanFaceLuminance === 'number' ? row.meanFaceLuminance : null,
+    darkPixelRatio: typeof row.darkPixelRatio === 'number' ? row.darkPixelRatio : null,
+    minMeanFaceLuminanceRequired:
+      typeof row.minMeanFaceLuminanceRequired === 'number'
+        ? row.minMeanFaceLuminanceRequired
+        : KYC_SELFIE_MIN_MEAN_FACE_LUMINANCE,
+    maxDarkPixelRatioAllowed:
+      typeof row.maxDarkPixelRatioAllowed === 'number'
+        ? row.maxDarkPixelRatioAllowed
+        : KYC_SELFIE_MAX_DARK_PIXEL_RATIO,
+    lightingPassed: typeof row.lightingPassed === 'boolean' ? row.lightingPassed : null,
     confidenceBreakdown,
   };
 }

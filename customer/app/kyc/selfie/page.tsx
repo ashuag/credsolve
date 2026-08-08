@@ -12,10 +12,28 @@ import styles from '@/components/kyc/kyc-hub-flow.module.css';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { AlertBanner } from '@/components/ui/alert-banner';
 import { Spinner } from '@/components/ui/spinner';
-import { getCustomerJourneyResumePath } from '@/lib/api/customer-session';
-import { pickLivenessFailureUserMessage, postKycLiveness, postKycSelfie } from '@/lib/api/kyc-face';
+import {
+  getCustomerJourneyResumePath,
+  isKycHeadMovementPending,
+} from '@/lib/api/customer-session';
+import {
+  pickLivenessFailureUserMessage,
+  postKycLiveness,
+  postKycLivenessVideo,
+  postKycSelfie,
+  type KycPhotoQualitySummary,
+} from '@/lib/api/kyc-face';
+import { formatAddressForDisplay } from '@/lib/format-address';
 import { kycJourneyProgressFromSession } from '@/lib/kyc-journey-progress';
 import { openUserCamera, openUserCameraErrorMessage } from '@/lib/media/open-user-camera';
+import {
+  headMovementRecordingErrorMessage,
+  isHeadMovementRecordingSupported,
+  recordHeadMovement,
+} from '@/lib/media/record-head-movement';
+
+/** Camera stays open through the head-movement recording, then closes for the liveness call. */
+type CapturePhase = 'selfie' | 'head-movement' | 'done';
 
 function dataUrlToFile(dataUrl: string, name: string): File {
   const [head, b64] = dataUrl.split(',');
@@ -66,7 +84,7 @@ function digilockerAadhaarIdentityBag(form: unknown): {
     name,
     dob: formatDobDdMmYyyy(dobRaw),
     gender: formatAadhaarGenderLabel(genderRaw),
-    fullAddress,
+    fullAddress: formatAddressForDisplay(fullAddress),
   };
 }
 
@@ -104,9 +122,19 @@ function KycSelfieContent() {
   const [retakeSelfie, setRetakeSelfie] = useState(false);
   /** Shown immediately after capture so the UI does not flash the previous cached selfie. */
   const [pendingSelfiePreview, setPendingSelfiePreview] = useState<string | null>(null);
-  const [suggestRetake, setSuggestRetake] = useState(false);
+  /**
+   * Holds the webcam open across the face checks that run straight after capture, so a pass
+   * flows into the head-movement recording on the same stream instead of reopening the camera.
+   */
+  const [holdCamera, setHoldCamera] = useState(false);
+  const [phase, setPhase] = useState<CapturePhase>('selfie');
+  const [recordingPct, setRecordingPct] = useState(0);
+  const [selfieQuality, setSelfieQuality] = useState<KycPhotoQualitySummary | null>(null);
+  const [headMovementScore, setHeadMovementScore] = useState<number | null>(null);
 
   const navigatingRef = useRef(false);
+  /** Verifies a previously saved selfie once per visit, not on every session refresh. */
+  const autoVerifyRef = useRef(false);
 
   const loanSelection = session?.authenticated === true ? session.loanSelection : null;
   const { progressPct, activeStepIndex } = useMemo(
@@ -140,11 +168,13 @@ function KycSelfieContent() {
   }, []);
 
   const selfieAlreadySaved = kyc?.selfieCaptured === true;
+  const cameraNeededForSelfie = !selfieAlreadySaved || retakeSelfie;
   const needsWebcamStream =
     !loading &&
     session?.authenticated === true &&
     kyc != null &&
-    (!selfieAlreadySaved || retakeSelfie);
+    phase !== 'done' &&
+    (cameraNeededForSelfie || phase === 'head-movement' || holdCamera);
 
   useEffect(() => {
     let cancelled = false;
@@ -194,46 +224,111 @@ function KycSelfieContent() {
     router.replace(getCustomerJourneyResumePath(next));
   }
 
+  /**
+   * A selfie saved on an earlier visit still needs the head-movement clip. Without this the
+   * step is only reachable in the same browser session that uploaded the selfie.
+   */
+  const headMovementPending = isKycHeadMovementPending(kyc);
+
   useEffect(() => {
     if (loading || busy || session?.authenticated !== true || retakeSelfie) return;
+    if (phase === 'head-movement' || headMovementPending) return;
     const progress = session.kycFaceProgress;
     if (!progress?.selfieCaptured) return;
     if (progress.livenessRequired === false || progress.livenessPassed) {
       void continueToNextStep();
     }
-  }, [loading, busy, session, retakeSelfie]);
+  }, [loading, busy, session, retakeSelfie, phase, headMovementPending]);
 
-  async function runLivenessCheck(): Promise<boolean> {
+  /**
+   * The face pipeline already accepted this selfie, so the clip is the only gate left. Re-running
+   * the pipeline would return "already complete" and skip straight past the recording.
+   */
+  useEffect(() => {
+    if (loading || busy || retakeSelfie) return;
+    if (phase !== 'selfie' || !headMovementPending) return;
+    if (kyc?.livenessPassed !== true) return;
+    setPhase('head-movement');
+  }, [loading, busy, retakeSelfie, phase, headMovementPending, kyc?.livenessPassed]);
+
+  /**
+   * A selfie saved on an earlier visit has not been through the gates in this browser session.
+   * Verify it in order on arrival so a photo problem is reported before the head-movement card,
+   * rather than letting the customer record a clip against a selfie that cannot pass.
+   */
+  useEffect(() => {
+    if (loading || busy || retakeSelfie || autoVerifyRef.current) return;
+    if (session?.authenticated !== true || phase !== 'selfie') return;
+    const progress = session.kycFaceProgress;
+    if (!progress?.selfieCaptured) return;
+    if (progress.livenessRequired === false || progress.livenessPassed) return;
+
+    autoVerifyRef.current = true;
+    void (async () => {
+      setBusy(true);
+      setBusyLabel('Checking your photo…');
+      try {
+        if ((await runFaceChecks()) !== 'passed') return;
+        setPhase('done');
+        await continueToNextStep();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Face verification failed.');
+      } finally {
+        setBusy(false);
+        setBusyLabel('');
+      }
+    })();
+  }, [loading, busy, retakeSelfie, session, phase]);
+
+  /**
+   * Photo quality first, then the Aadhaar face match, then head movement — the same order the
+   * server applies. A photo problem is reported before the customer is asked for a recording.
+   */
+  async function runFaceChecks(): Promise<'passed' | 'head-movement' | 'failed'> {
     const out = await postKycLiveness();
     if (!out) {
       setError('Empty response from liveness.');
-      return false;
+      return 'failed';
     }
     if (!out.configured) {
       setError(out.skipReason ?? 'Liveness is not configured on the server.');
-      return false;
+      return 'failed';
     }
+
+    if (out.suggestRetryHeadMovement) {
+      // Photo checks and the Aadhaar match passed; only the clip is outstanding.
+      setSelfieQuality(null);
+      setHeadMovementScore(out.headMovementScore ?? null);
+      setPhase('head-movement');
+      // Nothing has been recorded yet on a first pass, so the card's instructions are enough.
+      setError(out.headMovementCaptured ? (out.headMovementMessage ?? '') : '');
+      return 'head-movement';
+    }
+
+    if (out.livenessPassed) {
+      setSelfieQuality(null);
+      return 'passed';
+    }
+
+    // Quality or match failed: surface the specific reason and reopen the camera to retry.
+    setSelfieQuality(out.selfieQuality ?? null);
+    setError(pickLivenessFailureUserMessage(out));
     if (
       out.suggestRetrySelfie ||
       out.faceValidationPassed === false ||
-      out.faceMatchPassed === false ||
-      out.authenticityPassed === false
+      out.faceMatchPassed === false
     ) {
-      setSuggestRetake(true);
+      setPhase('selfie');
       setRetakeSelfie(true);
       setPendingSelfiePreview(null);
-      stopCamera();
     }
-    if (!out.livenessPassed) {
-      setError(pickLivenessFailureUserMessage(out));
-      await refresh();
-      return false;
-    }
-    return true;
+    await refresh();
+    return 'failed';
   }
 
   async function handleCapture() {
     setError('');
+    setSelfieQuality(null);
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || !cameraReady) {
@@ -255,6 +350,7 @@ function KycSelfieContent() {
     }
     ctx.drawImage(video, 0, 0, w, h);
     setBusy(true);
+    setHoldCamera(true);
     setBusyLabel('Saving selfie…');
     try {
       const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
@@ -265,40 +361,116 @@ function KycSelfieContent() {
         setError('Selfie upload did not complete.');
         return;
       }
-      setSuggestRetake(false);
       setRetakeSelfie(false);
-      stopCamera();
+      setHeadMovementScore(null);
+      setRecordingPct(0);
+      await refresh();
 
-      const refreshed = await refresh();
+      // Quality and match are checked now, so the head-movement card is only offered for a
+      // selfie that has already been accepted.
+      setBusyLabel('Checking your photo…');
+      const outcome = await runFaceChecks();
       setPendingSelfiePreview(null);
-      if (!refreshed.authenticated) return;
-
-      const livenessLabel =
-        refreshed.kycFaceProgress?.livenessRequired !== false
-          ? 'Running local face checks, then Tenacio liveness…'
-          : 'Running local face checks…';
-      setBusyLabel(livenessLabel);
-      const passed = await runLivenessCheck();
-      if (!passed) return;
-
-      await continueToNextStep();
+      if (outcome === 'passed') {
+        setPhase('done');
+        await continueToNextStep();
+      }
     } catch (e) {
       setPendingSelfiePreview(null);
       const msg = e instanceof Error ? e.message : 'Selfie upload failed.';
       setError(msg);
     } finally {
       setBusy(false);
+      setHoldCamera(false);
       setBusyLabel('');
+    }
+  }
+
+  async function finishAfterHeadMovement() {
+    const refreshed = await refresh();
+    if (!refreshed.authenticated) return;
+
+    // Head movement was the only outstanding check: the face pipeline already ran for this
+    // selfie, and re-running it would be rejected as an already-complete step.
+    if (refreshed.kycFaceProgress?.livenessPassed !== true) {
+      setBusyLabel('Running face checks…');
+      // A failure here keeps the camera and the current stage, so the customer can retry.
+      if ((await runFaceChecks()) !== 'passed') return;
+    }
+
+    setPhase('done');
+    stopCamera();
+    await continueToNextStep();
+  }
+
+  async function handleHeadMovement() {
+    setError('');
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || !cameraReady) {
+      setError('Camera is not ready yet.');
+      return;
+    }
+    const stream = streamRef.current;
+    if (!stream) {
+      setError('Camera stream is no longer available. Reload the page and try again.');
+      return;
+    }
+    if (!isHeadMovementRecordingSupported()) {
+      setError(headMovementRecordingErrorMessage('unsupported'));
+      return;
+    }
+
+    setBusy(true);
+    setBusyLabel('Recording — keep moving your head…');
+    setRecordingPct(0);
+    try {
+      const result = await recordHeadMovement({
+        stream,
+        video,
+        canvas,
+        onProgress: (elapsedMs, durationMs) =>
+          setRecordingPct(Math.round((elapsedMs / durationMs) * 100)),
+      });
+      if (!result.ok) {
+        setError(headMovementRecordingErrorMessage(result.reason));
+        return;
+      }
+
+      setBusyLabel('Checking your head movement…');
+      const out = await postKycLivenessVideo(
+        result.recording.videoFile,
+        result.recording.frameFiles,
+      );
+      if (!out?.success) {
+        setError('Head-movement upload did not complete.');
+        return;
+      }
+
+      setHeadMovementScore(out.score);
+      if (!out.passed) {
+        setError(out.reason ?? 'We did not detect enough head movement. Please record again.');
+        return;
+      }
+
+      setBusyLabel('Running face checks…');
+      await finishAfterHeadMovement();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Head-movement check failed.');
+    } finally {
+      setBusy(false);
+      setBusyLabel('');
+      setRecordingPct(0);
     }
   }
 
   async function handleLiveness() {
     setError('');
     setBusy(true);
-    setBusyLabel('Running local face checks, then Tenacio liveness…');
+    setBusyLabel('Checking your photo…');
     try {
-      const passed = await runLivenessCheck();
-      if (!passed) return;
+      if ((await runFaceChecks()) !== 'passed') return;
+      setPhase('done');
       await continueToNextStep();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Liveness request failed.');
@@ -333,7 +505,9 @@ function KycSelfieContent() {
   function handleRetakeSelfie() {
     setError('');
     setPendingSelfiePreview(null);
-    setSuggestRetake(false);
+    setSelfieQuality(null);
+    setHeadMovementScore(null);
+    setPhase('selfie');
     setRetakeSelfie(true);
   }
 
@@ -363,11 +537,9 @@ function KycSelfieContent() {
 
           <div className={`${styles.selfiePanel} ${styles.reveal} ${styles.d3} grid gap-4`}>
             {error ? <AlertBanner variant="error">{error}</AlertBanner> : null}
-            {suggestRetake && !busy ? (
-              <AlertBanner variant="error">
-                Your selfie did not pass our on-server checks (face validation or Aadhaar match). Take a new photo with
-                your full face visible, then we will run liveness again.
-              </AlertBanner>
+
+            {selfieQuality && !selfieQuality.ok && !busy ? (
+              <SelfieQualityChecklist quality={selfieQuality} />
             ) : null}
 
             {photoHref || hasAadhaarDetails ? (
@@ -426,7 +598,7 @@ function KycSelfieContent() {
             ) : null}
             <canvas ref={canvasRef} className="hidden" />
 
-            {needsWebcamStream ? (
+            {needsWebcamStream && phase !== 'head-movement' ? (
               <button
                 type="button"
                 disabled={busy || !cameraReady}
@@ -437,6 +609,50 @@ function KycSelfieContent() {
               </button>
             ) : null}
 
+            {phase === 'head-movement' ? (
+              <div className="grid gap-3 rounded-2xl border border-[rgba(18,36,79,0.12)] bg-white/90 p-4">
+                <div>
+                  <p className="m-0 text-sm font-semibold text-brand-navy">Head movement check</p>
+                  <p className="m-0 mt-1 text-sm text-brand-muted">
+                    Your selfie passed our photo checks and matches your Aadhaar photo. Last step — record a
+                    short clip: slowly move your head in any direction, turning left and right or nodding up
+                    and down, while looking at the camera.
+                  </p>
+                </div>
+
+                {busy && recordingPct > 0 ? (
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-[rgba(18,36,79,0.08)]">
+                    <div
+                      className="h-full rounded-full bg-[#1496f3] transition-[width] duration-200"
+                      style={{ width: `${recordingPct}%` }}
+                    />
+                  </div>
+                ) : null}
+
+                {headMovementScore != null ? (
+                  <p className="m-0 text-sm text-brand-muted">
+                    Movement score:{' '}
+                    <span className="font-semibold text-brand-navy">
+                      {Math.round(headMovementScore * 100)}%
+                    </span>
+                  </p>
+                ) : null}
+
+                <button
+                  type="button"
+                  disabled={busy || !cameraReady}
+                  onClick={() => void handleHeadMovement()}
+                  className="mc-btn-primary"
+                >
+                  {busy
+                    ? busyLabel || 'Please wait…'
+                    : headMovementScore != null
+                      ? 'Record again'
+                      : 'Start head movement check'}
+                </button>
+              </div>
+            ) : null}
+
             {busy && busyLabel && !needsWebcamStream ? (
               <div className="flex items-center justify-center gap-3 rounded-2xl border border-[rgba(18,36,79,0.1)] bg-white/80 p-4">
                 <Spinner size={28} />
@@ -444,7 +660,7 @@ function KycSelfieContent() {
               </div>
             ) : null}
 
-            {selfieAlreadySaved && !retakeSelfie && !livenessRetryNeeded ? (
+            {selfieAlreadySaved && !retakeSelfie && !livenessRetryNeeded && phase !== 'head-movement' ? (
               <button
                 type="button"
                 className="text-sm font-semibold text-[#1496f3] underline-offset-2 hover:underline bg-transparent border-0 p-0 cursor-pointer text-left"
@@ -465,7 +681,7 @@ function KycSelfieContent() {
               </button>
             ) : null}
 
-            {livenessRetryNeeded && !retakeSelfie ? (
+            {livenessRetryNeeded && !retakeSelfie && phase !== 'head-movement' ? (
               <div className="grid gap-3 rounded-2xl border border-[rgba(18,36,79,0.12)] bg-white/90 p-4">
                 <p className="m-0 text-sm text-brand-muted">
                   Selfie saved. Face liveness did not pass or was not completed — retry with the same photo, or take a
@@ -494,6 +710,67 @@ function KycSelfieContent() {
           </div>
         </section>
       </div>
+    </div>
+  );
+}
+
+/** Per-gate results from the on-server photo checks, so the customer knows what to fix. */
+function SelfieQualityChecklist({ quality }: { quality: KycPhotoQualitySummary }) {
+  const rows: Array<{ label: string; passed: boolean; hint: string }> = [
+    {
+      label: 'Only one person in frame',
+      passed: !quality.dualFaceDetected,
+      hint:
+        quality.faceCount > 1
+          ? `${quality.faceCount} faces detected — make sure nobody else is visible`
+          : 'Make sure nobody else is visible behind you',
+    },
+    {
+      label: 'Full face visible',
+      passed: quality.fullFaceDetected,
+      hint: 'Move closer so your whole face fills the frame',
+    },
+    {
+      label: 'Face not covered',
+      passed: quality.faceNotCovered,
+      hint: 'Remove masks, sunglasses, or anything covering your eyes, nose, or mouth',
+    },
+    {
+      label: 'Photo is sharp',
+      passed: quality.blurPassed !== false,
+      hint: 'Hold your phone steady and let the camera focus',
+    },
+    {
+      label: 'Lighting is good',
+      passed: quality.lightingPassed !== false,
+      hint: 'Face a window or light source so your face is evenly lit',
+    },
+  ];
+
+  return (
+    <div className="grid gap-2 rounded-2xl border border-[rgba(220,38,38,0.25)] bg-[rgba(220,38,38,0.04)] p-4">
+      <p className="m-0 text-sm font-semibold text-brand-navy">Photo checks</p>
+      <ul className="m-0 grid list-none gap-1.5 p-0">
+        {rows.map((row) => (
+          <li key={row.label} className="flex items-start gap-2 text-sm">
+            <span aria-hidden className={row.passed ? 'text-emerald-600' : 'text-red-600'}>
+              {row.passed ? '✓' : '✕'}
+            </span>
+            <span className={row.passed ? 'text-brand-muted' : 'text-brand-navy'}>
+              {row.label}
+              {row.passed ? null : <span className="block text-brand-muted">{row.hint}</span>}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {quality.qualityScore != null ? (
+        <p className="m-0 text-sm text-brand-muted">
+          Photo quality score:{' '}
+          <span className="font-semibold text-brand-navy">
+            {Math.round(quality.qualityScore * 100)}%
+          </span>
+        </p>
+      ) : null}
     </div>
   );
 }

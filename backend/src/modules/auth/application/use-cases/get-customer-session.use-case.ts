@@ -11,7 +11,6 @@ import {
   APPLICATION_KYC_STATUS,
 } from '../../../../common/constants/application.constants';
 import { isDigilockerAadhaarCaptureComplete } from '../../../../common/kyc/aadhaar-vendor-parse.util';
-import { isKycLivenessOutboundSkipped } from '../../../../common/kyc/kyc-liveness-env.util';
 import {
   formatLeadDetailForPortal,
   isLeadEmailVerifiedForPortal,
@@ -27,9 +26,15 @@ import { LeadRepository } from '../../infrastructure/repositories/lead.repositor
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
 import {
   DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS,
+  KYC_LIVENESS_MAX_ATTEMPTS,
 } from '../../../../common/constants/kyc.constants';
 import { VendorInternalErrorService } from '../../../../common/vendor/vendor-internal-error.service';
 import { resolveLiveTenureDays } from '../../../../common/loan/loan-calculation.util';
+import {
+  extractActiveLivenessBlock,
+  readHeadMovementSnapshot,
+} from '../../../../common/kyc/kyc-head-movement.util';
+import { isKycHeadMovementRequired } from '../../../../common/kyc/kyc-liveness-env.util';
 import { fetchLatestApplicationKycSnapshot } from '../../../../prisma/application-kyc-snapshot.query';
 import { PrismaService } from '../../../../prisma/prisma.service';
 
@@ -265,15 +270,18 @@ export class GetCustomerSessionUseCase {
       application?.digilockerAadhaarFormJson ?? null,
     );
     const hasSavedSelfie = Boolean(application?.selfieRelativePath?.trim());
-    const livenessOutboundSkipped = isKycLivenessOutboundSkipped();
+    const headMovement = readHeadMovementSnapshot(
+      extractActiveLivenessBlock(application?.livenessVendorJson),
+    );
     const livenessPassed = application?.livenessPassed === true;
     const livenessCheckCompleted = application?.livenessCheckCompleted === true;
     const livenessAttempts = application?.livenessAttempts ?? 0;
+    const headMovementRequired = isKycHeadMovementRequired();
+    /** When gated on, the face step stays open until a head-movement clip scores a pass. */
+    const headMovementSatisfied = !headMovementRequired || headMovement.passed;
+    /** DigiLocker + selfie + local Aadhaar face match (`livenessPassed`). Tenacio skip ≠ complete. */
     const faceStepCompleteForJourney = Boolean(
-      application &&
-        digilockerCaptured &&
-        hasSavedSelfie &&
-        (livenessPassed || livenessOutboundSkipped),
+      application && digilockerCaptured && hasSavedSelfie && livenessPassed && headMovementSatisfied,
     );
 
     /**
@@ -302,8 +310,10 @@ export class GetCustomerSessionUseCase {
       faceStepCompleteForJourney ||
         (Number(applicationKycStatus) === Number(APPLICATION_KYC_STATUS.COMPLETED) &&
           digilockerCaptured &&
-          hasSavedSelfie) ||
-        (latestCustomerKyc && kycDocsCount >= 3 && (livenessPassed || livenessOutboundSkipped)),
+          hasSavedSelfie &&
+          livenessPassed &&
+          headMovementSatisfied) ||
+        (latestCustomerKyc && kycDocsCount >= 3 && livenessPassed && headMovementSatisfied),
     );
 
     const leadReferences = leadReferenceRows.map((row) => ({
@@ -360,7 +370,8 @@ export class GetCustomerSessionUseCase {
             selfieCaptured: hasSavedSelfie,
             livenessPassed,
             livenessCheckCompleted,
-            livenessRequired: !livenessOutboundSkipped,
+            /** Always require the face pipeline (local Aadhaar↔selfie match); Tenacio may still be skipped. */
+            livenessRequired: true,
             digilockerAadhaarForm: application.digilockerAadhaarFormJson ?? null,
             digilockerAadhaarPhotoUrl: application.aadhaarPhotoRelativePath?.trim()
               ? '/auth/kyc/digilocker-aadhaar-photo'
@@ -373,7 +384,11 @@ export class GetCustomerSessionUseCase {
             digilockerAadhaarDownloadAttempts,
             digilockerAadhaarDownloadMaxAttempts: DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS,
             livenessAttempts,
-            livenessMaxAttempts: 0,
+            livenessMaxAttempts: KYC_LIVENESS_MAX_ATTEMPTS,
+            headMovementRequired,
+            headMovementCaptured: headMovement.captured,
+            headMovementPassed: headMovement.passed,
+            headMovementScore: headMovement.score,
           }
         : null;
 

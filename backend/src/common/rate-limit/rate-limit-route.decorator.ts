@@ -18,6 +18,7 @@ export type RateLimitRouteId =
   | 'kyc-documents'
   | 'kyc-selfie'
   | 'kyc-liveness'
+  | 'kyc-liveness-video'
   | 'bank-details'
   | 'bank-ifsc-lookup'
   | 'bank-submit-verified'
