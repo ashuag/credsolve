@@ -384,7 +384,22 @@ function formatPercent(value: string | null | undefined): string | null {
 function FeeStack({ row }: { row: LosLoanDetails }) {
   const processingFeePct = formatPercent(row.processingFeePercentage);
   const gstPct = formatPercent(row.gstPercentage);
-  const lines = [
+  const penal = Number(row.penalAmount);
+  const hasPenal = Number.isFinite(penal) && penal > 0;
+  const ratePerDay = Number(row.bounceRatePerDayInr);
+  // Flag the ceiling so an unchanging figure does not read as a stalled calculation.
+  const capped = hasPenal && ratePerDay > 0 && ratePerDay * row.overdueDays > penal;
+  const bounceLabel =
+    ratePerDay > 0
+      ? `Bounce charge (${formatINRExact(row.bounceRatePerDayInr)}/day × ${row.overdueDays})`
+      : 'Bounce charge';
+  const lines: Array<{
+    label: string;
+    value: string;
+    strong?: boolean;
+    muted?: boolean;
+    accent?: string;
+  }> = [
     { label: 'Principal sanctioned', value: formatINR(row.principalAmount), strong: true },
     {
       label: processingFeePct ? `Processing fee (${processingFeePct})` : 'Processing fee',
@@ -399,6 +414,22 @@ function FeeStack({ row }: { row: LosLoanDetails }) {
     { label: 'Net disbursed to bank', value: formatINR(row.netDisbursedAmount), accent: '#047857' },
     { label: 'Interest', value: `+ ${formatINR(row.interestAmount)}`, muted: true },
     { label: 'Total repayable', value: formatINR(row.totalRepaymentAmount), accent: '#1c347d', strong: true },
+    // Only charged once the loan is past due, so the rows stay hidden on a healthy loan.
+    ...(hasPenal
+      ? [
+          {
+            label: capped ? `${bounceLabel} — capped` : bounceLabel,
+            value: `+ ${formatINRExact(row.penalAmount)}`,
+            accent: '#b91c1c',
+          },
+          {
+            label: 'Total repayable + bounce',
+            value: formatINR(row.totalRepaymentWithPenalAmount),
+            accent: '#b91c1c',
+            strong: true,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -623,7 +654,13 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
         <MoneyTile
           label="Outstanding"
           value={formatINR(row.outstandingAmount)}
-          hint={Number(row.outstandingAmount) > 0 ? 'Still to collect' : 'Nothing due'}
+          hint={
+            Number(row.outstandingAmount) <= 0
+              ? 'Nothing due'
+              : Number(row.penalAmount) > 0
+                ? `Incl. bounce ${formatINRExact(row.penalAmount)}`
+                : 'Still to collect'
+          }
           accent={Number(row.outstandingAmount) > 0 ? '#b45309' : '#047857'}
           emphasis
         />
@@ -659,7 +696,7 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
             </p>
             <p className="m-0 mt-1 text-[0.72rem] font-semibold text-brand-muted">
               {Number(row.bounceFeeInr) > 0
-                ? `Principal + interest + bounce (${formatINRExact(row.bounceFeeInr)})`
+                ? `Principal + interest + bounce (${formatINRExact(row.bounceRatePerDayInr)}/day × ${row.overdueDays} = ${formatINRExact(row.bounceFeeInr)})`
                 : 'Principal + interest till today'}
             </p>
           </div>

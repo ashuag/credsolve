@@ -24,10 +24,16 @@ export function formatBounceAmountBand(minAmountInr: number, maxAmountInr: numbe
 }
 
 /**
- * Resolve bounce fee for an amount from active tiers.
+ * Ceiling on accrued bounce charge, mirroring the "Maximum penal charge" line in the sanction
+ * letter cum KFS. Without it a long-overdue small loan accrues more penalty than principal.
+ */
+export const MAX_BOUNCE_CHARGE_INR = 3_000;
+
+/**
+ * Resolve the per-day bounce rate for an amount from active tiers.
  * Band is inclusive on both ends when max is set; open upper bound when max is null.
  */
-export function resolveBounceFeeInr(
+export function resolveBounceRatePerDayInr(
   amountInr: number,
   tiers: BounceChargeTierRow[],
 ): number {
@@ -49,6 +55,22 @@ export function resolveBounceFeeInr(
   return 0;
 }
 
+/**
+ * Bounce charge accrued over `overdueDays` at the tier rate for the principal band, capped at
+ * {@link MAX_BOUNCE_CHARGE_INR}. Zero while the loan is still within term.
+ */
+export function computeBounceChargeInr(
+  amountInr: number,
+  overdueDays: number,
+  tiers: BounceChargeTierRow[],
+): number {
+  if (!Number.isFinite(overdueDays) || overdueDays <= 0) return 0;
+  const ratePerDay = resolveBounceRatePerDayInr(amountInr, tiers);
+  if (!(ratePerDay > 0)) return 0;
+  const accrued = Math.min(ratePerDay * overdueDays, MAX_BOUNCE_CHARGE_INR);
+  return Math.round(accrued * 100) / 100;
+}
+
 /** True when IST calendar day is after the loan maturity date (due day itself is still on time). */
 export function isRepaymentPastDue(
   loanMaturityDate: Date,
@@ -61,6 +83,29 @@ export function isRepaymentPastDue(
     loanMaturityDate.getUTCDate(),
   );
   return today.getTime() > maturity;
+}
+
+/**
+ * Signed IST calendar days until maturity: positive before the due day, 0 on it, negative once
+ * past due. IST matters because a UTC-clocked server rolls the day over 5.5 hours late.
+ */
+export function daysToMaturityIst(loanMaturityDate: Date, asOf: Date = new Date()): number {
+  const today = istCalendarDateUtc(asOf);
+  const maturity = Date.UTC(
+    loanMaturityDate.getUTCFullYear(),
+    loanMaturityDate.getUTCMonth(),
+    loanMaturityDate.getUTCDate(),
+  );
+  return Math.round((maturity - today.getTime()) / 86_400_000);
+}
+
+/** IST calendar days past maturity; 0 on or before the due day (due day itself is on time). */
+export function overdueDaysFromMaturity(
+  loanMaturityDate: Date,
+  asOf: Date = new Date(),
+): number {
+  const days = -daysToMaturityIst(loanMaturityDate, asOf);
+  return days > 0 ? days : 0;
 }
 
 /** HTML table body rows for bounce schedule (escaped). */

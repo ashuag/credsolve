@@ -211,6 +211,34 @@ export function LoansPanel() {
       render: (loan) => formatINR(loan.netDisbursedAmount),
     },
     {
+      key: 'repaymentWithPenal',
+      label: 'Repayment + penal',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.totalRepaymentWithPenalAmount ?? '',
+      getSortValue: (row) => {
+        const n = Number(row.totalRepaymentWithPenalAmount);
+        return Number.isFinite(n) ? n : null;
+      },
+      filter: false,
+      cellClassName: 'whitespace-nowrap',
+      render: (loan) => {
+        const penal = Number(loan.penalAmount);
+        const hasPenal = Number.isFinite(penal) && penal > 0;
+        return (
+          <>
+            <div className={hasPenal ? 'font-bold text-[#b91c1c]' : 'font-bold text-brand-text'}>
+              {formatINR(loan.totalRepaymentWithPenalAmount)}
+            </div>
+            {hasPenal ? (
+              <div className="text-[0.72rem] text-brand-muted mt-0.5">
+                incl. {formatINR(loan.penalAmount)} bounce ({formatINR(loan.bounceRatePerDayInr)}/day)
+              </div>
+            ) : null}
+          </>
+        );
+      },
+    },
+    {
       key: 'repayBy',
       label: 'Repay by',
       headerClassName: 'whitespace-nowrap',
@@ -226,6 +254,23 @@ export function LoansPanel() {
           </span>
         );
       },
+    },
+    {
+      key: 'overdueDays',
+      label: 'Overdue days',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => (row.overdueDays > 0 ? String(row.overdueDays) : ''),
+      getSortValue: (row) => row.overdueDays ?? 0,
+      filter: false,
+      cellClassName: 'whitespace-nowrap',
+      render: (loan) =>
+        loan.overdueDays > 0 ? (
+          <span className="font-bold text-[#b91c1c]">
+            {loan.overdueDays} {loan.overdueDays === 1 ? 'day' : 'days'}
+          </span>
+        ) : (
+          <span className="text-brand-muted">—</span>
+        ),
     },
     {
       key: 'status',

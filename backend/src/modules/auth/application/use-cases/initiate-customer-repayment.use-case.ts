@@ -18,7 +18,10 @@ import {
   computeAmountDueNowInr,
   decimalToNumber,
 } from '../../../../common/loan/loan-calculation.util';
-import { isRepaymentPastDue } from '../../../../common/loan/bounce-charge.util';
+import {
+  isRepaymentPastDue,
+  overdueDaysFromMaturity,
+} from '../../../../common/loan/bounce-charge.util';
 import { BounceChargeTierResolverService } from '../../../../common/loan/bounce-charge-tier.resolver';
 import { canDeactivateConvertedLeadForReapply } from '../../../../common/loan/customer-open-loan.util';
 import { RedisService } from '../../../../common/redis/redis.service';
@@ -147,12 +150,17 @@ export class InitiateCustomerRepaymentUseCase {
       throw new BadRequestException('Nothing due on this loan right now.');
     }
 
-    // Late repayment (after maturity / OVERDUE): add bounce fee from schedule by principal band.
+    // Late repayment (after maturity / OVERDUE): bounce accrues per overdue day at the rate for
+    // the principal band, capped. A loan flagged OVERDUE bills at least one day.
     const pastDue =
       loan.loanStatus.name === LOAN_STATUS.OVERDUE || isRepaymentPastDue(loan.loanMaturityDate);
-    const bounceFeeInr = pastDue
-      ? await this.bounceChargeTiers.resolveFeeForAmount(principal)
+    const overdueDays = pastDue
+      ? Math.max(overdueDaysFromMaturity(loan.loanMaturityDate), 1)
       : 0;
+    const bounceFeeInr = await this.bounceChargeTiers.resolveChargeForAmount(
+      principal,
+      overdueDays,
+    );
     const totalDue = Math.round((due.amountDue + bounceFeeInr) * 100) / 100;
 
     const amountInr = totalDue.toFixed(2);
@@ -167,7 +175,7 @@ export class InitiateCustomerRepaymentUseCase {
     if (this.easebuzzWire.isPayInitiateSkipped()) {
       this.logger.warn(
         `[repay] EASEBUZZ_PAY_SKIP — settling loan=${loan.loanNumber} amount=${amountInr} ` +
-          `bounce=${bounceFeeInrStr} without vendor call`,
+          `bounce=${bounceFeeInrStr} (${overdueDays}d overdue) without vendor call`,
       );
     } else {
       const payeeName = application.lead.leadDetail?.fullName?.trim();

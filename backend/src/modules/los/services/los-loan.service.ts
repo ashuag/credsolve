@@ -7,7 +7,12 @@ import {
   computeAmountDueNowInr,
   decimalToNumber,
 } from '../../../common/loan/loan-calculation.util';
-import { isRepaymentPastDue } from '../../../common/loan/bounce-charge.util';
+import {
+  computeBounceChargeInr,
+  daysToMaturityIst,
+  overdueDaysFromMaturity,
+  resolveBounceRatePerDayInr,
+} from '../../../common/loan/bounce-charge.util';
 import { BounceChargeTierResolverService } from '../../../common/loan/bounce-charge-tier.resolver';
 import { resolveEffectiveLoanStatus } from '../../../common/loan/effective-loan-status.util';
 import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbursement-view.util';
@@ -68,6 +73,9 @@ export class LosLoanService {
       },
     });
 
+    // Read once and resolve per row: the schedule is shared by every loan in the list.
+    const bounceTiers = await this.bounceChargeTiers.listActiveTiers();
+
     return loans.map((loan) => {
       const details = loan.application.details;
       const fees = computeFeeAmountsFromLoanDetail(
@@ -90,6 +98,18 @@ export class LosLoanService {
         closedAt: loan.closedAt,
       });
 
+      // A closed loan keeps its stored status, so exclude it explicitly before charging penalty.
+      const pastDue = loan.closedAt == null && effectiveStatus.code === LOAN_STATUS.OVERDUE;
+      const overdueDays = pastDue
+        ? Math.max(overdueDaysFromMaturity(loan.loanMaturityDate), 1)
+        : 0;
+      const principal = decimalToNumber(loan.principalAmount);
+      const bounceRatePerDay =
+        principal != null ? resolveBounceRatePerDayInr(principal, bounceTiers) : 0;
+      const penalAmount =
+        principal != null ? computeBounceChargeInr(principal, overdueDays, bounceTiers) : 0;
+      const totalRepayment = decimalToNumber(loan.totalRepaymentAmount) ?? 0;
+
       return {
         uuid: loan.uuid,
         loanNumber,
@@ -106,6 +126,15 @@ export class LosLoanService {
         interestRate: loan.interestRate.toString(),
         interestAmount: loan.interestAmount.toString(),
         totalRepaymentAmount: loan.totalRepaymentAmount.toString(),
+        /** Per-day bounce rate for this principal band, charged only while overdue. */
+        bounceRatePerDayInr: bounceRatePerDay.toFixed(2),
+        /** Accrued bounce charge (rate x overdue days, capped); 0 unless past due and still open. */
+        penalAmount: penalAmount.toFixed(2),
+        totalRepaymentWithPenalAmount: (
+          Math.round((totalRepayment + penalAmount) * 100) / 100
+        ).toFixed(2),
+        /** IST calendar days past maturity; 0 when not overdue. */
+        overdueDays,
         processingFeeAmount: fees.processingFeeAmount != null ? fees.processingFeeAmount.toFixed(2) : null,
         gstAmount: fees.gstAmount != null ? fees.gstAmount.toFixed(2) : null,
         disbursedAt: loan.disbursedAt.toISOString(),
@@ -235,42 +264,47 @@ export class LosLoanService {
       loanMaturityDate: loan.loanMaturityDate,
       closedAt: loan.closedAt,
     });
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const maturity = new Date(loan.loanMaturityDate);
-    maturity.setHours(0, 0, 0, 0);
-    const daysToMaturity = Math.round((maturity.getTime() - today.getTime()) / 86_400_000);
+    // IST, so this stays the exact negation of `overdueDays` on a UTC-clocked server.
+    const daysToMaturity = daysToMaturityIst(loan.loanMaturityDate);
     const totalPaid = repaymentRows
       .filter((row) => row.status === 'SUCCESS')
       .reduce((sum, row) => sum + Number(row.amount), 0);
-    const outstanding =
-      loan.closedAt != null
-        ? 0
-        : Math.max(Number(loan.totalRepaymentAmount) - totalPaid, 0);
 
     const principal = decimalToNumber(loan.principalAmount);
     const dailyRate = decimalToNumber(loan.interestRate);
+
+    // Same overdue test as `listLoans`, so the list and this page can never disagree.
+    const pastDue = loan.closedAt == null && effectiveStatus.code === LOAN_STATUS.OVERDUE;
+    const overdueDays = pastDue
+      ? Math.max(overdueDaysFromMaturity(loan.loanMaturityDate), 1)
+      : 0;
+    const bounceTiers = await this.bounceChargeTiers.listActiveTiers();
+    const bounceRatePerDay =
+      principal != null ? resolveBounceRatePerDayInr(principal, bounceTiers) : 0;
+    const penalAmount =
+      principal != null ? computeBounceChargeInr(principal, overdueDays, bounceTiers) : 0;
+
     let daysOutstanding: number | null = null;
     let interestTillToday: string | null = null;
     let amountDueToday: string | null = null;
-    let bounceFeeInr: string | null = null;
+    const bounceFeeInr = loan.closedAt == null ? penalAmount.toFixed(2) : null;
 
     if (loan.closedAt == null && principal != null && dailyRate != null) {
       const due = computeAmountDueNowInr(principal, dailyRate, loan.disbursedAt);
       daysOutstanding = due.daysOutstanding;
       interestTillToday = due.interestAmount.toFixed(2);
-      const pastDue =
-        loan.loanStatus.name === LOAN_STATUS.OVERDUE || isRepaymentPastDue(loan.loanMaturityDate);
-      const bounce = pastDue
-        ? await this.bounceChargeTiers.resolveFeeForAmount(principal)
-        : 0;
-      bounceFeeInr = bounce.toFixed(2);
-      amountDueToday = (Math.round((due.amountDue + bounce) * 100) / 100).toFixed(2);
+      amountDueToday = (Math.round((due.amountDue + penalAmount) * 100) / 100).toFixed(2);
     } else if (loan.closedAt != null) {
       daysOutstanding = calendarDaysBetween(loan.disbursedAt, loan.closedAt) + 1;
       interestTillToday = loan.interestAmount.toFixed(2);
       amountDueToday = loan.totalRepaymentAmount.toFixed(2);
     }
+
+    // Carries the accrued bounce so this reflects the full collectable amount.
+    const outstanding =
+      loan.closedAt != null
+        ? 0
+        : Math.max(Number(loan.totalRepaymentAmount) + penalAmount - totalPaid, 0);
 
     return {
       uuid: loan.uuid,
@@ -294,6 +328,13 @@ export class LosLoanService {
       interestRate: loan.interestRate.toString(),
       interestAmount: loan.interestAmount.toString(),
       totalRepaymentAmount: loan.totalRepaymentAmount.toString(),
+      /** Per-day bounce rate for this principal band, charged only while overdue. */
+      bounceRatePerDayInr: bounceRatePerDay.toFixed(2),
+      penalAmount: penalAmount.toFixed(2),
+      totalRepaymentWithPenalAmount: (
+        Math.round(((decimalToNumber(loan.totalRepaymentAmount) ?? 0) + penalAmount) * 100) / 100
+      ).toFixed(2),
+      overdueDays,
       processingFeeAmount: fees.processingFeeAmount != null ? fees.processingFeeAmount.toFixed(2) : null,
       gstAmount: fees.gstAmount != null ? fees.gstAmount.toFixed(2) : null,
       processingFeePercentage: details?.processingFeePercentage?.toString() ?? null,

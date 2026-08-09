@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
-  resolveBounceFeeInr,
+  computeBounceChargeInr,
+  resolveBounceRatePerDayInr,
   type BounceChargeTierRow,
 } from './bounce-charge.util';
 
@@ -53,9 +54,15 @@ export class BounceChargeTierResolverService {
     }
   }
 
-  /** Bounce fee for `amountInr` from the active schedule (0 when no matching tier). */
-  async resolveFeeForAmount(amountInr: number): Promise<number> {
+  /** Per-day bounce rate for `amountInr` from the active schedule (0 when no matching tier). */
+  async resolveRatePerDayForAmount(amountInr: number): Promise<number> {
     const tiers = await this.listActiveTiers();
-    return resolveBounceFeeInr(amountInr, tiers);
+    return resolveBounceRatePerDayInr(amountInr, tiers);
+  }
+
+  /** Bounce charge accrued over `overdueDays` for `amountInr`, capped at the maximum penal charge. */
+  async resolveChargeForAmount(amountInr: number, overdueDays: number): Promise<number> {
+    const tiers = await this.listActiveTiers();
+    return computeBounceChargeInr(amountInr, overdueDays, tiers);
   }
 }

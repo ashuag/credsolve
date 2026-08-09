@@ -10,8 +10,9 @@ import {
   decimalToNumber,
 } from '../../../../common/loan/loan-calculation.util';
 import {
+  computeBounceChargeInr,
   isRepaymentPastDue,
-  resolveBounceFeeInr,
+  overdueDaysFromMaturity,
   type BounceChargeTierRow,
 } from '../../../../common/loan/bounce-charge.util';
 import { BounceChargeTierResolverService } from '../../../../common/loan/bounce-charge-tier.resolver';
@@ -136,7 +137,10 @@ function mapRow(
     const pastDue =
       loanAccount.loanStatus.name === LOAN_STATUS.OVERDUE ||
       isRepaymentPastDue(loanAccount.loanMaturityDate);
-    bounceFeeInr = pastDue ? resolveBounceFeeInr(principal, bounceTiers) : 0;
+    const overdueDays = pastDue
+      ? Math.max(overdueDaysFromMaturity(loanAccount.loanMaturityDate), 1)
+      : 0;
+    bounceFeeInr = computeBounceChargeInr(principal, overdueDays, bounceTiers);
     amountDueToday = Math.round((due.amountDue + bounceFeeInr) * 100) / 100;
   } else if (loanAccount?.closedAt != null) {
     // Inclusive days from disbursement through repayment (disbursement day = day 1).
