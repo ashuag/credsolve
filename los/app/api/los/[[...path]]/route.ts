@@ -1,6 +1,9 @@
 import { NextRequest } from 'next/server';
 import { proxyLosApiRequest } from '@/lib/api-proxy';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 type RouteContext = {
   params: Promise<{ path?: string[] }>;
 };

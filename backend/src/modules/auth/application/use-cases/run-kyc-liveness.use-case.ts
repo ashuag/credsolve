@@ -303,11 +303,12 @@ export class RunKycLivenessUseCase {
 
       if (!verification.probeQuality.ok) {
         const reason = verification.probeQuality.reason ?? 'Selfie face validation failed.';
+        const isInfraFailure = /tensorflow native bindings failed to load/i.test(reason);
         return {
           ok: false,
           faceValidationPassed: false,
-          faceValidationMessage: `${reason} ${KYC_SELFIE_FACE_RETRY_HINT}`,
-          suggestRetrySelfie: true,
+          faceValidationMessage: isInfraFailure ? reason : `${reason} ${KYC_SELFIE_FACE_RETRY_HINT}`,
+          suggestRetrySelfie: !isInfraFailure,
           bestComputedConfidence,
           selfieQuality,
           aadhaarQuality,

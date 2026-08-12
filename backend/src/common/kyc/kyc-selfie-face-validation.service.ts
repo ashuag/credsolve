@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import * as tf from '@tensorflow/tfjs-node';
-import * as faceapi from '@vladmandic/face-api';
+import type * as tf from '@tensorflow/tfjs-node';
 import path from 'node:path';
+import { getFaceApi, getTfNode, isKycMlAvailable, isNonProductionNodeEnv } from './kyc-ml-runtime';
 import {
   type KycSelfieFaceInspection,
   type SelfieFaceDetectionInput,
@@ -57,8 +57,18 @@ export class KycSelfieFaceValidationService implements OnModuleDestroy {
   }
 
   async validateJpegBuffer(buffer: Buffer): Promise<SelfieFaceValidationResult> {
-    if (isKycSelfieFaceValidationDisabled()) {
+    if (isKycSelfieFaceValidationDisabled() || (!isKycMlAvailable() && isNonProductionNodeEnv())) {
+      if (!isKycMlAvailable() && !isKycSelfieFaceValidationDisabled()) {
+        this.logger.warn('KYC selfie validation skipped: native TensorFlow bindings are unavailable.');
+      }
       return { ok: true };
+    }
+    if (!isKycMlAvailable()) {
+      return {
+        ok: false,
+        reason:
+          'Selfie face validation is unavailable on this server (TensorFlow native bindings failed to load).',
+      };
     }
     const inspection = await this.inspectJpegBuffer(buffer);
     if (inspection.ok) {
@@ -67,14 +77,30 @@ export class KycSelfieFaceValidationService implements OnModuleDestroy {
     return { ok: false, reason: inspection.reason ?? 'Selfie face validation failed.' };
   }
 
-  /** Dry-run inspection for LOS developer tools (always runs local ML; no vendor API). */
+  /**
+   * Dry-run inspection for customer KYC (`verifyPair`) and LOS developer tools.
+   * Soft-skips in non-production when native TF bindings are missing — same policy as
+   * {@link validateJpegBuffer}.
+   */
   async inspectJpegBuffer(buffer: Buffer): Promise<KycSelfieFaceInspection> {
     if (!buffer.length) {
       return emptyInspection('Selfie image is empty.');
     }
+    if (isKycSelfieFaceValidationDisabled() || (!isKycMlAvailable() && isNonProductionNodeEnv())) {
+      if (!isKycMlAvailable() && !isKycSelfieFaceValidationDisabled()) {
+        this.logger.warn('KYC selfie inspection skipped: native TensorFlow bindings are unavailable.');
+      }
+      return skippedInspection();
+    }
+    if (!isKycMlAvailable()) {
+      return emptyInspection(
+        'Selfie face validation is unavailable (TensorFlow native bindings failed to load).',
+      );
+    }
 
     await this.ensureModelsLoaded();
 
+    const tf = getTfNode();
     let tensor: tf.Tensor3D | null = null;
     try {
       tensor = tf.node.decodeImage(buffer, 3) as tf.Tensor3D;
@@ -174,10 +200,11 @@ export class KycSelfieFaceValidationService implements OnModuleDestroy {
    * recording. Returns null when no face clears the frame confidence floor.
    */
   async detectFrameLandmarks(buffer: Buffer): Promise<SelfieFaceDetectionInput | null> {
-    if (!buffer.length) return null;
+    if (!buffer.length || !isKycMlAvailable()) return null;
 
     await this.ensureModelsLoaded();
 
+    const tf = getTfNode();
     let tensor: tf.Tensor3D | null = null;
     try {
       tensor = tf.node.decodeImage(buffer, 3) as tf.Tensor3D;
@@ -197,6 +224,7 @@ export class KycSelfieFaceValidationService implements OnModuleDestroy {
   }
 
   private async detectFaces(tensor: tf.Tensor3D): Promise<SelfieFaceDetectionInput[]> {
+    const faceapi = getFaceApi();
     const opts = new faceapi.SsdMobilenetv1Options({
       minConfidence: 0.1,
       maxResults: 3,
@@ -225,6 +253,7 @@ export class KycSelfieFaceValidationService implements OnModuleDestroy {
   }
 
   private async loadModels(): Promise<void> {
+    const faceapi = getFaceApi();
     const modelDir = path.join(path.dirname(require.resolve('@vladmandic/face-api')), '..', 'model');
     await faceapi.nets.ssdMobilenetv1.loadFromDisk(modelDir);
     await faceapi.nets.faceLandmark68Net.loadFromDisk(modelDir);
@@ -278,5 +307,19 @@ function emptyInspection(reason: string): KycSelfieFaceInspection {
     rawDetectionCount: 0,
     qualifyingDetectionCount: 0,
     detections: [],
+  };
+}
+
+/** Non-production / explicit-disable pass-through so `verifyPair` can continue to face match. */
+function skippedInspection(): KycSelfieFaceInspection {
+  return {
+    ...emptyInspection(''),
+    ok: true,
+    reason: undefined,
+    productionValidationDisabled: true,
+    blurPassed: true,
+    lightingPassed: true,
+    qualifyingDetectionCount: 1,
+    rawDetectionCount: 1,
   };
 }
