@@ -1,13 +1,16 @@
 import {
   computeBounceChargeInr,
   daysToMaturityIst,
+  DEFAULT_PENAL_CHARGE_CONFIG,
   formatBounceAmountBand,
+  formatPenalChargeDisplay,
   isRepaymentPastDue,
-  MAX_BOUNCE_CHARGE_INR,
   overdueDaysFromMaturity,
   resolveBounceRatePerDayInr,
   renderBounceChargeTierHtmlRows,
 } from './bounce-charge.util';
+
+const MAX_BOUNCE_CHARGE_INR = DEFAULT_PENAL_CHARGE_CONFIG.maxInr;
 
 describe('bounce-charge.util', () => {
   const tiers = [
@@ -45,6 +48,28 @@ describe('bounce-charge.util', () => {
     expect(computeBounceChargeInr(12_000, 400, tiers)).toBe(MAX_BOUNCE_CHARGE_INR);
     // A tiny loan can still never accrue more than the ceiling.
     expect(computeBounceChargeInr(10, 9_999, tiers)).toBe(MAX_BOUNCE_CHARGE_INR);
+  });
+
+  it('honours a cap supplied from the PENAL_MAX_INR setting', () => {
+    expect(computeBounceChargeInr(12_000, 9, tiers, 1_000)).toBe(1_000);
+    expect(computeBounceChargeInr(12_000, 9, tiers, 10_000)).toBe(4_500);
+    // A missing or nonsensical setting must fall back, never uncap or zero the charge.
+    for (const bad of [0, -1, Number.NaN, undefined]) {
+      expect(computeBounceChargeInr(12_000, 400, tiers, bad as number)).toBe(MAX_BOUNCE_CHARGE_INR);
+    }
+  });
+
+  it('formats penal parameters for the sanction letter', () => {
+    expect(formatPenalChargeDisplay({ ratePercent: 10, minInr: 100, maxInr: 3_000 })).toEqual({
+      ratePercent: '10%',
+      minInr: '100',
+      maxInr: '3,000',
+    });
+    expect(formatPenalChargeDisplay({ ratePercent: 12.5, minInr: 250, maxInr: 15_000 })).toEqual({
+      ratePercent: '12.5%',
+      minInr: '250',
+      maxInr: '15,000',
+    });
   });
 
   it('formats bands for documents', () => {

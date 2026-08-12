@@ -124,5 +124,20 @@ export const SettingKey = {
         key: 'PENNY_DROP_RETRY_COUNT',
         default: '2',
         description: 'Maximum penny-drop bank verification attempts per application before further tries are blocked',
+    },
+    PENAL_RATE_PERCENT: {
+        key: 'PENAL_RATE_PERCENT',
+        default: '10',
+        description: 'Penal charge rate on principal outstanding, printed on the sanction letter / KFS (display only; charges use the bounce_charge_tier grid)',
+    },
+    PENAL_MIN_INR: {
+        key: 'PENAL_MIN_INR',
+        default: '100',
+        description: 'Minimum penal charge in INR, printed on the sanction letter / KFS (display only; not enforced in the charge calculation)',
+    },
+    PENAL_MAX_INR: {
+        key: 'PENAL_MAX_INR',
+        default: '3000',
+        description: 'Maximum penal charge in INR — caps the accrued bounce charge and is printed on the sanction letter / KFS',
     }
 } as const;

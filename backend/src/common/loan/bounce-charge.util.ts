@@ -24,10 +24,37 @@ export function formatBounceAmountBand(minAmountInr: number, maxAmountInr: numbe
 }
 
 /**
- * Ceiling on accrued bounce charge, mirroring the "Maximum penal charge" line in the sanction
- * letter cum KFS. Without it a long-overdue small loan accrues more penalty than principal.
+ * Penal charge parameters printed on the sanction letter cum KFS. `maxInr` additionally caps the
+ * accrued bounce charge — without it a long-overdue small loan accrues more penalty than principal.
+ *
+ * Operators tune these through the `setting` table (`PENAL_*` keys); these values are only the
+ * fallback used when the table cannot be read.
  */
-export const MAX_BOUNCE_CHARGE_INR = 3_000;
+export type PenalChargeConfig = {
+  ratePercent: number;
+  minInr: number;
+  maxInr: number;
+};
+
+export const DEFAULT_PENAL_CHARGE_CONFIG: PenalChargeConfig = {
+  ratePercent: 10,
+  minInr: 100,
+  maxInr: 3_000,
+};
+
+/** Display strings for penal parameters on the sanction letter / KFS (e.g. `10%`, `3,000`). */
+export function formatPenalChargeDisplay(config: PenalChargeConfig): {
+  ratePercent: string;
+  minInr: string;
+  maxInr: string;
+} {
+  const amount = (n: number) => n.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  return {
+    ratePercent: `${Number(config.ratePercent.toFixed(2))}%`,
+    minInr: amount(config.minInr),
+    maxInr: amount(config.maxInr),
+  };
+}
 
 /**
  * Resolve the per-day bounce rate for an amount from active tiers.
@@ -57,18 +84,22 @@ export function resolveBounceRatePerDayInr(
 
 /**
  * Bounce charge accrued over `overdueDays` at the tier rate for the principal band, capped at
- * {@link MAX_BOUNCE_CHARGE_INR}. Zero while the loan is still within term.
+ * `maxChargeInr` (the `PENAL_MAX_INR` setting). Zero while the loan is still within term.
  */
 export function computeBounceChargeInr(
   amountInr: number,
   overdueDays: number,
   tiers: BounceChargeTierRow[],
+  maxChargeInr: number = DEFAULT_PENAL_CHARGE_CONFIG.maxInr,
 ): number {
   if (!Number.isFinite(overdueDays) || overdueDays <= 0) return 0;
   const ratePerDay = resolveBounceRatePerDayInr(amountInr, tiers);
   if (!(ratePerDay > 0)) return 0;
-  const accrued = Math.min(ratePerDay * overdueDays, MAX_BOUNCE_CHARGE_INR);
-  return Math.round(accrued * 100) / 100;
+  const cap =
+    Number.isFinite(maxChargeInr) && maxChargeInr > 0
+      ? maxChargeInr
+      : DEFAULT_PENAL_CHARGE_CONFIG.maxInr;
+  return Math.round(Math.min(ratePerDay * overdueDays, cap) * 100) / 100;
 }
 
 /** True when IST calendar day is after the loan maturity date (due day itself is still on time). */

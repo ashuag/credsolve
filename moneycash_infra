@@ -1,0 +1,8 @@
+1) CloudFlare Pro -- Check all security features. 
+2) AWS Firewall bind only to known static IPs (Cloudflare IPs and Administrative IPs)
+3) Ensure EC2 etc is patched and buy a basic subscription for Qualys to make sure vulnerability management control is established (Can be Tanium as well) the idea is to establish vulnerability management and patching of systems
+4) Make sure security groups are locked down and all ingress and egress traffic is routing via the external AWS firewall you have set up
+5) Make sure any and all IAM roles are locked down and please get a subscription for something like beyondtrust so you can show controls that passwords are encrypted and protected. This will be asked might as well establish now. 
+6) Make sure you are not using any vulnerable github projects and make sure your cloud monitoring is rock solid
+7) Octa setup
+8) kiro

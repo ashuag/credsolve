@@ -74,7 +74,7 @@ export class LosLoanService {
     });
 
     // Read once and resolve per row: the schedule is shared by every loan in the list.
-    const bounceTiers = await this.bounceChargeTiers.listActiveTiers();
+    const { tiers: bounceTiers, penal } = await this.bounceChargeTiers.loadContext();
 
     return loans.map((loan) => {
       const details = loan.application.details;
@@ -107,7 +107,9 @@ export class LosLoanService {
       const bounceRatePerDay =
         principal != null ? resolveBounceRatePerDayInr(principal, bounceTiers) : 0;
       const penalAmount =
-        principal != null ? computeBounceChargeInr(principal, overdueDays, bounceTiers) : 0;
+        principal != null
+          ? computeBounceChargeInr(principal, overdueDays, bounceTiers, penal.maxInr)
+          : 0;
       const totalRepayment = decimalToNumber(loan.totalRepaymentAmount) ?? 0;
 
       return {
@@ -278,11 +280,13 @@ export class LosLoanService {
     const overdueDays = pastDue
       ? Math.max(overdueDaysFromMaturity(loan.loanMaturityDate), 1)
       : 0;
-    const bounceTiers = await this.bounceChargeTiers.listActiveTiers();
+    const { tiers: bounceTiers, penal } = await this.bounceChargeTiers.loadContext();
     const bounceRatePerDay =
       principal != null ? resolveBounceRatePerDayInr(principal, bounceTiers) : 0;
     const penalAmount =
-      principal != null ? computeBounceChargeInr(principal, overdueDays, bounceTiers) : 0;
+      principal != null
+        ? computeBounceChargeInr(principal, overdueDays, bounceTiers, penal.maxInr)
+        : 0;
 
     let daysOutstanding: number | null = null;
     let interestTillToday: string | null = null;

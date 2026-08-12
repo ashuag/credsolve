@@ -1,7 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { LOAN_DOCUMENT_HTML_TEMPLATE, LENDER_LOGO_FILE } from '../constants/loan-document.constants';
-import { renderBounceChargeTierHtmlRows } from '../loan/bounce-charge.util';
+import {
+  DEFAULT_PENAL_CHARGE_CONFIG,
+  formatPenalChargeDisplay,
+  renderBounceChargeTierHtmlRows,
+} from '../loan/bounce-charge.util';
 import { buildLoanDocumentHtmlFieldValues } from './loan-document-html-field-map.util';
 import type { LoanDocumentMergeInput } from './loan-document.types';
 
@@ -50,6 +54,12 @@ function injectPrintFieldStyles(html: string): string {
   return html.replace('</style>', `${css}\n</style>`);
 }
 
+/** Replace the text of every `<span data-{attr}>…</span>` marker (values repeat across clauses). */
+function fillSpanByDataAttr(html: string, attr: string, value: string): string {
+  const pattern = new RegExp(`(<span\\b[^>]*\\b${attr}\\b[^>]*>)[\\s\\S]*?(</span>)`, 'gi');
+  return html.replace(pattern, `$1${escapeHtml(value)}$2`);
+}
+
 function fillInputById(html: string, id: string, value: string): string {
   const escaped = escapeHtml(value.trim());
   const span = `<span class="filled-val" data-field="${id}">${escaped}</span>`;
@@ -78,6 +88,12 @@ export async function renderLoanDocumentHtml(merge: LoanDocumentMergeInput): Pro
   for (const [id, value] of Object.entries(fields)) {
     html = fillInputById(html, id, value);
   }
+
+  // Section A uses `input#sl_penal_*`; Table II and clause 7 repeat the same values as prose.
+  const penal = formatPenalChargeDisplay(merge.penalCharges ?? DEFAULT_PENAL_CHARGE_CONFIG);
+  html = fillSpanByDataAttr(html, 'data-penal-rate', penal.ratePercent);
+  html = fillSpanByDataAttr(html, 'data-penal-min', penal.minInr);
+  html = fillSpanByDataAttr(html, 'data-penal-max', penal.maxInr);
 
   if (merge.bounceChargeTiers != null && merge.bounceChargeTiers.length > 0) {
     const rows = renderBounceChargeTierHtmlRows(merge.bounceChargeTiers);

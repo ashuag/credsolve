@@ -34,4 +34,10 @@ export type LoanDocumentMergeInput = {
     sortOrder?: number;
     isActive?: boolean;
   }> | null;
+  /** Penal charge parameters from the `PENAL_*` settings, for sanction letter / KFS text. */
+  penalCharges?: {
+    ratePercent: number;
+    minInr: number;
+    maxInr: number;
+  } | null;
 };

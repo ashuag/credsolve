@@ -92,6 +92,7 @@ function mapRow(
     } | null;
   },
   bounceTiers: BounceChargeTierRow[],
+  penalMaxInr: number,
 ): CustomerLoanCard {
   const loanDetail = r.details;
   const loanAccount = r.loanAccount;
@@ -140,7 +141,7 @@ function mapRow(
     const overdueDays = pastDue
       ? Math.max(overdueDaysFromMaturity(loanAccount.loanMaturityDate), 1)
       : 0;
-    bounceFeeInr = computeBounceChargeInr(principal, overdueDays, bounceTiers);
+    bounceFeeInr = computeBounceChargeInr(principal, overdueDays, bounceTiers, penalMaxInr);
     amountDueToday = Math.round((due.amountDue + bounceFeeInr) * 100) / 100;
   } else if (loanAccount?.closedAt != null) {
     // Inclusive days from disbursement through repayment (disbursement day = day 1).
@@ -248,9 +249,9 @@ export class GetCustomerLoansDashboardUseCase {
       },
     });
 
-    const bounceTiers = await this.bounceChargeTiers.listActiveTiers();
+    const { tiers: bounceTiers, penal } = await this.bounceChargeTiers.loadContext();
     const todayStart = startOfTodayUtc();
-    const cards = rows.map((row) => mapRow(row, bounceTiers));
+    const cards = rows.map((row) => mapRow(row, bounceTiers, penal.maxInr));
 
     const maturityFor = (raw: (typeof rows)[number]) =>
       raw.loanAccount?.loanMaturityDate ?? raw.details?.expectedRepaymentDate ?? null;

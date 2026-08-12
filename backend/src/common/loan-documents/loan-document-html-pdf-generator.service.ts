@@ -14,11 +14,16 @@ export class LoanDocumentHtmlPdfGeneratorService {
   constructor(private readonly bounceChargeTiers: BounceChargeTierResolverService) {}
 
   async generatePdf(merge: LoanDocumentMergeInput): Promise<Buffer> {
-    const tiers =
-      merge.bounceChargeTiers != null
-        ? merge.bounceChargeTiers
-        : await this.bounceChargeTiers.listActiveTiers();
-    const html = await renderLoanDocumentHtml({ ...merge, bounceChargeTiers: tiers });
+    const needsTiers = merge.bounceChargeTiers == null;
+    const needsPenal = merge.penalCharges == null;
+    const context =
+      needsTiers || needsPenal ? await this.bounceChargeTiers.loadContext() : null;
+
+    const html = await renderLoanDocumentHtml({
+      ...merge,
+      bounceChargeTiers: merge.bounceChargeTiers ?? context?.tiers,
+      penalCharges: merge.penalCharges ?? context?.penal,
+    });
     let rawPdf: Buffer;
     try {
       rawPdf = await this.htmlToPdfBuffer(html);

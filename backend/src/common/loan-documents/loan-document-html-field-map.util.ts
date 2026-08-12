@@ -1,7 +1,4 @@
 import {
-  DEFAULT_PENAL_MAX_INR,
-  DEFAULT_PENAL_MIN_INR,
-  DEFAULT_PENAL_RATE_PERCENT,
   LENDER_GRO_NAME,
   LENDER_GRO_PHONE,
   LENDER_GRO_EMAIL,
@@ -17,6 +14,10 @@ import {
   LSP_NODAL_PHONE,
   LSP_NODAL_EMAIL,
 } from '../constants/loan-document.constants';
+import {
+  DEFAULT_PENAL_CHARGE_CONFIG,
+  formatPenalChargeDisplay,
+} from '../loan/bounce-charge.util';
 import { SettingKey } from '../constants/setting.constants';
 import { normalizeClientIp } from '../http/client-ip.util';
 import { inrAmountToWords } from '../utils/inr-amount-words.util';
@@ -131,6 +132,8 @@ export function buildLoanDocumentHtmlFieldValues(input: LoanDocumentMergeInput):
         )
       : dateStr;
 
+  const penal = formatPenalChargeDisplay(input.penalCharges ?? DEFAULT_PENAL_CHARGE_CONFIG);
+
   const map: Record<string, string> = {
     sl_borrower_name: borrowerName,
     sl_app_date: dateStr,
@@ -139,9 +142,9 @@ export function buildLoanDocumentHtmlFieldValues(input: LoanDocumentMergeInput):
     sl_interest_rate: base.INTEREST_RATE,
     sl_proc_fee_amt: processingFee != null ? formatInrPlain(processingFee) : '',
     sl_proc_fee_pct: processingPct != null ? formatPercent(processingPct) : '',
-    sl_penal_rate: DEFAULT_PENAL_RATE_PERCENT,
-    sl_penal_min: DEFAULT_PENAL_MIN_INR,
-    sl_penal_max: DEFAULT_PENAL_MAX_INR,
+    sl_penal_rate: penal.ratePercent,
+    sl_penal_min: penal.minInr,
+    sl_penal_max: penal.maxInr,
     // Cap statement uses per-day ROI from application (settings `ROI_PER_DAY`), not a monthly %.
     sl_max_rate: formatRoiPerDayNumber(interestRate),
     kfs_name: borrowerName,

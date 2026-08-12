@@ -1,10 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SettingKey } from '../constants/setting.constants';
 import {
   computeBounceChargeInr,
   resolveBounceRatePerDayInr,
+  DEFAULT_PENAL_CHARGE_CONFIG,
   type BounceChargeTierRow,
+  type PenalChargeConfig,
 } from './bounce-charge.util';
+
+/** Active bounce schedule plus the penal parameters that bound it. */
+export type BounceChargeContext = {
+  tiers: BounceChargeTierRow[];
+  penal: PenalChargeConfig;
+};
 
 /** Fallback schedule matching seed / sanction-letter grid when table or client is unavailable. */
 const DEFAULT_BOUNCE_TIERS: BounceChargeTierRow[] = [
@@ -54,6 +63,49 @@ export class BounceChargeTierResolverService {
     }
   }
 
+  /** Penal parameters from the `setting` table, falling back per-key when a row is missing. */
+  async loadPenalConfig(): Promise<PenalChargeConfig> {
+    const keys = [
+      SettingKey.PENAL_RATE_PERCENT.key,
+      SettingKey.PENAL_MIN_INR.key,
+      SettingKey.PENAL_MAX_INR.key,
+    ] as const;
+
+    let rows: Array<{ key: string; value: string }> = [];
+    try {
+      rows = await this.prisma.client.setting.findMany({
+        where: { key: { in: [...keys] }, isActive: true },
+        select: { key: true, value: true },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to load PENAL_* settings; using defaults. ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return DEFAULT_PENAL_CHARGE_CONFIG;
+    }
+
+    const pick = (key: string, fallback: number): number => {
+      const raw = rows.find((r) => r.key === key)?.value;
+      const parsed = raw != null ? Number.parseFloat(raw) : Number.NaN;
+      // A blank or non-numeric row must not silently zero out a charge parameter.
+      return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+    };
+
+    return {
+      ratePercent: pick(SettingKey.PENAL_RATE_PERCENT.key, DEFAULT_PENAL_CHARGE_CONFIG.ratePercent),
+      minInr: pick(SettingKey.PENAL_MIN_INR.key, DEFAULT_PENAL_CHARGE_CONFIG.minInr),
+      maxInr: pick(SettingKey.PENAL_MAX_INR.key, DEFAULT_PENAL_CHARGE_CONFIG.maxInr),
+    };
+  }
+
+  /** Schedule and penal parameters in one round trip, for callers resolving many loans. */
+  async loadContext(): Promise<BounceChargeContext> {
+    const [tiers, penal] = await Promise.all([this.listActiveTiers(), this.loadPenalConfig()]);
+    return { tiers, penal };
+  }
+
   /** Per-day bounce rate for `amountInr` from the active schedule (0 when no matching tier). */
   async resolveRatePerDayForAmount(amountInr: number): Promise<number> {
     const tiers = await this.listActiveTiers();
@@ -62,7 +114,7 @@ export class BounceChargeTierResolverService {
 
   /** Bounce charge accrued over `overdueDays` for `amountInr`, capped at the maximum penal charge. */
   async resolveChargeForAmount(amountInr: number, overdueDays: number): Promise<number> {
-    const tiers = await this.listActiveTiers();
-    return computeBounceChargeInr(amountInr, overdueDays, tiers);
+    const { tiers, penal } = await this.loadContext();
+    return computeBounceChargeInr(amountInr, overdueDays, tiers, penal.maxInr);
   }
 }
