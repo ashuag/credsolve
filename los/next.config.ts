@@ -2,6 +2,7 @@ import type { NextConfig } from 'next';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getLosServerApiBase } from './lib/api-env';
 
 const require = createRequire(import.meta.url);
 
@@ -34,6 +35,9 @@ const allowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? '')
   .split(',')
   .map((value) => value.trim())
   .filter(Boolean);
+
+// Fail fast at build/start if the server-side API proxy target is misconfigured.
+getLosServerApiBase();
 
 const securityHeaders: { key: string; value: string }[] = [
   { key: 'X-DNS-Prefetch-Control', value: 'on' },
