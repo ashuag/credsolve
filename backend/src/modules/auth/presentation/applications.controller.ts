@@ -113,9 +113,9 @@ export class ApplicationsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Run MoneyCash local KYC checks (selfie face validation, Aadhaar face match, authenticity), then Tenacio liveness on the stored selfie URL when outbound is enabled.',
+      'Run MoneyCash in-house KYC checks (same face-api pipeline as LOS Developer → KYC Face Match Check): selfie quality, Aadhaar↔selfie match, then optional head-movement gate.',
   })
-  @ApiOkResponse({ description: 'Vendor outcome; updates application when HTTP call completes' })
+  @ApiOkResponse({ description: 'Local face-check outcome; updates application KYC when all gates pass' })
   kycLivenessRoute(@Req() req: Request) {
     return this.runKycLiveness.execute(req);
   }

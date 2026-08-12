@@ -27,7 +27,7 @@ function formatBool(value: boolean | null | undefined): string {
   return '—';
 }
 
-export function KycTenacioVendorResult({
+export function KycFaceMatchResultCard({
   result,
   passLabel,
   failLabel,

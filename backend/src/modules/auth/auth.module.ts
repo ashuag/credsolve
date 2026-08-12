@@ -34,7 +34,6 @@ import { DownloadAadhaarDigilockerUseCase } from './application/use-cases/downlo
 import { GetPendingDigilockerSessionUseCase } from './application/use-cases/get-pending-digilocker-session.use-case';
 import { ServeDigilockerAadhaarPhotoUseCase } from './application/use-cases/serve-digilocker-aadhaar-photo.use-case';
 import { ServeKycSelfiePhotoUseCase } from './application/use-cases/serve-kyc-selfie-photo.use-case';
-import { ServeKycLivenessSelfieVendorUseCase } from './application/use-cases/serve-kyc-liveness-selfie-vendor.use-case';
 import { GetLoanDocumentsUseCase } from './application/use-cases/get-loan-documents.use-case';
 import { ServeLoanDocumentPdfUseCase } from './application/use-cases/serve-loan-document-pdf.use-case';
 import { SendLoanDocumentsOtpUseCase } from './application/use-cases/send-loan-documents-otp.use-case';
@@ -62,7 +61,6 @@ import { CustomerSessionService } from './infrastructure/session/customer-sessio
 import { AuthController } from './presentation/auth.controller';
 import { CustomerLeadsController } from './presentation/customer-leads.controller';
 import { ApplicationsController } from './presentation/applications.controller';
-import { VendorKycController } from './presentation/vendor-kyc.controller';
 import { LoansController } from './presentation/loans.controller';
 import { LookupController } from './presentation/lookup.controller';
 import { OptionalCustomerSessionGuard } from './presentation/guards/optional-customer-session.guard';
@@ -73,7 +71,6 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
   controllers: [
     AuthController,
     ApplicationsController,
-    VendorKycController,
     CustomerLeadsController,
     LoansController,
     LookupController,
@@ -123,7 +120,6 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     KycCompletionService,
     ServeDigilockerAadhaarPhotoUseCase,
     ServeKycSelfiePhotoUseCase,
-    ServeKycLivenessSelfieVendorUseCase,
     GetLoanDocumentsUseCase,
     ServeLoanDocumentPdfUseCase,
     SendLoanDocumentsOtpUseCase,

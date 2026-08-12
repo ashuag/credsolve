@@ -1,6 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import * as tf from '@tensorflow/tfjs-node';
-import * as faceapi from '@vladmandic/face-api';
+import type * as tf from '@tensorflow/tfjs-node';
 import path from 'node:path';
 import {
   emptyFaceMatchInspection,
@@ -11,6 +10,7 @@ import {
   type KycFaceMatchInspection,
   type KycFaceMatchSideResult,
 } from './kyc-face-match.util';
+import { getFaceApi, getTfNode, isKycMlAvailable, isNonProductionNodeEnv } from './kyc-ml-runtime';
 import { KYC_SELFIE_MIN_FACE_CONFIDENCE } from './kyc-selfie-face-validation.util';
 
 type FaceApiDetectionWithDescriptor = {
@@ -37,7 +37,10 @@ export class KycFaceMatchService implements OnModuleDestroy {
   }
 
   async compareJpegBuffers(reference: Buffer, probe: Buffer): Promise<KycFaceMatchInspection> {
-    if (isKycFaceMatchDisabled()) {
+    if (isKycFaceMatchDisabled() || (!isKycMlAvailable() && isNonProductionNodeEnv())) {
+      if (!isKycMlAvailable() && !isKycFaceMatchDisabled()) {
+        this.logger.warn('KYC face match skipped: native TensorFlow bindings are unavailable.');
+      }
       return {
         ok: true,
         matchPassed: true,
@@ -64,12 +67,20 @@ export class KycFaceMatchService implements OnModuleDestroy {
       };
     }
 
+    if (!isKycMlAvailable()) {
+      return emptyFaceMatchInspection(
+        'Face match is unavailable on this server (TensorFlow native bindings failed to load).',
+      );
+    }
+
     if (!reference.length || !probe.length) {
       return emptyFaceMatchInspection('Both images must be non-empty JPEGs.');
     }
 
     await this.ensureModelsLoaded();
 
+    const tf = getTfNode();
+    const faceapi = getFaceApi();
     let referenceTensor: tf.Tensor3D | null = null;
     let probeTensor: tf.Tensor3D | null = null;
 
@@ -148,6 +159,7 @@ export class KycFaceMatchService implements OnModuleDestroy {
   }
 
   private async detectFaces(tensor: tf.Tensor3D): Promise<FaceSideDetection> {
+    const faceapi = getFaceApi();
     const opts = new faceapi.SsdMobilenetv1Options({
       minConfidence: KYC_FACE_MATCH_MIN_DETECTION_SCORE,
       maxResults: 5,
@@ -183,6 +195,7 @@ export class KycFaceMatchService implements OnModuleDestroy {
   }
 
   private async loadModels(): Promise<void> {
+    const faceapi = getFaceApi();
     const modelDir = path.join(path.dirname(require.resolve('@vladmandic/face-api')), '..', 'model');
     await faceapi.nets.ssdMobilenetv1.loadFromDisk(modelDir);
     await faceapi.nets.faceLandmark68Net.loadFromDisk(modelDir);
