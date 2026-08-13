@@ -70,6 +70,8 @@ services:
       - ./los:/workspace/los:cached
       # Keep .next off the bind mount — Next's atomic manifest writes race on
       # host-mounted volumes and produce ENOENT on `_buildManifest.js.tmp.*`.
+      # If `/api/los/*` 404s after adding the proxy, wipe this volume:
+      #   docker compose down && docker volume rm moneycash_los-next
       - los-next:/workspace/los/.next
       - *entrypoint-mount
     command: ["npm", "run", "dev"]

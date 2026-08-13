@@ -37,8 +37,7 @@ const allowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? '')
   .filter(Boolean);
 
 // Fail fast at build/start if the server-side API proxy target is misconfigured.
-// (Also used below for rewrite destination.)
-getLosServerApiBase();
+const losApiProxyBase = getLosServerApiBase().replace(/\/$/, '');
 
 const securityHeaders: { key: string; value: string }[] = [
   { key: 'X-DNS-Prefetch-Control', value: 'on' },
@@ -57,8 +56,6 @@ if (isProductionRuntime) {
     value: 'max-age=63072000; includeSubDomains; preload',
   });
 }
-
-const losApiProxyBase = getLosServerApiBase().replace(/\/$/, '');
 
 const nextConfig: NextConfig = {
   output: 'standalone',
