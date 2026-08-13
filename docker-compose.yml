@@ -56,10 +56,10 @@ services:
   los:
     <<: *node-defaults
     env_file: ./los/.env
-    # Browser uses same-origin `/api/los` (Next proxy). Inside the container, localhost
-    # is not the API — proxy target must be the `backend` service.
+    # Browser on the host calls Nest via published :4001 (CORS allows localhost:3020).
+    # Server-side fetches inside the container must use the `backend` service hostname.
     environment:
-      NEXT_PUBLIC_API_URL: /api/los
+      NEXT_PUBLIC_API_URL: http://localhost:4001/api/los
       API_SERVER_URL: http://backend:4001/api/los
     depends_on:
       - backend

@@ -40,6 +40,17 @@ export function LoginForm() {
         body: JSON.stringify({ email, password })
       });
 
+      const contentType = response.headers.get('content-type') ?? '';
+      if (!contentType.includes('application/json')) {
+        setError(
+          response.status === 404
+            ? 'LOS API is not reachable (404). Set NEXT_PUBLIC_API_URL=http://localhost:4001/api/los and ensure the backend is up on :4001.'
+            : `Unable to reach the backend (HTTP ${response.status}).`,
+        );
+        setLoading(false);
+        return;
+      }
+
       const data = await response.json() as LoginResponse;
 
       if (!response.ok) {
