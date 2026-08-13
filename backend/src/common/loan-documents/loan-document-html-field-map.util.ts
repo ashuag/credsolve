@@ -191,11 +191,14 @@ export function buildLoanDocumentHtmlFieldValues(input: LoanDocumentMergeInput):
     ct_borrower_name: borrowerName,
     ct_borrower_address: address,
     ct_lender_office: LENDER_REGISTERED_OFFICE,
-    sig_signed_by: borrowerName,
-    sig_name: borrowerName,
-    sig_ip: normalizeClientIp(input.acceptanceIpAddress) ?? '',
-    sig_ts:
-      input.acceptanceSignedAt != null ? formatAcceptanceTimestamp(input.acceptanceSignedAt) : '',
+    ...(input.acceptanceSignedAt != null
+      ? {
+          sig_signed_by: borrowerName,
+          sig_name: borrowerName,
+          sig_ip: normalizeClientIp(input.acceptanceIpAddress) ?? '',
+          sig_ts: formatAcceptanceTimestamp(input.acceptanceSignedAt),
+        }
+      : {}),
     lender_dsc_signer: input.lenderDscSignerName?.trim() || LENDER_NAME,
     lender_dsc_date:
       input.lenderDscSignedAt != null

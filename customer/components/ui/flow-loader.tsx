@@ -5,15 +5,78 @@ type FlowLoaderProps = {
   title: string;
   description: string;
   steps: string[];
+  /** 0-based index of the step currently in progress. Steps before this show as done. */
+  activeStepIndex?: number;
+  /** When true, every step is ticked complete. */
+  allComplete?: boolean;
 };
 
-export function FlowLoader({ eyebrow, title, description, steps }: FlowLoaderProps) {
+function StepGlyph({
+  index,
+  state,
+}: {
+  index: number;
+  state: 'complete' | 'active' | 'pending' | 'static';
+}) {
+  if (state === 'complete') {
+    return (
+      <span className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-[12px] bg-[rgba(36,168,111,0.22)] text-[#8ef0c4]">
+        <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
+          <path d="M3 8.2 6.2 11.5 13 4.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
+    );
+  }
+
+  if (state === 'active') {
+    return (
+      <span className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-[12px] bg-[linear-gradient(135deg,rgba(255,197,25,0.32),rgba(20,150,243,0.28))] text-[#fff9e8]">
+        <span
+          className="h-[16px] w-[16px] rounded-full border-2 border-white/25 border-t-white animate-spin"
+          aria-hidden
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={`inline-flex h-[34px] w-[34px] items-center justify-center rounded-[12px] bg-[linear-gradient(135deg,rgba(255,197,25,0.26),rgba(20,150,243,0.22))] text-[#fff9e8] text-[0.84rem] font-black ${
+        state === 'pending' ? 'opacity-45' : ''
+      }`}
+    >
+      {index + 1}
+    </span>
+  );
+}
+
+export function FlowLoader({
+  eyebrow,
+  title,
+  description,
+  steps,
+  activeStepIndex,
+  allComplete = false,
+}: FlowLoaderProps) {
+  const tracked = typeof activeStepIndex === 'number';
+  const currentIndex = tracked ? Math.max(0, Math.min(activeStepIndex, steps.length - 1)) : 0;
+  const progressPct = !tracked
+    ? 42
+    : allComplete
+      ? 100
+      : Math.round(((currentIndex + 0.38) / steps.length) * 100);
+  const currentStepLabel = tracked && !allComplete ? steps[currentIndex] : null;
+
   return (
     <div
       className="fixed inset-0 z-[120] grid place-items-center p-6 backdrop-blur-[16px] bg-[radial-gradient(circle_at_top,rgba(20,150,243,0.26),transparent_32rem),radial-gradient(circle_at_bottom,rgba(255,197,25,0.2),transparent_28rem),rgba(8,18,48,0.54)] max-sm:p-4"
       role="status"
       aria-live="polite"
-      aria-label={title}
+      aria-label={
+        currentStepLabel
+          ? `${title}. ${eyebrow}. Step ${currentIndex + 1} of ${steps.length}: ${currentStepLabel}`
+          : title
+      }
     >
       {/* Background glow */}
       <div
@@ -68,18 +131,43 @@ export function FlowLoader({ eyebrow, title, description, steps }: FlowLoaderPro
 
         {/* Step rail */}
         <div className="grid gap-[10px] mt-[22px]">
-          {steps.map((step, index) => (
-            <div
-              key={step}
-              className="grid gap-3 items-center p-3 px-[14px] rounded-[18px] bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.08)]"
-              style={{ gridTemplateColumns: '34px 1fr' }}
-            >
-              <span className="inline-flex items-center justify-center w-[34px] h-[34px] rounded-[12px] bg-[linear-gradient(135deg,rgba(255,197,25,0.26),rgba(20,150,243,0.22))] text-[#fff9e8] text-[0.84rem] font-black">
-                {index + 1}
-              </span>
-              <span className="text-[rgba(240,245,255,0.9)] text-[0.94rem] font-bold">{step}</span>
-            </div>
-          ))}
+          {steps.map((step, index) => {
+            const state: 'complete' | 'active' | 'pending' | 'static' = !tracked
+              ? 'static'
+              : allComplete || index < currentIndex
+                ? 'complete'
+                : index === currentIndex
+                  ? 'active'
+                  : 'pending';
+
+            return (
+              <div
+                key={step}
+                className={`grid gap-3 items-center p-3 px-[14px] rounded-[18px] border transition-colors duration-300 ${
+                  state === 'complete'
+                    ? 'bg-[rgba(36,168,111,0.12)] border-[rgba(36,168,111,0.22)]'
+                    : state === 'active'
+                      ? 'bg-[rgba(255,255,255,0.12)] border-[rgba(255,255,255,0.2)]'
+                      : 'bg-[rgba(255,255,255,0.08)] border-[rgba(255,255,255,0.08)]'
+                }`}
+                style={{ gridTemplateColumns: '34px 1fr' }}
+                aria-current={state === 'active' ? 'step' : undefined}
+              >
+                <StepGlyph index={index} state={state} />
+                <span
+                  className={`text-[0.94rem] font-bold transition-colors duration-300 ${
+                    state === 'complete'
+                      ? 'text-[#d9ffe9]'
+                      : state === 'pending'
+                        ? 'text-[rgba(240,245,255,0.48)]'
+                        : 'text-[rgba(240,245,255,0.94)]'
+                  }`}
+                >
+                  {step}
+                </span>
+              </div>
+            );
+          })}
         </div>
 
         {/* Progress track */}
@@ -88,10 +176,11 @@ export function FlowLoader({ eyebrow, title, description, steps }: FlowLoaderPro
           aria-hidden
         >
           <span
-            className="block w-[42%] h-full rounded-[inherit] animate-loader-bar"
+            className={`block h-full rounded-[inherit] ${tracked ? 'transition-[width] duration-500 ease-out' : 'w-[42%] animate-loader-bar'}`}
             style={{
+              width: tracked ? `${progressPct}%` : undefined,
               background: 'linear-gradient(90deg, #1496f3, #ffc519, #1496f3)',
-              backgroundSize: '200% 100%'
+              backgroundSize: '200% 100%',
             }}
           />
         </div>

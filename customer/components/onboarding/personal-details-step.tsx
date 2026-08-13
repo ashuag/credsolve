@@ -42,6 +42,11 @@ export type PersonalDetailsStepProps = {
 
 const DRAFT_KEY_PREFIX = 'mc:details:draft:';
 const PROFILE_FIELDS: Array<keyof Fields> = ['fullName', 'gender', 'dob', 'panNumber', 'occupation', 'monthlyIncome', 'annualTurnover', 'annualProfit'];
+const ELIGIBILITY_CHECK_STEPS = [
+  'Saving your address',
+  'Pre-eligibility checks',
+  'PAN verification and bureau',
+] as const;
 
 function pickErrors(errors: FieldError, keys: Array<keyof Fields>): FieldError {
   return Object.fromEntries(keys.filter((k) => errors[k]).map((k) => [k, errors[k]]));
@@ -107,6 +112,8 @@ export function PersonalDetailsStep(
   const [dobDisplay, setDobDisplay] = useState('');
   const [errors, setErrors] = useState<FieldError>({});
   const [busy, setBusy] = useState<BusyState>('idle');
+  const [checkStepIndex, setCheckStepIndex] = useState(0);
+  const [checkAllDone, setCheckAllDone] = useState(false);
   const [isLookingUpPincode, setIsLookingUpPincode] = useState(false);
   const [cityFromPincode, setCityFromPincode] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -314,7 +321,11 @@ export function PersonalDetailsStep(
     event.preventDefault();
     const all = { ...validateProfile(), ...validateFinancial() };
     if (Object.keys(all).length) { setErrors(all); onSectionChange(hasErrors(all, PROFILE_FIELDS) ? 'profile' : 'financial'); return; }
-    setSubmitError(''); setBusy('submitting');
+    setSubmitError('');
+    setBusy('submitting');
+    setCheckStepIndex(0);
+    setCheckAllDone(false);
+    let lastStepTimer: ReturnType<typeof setTimeout> | undefined;
     try {
       await saveLeadDetails({
         ...profilePayload(), addressLine1: fields.addressLine1.trim(),
@@ -322,6 +333,8 @@ export function PersonalDetailsStep(
         currentCity: fields.currentCity.trim(), ...(fields.currentCityId != null ? { currentCityId: fields.currentCityId } : {}),
         pincode: fields.pincode, creditConsentAccepted: fields.creditConsentAccepted,
       });
+      setCheckStepIndex(1);
+      lastStepTimer = setTimeout(() => setCheckStepIndex(2), 1100);
       const result = await verifyLeadPan({
         ...(leadUuid ? { leadUuid } : {}), panNumber: fields.panNumber.trim().toUpperCase(),
         fullName: fields.fullName.trim(), dob: fields.dob,
@@ -330,6 +343,9 @@ export function PersonalDetailsStep(
         ...(usesMonthlyIncome ? { monthlyIncome: fields.monthlyIncome.trim() } : {}),
         ...(isSelfEmployed ? { annualTurnover: fields.annualTurnover.trim(), annualProfit: fields.annualProfit.trim() } : {}),
       });
+      clearTimeout(lastStepTimer);
+      lastStepTimer = undefined;
+      setCheckStepIndex(2);
       if (!result.success) { setSubmitError('Unable to complete your profile right now. Please try again.'); return; }
       if (result.rejected) { router.push('/thank-you-interest'); return; }
       if (result.attemptsUsed != null && result.attemptsAllowed != null) {
@@ -339,10 +355,15 @@ export function PersonalDetailsStep(
         return;
       }
       try { window.localStorage.removeItem(draftKey); } catch { /* ignore */ }
+      setCheckAllDone(true);
+      await new Promise((resolve) => setTimeout(resolve, 350));
       await onSaved();
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : 'Unable to complete your profile right now. Please try again.');
-    } finally { setBusy('idle'); }
+    } finally {
+      if (lastStepTimer) clearTimeout(lastStepTimer);
+      setBusy('idle');
+    }
   }
 
   const isBusy = busy !== 'idle';
@@ -412,14 +433,12 @@ export function PersonalDetailsStep(
 
       {busy === 'submitting' && (
         <FlowLoader
-          eyebrow="Almost there" 
+          eyebrow={checkAllDone || checkStepIndex >= 2 ? 'Almost there' : 'Checking…'}
           title="Checking your eligibility"
           description="We save your address, run pre-checks, verify PAN, fetch CIBIL when needed, then calculate your eligible loan amount."
-          steps={[
-            'Saving your address', 
-            'Pre-eligibility checks', 
-            'PAN verification and bureau'
-          ]}
+          steps={[...ELIGIBILITY_CHECK_STEPS]}
+          activeStepIndex={checkStepIndex}
+          allComplete={checkAllDone}
         />
       )}
     </>

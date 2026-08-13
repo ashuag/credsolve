@@ -154,7 +154,7 @@ export function EmailOtpStep({
             <p className="text-[0.88rem] text-slate-600 leading-relaxed m-0 pt-0.5">
               {otpRequest?.debugOtp ? (
                 <>
-                  We also sent a code to <strong className="text-slate-900 font-bold tracking-wider">{otpRequest.maskedEmail ?? email}</strong> when possible.
+                  We have sent a code to <strong className="text-slate-900 font-bold tracking-wider">{otpRequest.maskedEmail ?? email}</strong> when possible.
                   If it does not arrive within a minute, check spam and use the code shown below.
                 </>
               ) : (

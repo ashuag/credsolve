@@ -33,7 +33,7 @@ export type CustomerPortalJourneySnapshot = {
   detailsCompleted: boolean;
   /** Customer has selected a loan amount + tenure (`application_detail` populated). */
   loanSelectionCompleted: boolean;
-  /** Key Fact Statement reviewed/agreed on /loan-documents (no OTP). */
+  /** Key Fact Statement reviewed on /loan-documents (review-only; legal acceptance is eSign OTP). */
   loanDocumentsCompleted: boolean;
   /** Mobile OTP acceptance after references — signed sanctioned letter emailed. */
   loanDocumentsAccepted: boolean;

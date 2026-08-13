@@ -116,6 +116,7 @@ export function LandingNavbar() {
                     : 'text-[#12244f]/70 hover:bg-[#12244f]/5 hover:text-[#12244f]'
                 }`}
               >
+                ssdsdsd
                 <span className="relative inline-block">
                   {link.label}
                   <span

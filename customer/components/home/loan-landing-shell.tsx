@@ -72,19 +72,18 @@ export function LoanLandingShell({
   return (
     <div
       className={[
-        'flex w-full min-w-0 flex-col overflow-x-hidden',
-        fullBleedPanel ? 'h-full min-h-0 flex-1 overflow-hidden' : 'min-h-0',
+        'flex w-full min-w-0 flex-col overflow-x-clip',
+        fullBleedPanel ? 'min-h-0 lg:h-full lg:min-h-0 lg:flex-1 lg:overflow-hidden' : 'min-h-0',
       ].join(' ')}
     >
       {/* ── Mobile app bar (hidden on lg+) ────────────────────────────────── */}
-      <header className="lg:hidden sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-[0_1px_0_rgba(18,36,79,0.06)]">
-        <div className="flex h-14 items-center justify-between px-4">
-          {/* Back button */}
+      <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 pt-[env(safe-area-inset-top)] shadow-[0_1px_0_rgba(18,36,79,0.06)] backdrop-blur-md lg:hidden">
+        <div className="relative flex h-14 items-center px-4">
           {mobileOnBack ? (
             <button
               type="button"
               onClick={mobileOnBack}
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 transition-colors active:scale-95"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 active:scale-95"
               aria-label="Go back"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -92,14 +91,9 @@ export function LoanLandingShell({
               </svg>
             </button>
           ) : (
-            <Link href="/" className="flex h-9 w-9 items-center justify-center">
-              <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-500" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M19 12H5M12 5l-7 7 7 7" />
-              </svg>
-            </Link>
+            <span className="w-9 shrink-0" aria-hidden />
           )}
 
-          {/* Logo centred */}
           <Link href="/" className="absolute left-1/2 -translate-x-1/2">
             <Image
               src="/images/moneycash-logo.png"
@@ -113,13 +107,11 @@ export function LoanLandingShell({
             />
           </Link>
 
-          {/* Step label */}
-          <span className="text-[0.7rem] font-[800] uppercase tracking-[0.14em] text-[#1496f3]">
+          <span className="ml-auto max-w-[38%] truncate text-right text-[0.7rem] font-[800] uppercase tracking-[0.14em] text-[#1496f3]">
             {mobileStepLabel ?? ''}
           </span>
         </div>
 
-        {/* Thin progress strip */}
         <MobileProgressBar />
       </header>
 
@@ -134,7 +126,7 @@ export function LoanLandingShell({
       <div className={[
         'w-full flex flex-col bg-white lg:mx-auto',
         fullBleedPanel
-          ? 'min-h-0 flex-1 overflow-hidden lg:max-w-[1240px] lg:flex-row lg:items-stretch lg:rounded-[2.5rem] lg:border lg:border-slate-100 lg:relative lg:z-10 lg:shadow-[0_24px_80px_rgba(23,44,113,0.12),0_8px_32px_rgba(23,44,113,0.06)] lg:animate-fade-in-up'
+          ? 'min-h-0 lg:flex-1 lg:overflow-hidden lg:max-w-[1240px] lg:flex-row lg:items-stretch lg:rounded-[2.5rem] lg:border lg:border-slate-100 lg:relative lg:z-10 lg:shadow-[0_24px_80px_rgba(23,44,113,0.12),0_8px_32px_rgba(23,44,113,0.06)] lg:animate-fade-in-up'
           : 'lg:max-w-[1240px] lg:flex-row lg:items-stretch lg:rounded-[2.5rem] lg:shadow-[0_24px_80px_rgba(23,44,113,0.12),0_8px_32px_rgba(23,44,113,0.06)] lg:overflow-hidden lg:border lg:border-slate-100 lg:relative lg:z-10 lg:animate-fade-in-up',
       ].join(' ')}>
 

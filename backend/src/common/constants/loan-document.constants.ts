@@ -9,15 +9,15 @@ export const NBFC_LOGO_FILE = 'moneycash-logo.png';
 export const LENDER_NAME = 'Aasra Fincorp Pvt. Ltd.';
 export const LENDER_LOGO_FILE = 'asra-fincorp-logo.png';
 export const LSP_NAME = 'CREDSOLVE TECHNOLOGIES PRIVATE LIMITED';
-export const DLA_NAME = 'NA';
+export const DLA_NAME = 'MoneyCash (moneycash.in)';
 export const RECOVERY_AGENT_NAME = 'CREDSOLVE TECHNOLOGIES PRIVATE LIMITED';
 export const PAYABLE_TO = 'Aasra Fincorp Pvt. Ltd.';
 
 /** Grievance / nodal contacts shown on KFS (LSP = NBFC/MoneyCash, RE = Lender). */
-export const LSP_GRO_NAME = 'saurabh Agarwal';
+export const LSP_GRO_NAME = 'Saurabh Agarwal';
 export const LSP_GRO_PHONE = '+91-8882911939';
 export const LSP_GRO_EMAIL = 'saurabh@moneycash.in';
-export const LSP_NODAL_NAME = 'saurabh Agarwal';
+export const LSP_NODAL_NAME = 'Saurabh Agarwal';
 export const LSP_NODAL_PHONE = '+91-8882911939';
 export const LSP_NODAL_EMAIL = 'saurabh@moneycash.in';
 export const LENDER_GRO_NAME = 'Subash Patel';

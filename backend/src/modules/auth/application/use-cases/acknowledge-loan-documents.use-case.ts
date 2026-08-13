@@ -8,8 +8,8 @@ import { LeadRepository } from '../../infrastructure/repositories/lead.repositor
 import { LoanDocumentApplicationService } from '../services/loan-document-application.service';
 
 /**
- * Records that the customer reviewed and agreed to loan documents on /loan-documents.
- * No OTP and no email — OTP + sanctioned letter happen after references.
+ * Records that the customer reviewed loan documents on /loan-documents (review-only).
+ * Legal acceptance is eSign OTP after references — not this step.
  */
 @Injectable()
 export class AcknowledgeLoanDocumentsUseCase {

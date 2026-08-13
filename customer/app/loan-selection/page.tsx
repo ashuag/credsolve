@@ -287,7 +287,7 @@ export default function LoanSelectionPage() {
         <SummaryItem label="Principal" value={formatInr(calculations.principal)} />
         <SummaryItem label="Interest" value={formatInr(calculations.interestAmount)} subValue={`${settings.roiPerDayPercent}% per day`} />
         <SummaryItem label="Processing Fee" value={formatInr(calculations.processingFeeAmount)} subValue={`${settings.processingFeePercent}%`} />
-        <SummaryItem label="GST (18%)" value={formatInr(calculations.gstOnProcessing)} />
+        <SummaryItem label={`GST (${settings.processingFeeGstPercent}%)`} value={formatInr(calculations.gstOnProcessing)} />
         <div className="h-px bg-white/10 my-2" />
         <div className="flex justify-between items-center">
           <div className="text-white/60 text-[0.8rem] font-bold uppercase">Repayment</div>
@@ -304,28 +304,13 @@ export default function LoanSelectionPage() {
   const journeyPanel = (
     <div className="h-full flex flex-col justify-center">
       <div className="mb-8">
-        <div className="flex items-center gap-2 mb-8">
-          <div className="flex gap-1.5">
-            <div className="h-2 w-8 rounded-full bg-blue-600"></div>
-            <div className="h-2 w-8 rounded-full bg-blue-600"></div>
-            <div className="h-2 w-8 rounded-full bg-blue-600"></div>
-            <div className="h-2 w-8 rounded-full bg-blue-600"></div>
-            <div className="h-2 w-8 rounded-full bg-blue-600"></div>
-          </div>
-          <span className="ml-3 text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Step 4 — Selection</span>
-        </div>
-
         <h1 className="text-2xl md:text-[2.2rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">
-          Customize your loan.
+          Customize your loan
         </h1>
         <p className="text-[0.95rem] text-slate-500 mb-8 leading-relaxed">
-          Choose an amount between your minimum loan and your pre-approved limit. Repayment date follows our schedule
-          (month-end rule) and is shown in your loan summary on the left.
+          Choose an amount between your minimum loan and your pre-approved limit. Repayment follows our month-end
+          schedule. Interest, processing fee, GST, and in-hand amount update as you adjust the slider.
         </p>
-
-        <div className="mb-6 lg:hidden">
-          <RepaymentDateCard repaymentDate={fixedRepaymentDate} tenureDays={tenureDays} />
-        </div>
 
         <div className="grid gap-6">
           <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
@@ -347,6 +332,16 @@ export default function LoanSelectionPage() {
               <span>{formatInr(sliderMax)}</span>
             </div>
           </div>
+
+          <LoanDetailsCard
+            className="lg:hidden"
+            repaymentDate={fixedRepaymentDate}
+            tenureDays={tenureDays}
+            roiPerDayPercent={settings.roiPerDayPercent}
+            processingFeePercent={settings.processingFeePercent}
+            processingFeeGstPercent={settings.processingFeeGstPercent}
+            calculations={calculations}
+          />
 
           <LoanPurposePicker
             value={loanPurpose}
@@ -397,11 +392,90 @@ function SummaryItem({ label, value, subValue }: { label: string; value: string;
   );
 }
 
-function SummaryRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+function SummaryRow({
+  label,
+  value,
+  subValue,
+}: {
+  label: string;
+  value: string;
+  subValue?: string;
+}) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-[12px] border border-[rgba(18,36,79,0.08)] bg-[rgba(244,249,255,0.74)] px-3.5 py-3">
-      <span className="text-brand-muted text-[0.9rem]">{label}</span>
-      <span className={strong ? 'text-brand-navy font-extrabold' : 'text-brand-navy font-semibold'}>{value}</span>
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div className="text-[0.78rem] font-semibold text-brand-muted">{label}</div>
+        {subValue ? <div className="mt-0.5 text-[0.68rem] font-medium text-slate-400">{subValue}</div> : null}
+      </div>
+      <div className="shrink-0 text-[0.95rem] font-bold text-brand-navy">{value}</div>
+    </div>
+  );
+}
+
+function LoanDetailsCard({
+  className,
+  repaymentDate,
+  tenureDays,
+  roiPerDayPercent,
+  processingFeePercent,
+  processingFeeGstPercent,
+  calculations,
+}: {
+  className?: string;
+  repaymentDate: Date;
+  tenureDays: number;
+  roiPerDayPercent: number;
+  processingFeePercent: number;
+  processingFeeGstPercent: number;
+  calculations: {
+    principal: number;
+    interestAmount: number;
+    processingFeeAmount: number;
+    gstOnProcessing: number;
+    totalRepaymentAmount: number;
+    totalDisbursementAmount: number;
+  };
+}) {
+  return (
+    <div className={`rounded-2xl border border-slate-200 bg-slate-50 p-5 ${className ?? ''}`}>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[0.75rem] font-bold uppercase tracking-wider text-slate-500">Loan details</div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 rounded-xl border border-slate-200 bg-white px-4 py-4">
+        <SummaryRow label="Principal Amount" value={formatInr(calculations.principal)} />
+        <SummaryRow
+          label="Interest"
+          value={formatInr(calculations.interestAmount)}
+          subValue={`${roiPerDayPercent}% per day`}
+        />
+        <SummaryRow
+          label="Processing fee"
+          value={formatInr(calculations.processingFeeAmount)}
+          subValue={`${processingFeePercent}%`}
+        />
+        <SummaryRow
+          label={`GST on processing fee (${processingFeeGstPercent}%)`}
+          value={formatInr(calculations.gstOnProcessing)}
+        />
+        <div className="h-px bg-slate-100" />
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[0.78rem] font-bold uppercase tracking-wide text-slate-500">You repay</span>
+          <span className="text-[1.15rem] font-black text-brand-navy">{formatInr(calculations.totalRepaymentAmount)}</span>
+        </div>
+        <div className="h-px bg-slate-100"  />
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[0.78rem] font-bold uppercase tracking-wide text-slate-500">Repay By</span>
+          <span className="text-[0.78rem] font-black text-brand-navy">{formatRepaymentDateDisplay(repaymentDate)}</span>
+        </div> 
+        <div className="h-px bg-slate-100" />
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-[rgba(18,36,79,0.08)] bg-brand-navy px-3.5 py-3">
+          <span className="text-[0.72rem] font-bold uppercase tracking-wide text-blue-200">In-hand amount</span>
+          <span className="text-[1.05rem] font-black text-[#facc15]">{formatInr(calculations.totalDisbursementAmount)}</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -430,14 +504,14 @@ function LoanPurposePicker({
               key={p.value}
               type="button"
               onClick={() => onChange(active ? '' : p.value)}
-              className={`flex flex-col items-center justify-center gap-1.5 rounded-xl py-3 px-1 border text-center transition-all duration-150 ${
+              className={`min-w-0 overflow-hidden flex flex-col items-center justify-center gap-1.5 rounded-xl py-3 px-1 border text-center transition-all duration-150 ${
                 active
                   ? 'border-brand-blue bg-blue-50 shadow-sm'
                   : 'border-slate-200 bg-white hover:border-brand-blue/40 hover:bg-blue-50/40'
               }`}
             >
               <span className="text-xl leading-none">{p.icon}</span>
-              <span className={`text-[0.6rem] font-extrabold uppercase tracking-wide leading-tight ${
+              <span className={`w-full max-w-full px-0.5 text-[0.55rem] font-extrabold uppercase tracking-tight leading-tight break-words [overflow-wrap:anywhere] ${
                 active ? 'text-brand-blue' : 'text-slate-500'
               }`}>
                 {p.label}

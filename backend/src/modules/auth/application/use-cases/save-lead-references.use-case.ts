@@ -98,7 +98,7 @@ export class SaveLeadReferencesUseCase {
         LIMIT 1
       `;
       if (!reviewedRows[0]?.loanDocumentsReviewedAt) {
-        throw new BadRequestException('Review and agree to loan documents before adding references.');
+        throw new BadRequestException('Review the sanction letter before adding references.');
       }
 
       await Promise.all(

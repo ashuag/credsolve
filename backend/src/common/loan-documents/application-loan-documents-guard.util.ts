@@ -6,7 +6,7 @@ export function assertLoanDocumentsReviewedForApplication(
 ): void {
   if (!application?.details?.loanDocumentsReviewedAt) {
     throw new BadRequestException(
-      'Review and agree to the sanction letter and Key Fact Statement before starting KYC.',
+      'Review the sanction letter and Key Fact Statement before starting KYC.',
     );
   }
 }

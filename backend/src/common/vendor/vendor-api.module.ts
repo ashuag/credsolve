@@ -4,8 +4,6 @@ import { BureauFetchService } from './bureau-fetch.service';
 import { BankTenacioVendorService } from './bank-tenacio-vendor.service';
 import { DigilockerFetchService } from './digilocker-fetch.service';
 import { DigilockerVendorService } from './digilocker-vendor.service';
-import { LivenessVendorService } from './liveness-vendor.service';
-import { KycTenacioVendorService } from './kyc-tenacio-vendor.service';
 import { PanVerificationService } from './pan-verification.service';
 import { SurepassCibilModule } from './surepass/surepass-cibil.module';
 import { SurepassDigilockerModule } from './surepass/surepass-digilocker.module';
@@ -33,9 +31,7 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
     BureauFetchService,
     DigilockerVendorService,
     DigilockerFetchService,
-    LivenessVendorService,
     BankTenacioVendorService,
-    KycTenacioVendorService,
     EasebuzzWireService,
   ],
   exports: [
@@ -46,9 +42,7 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
     BureauFetchService,
     DigilockerVendorService,
     DigilockerFetchService,
-    LivenessVendorService,
     BankTenacioVendorService,
-    KycTenacioVendorService,
     EasebuzzWireService,
     SurepassCibilModule,
     SurepassDigilockerModule,

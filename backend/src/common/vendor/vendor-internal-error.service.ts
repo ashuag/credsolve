@@ -17,7 +17,8 @@ type LatestVendorLogRow = {
 };
 
 function resolveLivenessAuditServiceName(): string {
-  return (process.env.TENACIO_LIVENESS_AUDIT_SERVICE ?? 'liveness').trim() || 'liveness';
+  // Historical vendor_api_log service name for the removed Tenacio passive-liveness path.
+  return 'liveness';
 }
 
 @Injectable()

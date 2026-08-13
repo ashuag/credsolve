@@ -1,5 +1,4 @@
 import type { KycFilesService } from './kyc-files.service';
-import { isPubliclyReachableHttpUrl } from './kyc-liveness-selfie-url.util';
 
 export type KycPublicObjectUrlResult =
   | { ok: true; url: string }
@@ -9,8 +8,29 @@ function trimBase(base: string): string {
   return base.trim().replace(/\/+$/, '');
 }
 
+/** True when `url` looks fetchable from the public internet (not localhost / RFC1918). */
+export function isPubliclyReachableHttpUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+      return false;
+    }
+    const host = u.hostname.toLowerCase();
+    if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.local')) {
+      return false;
+    }
+    if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) return false;
+    if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(host)) return false;
+    if (/^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(host)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Absolute HTTPS URL for a stored object key (Tenacio must fetch from the public internet).
+ * Absolute HTTPS URL for a stored object key (public CDN / Spaces).
+ * Kept for LOS uploads and any future vendor that must fetch an object by URL.
  */
 export async function resolveKycPublicObjectUrl(
   kycFiles: KycFilesService,
@@ -21,7 +41,7 @@ export async function resolveKycPublicObjectUrl(
     return { ok: false, error: 'Object path is missing.' };
   }
 
-  for (const envName of ['KYC_LIVENESS_SELFIE_PUBLIC_BASE_URL', 'STORAGE_BASE_URL'] as const) {
+  for (const envName of ['STORAGE_BASE_URL', 'S3_URL'] as const) {
     const base = trimBase(process.env[envName] ?? '');
     if (!base) continue;
     const candidate = `${base}/${rel}`;
@@ -42,8 +62,7 @@ export async function resolveKycPublicObjectUrl(
 
   return {
     ok: false,
-    error:
-      'Configure a public object URL (STORAGE_BASE_URL / DigitalOcean Spaces) so Tenacio can download the image.',
+    error: 'Configure a public object URL (STORAGE_BASE_URL / DigitalOcean Spaces).',
   };
 }
 

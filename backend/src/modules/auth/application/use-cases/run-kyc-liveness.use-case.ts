@@ -303,6 +303,7 @@ export class RunKycLivenessUseCase {
 
       if (!verification.probeQuality.ok) {
         const reason = verification.probeQuality.reason ?? 'Selfie face validation failed.';
+        // Infrastructure failures (missing TF natives) are not fixed by retaking the photo.
         const isInfraFailure = /tensorflow native bindings failed to load/i.test(reason);
         return {
           ok: false,

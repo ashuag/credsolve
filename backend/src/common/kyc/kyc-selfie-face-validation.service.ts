@@ -66,8 +66,7 @@ export class KycSelfieFaceValidationService implements OnModuleDestroy {
     if (!isKycMlAvailable()) {
       return {
         ok: false,
-        reason:
-          'Selfie face validation is unavailable on this server (TensorFlow native bindings failed to load).',
+        reason: 'Selfie face validation is unavailable on this server (TensorFlow native bindings failed to load).',
       };
     }
     const inspection = await this.inspectJpegBuffer(buffer);
@@ -80,7 +79,8 @@ export class KycSelfieFaceValidationService implements OnModuleDestroy {
   /**
    * Dry-run inspection for customer KYC (`verifyPair`) and LOS developer tools.
    * Soft-skips in non-production when native TF bindings are missing — same policy as
-   * {@link validateJpegBuffer}.
+   * {@link validateJpegBuffer} — so Apple Silicon arm64 Docker does not block the journey
+   * with a photo-retry hint for a server binding problem.
    */
   async inspectJpegBuffer(buffer: Buffer): Promise<KycSelfieFaceInspection> {
     if (!buffer.length) {

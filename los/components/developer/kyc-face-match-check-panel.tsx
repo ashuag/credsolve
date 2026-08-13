@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   buildLocalFaceMatchExtraRows,
-  KycTenacioVendorResult,
-} from '@/components/developer/kyc-tenacio-vendor-result';
+  KycFaceMatchResultCard,
+} from '@/components/developer/kyc-face-match-result-card';
 import { cx, getLosToken } from '@/components/eligibility/eligibility-ui';
 import {
   runKycFaceMatchCheck,
@@ -116,7 +116,7 @@ function PhotoQualityResultCard({
 }) {
   return (
     <div className="grid gap-2">
-      <KycTenacioVendorResult
+      <KycFaceMatchResultCard
         result={{
           configured: true,
           ok: quality.ok,
@@ -567,7 +567,7 @@ export function KycFaceMatchCheckPanel() {
 
           {result.local ? (
             <>
-              <KycTenacioVendorResult
+              <KycFaceMatchResultCard
                 result={{
                   configured: true,
                   ok: result.local.ok,

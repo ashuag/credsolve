@@ -119,7 +119,7 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
   const loanDone = Boolean(row.details?.loanAmount);
   const refsDone = (row.referencesCount ?? 0) >= 2;
   const emailDone = Boolean(row.emailVerifiedAt);
-  /** Agree on /loan-documents (no OTP). */
+  /** Reviewed sanction letter on /loan-documents (no OTP). */
   const letterReviewed = Boolean(row.loanDocuments.reviewedAt ?? row.loanDocuments.acceptedAt);
   /** Mobile OTP after references. */
   const letterAccepted = Boolean(row.loanDocuments.acceptedAt);

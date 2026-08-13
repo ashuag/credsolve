@@ -34,6 +34,8 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
     pathname === '/pre-approved-loan' || pathname === '/loan-selection';
   const isAccountLoginPage = pathname === '/my-account';
   const isOnboardingLayout = pathname === '/onboarding' || pathname === '/email-verify';
+  /** Bank / references use LoanLandingShell (same mobile chrome as apply-for-loan). */
+  const isBankJourneyPage = pathname === '/bank-details' || pathname === '/references';
   const isLoanDocumentsPage = pathname === '/loan-documents';
   const isKycJourneyPage = pathname === '/kyc' || pathname.startsWith('/kyc/');
   const isLegalPage = SELF_CONTAINED_LEGAL_ROUTES.has(pathname);
@@ -73,7 +75,7 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
 
   if (isLoanDocumentsPage) {
     return (
-      <div className="flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden">
+      <>
         <div className="hidden shrink-0 lg:block">
           <Suspense
             fallback={
@@ -86,11 +88,13 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
             <BrandHeader />
           </Suspense>
         </div>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:px-4 lg:py-3">{children}</div>
-      </div>
+        <div className="flex min-h-screen w-full flex-col items-stretch justify-start lg:h-[100dvh] lg:max-h-[100dvh] lg:min-h-0 lg:overflow-hidden lg:px-4 lg:py-3">
+          {children}
+        </div>
+      </>
     );
   }
-  if (isOnboardingLayout) {
+  if (isOnboardingLayout || isBankJourneyPage) {
     return (
       <>
         <div className="hidden lg:block">
@@ -105,7 +109,7 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
             <BrandHeader />
           </Suspense>
         </div>
-        <div className="flex w-full min-h-[calc(100vh-72px)] flex-col items-stretch justify-start lg:items-center lg:py-8">
+        <div className="flex min-h-screen w-full flex-col items-stretch justify-start lg:min-h-[calc(100vh-72px)] lg:items-center lg:py-8">
           {children}
         </div>
       </>

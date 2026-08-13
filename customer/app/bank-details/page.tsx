@@ -260,21 +260,9 @@ export default function BankDetailsPage() {
   const journeyPanel = (
     <div className="h-full flex flex-col justify-center">
       <div className="mb-6">
-        <div className="flex items-center gap-2 mb-8">
-          <div className="flex gap-1.5">
-            {[...Array(7)].map((_, i) => (
-              <div key={i} className="h-2 w-8 rounded-full bg-blue-600"></div>
-            ))}
-          </div>
-          <span className="ml-3 text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Step 6 — Disbursement</span>
-        </div>
-
         <h1 className="text-2xl md:text-[2.2rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">
-          Receive Money.
+          Verify your bank details
         </h1>
-        <p className="text-[0.95rem] text-slate-500 mb-8 leading-relaxed">
-          Enter your IFSC — we fetch branch details for you to review. When you submit, we verify your account.
-        </p>
 
         <div className="grid gap-4">
           <div>
@@ -471,36 +459,49 @@ export default function BankDetailsPage() {
 
   return (
     <CustomerJourneyGuard>
-      <div className="min-h-screen bg-[linear-gradient(135deg,#f8faff,#e6f0ff)] flex items-center justify-center p-4 sm:p-6 md:p-8">
-        <LoanLandingShell
-          journeyPanel={journeyPanel}
-          leftTitle={<>Instant <span className="text-[#60a5fa]">Disbursement</span></>}
-          leftDescription="We verify your account securely before crediting your loan. Review IFSC details, then confirm to submit your application for review."
-          leftInfographic={
-            <svg viewBox="0 0 400 400" className="w-full h-full drop-shadow-2xl" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="moneyGrad" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stopColor="#34d399" />
-                  <stop offset="100%" stopColor="#059669" />
-                </linearGradient>
-              </defs>
-              <g transform="translate(100, 120)">
-                <path d="M0 120 H200 V140 H0 Z" fill="#1e3a8a" />
-                <path d="M20 120 V50 H180 V120" fill="#1e40af" />
-                <path d="M10 50 L100 0 L190 50 Z" fill="#1e3a8a" />
-                <rect x="40" y="70" width="20" height="30" fill="rgba(255,255,255,0.2)" />
-                <rect x="90" y="70" width="20" height="30" fill="rgba(255,255,255,0.2)" />
-                <rect x="140" y="70" width="20" height="30" fill="rgba(255,255,255,0.2)" />
-                <circle cx="220" cy="40" r="30" fill="url(#moneyGrad)" className="animate-bounce" />
-                <text x="220" y="50" textAnchor="middle" fill="white" fontSize="30" fontWeight="bold">
-                  ₹
-                </text>
-                <path d="M180 40 Q250 40 250 100" stroke="#facc15" strokeWidth="6" strokeDasharray="10,5" fill="none" />
-                <path d="M245 95 L250 105 L255 95" fill="#facc15" />
-              </g>
-            </svg>
-          }
-        />
+      <div className="flex min-h-screen w-full flex-col selection:bg-[#ffc519]/30 bg-[#fffdf8] lg:min-h-0 lg:bg-transparent">
+        <main className="relative flex grow flex-col items-center justify-center p-0">
+          <div className="pointer-events-none absolute inset-0 overflow-hidden lg:hidden">
+            <div className="absolute top-0 left-1/2 h-[600px] w-[100vw] -translate-x-1/2 bg-[radial-gradient(ellipse_at_top,_rgba(20,150,243,0.06)_0%,_transparent_60%)]" />
+          </div>
+
+          <LoanLandingShell
+            showSpeedometer
+            journeyPanel={journeyPanel}
+            leftTitle={
+              <>
+                Instant <span className="text-[#60a5fa]">Disbursement</span>
+              </>
+            }
+            leftDescription="We verify your account securely before crediting your loan. Review IFSC details, then confirm to submit your application for review."
+            leftInfographic={
+              <svg viewBox="0 0 400 400" className="w-full h-full drop-shadow-2xl" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="moneyGrad" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#34d399" />
+                    <stop offset="100%" stopColor="#059669" />
+                  </linearGradient>
+                </defs>
+                <g transform="translate(100, 120)">
+                  <path d="M0 120 H200 V140 H0 Z" fill="#1e3a8a" />
+                  <path d="M20 120 V50 H180 V120" fill="#1e40af" />
+                  <path d="M10 50 L100 0 L190 50 Z" fill="#1e3a8a" />
+                  <rect x="40" y="70" width="20" height="30" fill="rgba(255,255,255,0.2)" />
+                  <rect x="90" y="70" width="20" height="30" fill="rgba(255,255,255,0.2)" />
+                  <rect x="140" y="70" width="20" height="30" fill="rgba(255,255,255,0.2)" />
+                  <circle cx="220" cy="40" r="30" fill="url(#moneyGrad)" className="animate-bounce" />
+                  <text x="220" y="50" textAnchor="middle" fill="white" fontSize="30" fontWeight="bold">
+                    ₹
+                  </text>
+                  <path d="M180 40 Q250 40 250 100" stroke="#facc15" strokeWidth="6" strokeDasharray="10,5" fill="none" />
+                  <path d="M245 95 L250 105 L255 95" fill="#facc15" />
+                </g>
+              </svg>
+            }
+            mobileStepLabel="Bank"
+            mobileOnBack={() => router.push('/kyc')}
+          />
+        </main>
       </div>
     </CustomerJourneyGuard>
   );

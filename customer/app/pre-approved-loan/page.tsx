@@ -175,20 +175,8 @@ export default function PreApprovedLoanPage() {
     content = (
       <div className="h-full flex flex-col justify-center py-4">
         <div className="mb-8">
-          <div className="flex items-center gap-2 mb-6">
-            <div className="flex gap-1.5">
-              <div className="h-2 w-8 rounded-full bg-blue-600"></div>
-              <div className="h-2 w-8 rounded-full bg-blue-600"></div>
-              <div className="h-2 w-8 rounded-full bg-blue-600"></div>
-              <div className="h-2 w-8 rounded-full bg-blue-600"></div>
-            </div>
-            <span className="ml-3 text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">
-              Step 3 — Offer
-            </span>
-          </div>
-
           <div className="mb-8">
-            <AmountVisual amount={formatInr(amountInr)} caption="Secured offer generated." />
+            <AmountVisual amount={formatInr(amountInr)} caption="Your offer is locked in." />
           </div>
 
           <p className="text-[1rem] text-slate-600 leading-relaxed mb-8 font-medium">
