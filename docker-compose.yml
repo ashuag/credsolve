@@ -28,10 +28,11 @@ services:
     image: moneycash-backend-dev:local
     tty: true
     env_file: ./backend/.env
-    # @tensorflow/tfjs-node only ships linux-x64 bindings. Force amd64 so in-house
-    # face-api (KYC selfie + Aadhaar match) works on Apple Silicon Docker (via qemu).
-    # After changing platform, recreate and wipe backend/node_modules so addons rebuild.
-    platform: linux/amd64
+    # Do NOT force linux/amd64 here. On Apple Silicon that runs the whole Nest
+    # process under qemu (slow startup, platform warnings). @tensorflow/tfjs-node
+    # has no linux-arm64 bindings — KYC ML soft-skips via kyc-ml-runtime.ts so
+    # auth/LOS still work. For in-Docker face-api, use:
+    #   docker compose -f docker-compose.yml -f docker-compose.tfjs-amd64.yml up -d backend
     # Nest must listen on all interfaces so other containers (customer, los) can reach `backend:4001`.
     environment:
       HOST: "0.0.0.0"

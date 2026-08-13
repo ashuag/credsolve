@@ -1,0 +1,11 @@
+# Optional override: run the backend as linux/amd64 so @tensorflow/tfjs-node
+# (linux-x64) loads for in-house KYC face checks inside Docker on Apple Silicon.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.tfjs-amd64.yml up -d --force-recreate backend
+#
+# Expect a platform mismatch warning — that is qemu emulation, not a failed start.
+# After switching platform, wipe native addons so they rebuild for the new arch:
+#   docker compose run --rm backend sh -c 'rm -rf node_modules && npm ci'
+services:
+  backend:
+    platform: linux/amd64
