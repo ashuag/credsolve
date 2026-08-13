@@ -39,15 +39,6 @@ export default function ThankYouInterestPage() {
   const journeyPanel = (
     <div className="h-full flex flex-col justify-center">
       <div className="mb-6">
-        <div className="flex items-center gap-2 mb-8">
-          <div className="flex gap-1.5">
-            <div className="h-2 w-8 rounded-full bg-amber-400"></div>
-          </div>
-          <span className="ml-3 text-[0.7rem] font-black text-amber-600 uppercase tracking-widest">
-            Application Update
-          </span>
-        </div>
-
         <h1 className="text-2xl md:text-[2.5rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">
           Thank You for Your Interest
         </h1>

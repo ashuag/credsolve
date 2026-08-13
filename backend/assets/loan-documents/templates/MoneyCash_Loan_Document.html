@@ -735,7 +735,7 @@ th.teal-hdr { background: var(--teal); }
       <tr>
         <td class="td-sr">4</td>
         <td class="td-label">Name of the Digital Lending Application (DLA)</td>
-        <td class="td-val fixed-val">NA</td>
+        <td class="td-val fixed-val">MoneyCash (moneycash.in)</td>
       </tr>
       <tr>
         <td class="td-sr">5</td>
@@ -1316,19 +1316,19 @@ th.teal-hdr { background: var(--teal); }
     <div class="sig-block">
       <div class="sig-row">
         <span class="sig-label">Digitally Signed by:</span>
-        <input type="text" id="sig_signed_by" class="field cf xl" placeholder="Full Legal Name of Borrower" title="Filled by Customer / Borrower" autocomplete="off">
+        <input type="text" id="sig_signed_by" class="field cf xl" placeholder="" title="Filled on eSign acceptance" autocomplete="off">
       </div>
       <div class="sig-row">
         <span class="sig-label">Name:</span>
-        <input type="text" id="sig_name" class="field cf xl" placeholder="Full Name" title="Filled by Customer / Borrower" autocomplete="off">
+        <input type="text" id="sig_name" class="field cf xl" placeholder="" title="Filled on eSign acceptance" autocomplete="off">
       </div>
       <div class="sig-row">
         <span class="sig-label">IP Address:</span>
-        <input type="text" id="sig_ip" class="field lf sm" placeholder="Auto-filled" title="Auto-captured IP address" readonly style="color:var(--muted)">
+        <input type="text" id="sig_ip" class="field lf sm" placeholder="" title="Captured at eSign acceptance" readonly style="color:var(--muted)">
       </div>
       <div class="sig-row">
         <span class="sig-label">Timestamp:</span>
-        <input type="text" id="sig_ts" class="field lf md" placeholder="Auto-filled on acceptance" title="Auto-captured timestamp" readonly style="color:var(--muted)">
+        <input type="text" id="sig_ts" class="field lf md" placeholder="" title="Captured at eSign acceptance" readonly style="color:var(--muted)">
       </div>
     </div>
 
@@ -1411,13 +1411,6 @@ syncField('kfs_date', ['ct_date']);
 //  AUTO-FILL: timestamp & IP
 // ============================================================
 window.addEventListener('load', () => {
-  const ts = document.getElementById('sig_ts');
-  if (ts) ts.value = new Date().toLocaleString('en-IN', {timeZone:'Asia/Kolkata'}) + ' IST';
-  // Fetch public IP
-  fetch('https://api.ipify.org?format=json')
-    .then(r => r.json())
-    .then(d => { const ip = document.getElementById('sig_ip'); if (ip) ip.value = d.ip; })
-    .catch(() => { const ip = document.getElementById('sig_ip'); if (ip) ip.value = '(captured at acceptance)'; });
   updateProgress();
 });
 

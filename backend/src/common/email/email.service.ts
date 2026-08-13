@@ -261,11 +261,11 @@ export class EmailService {
     attachments: EmailAttachment[],
     audit?: Pick<SendEmailAuditContext, 'leadId'>,
   ): Promise<void> {
-    const subject = 'Your MoneyCash KYC letter — Key Fact Statement';
+    const subject = 'Your MoneyCash Sanction letter — Key Fact Statement';
     const text = [
       'Thank you for completing your references.',
       '',
-      'Attached is your KYC letter (Key Fact Statement) for your records.',
+      'Attached is your Sanction letter (Key Fact Statement) for your records.',
       '',
       'Please verify the OTP sent to your registered mobile number to receive your signed sanctioned letter.',
       '',
@@ -274,7 +274,7 @@ export class EmailService {
 
     const html = `
       <p>Thank you for completing your references.</p>
-      <p>Attached is your <strong>KYC letter (Key Fact Statement)</strong> for your records.</p>
+      <p>Attached is your <strong>Sanction letter (Key Fact Statement)</strong> for your records.</p>
       <p style="color:#555;font-size:0.9em;">Please verify the OTP sent to your registered mobile number to receive your signed sanctioned letter.</p>
       <p style="color:#555;font-size:0.85em;">If you did not submit this application, please contact support.</p>
     `.trim();

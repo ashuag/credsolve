@@ -1,4 +1,5 @@
-import { API_URL, fetchWithTimeout, SERVER_REVALIDATE_SECONDS } from './_shared';
+import { getLosServerApiBase } from '../api-env';
+import { fetchWithTimeout, SERVER_REVALIDATE_SECONDS } from './_shared';
 
 export type LosPartnerTeamMember = {
   id: string;
@@ -40,7 +41,7 @@ const partnersFallback: LosPartner[] = [
 
 export async function getPartners(): Promise<LosPartner[]> {
   try {
-    const response = await fetchWithTimeout(`${API_URL}/partners`, {
+    const response = await fetchWithTimeout(`${getLosServerApiBase()}/partners`, {
       next: { revalidate: SERVER_REVALIDATE_SECONDS },
     });
     if (!response.ok) return partnersFallback;

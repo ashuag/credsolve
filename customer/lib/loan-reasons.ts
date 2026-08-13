@@ -2,7 +2,7 @@
 export type CustomerLoanPurposeOption = {
   /** Stored in `loan_detail.reason_for_loan_id` via exact name lookup. */
   value: string;
-  /** Short label shown in the customer picker. */
+  /** Short label shown in the picker and printed verbatim on the sanction letter (KFS Field 6). */
   label: string;
   icon: string;
 };

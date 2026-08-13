@@ -53,7 +53,7 @@ export async function acknowledgeLoanDocuments(): Promise<{ success: boolean; re
   const data = await apiPost<{ success: boolean; reviewedAt: string }>(
     '/auth/loan-documents/acknowledge',
     {},
-    'Unable to confirm loan documents.',
+    'Unable to continue after reviewing documents.',
   );
   if (!data) {
     throw new Error('Unable to confirm loan documents.');

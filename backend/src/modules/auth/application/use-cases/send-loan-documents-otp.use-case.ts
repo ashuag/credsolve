@@ -42,7 +42,7 @@ export class SendLoanDocumentsOtpUseCase {
     }
 
     if (!app.loanDocumentsReviewedAt) {
-      throw new BadRequestException('Review and agree to loan documents before requesting OTP.');
+      throw new BadRequestException('Review the sanction letter before requesting OTP.');
     }
 
     const refsCount = await this.prisma.client.applicationReference.count({

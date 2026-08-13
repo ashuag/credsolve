@@ -1,6 +1,6 @@
 import type { CustomerSessionResponse } from './api/customer-session';
 
-/** True after loan documents were reviewed/agreed (no OTP required on that page). */
+/** True after the sanction letter was reviewed on /loan-documents (eSign OTP is later). */
 export function isLoanDocumentsJourneyComplete(
   session: CustomerSessionResponse | null | undefined,
 ): boolean {

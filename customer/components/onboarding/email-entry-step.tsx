@@ -246,8 +246,8 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', le
               className={`text-[0.9rem] leading-[1.55] ${emailError ? 'text-[#b2372d]' : 'text-brand-muted'}`}
             >
               {emailError || (isLogin
-                ? 'We send a 6-digit code to your email. In dev/staging the code also appears on the next screen if mail is delayed.'
-                : 'We send a 6-digit code to your email. In dev/staging the code also appears on the next screen if mail is delayed.')}
+                ? 'We send a 6-digit code to your email.'
+                : 'We send a 6-digit code to your email.')}
             </p>
 
           <div className="sticky bottom-0 z-10 bg-white/95 backdrop-blur-sm mt-4 pb-[max(12px,env(safe-area-inset-bottom))] -mx-5 px-5 pt-3 border-t border-slate-100 lg:mx-0 lg:px-0">

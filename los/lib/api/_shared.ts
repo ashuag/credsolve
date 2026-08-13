@@ -2,11 +2,14 @@
  * Internal helpers for the LOS API client. NOT re-exported from
  * `@/lib/api` — keep these private to the api/ folder so consumers of
  * the public surface can't reach into transport plumbing.
+ *
+ * Do not call `getLosServerApiBase()` at module load. This file is pulled
+ * into client components via `@/lib/api`; `API_SERVER_URL` is server-only
+ * and a top-level call falls back to `NEXT_PUBLIC_API_URL=/api/los` and throws.
  */
-import { buildLosApiUrl, getLosClientApiBase, getLosServerApiBase } from '../api-env';
+import { buildLosApiUrl, getLosClientApiBase } from '../api-env';
 import { LOS_COOKIE_NAME, LOS_STORAGE_KEY } from '../auth';
 
-export const API_URL = getLosServerApiBase();
 export const SERVER_REVALIDATE_SECONDS = 30;
 export const CLIENT_READ_CACHE_TTL_MS = 30_000;
 const DEFAULT_FETCH_TIMEOUT_MS = 30_000;

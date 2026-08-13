@@ -82,16 +82,6 @@ export function LoanEntryPanel() {
   return (
     <section className="h-full flex flex-col justify-center" aria-labelledby="entry-heading">
       <div className="mb-8">
-        {/* Modern Visual Stepper */}
-        <div className="flex items-center gap-2 mb-8">
-          <div className="flex gap-1.5">
-            <div className="h-2 w-8 rounded-full bg-blue-600"></div>
-            <div className="h-2 w-8 rounded-full bg-slate-100"></div>
-            <div className="h-2 w-8 rounded-full bg-slate-100"></div>
-          </div>
-          <span className="ml-3 text-[0.7rem] font-black text-slate-400 uppercase tracking-widest">Step 1 — Onboarding</span>
-        </div>
-
         <h2 id="entry-heading" className="text-2xl md:text-[1.8rem] font-extrabold text-brand-navy mb-6 tracking-tight leading-[1.1] whitespace-nowrap">
           Unlock Your <span className="text-brand-blue">Instant Loan</span>
         </h2>

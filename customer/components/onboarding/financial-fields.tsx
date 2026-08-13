@@ -1,6 +1,7 @@
 import type { ChangeEvent } from 'react';
 import { SessionRequiredAlert } from '@/components/auth/session-required-alert';
 import { SearchableCityInput, type CityInputChange } from '@/components/ui/searchable-city-input';
+import { cn } from '@/lib/cn';
 import {
   CUSTOMER_CREDIT_CONSENT_REASSURANCE,
   CUSTOMER_CREDIT_CONSENT_TEXT,
@@ -55,18 +56,69 @@ export function FinancialFields({
           value={fields.addressLine2} onChange={onFieldChange('addressLine2')} />
       </div>
 
-      <div className="mt-4 md:mt-5 p-4 rounded-xl bg-slate-50 border border-slate-200">
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input id="creditConsentAccepted" name="creditConsentAccepted" type="checkbox"
-            checked={fields.creditConsentAccepted} onChange={onConsent}
-            className="mt-1 h-5 w-5 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-          <span className="text-[0.85rem] leading-relaxed text-slate-600">{CUSTOMER_CREDIT_CONSENT_TEXT}</span>
+      <div
+        className={cn(
+          'mt-4 md:mt-5 overflow-hidden rounded-2xl border transition-all duration-200',
+          fields.creditConsentAccepted
+            ? 'border-[rgba(20,150,243,0.38)] bg-[linear-gradient(180deg,rgba(20,150,243,0.09),rgba(255,255,255,0.94))] shadow-[0_10px_22px_rgba(23,44,113,0.08)]'
+            : errors.creditConsentAccepted
+              ? 'border-red-300 bg-red-50/70'
+              : 'border-[rgba(18,36,79,0.12)] bg-[rgba(248,251,255,0.92)] hover:border-[rgba(20,150,243,0.28)]',
+        )}
+      >
+        <label htmlFor="creditConsentAccepted" className="block cursor-pointer p-4">
+         
+          <div className="text-[0.85rem] leading-[1.55] text-brand-navy/80">
+            <span className="relative float-left mt-[0.15rem] mr-2.5 inline-flex h-5 w-5">
+              <input
+                id="creditConsentAccepted"
+                name="creditConsentAccepted"
+                type="checkbox"
+                checked={fields.creditConsentAccepted}
+                onChange={onConsent}
+                aria-invalid={Boolean(errors.creditConsentAccepted)}
+                aria-describedby={
+                  errors.creditConsentAccepted
+                    ? 'creditConsentReassurance creditConsentAccepted-error'
+                    : 'creditConsentReassurance'
+                }
+                className="peer absolute inset-0 z-10 cursor-pointer opacity-0"
+              />
+              <span
+                className={cn(
+                  'pointer-events-none flex h-5 w-5 items-center justify-center rounded-[6px] border-2 transition-all',
+                  'peer-focus-visible:ring-2 peer-focus-visible:ring-brand-blue/35 peer-focus-visible:ring-offset-1',
+                  fields.creditConsentAccepted
+                    ? 'border-brand-blue bg-brand-blue text-white'
+                    : 'border-slate-300 bg-white text-transparent',
+                )}
+              >
+                <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.4">
+                  <path d="M3 8.2 6.2 11.5 13 4.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+            </span>
+            {CUSTOMER_CREDIT_CONSENT_TEXT}
+          </div>
+
+          <p
+            id="creditConsentReassurance"
+            className="mt-3 clear-both m-0 flex items-start gap-2 rounded-xl bg-[rgba(36,168,111,0.1)] px-3 py-2.5 text-[0.8rem] font-semibold leading-snug text-[#17624a]"
+          >
+            <svg viewBox="0 0 20 20" className="mt-0.5 h-4 w-4 shrink-0" fill="currentColor" aria-hidden>
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                clipRule="evenodd"
+              />
+            </svg>
+            {CUSTOMER_CREDIT_CONSENT_REASSURANCE}
+          </p>
         </label>
-        <p className="mt-2 pl-8 m-0 text-[0.8rem] font-medium text-emerald-700">
-          {CUSTOMER_CREDIT_CONSENT_REASSURANCE}
-        </p>
         {errors.creditConsentAccepted && (
-          <p id="creditConsentAccepted-error" className="mt-2 text-[#b2372d] text-sm font-medium">{errors.creditConsentAccepted}</p>
+          <p id="creditConsentAccepted-error" className="m-0 border-t border-red-200 px-4 py-2.5 text-[0.8rem] font-semibold text-[#b2372d]">
+            {errors.creditConsentAccepted}
+          </p>
         )}
       </div>
 

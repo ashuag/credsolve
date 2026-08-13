@@ -6,6 +6,7 @@ import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { LoanDocumentScrollPanel } from '@/components/loan-documents/loan-document-scroll-panel';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { LoanCalculationLeftRail } from '@/components/loan/loan-calculation-left-rail';
+import { JourneyProgressProvider, useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 import { AlertBanner } from '@/components/ui/alert-banner';
 import { Spinner } from '@/components/ui/spinner';
 import {
@@ -14,16 +15,29 @@ import {
   type LoanDocumentItem,
 } from '@/lib/api/loan-documents';
 import { CUSTOMER_EMAIL_JOURNEY_PATH, getCustomerJourneyResumePath } from '@/lib/api/customer-session';
+import { buildCustomerJourneyProgress } from '@/lib/customer-journey-progress';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 
-export default function LoanDocumentsPage() {
+function LoanDocumentsProgressSync() {
+  const journey = useJourneyProgressOptional();
+  const { session } = useCustomerSession();
+
+  useEffect(() => {
+    const progress = buildCustomerJourneyProgress(session);
+    journey?.setCompletion01(Math.min(1, progress.percent / 100 + 0.05));
+  }, [journey, session]);
+
+  return null;
+}
+
+function LoanDocumentsContent() {
   const router = useRouter();
   const { session, refresh: refreshSession } = useCustomerSession();
   const loanSelection = session?.authenticated === true ? session.loanSelection : null;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [documents, setDocuments] = useState<LoanDocumentItem[]>([]);
-  const [agreedByType, setAgreedByType] = useState<Record<string, boolean>>({});
+  const [readyByType, setReadyByType] = useState<Record<string, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -50,11 +64,11 @@ export default function LoanDocumentsPage() {
   }, [refreshSession, router]);
 
   const current = documents[0];
-  const allAgreed =
-    documents.length > 0 && documents.every((d) => agreedByType[d.type] === true);
+  const allReviewed =
+    documents.length > 0 && documents.every((d) => readyByType[d.type] === true);
 
-  async function handleAgreeAndContinue() {
-    if (!allAgreed) return;
+  async function handleContinue() {
+    if (!allReviewed) return;
     setError('');
     setIsSubmitting(true);
     try {
@@ -69,46 +83,54 @@ export default function LoanDocumentsPage() {
   }
 
   const journeyPanel = (
-    <div className="flex w-full min-w-0 flex-col">
+    <div className="flex w-full min-w-0 flex-1 flex-col lg:justify-center">
       {loading ? (
         <div className="flex flex-col items-center gap-4 py-16">
           <Spinner size={48} />
-          <p className="text-slate-500 font-medium">Preparing your loan documents…</p>
+          <p className="font-medium text-slate-500">Preparing your loan documents…</p>
         </div>
       ) : current ? (
-        <div className="flex w-full min-w-0 flex-col gap-4 pb-2">
+        <div className="flex w-full min-w-0 flex-1 flex-col gap-5 pb-2 lg:gap-4 lg:pb-0">
           <div>
-            <h1 className="mb-2 text-2xl font-black text-brand-navy">KYC letter cum Key Fact Statement</h1>
-            <p className="mb-2 text-sm text-slate-500">
-              Read the full document below. Confirm your agreement to continue to KYC. No OTP is sent here and
-              nothing is emailed yet — after references you will verify one OTP to receive your signed sanctioned
-              letter.
+            <p className="mc-chip mb-3">Sanction letter</p>
+            <h1 className="mb-2 text-2xl font-extrabold leading-[1.1] tracking-tight text-brand-navy md:text-[2.1rem]">
+              Review your sanction letter
+            </h1>
+            <p className="text-[0.95rem] leading-relaxed text-slate-500">
+              Read the Key Fact Statement. Legal acceptance happens later by eSign OTP.
             </p>
-            {error ? <AlertBanner variant="error">{error}</AlertBanner> : null}
+            {error ? (
+              <div className="mt-3">
+                <AlertBanner variant="error">{error}</AlertBanner>
+              </div>
+            ) : null}
           </div>
+
           <LoanDocumentScrollPanel
             key={current.type}
             title={current.title}
             pdfUrlFragment={current.pdfUrl}
-            agreed={agreedByType[current.type] === true}
-            onAgreedChange={(next) =>
-              setAgreedByType((prev) => ({ ...prev, [current.type]: next }))
+            onReadyChange={(next) =>
+              setReadyByType((prev) => ({ ...prev, [current.type]: next }))
             }
           />
-          <button
-            type="button"
-            disabled={!allAgreed || isSubmitting}
-            onClick={() => void handleAgreeAndContinue()}
-            className="mc-btn-primary w-full shrink-0 py-4"
-          >
-            {isSubmitting ? (
-              <span className="inline-flex items-center justify-center gap-2">
-                <Spinner size={20} /> Continuing…
-              </span>
-            ) : (
-              'I agree — continue to KYC'
-            )}
-          </button>
+
+          <div className="sticky bottom-0 z-20 -mx-5 mt-auto border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur-md lg:static lg:mx-0 lg:mt-2 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0 lg:backdrop-blur-none">
+            <button
+              type="button"
+              disabled={!allReviewed || isSubmitting}
+              onClick={() => void handleContinue()}
+              className="mc-btn-primary w-full shrink-0 py-4"
+            >
+              {isSubmitting ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Spinner size={20} /> Continuing…
+                </span>
+              ) : (
+                'Continue to KYC'
+              )}
+            </button>
+          </div>
         </div>
       ) : (
         <AlertBanner variant="error">{error || 'No documents available.'}</AlertBanner>
@@ -117,23 +139,38 @@ export default function LoanDocumentsPage() {
   );
 
   return (
-    <CustomerJourneyGuard>
-      <div className="flex h-full min-h-0 w-full flex-col">
+    <div className="flex min-h-screen w-full flex-col bg-[#fffdf8] selection:bg-[#ffc519]/30 lg:h-full lg:min-h-0 lg:bg-transparent">
+      <LoanDocumentsProgressSync />
+      <main className="relative flex w-full grow flex-col items-center justify-start p-0 lg:h-full lg:min-h-0 lg:justify-center">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden lg:hidden">
+          <div className="absolute top-0 left-1/2 h-[600px] w-[100vw] -translate-x-1/2 bg-[radial-gradient(ellipse_at_top,_rgba(20,150,243,0.06)_0%,_transparent_60%)]" />
+        </div>
+
         <LoanLandingShell
           fullBleedPanel
+          showSpeedometer
           journeyPanel={journeyPanel}
           leftTitle={
             <>
               KYC <span className="text-[#60a5fa]">letter</span>
             </>
           }
-          leftDescription="Review your KYC letter and Key Fact Statement, then continue to KYC."
+          leftDescription="Review your sanction letter and Key Fact Statement. You will eSign after references."
           leftInfographic={<LoanCalculationLeftRail loanSelection={loanSelection} />}
-          mobileStepLabel="KYC letter"
+          mobileStepLabel="Letter"
           mobileOnBack={() => router.push(CUSTOMER_EMAIL_JOURNEY_PATH)}
-          showSpeedometer={false}
         />
-      </div>
+      </main>
+    </div>
+  );
+}
+
+export default function LoanDocumentsPage() {
+  return (
+    <CustomerJourneyGuard>
+      <JourneyProgressProvider>
+        <LoanDocumentsContent />
+      </JourneyProgressProvider>
     </CustomerJourneyGuard>
   );
 }

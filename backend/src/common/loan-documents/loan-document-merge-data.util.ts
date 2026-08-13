@@ -8,6 +8,7 @@ import {
   PAYABLE_TO,
   RECOVERY_AGENT_NAME,
 } from '../constants/loan-document.constants';
+import { sanctionLetterLoanPurpose } from '../constants/loanReason.constants';
 import type { LoanDocumentMergeInput } from './loan-document.types';
 
 const MONTH_NAMES = [
@@ -63,7 +64,7 @@ export function buildLoanDocumentReplacements(input: LoanDocumentMergeInput): Re
   // Sanction letter / KFS: borrower identity fields are always uppercase.
   const address = addressParts.join(', ').toUpperCase();
   const borrowerName = (input.fullName?.trim() ?? '').toUpperCase();
-  const purposeOfLoan = (input.loanPurpose?.trim() ?? '').toUpperCase();
+  const purposeOfLoan = sanctionLetterLoanPurpose(input.loanPurpose);
 
   const loanAmount = toNumber(input.loanAmountInr);
   const processingFeeAmount = toNumber(input.processingFeeAmountInr);

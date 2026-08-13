@@ -184,7 +184,7 @@ export class AuthController {
   @RateLimitByRoute('loan-documents')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Record loan-document review agreement (no OTP; continues to KYC)',
+    summary: 'Record loan-document review (no OTP / no legal acceptance; continues to KYC)',
   })
   acknowledgeLoanDocumentsRoute(@Req() req: Request) {
     return this.acknowledgeLoanDocumentsFlow.execute(req);
