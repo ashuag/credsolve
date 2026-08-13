@@ -44,7 +44,7 @@ export function LoginForm() {
       if (!contentType.includes('application/json')) {
         setError(
           response.status === 404
-            ? 'LOS API is not reachable (404). Set NEXT_PUBLIC_API_URL=http://localhost:4001/api/los and ensure the backend is up on :4001.'
+            ? 'LOS API proxy returned 404. Recreate the los container (docker compose up -d --force-recreate los) and hard-refresh.'
             : `Unable to reach the backend (HTTP ${response.status}).`,
         );
         setLoading(false);

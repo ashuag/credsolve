@@ -59,14 +59,28 @@ function ensureHttpsForSecurePage(base: string): string {
 }
 
 /**
- * Browser base for LOS API calls.
- * Local Docker: use `http://localhost:4001/api/los` (Nest port is published; CORS allows :3020).
- * Same-origin `/api/los` also works when the Next proxy/rewrite is active.
+ * Browser base — same pattern as customer `/api`: same-origin `/api/los`, proxied by Next
+ * (`beforeFiles` rewrite in next.config.ts) to Nest. Avoids CORS and Firefox :4001 issues.
  */
 export function getLosClientApiBase(): string {
   const u = process.env.NEXT_PUBLIC_API_URL;
   if (!u?.trim()) {
     throw new Error('Missing NEXT_PUBLIC_API_URL.');
   }
-  return ensureHttpsForSecurePage(normalizeLosApiBase(u));
+
+  const raw = u.trim();
+
+  // Stale local env often still points at Nest :4001 — force same-origin like customer.
+  if (/^https?:\/\/(?:127\.0\.0\.1|localhost):4001\b/i.test(raw)) {
+    if (process.env.NODE_ENV === 'development') {
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[MoneyCash LOS] NEXT_PUBLIC_API_URL points at port 4001; using same-origin `/api/los` instead. ' +
+          'Set NEXT_PUBLIC_API_URL=/api/los in los/.env and recreate the los container.',
+      );
+    }
+    return '/api/los';
+  }
+
+  return ensureHttpsForSecurePage(normalizeLosApiBase(raw));
 }

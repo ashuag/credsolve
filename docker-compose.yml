@@ -57,10 +57,10 @@ services:
   los:
     <<: *node-defaults
     env_file: ./los/.env
-    # Browser on the host calls Nest via published :4001 (CORS allows localhost:3020).
-    # Server-side fetches inside the container must use the `backend` service hostname.
+    # Same pattern as customer: browser uses same-origin `/api/los`; Next rewrites to Nest.
+    # Inside the container, localhost is not the API — rewrite target must be `backend`.
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:4001/api/los
+      NEXT_PUBLIC_API_URL: /api/los
       API_SERVER_URL: http://backend:4001/api/los
     depends_on:
       - backend
@@ -71,9 +71,8 @@ services:
       - ./los:/workspace/los:cached
       # Keep .next off the bind mount — Next's atomic manifest writes race on
       # host-mounted volumes and produce ENOENT on `_buildManifest.js.tmp.*`.
-      # If `/api/los/*` 404s after adding the proxy, wipe this volume:
-      #   docker compose down && docker volume rm moneycash_los-next
-      - los-next:/workspace/los/.next
+      # Volume name bumped when the `/api/los` proxy was added so recreates get a clean cache.
+      - los-next-v2:/workspace/los/.next
       - *entrypoint-mount
     command: ["npm", "run", "dev"]
 
@@ -98,7 +97,7 @@ services:
 
 volumes:
   customer-next:
-  los-next:
+  los-next-v2:
 
 networks:
   shared-net:

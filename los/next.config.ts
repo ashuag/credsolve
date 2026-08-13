@@ -74,15 +74,22 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },
-  // Fallback when the App Router catch-all is not picked up (stale `.next` / Turbopack).
-  // Destination must be absolute so Docker can reach the `backend` service.
+  /**
+   * `beforeFiles` runs before the App Router. That mirrors how customer reliably reaches Nest
+   * via same-origin `/api/*`, and avoids stale Turbopack / `.next` volume 404s on `/api/los/*`.
+   * Destination must be absolute so the LOS container can reach the `backend` service.
+   */
   async rewrites() {
-    return [
-      {
-        source: '/api/los/:path*',
-        destination: `${losApiProxyBase}/:path*`,
-      },
-    ];
+    return {
+      beforeFiles: [
+        {
+          source: '/api/los/:path*',
+          destination: `${losApiProxyBase}/:path*`,
+        },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
   },
 };
 
