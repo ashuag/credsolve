@@ -37,6 +37,7 @@ const allowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? '')
   .filter(Boolean);
 
 // Fail fast at build/start if the server-side API proxy target is misconfigured.
+// (Also used below for rewrite destination.)
 getLosServerApiBase();
 
 const securityHeaders: { key: string; value: string }[] = [
@@ -57,6 +58,8 @@ if (isProductionRuntime) {
   });
 }
 
+const losApiProxyBase = getLosServerApiBase().replace(/\/$/, '');
+
 const nextConfig: NextConfig = {
   output: 'standalone',
   poweredByHeader: false,
@@ -73,6 +76,16 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: configDir,
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
+  },
+  // Fallback when the App Router catch-all is not picked up (stale `.next` / Turbopack).
+  // Destination must be absolute so Docker can reach the `backend` service.
+  async rewrites() {
+    return [
+      {
+        source: '/api/los/:path*',
+        destination: `${losApiProxyBase}/:path*`,
+      },
+    ];
   },
 };
 

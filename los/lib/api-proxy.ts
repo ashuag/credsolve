@@ -23,7 +23,12 @@ const PROXY_TIMEOUT_MS = 60_000;
 
 function buildUpstreamUrl(pathSegments: string[], search: string): string {
   const base = getLosServerApiBase().replace(/\/$/, '');
-  const suffix = pathSegments.map(encodeURIComponent).join('/');
+  // `/api/los/auth/login` → ['los','auth','login'] while base is `.../api/los`.
+  let segments = pathSegments;
+  if (base.endsWith('/api/los') && segments[0] === 'los') {
+    segments = segments.slice(1);
+  }
+  const suffix = segments.map(encodeURIComponent).join('/');
   const url = suffix ? `${base}/${suffix}` : base;
   return search ? `${url}${search}` : url;
 }

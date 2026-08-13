@@ -9,8 +9,8 @@ type RouteContext = {
 };
 
 /**
- * Browser calls same-origin `/api/los/...` (e.g. `/api/los/auth/login`).
- * This handler forwards to Nest `API_SERVER_URL` (`.../api/los/...`).
+ * Same shape as customer `app/api/[[...path]]`.
+ * Browser calls `/api/los/auth/login` → segments `['los','auth','login']` → Nest `/api/los/auth/login`.
  */
 async function handle(request: NextRequest, context: RouteContext) {
   const { path = [] } = await context.params;
