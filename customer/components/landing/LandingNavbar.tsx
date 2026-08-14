@@ -65,6 +65,7 @@ export function LandingNavbar() {
 
   return (
     <header className="sticky top-0 z-50 w-full">
+      sdsdsdsd  dsdsd
       <div className="bg-[linear-gradient(90deg,#1c347d_0%,#2388e5_50%,#1c347d_100%)] px-4 py-2.5 shadow-[inset_0_-1px_0_rgba(255,255,255,0.12)] sm:px-6 lg:px-8">
         <ul className="mx-auto flex max-w-7xl list-none flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-[0.68rem] font-[700] leading-snug tracking-[0.02em] text-white/95 sm:grid sm:grid-cols-4 sm:gap-x-6 sm:text-[0.75rem] sm:tracking-[0.03em]">
           {TICKER_TAGS.map((tag) => (
@@ -154,7 +155,6 @@ export function LandingNavbar() {
               </div>
             </div>
           </div>
-
           <div className="flex shrink-0 items-center gap-2 md:gap-3">
             {showGuestChrome && (
               <>
@@ -202,7 +202,6 @@ export function LandingNavbar() {
             </button>
           </div>
         </div>
-
         {menuOpen && (
           <div className="border-t border-[#12244f]/10 bg-white/98 px-4 py-4 backdrop-blur-xl md:hidden">
             <div className="flex flex-col gap-1">

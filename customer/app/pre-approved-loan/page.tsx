@@ -6,25 +6,51 @@ import {useEffect, useRef, useState} from 'react';
 import {CustomerJourneyGuard} from '@/components/auth/customer-journey-guard';
 import {useCustomerSession} from '@/components/providers/customer-session-provider';
 import {Spinner} from '@/components/ui/spinner';
-import {fetchLoanEligibility} from '@/lib/api/eligibility';
+import {fetchLoanCalculationSettings, fetchLoanEligibility} from '@/lib/api/eligibility';
 import {ApiRequestError} from '@/lib/api/client';
 import {
   isLeadRejectedAndLocked,
   type CustomerSessionResponse,
 } from '@/lib/api/customer-session';
 import {LoanLandingShell} from '@/components/home/loan-landing-shell';
+import {formatLoanInr} from '@/lib/loan-calculation';
 
 const BENEFIT_TAGS = ['100% Digital', 'Secure verification', 'Continue in minutes'] as const;
 
-function formatInr(amount: number) {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(amount);
+/** Matches backend `PROCESSING_FEE` / `PROCESSING_FEE_GST` defaults until live settings load. */
+const DEFAULT_FEE_SETTINGS = {
+  processingFeePercent: 12,
+  processingFeeGstPercent: 18,
+};
+
+function computeOfferFees(
+  principal: number,
+  processingFeePercent: number,
+  processingFeeGstPercent: number,
+) {
+  const processingFeeAmount = (principal * processingFeePercent) / 100;
+  const gstOnProcessing = (processingFeeAmount * processingFeeGstPercent) / 100;
+  return {
+    processingFeeWithGst: processingFeeAmount + gstOnProcessing,
+    netInBank: principal - processingFeeAmount - gstOnProcessing,
+  };
 }
 
-function AmountVisual({ amount, caption }: { amount: string; caption: string }) {
+function AmountVisual({
+  amount,
+  processingFeePercent,
+  processingFeeGstPercent,
+  processingFeeWithGst,
+  netInBank,
+  caption,
+}: {
+  amount: string;
+  processingFeePercent: number;
+  processingFeeGstPercent: number;
+  processingFeeWithGst: string;
+  netInBank: string;
+  caption: string;
+}) {
   return (
     <div className="relative overflow-hidden rounded-[22px] border border-[rgba(255,255,255,0.12)] bg-[linear-gradient(145deg,#0f1f57,#1b3788_58%,#1b91e8_120%)] p-4 shadow-[0_18px_40px_rgba(17,33,88,0.24)] sm:rounded-[24px] sm:p-5 min-w-0">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
@@ -40,17 +66,43 @@ function AmountVisual({ amount, caption }: { amount: string; caption: string }) 
         Secure flow
       </div>
 
-      <div className="relative grid min-h-[238px] place-items-center sm:min-h-[280px]">
+      <div className="relative grid min-h-[280px] place-items-center pt-10 sm:min-h-[320px]">
         <div className="absolute h-[226px] w-[226px] rounded-full border border-[rgba(255,255,255,0.1)] sm:h-[250px] sm:w-[250px]" />
         <div className="absolute h-[184px] w-[184px] rounded-full border border-dashed border-[rgba(255,197,25,0.24)] sm:h-[206px] sm:w-[206px]" />
         <div className="absolute h-[140px] w-[140px] rounded-full border border-[rgba(20,150,243,0.32)] sm:h-[156px] sm:w-[156px]" />
         <div className="absolute h-[208px] w-[208px] rounded-full bg-[radial-gradient(circle,rgba(20,150,243,0.16),transparent_68%)] sm:h-[230px] sm:w-[230px]" />
 
-        <div className="relative z-[1] w-full min-w-0 max-w-[min(17rem,100%)] rounded-[20px] border border-[rgba(255,255,255,0.16)] bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.08))] px-4 py-5 text-center shadow-[0_16px_32px_rgba(5,13,40,0.26)] backdrop-blur-[10px] sm:max-w-[min(19rem,100%)] sm:rounded-[24px] sm:px-6 sm:py-6">
+        <div className="relative z-[1] w-full min-w-0 max-w-[min(22rem,100%)] rounded-[20px] border border-[rgba(255,255,255,0.16)] bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.08))] px-4 py-5 text-center shadow-[0_16px_32px_rgba(5,13,40,0.26)] backdrop-blur-[10px] sm:rounded-[24px] sm:px-5 sm:py-6">
           <div className="text-[0.76rem] font-black uppercase tracking-[0.16em] text-[#fff1bb]">Eligible loan amount</div>
           <div className="mt-2 text-[clamp(1.75rem,6vw,2.35rem)] font-black tracking-tight text-white break-words">
             {amount}
           </div>
+
+          <div className="mt-4 grid gap-2.5 border-t border-[rgba(255,255,255,0.14)] pt-3.5 text-left">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[0.72rem] font-bold uppercase tracking-wide text-[rgba(236,243,255,0.72)]">
+                  Processing fee
+                </div>
+                <div className="mt-0.5 text-[0.68rem] font-medium text-[rgba(236,243,255,0.5)]">
+                  {processingFeePercent}% + {processingFeeGstPercent}% GST
+                </div>
+              </div>
+              <div className="shrink-0 text-[0.95rem] font-bold text-white">−{processingFeeWithGst}</div>
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-[14px] border border-[rgba(255,255,255,0.12)] bg-[rgba(7,17,48,0.28)] px-3 py-2.5">
+              <div className="min-w-0">
+                <div className="text-[0.68rem] font-black uppercase tracking-wide text-[#9ecbff]">
+                  Net in your bank
+                </div>
+                <div className="mt-0.5 text-[0.62rem] font-medium text-[rgba(236,243,255,0.5)]">
+                  After fee and GST
+                </div>
+              </div>
+              <div className="shrink-0 text-[1.05rem] font-black text-[#facc15]">{netInBank}</div>
+            </div>
+          </div>
+
           <p className="mt-3 text-[0.82rem] font-medium leading-snug text-[rgba(236,243,255,0.82)]">{caption}</p>
         </div>
       </div>
@@ -88,9 +140,28 @@ export default function PreApprovedLoanPage() {
   const router = useRouter();
   const { loading: sessionLoading, session, refresh } = useCustomerSession();
   const [amountInr, setAmountInr] = useState<number | null>(null);
+  const [feeSettings, setFeeSettings] = useState(DEFAULT_FEE_SETTINGS);
   const [error, setError] = useState<string | null>(null);
   const [loadKey, setLoadKey] = useState(0);
   const requestIdRef = useRef(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchLoanCalculationSettings()
+      .then((settings) => {
+        if (cancelled) return;
+        setFeeSettings({
+          processingFeePercent: settings.processingFeePercent,
+          processingFeeGstPercent: settings.processingFeeGstPercent,
+        });
+      })
+      .catch(() => {
+        /* keep backend-matching defaults so the offer still discloses cost */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (sessionLoading) return;
@@ -172,16 +243,30 @@ export default function PreApprovedLoanPage() {
       </div>
     );
   } else {
+    const fees = computeOfferFees(
+      amountInr,
+      feeSettings.processingFeePercent,
+      feeSettings.processingFeeGstPercent,
+    );
     content = (
       <div className="h-full flex flex-col justify-center py-4">
         <div className="mb-8">
           <div className="mb-8">
-            <AmountVisual amount={formatInr(amountInr)} caption="Your offer is locked in." />
+            <AmountVisual
+              amount={formatLoanInr(amountInr)}
+              processingFeePercent={feeSettings.processingFeePercent}
+              processingFeeGstPercent={feeSettings.processingFeeGstPercent}
+              processingFeeWithGst={formatLoanInr(fees.processingFeeWithGst)}
+              netInBank={formatLoanInr(fees.netInBank)}
+              caption="Your offer is locked in."
+            />
           </div>
 
           <p className="text-[1rem] text-slate-600 leading-relaxed mb-8 font-medium">
-            Great news! You have been pre-approved for the amount shown above. Complete your account
-            selection to move ahead to disbursement.
+            Great news! You have been pre-approved for {formatLoanInr(amountInr)}. A processing fee
+            of {feeSettings.processingFeePercent}% plus {feeSettings.processingFeeGstPercent}% GST is
+            deducted before disbursement, so {formatLoanInr(fees.netInBank)} is credited to your
+            bank. Complete your account selection to continue.
           </p>
 
           <Link href="/loan-selection" className="mc-btn-primary block w-full text-center py-4 text-[1rem]">

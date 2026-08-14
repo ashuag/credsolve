@@ -47,6 +47,19 @@ const ELIGIBILITY_CHECK_STEPS = [
   'Pre-eligibility checks',
   'PAN verification and bureau',
 ] as const;
+const ELIGIBILITY_STEP_MIN_MS = 900;
+const ALMOST_THERE_AFTER_LAST_MS = 2400;
+const ALL_DONE_HOLD_MS = 550;
+const LAST_ELIGIBILITY_STEP = ELIGIBILITY_CHECK_STEPS.length - 1;
+
+function waitMs(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitAtLeast(startedAt: number, minMs: number) {
+  const remaining = minMs - (Date.now() - startedAt);
+  if (remaining > 0) await waitMs(remaining);
+}
 
 function pickErrors(errors: FieldError, keys: Array<keyof Fields>): FieldError {
   return Object.fromEntries(keys.filter((k) => errors[k]).map((k) => [k, errors[k]]));
@@ -114,6 +127,7 @@ export function PersonalDetailsStep(
   const [busy, setBusy] = useState<BusyState>('idle');
   const [checkStepIndex, setCheckStepIndex] = useState(0);
   const [checkAllDone, setCheckAllDone] = useState(false);
+  const [checkNearEnd, setCheckNearEnd] = useState(false);
   const [isLookingUpPincode, setIsLookingUpPincode] = useState(false);
   const [cityFromPincode, setCityFromPincode] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -325,7 +339,16 @@ export function PersonalDetailsStep(
     setBusy('submitting');
     setCheckStepIndex(0);
     setCheckAllDone(false);
-    let lastStepTimer: ReturnType<typeof setTimeout> | undefined;
+    setCheckNearEnd(false);
+    let nearEndTimer: ReturnType<typeof setTimeout> | undefined;
+    let stepStartedAt = Date.now();
+
+    async function advanceCheckStep(nextIndex: number) {
+      await waitAtLeast(stepStartedAt, ELIGIBILITY_STEP_MIN_MS);
+      setCheckStepIndex(nextIndex);
+      stepStartedAt = Date.now();
+    }
+
     try {
       await saveLeadDetails({
         ...profilePayload(), addressLine1: fields.addressLine1.trim(),
@@ -333,9 +356,7 @@ export function PersonalDetailsStep(
         currentCity: fields.currentCity.trim(), ...(fields.currentCityId != null ? { currentCityId: fields.currentCityId } : {}),
         pincode: fields.pincode, creditConsentAccepted: fields.creditConsentAccepted,
       });
-      setCheckStepIndex(1);
-      lastStepTimer = setTimeout(() => setCheckStepIndex(2), 1100);
-      const result = await verifyLeadPan({
+      const panPromise = verifyLeadPan({
         ...(leadUuid ? { leadUuid } : {}), panNumber: fields.panNumber.trim().toUpperCase(),
         fullName: fields.fullName.trim(), dob: fields.dob,
         gender: fields.gender, occupation: fields.occupation,
@@ -343,9 +364,12 @@ export function PersonalDetailsStep(
         ...(usesMonthlyIncome ? { monthlyIncome: fields.monthlyIncome.trim() } : {}),
         ...(isSelfEmployed ? { annualTurnover: fields.annualTurnover.trim(), annualProfit: fields.annualProfit.trim() } : {}),
       });
-      clearTimeout(lastStepTimer);
-      lastStepTimer = undefined;
-      setCheckStepIndex(2);
+      await advanceCheckStep(1);
+      await advanceCheckStep(LAST_ELIGIBILITY_STEP);
+      nearEndTimer = setTimeout(() => setCheckNearEnd(true), ALMOST_THERE_AFTER_LAST_MS);
+
+      const result = await panPromise;
+      await waitAtLeast(stepStartedAt, ELIGIBILITY_STEP_MIN_MS);
       if (!result.success) { setSubmitError('Unable to complete your profile right now. Please try again.'); return; }
       if (result.rejected) { router.push('/thank-you-interest'); return; }
       if (result.attemptsUsed != null && result.attemptsAllowed != null) {
@@ -355,13 +379,14 @@ export function PersonalDetailsStep(
         return;
       }
       try { window.localStorage.removeItem(draftKey); } catch { /* ignore */ }
+      setCheckNearEnd(true);
       setCheckAllDone(true);
-      await new Promise((resolve) => setTimeout(resolve, 350));
+      await waitMs(ALL_DONE_HOLD_MS);
       await onSaved();
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : 'Unable to complete your profile right now. Please try again.');
     } finally {
-      if (lastStepTimer) clearTimeout(lastStepTimer);
+      if (nearEndTimer) clearTimeout(nearEndTimer);
       setBusy('idle');
     }
   }
@@ -433,7 +458,7 @@ export function PersonalDetailsStep(
 
       {busy === 'submitting' && (
         <FlowLoader
-          eyebrow={checkAllDone || checkStepIndex >= 2 ? 'Almost there' : 'Checking…'}
+          eyebrow={checkAllDone || checkNearEnd ? 'Almost there' : 'Checking…'}
           title="Checking your eligibility"
           description="We save your address, run pre-checks, verify PAN, fetch CIBIL when needed, then calculate your eligible loan amount."
           steps={[...ELIGIBILITY_CHECK_STEPS]}

@@ -79,21 +79,6 @@ export function LoanLandingShell({
       {/* ── Mobile app bar (hidden on lg+) ────────────────────────────────── */}
       <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 pt-[env(safe-area-inset-top)] shadow-[0_1px_0_rgba(18,36,79,0.06)] backdrop-blur-md lg:hidden">
         <div className="relative flex h-14 items-center px-4">
-          {mobileOnBack ? (
-            <button
-              type="button"
-              onClick={mobileOnBack}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 active:scale-95"
-              aria-label="Go back"
-            >
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M19 12H5M12 5l-7 7 7 7" />
-              </svg>
-            </button>
-          ) : (
-            <span className="w-9 shrink-0" aria-hidden />
-          )}
-
           <Link href="/" className="absolute left-1/2 -translate-x-1/2">
             <Image
               src="/images/moneycash-logo.png"
@@ -106,10 +91,6 @@ export function LoanLandingShell({
               priority
             />
           </Link>
-
-          <span className="ml-auto max-w-[38%] truncate text-right text-[0.7rem] font-[800] uppercase tracking-[0.14em] text-[#1496f3]">
-            {mobileStepLabel ?? ''}
-          </span>
         </div>
 
         <MobileProgressBar />

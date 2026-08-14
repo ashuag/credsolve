@@ -20,8 +20,11 @@ function StepGlyph({
 }) {
   if (state === 'complete') {
     return (
-      <span className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-[12px] bg-[rgba(36,168,111,0.22)] text-[#8ef0c4]">
-        <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
+      <span
+        className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-[12px] bg-[#24a86f] text-white shadow-[0_0_0_4px_rgba(36,168,111,0.22)] animate-scale-in"
+        aria-hidden
+      >
+        <svg viewBox="0 0 16 16" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2.6">
           <path d="M3 8.2 6.2 11.5 13 4.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </span>
@@ -153,7 +156,7 @@ export function FlowLoader({
                 style={{ gridTemplateColumns: '34px 1fr' }}
                 aria-current={state === 'active' ? 'step' : undefined}
               >
-                <StepGlyph index={index} state={state} />
+                <StepGlyph key={`${step}-${state}`} index={index} state={state} />
                 <span
                   className={`text-[0.94rem] font-bold transition-colors duration-300 ${
                     state === 'complete'
