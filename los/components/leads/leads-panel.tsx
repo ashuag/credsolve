@@ -6,8 +6,9 @@ import {
   type DataTableColumn,
 } from '@/components/ui/data-table';
 import { getNewLeads, getMasters, type LosLead } from '@/lib/api';
-import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
+import { LOS_STORAGE_KEY } from '@/lib/auth';
+import { formatPersonName } from '@/lib/format-person-name';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 

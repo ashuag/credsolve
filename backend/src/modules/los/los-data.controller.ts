@@ -11,6 +11,8 @@ import { LosMasterService } from './services/los-master.service';
 import { LosRejectionService } from './services/los-rejection.service';
 import { LosDisbursementService } from './services/los-disbursement.service';
 import { LosLoanService } from './services/los-loan.service';
+import { LosBureauReportService } from './services/los-bureau-report.service';
+
 @ApiTags('LOS Data')
 @Controller('los')
 @UseGuards(LosAuthGuard)
@@ -24,12 +26,32 @@ export class LosDataController {
     private readonly losRejection: LosRejectionService,
     private readonly losDisbursement: LosDisbursementService,
     private readonly losLoan: LosLoanService,
+    private readonly losBureauReport: LosBureauReportService,
   ) {}
 
   @Get('dashboard/crm')
   @ApiOperation({ summary: 'LOS CRM dashboard aggregates (live counts from the book)' })
   dashboardCrm() {
     return this.losDashboard.getDashboardCrm();
+  }
+
+  @Get('bureau-reports')
+  @ApiOperation({ summary: 'List stored CIBIL bureau reports for LOS Reports' })
+  bureauReports() {
+    return this.losBureauReport.listBureauReports();
+  }
+
+  @Get('bureau-reports/export')
+  @ApiOperation({ summary: 'Download stored CIBIL bureau reports as a Credit Assessment data workbook (.xlsx)' })
+  async bureauReportsExport(@Res() res: Response): Promise<void> {
+    const buffer = await this.losBureauReport.exportBureauReportsWorkbook();
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', 'attachment; filename="Credit Assessment data.xlsx"');
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.send(buffer);
   }
 
   @Get('leads/new')

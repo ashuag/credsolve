@@ -1,8 +1,8 @@
 'use client';
 
 import type {
+  CibilAssessmentInsights,
   CibilReportAccountRow,
-  CibilReportData,
   CibilReportPaymentMonth,
   LosApplicationCibilReportPayload,
 } from '@/lib/api';
@@ -18,6 +18,149 @@ function formatInr(value: number | null | undefined): string {
     currency: 'INR',
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function formatInsightCount(value: number | null | undefined): string {
+  if (value == null) return '—';
+  return String(value);
+}
+
+function InsightMetricGrid({
+  rows,
+}: {
+  rows: Array<{ label: string; hint?: string; value: string; tone?: 'ok' | 'warn' | 'bad' }>;
+}) {
+  return (
+    <dl className="m-0 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      {rows.map((row) => (
+        <div
+          key={row.label}
+          className="rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(255,255,255,0.78)] px-3 py-2.5"
+        >
+          <dt className="text-[0.62rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted leading-tight">
+            {row.label}
+          </dt>
+          <dd
+            className={cx(
+              'm-0 mt-1 text-[0.92rem] font-extrabold leading-snug',
+              row.tone === 'bad'
+                ? 'text-[#b91c1c]'
+                : row.tone === 'warn'
+                  ? 'text-[#b45309]'
+                  : 'text-brand-navy',
+            )}
+          >
+            {row.value}
+          </dd>
+          {row.hint ? <p className="m-0 mt-0.5 text-[0.68rem] text-brand-muted">{row.hint}</p> : null}
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function InsightFlagList({ items, emptyLabel = 'None' }: { items: string[]; emptyLabel?: string }) {
+  if (items.length === 0) {
+    return <span className="text-[0.82rem] font-semibold text-brand-muted">{emptyLabel}</span>;
+  }
+  return (
+    <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
+      {items.map((item, idx) => (
+        <li
+          key={`${item}-${idx}`}
+          className="inline-flex rounded-full border border-[rgba(180,83,9,0.22)] bg-[rgba(245,158,11,0.1)] px-2.5 py-0.5 text-[0.72rem] font-bold text-[#b45309]"
+        >
+          {item}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function CibilInsightsSection({ insights }: { insights: CibilAssessmentInsights }) {
+  const score = insights.riskScore;
+  const scoreLabel =
+    score == null
+      ? '—'
+      : score === -1 || score === 0 || score === 1
+        ? `NTC (${score})`
+        : String(score);
+
+  const flagRows: Array<{ label: string; hint: string; items: string[] }> = [
+    { label: 'Default loans', hint: 'Wilful default / suit filed', items: insights.defaultLoans },
+    { label: 'Write-off amounts', hint: 'Write-off per tradeline (INR)', items: insights.writeoffLoan },
+    { label: 'Settled amounts', hint: 'Settlement amounts per tradeline', items: insights.settledLoan },
+    { label: 'SMA tradelines', hint: 'Special Mention Account flags', items: insights.loanContainStatusSma },
+    { label: 'Substandard', hint: 'SUB asset classification', items: insights.loanContainStatusSub },
+    { label: 'Doubtful', hint: 'DBT asset classification', items: insights.loanContainStatusDbt },
+    { label: 'Loss', hint: 'LSS asset classification', items: insights.loanContainStatusLss },
+    { label: 'DPD 30+ (3 months)', hint: 'Tradelines with 30+ DPD in last 3 months', items: insights.dpd30Last3Months },
+    { label: 'DPD 60+ (9 months)', hint: 'Tradelines with 60+ DPD in last 9 months', items: insights.dpd60Last9Months },
+    { label: 'DPD 90+ (12 months)', hint: 'Tradelines with 90+ DPD in last 12 months', items: insights.dpd90Last12Months },
+    { label: 'Open DPD (6 months)', hint: 'Open tradelines with DPD in last 6 months', items: insights.openLoanDpdLast6Months },
+    { label: 'Defaults (18 months)', hint: 'Wilful default / suit / settled events', items: insights.defaultsInLast18Months },
+    { label: 'Doubtful (18 months)', hint: 'SUB / DBT / LSS in last 18 months', items: insights.doubtfulInLast18Months },
+    { label: 'Restructured loans', hint: 'Renegotiated / restructured facilities', items: insights.restructuredLoans },
+    { label: 'PWOS tradelines', hint: 'Post write-off settled', items: insights.pwosTradelines },
+    { label: 'Missed payments (6 months)', hint: 'Missed EMI months in last 6 months', items: insights.missedPaymentsIn6m },
+  ];
+
+  return (
+    <ReportSection
+      id="cibil-insights"
+      title="CIBIL insights"
+      description="Assessment features derived from bureau tradelines — the same columns used by the CIBIL credit engine."
+      defaultOpen
+    >
+      <p className="mb-2 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
+        Portfolio snapshot
+      </p>
+      <InsightMetricGrid
+        rows={[
+          {
+            label: 'CIBIL risk score',
+            hint: '300–900; 0 / −1 / 1 = no usable score (NTC)',
+            value: scoreLabel,
+            tone: score != null && (score < 1 || score === 1) ? 'warn' : undefined,
+          },
+          { label: 'Total tradelines', hint: 'Active + closed loan accounts', value: formatInsightCount(insights.noOfLoans) },
+          { label: 'Credit cards', hint: 'Credit card tradeline count', value: formatInsightCount(insights.noOfCreditcards) },
+          { label: 'Unsecured loans', hint: 'Personal, consumer, cards, etc.', value: formatInsightCount(insights.noOfUnsecuredLoans) },
+          { label: 'Secured loans', hint: 'Home, auto, gold, etc.', value: formatInsightCount(insights.noOfSecuredLoans) },
+          { label: 'Gold loans', hint: 'Gold loan tradeline count', value: formatInsightCount(insights.noOfGoldLoans) },
+          { label: 'Enquiries (6 months)', hint: 'Bureau enquiries in last 6 months', value: formatInsightCount(insights.sixMEnq) },
+          { label: 'Total enquiries', hint: 'All-time enquiry count', value: formatInsightCount(insights.totalEnq) },
+          { label: 'Settled loan count', hint: 'Number of settled accounts', value: formatInsightCount(insights.settledLoansCounts) },
+          {
+            label: 'Total overdue',
+            hint: 'Sum of outstanding overdue (INR)',
+            value: formatInr(insights.totalOverdueAmounts),
+            tone: insights.totalOverdueAmounts > 0 ? 'bad' : 'ok',
+          },
+          { label: 'Category', hint: 'Original model category (A–H); blank for new data', value: insights.category?.trim() || '—' },
+        ]}
+      />
+
+      <p className="mb-2 mt-5 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
+        Adverse flags
+      </p>
+      <dl className="m-0 divide-y divide-[rgba(23,44,113,0.08)]">
+        {flagRows.map((row) => (
+          <div key={row.label} className="grid gap-1 py-2.5 first:pt-0 last:pb-0 sm:grid-cols-[minmax(160px,220px)_1fr] sm:items-start sm:gap-3">
+            <dt>
+              <span className="text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">{row.label}</span>
+              <span className="mt-0.5 block text-[0.68rem] font-medium normal-case tracking-normal text-brand-muted">
+                {row.hint}
+              </span>
+            </dt>
+            <dd className="m-0 min-w-0">
+              <InsightFlagList items={row.items} />
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </ReportSection>
+  );
 }
 
 function formatDateTime(iso: string | null | undefined) {
@@ -302,6 +445,7 @@ export function CibilReportViewer({
 
   const sections = useMemo(
     () => [
+      { id: 'cibil-insights', label: 'CIBIL insights' },
       { id: 'cibil-score', label: 'Score & insights' },
       { id: 'cibil-accounts-summary', label: 'Accounts summary' },
       { id: 'cibil-profile', label: 'Consumer profile' },
@@ -386,6 +530,8 @@ export function CibilReportViewer({
             ) : null}
           </div>
         </header>
+
+        {report.assessmentInsights ? <CibilInsightsSection insights={report.assessmentInsights} /> : null}
 
         <ReportSection
           id="cibil-score"

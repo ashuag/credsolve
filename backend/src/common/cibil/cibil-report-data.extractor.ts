@@ -15,6 +15,7 @@ import {
   parseCibilTradeline,
 } from './cibil-tradeline.parser';
 import { parseTenacioBureauVendorBody } from '../vendor/tenacio-bureau-payload.mapper';
+import { extractCibilAssessmentInsights, type CibilAssessmentInsights } from './cibil-assessment-insights';
 import { response } from 'express';
 
 export type CibilReportPaymentMonth = {
@@ -143,6 +144,7 @@ export type CibilReportData = {
   accountOverview: CibilReportAccountOverviewRow[];
   exposureInsight: CibilReportExposureInsight;
   preApprovedInsight: CibilReportPreApprovedInsight | null;
+  assessmentInsights: CibilAssessmentInsights;
 };
 
 
@@ -752,5 +754,6 @@ export function extractCibilReportData(vendorBody: unknown): CibilReportData {
     accountOverview,
     exposureInsight,
     preApprovedInsight: null,
+    assessmentInsights: extractCibilAssessmentInsights(vendorBody, parsed.bureauScore),
   };
 }

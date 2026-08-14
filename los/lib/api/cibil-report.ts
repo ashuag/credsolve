@@ -90,6 +90,36 @@ export type CibilReportPreApprovedInsight = {
   detail: string;
 };
 
+export type CibilAssessmentInsights = {
+  riskScore: number | null;
+  noOfLoans: number;
+  noOfCreditcards: number;
+  noOfUnsecuredLoans: number;
+  noOfSecuredLoans: number;
+  noOfGoldLoans: number;
+  sixMEnq: number;
+  totalEnq: number;
+  settledLoansCounts: number;
+  totalOverdueAmounts: number;
+  defaultLoans: string[];
+  writeoffLoan: string[];
+  settledLoan: string[];
+  loanContainStatusSma: string[];
+  loanContainStatusSub: string[];
+  loanContainStatusDbt: string[];
+  loanContainStatusLss: string[];
+  dpd30Last3Months: string[];
+  dpd60Last9Months: string[];
+  dpd90Last12Months: string[];
+  openLoanDpdLast6Months: string[];
+  defaultsInLast18Months: string[];
+  doubtfulInLast18Months: string[];
+  restructuredLoans: string[];
+  pwosTradelines: string[];
+  missedPaymentsIn6m: string[];
+  category: string | null;
+};
+
 export type CibilReportData = {
   generatedAt: string;
   bureauInquiryDate: string | null;
@@ -126,6 +156,7 @@ export type CibilReportData = {
   accountOverview: CibilReportAccountOverviewRow[];
   exposureInsight: CibilReportExposureInsight;
   preApprovedInsight: CibilReportPreApprovedInsight | null;
+  assessmentInsights?: CibilAssessmentInsights;
 };
 
 export type LosApplicationCibilReportPayload = {

@@ -37,7 +37,8 @@ type NavIcon =
   | 'masters'
   | 'eligibility'
   | 'developer'
-  | 'partners';
+  | 'partners'
+  | 'reports';
 type NavChildItem = { href: string; label: string };
 type NavItem = { href: string; label: string; icon: NavIcon; badge?: number; children?: NavChildItem[] };
 type NotificationItem = { title: string; detail: string; time: string; tone: 'lead' | 'disbursal' | 'payment' | 'risk' };
@@ -59,6 +60,18 @@ const navGroups: { section: string; color: string; items: NavItem[] }[] = [
       { href: '/applications', label: 'Applications', icon: 'applications' },
       { href: '/loans', label: 'Loans', icon: 'loans' },
       { href: '/customers', label: 'Customers', icon: 'customers' },
+    ],
+  },
+  {
+    section: 'Reports',
+    color: '#0ea5e9',
+    items: [
+      {
+        href: '/reports',
+        label: 'Reports',
+        icon: 'reports',
+        children: [{ href: '/reports/bureau-report', label: 'Bureau Report' }],
+      },
     ],
   },
   {
@@ -145,6 +158,7 @@ const notifications: NotificationItem[] = [
 const GROUP_ACCENT: Record<string, { dot: string; bg: string; border: string; text: string }> = {
   'Overview':      { dot: 'bg-brand-blue',  bg: 'rgba(20,150,243,0.07)',  border: 'rgba(20,150,243,0.18)',  text: '#1496f3' },
   'Loan Pipeline': { dot: 'bg-indigo-500',  bg: 'rgba(99,102,241,0.07)', border: 'rgba(99,102,241,0.18)', text: '#6366f1' },
+  'Reports':       { dot: 'bg-sky-500',     bg: 'rgba(14,165,233,0.07)', border: 'rgba(14,165,233,0.18)', text: '#0284c7' },
   'Team':          { dot: 'bg-teal-600',    bg: 'rgba(13,148,136,0.07)', border: 'rgba(13,148,136,0.18)', text: '#0d9488' },
   'Configuration': { dot: 'bg-amber-400',  bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)',  text: '#d97706' },
   'Sources & Utm': { dot: 'bg-amber-500',  bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)', text: '#d97706' },
@@ -166,6 +180,8 @@ const BREADCRUMBS: Record<string, string> = {
   '/applications': 'Application Management',
   '/loans': 'Loan Management',
   '/customers': 'Customer Management',
+  '/reports': 'Reports',
+  '/reports/bureau-report': 'Bureau Report',
   '/partners': 'Partners',
   '/agents': 'Agent Management',
   '/roles': 'Role Management',
@@ -230,6 +246,7 @@ function breadcrumbLabel(pathname: string): string {
   if (/^\/applications\/[^/]+$/.test(pathname)) return 'Application detail';
   if (/^\/loans\/[^/]+$/.test(pathname)) return 'Loan detail';
   if (/^\/customers\/[^/]+$/.test(pathname)) return 'Customer detail';
+  if (/^\/reports\/bureau-report\/[^/]+$/.test(pathname)) return 'Report detail';
   const seg = pathname.replace(/^\//, '').split('/')[0];
   return seg ? seg.charAt(0).toUpperCase() + seg.slice(1) : 'Home';
 }
@@ -260,6 +277,13 @@ function breadcrumbTrail(pathname: string): BreadcrumbItem[] {
     return [
       { label: 'Customers', href: '/customers' },
       { label: 'Customer detail' },
+    ];
+  }
+  if (/^\/reports\/bureau-report\/[^/]+$/.test(pathname)) {
+    return [
+      { label: 'Reports', href: '/reports' },
+      { label: 'Bureau Report', href: '/reports/bureau-report' },
+      { label: 'Report detail' },
     ];
   }
   return [{ label: breadcrumbLabel(pathname) }];
@@ -364,6 +388,9 @@ function IcDeveloper(p: SvgProps) {
 function IcPartners(p: SvgProps) {
   return <Icon {...p}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></Icon>;
 }
+function IcReports(p: SvgProps) {
+  return <Icon {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="13" y2="17" /></Icon>;
+}
 
 function NavIconSvg({ name, size = 18 }: { name: NavIcon; size?: number }) {
   const p = { size };
@@ -379,6 +406,7 @@ function NavIconSvg({ name, size = 18 }: { name: NavIcon; size?: number }) {
     case 'eligibility':  return <IcEligibility {...p} />;
     case 'developer':    return <IcDeveloper {...p} />;
     case 'partners':     return <IcPartners {...p} />;
+    case 'reports':      return <IcReports {...p} />;
   }
 }
 
@@ -653,7 +681,10 @@ export function CrmShell({
                   <div className="flex flex-col gap-[2px]">
                     {group.items.map((item, itemIndex) => {
                       const active = isNavActive(pathname, item);
-                      const hasActiveChild = item.children?.some((child) => pathname === stripRouteDecorators(child.href)) ?? false;
+                      const hasActiveChild = item.children?.some((child) => {
+                        const childPath = stripRouteDecorators(child.href);
+                        return pathname === childPath || pathname.startsWith(`${childPath}/`);
+                      }) ?? false;
                       const showExpandedChildren = !isIcons && active && item.children?.length;
                       const navChildren = item.children ?? [];
                       const parentActive = active && !hasActiveChild;
@@ -716,7 +747,8 @@ export function CrmShell({
                               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
                             >
                               {navChildren.map((child, childIndex) => {
-                                const childActive = pathname === stripRouteDecorators(child.href);
+                                const childPath = stripRouteDecorators(child.href);
+                                const childActive = pathname === childPath || pathname.startsWith(`${childPath}/`);
                                 return (
                                   <Link
                                     key={`${item.href}-${child.href}-${child.label}-${childIndex}`}
