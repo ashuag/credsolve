@@ -1,4 +1,4 @@
-import { authorizedLosRequest, cachedAuthorizedLosGet, clientApiUrl, fetchWithTimeout, messageFromBody, parseJsonResponse } from './_shared';
+import { authorizedLosRequest, cachedAuthorizedLosGet, clientApiUrl, fetchWithTimeout, invalidateClientReadCache, messageFromBody, parseJsonResponse } from './_shared';
 
 export type LosLead = {
   uuid: string;
@@ -112,6 +112,12 @@ export type LosLeadDetails = {
     annualTurnover: string | null;
     annualProfit: string | null;
     cibilConsentAt: string | null;
+  } | null;
+  bureauReport: {
+    uuid: string;
+    cibilScore: number | null;
+    htmlUrl: string | null;
+    fetchedAt: string;
   } | null;
   applications: Array<{
     uuid: string;
@@ -444,6 +450,7 @@ export async function createApplicationCibilReport(
   if (!body?.success) {
     throw new Error(body?.message ?? body?.transportError ?? 'CIBIL report creation failed.');
   }
+  invalidateClientReadCache();
 }
 
 export async function fetchApplicationLoanDocumentBlob(

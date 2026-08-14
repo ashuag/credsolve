@@ -152,6 +152,21 @@ export class LosDataController {
     return this.losCustomer.getCustomerDetails(customerUuid);
   }
 
+  @Get('leads/:leadUuid/cibil-report/pdf')
+  @ApiOperation({ summary: 'Stream CIBIL summary PDF for a lead (LOS auth)' })
+  async leadCibilReportPdf(
+    @Param('leadUuid') leadUuid: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    await this.losLead.serveLeadCibilReportPdf(leadUuid, res);
+  }
+
+  @Get('leads/:leadUuid/cibil-report')
+  @ApiOperation({ summary: 'Structured CIBIL report view for a lead (from latest bureau pull)' })
+  leadCibilReport(@Param('leadUuid') leadUuid: string) {
+    return this.losLead.getLeadCibilReport(leadUuid);
+  }
+
   @Get('leads/:leadUuid')
   @ApiOperation({ summary: 'Get lead details by lead uuid' })
   leadByUuid(@Param('leadUuid') leadUuid: string) {

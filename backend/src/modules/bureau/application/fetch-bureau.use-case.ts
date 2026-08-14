@@ -55,18 +55,21 @@ export class FetchBureauUseCase {
       };
     }
 
-    if (out.ok && leadId != null && out.vendorBody != null && isTenacioBureauSuccessPayload(out.vendorBody)) {
+    const vendorBody = out.vendorBody;
+    const successPayload = vendorBody != null && isTenacioBureauSuccessPayload(vendorBody);
+
+    if (leadId != null && vendorBody != null && (successPayload || out.isNewToCredit)) {
       const lead = await this.prisma.client.lead.findUnique({
         where: { id: leadId },
         select: { customerId: true, customer: { select: { uuid: true } } },
       });
       if (lead) {
         try {
-          const parsed = parseTenacioBureauVendorBody(out.vendorBody);
+          const parsed = parseTenacioBureauVendorBody(vendorBody);
           const created = await this.bureauReports.createFromVendorSnapshot({
             customerId: lead.customerId,
             leadId,
-            vendorBody: out.vendorBody,
+            vendorBody,
             parsed,
             httpStatus: out.httpStatus,
             dummyFetched: out.dummyPayload,
@@ -75,7 +78,7 @@ export class FetchBureauUseCase {
             bureauReportId: created.id,
             customerUuid: lead.customer.uuid,
             bureauReportUuid: created.uuid,
-            vendorBody: out.vendorBody,
+            vendorBody,
           });
         } catch (err) {
           this.logger.warn(
@@ -90,7 +93,9 @@ export class FetchBureauUseCase {
       envelope != null && isTenacioBureauClientError(envelope.serviceStatusCode);
 
     return {
-      success: out.ok && !bureauClientError && (out.vendorBody == null || isTenacioBureauSuccessPayload(out.vendorBody)),
+      success:
+        out.isNewToCredit ||
+        (out.ok && !bureauClientError && (vendorBody == null || successPayload)),
       configured: true,
       leadId: leadId?.toString() ?? null,
       httpStatus: out.httpStatus,

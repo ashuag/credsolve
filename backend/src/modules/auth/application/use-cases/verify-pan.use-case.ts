@@ -626,6 +626,7 @@ export class VerifyPanUseCase {
     // Bureau processed the request but holds no matching credit record for this
     // identity (e.g. serviceStatusCode 422 "Authentication required"). Treat the
     // customer as New-To-Credit; the caller rejects the lead with NEW_TO_CREDIT.
+    // Still persist the vendor payload so LOS can open the bureau report on the lead.
     if (out.isNewToCredit) {
       await this.leads.updateLeadDetail({
         where: { leadId },
@@ -635,6 +636,16 @@ export class VerifyPanUseCase {
           bureauFetchedNote: `NTC: ${out.serviceErrorMessage ?? 'bureau has no matching credit record'}`.slice(0, 500),
         },
       });
+      if (out.vendorBody != null) {
+        await this.persistBureauSnapshot({
+          customerId: row.customerId,
+          customerUuid: row.customer?.uuid,
+          leadId,
+          vendorBody: out.vendorBody,
+          httpStatus: out.httpStatus,
+          dummyFetched: out.dummyPayload,
+        });
+      }
       this.logger.warn(
         `Bureau soft-pull NTC (leadId=${leadId}): ${out.serviceErrorMessage ?? 'authentication required / no bureau record'}`,
       );
@@ -653,30 +664,14 @@ export class VerifyPanUseCase {
           bureauFetchedNote: null,
         },
       });
-      try {
-        const parsed = parseTenacioBureauVendorBody(out.vendorBody);
-        const created = await this.bureauReports.createFromVendorSnapshot({
-          customerId: row.customerId,
-          leadId,
-          vendorBody: out.vendorBody,
-          parsed,
-          httpStatus: out.httpStatus,
-          dummyFetched: out.dummyPayload,
-        });
-        const customerUuid = row.customer?.uuid;
-        if (customerUuid) {
-          await this.bureauReportPdf.generateAndAttachForReport({
-            bureauReportId: created.id,
-            customerUuid,
-            bureauReportUuid: created.uuid,
-            vendorBody: out.vendorBody,
-          });
-        }
-      } catch (err) {
-        this.logger.warn(
-          `BureauReport row not saved (leadId=${leadId.toString()}): ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
+      await this.persistBureauSnapshot({
+        customerId: row.customerId,
+        customerUuid: row.customer?.uuid,
+        leadId,
+        vendorBody: out.vendorBody,
+        httpStatus: out.httpStatus,
+        dummyFetched: out.dummyPayload,
+      });
       try {
         const offerResult = await this.postBureauOffer.runAfterSuccessfulBureauFetch({
           leadId,
@@ -731,6 +726,39 @@ export class VerifyPanUseCase {
       `Bureau soft-pull HTTP/vendor issue (leadId=${leadId}): http=${out.httpStatus ?? 'n/a'} transport=${out.error?.message ?? 'none'}`,
     );
     return 'failed';
+  }
+
+  private async persistBureauSnapshot(params: {
+    customerId: bigint;
+    customerUuid: string | null | undefined;
+    leadId: bigint;
+    vendorBody: unknown;
+    httpStatus: number | null;
+    dummyFetched: boolean;
+  }): Promise<void> {
+    try {
+      const parsed = parseTenacioBureauVendorBody(params.vendorBody);
+      const created = await this.bureauReports.createFromVendorSnapshot({
+        customerId: params.customerId,
+        leadId: params.leadId,
+        vendorBody: params.vendorBody,
+        parsed,
+        httpStatus: params.httpStatus,
+        dummyFetched: params.dummyFetched,
+      });
+      if (params.customerUuid) {
+        await this.bureauReportPdf.generateAndAttachForReport({
+          bureauReportId: created.id,
+          customerUuid: params.customerUuid,
+          bureauReportUuid: created.uuid,
+          vendorBody: params.vendorBody,
+        });
+      }
+    } catch (err) {
+      this.logger.warn(
+        `BureauReport row not saved (leadId=${params.leadId.toString()}): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   private async resolveGenderOccupationIds(

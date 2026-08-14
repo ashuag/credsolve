@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/data-table';
 import { getNewLeads, getMasters, type LosLead } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
-import { formatPersonName } from '@/lib/format-person-name';
+import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -233,14 +233,16 @@ export function LeadsPanel() {
           <span
             className="inline-flex items-center justify-center min-w-[46px] h-7 px-2 rounded-[7px] text-[0.8rem] font-extrabold"
             style={
-              lead.cibilScore >= 750
+              isDisplayedNtcCibilScore(lead.cibilScore)
+                ? { background: 'rgba(99,102,241,0.12)', color: '#4f46e5' }
+                : lead.cibilScore >= 750
                 ? { background: 'rgba(16,185,129,0.1)', color: '#10b981' }
                 : lead.cibilScore >= 650
                 ? { background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }
                 : { background: 'rgba(239,68,68,0.1)', color: '#ef4444' }
             }
           >
-            {lead.cibilScore}
+            {formatCibilScoreLabel(lead.cibilScore)}
           </span>
         ) : (
           <span className="text-brand-muted">—</span>

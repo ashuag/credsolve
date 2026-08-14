@@ -7,6 +7,7 @@ import {
   createApplicationCibilReport,
   getApplicationCibilReport,
   getApplicationDetails,
+  getLeadCibilReport,
   resolveLosKycPhotoSrc,
   runPostBureauBreCheck,
   type LosApplicationCibilReportPayload,
@@ -18,7 +19,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 type CibilReportView = 'report' | 'json' | 'bre';
 
 type ApplicationCibilReportTabProps = {
-  applicationUuid: string;
+  applicationUuid?: string;
+  leadUuid?: string;
+  mobileNumber?: string;
+  fullName?: string | null;
+  panNumber?: string | null;
   /** Called after a bureau pull succeeds so the parent can refresh summary data. */
   onReportCreated?: () => void;
 };
@@ -80,9 +85,17 @@ function CibilJsonViewer({ rawPayload }: { rawPayload: unknown }) {
 
 function CibilReportUnavailable({
   applicationUuid,
+  leadUuid,
+  mobileNumber,
+  fullName,
+  panNumber,
   onCreated,
 }: {
-  applicationUuid: string;
+  applicationUuid?: string;
+  leadUuid?: string;
+  mobileNumber?: string;
+  fullName?: string | null;
+  panNumber?: string | null;
   onCreated?: () => void;
 }) {
   const [creating, setCreating] = useState(false);
@@ -99,21 +112,30 @@ function CibilReportUnavailable({
     setError(null);
 
     try {
-      const details = await getApplicationDetails(token, applicationUuid);
-      const profile = details.lead.profile;
-      const fullName = profile?.fullName?.trim();
-      const panNumber = details.lead.panNumber?.trim().toUpperCase();
+      let resolvedLeadUuid = leadUuid?.trim() || '';
+      let resolvedMobile = mobileNumber?.trim() || '';
+      let resolvedName = fullName?.trim() || '';
+      let resolvedPan = panNumber?.trim().toUpperCase() || '';
 
-      if (!fullName || !panNumber) {
+      if (applicationUuid && (!resolvedLeadUuid || !resolvedMobile || !resolvedName || !resolvedPan)) {
+        const details = await getApplicationDetails(token, applicationUuid);
+        const profile = details.lead.profile;
+        resolvedLeadUuid = details.leadUuid;
+        resolvedMobile = details.mobileNumber;
+        resolvedName = profile?.fullName?.trim() || resolvedName;
+        resolvedPan = details.lead.panNumber?.trim().toUpperCase() || resolvedPan;
+      }
+
+      if (!resolvedLeadUuid || !resolvedName || !resolvedPan) {
         setError('Full name and PAN are required on the lead profile before fetching a CIBIL report.');
         return;
       }
 
       await createApplicationCibilReport(token, {
-        leadUuid: details.leadUuid,
-        mobileNumber: details.mobileNumber,
-        fullName,
-        panNumber,
+        leadUuid: resolvedLeadUuid,
+        mobileNumber: resolvedMobile,
+        fullName: resolvedName,
+        panNumber: resolvedPan,
       });
 
       onCreated?.();
@@ -215,7 +237,14 @@ function PostBreView({ rawPayload }: { rawPayload: unknown }) {
   );
 }
 
-export function ApplicationCibilReportTab({ applicationUuid, onReportCreated }: ApplicationCibilReportTabProps) {
+export function ApplicationCibilReportTab({
+  applicationUuid,
+  leadUuid,
+  mobileNumber,
+  fullName,
+  panNumber,
+  onReportCreated,
+}: ApplicationCibilReportTabProps) {
   const [payload, setPayload] = useState<LosApplicationCibilReportPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [missingReport, setMissingReport] = useState(false);
@@ -235,8 +264,17 @@ export function ApplicationCibilReportTab({ applicationUuid, onReportCreated }: 
       return;
     }
 
+    if (!applicationUuid && !leadUuid) {
+      setError('Missing application or lead reference.');
+      setPayload(null);
+      setLoading(false);
+      return;
+    }
+
     try {
-      const data = await getApplicationCibilReport(token, applicationUuid);
+      const data = applicationUuid
+        ? await getApplicationCibilReport(token, applicationUuid)
+        : await getLeadCibilReport(token, leadUuid!);
       setPayload(data);
     } catch (e) {
       setPayload(null);
@@ -250,7 +288,7 @@ export function ApplicationCibilReportTab({ applicationUuid, onReportCreated }: 
     } finally {
       setLoading(false);
     }
-  }, [applicationUuid]);
+  }, [applicationUuid, leadUuid]);
 
   useEffect(() => {
     void load();
@@ -274,7 +312,16 @@ export function ApplicationCibilReportTab({ applicationUuid, onReportCreated }: 
   }
 
   if (missingReport) {
-    return <CibilReportUnavailable applicationUuid={applicationUuid} onCreated={handleReportCreated} />;
+    return (
+      <CibilReportUnavailable
+        applicationUuid={applicationUuid}
+        leadUuid={leadUuid}
+        mobileNumber={mobileNumber}
+        fullName={fullName}
+        panNumber={panNumber}
+        onCreated={handleReportCreated}
+      />
+    );
   }
 
   if (error) {
@@ -297,9 +344,12 @@ export function ApplicationCibilReportTab({ applicationUuid, onReportCreated }: 
     );
   }
 
+  const pdfFallbackPath = applicationUuid
+    ? `/applications/${encodeURIComponent(applicationUuid)}/cibil-report/pdf`
+    : `/leads/${encodeURIComponent(leadUuid ?? '')}/cibil-report/pdf`;
   const pdfDownloadUrl =
     resolveLosKycPhotoSrc(
-      payload.reportPdfUrl ?? `/applications/${encodeURIComponent(applicationUuid)}/cibil-report/pdf`,
+      payload.reportPdfUrl ?? pdfFallbackPath,
       getToken() ?? '',
     );
 

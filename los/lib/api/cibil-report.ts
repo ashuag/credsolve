@@ -138,6 +138,17 @@ export type LosApplicationCibilReportPayload = {
   report: CibilReportData;
 };
 
+export async function getLeadCibilReport(
+  token: string,
+  leadUuid: string,
+): Promise<LosApplicationCibilReportPayload> {
+  return cachedAuthorizedLosGet<LosApplicationCibilReportPayload>(
+    token,
+    `/leads/${encodeURIComponent(leadUuid)}/cibil-report`,
+    'Failed to load CIBIL report',
+  );
+}
+
 export async function getApplicationCibilReport(
   token: string,
   applicationUuid: string,

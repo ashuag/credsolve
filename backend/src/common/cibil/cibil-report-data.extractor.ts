@@ -235,6 +235,7 @@ function inquiryPurposeLabel(code: unknown): string {
 
 function scoreRatingFromScore(score: number | null): string | null {
   if (score == null) return null;
+  if (score === -1 || score === 0 || score === 1) return 'NEW TO CREDIT (NTC)';
   if (score >= 750) return 'LOW RISK';
   if (score >= 700) return 'MODERATE RISK';
   if (score >= 550) return 'HIGH RISK';

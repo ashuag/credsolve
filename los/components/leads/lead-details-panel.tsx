@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { WorkspaceRecordHeader } from '@/components/shared/workspace-record-header';
 import { LosStatusPill } from '@/components/shared/los-status-pill';
 import { canRejectLeadStatus, RejectRecordModal } from '@/components/shared/reject-record-modal';
+import { ApplicationCibilReportTab } from '@/components/applications/application-cibil-report-tab';
 import { buildLeadIntakeJourney } from '@/lib/customer-journey';
+import { formatCibilScoreLabel } from '@/lib/application-review-format';
 import { formatPersonName } from '@/lib/format-person-name';
 import { buildWorkspaceAlertText } from '@/lib/workspace-alert';
 import { getLeadDetails, type LosLeadDetails } from '@/lib/api';
@@ -326,6 +328,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
         quickStats={[
           { label: 'PAN', value: lead.panVerifiedLabel ?? '—' },
           { label: 'Bureau', value: lead.bureauFetchedLabel ?? '—' },
+          { label: 'CIBIL', value: formatCibilScoreLabel(lead.bureauReport?.cibilScore) },
         ]}
         journeyTitle="Intake progress"
         journeySubtitle="Steps before an application is created"
@@ -345,6 +348,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
                     { label: 'PAN', value: profile.panNumber ?? '—' },
                     { label: 'PAN status', value: lead.panVerifiedLabel ?? '—' },
                     { label: 'Bureau', value: lead.bureauFetchedLabel ?? '—' },
+                    { label: 'CIBIL', value: formatCibilScoreLabel(lead.bureauReport?.cibilScore) },
                     { label: 'Gender', value: profile.gender ?? '—' },
                     { label: 'Occupation', value: profile.occupation ?? '—' },
                   ]}
@@ -381,6 +385,20 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
             </div>
           ) : null}
         </div>
+      </div>
+
+      <div className="grid gap-3">
+        <div>
+          <p className="m-0 text-[0.62rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">Credit bureau</p>
+          <h2 className="m-0 mt-0.5 text-[1.02rem] font-extrabold tracking-[-0.02em] text-brand-navy">CIBIL report</h2>
+        </div>
+        <ApplicationCibilReportTab
+          leadUuid={lead.uuid}
+          mobileNumber={lead.mobileNumber}
+          fullName={profile?.fullName}
+          panNumber={profile?.panNumber}
+          onReportCreated={() => void load()}
+        />
       </div>
 
       {lead.applications.length > 0 ? (

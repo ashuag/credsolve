@@ -321,7 +321,7 @@ export function CibilReportViewer({
   const scoreBadge =
     report.cibilScore != null ? (
       <span className="inline-flex rounded-full bg-[rgba(20,150,243,0.12)] px-2.5 py-0.5 text-[0.72rem] font-extrabold text-brand-blue">
-        {report.cibilScore}
+        {report.cibilScore === -1 || report.cibilScore === 0 || report.cibilScore === 1 ? 'NTC' : report.cibilScore}
       </span>
     ) : null;
 
@@ -352,7 +352,11 @@ export function CibilReportViewer({
                 <p className="m-0 text-[0.65rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
                   CIBIL score
                 </p>
-                <p className="m-0 text-[2rem] font-extrabold leading-none text-brand-navy">{report.cibilScore}</p>
+                <p className="m-0 text-[2rem] font-extrabold leading-none text-brand-navy">
+                  {report.cibilScore === -1 || report.cibilScore === 0 || report.cibilScore === 1
+                    ? 'NTC'
+                    : report.cibilScore}
+                </p>
                 {report.scoreRatingLabel ? (
                   <p className="m-0 mt-1 text-[0.72rem] font-bold text-brand-blue">{report.scoreRatingLabel}</p>
                 ) : null}

@@ -1,7 +1,10 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import type { Response } from 'express';
 import { BUREAU_FETCHED } from '../../../common/constants/bureau-fetch.constants';
 import { LEAD_STATUS } from '../../../common/constants/lead.constants';
 import { PAN_VERIFIED } from '../../../common/constants/pan-verification.constants';
+import { BureauReportPdfService } from '../../../common/cibil/bureau-report-pdf.service';
+import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
 
@@ -41,7 +44,11 @@ function bureauFetchedStatusLabel(code: number): string {
 
 @Injectable()
 export class LosLeadService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly bureauReportPdf: BureauReportPdfService,
+    private readonly kycFiles: KycFilesService,
+  ) {}
 
   async listLeads() {
     const leads = await this.prisma.client.lead.findMany({
@@ -149,6 +156,16 @@ export class LosLeadService {
           },
           orderBy: { createdAt: 'desc' },
         },
+        bureauReports: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            uuid: true,
+            cibilScore: true,
+            htmlUrl: true,
+            createdAt: true,
+          },
+        },
       },
     });
 
@@ -212,6 +229,14 @@ export class LosLeadService {
             cibilConsentAt: detail.cibilConsentAt?.toISOString() ?? null,
           }
         : null,
+      bureauReport: lead.bureauReports[0]
+        ? {
+            uuid: lead.bureauReports[0].uuid,
+            cibilScore: lead.bureauReports[0].cibilScore,
+            htmlUrl: lead.bureauReports[0].htmlUrl,
+            fetchedAt: lead.bureauReports[0].createdAt.toISOString(),
+          }
+        : null,
       applications: lead.applications.map((application) => ({
         uuid: application.uuid,
         applicationNumber: application.applicationNumber,
@@ -223,6 +248,102 @@ export class LosLeadService {
         updatedAt: application.updatedAt.toISOString(),
       })),
     };
+  }
+
+  async getLeadCibilReport(leadUuid: string) {
+    const lead = await this.prisma.client.lead.findUnique({
+      where: { uuid: leadUuid },
+      select: {
+        id: true,
+        customer: { select: { uuid: true } },
+      },
+    });
+
+    if (!lead) {
+      throw new NotFoundException('Lead not found');
+    }
+
+    const bureauReportRow = await this.prisma.client.bureauReport.findFirst({
+      where: { leadId: lead.id },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        uuid: true,
+        htmlUrl: true,
+        rawPayload: true,
+        createdAt: true,
+      },
+    });
+
+    if (!bureauReportRow) {
+      throw new NotFoundException('No bureau report found for this lead');
+    }
+
+    if (bureauReportRow.rawPayload == null) {
+      throw new NotFoundException('Bureau report has no stored JSON payload');
+    }
+
+    const pdfResult = await this.bureauReportPdf.ensurePdfForLead({
+      leadId: lead.id,
+      customerUuid: lead.customer.uuid,
+    });
+
+    const report = await this.bureauReportPdf.buildReportViewData(bureauReportRow.rawPayload);
+
+    return {
+      bureauReportUuid: bureauReportRow.uuid,
+      fetchedAt: bureauReportRow.createdAt.toISOString(),
+      reportPdfUrl: this.resolveBureauReportPdfUrl(leadUuid, pdfResult, true),
+      htmlUrl: bureauReportRow.htmlUrl,
+      rawPayload: bureauReportRow.rawPayload,
+      report,
+    };
+  }
+
+  async serveLeadCibilReportPdf(leadUuid: string, res: Response): Promise<void> {
+    const lead = await this.prisma.client.lead.findUnique({
+      where: { uuid: leadUuid },
+      select: {
+        id: true,
+        customer: { select: { uuid: true } },
+      },
+    });
+
+    if (!lead) {
+      throw new NotFoundException('Lead not found');
+    }
+
+    const pdfResult = await this.bureauReportPdf.ensurePdfForLead({
+      leadId: lead.id,
+      customerUuid: lead.customer.uuid,
+    });
+    if (!pdfResult?.relativePath) {
+      throw new NotFoundException('Bureau report PDF is not available for this lead.');
+    }
+
+    let buf: Buffer;
+    try {
+      buf = await this.kycFiles.readBytes(pdfResult.relativePath);
+    } catch (err) {
+      if (isStorageObjectMissing(err)) {
+        throw new NotFoundException('Bureau report PDF file is missing from storage.');
+      }
+      throw err;
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="cibil-summary-report.pdf"');
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.send(buf);
+  }
+
+  private resolveBureauReportPdfUrl(
+    leadUuid: string,
+    pdfResult: { relativePath: string; publicUrl: string | null } | null,
+    hasBureauReport: boolean,
+  ): string | null {
+    if (!hasBureauReport) return null;
+    if (pdfResult?.publicUrl) return pdfResult.publicUrl;
+    return `/leads/${leadUuid}/cibil-report/pdf`;
   }
 
   async rejectLead(leadUuid: string, input: { rejectionReasonId: number; note?: string | null }) {
@@ -275,4 +396,9 @@ export class LosLeadService {
 
     return this.getLeadDetails(leadUuid);
   }
+}
+
+function isStorageObjectMissing(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes('NoSuchKey') || msg.includes('S3 GET failed (404)') || msg.includes('S3 HEAD failed (404)');
 }

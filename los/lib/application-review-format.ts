@@ -68,10 +68,21 @@ export function leadSourceLabel(sourceName: string | null | undefined, sourceTyp
 
 export function cibilScoreBand(score: number | null | undefined): string {
   if (score == null) return '—';
+  if (score === -1 || score === 0 || score === 1) return 'New to credit (NTC)';
   if (score >= 750) return 'Excellent — low risk band';
   if (score >= 700) return 'Good — low risk band';
   if (score >= 650) return 'Fair — review carefully';
   return 'Below threshold — high risk band';
+}
+
+export function isDisplayedNtcCibilScore(score: number | null | undefined): boolean {
+  return score === -1 || score === 0 || score === 1;
+}
+
+export function formatCibilScoreLabel(score: number | null | undefined): string {
+  if (score == null) return '—';
+  if (isDisplayedNtcCibilScore(score)) return 'NTC';
+  return String(score);
 }
 
 export function formatApplicationDisplayId(applicationNumber: string): string {

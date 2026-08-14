@@ -6,6 +6,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui/data-table';
 import { getApplications, getMasters, type LosApplication } from '@/lib/api';
+import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { APPLICATION_JOURNEY_STAGE_FILTER_OPTIONS } from '@/lib/constants/application-journey-stages';
 import { resolveApplicationStageLabel } from '@/lib/customer-journey';
@@ -87,6 +88,16 @@ function StatusPill({ label, code }: { label: string; code?: string }) {
 
 function CibilBadge({ score }: { score: number | null | undefined }) {
   if (score == null) return <span className="text-brand-muted">—</span>;
+  if (isDisplayedNtcCibilScore(score)) {
+    return (
+      <span
+        className="inline-flex items-center justify-center min-w-[46px] h-7 px-2 rounded-[7px] text-[0.8rem] font-extrabold"
+        style={{ background: 'rgba(99,102,241,0.12)', color: '#4f46e5' }}
+      >
+        {formatCibilScoreLabel(score)}
+      </span>
+    );
+  }
   const style =
     score >= 750
       ? { background: 'rgba(16,185,129,0.1)', color: '#10b981' }

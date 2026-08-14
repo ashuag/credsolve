@@ -21,6 +21,7 @@ import {
   maskPan,
   parseInrNumber,
   cibilScoreBand,
+  formatCibilScoreLabel,
   truncateUuid,
 } from '@/lib/application-review-format';
 import { isApplicationJourneyStepActive } from '@/lib/customer-journey';
@@ -1100,7 +1101,12 @@ export function ReviewCibilPanel({
         title="Credit bureau summary"
       >
         <div className="fgrid thirds">
-          <ReviewField label="CIBIL score" value={score ?? '—'} tone={score != null && score >= 700 ? 'accent' : undefined} sub={cibilScoreBand(score)} />
+          <ReviewField
+            label="CIBIL score"
+            value={formatCibilScoreLabel(score)}
+            tone={score != null && score >= 700 ? 'accent' : undefined}
+            sub={cibilScoreBand(score)}
+          />
           <ReviewField label="Bureau" value="TransUnion CIBIL" />
           <ReviewField label="Pulled" value={formatReviewDateOnly(row.bureauReport?.fetchedAt)} />
         </div>
