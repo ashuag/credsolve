@@ -21,5 +21,5 @@ export const metadata: Metadata = {
 };
 
 export default function KycLayout({ children }: { children: React.ReactNode }) {
-  return <div className={`${sora.variable} ${hanken.variable} flex h-full min-h-0 flex-1 flex-col`}>{children}</div>;
+  return <div className={`${sora.variable} ${hanken.variable} w-full`}>{children}</div>;
 }

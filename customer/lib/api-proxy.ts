@@ -25,6 +25,8 @@ const HOP_BY_HOP = new Set([
 const RESPONSE_STRIP_HEADERS = new Set(['content-encoding', 'content-length']);
 
 const PROXY_TIMEOUT_MS = 60_000;
+/** First-time KFS HTML→PDF (Puppeteer) can exceed the default API budget. */
+const LOAN_DOCUMENT_PDF_PROXY_TIMEOUT_MS = 90_000;
 
 function buildUpstreamUrl(pathSegments: string[], search: string): string {
   const base = getCustomerServerApiBase().replace(/\/$/, '');
@@ -76,11 +78,12 @@ export async function proxyCustomerApiRequest(
   const upstreamUrl = buildUpstreamUrl(pathSegments, request.nextUrl.search);
   const method = request.method.toUpperCase();
 
+  const isLoanDocumentPdf = /\/loan-documents\/[^/]+\/pdf(?:\?|$)/i.test(upstreamUrl);
   const init: RequestInit = {
     method,
     headers: forwardRequestHeaders(request),
     redirect: 'manual',
-    signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
+    signal: AbortSignal.timeout(isLoanDocumentPdf ? LOAN_DOCUMENT_PDF_PROXY_TIMEOUT_MS : PROXY_TIMEOUT_MS),
   };
 
   if (method !== 'GET' && method !== 'HEAD') {

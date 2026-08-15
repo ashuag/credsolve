@@ -431,15 +431,29 @@ export function getCustomerPostAuthResumePath(
 }
 
 /**
- * After DigiLocker Aadhaar fetch, continue to selfie/liveness when face step is pending.
+ * After DigiLocker Aadhaar fetch, go straight to selfie — never bounce through the `/kyc` hub.
  */
 export function getPostDigilockerAadhaarContinuePath(
   session: Extract<CustomerSessionResponse, { authenticated: true }>
 ): string {
+  if (session.lead && isLeadRejectedAndLocked(session.lead)) {
+    return '/thank-you-interest';
+  }
   if (shouldResumeKycSelfie(session)) {
     return '/kyc/selfie';
   }
-  return getCustomerJourneyResumePath(session);
+  const kyc = session.kycFaceProgress;
+  if (
+    kyc?.livenessCheckCompleted &&
+    !kyc.livenessPassed &&
+    !hasKycLivenessRetryRemaining(kyc)
+  ) {
+    return '/thank-you';
+  }
+  if (session.journey.kycCompleted) {
+    return getCustomerJourneyResumePath(session);
+  }
+  return '/kyc/selfie';
 }
 
 /** Back navigation from the KYC hub (avoid `getCustomerJourneyResumePath` looping to `/kyc`). */

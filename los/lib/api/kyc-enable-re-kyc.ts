@@ -5,11 +5,12 @@ export type EnableReKycResult = {
   applicationUuid: string;
   leadUuid: string;
   digilockerCleared: boolean;
+  digilockerPreserved?: boolean;
   leadRecovered: boolean;
   applicationRecovered: boolean;
 };
 
-/** Reset DigiLocker / KYC status so the customer can redo identity verification. */
+/** Reset selfie / liveness so the customer can retake KYC selfie. DigiLocker Aadhaar is kept if already captured. */
 export async function enableReKyc(
   token: string,
   applicationUuid: string,
@@ -18,6 +19,6 @@ export async function enableReKyc(
     token,
     `/applications/${encodeURIComponent(applicationUuid)}/kyc/enable-re-kyc`,
     { method: 'POST' },
-    'Failed to enable re-KYC.',
+    'Failed to re-enable KYC selfie.',
   );
 }

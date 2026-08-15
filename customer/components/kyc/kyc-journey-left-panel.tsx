@@ -90,30 +90,6 @@ export function KycJourneyLeftPanel({
             );
           })}
         </div>
-
-        <h2 className={styles.leftTitle}>
-          Loan <b>details</b>
-        </h2>
-        <p className={styles.leftSub}>The amount and tenure you selected stay visible while you complete KYC.</p>
-
-        <div className={styles.calcSlot}>
-          <LoanCalculationLeftRail loanSelection={loanSelection ?? null} />
-        </div>
-
-        <div className={styles.pills}>
-          <div className={styles.pill}>
-            <b>100%</b>
-            <span>PAPERLESS</span>
-          </div>
-          <div className={styles.pill}>
-            <b>Instant</b>
-            <span>APPROVAL</span>
-          </div>
-          <div className={styles.pill}>
-            <b>Zero</b>
-            <span>HIDDEN FEES</span>
-          </div>
-        </div>
       </div>
     </aside>
   );

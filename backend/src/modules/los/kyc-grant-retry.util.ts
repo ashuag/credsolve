@@ -5,7 +5,7 @@ import {
 } from '../../common/constants/application.constants';
 import { LEAD_STATUS, type LeadStatus } from '../../common/constants/lead.constants';
 
-/** Snapshot for full re-KYC (DigiLocker / docs reset). */
+/** Snapshot for re-enabling KYC selfie (DigiLocker Aadhaar is kept when already captured). */
 export type KycEnableReKycSnapshot = {
   kycStatus: number;
   livenessPassed: boolean;
@@ -27,8 +27,8 @@ const RE_KYC_BLOCKED_APPLICATION_STATUSES = new Set<ApplicationStatus>([
 ]);
 
 /**
- * True when LOS ops may enable full re-KYC so the customer can redo DigiLocker / docs.
- * Selfie/liveness grant-retry removed pending rewrite.
+ * True when LOS ops may re-enable KYC selfie so the customer can retake the face step.
+ * DigiLocker Aadhaar is not cleared when it is already complete.
  */
 export function canEnableReKyc(snapshot: KycEnableReKycSnapshot): boolean {
   if (RE_KYC_BLOCKED_APPLICATION_STATUSES.has(snapshot.applicationStatusCode as ApplicationStatus)) {

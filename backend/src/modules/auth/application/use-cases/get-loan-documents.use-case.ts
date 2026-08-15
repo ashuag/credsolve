@@ -42,11 +42,7 @@ export class GetLoanDocumentsUseCase {
       throw new BadRequestException('Complete loan selection before reviewing documents.');
     }
 
-    const merge = this.loanDocs.buildMergeInput({ customer: ctx.customer, lead: ctx.lead, application: app });
     const docType = LOAN_DOCUMENT_TYPE.KEY_FACT;
-    const existing = this.loanDocs.relativePathForType(docType, app);
-    await this.loanDocs.ensurePdf(docType, customer.uuid, app.uuid, app.id, merge, existing);
-
     const documents = [docType].map((type) => ({
       type,
       title: this.loanDocs.documentTitle(type),

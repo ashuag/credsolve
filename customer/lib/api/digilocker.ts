@@ -76,6 +76,36 @@ export function clearDigilockerSessionTokenFromStorage(): void {
   }
 }
 
+/** Set before leaving for DigiLocker so `/kyc` does not flash the hub on return. */
+export const DIGILOCKER_EXPECT_SELFIE_STORAGE_KEY = 'moneycash:digilocker:expect-selfie';
+
+export function markDigilockerExpectSelfie(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(DIGILOCKER_EXPECT_SELFIE_STORAGE_KEY, '1');
+  } catch {
+    /* ignore */
+  }
+}
+
+export function peekDigilockerExpectSelfie(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return sessionStorage.getItem(DIGILOCKER_EXPECT_SELFIE_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function clearDigilockerExpectSelfie(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.removeItem(DIGILOCKER_EXPECT_SELFIE_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 export type PendingDigilockerSessionResponse = {
   sessionToken: string | null;
 };
@@ -187,6 +217,7 @@ export async function startDigilockerLoginFlow(
     };
   }
 
+  markDigilockerExpectSelfie();
   window.location.assign(redirect);
   return { ok: true };
 }

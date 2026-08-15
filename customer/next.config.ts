@@ -28,10 +28,14 @@ function withOptionalSentry(config: NextConfig): NextConfig {
   }
 }
 
-const allowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? '')
-  .split(',')
+const allowedDevOrigins = [
+  'localhost',
+  '127.0.0.1',
+  ...(process.env.NEXT_ALLOWED_DEV_ORIGINS ?? '').split(','),
+]
   .map((value) => value.trim())
-  .filter(Boolean);
+  .filter(Boolean)
+  .filter((value, index, all) => all.indexOf(value) === index);
 
 // Fail fast at build/start if the server-side API proxy target is misconfigured.
 getCustomerServerApiBase();

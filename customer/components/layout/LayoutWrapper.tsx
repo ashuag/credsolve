@@ -53,26 +53,6 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
-  if (isKycJourneyPage) {
-    return (
-      <div className="flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden">
-        <div className="hidden shrink-0 lg:block">
-          <Suspense
-            fallback={
-              <header
-                className="sticky top-0 z-20 min-h-[72px] border-b border-b-[rgba(18,36,79,0.09)] bg-[rgba(255,253,248,0.95)] backdrop-blur-[24px] shadow-[0_4px_32px_rgba(23,44,113,0.08)]"
-                aria-hidden
-              />
-            }
-          >
-            <BrandHeader />
-          </Suspense>
-        </div>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
-      </div>
-    );
-  }
-
   if (isLoanDocumentsPage) {
     return (
       <>
@@ -94,7 +74,7 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
       </>
     );
   }
-  if (isOnboardingLayout || isBankJourneyPage) {
+  if (isOnboardingLayout || isBankJourneyPage || isKycJourneyPage) {
     return (
       <>
         <div className="hidden lg:block">

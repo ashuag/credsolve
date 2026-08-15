@@ -237,7 +237,7 @@ export type LosApplicationDetails = {
   };
   /** True when LOS ops may grant one more customer KYC liveness attempt. */
   canGrantKycLivenessRetry: boolean;
-  /** True when LOS ops may enable full re-KYC (reset face pipeline / reopen KYC). */
+  /** True when LOS ops may re-enable KYC selfie (DigiLocker Aadhaar is kept if already captured). */
   canEnableReKyc?: boolean;
   preApprovedLoanAmount: string | null;
   createdAt: string;

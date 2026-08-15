@@ -7,7 +7,7 @@ import {
   JourneyProgressProvider,
   useJourneyProgressOptional,
 } from '@/components/journey/journey-progress-context';
-import { KycJourneyLeftPanel } from '@/components/kyc/kyc-journey-left-panel';
+import { KycJourneyShell } from '@/components/kyc/kyc-journey-shell';
 import styles from '@/components/kyc/kyc-hub-flow.module.css';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { AlertBanner } from '@/components/ui/alert-banner';
@@ -25,6 +25,7 @@ import {
 } from '@/lib/api/kyc-face';
 import { formatAddressForDisplay } from '@/lib/format-address';
 import { kycJourneyProgressFromSession } from '@/lib/kyc-journey-progress';
+import { clearDigilockerExpectSelfie } from '@/lib/api/digilocker';
 import { openUserCamera, openUserCameraErrorMessage } from '@/lib/media/open-user-camera';
 import {
   headMovementRecordingErrorMessage,
@@ -120,8 +121,6 @@ function KycSelfieContent() {
   const [cameraReady, setCameraReady] = useState(false);
   /** Open webcam only while capturing; not after a saved selfie (avoids permission prompts on refresh / return visits). */
   const [retakeSelfie, setRetakeSelfie] = useState(false);
-  /** Shown immediately after capture so the UI does not flash the previous cached selfie. */
-  const [pendingSelfiePreview, setPendingSelfiePreview] = useState<string | null>(null);
   /**
    * Holds the webcam open across the face checks that run straight after capture, so a pass
    * flows into the head-movement recording on the same stream instead of reopening the camera.
@@ -136,8 +135,7 @@ function KycSelfieContent() {
   /** Verifies a previously saved selfie once per visit, not on every session refresh. */
   const autoVerifyRef = useRef(false);
 
-  const loanSelection = session?.authenticated === true ? session.loanSelection : null;
-  const { progressPct, activeStepIndex } = useMemo(
+  const { progressPct } = useMemo(
     () => kycJourneyProgressFromSession(session),
     [session],
   );
@@ -146,16 +144,14 @@ function KycSelfieContent() {
     journey?.setCompletion01(progressPct / 100);
   }, [journey, progressPct]);
 
+  useEffect(() => {
+    clearDigilockerExpectSelfie();
+  }, []);
+
   const kyc = session?.authenticated === true ? session.kycFaceProgress : null;
   const photoHref =
     kyc?.digilockerAadhaarPhotoUrl && session?.authenticated === true
       ? `/api${kyc.digilockerAadhaarPhotoUrl}`
-      : null;
-  const selfieHref =
-    kyc?.kycSelfiePhotoUrl && session?.authenticated === true
-      ? `/api${kyc.kycSelfiePhotoUrl}${
-          kyc.selfieUpdatedAt ? `?v=${encodeURIComponent(kyc.selfieUpdatedAt)}` : ''
-        }`
       : null;
 
   const stopCamera = useCallback(() => {
@@ -266,7 +262,7 @@ function KycSelfieContent() {
     autoVerifyRef.current = true;
     void (async () => {
       setBusy(true);
-      setBusyLabel('Checking your photo…');
+      setBusyLabel('Checking your photo and matching with Aadhaar…');
       try {
         if ((await runFaceChecks()) !== 'passed') return;
         setPhase('done');
@@ -320,7 +316,6 @@ function KycSelfieContent() {
     ) {
       setPhase('selfie');
       setRetakeSelfie(true);
-      setPendingSelfiePreview(null);
     }
     await refresh();
     return 'failed';
@@ -354,7 +349,6 @@ function KycSelfieContent() {
     setBusyLabel('Saving selfie…');
     try {
       const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-      setPendingSelfiePreview(dataUrl);
       const file = dataUrlToFile(dataUrl, 'selfie.jpg');
       const out = await postKycSelfie(file);
       if (!out?.success) {
@@ -366,17 +360,14 @@ function KycSelfieContent() {
       setRecordingPct(0);
       await refresh();
 
-      // Quality and match are checked now, so the head-movement card is only offered for a
-      // selfie that has already been accepted.
-      setBusyLabel('Checking your photo…');
+      // Quality, then Aadhaar match. Head-movement instructions only after both pass.
+      setBusyLabel('Checking your photo and matching with Aadhaar…');
       const outcome = await runFaceChecks();
-      setPendingSelfiePreview(null);
       if (outcome === 'passed') {
         setPhase('done');
         await continueToNextStep();
       }
     } catch (e) {
-      setPendingSelfiePreview(null);
       const msg = e instanceof Error ? e.message : 'Selfie upload failed.';
       setError(msg);
     } finally {
@@ -467,7 +458,7 @@ function KycSelfieContent() {
   async function handleLiveness() {
     setError('');
     setBusy(true);
-    setBusyLabel('Checking your photo…');
+    setBusyLabel('Checking your photo and matching with Aadhaar…');
     try {
       if ((await runFaceChecks()) !== 'passed') return;
       setPhase('done');
@@ -482,18 +473,15 @@ function KycSelfieContent() {
 
   if (loading || !session || session.authenticated !== true) {
     return (
-      <div className={styles.page}>
-        <div className={styles.shell}>
-          <KycJourneyLeftPanel
-            loanSelection={null}
-            progressPct={progressPct}
-            activeStepIndex={activeStepIndex}
-          />
-          <section className={`${styles.right} ${styles.rightCentered}`}>
+      <KycJourneyShell
+        mobileStepLabel="Selfie"
+        mobileOnBack={() => router.push('/kyc')}
+        journeyPanel={
+          <div className="flex min-h-[40vh] items-center justify-center">
             <Spinner size={36} />
-          </section>
-        </div>
-      </div>
+          </div>
+        }
+      />
     );
   }
 
@@ -504,7 +492,6 @@ function KycSelfieContent() {
 
   function handleRetakeSelfie() {
     setError('');
-    setPendingSelfiePreview(null);
     setSelfieQuality(null);
     setHeadMovementScore(null);
     setPhase('selfie');
@@ -521,29 +508,27 @@ function KycSelfieContent() {
   );
 
   return (
-    <div className={styles.page}>
-      <div className={styles.shell}>
-        <KycJourneyLeftPanel
-          loanSelection={loanSelection}
-          progressPct={progressPct}
-          activeStepIndex={activeStepIndex}
-        />
-
-        <section className={styles.right}>
+    <KycJourneyShell
+      mobileStepLabel="Selfie"
+      mobileOnBack={() => router.push('/kyc')}
+      journeyPanel={
+        <>
           <div className={`${styles.reveal} ${styles.d1}`}>
             <span className={styles.eyebrow}>KYC</span>
           </div>
           <h1 className={`${styles.rightTitle} ${styles.reveal} ${styles.d1}`}>Selfie &amp; liveness</h1>
 
           <div className={`${styles.selfiePanel} ${styles.reveal} ${styles.d3} grid gap-4`}>
-            {error ? <AlertBanner variant="error">{error}</AlertBanner> : null}
+            {error && !(selfieQuality && !selfieQuality.ok) ? (
+              <AlertBanner variant="error">{error}</AlertBanner>
+            ) : null}
 
             {selfieQuality && !selfieQuality.ok && !busy ? (
-              <SelfieQualityChecklist quality={selfieQuality} />
+              <SelfieQualityGuidance quality={selfieQuality} />
             ) : null}
 
             {photoHref || hasAadhaarDetails ? (
-              <div className="grid gap-3 sm:grid-cols-2 sm:items-start rounded-2xl border border-[rgba(18,36,79,0.12)] p-3 bg-white/90">
+              <div className="hidden gap-3 rounded-2xl border border-[rgba(18,36,79,0.12)] bg-white/90 p-3 lg:grid lg:grid-cols-2 lg:items-start">
                 <div className="min-w-0">
                   <p className="m-0 mb-2 text-sm font-semibold text-brand-navy">Aadhaar details</p>
                   {hasAadhaarDetails ? (
@@ -579,47 +564,36 @@ function KycSelfieContent() {
               </div>
             ) : null}
 
-            {(pendingSelfiePreview ?? selfieHref) && !retakeSelfie ? (
-              <div className="rounded-2xl border border-[rgba(18,36,79,0.12)] p-3 bg-white/90">
-                <p className="m-0 mb-2 text-sm font-semibold text-brand-navy">Your saved selfie</p>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={pendingSelfiePreview ?? selfieHref!}
-                  alt="Your selfie"
-                  className="w-full max-h-56 object-contain rounded-xl"
-                />
+            {phase === 'head-movement' ? (
+              <div className="rounded-2xl border border-[rgba(18,36,79,0.12)] bg-white/90 p-4">
+                <p className="m-0 text-sm font-semibold text-brand-navy">Head movement check</p>
+                <p className="m-0 mt-1 text-sm text-brand-muted">
+                  Your selfie matches your Aadhaar photo. Last step — record a short clip: slowly turn
+                  your head left and right or nod up and down, while looking at the camera.
+                </p>
               </div>
             ) : null}
 
             {needsWebcamStream ? (
-              <div className="rounded-2xl overflow-hidden border border-[rgba(18,36,79,0.12)] bg-black aspect-[4/3] max-h-[360px]">
+              <div className="overflow-hidden rounded-2xl border border-[rgba(18,36,79,0.12)] bg-black aspect-[4/3] max-h-[360px]">
                 <video ref={videoRef} className="h-full w-full object-cover" autoPlay playsInline muted />
               </div>
             ) : null}
             <canvas ref={canvasRef} className="hidden" />
 
-            {needsWebcamStream && phase !== 'head-movement' ? (
+            {phase !== 'head-movement' && needsWebcamStream ? (
               <button
                 type="button"
                 disabled={busy || !cameraReady}
                 onClick={() => void handleCapture()}
-                className="mc-btn-primary"
+                className="mc-btn-primary w-full"
               >
-                {busy ? busyLabel || 'Please wait…' : 'Capture from webcam'}
+                {busy ? busyLabel || 'Please wait…' : retakeSelfie ? 'Try again' : 'Capture from webcam'}
               </button>
             ) : null}
 
             {phase === 'head-movement' ? (
-              <div className="grid gap-3 rounded-2xl border border-[rgba(18,36,79,0.12)] bg-white/90 p-4">
-                <div>
-                  <p className="m-0 text-sm font-semibold text-brand-navy">Head movement check</p>
-                  <p className="m-0 mt-1 text-sm text-brand-muted">
-                    Your selfie passed our photo checks and matches your Aadhaar photo. Last step — record a
-                    short clip: slowly move your head in any direction, turning left and right or nodding up
-                    and down, while looking at the camera.
-                  </p>
-                </div>
-
+              <div className="grid gap-3">
                 {busy && recordingPct > 0 ? (
                   <div className="h-2 w-full overflow-hidden rounded-full bg-[rgba(18,36,79,0.08)]">
                     <div
@@ -642,7 +616,7 @@ function KycSelfieContent() {
                   type="button"
                   disabled={busy || !cameraReady}
                   onClick={() => void handleHeadMovement()}
-                  className="mc-btn-primary"
+                  className="mc-btn-primary w-full"
                 >
                   {busy
                     ? busyLabel || 'Please wait…'
@@ -660,28 +634,17 @@ function KycSelfieContent() {
               </div>
             ) : null}
 
-            {selfieAlreadySaved && !retakeSelfie && !livenessRetryNeeded && phase !== 'head-movement' ? (
+            {selfieAlreadySaved && !retakeSelfie && !busy && !livenessRetryNeeded && phase !== 'head-movement' ? (
               <button
                 type="button"
-                className="text-sm font-semibold text-[#1496f3] underline-offset-2 hover:underline bg-transparent border-0 p-0 cursor-pointer text-left"
+                className="mc-btn-secondary w-full bg-[rgba(20,150,243,0.08)] text-brand-navy"
                 onClick={handleRetakeSelfie}
               >
-                Replace selfie (opens camera)
-              </button>
-            ) : retakeSelfie ? (
-              <button
-                type="button"
-                className="text-sm font-medium text-brand-muted underline-offset-2 hover:underline bg-transparent border-0 p-0 cursor-pointer text-left"
-                onClick={() => {
-                  setRetakeSelfie(false);
-                  setError('');
-                }}
-              >
-                Cancel replace
+                Replace selfie
               </button>
             ) : null}
 
-            {livenessRetryNeeded && !retakeSelfie && phase !== 'head-movement' ? (
+            {livenessRetryNeeded && !retakeSelfie && !busy && phase !== 'head-movement' ? (
               <div className="grid gap-3 rounded-2xl border border-[rgba(18,36,79,0.12)] bg-white/90 p-4">
                 <p className="m-0 text-sm text-brand-muted">
                   Selfie saved. Face liveness did not pass or was not completed — retry with the same photo, or take a
@@ -708,69 +671,83 @@ function KycSelfieContent() {
               </div>
             ) : null}
           </div>
-        </section>
-      </div>
-    </div>
+        </>
+      }
+    />
   );
 }
 
-/** Per-gate results from the on-server photo checks, so the customer knows what to fix. */
-function SelfieQualityChecklist({ quality }: { quality: KycPhotoQualitySummary }) {
-  const rows: Array<{ label: string; passed: boolean; hint: string }> = [
-    {
-      label: 'Only one person in frame',
-      passed: !quality.dualFaceDetected,
+/** Failed photo gates only — tell the customer what to change, not a full pass/fail list. */
+function selfieQualityIssues(quality: KycPhotoQualitySummary): Array<{ title: string; hint: string }> {
+  const issues: Array<{ title: string; hint: string }> = [];
+
+  if (quality.dualFaceDetected) {
+    issues.push({
+      title: 'More than one person in the photo',
       hint:
         quality.faceCount > 1
-          ? `${quality.faceCount} faces detected — make sure nobody else is visible`
-          : 'Make sure nobody else is visible behind you',
-    },
-    {
-      label: 'Full face visible',
-      passed: quality.fullFaceDetected,
-      hint: 'Move closer so your whole face fills the frame',
-    },
-    {
-      label: 'Face not covered',
-      passed: quality.faceNotCovered,
-      hint: 'Remove masks, sunglasses, or anything covering your eyes, nose, or mouth',
-    },
-    {
-      label: 'Photo is sharp',
-      passed: quality.blurPassed !== false,
-      hint: 'Hold your phone steady and let the camera focus',
-    },
-    {
-      label: 'Lighting is good',
-      passed: quality.lightingPassed !== false,
-      hint: 'Face a window or light source so your face is evenly lit',
-    },
-  ];
+          ? `We found ${quality.faceCount} faces. Take the photo with only you in the frame.`
+          : 'Make sure nobody else is visible behind or beside you.',
+    });
+  }
+  if (!quality.fullFaceDetected) {
+    issues.push({
+      title: 'Face is not fully visible',
+      hint: 'Move closer and look straight at the camera so your whole face fills the frame.',
+    });
+  }
+  if (!quality.faceNotCovered) {
+    issues.push({
+      title: 'Face is covered',
+      hint: 'Remove masks, sunglasses, hats, or anything covering your eyes, nose, or mouth.',
+    });
+  }
+  if (quality.blurPassed === false) {
+    issues.push({
+      title: 'Photo is too blurry',
+      hint: 'Hold your phone steady, wait for the camera to focus, and try again.',
+    });
+  }
+  if (quality.lightingPassed === false) {
+    issues.push({
+      title: 'Lighting is too dark',
+      hint: 'Move to a brighter place and face a window or lamp so your face is clearly lit.',
+    });
+  }
 
+  if (issues.length === 0) {
+    issues.push({
+      title: 'We could not use this selfie',
+      hint:
+        quality.reason?.trim() ||
+        'Look at the camera, use good lighting, and keep your full face visible.',
+    });
+  }
+
+  return issues;
+}
+
+function SelfieQualityGuidance({ quality }: { quality: KycPhotoQualitySummary }) {
+  const issues = selfieQualityIssues(quality);
   return (
-    <div className="grid gap-2 rounded-2xl border border-[rgba(220,38,38,0.25)] bg-[rgba(220,38,38,0.04)] p-4">
-      <p className="m-0 text-sm font-semibold text-brand-navy">Photo checks</p>
-      <ul className="m-0 grid list-none gap-1.5 p-0">
-        {rows.map((row) => (
-          <li key={row.label} className="flex items-start gap-2 text-sm">
-            <span aria-hidden className={row.passed ? 'text-emerald-600' : 'text-red-600'}>
-              {row.passed ? '✓' : '✕'}
+    <div className="grid gap-3 rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50/90 to-orange-50/40 p-4">
+      <p className="m-0 text-sm font-extrabold text-brand-navy">Fix these and try again</p>
+      <ul className="m-0 grid list-none gap-3 p-0">
+        {issues.map((issue) => (
+          <li key={issue.title} className="flex items-start gap-3">
+            <span
+              className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[0.85rem] font-extrabold text-amber-800"
+              aria-hidden
+            >
+              !
             </span>
-            <span className={row.passed ? 'text-brand-muted' : 'text-brand-navy'}>
-              {row.label}
-              {row.passed ? null : <span className="block text-brand-muted">{row.hint}</span>}
+            <span className="min-w-0">
+              <span className="block text-sm font-extrabold text-brand-navy">{issue.title}</span>
+              <span className="mt-0.5 block text-sm leading-relaxed text-slate-600">{issue.hint}</span>
             </span>
           </li>
         ))}
       </ul>
-      {quality.qualityScore != null ? (
-        <p className="m-0 text-sm text-brand-muted">
-          Photo quality score:{' '}
-          <span className="font-semibold text-brand-navy">
-            {Math.round(quality.qualityScore * 100)}%
-          </span>
-        </p>
-      ) : null}
     </div>
   );
 }

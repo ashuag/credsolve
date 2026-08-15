@@ -88,7 +88,11 @@ export function LoanDocumentScrollPanel({
 
     (async () => {
       try {
-        const res = await fetch(pdfSrc, { credentials: 'include', cache: 'no-store' });
+        const res = await fetch(pdfSrc, {
+          credentials: 'include',
+          cache: 'no-store',
+          signal: AbortSignal.timeout(90_000),
+        });
         if (!res.ok) {
           throw new Error(`Unable to load PDF (${res.status}).`);
         }
@@ -99,7 +103,16 @@ export function LoanDocumentScrollPanel({
         setBlobUrl(url);
       } catch (e) {
         if (!cancelled) {
-          setLoadError(e instanceof Error ? e.message : 'Unable to load PDF.');
+          const timedOut =
+            (typeof DOMException !== 'undefined' && e instanceof DOMException && e.name === 'TimeoutError') ||
+            (e instanceof Error && e.name === 'TimeoutError');
+          setLoadError(
+            timedOut
+              ? 'The sanction letter is taking too long to generate. Open it in a new tab, or retry.'
+              : e instanceof Error
+                ? e.message
+                : 'Unable to load PDF.',
+          );
           setUseNativeViewer(true);
         }
       }
@@ -156,7 +169,7 @@ export function LoanDocumentScrollPanel({
               onClick={handleOpenPdf}
               className="mc-btn-primary inline-flex min-h-[48px] w-full items-center justify-center px-6 py-3 text-sm"
             >
-              {openedExternally ? 'Reopen sanction letter PDF' : 'View sanction letter PDF'}
+              {openedExternally ? 'Reopen sanction letter' : 'View sanction letter'}
             </a>
             {openedExternally ? (
               <p className="mt-3 mb-0 text-xs font-semibold text-emerald-700">
@@ -182,7 +195,7 @@ export function LoanDocumentScrollPanel({
             />
           ) : (
             <div className="flex h-full min-h-[200px] items-center justify-center text-sm font-medium text-slate-500">
-              Loading document…
+              Preparing your sanction letter…
             </div>
           )}
         </div>

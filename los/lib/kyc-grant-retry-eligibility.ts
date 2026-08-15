@@ -8,7 +8,7 @@ const RE_KYC_BLOCKED_APPLICATION_STATUSES = new Set([
 ]);
 
 /**
- * Mirrors backend `canEnableReKyc` — DigiLocker / docs reset (selfie/liveness grant-retry removed).
+ * Mirrors backend `canEnableReKyc` — re-enable KYC selfie (DigiLocker Aadhaar is kept when captured).
  */
 export function canEnableReKycFromRow(
   row: Pick<

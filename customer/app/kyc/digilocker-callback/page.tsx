@@ -4,15 +4,17 @@ import Link from 'next/link';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { usePathname, useRouter, useSearchParams, type ReadonlyURLSearchParams } from 'next/navigation';
 import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
-import { KycJourneyLeftPanel } from '@/components/kyc/kyc-journey-left-panel';
+import { KycJourneyShell } from '@/components/kyc/kyc-journey-shell';
 import styles from '@/components/kyc/kyc-hub-flow.module.css';
-import { JourneyProgressProvider } from '@/components/journey/journey-progress-context';
+import { JourneyProgressProvider, useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { Spinner } from '@/components/ui/spinner';
 import {
+  clearDigilockerExpectSelfie,
   clearDigilockerSessionTokenFromStorage,
   downloadDigilockerAadhaar,
   fetchPendingDigilockerSession,
+  markDigilockerExpectSelfie,
   persistDigilockerSessionTokenForCallback,
   pickDigilockerDownloadErrorMessage,
   readDigilockerSessionTokenFromStorage,
@@ -30,6 +32,9 @@ const DEFAULT_MAX_ATTEMPTS = 3;
 type DownloadFailureKind = 'retryable' | 'identity_mismatch' | 'missing_token' | 'not_configured';
 
 function describeContinueStep(href: string): string {
+  if (href.startsWith('/kyc/selfie')) {
+    return 'Continue to take a selfie.';
+  }
   if (href.startsWith('/kyc')) {
     return 'Continue to complete your KYC.';
   }
@@ -127,6 +132,7 @@ function DigilockerCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { session, refresh } = useCustomerSession();
+  const journey = useJourneyProgressOptional();
   const [status, setStatus] = useState<'working' | 'done' | 'error'>('working');
   const [message, setMessage] = useState('Fetching your Aadhaar from DigiLocker…');
   const [error, setError] = useState('');
@@ -134,7 +140,7 @@ function DigilockerCallbackContent() {
   const [attemptsUsed, setAttemptsUsed] = useState(0);
   const [attemptsAllowed, setAttemptsAllowed] = useState(DEFAULT_MAX_ATTEMPTS);
   const [retryBusy, setRetryBusy] = useState(false);
-  const [continueHref, setContinueHref] = useState('/kyc');
+  const [continueHref, setContinueHref] = useState('/kyc/selfie');
   const sessionTokenRef = useRef('');
   const runDownloadRef = useRef<() => Promise<void>>(async () => {});
   const refreshRef = useRef(refresh);
@@ -151,11 +157,14 @@ function DigilockerCallbackContent() {
     }
   }
 
-  const loanSelection = session?.authenticated === true ? session.loanSelection : null;
-  const { progressPct, activeStepIndex } = useMemo(
+  const { progressPct } = useMemo(
     () => kycJourneyProgressFromSession(session),
     [session],
   );
+
+  useEffect(() => {
+    journey?.setCompletion01(progressPct / 100);
+  }, [journey, progressPct]);
 
   const resolveSessionToken = useCallback(async (): Promise<string> => {
     const fromQuery = readTokenFromSearchParams(searchParams);
@@ -232,6 +241,7 @@ function DigilockerCallbackContent() {
       );
 
       if (!out.configured) {
+        clearDigilockerExpectSelfie();
         setStatus('error');
         setFailureKind('not_configured');
         setError(downloadErrorMessage(out));
@@ -239,6 +249,7 @@ function DigilockerCallbackContent() {
       }
 
       if (!out.ok) {
+        clearDigilockerExpectSelfie();
         if (out.identityMismatch) {
           const redirected = await handleTerminalFailure(out);
           if (redirected) return;
@@ -260,16 +271,17 @@ function DigilockerCallbackContent() {
       }
 
       clearDigilockerSessionTokenFromStorage();
+      markDigilockerExpectSelfie();
       const next = await refresh();
       const href =
         next.authenticated === true && next.lead
           ? getPostDigilockerAadhaarContinuePath(next)
-          : '/apply-for-loan';
+          : '/kyc/selfie';
       setContinueHref(href);
-      setStatus('done');
-      setMessage('Aadhaar details were saved. Continuing…');
+      setMessage('Aadhaar verified. Opening selfie…');
       router.replace(href);
     } catch (e) {
+      clearDigilockerExpectSelfie();
       setStatus('error');
       setFailureKind('retryable');
       setError(e instanceof Error ? e.message : 'Something went wrong.');
@@ -296,11 +308,10 @@ function DigilockerCallbackContent() {
   }, []);
 
   useEffect(() => {
-    if (searchParams?.toString()) {
-      const cleanPath = pathname ?? '/kyc/digilocker-callback';
-      window.history.replaceState(null, '', cleanPath);
-      void router.replace(cleanPath, { scroll: false });
-    }
+    if (!searchParams?.toString()) return;
+    if (pathname !== '/kyc/digilocker-callback') return;
+    window.history.replaceState(null, '', '/kyc/digilocker-callback');
+    void router.replace('/kyc/digilocker-callback', { scroll: false });
   }, [pathname, router, searchParams]);
 
   useEffect(() => {
@@ -318,13 +329,14 @@ function DigilockerCallbackContent() {
 
       if (currentSession.authenticated === true && kyc?.digilockerAadhaarCaptured) {
         clearDigilockerSessionTokenFromStorage();
+        markDigilockerExpectSelfie();
         const href =
           currentSession.lead != null
             ? getPostDigilockerAadhaarContinuePath(currentSession)
-            : '/apply-for-loan';
+            : '/kyc/selfie';
         setContinueHref(href);
-        setStatus('done');
-        setMessage('Aadhaar details were saved. Continue to the next step.');
+        setMessage('Aadhaar verified. Opening selfie…');
+        router.replace(href);
         return;
       }
 
@@ -338,6 +350,7 @@ function DigilockerCallbackContent() {
       }
 
       if (priorAttempts >= maxAttempts) {
+        clearDigilockerExpectSelfie();
         setStatus('error');
         setFailureKind('retryable');
         setError('Maximum download attempts reached.');
@@ -371,20 +384,15 @@ function DigilockerCallbackContent() {
     !retryBusy;
 
   return (
-    <JourneyProgressProvider>
-      <div className={styles.page}>
-        <div className={styles.shell}>
-          <KycJourneyLeftPanel
-            loanSelection={loanSelection}
-            progressPct={progressPct}
-            activeStepIndex={activeStepIndex}
-          />
-
-          <section
-            className={`${styles.right} ${
-              status === 'working' || status === 'error' ? styles.rightCentered : ''
-            }`}
-          >
+    <KycJourneyShell
+      mobileStepLabel="KYC"
+      mobileOnBack={() => router.push('/kyc')}
+      journeyPanel={
+        <div
+          className={
+            status === 'working' || status === 'error' ? 'flex min-h-[40vh] flex-col justify-center' : undefined
+          }
+        >
             {status === 'working' ? (
               <CallbackStatusCard>
                 <Spinner size={40} />
@@ -433,7 +441,6 @@ function DigilockerCallbackContent() {
                       )}
                     </button>
                   ) : null}
-                 
                 </div>
               </CallbackStatusCard>
             ) : status === 'done' ? (
@@ -451,27 +458,31 @@ function DigilockerCallbackContent() {
                 </div>
               </>
             ) : null}
-          </section>
         </div>
-      </div>
-    </JourneyProgressProvider>
+      }
+    />
   );
 }
 
 export default function DigilockerCallbackPage() {
   return (
     <CustomerJourneyGuard>
-      <Suspense
-        fallback={
-          <div className={styles.page}>
-            <div className="flex min-h-[40vh] w-full items-center justify-center">
-              <Spinner size={40} />
-            </div>
-          </div>
-        }
-      >
-        <DigilockerCallbackContent />
-      </Suspense>
+      <JourneyProgressProvider>
+        <Suspense
+          fallback={
+            <KycJourneyShell
+              mobileStepLabel="KYC"
+              journeyPanel={
+                <div className="flex min-h-[40vh] w-full items-center justify-center">
+                  <Spinner size={40} />
+                </div>
+              }
+            />
+          }
+        >
+          <DigilockerCallbackContent />
+        </Suspense>
+      </JourneyProgressProvider>
     </CustomerJourneyGuard>
   );
 }

@@ -893,8 +893,8 @@ export class LosApplicationService {
   }
 
   /**
-   * Enables full re-KYC: resets DigiLocker / KYC status so the customer can redo
-   * identity verification. Selfie/liveness pipeline removed pending rewrite.
+   * Re-enables KYC selfie: resets selfie / liveness / face-match so the customer can retake
+   * the face step. DigiLocker Aadhaar is kept when already captured.
    */
   async enableReKyc(applicationUuid: string) {
     const application = await this.prisma.client.application.findUnique({
@@ -925,6 +925,20 @@ export class LosApplicationService {
       throw new BadRequestException('KYC record not found for this application.');
     }
 
+    const customerKyc = await this.prisma.client.customerKyc.findFirst({
+      where: { customerId: application.customerId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        aadhaarData: true,
+        aadhaarPhotoPath: true,
+      },
+    });
+
+    const digilockerDone =
+      isDigilockerAadhaarCaptureComplete(customerKyc?.aadhaarData ?? null) ||
+      Boolean(customerKyc?.aadhaarPhotoPath?.trim());
+
     const snapshot = {
       kycStatus: kyc.kycStatus,
       livenessPassed: kyc.livenessPassed,
@@ -933,11 +947,11 @@ export class LosApplicationService {
       livenessCheckedAt: kyc.livenessCheckedAt,
       applicationStatusCode: application.applicationStatus.name,
       leadStatusCode: application.lead.leadStatus.name,
-      hasKycArtifacts: Boolean(kyc.livenessSelfiePath?.trim()),
+      hasKycArtifacts: Boolean(kyc.livenessSelfiePath?.trim() || customerKyc?.aadhaarPhotoPath?.trim()),
     };
 
     if (!canEnableReKyc(snapshot)) {
-      throw new BadRequestException('This application is not eligible for re-KYC.');
+      throw new BadRequestException('This application is not eligible to re-enable KYC selfie.');
     }
 
     const loanSelectionCompleted = Boolean(
@@ -973,14 +987,12 @@ export class LosApplicationService {
     const appWasKycFailed = application.applicationStatus.name === APPLICATION_STATUS.KYC_FAILED;
 
     await this.prisma.client.$transaction(async (tx) => {
-      // Always clear DigiLocker / docs so session `kycCompleted` becomes false and
-      // the customer journey guard routes them back to /kyc.
       await tx.applicationKyc.update({
         where: { applicationId: application.id },
         data: {
           kycStatus: APPLICATION_KYC_STATUS.NOT_DONE,
           kycCompletedAt: null,
-          digilockerAadhaarDownloadAttempts: 0,
+          ...(digilockerDone ? {} : { digilockerAadhaarDownloadAttempts: 0 }),
           livenessSelfiePath: null,
           isLiveness: false,
           livenessCheckedAt: null,
@@ -995,12 +1007,12 @@ export class LosApplicationService {
         },
       });
 
-      const customerKyc = await tx.customerKyc.findFirst({
-        where: { customerId: application.customerId },
-        orderBy: { createdAt: 'desc' },
-        select: { id: true },
+      await tx.customer.update({
+        where: { id: application.customerId },
+        data: { kycVerifiedAt: null },
       });
-      if (customerKyc) {
+
+      if (!digilockerDone && customerKyc) {
         await tx.customerKyc.update({
           where: { id: customerKyc.id },
           data: {
@@ -1037,7 +1049,8 @@ export class LosApplicationService {
       success: true as const,
       applicationUuid,
       leadUuid: application.lead.uuid,
-      digilockerCleared: true,
+      digilockerCleared: !digilockerDone,
+      digilockerPreserved: digilockerDone,
       leadRecovered: leadWasInternalError || leadWasRejected,
       applicationRecovered: appWasInternalError || appWasKycFailed,
     };

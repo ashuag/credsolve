@@ -45,23 +45,19 @@ export function summarizePhotoQuality(
 
   const blurPassed = inspection.blurPassed;
   const lightingPassed = inspection.lightingPassed;
-  const fullFaceDetected =
-    !dualFaceDetected &&
-    faceCount === 1 &&
-    !/move closer|fills more of the frame|could not detect|dimensions are invalid/i.test(
-      reasonLower,
-    );
-  const faceNotCovered =
-    !dualFaceDetected &&
-    faceCount === 1 &&
-    !/cover|covering|unobstructed|eyes, nose, or mouth/i.test(reasonLower);
+  const noFaceDetected = /could not detect|dimensions are invalid/i.test(reasonLower);
+  const tooFarFromCamera = /move closer|fills more of the frame/i.test(reasonLower);
+  const faceCovered = /do not cover your eyes|cover your eyes, nose, or mouth/i.test(reasonLower);
+  const fullFaceDetected = !dualFaceDetected && faceCount === 1 && !noFaceDetected && !tooFarFromCamera;
+  /** Covering is a landmark failure — a missing face is not treated as “covered”. */
+  const faceNotCovered = !faceCovered;
 
   if (dualFaceDetected) {
     return {
       blurPassed,
       lightingPassed,
-      fullFaceDetected: false,
-      faceNotCovered: false,
+      fullFaceDetected: true,
+      faceNotCovered: true,
       dualFaceDetected: true,
       faceCount,
       qualityScore,

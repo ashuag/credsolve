@@ -1,11 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
-import { startDigilockerLoginFlow, fetchPendingDigilockerSession } from '@/lib/api/digilocker';
+import { startDigilockerLoginFlow, fetchPendingDigilockerSession, peekDigilockerExpectSelfie, clearDigilockerExpectSelfie } from '@/lib/api/digilocker';
 import {
   getCustomerJourneyResumePath,
   getKycHubBackPath,
@@ -14,46 +13,23 @@ import {
 } from '@/lib/api/customer-session';
 import { isLoanDocumentsJourneyComplete } from '@/lib/loan-documents-journey';
 import { kycJourneyProgressFromSession } from '@/lib/kyc-journey-progress';
-import { KycJourneyLeftPanel } from '@/components/kyc/kyc-journey-left-panel';
+import { KycJourneyShell } from '@/components/kyc/kyc-journey-shell';
 import { AlertBanner } from '@/components/ui/alert-banner';
 import { Spinner } from '@/components/ui/spinner';
-import styles from './kyc-hub-flow.module.css';
 
 function ShieldIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
       <path
         d="M12 2 4 6v6c0 5 3.4 8.3 8 10 4.6-1.7 8-5 8-10V6l-8-4Z"
-        stroke="#fff"
+        stroke="currentColor"
         strokeWidth="1.6"
         strokeLinejoin="round"
       />
       <path
         d="m8.5 12 2.4 2.4 4.6-4.8"
-        stroke="#fff"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ArrowRightIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M5 12h14M13 6l6 6-6 6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function ArrowLeftIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M19 12H5M11 6l-6 6 6 6"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -64,11 +40,11 @@ function ArrowLeftIcon() {
 export function KycHubFlow() {
   const router = useRouter();
   const journey = useJourneyProgressOptional();
-  const { session, refresh } = useCustomerSession();
+  const { session, refresh, loading } = useCustomerSession();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [awaitingDigilockerReturn, setAwaitingDigilockerReturn] = useState(peekDigilockerExpectSelfie);
 
-  const loanSelection = session?.authenticated === true ? session.loanSelection : null;
   const digilockerDone =
     session?.authenticated === true &&
     Boolean(session.kycFaceProgress?.digilockerAadhaarCaptured);
@@ -84,7 +60,9 @@ export function KycHubFlow() {
   /** Where the journey goes once KYC is done — normally bank details. */
   const nextJourneyPath = getCustomerJourneyResumePath(session);
 
-  const { progressPct, activeStepIndex } = useMemo(
+  const resumeToSelfie = session?.authenticated === true && shouldResumeKycSelfie(session);
+
+  const { progressPct } = useMemo(
     () => kycJourneyProgressFromSession(session),
     [session],
   );
@@ -100,21 +78,34 @@ export function KycHubFlow() {
   }, [router, session]);
 
   useEffect(() => {
-    if (session?.authenticated === true && shouldResumeKycSelfie(session)) {
+    if (resumeToSelfie) {
+      clearDigilockerExpectSelfie();
       router.replace('/kyc/selfie');
     }
-  }, [router, session]);
+  }, [resumeToSelfie, router]);
 
   // Local DigiLocker testing: Surepass redirects to a public callback; after you switch
   // back to /kyc, resume Aadhaar download if init left a pending session on the server.
   useEffect(() => {
     if (session?.authenticated !== true) return;
-    if (session.kycFaceProgress?.digilockerAadhaarCaptured) return;
     if (!isLoanDocumentsJourneyComplete(session)) return;
+    if (resumeToSelfie) return;
+
+    if (session.kycFaceProgress?.digilockerAadhaarCaptured) {
+      if (awaitingDigilockerReturn) {
+        if (!session.journey.kycCompleted) {
+          router.replace('/kyc/selfie');
+          return;
+        }
+        clearDigilockerExpectSelfie();
+        setAwaitingDigilockerReturn(false);
+      }
+      return;
+    }
 
     const resumeKey = 'moneycash:digilocker:hub-resume';
     try {
-      if (sessionStorage.getItem(resumeKey) === '1') return;
+      if (sessionStorage.getItem(resumeKey) === '1' && !awaitingDigilockerReturn) return;
     } catch {
       /* ignore */
     }
@@ -131,16 +122,21 @@ export function KycHubFlow() {
             /* ignore */
           }
           router.replace('/kyc/digilocker-callback');
+          return;
         }
       } catch {
         /* ignore — user can start DigiLocker manually */
+      }
+      if (!cancelled && awaitingDigilockerReturn) {
+        clearDigilockerExpectSelfie();
+        setAwaitingDigilockerReturn(false);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [router, session]);
+  }, [awaitingDigilockerReturn, resumeToSelfie, router, session]);
 
   async function handleDigilocker() {
     setError('');
@@ -167,149 +163,173 @@ export function KycHubFlow() {
     router.push('/apply-for-loan');
   }
 
-  return (
-    <div className={styles.page}>
-      <div className={styles.shell}>
-        <KycJourneyLeftPanel
-          loanSelection={loanSelection}
-          progressPct={progressPct}
-          activeStepIndex={activeStepIndex}
-        />
-
-        <section className={styles.right}>
-          <div className={`${styles.reveal} ${styles.d1}`}>
-            <span className={styles.eyebrow}>KYC</span>
+  if (loading || resumeToSelfie || awaitingDigilockerReturn) {
+    return (
+      <KycJourneyShell
+        mobileStepLabel="KYC"
+        mobileOnBack={handleBack}
+        journeyPanel={
+          <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3">
+            <Spinner size={36} />
+            <p className="m-0 text-sm font-semibold text-slate-500">Opening the next KYC step…</p>
           </div>
-          <h1 className={`${styles.rightTitle} ${styles.reveal} ${styles.d1}`}>
-            {digilockerDone ? 'DigiLocker verified' : 'Verify your identity'}
-          </h1>
+        }
+      />
+    );
+  }
 
+  return (
+    <KycJourneyShell
+      mobileStepLabel="KYC"
+      mobileOnBack={handleBack}
+      journeyPanel={
+        <section className="flex h-full flex-col" aria-labelledby="kyc-heading">
           {digilockerDone ? (
-            <div className={`${styles.reveal} ${styles.d2} grid gap-3 rounded-2xl border border-[rgba(18,36,79,0.1)] bg-white/90 p-6`}>
-              <p className="m-0 text-sm font-semibold text-emerald-800">Aadhaar verified via DigiLocker</p>
-              <p className="m-0 text-sm text-brand-muted leading-relaxed">
-                {!livenessPassed
-                  ? 'Identity capture from DigiLocker is complete. Next, verify with a selfie and liveness check.'
-                  : headMovementPending
-                    ? 'Identity capture from DigiLocker is complete. One step left — record a short head-movement clip to confirm you are live.'
-                    : kycCompleted
-                      ? 'KYC is complete. You can continue to bank details.'
-                      : 'Identity capture from DigiLocker is complete. Finish any remaining KYC steps to continue.'}
-              </p>
+            <>
+              <div className="mb-4">
+                <h2
+                  id="kyc-heading"
+                  className="mb-3 text-xl font-extrabold leading-[1.1] tracking-tight text-brand-navy md:text-[1.8rem]"
+                >
+                  DigiLocker <span className="text-brand-blue">verified</span>
+                </h2>
+                <div className="flex items-start gap-3 rounded-2xl border border-emerald-100/80 bg-gradient-to-br from-emerald-50/90 to-blue-50/50 p-3">
+                  <div className="shrink-0 rounded-xl bg-white p-1.5 text-emerald-600 shadow-sm">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <p className="m-0 pt-0.5 text-[0.88rem] leading-relaxed text-slate-600">
+                    {!livenessPassed
+                      ? 'Aadhaar is verified. Next, take a selfie so we can confirm it is you.'
+                      : headMovementPending
+                        ? 'Aadhaar is verified. One step left — a short head-movement clip.'
+                        : kycCompleted
+                          ? 'KYC is complete. Continue to bank details.'
+                          : 'Aadhaar is verified. Finish any remaining KYC steps to continue.'}
+                  </p>
+                </div>
+              </div>
               {faceStepPending ? (
-                <button
-                  type="button"
-                  className={styles.cta}
-                  onClick={() => router.push('/kyc/selfie')}
-                >
-                  {headMovementPending
-                    ? 'Continue to head movement check'
-                    : 'Continue to selfie & liveness'}
-                  <ArrowRightIcon />
-                </button>
+                <div className="sticky bottom-0 z-10 -mx-5 mt-6 border-t border-slate-100 bg-white/95 px-5 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] backdrop-blur-sm lg:mx-0 lg:px-0">
+                  <button type="button" className="mc-btn-primary w-full" onClick={() => router.push('/kyc/selfie')}>
+                    {headMovementPending ? 'Continue to head movement' : 'Continue to selfie'}
+                  </button>
+                </div>
               ) : kycCompleted ? (
-                <button
-                  type="button"
-                  className={styles.cta}
-                  onClick={() => router.push(nextJourneyPath)}
-                >
-                  {nextJourneyPath === '/bank-details' ? 'Continue to bank details' : 'Continue'}
-                  <ArrowRightIcon />
-                </button>
+                <div className="sticky bottom-0 z-10 -mx-5 mt-6 border-t border-slate-100 bg-white/95 px-5 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] backdrop-blur-sm lg:mx-0 lg:px-0">
+                  <button type="button" className="mc-btn-primary w-full" onClick={() => router.push(nextJourneyPath)}>
+                    {nextJourneyPath === '/bank-details' ? 'Continue to bank details' : 'Continue'}
+                  </button>
+                </div>
               ) : null}
-            </div>
+            </>
           ) : (
             <>
-          <button
-            type="button"
-            className={`${styles.method} ${styles.reveal} ${styles.d2}`}
-            disabled={busy}
-            onClick={() => void handleDigilocker()}
-          >
-            <div className={styles.methodTop}>
-              <span className={styles.dlIcon}>
-                <ShieldIcon />
-              </span>
-              <h3 className={styles.methodTitle}>Login with DigiLocker</h3>
-              <span className={styles.badge}>Recommended</span>
-            </div>
-            <p className={styles.methodDesc}>
-              Government of India&apos;s secure document wallet. Verified instantly from your Aadhaar — the fastest way
-              to finish KYC.
-            </p>
-          </button>
+              <div className="mb-4">
+                <h2
+                  id="kyc-heading"
+                  className="mb-3 text-xl font-extrabold leading-[1.1] tracking-tight text-brand-navy md:text-[1.8rem]"
+                >
+                  Verify your <span className="text-brand-blue">identity</span>
+                </h2>
+                <div className="mb-2 flex items-start gap-3 rounded-2xl border border-blue-100/60 bg-gradient-to-br from-blue-50/80 to-indigo-50/50 p-3">
+                  <div className="shrink-0 rounded-xl bg-white p-1.5 text-blue-600 shadow-sm">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2.5}
+                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                      />
+                    </svg>
+                  </div>
+                  <p className="m-0 pt-0.5 text-[0.88rem] leading-relaxed text-slate-600">
+                    Use DigiLocker to share Aadhaar instantly. An OTP goes to the mobile number on your Aadhaar — tap
+                    Allow on the consent screen.
+                  </p>
+                </div>
+              </div>
 
-          <p className={`${styles.howTitle} ${styles.reveal} ${styles.d3}`}>How it works</p>
-          <div className={styles.flow}>
-            <div className={`${styles.flowStep} ${styles.reveal} ${styles.d3}`}>
-              <span className={styles.flowNum}>1</span>
-              <div className={styles.flowBody}>
-                <h4>Get an Aadhaar OTP</h4>
-                <p>
-                  An OTP is sent to the <span className={styles.hl}>mobile number registered with your Aadhaar</span>.
-                  Keep that phone handy.
-                </p>
+              <div className="rounded-[20px] border border-[rgba(20,150,243,0.34)] bg-[rgba(20,150,243,0.08)] px-5 py-4 shadow-[0_0_0_4px_rgba(20,150,243,0.08),0_18px_32px_rgba(23,44,113,0.08)]">
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[rgba(18,36,79,0.08)] bg-white text-brand-blue shadow-[0_8px_18px_rgba(23,44,113,0.08)]">
+                    <ShieldIcon />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="text-[1rem] font-extrabold text-brand-navy">DigiLocker</span>
+                      <span className="rounded-full bg-white px-2 py-0.5 text-[0.65rem] font-extrabold uppercase tracking-wider text-brand-blue">
+                        Recommended
+                      </span>
+                    </span>
+                    <span className="mt-1 block text-[0.92rem] leading-[1.55] text-brand-muted">
+                      Government of India document wallet. Fastest way to finish KYC — no scans or uploads.
+                    </span>
+                  </span>
+                </div>
               </div>
-            </div>
-            <div className={`${styles.flowStep} ${styles.reveal} ${styles.d4}`}>
-              <span className={styles.flowNum}>2</span>
-              <div className={styles.flowBody}>
-                <h4>Log in to DigiLocker</h4>
-                <p>Enter the OTP to sign in securely. No passwords or paperwork needed.</p>
-              </div>
-            </div>
-            <div className={`${styles.flowStep} ${styles.reveal} ${styles.d5}`}>
-              <span className={styles.flowNum}>3</span>
-              <div className={styles.flowBody}>
-                <h4>Allow Aadhaar and Pan access</h4>
-                <p>
-                  On the consent screen, you <span className={styles.hl}>must tap &ldquo;Allow&rdquo;</span> to let
-                  DigiLocker share your Aadhaar and Pan with us.
-                </p>
-              </div>
-            </div>
-          </div>
 
-          <div className={`${styles.notice} ${styles.reveal} ${styles.d5}`}>
-            <span className={styles.noticeIc}>!</span>
-            <div>
-              <h5>Consent is required to finish KYC</h5>
-              <p>
-                If you decline the permission on the DigiLocker screen, we can&apos;t fetch your Aadhaar and Pan — and your KYC
-                will stay <strong>incomplete</strong>. Please tap &ldquo;Allow&rdquo; when prompted.
+              <p className="mb-2 mt-5 text-[0.72rem] font-extrabold uppercase tracking-[0.14em] text-slate-400">
+                How it works
               </p>
-            </div>
-          </div>
+              <ol className="m-0 grid list-none gap-3 p-0">
+                {[
+                  {
+                    n: '1',
+                    title: 'Get an Aadhaar OTP',
+                    body: 'Sent to the mobile number registered with your Aadhaar.',
+                  },
+                  {
+                    n: '2',
+                    title: 'Log in to DigiLocker',
+                    body: 'Enter the OTP. No password or paperwork.',
+                  },
+                  {
+                    n: '3',
+                    title: 'Tap Allow',
+                    body: 'Consent is required so we can fetch Aadhaar and PAN. If you decline, KYC stays incomplete.',
+                  },
+                ].map((step) => (
+                  <li key={step.n} className="flex gap-3">
+                    <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[rgba(20,150,243,0.1)] text-[0.8rem] font-extrabold text-brand-blue">
+                      {step.n}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-[0.95rem] font-extrabold text-brand-navy">{step.title}</span>
+                      <span className="mt-0.5 block text-[0.86rem] leading-relaxed text-slate-500">{step.body}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
 
-          {error ? (
-            <div className={styles.errorBanner}>
-              <AlertBanner variant="error">{error}</AlertBanner>
-            </div>
-          ) : null}
+              {error ? (
+                <div className="mt-4">
+                  <AlertBanner variant="error">{error}</AlertBanner>
+                </div>
+              ) : null}
 
-          <button
-            type="button"
-            id="go"
-            className={`${styles.cta} ${styles.reveal} ${styles.d6}`}
-            disabled={busy}
-            onClick={() => void handleDigilocker()}
-          >
-            {busy ? (
-              <>
-                <Spinner size={18} />
-                Connecting to DigiLocker…
-              </>
-            ) : (
-              <>
-                Continue with DigiLocker
-                <ArrowRightIcon />
-              </>
-            )}
-          </button>
+              <div className="sticky bottom-0 z-10 -mx-5 mt-6 border-t border-slate-100 bg-white/95 px-5 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] backdrop-blur-sm lg:mx-0 lg:px-0">
+                <button
+                  type="button"
+                  id="go"
+                  className="mc-btn-primary w-full"
+                  disabled={busy}
+                  onClick={() => void handleDigilocker()}
+                >
+                  {busy ? (
+                    <span className="inline-flex items-center justify-center gap-2">
+                      <Spinner size={18} /> Connecting…
+                    </span>
+                  ) : (
+                    'Continue with DigiLocker'
+                  )}
+                </button>
+              </div>
             </>
           )}
         </section>
-      </div>
-    </div>
+      }
+    />
   );
 }

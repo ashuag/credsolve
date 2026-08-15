@@ -39,7 +39,7 @@ export function KycEnableReKycButton({
   const handleEnable = async () => {
     if (!authToken || busy) return;
     const confirmed = window.confirm(
-      'Enable re-KYC for this customer? This clears DigiLocker / KYC so they must redo identity verification in the app.',
+      'Re-enable KYC selfie for this customer? They will retake selfie and liveness in the app. DigiLocker Aadhaar will not be requested again if it is already complete.',
     );
     if (!confirmed) return;
 
@@ -49,7 +49,9 @@ export function KycEnableReKycButton({
     try {
       const result = await enableReKyc(authToken, applicationUuid);
       const parts = [
-        'Re-KYC enabled — DigiLocker was cleared; customer must redo KYC from the app.',
+        result.digilockerPreserved || !result.digilockerCleared
+          ? 'KYC selfie re-enabled — DigiLocker Aadhaar was kept; customer should retake selfie in the app.'
+          : 'KYC selfie re-enabled — customer should continue KYC from the app.',
       ];
       if (result.leadRecovered || result.applicationRecovered) {
         parts.push('Lead/application moved back to in progress.');
@@ -57,7 +59,7 @@ export function KycEnableReKycButton({
       setMessage(parts.join(' '));
       onSuccess?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to enable re-KYC.');
+      setError(e instanceof Error ? e.message : 'Failed to re-enable KYC selfie.');
     } finally {
       setBusy(false);
     }
@@ -71,7 +73,7 @@ export function KycEnableReKycButton({
         disabled={!authToken || busy}
         onClick={() => void handleEnable()}
       >
-        {busy ? 'Enabling…' : 'Enable re-KYC'}
+        {busy ? 'Enabling…' : 'Re-enable KYC Selfie'}
       </button>
       {message ? (
         <p className="m-0 mt-2 text-[0.82rem] leading-[1.45] text-[var(--ok,#15803d)]">{message}</p>

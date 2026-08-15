@@ -10,6 +10,8 @@ import { BounceChargeTierResolverService } from '../loan/bounce-charge-tier.reso
 @Injectable()
 export class LoanDocumentHtmlPdfGeneratorService {
   private readonly logger = new Logger(LoanDocumentHtmlPdfGeneratorService.name);
+  /** One Chromium at a time — parallel launches OOM the Docker VM and can kill sibling containers. */
+  private chromiumTail: Promise<unknown> = Promise.resolve();
 
   constructor(private readonly bounceChargeTiers: BounceChargeTierResolverService) {}
 
@@ -58,6 +60,15 @@ export class LoanDocumentHtmlPdfGeneratorService {
   }
 
   private async htmlToPdfBuffer(html: string): Promise<Buffer> {
+    const run = this.chromiumTail.then(() => this.renderHtmlWithChromium(html));
+    this.chromiumTail = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  private async renderHtmlWithChromium(html: string): Promise<Buffer> {
     const configuredPath = process.env.PUPPETEER_EXECUTABLE_PATH?.trim();
     const executablePath = this.resolveLaunchExecutablePath();
     if (configuredPath && !executablePath) {

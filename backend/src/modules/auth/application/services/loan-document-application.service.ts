@@ -54,6 +54,9 @@ export type LoanDocumentApplicationContext = {
 
 @Injectable()
 export class LoanDocumentApplicationService {
+  /** Coalesce concurrent generate/upload for the same application + doc type. */
+  private readonly inflightPdf = new Map<string, Promise<string>>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly kycFiles: KycFilesService,
@@ -231,6 +234,38 @@ export class LoanDocumentApplicationService {
     forceRegenerate = false,
     digitallySign = false,
     createNewFile = false,
+  ): Promise<string> {
+    const key = `${applicationId}:${docType}:${digitallySign ? 1 : 0}:${forceRegenerate ? 1 : 0}:${createNewFile ? 1 : 0}`;
+    const pending = this.inflightPdf.get(key);
+    if (pending) return pending;
+
+    const work = this.writePdfIfNeeded(
+      docType,
+      customerUuid,
+      applicationUuid,
+      applicationId,
+      merge,
+      existingRelativePath,
+      forceRegenerate,
+      digitallySign,
+      createNewFile,
+    ).finally(() => {
+      this.inflightPdf.delete(key);
+    });
+    this.inflightPdf.set(key, work);
+    return work;
+  }
+
+  private async writePdfIfNeeded(
+    docType: LoanDocumentType,
+    customerUuid: string,
+    applicationUuid: string,
+    applicationId: bigint,
+    merge: LoanDocumentMergeInput,
+    existingRelativePath: string | null,
+    forceRegenerate: boolean,
+    digitallySign: boolean,
+    createNewFile: boolean,
   ): Promise<string> {
     const pdfName = this.generator.pdfFileName(docType);
     const existing = existingRelativePath?.trim() || null;

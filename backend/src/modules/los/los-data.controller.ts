@@ -112,7 +112,7 @@ export class LosDataController {
   @Post('applications/:applicationUuid/kyc/enable-re-kyc')
   @ApiOperation({
     summary:
-      'Enable re-KYC: reset DigiLocker / KYC status so the customer can redo identity verification',
+      'Enable re-KYC selfie: reset selfie / liveness so the customer can retake the face step (DigiLocker Aadhaar is kept if already captured)',
   })
   enableReKyc(@Param('applicationUuid') applicationUuid: string) {
     return this.losApplication.enableReKyc(applicationUuid);
