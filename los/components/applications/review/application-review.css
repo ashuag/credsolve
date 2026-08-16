@@ -66,7 +66,21 @@
 .app-review .ar-toolbar {
   display: flex;
   justify-content: flex-end;
-  margin-top: 12px;
+  flex-shrink: 0;
+}
+
+.app-review .ar-tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.app-review .ar-tabs-row .tabs {
+  margin-top: 0;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .app-review .ar-hero {
@@ -725,6 +739,10 @@
 
 .app-review .fgrid.thirds {
   grid-template-columns: 1fr 1fr 1fr;
+}
+
+.app-review .fgrid.fourths {
+  grid-template-columns: 1fr 1fr 1fr 1fr;
 }
 
 .app-review .field {
@@ -1606,6 +1624,15 @@
 }
 
 @media (max-width: 760px) {
+  .app-review .ar-tabs-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .app-review .ar-toolbar {
+    justify-content: flex-start;
+  }
+
   .app-review .ar-hero-top {
     gap: 14px;
   }
@@ -1625,7 +1652,8 @@
   }
 
   .app-review .fgrid,
-  .app-review .fgrid.thirds {
+  .app-review .fgrid.thirds,
+  .app-review .fgrid.fourths {
     grid-template-columns: 1fr;
   }
 

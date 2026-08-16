@@ -159,6 +159,46 @@ export type CibilReportData = {
   assessmentInsights?: CibilAssessmentInsights;
 };
 
+export type CibilCreditAssessmentSignals = {
+  riskScore: number | null;
+  noOfLoans: number;
+  noOfCreditCards: number;
+  noOfSecuredLoans: number;
+  noOfUnsecuredLoans: number;
+  noOfGoldLoans: number;
+  sixMonthEnquiries: number;
+  totalEnquiries: number;
+  totalOverdueAmountInr: number;
+  hasWilfulDefault: boolean;
+  hasSuitFiledOnly: boolean;
+  hasActiveDbt: boolean;
+  hasActiveLss: boolean;
+  hasActiveSub: boolean;
+  doubtfulOrLossInLast18MonthsCount: number;
+  defaultsInLast18MonthsCount: number;
+  restructuredLoansCount: number;
+  pwosTradelinesCount: number;
+  settledLoansCount: number;
+  writeoffPresent: boolean;
+  writeoffTotalAmountInr: number;
+  dpd30InLast3MonthsCount: number;
+  dpd60InLast9MonthsCount: number;
+  dpd90InLast12MonthsCount: number;
+  openLoanDpdInLast6MonthsCount: number;
+  missedPaymentsInLast6MonthsCount: number;
+};
+
+export type CibilCreditAssessment = {
+  category: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
+  categoryDescription: string;
+  creditStatus: 'Approved' | 'Rejected';
+  rejectionReasons: string | null;
+  paymentProbabilityPct: number;
+  creditRecommendation: 'Approved' | 'Rejected';
+  recommendationRejectionReason: string | null;
+  signals: CibilCreditAssessmentSignals;
+};
+
 export type LosApplicationCibilReportPayload = {
   bureauReportUuid: string;
   fetchedAt: string;
@@ -167,6 +207,7 @@ export type LosApplicationCibilReportPayload = {
   /** Original Tenacio / TrueLink bureau JSON stored on the bureau report row. */
   rawPayload: unknown;
   report: CibilReportData;
+  creditAssessment: CibilCreditAssessment | null;
 };
 
 export async function getLeadCibilReport(

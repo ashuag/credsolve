@@ -91,7 +91,10 @@ export function PostBreBureauSummaryCards({ result }: { result: PostBreDryRunRes
     { label: 'Tradelines', value: `${bureau.tradelineCount} (${bureau.openTradelineCount} open)` },
     {
       label: `Loan enquiries (${bureau.enquiryWindowDays}d)`,
-      value: `${bureau.loanEnquiryCountInWindow} / max ${result.thresholds.maxEnquiries30Days}`,
+      value:
+        result.thresholds.maxEnquiries30Days == null
+          ? `${bureau.loanEnquiryCountInWindow} (limit off)`
+          : `${bureau.loanEnquiryCountInWindow} / max ${result.thresholds.maxEnquiries30Days}`,
     },
     { label: 'Total enquiries', value: String(bureau.totalEnquiryCount) },
   ];

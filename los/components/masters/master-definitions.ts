@@ -90,6 +90,16 @@ export const MASTER_DEFINITIONS = [
     canCreate: true,
   },
   {
+    slug: 'due-dates',
+    label: 'Due Dates',
+    eyebrow: 'Repayment',
+    description: 'Override the month-end repayment due date for specific months (for example Aug 2026 → 29 Aug).',
+    pageTitle: 'Due Dates',
+    pageSubtitle: 'Set a custom due date for a calendar month. New applications in that month use this date while it has not passed; otherwise month-end (1–15 / 16+) applies.',
+    searchPlaceholder: 'Search due dates...',
+    canCreate: true,
+  },
+  {
     slug: 'sms-templates',
     label: 'SMS Templates',
     eyebrow: 'Communications',

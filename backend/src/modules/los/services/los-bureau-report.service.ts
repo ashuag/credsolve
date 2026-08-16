@@ -28,6 +28,7 @@ export class LosBureauReportService {
             },
           },
         },
+        cibilCreditAssessment: { select: { category: true } },
       },
     });
 
@@ -41,6 +42,7 @@ export class LosBureauReportService {
       mobileNumber: row.customer.mobileNumber,
       panNumber: row.lead.leadDetail?.panNumber?.trim().toUpperCase() || null,
       cibilScore: row.cibilScore,
+      cibilCreditAssessmentCategory: row.cibilCreditAssessment?.category ?? null,
       dummyFetched: Boolean(row.dummyFetched),
       fetchedAt: row.createdAt.toISOString(),
     }));

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import type { Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { BureauReportPdfService } from '../../../common/cibil/bureau-report-pdf.service';
+import { CibilCreditAssessmentService } from '../../../common/cibil/cibil-credit-assessment.service';
 import { isDigilockerAadhaarCaptureComplete } from '../../../common/kyc/aadhaar-vendor-parse.util';
 import { extractProfileFromDigilockerFormJson } from '../../../common/kyc/digilocker-form-profile.util';
 import { appendPhotoCacheBuster } from '../../../common/kyc/kyc-photo-url.util';
@@ -162,6 +163,7 @@ export class LosApplicationService {
     private readonly bureauReportPdf: BureauReportPdfService,
     private readonly kycFiles: KycFilesService,
     private readonly loanDocs: LoanDocumentApplicationService,
+    private readonly cibilCreditAssessment: CibilCreditAssessmentService,
   ) {}
 
   async listApplications() {
@@ -182,6 +184,11 @@ export class LosApplicationService {
             },
             leadStatus: { select: { name: true, displayName: true } },
             rejectionReason: { select: { name: true } },
+            bureauReports: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: { cibilCreditAssessment: { select: { category: true } } },
+            },
           },
         },
         applicationStatus: { select: { name: true, displayName: true } },
@@ -238,6 +245,7 @@ export class LosApplicationService {
         email: appDetails?.emailId ?? null,
         fullName: formatLosPersonName(application.lead.leadDetail?.fullName),
         cibilScore: null,
+        cibilCreditAssessmentCategory: application.lead.bureauReports[0]?.cibilCreditAssessment?.category ?? null,
         eligibleLoanAmount,
         selectedLoanAmount: appDetails?.selectedLoanAmount?.toString() ?? null,
         repayDate: loanAccount
@@ -337,6 +345,7 @@ export class LosApplicationService {
         cibilScore: true,
         htmlUrl: true,
         createdAt: true,
+        cibilCreditAssessment: { select: { category: true, creditRecommendation: true } },
       },
     });
 
@@ -511,6 +520,8 @@ export class LosApplicationService {
             htmlUrl: bureauReportRow.htmlUrl,
             reportPdfUrl: bureauReportPdfUrl,
             fetchedAt: bureauReportRow.createdAt.toISOString(),
+            creditAssessmentCategory: bureauReportRow.cibilCreditAssessment?.category ?? null,
+            creditAssessmentRecommendation: bureauReportRow.cibilCreditAssessment?.creditRecommendation ?? null,
           }
         : null,
       agreement: buildLoanAgreementView(application.details),
@@ -773,6 +784,7 @@ export class LosApplicationService {
       where: { leadId: application.leadId },
       orderBy: { createdAt: 'desc' },
       select: {
+        id: true,
         uuid: true,
         htmlUrl: true,
         rawPayload: true,
@@ -794,6 +806,7 @@ export class LosApplicationService {
     });
 
     const report = await this.bureauReportPdf.buildReportViewData(bureauReportRow.rawPayload);
+    const creditAssessment = await this.cibilCreditAssessment.getViewForBureauReportId(bureauReportRow.id);
 
     return {
       bureauReportUuid: bureauReportRow.uuid,
@@ -802,6 +815,7 @@ export class LosApplicationService {
       htmlUrl: bureauReportRow.htmlUrl,
       rawPayload: bureauReportRow.rawPayload,
       report,
+      creditAssessment,
     };
   }
 

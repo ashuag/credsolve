@@ -4,18 +4,21 @@ import { REJECTION_REASON } from '../constants/rejection-reason.constants';
 export const POST_BRE_ENQUIRY_WINDOW_DAYS = 30;
 
 export type PostBreThresholdsSnapshot = {
-  cibilMinNew: number;
-  cibilMinExisting: number;
-  settledLookbackMonths: number;
-  maxEnquiries30Days: number;
-  openDpdMonths: number;
-  dpd30PlusMonths: number;
-  dpd60PlusMonths: number;
-  dpd90PlusMonths: number;
-  enforceNoRestructuredLoans: boolean;
-  enforceNoSmaPwos: boolean;
-  enforceNoActiveMfi: boolean;
-  maxMissedPayments6Months: number;
+  /** Null when the eligibility criterion is inactive / not loaded. */
+  cibilMinNew: number | null;
+  cibilMinExisting: number | null;
+  settledLookbackMonths: number | null;
+  maxEnquiries30Days: number | null;
+  openDpdMonths: number | null;
+  dpd30PlusMonths: number | null;
+  dpd60PlusMonths: number | null;
+  dpd90PlusMonths: number | null;
+  enforceNoRestructuredLoans: boolean | null;
+  enforceNoSmaPwos: boolean | null;
+  enforceNoActiveMfi: boolean | null;
+  maxMissedPayments6Months: number | null;
+  minUnsecuredLoanAmount: number | null;
+  rejectedCreditAssessmentGrades: string[] | null;
 };
 
 export type PostBreRuleCatalogEntry = {
@@ -41,9 +44,44 @@ export type PostBreRulesCatalog = {
   rules: PostBreRuleCatalogEntry[];
 };
 
-/** Static rule definitions with live threshold values interpolated. */
+function isCriteriaLoaded(key: string, thresholds: PostBreThresholdsSnapshot): boolean {
+  switch (key) {
+    case EC.CIBIL_MIN_NEW:
+      return thresholds.cibilMinNew != null;
+    case EC.CIBIL_MIN_EXISTING:
+      return thresholds.cibilMinExisting != null;
+    case EC.SETTLED_MONTHS:
+      return thresholds.settledLookbackMonths != null;
+    case EC.MAX_ENQUIRIES_30_DAYS:
+      return thresholds.maxEnquiries30Days != null;
+    case EC.OPEN_DPD_MONTHS:
+      return thresholds.openDpdMonths != null;
+    case EC.DPD_30PLUS_MONTHS:
+      return thresholds.dpd30PlusMonths != null;
+    case EC.DPD_60PLUS_MONTHS:
+      return thresholds.dpd60PlusMonths != null;
+    case EC.DPD_90PLUS_MONTHS:
+      return thresholds.dpd90PlusMonths != null;
+    case EC.MAX_MISSED_PAYMENTS_6_MONTHS:
+      return thresholds.maxMissedPayments6Months != null;
+    case EC.MIN_UNSECURED_LOAN_AMOUNT:
+      return thresholds.minUnsecuredLoanAmount != null;
+    case EC.REJECTED_CREDIT_ASSESSMENT_GRADES:
+      return thresholds.rejectedCreditAssessmentGrades != null;
+    case EC.NO_RESTRUCTURED_LOANS:
+      return thresholds.enforceNoRestructuredLoans != null;
+    case EC.NO_SMA_PWOS:
+      return thresholds.enforceNoSmaPwos != null;
+    case EC.NO_ACTIVE_MFI:
+      return thresholds.enforceNoActiveMfi != null;
+    default:
+      return true;
+  }
+}
+
+/** Static rule definitions with live threshold values interpolated. Inactive criteria are omitted. */
 export function buildPostBreRulesCatalog(thresholds: PostBreThresholdsSnapshot): PostBreRulesCatalog {
-  const rules: PostBreRuleCatalogEntry[] = [
+  const allRules: PostBreRuleCatalogEntry[] = [
     {
       id: 'bureau_score_present',
       label: 'Bureau score available',
@@ -259,7 +297,47 @@ export function buildPostBreRulesCatalog(thresholds: PostBreThresholdsSnapshot):
       tuefReference: null,
       notes: 'Counts every (tradeline, month) pair with any positive DPD. Threshold is the maximum allowed count.',
     },
+    {
+      id: EC.MIN_UNSECURED_LOAN_AMOUNT,
+      label: 'Minimum total unsecured loan amount',
+      category: 'tradeline',
+      informationalOnly: false,
+      alwaysEvaluated: true,
+      toggleCriteriaKey: null,
+      criteriaKeys: [EC.MIN_UNSECURED_LOAN_AMOUNT],
+      rejectionReasonCode: REJECTION_REASON.MIN_UNSECURED_LOAN_AMOUNT_FAILED,
+      condition: `Total open unsecured tradeline exposure < ₹${thresholds.minUnsecuredLoanAmount}.`,
+      passCondition: `Sum of open unsecured exposure ≥ ₹${thresholds.minUnsecuredLoanAmount}.`,
+      dataSources: [
+        'TradeLinePartition → Tradeline (open unsecured TUEF Appendix E types)',
+        'highBalance / currentBalance / GrantedTrade.CreditLimit',
+      ],
+      tuefReference: 'Appendix E unsecured account types',
+      notes:
+        'Uses totalOpenUnsecuredExposureInr (sum of every open unsecured tradeline), not max. Aligns with credit-limit tier lookup input.',
+    },
+    {
+      id: EC.REJECTED_CREDIT_ASSESSMENT_GRADES,
+      label: 'Rejected credit assessment grades',
+      category: 'score',
+      informationalOnly: false,
+      alwaysEvaluated: true,
+      toggleCriteriaKey: null,
+      criteriaKeys: [EC.REJECTED_CREDIT_ASSESSMENT_GRADES],
+      rejectionReasonCode: REJECTION_REASON.CREDIT_ASSESSMENT_GRADE_FAILED,
+      condition: `Credit assessment grade is one of ${(thresholds.rejectedCreditAssessmentGrades ?? []).join(', ') || '—'}.`,
+      passCondition: `Grade is not in the rejected set (${(thresholds.rejectedCreditAssessmentGrades ?? []).join(', ') || 'none'}).`,
+      dataSources: [
+        'CIBIL credit-assessment category (loan-count bands A–H)',
+        'TradeLinePartition → Tradeline count',
+      ],
+      tuefReference: null,
+      notes: 'Same category as the Credit Assessment panel (A best … H worst). Default blocked grades: E, F, G, H.',
+    },
   ];
 
-  return { enquiryWindowDays: POST_BRE_ENQUIRY_WINDOW_DAYS, rules };
+  return {
+    enquiryWindowDays: POST_BRE_ENQUIRY_WINDOW_DAYS,
+    rules: allRules.filter((rule) => rule.criteriaKeys.every((key) => isCriteriaLoaded(key, thresholds))),
+  };
 }

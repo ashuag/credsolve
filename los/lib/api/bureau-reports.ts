@@ -10,6 +10,8 @@ export type LosBureauReportListItem = {
   mobileNumber: string;
   panNumber: string | null;
   cibilScore: number | null;
+  /** Rule-based CIBIL credit-assessment category (A best .. H worst); null if not yet computed. */
+  cibilCreditAssessmentCategory: string | null;
   dummyFetched: boolean;
   fetchedAt: string;
 };

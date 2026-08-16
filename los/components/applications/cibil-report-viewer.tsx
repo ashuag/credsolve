@@ -2,6 +2,7 @@
 
 import type {
   CibilAssessmentInsights,
+  CibilCreditAssessment,
   CibilReportAccountRow,
   CibilReportPaymentMonth,
   LosApplicationCibilReportPayload,
@@ -159,6 +160,147 @@ function CibilInsightsSection({ insights }: { insights: CibilAssessmentInsights 
           </div>
         ))}
       </dl>
+    </ReportSection>
+  );
+}
+
+const CREDIT_ASSESSMENT_CATEGORY_TONE: Record<CibilCreditAssessment['category'], 'ok' | 'warn' | 'bad'> = {
+  A: 'ok',
+  B: 'ok',
+  C: 'ok',
+  D: 'warn',
+  E: 'warn',
+  F: 'warn',
+  G: 'bad',
+  H: 'bad',
+};
+
+function StatusPill({ status }: { status: 'Approved' | 'Rejected' }) {
+  return (
+    <span
+      className={cx(
+        'inline-flex rounded-full px-3 py-1 text-[0.78rem] font-extrabold',
+        status === 'Approved' ? 'bg-[rgba(34,197,94,0.14)] text-[#166534]' : 'bg-[rgba(220,38,38,0.12)] text-[#b91c1c]',
+      )}
+    >
+      {status}
+    </span>
+  );
+}
+
+function CibilCreditAssessmentSection({ assessment }: { assessment: CibilCreditAssessment | null }) {
+  if (!assessment) {
+    return (
+      <ReportSection
+        id="cibil-credit-assessment"
+        title="Credit Assessment"
+        description="Rule-based category, credit decision and payment probability computed from the bureau pull."
+      >
+        <p className="m-0 text-[0.82rem] text-brand-muted">
+          No credit assessment has been computed for this bureau report yet.
+        </p>
+      </ReportSection>
+    );
+  }
+
+  const rejectionReasons = assessment.rejectionReasons ? assessment.rejectionReasons.split('|').filter(Boolean) : [];
+  const recommendationRejectionReasons = assessment.recommendationRejectionReason
+    ? assessment.recommendationRejectionReason.split('|').filter(Boolean)
+    : [];
+  const tone = CREDIT_ASSESSMENT_CATEGORY_TONE[assessment.category];
+
+  return (
+    <ReportSection
+      id="cibil-credit-assessment"
+      title="Credit Assessment"
+      description="Rule-based category, credit decision and payment probability computed from the bureau pull."
+      defaultOpen
+      badge={
+        <span
+          className={cx(
+            'inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-[0.8rem] font-extrabold',
+            tone === 'ok'
+              ? 'bg-[rgba(34,197,94,0.14)] text-[#166534]'
+              : tone === 'warn'
+                ? 'bg-[rgba(245,158,11,0.16)] text-[#b45309]'
+                : 'bg-[rgba(220,38,38,0.12)] text-[#b91c1c]',
+          )}
+        >
+          {assessment.category}
+        </span>
+      }
+    >
+      <InsightMetricGrid
+        rows={[
+          { label: 'Category', value: assessment.category, hint: assessment.categoryDescription },
+          { label: 'Payment probability', value: `${assessment.paymentProbabilityPct.toFixed(2)}%` },
+        ]}
+      />
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(255,255,255,0.78)] px-3 py-2.5">
+          <dt className="text-[0.62rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted leading-tight">
+            Credit status
+          </dt>
+          <dd className="m-0 mt-1.5 flex flex-wrap items-center gap-2">
+            <StatusPill status={assessment.creditStatus} />
+          </dd>
+          {rejectionReasons.length > 0 ? (
+            <div className="mt-2">
+              <InsightFlagList items={rejectionReasons} />
+            </div>
+          ) : null}
+        </div>
+        <div className="rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(255,255,255,0.78)] px-3 py-2.5">
+          <dt className="text-[0.62rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted leading-tight">
+            Credit recommendation
+          </dt>
+          <dd className="m-0 mt-1.5 flex flex-wrap items-center gap-2">
+            <StatusPill status={assessment.creditRecommendation} />
+          </dd>
+          {recommendationRejectionReasons.length > 0 ? (
+            <div className="mt-2">
+              <InsightFlagList items={recommendationRejectionReasons} />
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <p className="mb-2 mt-5 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
+        Underlying signals
+      </p>
+      <InsightMetricGrid
+        rows={[
+          { label: 'Total tradelines', value: formatInsightCount(assessment.signals.noOfLoans) },
+          { label: 'Credit cards', value: formatInsightCount(assessment.signals.noOfCreditCards) },
+          { label: 'Unsecured loans', value: formatInsightCount(assessment.signals.noOfUnsecuredLoans) },
+          { label: 'Secured loans', value: formatInsightCount(assessment.signals.noOfSecuredLoans) },
+          { label: 'Gold loans', value: formatInsightCount(assessment.signals.noOfGoldLoans) },
+          { label: 'Enquiries (6 months)', value: formatInsightCount(assessment.signals.sixMonthEnquiries) },
+          { label: 'Total enquiries', value: formatInsightCount(assessment.signals.totalEnquiries) },
+          { label: 'Settled loans', value: formatInsightCount(assessment.signals.settledLoansCount) },
+          {
+            label: 'Total overdue',
+            value: formatInr(assessment.signals.totalOverdueAmountInr),
+            tone: assessment.signals.totalOverdueAmountInr > 0 ? 'bad' : 'ok',
+          },
+          {
+            label: 'Wilful default',
+            value: assessment.signals.hasWilfulDefault ? 'Yes' : 'No',
+            tone: assessment.signals.hasWilfulDefault ? 'bad' : undefined,
+          },
+          {
+            label: 'Restructured loans',
+            value: formatInsightCount(assessment.signals.restructuredLoansCount),
+            tone: assessment.signals.restructuredLoansCount > 0 ? 'warn' : undefined,
+          },
+          {
+            label: 'DPD 90+ (12 months)',
+            value: formatInsightCount(assessment.signals.dpd90InLast12MonthsCount),
+            tone: assessment.signals.dpd90InLast12MonthsCount > 0 ? 'bad' : undefined,
+          },
+        ]}
+      />
     </ReportSection>
   );
 }
@@ -446,6 +588,7 @@ export function CibilReportViewer({
   const sections = useMemo(
     () => [
       { id: 'cibil-insights', label: 'CIBIL insights' },
+      { id: 'cibil-credit-assessment', label: 'Credit Assessment' },
       { id: 'cibil-score', label: 'Score & insights' },
       { id: 'cibil-accounts-summary', label: 'Accounts summary' },
       { id: 'cibil-profile', label: 'Consumer profile' },
@@ -532,6 +675,8 @@ export function CibilReportViewer({
         </header>
 
         {report.assessmentInsights ? <CibilInsightsSection insights={report.assessmentInsights} /> : null}
+
+        <CibilCreditAssessmentSection assessment={payload.creditAssessment} />
 
         <ReportSection
           id="cibil-score"

@@ -9,6 +9,10 @@ import {
 import {SettingKey} from '../../../../common/constants/setting.constants';
 import {RedisService} from '../../../../common/redis/redis.service';
 import {PrismaService} from '../../../../prisma/prisma.service';
+import {
+  isoDateOnlyUtc,
+  resolveRepaymentDueDateUtc,
+} from '../../../../common/loan/repayment-due-date.util';
 
 const KEYS = [
   SettingKey.OTP_EXPIRE_DURATION.key,
@@ -60,6 +64,8 @@ export interface LoanCalculationSettings {
   roiPerDayPercent: number;
   processingFeePercent: number;
   processingFeeGstPercent: number;
+  /** YYYY-MM-DD repayment due date (month-end, or LOS override for that month). */
+  repaymentDueDate: string;
 }
 
 export interface CustomerLeadPolicySettings {
@@ -396,6 +402,8 @@ export class SettingsRepository implements OnModuleInit {
       Math.max(0, parseFloat(pick(SettingKey.PROCESSING_FEE_GST.key, SettingKey.PROCESSING_FEE_GST.default)) || 0)
     );
 
+    const repaymentDueDate = isoDateOnlyUtc(await resolveRepaymentDueDateUtc(this.prisma.client));
+
     return {
       minLoanAmount,
       maxLoanAmount,
@@ -403,6 +411,7 @@ export class SettingsRepository implements OnModuleInit {
       roiPerDayPercent,
       processingFeePercent,
       processingFeeGstPercent,
+      repaymentDueDate,
     };
   }
 

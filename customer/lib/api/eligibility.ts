@@ -13,6 +13,8 @@ export type LoanCalculationSettingsResponse = {
   roiPerDayPercent: number;
   processingFeePercent: number;
   processingFeeGstPercent: number;
+  /** YYYY-MM-DD; month-end or LOS override for the computed due month. */
+  repaymentDueDate?: string;
 };
 
 const ELIGIBILITY_CACHE_TTL_MS = 60_000;
@@ -84,8 +86,13 @@ export async function fetchLoanCalculationSettings(): Promise<LoanCalculationSet
         throw new Error('Invalid loan settings response.');
       }
 
+      const repaymentDueDate =
+        typeof data.repaymentDueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.repaymentDueDate)
+          ? data.repaymentDueDate
+          : undefined;
+
       settingsCache = {
-        data,
+        data: { ...data, repaymentDueDate },
         expiresAt: Date.now() + SETTINGS_CACHE_TTL_MS
       };
       return data;

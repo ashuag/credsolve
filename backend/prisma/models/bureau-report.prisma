@@ -21,7 +21,40 @@ model BureauReport {
   customer Customer @relation(fields: [customerId], references: [id])
   lead     Lead     @relation(fields: [leadId], references: [id])
 
+  cibilCreditAssessment CibilCreditAssessment?
+
   @@index([customerId, createdAt])
   @@index([leadId, createdAt])
   @@map("bureau_report")
+}
+
+/**
+ * Rule-based CIBIL credit assessment (category, hard-underwriting decision, payment
+ * probability) computed from a bureau report's raw payload — runs before post-BRE.
+ * One row per bureau report; logic is deterministic (loan-count category table, fixed
+ * hard/conditional rejection rules, fixed payment-probability formula) — no ML training.
+ */
+model CibilCreditAssessment {
+  id                           BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                         String   @unique @default(uuid()) @db.Char(36)
+  bureauReportId               BigInt   @unique @map("bureau_report_id") @db.UnsignedBigInt
+  riskScore                    Int?     @map("risk_score")
+  /// Category_New: A (best) .. H (worst), assigned from the total-loan-count table.
+  category                     String   @db.Char(1)
+  categoryDescription          String   @map("category_description") @db.Text
+  /// Credit_Status: Approved / Rejected — hard + conditional underwriting rules only.
+  creditStatus                 String   @map("credit_status") @db.VarChar(20)
+  rejectionReasons             String?  @map("rejection_reasons") @db.Text
+  /// Payment_Probability_Pct: 5.00 - 98.00
+  paymentProbabilityPct        Decimal  @map("payment_probability_pct") @db.Decimal(5, 2)
+  /// Credit_Recommendation: Approved only if Credit_Status = Approved AND probability >= 75%.
+  creditRecommendation         String   @map("credit_recommendation") @db.VarChar(20)
+  recommendationRejectionReason String? @map("recommendation_rejection_reason") @db.Text
+  /// Derived bureau signals used to compute the columns above (for traceability).
+  metricsSnapshot              Json     @map("metrics_snapshot")
+  createdAt                    DateTime @default(now()) @map("created_at")
+
+  bureauReport BureauReport @relation(fields: [bureauReportId], references: [id])
+
+  @@map("cibil_credit_assessment")
 }

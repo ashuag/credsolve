@@ -1100,7 +1100,7 @@ export function ReviewCibilPanel({
         }
         title="Credit bureau summary"
       >
-        <div className="fgrid thirds">
+        <div className="fgrid fourths">
           <ReviewField
             label="CIBIL score"
             value={formatCibilScoreLabel(score)}
@@ -1109,6 +1109,18 @@ export function ReviewCibilPanel({
           />
           <ReviewField label="Bureau" value="TransUnion CIBIL" />
           <ReviewField label="Pulled" value={formatReviewDateOnly(row.bureauReport?.fetchedAt)} />
+          <ReviewField
+            label="Credit assessment"
+            value={row.bureauReport?.creditAssessmentCategory ?? null}
+            tone={
+              row.bureauReport?.creditAssessmentRecommendation === 'Approved'
+                ? 'accent'
+                : row.bureauReport?.creditAssessmentRecommendation === 'Rejected'
+                  ? 'flag'
+                  : undefined
+            }
+            sub={row.bureauReport?.creditAssessmentRecommendation ? `Recommendation: ${row.bureauReport.creditAssessmentRecommendation}` : undefined}
+          />
         </div>
       </ReviewCard>
       <div style={{ borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid var(--line)' }}>

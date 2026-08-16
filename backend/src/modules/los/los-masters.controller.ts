@@ -15,6 +15,14 @@ import { LosAuthGuard } from './auth/los-auth.guard';
 import { CreateBankMasterDto } from './dto/create-bank-master.dto';
 import { CreateLeadSourceMasterDto } from './dto/create-lead-source-master.dto';
 import { UpdateLeadSourceMasterDto } from './dto/update-lead-source-master.dto';
+import { CreateNamedMasterDto } from './dto/create-named-master.dto';
+import { UpdateNamedMasterDto } from './dto/update-named-master.dto';
+import { CreateStateMasterDto } from './dto/create-state-master.dto';
+import { UpdateStateMasterDto } from './dto/update-state-master.dto';
+import { CreateCityMasterDto } from './dto/create-city-master.dto';
+import { UpdateCityMasterDto } from './dto/update-city-master.dto';
+import { CreateRepaymentDueDateDto } from './dto/create-repayment-due-date.dto';
+import { UpdateRepaymentDueDateDto } from './dto/update-repayment-due-date.dto';
 import { CreateSourceUtmDto } from './dto/create-source-utm.dto';
 import { UpdateSourceUtmDto } from './dto/update-source-utm.dto';
 import { UpdateBankMasterDto } from './dto/update-bank-master.dto';
@@ -79,6 +87,82 @@ export class LosMastersController {
   @ApiOperation({ summary: 'Permanently delete bank master record' })
   deleteBank(@Param('id', ParseIntPipe) id: number) {
     return this.losMaster.deleteBank(id);
+  }
+
+  @Post('occupations')
+  @ApiOperation({ summary: 'Create occupation master record' })
+  createOccupation(@Body() body: CreateNamedMasterDto) {
+    return this.losMaster.createOccupation(body.name);
+  }
+
+  @Patch('occupations/:id')
+  @ApiOperation({ summary: 'Update occupation master (name and/or active state)' })
+  updateOccupation(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateNamedMasterDto) {
+    return this.losMaster.updateOccupation(id, body);
+  }
+
+  @Post('genders')
+  @ApiOperation({ summary: 'Create gender master record' })
+  createGender(@Body() body: CreateNamedMasterDto) {
+    return this.losMaster.createGender(body.name);
+  }
+
+  @Patch('genders/:id')
+  @ApiOperation({ summary: 'Update gender master (name and/or active state)' })
+  updateGender(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateNamedMasterDto) {
+    return this.losMaster.updateGender(id, body);
+  }
+
+  @Post('reasons-for-loan')
+  @ApiOperation({ summary: 'Create reason-for-loan master record' })
+  createReasonForLoan(@Body() body: CreateNamedMasterDto) {
+    return this.losMaster.createReasonForLoan(body.name);
+  }
+
+  @Patch('reasons-for-loan/:id')
+  @ApiOperation({ summary: 'Update reason-for-loan master (name and/or active state)' })
+  updateReasonForLoan(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateNamedMasterDto) {
+    return this.losMaster.updateReasonForLoan(id, body);
+  }
+
+  @Post('states')
+  @ApiOperation({ summary: 'Create state master record' })
+  createState(@Body() body: CreateStateMasterDto) {
+    return this.losMaster.createState({ name: body.name, code: body.code });
+  }
+
+  @Patch('states/:id')
+  @ApiOperation({ summary: 'Update state master (name, code, and/or active state)' })
+  updateState(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateStateMasterDto) {
+    return this.losMaster.updateState(id, body);
+  }
+
+  @Post('cities')
+  @ApiOperation({ summary: 'Create city master record' })
+  createCity(@Body() body: CreateCityMasterDto) {
+    return this.losMaster.createCity({ name: body.name, stateId: body.stateId });
+  }
+
+  @Patch('cities/:id')
+  @ApiOperation({ summary: 'Update city master (name, state, and/or active state)' })
+  updateCity(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateCityMasterDto) {
+    return this.losMaster.updateCity(id, body);
+  }
+
+  @Post('due-dates')
+  @ApiOperation({ summary: 'Create a month-specific repayment due date override' })
+  createRepaymentDueDate(@Body() body: CreateRepaymentDueDateDto) {
+    return this.losMaster.createRepaymentDueDate({
+      year: body.year,
+      month: body.month,
+      dueDate: body.dueDate,
+    });
+  }
+
+  @Patch('due-dates/:id')
+  @ApiOperation({ summary: 'Update repayment due date override (date and/or active state)' })
+  updateRepaymentDueDate(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateRepaymentDueDateDto) {
+    return this.losMaster.updateRepaymentDueDate(id, body);
   }
 
   @Post('lead-sources')

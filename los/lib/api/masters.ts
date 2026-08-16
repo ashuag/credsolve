@@ -54,6 +54,14 @@ export type LosNamedMaster = {
   isActive: boolean;
 };
 
+export type LosRepaymentDueDateMaster = {
+  id: number;
+  year: number;
+  month: number;
+  dueDate: string;
+  isActive: boolean;
+};
+
 export type LosMastersPayload = {
   leadStatuses: LosStatusMaster[];
   applicationStatuses: LosStatusMaster[];
@@ -66,6 +74,7 @@ export type LosMastersPayload = {
   banks: LosNamedMaster[];
   rejectionReasons: LosNamedMaster[];
   sourceUtms: LosSourceUtmMaster[];
+  repaymentDueDates: LosRepaymentDueDateMaster[];
 };
 
 export type LosEligibilityCriterion = {
@@ -344,6 +353,31 @@ export async function deleteBank(token: string, id: number): Promise<{ ok: true 
     `/masters/banks/${id}`,
     { method: 'DELETE' },
     'Failed to delete bank',
+  );
+}
+
+export async function createRepaymentDueDate(
+  token: string,
+  data: { year: number; month: number; dueDate: string },
+): Promise<LosRepaymentDueDateMaster> {
+  return authorizedLosRequest<LosRepaymentDueDateMaster>(
+    token,
+    '/masters/due-dates',
+    { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(data) },
+    'Failed to create due date',
+  );
+}
+
+export async function updateRepaymentDueDate(
+  token: string,
+  id: number,
+  data: { dueDate?: string; isActive?: boolean },
+): Promise<LosRepaymentDueDateMaster> {
+  return authorizedLosRequest<LosRepaymentDueDateMaster>(
+    token,
+    `/masters/due-dates/${id}`,
+    { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(data) },
+    'Failed to update due date',
   );
 }
 

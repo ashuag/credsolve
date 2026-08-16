@@ -52,6 +52,7 @@ export function ApplicationReviewDashboard({
   const profile = row.lead.profile;
   const displayName = formatPersonName(profile?.fullName, 'Applicant (name pending)');
   const cibilScore = row.bureauReport?.cibilScore ?? null;
+  const cibilCreditAssessmentCategory = row.bureauReport?.creditAssessmentCategory ?? null;
   const loanAmount = row.details?.loanAmount ?? row.preApprovedLoanAmount;
   const journeySteps = buildApplicationJourney(row);
   const progressPct = journeyProgressPercent(journeySteps);
@@ -150,21 +151,10 @@ export function ApplicationReviewDashboard({
         row={row}
         displayName={displayName}
         cibilScore={cibilScore}
+        cibilCreditAssessmentCategory={cibilCreditAssessmentCategory}
         loanAmount={loanAmount}
         journeySteps={journeySteps}
       />
-
-      <div className="ar-toolbar">
-        <ApplicationReviewToolbar
-          onRefresh={onRefresh}
-          onReject={canRejectApplicationStatus(row.statusCode) ? () => setRejectOpen(true) : undefined}
-          rejectDisabled={!canRejectApplicationStatus(row.statusCode)}
-          onApprove={canApprove ? () => void handleApprove() : undefined}
-          approveBusy={approveBusy}
-          onDisburse={canDisburse ? () => void handleDisburse() : undefined}
-          disburseBusy={disburseBusy}
-        />
-      </div>
 
       {actionError ? (
         <div className="mb-4 rounded-[10px] border border-[rgba(239,68,68,0.3)] bg-[#fef2f2] px-4 py-3 text-[0.85rem] font-semibold text-[#b91c1c]" role="alert">
@@ -182,20 +172,34 @@ export function ApplicationReviewDashboard({
         onSuccess={onRefresh}
       />
 
-      <nav className="tabs" aria-label="Application review sections">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            className={`tab${activeTab === tab.id ? ' on' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
-            aria-current={activeTab === tab.id ? 'page' : undefined}
-          >
-            {tab.label}
-            {tab.badge}
-          </button>
-        ))}
-      </nav>
+      <div className="ar-tabs-row">
+        <nav className="tabs" aria-label="Application review sections">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={`tab${activeTab === tab.id ? ' on' : ''}`}
+              onClick={() => setActiveTab(tab.id)}
+              aria-current={activeTab === tab.id ? 'page' : undefined}
+            >
+              {tab.label}
+              {tab.badge}
+            </button>
+          ))}
+        </nav>
+
+        <div className="ar-toolbar">
+          <ApplicationReviewToolbar
+            onRefresh={onRefresh}
+            onReject={canRejectApplicationStatus(row.statusCode) ? () => setRejectOpen(true) : undefined}
+            rejectDisabled={!canRejectApplicationStatus(row.statusCode)}
+            onApprove={canApprove ? () => void handleApprove() : undefined}
+            approveBusy={approveBusy}
+            onDisburse={canDisburse ? () => void handleDisburse() : undefined}
+            disburseBusy={disburseBusy}
+          />
+        </div>
+      </div>
 
       <div className="ar-layout-grid">
         <div className="col-main">

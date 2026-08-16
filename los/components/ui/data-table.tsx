@@ -445,7 +445,7 @@ export function DataTable<T, K extends string = string>({
   emptyMessage,
   noResultsMessage,
   toolbarActions,
-  hint = 'Click a column title to sort. Use the search boxes below each column to filter.',
+  hint = '',
   minWidth = '720px',
   stickyHeader = false,
   className,

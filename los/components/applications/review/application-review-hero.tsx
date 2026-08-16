@@ -20,12 +20,14 @@ export function ApplicationReviewHero({
   row,
   displayName,
   cibilScore,
+  cibilCreditAssessmentCategory,
   loanAmount,
   journeySteps,
 }: {
   row: LosApplicationDetails;
   displayName: string;
   cibilScore: number | null;
+  cibilCreditAssessmentCategory?: string | null;
   loanAmount: string | number | null | undefined;
   journeySteps: JourneyStep[];
 }) {
@@ -81,6 +83,12 @@ export function ApplicationReviewHero({
           <div className="ah-metric">
             <div className="ah-mk">CIBIL score</div>
             <div className={`ah-mv${cibilScore != null ? ' cibil' : ''}`}>{cibilScore ?? '—'}</div>
+          </div>
+          <div className="ah-metric">
+            <div className="ah-mk">Grade</div>
+            <div className={`ah-mv${cibilCreditAssessmentCategory ? ' cibil' : ''}`}>
+              {cibilCreditAssessmentCategory ?? '—'}
+            </div>
           </div>
           <div className="ah-metric">
             <div className="ah-mk">{isRejected ? 'Status' : 'Stage'}</div>

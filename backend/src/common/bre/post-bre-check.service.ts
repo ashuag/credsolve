@@ -19,6 +19,7 @@ import {
   checkNoRestructuredLoans,
   checkNoSmaPwosTradelines,
   checkNoWilfulDefault,
+  computeCibilAssessmentSignals,
   countBureauEnquiriesInLastDays,
   evaluateBureauDpdRulesDetailed,
   resolveBureauAsOfDate,
@@ -28,6 +29,7 @@ import {
   type PostBreEnquiryInspectionRow,
   type PostBreTradelineInspectionRow,
 } from '../cibil/cibil-bureau-rules.parser';
+import { assignCibilCategory } from '../cibil/cibil-credit-assessment.engine';
 import {
   isCibilNewToCreditScore,
   parseTenacioBureauVendorBody,
@@ -190,7 +192,7 @@ export class PostBreCheckService {
     const parsedReport = parseBureauReport(input.rawPayload);
     const bureauAsOf = parsedReport.bureauAsOfDate;
     const checks: PostBreRuleCheck[] = [];
-    const activeTradelineRuleIds: string[] = [EC.SETTLED_MONTHS];
+    const activeTradelineRuleIds: string[] = [];
 
     const push = (check: PostBreRuleCheck) => {
       checks.push(check);
@@ -253,95 +255,136 @@ export class PostBreCheckService {
 
     if (cibilScore !== null) {
       const minScore = input.isExistingCustomer ? thresholds.cibilMinExisting : thresholds.cibilMinNew;
-      const customerLabel = input.isExistingCustomer ? 'existing' : 'new';
-      const scorePassed = cibilScore >= minScore;
-      const gap = minScore - cibilScore;
+      if (minScore != null) {
+        const customerLabel = input.isExistingCustomer ? 'existing' : 'new';
+        const scorePassed = cibilScore >= minScore;
+        const gap = minScore - cibilScore;
+        push({
+          id: input.isExistingCustomer ? EC.CIBIL_MIN_EXISTING : EC.CIBIL_MIN_NEW,
+          label: `Minimum CIBIL score (${customerLabel} customer)`,
+          passed: scorePassed,
+          rejectionReasonCode: scorePassed ? null : REJECTION_REASON.CIBIL_SCORE_LOW,
+          detail: scorePassed
+            ? `Score ${cibilScore} meets minimum ${minScore} for ${customerLabel} customers.`
+            : `Score ${cibilScore} is below minimum ${minScore} for ${customerLabel} customers.`,
+          meta: { cibilScore, minScore, customerType: customerLabel },
+          findings: scorePassed
+            ? undefined
+            : [
+                {
+                  title: 'Score below threshold',
+                  detail: `Need at least ${minScore} for ${customerLabel} customers; shortfall of ${gap} point(s).`,
+                  data: {
+                    cibilScore,
+                    minScore,
+                    gap,
+                    customerType: customerLabel,
+                    criterionKey: input.isExistingCustomer ? EC.CIBIL_MIN_EXISTING : EC.CIBIL_MIN_NEW,
+                  },
+                },
+              ],
+        });
+      }
+    }
+
+    if (thresholds.rejectedCreditAssessmentGrades != null) {
+      const rejectedGrades = thresholds.rejectedCreditAssessmentGrades;
+      const grade = this.resolveCreditAssessmentGrade(input.rawPayload, cibilScore);
+      const blocked = grade != null && rejectedGrades.includes(grade);
+      const gradeList = rejectedGrades.join(', ') || 'none';
       push({
-        id: input.isExistingCustomer ? EC.CIBIL_MIN_EXISTING : EC.CIBIL_MIN_NEW,
-        label: `Minimum CIBIL score (${customerLabel} customer)`,
-        passed: scorePassed,
-        rejectionReasonCode: scorePassed ? null : REJECTION_REASON.CIBIL_SCORE_LOW,
-        detail: scorePassed
-          ? `Score ${cibilScore} meets minimum ${minScore} for ${customerLabel} customers.`
-          : `Score ${cibilScore} is below minimum ${minScore} for ${customerLabel} customers.`,
-        meta: { cibilScore, minScore, customerType: customerLabel },
-        findings: scorePassed
-          ? undefined
-          : [
+        id: EC.REJECTED_CREDIT_ASSESSMENT_GRADES,
+        label: 'Rejected credit assessment grades',
+        passed: !blocked,
+        rejectionReasonCode: blocked ? REJECTION_REASON.CREDIT_ASSESSMENT_GRADE_FAILED : null,
+        detail: blocked
+          ? `Credit assessment grade ${grade} is in the rejected set (${gradeList}).`
+          : grade
+            ? `Credit assessment grade ${grade} is not in the rejected set (${gradeList}).`
+            : `Credit assessment grade could not be computed; rejected set is ${gradeList}.`,
+        meta: {
+          creditAssessmentGrade: grade,
+          rejectedGrades: gradeList,
+        },
+        criteriaKeys: [EC.REJECTED_CREDIT_ASSESSMENT_GRADES],
+        findings: blocked
+          ? [
               {
-                title: 'Score below threshold',
-                detail: `Need at least ${minScore} for ${customerLabel} customers; shortfall of ${gap} point(s).`,
+                title: 'Rejected credit assessment grade',
+                detail: `Grade ${grade} is blocked. Blocked grades: ${gradeList}.`,
                 data: {
-                  cibilScore,
-                  minScore,
-                  gap,
-                  customerType: customerLabel,
-                  criterionKey: input.isExistingCustomer ? EC.CIBIL_MIN_EXISTING : EC.CIBIL_MIN_NEW,
+                  creditAssessmentGrade: grade,
+                  rejectedGrades: gradeList,
                 },
               },
+            ]
+          : undefined,
+      });
+    }
+
+    if (thresholds.maxEnquiries30Days != null) {
+      const enquiries = auditBureauEnquiriesInLastDays(
+        parsedReport,
+        ENQUIRY_WINDOW_DAYS,
+        thresholds.maxEnquiries30Days,
+      );
+      push({
+        id: EC.MAX_ENQUIRIES_30_DAYS,
+        label: `Not more than ${thresholds.maxEnquiries30Days} loan enquiries (last ${ENQUIRY_WINDOW_DAYS} days)`,
+        passed: enquiries.passed,
+        rejectionReasonCode: enquiries.passed ? null : REJECTION_REASON.BUREAU_ENQUIRIES_EXCEEDED,
+        detail: enquiries.passed
+          ? `${enquiries.count} loan enquiry(ies) within limit of ${thresholds.maxEnquiries30Days} (excludes credit-card-only and portfolio enquiry purposes per TUEF Appendix A).`
+          : enquiries.detail,
+        meta: {
+          enquiryCount: enquiries.count,
+          maxEnquiries: thresholds.maxEnquiries30Days,
+          windowDays: ENQUIRY_WINDOW_DAYS,
+        },
+        findings: enquiries.passed
+          ? enquiries.count > 0
+            ? enquiries.findings
+            : undefined
+          : [
+              {
+                title: 'Enquiry limit exceeded',
+                detail: `${enquiries.count} enquiries in window; maximum allowed is ${thresholds.maxEnquiries30Days}.`,
+                data: {
+                  enquiryCount: enquiries.count,
+                  maxEnquiries: thresholds.maxEnquiries30Days,
+                  windowDays: ENQUIRY_WINDOW_DAYS,
+                },
+              },
+              ...enquiries.findings,
             ],
       });
     }
 
-    const enquiries = auditBureauEnquiriesInLastDays(
-      parsedReport,
-      ENQUIRY_WINDOW_DAYS,
-      thresholds.maxEnquiries30Days,
-    );
-    push({
-      id: EC.MAX_ENQUIRIES_30_DAYS,
-      label: `Not more than ${thresholds.maxEnquiries30Days} loan enquiries (last ${ENQUIRY_WINDOW_DAYS} days)`,
-      passed: enquiries.passed,
-      rejectionReasonCode: enquiries.passed ? null : REJECTION_REASON.BUREAU_ENQUIRIES_EXCEEDED,
-      detail: enquiries.passed
-        ? `${enquiries.count} loan enquiry(ies) within limit of ${thresholds.maxEnquiries30Days} (excludes credit-card-only and portfolio enquiry purposes per TUEF Appendix A).`
-        : enquiries.detail,
-      meta: {
-        enquiryCount: enquiries.count,
-        maxEnquiries: thresholds.maxEnquiries30Days,
-        windowDays: ENQUIRY_WINDOW_DAYS,
-      },
-      findings: enquiries.passed
-        ? enquiries.count > 0
-          ? enquiries.findings
-          : undefined
-        : [
-            {
-              title: 'Enquiry limit exceeded',
-              detail: `${enquiries.count} enquiries in window; maximum allowed is ${thresholds.maxEnquiries30Days}.`,
-              data: {
-                enquiryCount: enquiries.count,
-                maxEnquiries: thresholds.maxEnquiries30Days,
-                windowDays: ENQUIRY_WINDOW_DAYS,
-              },
-            },
-            ...enquiries.findings,
-          ],
-    });
-
-    const missedPayments = auditMissedPayments(
-      parsedReport,
-      6,
-      thresholds.maxMissedPayments6Months,
-      bureauAsOf,
-    );
-    push({
-      id: EC.MAX_MISSED_PAYMENTS_6_MONTHS,
-      label: `Missed payments in last 6 months (max ${thresholds.maxMissedPayments6Months})`,
-      passed: missedPayments.passed,
-      rejectionReasonCode: missedPayments.passed ? null : REJECTION_REASON.BUREAU_DPD_FAILED,
-      detail: missedPayments.detail ?? (
-        missedPayments.passed
-          ? `${missedPayments.findings.length} missed payment(s) within limit of ${thresholds.maxMissedPayments6Months}.`
-          : `Too many missed payments (${missedPayments.findings.length}) in the last 6 months; maximum allowed is ${thresholds.maxMissedPayments6Months}.`
-      ),
-      meta: {
-        missedPaymentCount: missedPayments.findings.length,
-        maxAllowed: thresholds.maxMissedPayments6Months,
-        lookbackMonths: 6,
-      },
-      findings: missedPayments.findings.length > 0 ? missedPayments.findings : undefined,
-    });
+    if (thresholds.maxMissedPayments6Months != null) {
+      const missedPayments = auditMissedPayments(
+        parsedReport,
+        6,
+        thresholds.maxMissedPayments6Months,
+        bureauAsOf,
+      );
+      push({
+        id: EC.MAX_MISSED_PAYMENTS_6_MONTHS,
+        label: `Missed payments in last 6 months (max ${thresholds.maxMissedPayments6Months})`,
+        passed: missedPayments.passed,
+        rejectionReasonCode: missedPayments.passed ? null : REJECTION_REASON.BUREAU_DPD_FAILED,
+        detail: missedPayments.detail ?? (
+          missedPayments.passed
+            ? `${missedPayments.findings.length} missed payment(s) within limit of ${thresholds.maxMissedPayments6Months}.`
+            : `Too many missed payments (${missedPayments.findings.length}) in the last 6 months; maximum allowed is ${thresholds.maxMissedPayments6Months}.`
+        ),
+        meta: {
+          missedPaymentCount: missedPayments.findings.length,
+          maxAllowed: thresholds.maxMissedPayments6Months,
+          lookbackMonths: 6,
+        },
+        findings: missedPayments.findings.length > 0 ? missedPayments.findings : undefined,
+      });
+    }
 
     if (thresholds.enforceNoActiveMfi) {
       activeTradelineRuleIds.push(EC.NO_ACTIVE_MFI);
@@ -371,24 +414,27 @@ export class PostBreCheckService {
       findings: wilfulDefault.passed ? undefined : wilfulDefault.findings,
     });
 
-    const adverse = auditNoAdverseTradelineInLookback(
-      parsedReport,
-      thresholds.settledLookbackMonths,
-      bureauAsOf,
-    );
-    push({
-      id: EC.SETTLED_MONTHS,
-      label: `No Doubtful / Loss / Written-off / Settled / Suit Filed (last ${thresholds.settledLookbackMonths} months)`,
-      passed: adverse.passed,
-      rejectionReasonCode: adverse.passed ? null : REJECTION_REASON.BUREAU_ADVERSE_TRADELINE,
-      detail:
-        adverse.detail ??
-        (adverse.passed
-          ? `No adverse tradeline signals (including suit filed / wilful default) in the last ${thresholds.settledLookbackMonths} months.`
-          : `Adverse bureau tradeline status in the last ${thresholds.settledLookbackMonths} months.`),
-      meta: { lookbackMonths: thresholds.settledLookbackMonths, hitCount: adverse.findings.length },
-      findings: adverse.passed ? undefined : adverse.findings,
-    });
+    if (thresholds.settledLookbackMonths != null) {
+      activeTradelineRuleIds.push(EC.SETTLED_MONTHS);
+      const adverse = auditNoAdverseTradelineInLookback(
+        parsedReport,
+        thresholds.settledLookbackMonths,
+        bureauAsOf,
+      );
+      push({
+        id: EC.SETTLED_MONTHS,
+        label: `No Doubtful / Loss / Written-off / Settled / Suit Filed (last ${thresholds.settledLookbackMonths} months)`,
+        passed: adverse.passed,
+        rejectionReasonCode: adverse.passed ? null : REJECTION_REASON.BUREAU_ADVERSE_TRADELINE,
+        detail:
+          adverse.detail ??
+          (adverse.passed
+            ? `No adverse tradeline signals (including suit filed / wilful default) in the last ${thresholds.settledLookbackMonths} months.`
+            : `Adverse bureau tradeline status in the last ${thresholds.settledLookbackMonths} months.`),
+        meta: { lookbackMonths: thresholds.settledLookbackMonths, hitCount: adverse.findings.length },
+        findings: adverse.passed ? undefined : adverse.findings,
+      });
+    }
 
     if (thresholds.enforceNoRestructuredLoans) {
       activeTradelineRuleIds.push(EC.NO_RESTRUCTURED_LOANS);
@@ -432,10 +478,14 @@ export class PostBreCheckService {
     };
 
     const dpdLabels: Record<string, string> = {
-      [EC.DPD_90PLUS_MONTHS]: `90+ DPD (last ${thresholds.dpd90PlusMonths} months)`,
-      [EC.DPD_60PLUS_MONTHS]: `60+ DPD (last ${thresholds.dpd60PlusMonths} months)`,
-      [EC.DPD_30PLUS_MONTHS]: `30+ DPD (last ${thresholds.dpd30PlusMonths} months)`,
-      [EC.OPEN_DPD_MONTHS]: `Open loan DPD > 0 (last ${thresholds.openDpdMonths} months)`,
+      [EC.DPD_90PLUS_MONTHS]:
+        thresholds.dpd90PlusMonths != null ? `90+ DPD (last ${thresholds.dpd90PlusMonths} months)` : '90+ DPD',
+      [EC.DPD_60PLUS_MONTHS]:
+        thresholds.dpd60PlusMonths != null ? `60+ DPD (last ${thresholds.dpd60PlusMonths} months)` : '60+ DPD',
+      [EC.DPD_30PLUS_MONTHS]:
+        thresholds.dpd30PlusMonths != null ? `30+ DPD (last ${thresholds.dpd30PlusMonths} months)` : '30+ DPD',
+      [EC.OPEN_DPD_MONTHS]:
+        thresholds.openDpdMonths != null ? `Open loan DPD > 0 (last ${thresholds.openDpdMonths} months)` : 'Open loan DPD',
     };
 
     for (const dpdRule of evaluateBureauDpdRulesDetailed(parsedReport, dpdThresholds, bureauAsOf)) {
@@ -450,6 +500,53 @@ export class PostBreCheckService {
           (dpdRule.passed ? 'No delinquency breach for this window.' : 'Bureau DPD rules failed.'),
         meta: { hitCount: dpdRule.findings.length },
         findings: dpdRule.passed ? undefined : dpdRule.findings,
+      });
+    }
+
+    const exposure = computeOpenUnsecuredExposureBreakdown(input.rawPayload);
+    if (thresholds.minUnsecuredLoanAmount != null) {
+      activeTradelineRuleIds.push(EC.MIN_UNSECURED_LOAN_AMOUNT);
+      const minAmount = thresholds.minUnsecuredLoanAmount;
+      const total = exposure.totalOpenUnsecuredExposureInr;
+      const passed = total >= minAmount;
+      const shortfall = minAmount - total;
+      push({
+        id: EC.MIN_UNSECURED_LOAN_AMOUNT,
+        label: `Minimum total unsecured loan amount (₹${minAmount})`,
+        passed,
+        rejectionReasonCode: passed ? null : REJECTION_REASON.MIN_UNSECURED_LOAN_AMOUNT_FAILED,
+        detail: passed
+          ? `Total open unsecured exposure ${total} INR meets minimum ${minAmount} INR.`
+          : `Total open unsecured exposure ${total} INR is below minimum ${minAmount} INR.`,
+        meta: {
+          totalOpenUnsecuredExposureInr: total,
+          minUnsecuredLoanAmount: minAmount,
+          openUnsecuredTradelineCount: exposure.lines.length,
+        },
+        criteriaKeys: [EC.MIN_UNSECURED_LOAN_AMOUNT],
+        findings: passed
+          ? undefined
+          : [
+              {
+                title: 'Unsecured exposure below minimum',
+                detail: `Need at least ${minAmount} INR total open unsecured exposure; shortfall of ${shortfall} INR.`,
+                data: {
+                  totalOpenUnsecuredExposureInr: total,
+                  minUnsecuredLoanAmount: minAmount,
+                  shortfallInr: shortfall,
+                  openUnsecuredTradelineCount: exposure.lines.length,
+                },
+              },
+              ...exposure.lines.map((line) => ({
+                title: line.creditorName,
+                detail: `${line.accountTypeLabel} · ${line.accountNumber} · ${line.exposureInr} INR`,
+                data: {
+                  accountNumber: line.accountNumber,
+                  accountTypeSymbol: line.accountTypeSymbol,
+                  exposureInr: line.exposureInr,
+                },
+              })),
+            ],
       });
     }
 
@@ -468,15 +565,13 @@ export class PostBreCheckService {
       enquiries: buildPostBreEnquiryInspection(parsedReport, ENQUIRY_WINDOW_DAYS),
     };
 
-    let unsecuredExposure: PostBreDryRunResult['unsecuredExposure'] = null;
     let creditLimit: PostBreDryRunResult['creditLimit'] = null;
-    try {
-      const exposure = computeOpenUnsecuredExposureBreakdown(input.rawPayload);
-      unsecuredExposure = {
-        totalOpenUnsecuredExposureInr: exposure.totalOpenUnsecuredExposureInr,
-        maxOpenUnsecuredExposureInr: exposure.maxOpenUnsecuredExposureInr,
-      };
-      if (overallPassed) {
+    const unsecuredExposure: PostBreDryRunResult['unsecuredExposure'] = {
+      totalOpenUnsecuredExposureInr: exposure.totalOpenUnsecuredExposureInr,
+      maxOpenUnsecuredExposureInr: exposure.maxOpenUnsecuredExposureInr,
+    };
+    if (overallPassed) {
+      try {
         const [bounds, tier] = await Promise.all([
           loadLoanAmountBounds(this.prisma),
           this.creditLimitTiers.resolveMaxBulletLoan(exposure.totalOpenUnsecuredExposureInr),
@@ -491,9 +586,9 @@ export class PostBreCheckService {
             maxOpenUnsecuredExposureInr: exposure.maxOpenUnsecuredExposureInr,
           };
         }
+      } catch {
+        // non-blocking — continue without credit limit if bounds/tier lookup fails
       }
-    } catch {
-      // non-blocking — continue without exposure/credit limit if payload unparseable
     }
 
     return {
@@ -554,7 +649,7 @@ export class PostBreCheckService {
     const thresholds = this.buildPostBreThresholds(postBreRows);
 
     if (isExistingCustomer) {
-      if (cibilScore < thresholds.cibilMinExisting) {
+      if (thresholds.cibilMinExisting != null && cibilScore < thresholds.cibilMinExisting) {
         return {
           passed: false,
           rejectReason: `CIBIL score ${cibilScore} is below minimum ${thresholds.cibilMinExisting} for existing customers.`,
@@ -562,7 +657,7 @@ export class PostBreCheckService {
           cibilScore,
         };
       }
-    } else if (cibilScore < thresholds.cibilMinNew) {
+    } else if (thresholds.cibilMinNew != null && cibilScore < thresholds.cibilMinNew) {
       return {
         passed: false,
         rejectReason: `CIBIL score ${cibilScore} is below minimum ${thresholds.cibilMinNew} for new customers.`,
@@ -599,19 +694,21 @@ export class PostBreCheckService {
       };
     }
 
-    const adverse = checkNoAdverseTradelineInLookback(
-      parsedReport,
-      thresholds.settledLookbackMonths,
-      parsedReport.bureauAsOfDate,
-    );
-    if (!adverse.passed) {
-      return {
-        passed: false,
-        rejectReason:
-          adverse.detail ??
-          `Adverse bureau tradeline status in the last ${thresholds.settledLookbackMonths} months.`,
-        rejectionReasonCode: REJECTION_REASON.BUREAU_ADVERSE_TRADELINE,
-      };
+    if (thresholds.settledLookbackMonths != null) {
+      const adverse = checkNoAdverseTradelineInLookback(
+        parsedReport,
+        thresholds.settledLookbackMonths,
+        parsedReport.bureauAsOfDate,
+      );
+      if (!adverse.passed) {
+        return {
+          passed: false,
+          rejectReason:
+            adverse.detail ??
+            `Adverse bureau tradeline status in the last ${thresholds.settledLookbackMonths} months.`,
+          rejectionReasonCode: REJECTION_REASON.BUREAU_ADVERSE_TRADELINE,
+        };
+      }
     }
 
     if (thresholds.enforceNoRestructuredLoans) {
@@ -647,13 +744,15 @@ export class PostBreCheckService {
       }
     }
 
-    const enquiryCount = countBureauEnquiriesInLastDays(parsedReport, ENQUIRY_WINDOW_DAYS);
-    if (enquiryCount > thresholds.maxEnquiries30Days) {
-      return {
-        passed: false,
-        rejectReason: `Too many credit enquiries (${enquiryCount}) in the last ${ENQUIRY_WINDOW_DAYS} days (max ${thresholds.maxEnquiries30Days}).`,
-        rejectionReasonCode: REJECTION_REASON.BUREAU_ENQUIRIES_EXCEEDED,
-      };
+    if (thresholds.maxEnquiries30Days != null) {
+      const enquiryCount = countBureauEnquiriesInLastDays(parsedReport, ENQUIRY_WINDOW_DAYS);
+      if (enquiryCount > thresholds.maxEnquiries30Days) {
+        return {
+          passed: false,
+          rejectReason: `Too many credit enquiries (${enquiryCount}) in the last ${ENQUIRY_WINDOW_DAYS} days (max ${thresholds.maxEnquiries30Days}).`,
+          rejectionReasonCode: REJECTION_REASON.BUREAU_ENQUIRIES_EXCEEDED,
+        };
+      }
     }
 
     const dpd = checkBureauDpdRules(
@@ -674,18 +773,44 @@ export class PostBreCheckService {
       };
     }
 
-    const missedPayments = auditMissedPayments(
-      parsedReport,
-      6,
-      thresholds.maxMissedPayments6Months,
-      parsedReport.bureauAsOfDate,
-    );
-    if (!missedPayments.passed) {
-      return {
-        passed: false,
-        rejectReason: missedPayments.detail ?? 'Too many missed payments in the last 6 months.',
-        rejectionReasonCode: REJECTION_REASON.BUREAU_DPD_FAILED,
-      };
+    if (thresholds.maxMissedPayments6Months != null) {
+      const missedPayments = auditMissedPayments(
+        parsedReport,
+        6,
+        thresholds.maxMissedPayments6Months,
+        parsedReport.bureauAsOfDate,
+      );
+      if (!missedPayments.passed) {
+        return {
+          passed: false,
+          rejectReason: missedPayments.detail ?? 'Too many missed payments in the last 6 months.',
+          rejectionReasonCode: REJECTION_REASON.BUREAU_DPD_FAILED,
+        };
+      }
+    }
+
+    if (thresholds.minUnsecuredLoanAmount != null) {
+      const exposure = computeOpenUnsecuredExposureBreakdown(rawPayload);
+      const total = exposure.totalOpenUnsecuredExposureInr;
+      if (total < thresholds.minUnsecuredLoanAmount) {
+        return {
+          passed: false,
+          rejectReason: `Total open unsecured exposure ${total} INR is below minimum ${thresholds.minUnsecuredLoanAmount} INR.`,
+          rejectionReasonCode: REJECTION_REASON.MIN_UNSECURED_LOAN_AMOUNT_FAILED,
+        };
+      }
+    }
+
+    if (thresholds.rejectedCreditAssessmentGrades != null && thresholds.rejectedCreditAssessmentGrades.length > 0) {
+      const grade = this.resolveCreditAssessmentGrade(rawPayload, null);
+      if (grade != null && thresholds.rejectedCreditAssessmentGrades.includes(grade)) {
+        const gradeList = thresholds.rejectedCreditAssessmentGrades.join(', ');
+        return {
+          passed: false,
+          rejectReason: `Credit assessment grade ${grade} is in the rejected set (${gradeList}).`,
+          rejectionReasonCode: REJECTION_REASON.CREDIT_ASSESSMENT_GRADE_FAILED,
+        };
+      }
     }
 
     return { passed: true, rejectReason: null, rejectionReasonCode: null };
@@ -760,9 +885,9 @@ export class PostBreCheckService {
   ): PostBreCriteriaConfigRow[] {
     const ruleEnabledForKey = (key: string): boolean => {
       switch (key) {
-        case EC.NO_RESTRUCTURED_LOANS: return thresholds.enforceNoRestructuredLoans;
-        case EC.NO_SMA_PWOS: return thresholds.enforceNoSmaPwos;
-        case EC.NO_ACTIVE_MFI: return thresholds.enforceNoActiveMfi;
+        case EC.NO_RESTRUCTURED_LOANS: return Boolean(thresholds.enforceNoRestructuredLoans);
+        case EC.NO_SMA_PWOS: return Boolean(thresholds.enforceNoSmaPwos);
+        case EC.NO_ACTIVE_MFI: return Boolean(thresholds.enforceNoActiveMfi);
         default: return true;
       }
     };
@@ -778,7 +903,8 @@ export class PostBreCheckService {
 
   private buildPostBreThresholds(rows: { key: string; value: string }[]): PostBreThresholds {
     const map = new Map(rows.map((r) => [r.key, r.value]));
-    const pickInt = (key: string) => {
+    const pickInt = (key: string): number | null => {
+      if (!map.has(key)) return null;
       const raw = map.get(key)?.trim();
       const n = raw ? Number.parseInt(raw, 10) : NaN;
       if (!Number.isFinite(n)) throw new Error(`Missing or invalid eligibility_criteria: ${key}`);
@@ -786,11 +912,20 @@ export class PostBreCheckService {
     };
     const FALSY = new Set(['false', '0', 'no']);
     const TRUTHY = new Set(['true', '1', 'yes']);
-    const pickBool = (key: string) => {
+    const pickBool = (key: string): boolean | null => {
+      if (!map.has(key)) return null;
       const raw = map.get(key)?.trim().toLowerCase();
       if (FALSY.has(raw!)) return false;
       if (TRUTHY.has(raw!)) return true;
       throw new Error(`Missing or invalid eligibility_criteria: ${key}`);
+    };
+    const pickGradeList = (key: string): string[] | null => {
+      if (!map.has(key)) return null;
+      const raw = map.get(key)?.trim() ?? '';
+      return raw
+        .split(',')
+        .map((s) => s.trim().toUpperCase())
+        .filter(Boolean);
     };
     return {
       cibilMinNew: pickInt(EC.CIBIL_MIN_NEW),
@@ -805,7 +940,18 @@ export class PostBreCheckService {
       enforceNoSmaPwos: pickBool(EC.NO_SMA_PWOS),
       enforceNoActiveMfi: pickBool(EC.NO_ACTIVE_MFI),
       maxMissedPayments6Months: pickInt(EC.MAX_MISSED_PAYMENTS_6_MONTHS),
+      minUnsecuredLoanAmount: pickInt(EC.MIN_UNSECURED_LOAN_AMOUNT),
+      rejectedCreditAssessmentGrades: pickGradeList(EC.REJECTED_CREDIT_ASSESSMENT_GRADES),
     };
+  }
+
+  private resolveCreditAssessmentGrade(rawPayload: unknown, riskScore: number | null): string | null {
+    try {
+      const signals = computeCibilAssessmentSignals(rawPayload, riskScore);
+      return assignCibilCategory(signals).category;
+    } catch {
+      return null;
+    }
   }
 
   /** True when the customer has at least one fully disbursed loan (repeat borrower). */

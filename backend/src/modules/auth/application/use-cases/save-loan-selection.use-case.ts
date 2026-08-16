@@ -9,14 +9,7 @@ import { SettingsRepository } from '../../infrastructure/repositories/settings.r
 import { CheckLoanEligibilityUseCase } from './check-loan-eligibility.use-case';
 import type { SaveLoanSelectionDto } from '../dto/save-loan-selection.dto';
 import { computeTenureDays, istCalendarDateUtc } from '../../../../common/loan/loan-calculation.util';
-
-function parseDateOnlyUtc(raw: string): Date {
-  const [y, m, d] = raw.split('-').map((v) => Number.parseInt(v, 10));
-  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) {
-    throw new BadRequestException('Invalid tenure end date.');
-  }
-  return new Date(Date.UTC(y, m - 1, d));
-}
+import { resolveRepaymentDueDateUtc } from '../../../../common/loan/repayment-due-date.util';
 
 @Injectable()
 export class SaveLoanSelectionUseCase {
@@ -54,7 +47,7 @@ export class SaveLoanSelectionUseCase {
       );
     }
 
-    const tenureEndDate = parseDateOnlyUtc(dto.tenureEndDate);
+    const tenureEndDate = await resolveRepaymentDueDateUtc(this.prisma.client);
     // Inclusive IST day count (selection day = day 1), matching disbursement / accrual.
     const tenureDays = computeTenureDays(istCalendarDateUtc(), tenureEndDate);
     if (tenureDays > 62) {

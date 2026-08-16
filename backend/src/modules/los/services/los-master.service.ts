@@ -1,8 +1,14 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { LeadSourceType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { isoDateOnlyUtc, parseIsoDateUtc } from '../../../common/loan/repayment-due-date.util';
+import { ELIGIBILITY_CRITERIA } from '../../../common/constants/eligibility-criteria.constants';
 import type { UpdateLeadSourceMasterDto } from '../dto/update-lead-source-master.dto';
 import type { UpdateBankMasterDto } from '../dto/update-bank-master.dto';
+import type { UpdateNamedMasterDto } from '../dto/update-named-master.dto';
+import type { UpdateStateMasterDto } from '../dto/update-state-master.dto';
+import type { UpdateCityMasterDto } from '../dto/update-city-master.dto';
+import type { UpdateRepaymentDueDateDto } from '../dto/update-repayment-due-date.dto';
 import type { UpdateEligibilityCriterionDto } from '../dto/update-eligibility-criterion.dto';
 import type { UpdateCreditLimitTierDto } from '../dto/update-credit-limit-tier.dto';
 import type { UpdateSmsTemplateDto } from '../dto/update-sms-template.dto';
@@ -17,6 +23,44 @@ function maskBearerToken(token: string): string {
     return '****';
   }
   return `${trimmed.slice(0, 4)}…${trimmed.slice(-4)}`;
+}
+
+function isPrismaUniqueConflict(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+}
+
+function slugMasterKey(name: string, maxLen: number): string {
+  const slug = name
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, maxLen);
+  return slug || 'ITEM';
+}
+
+const CREDIT_ASSESSMENT_GRADES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
+const CREDIT_ASSESSMENT_GRADE_SET = new Set<string>(CREDIT_ASSESSMENT_GRADES);
+
+function normalizeRejectedCreditAssessmentGrades(value: string): string {
+  const seen = new Set<string>();
+  const invalid: string[] = [];
+  for (const part of value.split(',')) {
+    const grade = part.trim().toUpperCase();
+    if (!grade) continue;
+    if (!CREDIT_ASSESSMENT_GRADE_SET.has(grade)) {
+      invalid.push(part.trim());
+      continue;
+    }
+    seen.add(grade);
+  }
+  if (invalid.length) {
+    throw new BadRequestException(`Invalid credit-assessment grade(s): ${invalid.join(', ')}. Use A–H.`);
+  }
+  if (!seen.size) {
+    throw new BadRequestException('Select at least one credit-assessment grade.');
+  }
+  return CREDIT_ASSESSMENT_GRADES.filter((grade) => seen.has(grade)).join(',');
 }
 
 type LosSourceUtmRow = {
@@ -50,6 +94,7 @@ export class LosMasterService {
       banks,
       rejectionReasons,
       sourceUtms,
+      repaymentDueDates,
     ] = await Promise.all([
       this.prisma.client.leadStatus.findMany({ orderBy: { id: 'asc' } }),
       this.prisma.client.applicationStatus.findMany({ orderBy: { id: 'asc' } }),
@@ -65,6 +110,7 @@ export class LosMasterService {
         include: { leadSource: { select: { name: true } } },
         orderBy: [{ leadSource: { name: 'asc' } }, { id: 'asc' }],
       }),
+      this.prisma.client.repaymentDueDate.findMany({ orderBy: [{ year: 'desc' }, { month: 'desc' }] }),
     ]);
 
     return {
@@ -129,11 +175,54 @@ export class LosMasterService {
         isActive: item.isActive,
       })),
       sourceUtms: (sourceUtms as LosSourceUtmRow[]).map((item) => this.mapSourceUtm(item)),
+      repaymentDueDates: repaymentDueDates.map((item) => this.mapRepaymentDueDate(item)),
     };
   }
 
   private mapBank(item: { id: number; name: string; isActive: boolean }) {
     return { id: item.id, name: item.name, isActive: item.isActive };
+  }
+
+  private mapNamed(item: { id: number; name: string; isActive: boolean }) {
+    return { id: item.id, name: item.name, isActive: item.isActive };
+  }
+
+  private mapState(item: { id: number; name: string; code: string; isActive: boolean }) {
+    return { id: item.id, name: item.name, code: item.code, isActive: item.isActive };
+  }
+
+  private mapCity(item: {
+    id: number;
+    name: string;
+    stateId: number;
+    isActive: boolean;
+    state: { name: string; code: string; isActive: boolean };
+  }) {
+    return {
+      id: item.id,
+      name: item.name,
+      stateId: item.stateId,
+      stateName: item.state.name,
+      stateCode: item.state.code,
+      stateIsActive: item.state.isActive,
+      isActive: item.isActive,
+    };
+  }
+
+  private mapRepaymentDueDate(item: {
+    id: number;
+    year: number;
+    month: number;
+    dueDate: Date;
+    isActive: boolean;
+  }) {
+    return {
+      id: item.id,
+      year: item.year,
+      month: item.month,
+      dueDate: isoDateOnlyUtc(item.dueDate),
+      isActive: item.isActive,
+    };
   }
 
   private mapLeadSource(item: { id: number; name: string; type: string; isActive: boolean }) {
@@ -224,6 +313,370 @@ export class LosMasterService {
 
     await this.prisma.client.bank.delete({ where: { id } });
     return { ok: true as const };
+  }
+
+  private async uniqueKeyedMasterKey(
+    name: string,
+    maxLen: number,
+    exists: (key: string) => Promise<boolean>,
+    label: string,
+  ): Promise<string> {
+    const base = slugMasterKey(name, maxLen);
+    if (!(await exists(base))) {
+      return base;
+    }
+    for (let i = 2; i < 100; i++) {
+      const suffix = `_${i}`;
+      const key = `${base.slice(0, Math.max(1, maxLen - suffix.length))}${suffix}`;
+      if (!(await exists(key))) {
+        return key;
+      }
+    }
+    throw new ConflictException(`Could not generate a unique ${label} key.`);
+  }
+
+  private requireNameOrActive(dto: UpdateNamedMasterDto, label: string) {
+    if (dto.name === undefined && dto.isActive === undefined) {
+      throw new BadRequestException(`Provide name and/or isActive to update ${label}.`);
+    }
+  }
+
+  private trimMasterName(name: string, label: string, maxLen: number): string {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      throw new BadRequestException(`${label} cannot be empty.`);
+    }
+    if (trimmed.length > maxLen) {
+      throw new BadRequestException(`${label} cannot exceed ${maxLen} characters.`);
+    }
+    return trimmed;
+  }
+
+  async createOccupation(name: string) {
+    const trimmed = this.trimMasterName(name, 'Occupation name', 50);
+    const key = await this.uniqueKeyedMasterKey(
+      trimmed,
+      50,
+      async (candidate) =>
+        Boolean(await this.prisma.client.occupation.findUnique({ where: { key: candidate }, select: { id: true } })),
+      'occupation',
+    );
+
+    try {
+      const row = await this.prisma.client.occupation.create({
+        data: { key, name: trimmed, isActive: true },
+      });
+      return this.mapNamed(row);
+    } catch (error) {
+      if (isPrismaUniqueConflict(error)) {
+        throw new ConflictException('An occupation with this name already exists.');
+      }
+      throw error;
+    }
+  }
+
+  async updateOccupation(id: number, dto: UpdateNamedMasterDto) {
+    this.requireNameOrActive(dto, 'occupation');
+
+    const existing = await this.prisma.client.occupation.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('Occupation not found');
+    }
+
+    const data: { name?: string; isActive?: boolean } = {};
+    if (dto.name !== undefined) {
+      data.name = this.trimMasterName(dto.name, 'Occupation name', 50);
+    }
+    if (dto.isActive !== undefined) {
+      data.isActive = dto.isActive;
+    }
+
+    try {
+      const row = await this.prisma.client.occupation.update({
+        where: { id },
+        data,
+      });
+      return this.mapNamed(row);
+    } catch (error) {
+      if (isPrismaUniqueConflict(error)) {
+        throw new ConflictException('An occupation with this name already exists.');
+      }
+      throw error;
+    }
+  }
+
+  async createGender(name: string) {
+    const trimmed = this.trimMasterName(name, 'Gender name', 20);
+    const key = await this.uniqueKeyedMasterKey(
+      trimmed,
+      20,
+      async (candidate) =>
+        Boolean(await this.prisma.client.gender.findUnique({ where: { key: candidate }, select: { id: true } })),
+      'gender',
+    );
+
+    try {
+      const row = await this.prisma.client.gender.create({
+        data: { key, name: trimmed, isActive: true },
+      });
+      return this.mapNamed(row);
+    } catch (error) {
+      if (isPrismaUniqueConflict(error)) {
+        throw new ConflictException('A gender with this name already exists.');
+      }
+      throw error;
+    }
+  }
+
+  async updateGender(id: number, dto: UpdateNamedMasterDto) {
+    this.requireNameOrActive(dto, 'gender');
+
+    const existing = await this.prisma.client.gender.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('Gender not found');
+    }
+
+    const data: { name?: string; isActive?: boolean } = {};
+    if (dto.name !== undefined) {
+      data.name = this.trimMasterName(dto.name, 'Gender name', 20);
+    }
+    if (dto.isActive !== undefined) {
+      data.isActive = dto.isActive;
+    }
+
+    try {
+      const row = await this.prisma.client.gender.update({
+        where: { id },
+        data,
+      });
+      return this.mapNamed(row);
+    } catch (error) {
+      if (isPrismaUniqueConflict(error)) {
+        throw new ConflictException('A gender with this name already exists.');
+      }
+      throw error;
+    }
+  }
+
+  async createReasonForLoan(name: string) {
+    const trimmed = this.trimMasterName(name, 'Reason for loan', 50);
+
+    try {
+      const row = await this.prisma.client.reasonForLoan.create({
+        data: { name: trimmed, isActive: true },
+      });
+      return this.mapNamed(row);
+    } catch (error) {
+      if (isPrismaUniqueConflict(error)) {
+        throw new ConflictException('A reason for loan with this name already exists.');
+      }
+      throw error;
+    }
+  }
+
+  async updateReasonForLoan(id: number, dto: UpdateNamedMasterDto) {
+    this.requireNameOrActive(dto, 'reason for loan');
+
+    const existing = await this.prisma.client.reasonForLoan.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('Reason for loan not found');
+    }
+
+    const data: { name?: string; isActive?: boolean } = {};
+    if (dto.name !== undefined) {
+      data.name = this.trimMasterName(dto.name, 'Reason for loan', 50);
+    }
+    if (dto.isActive !== undefined) {
+      data.isActive = dto.isActive;
+    }
+
+    try {
+      const row = await this.prisma.client.reasonForLoan.update({
+        where: { id },
+        data,
+      });
+      return this.mapNamed(row);
+    } catch (error) {
+      if (isPrismaUniqueConflict(error)) {
+        throw new ConflictException('A reason for loan with this name already exists.');
+      }
+      throw error;
+    }
+  }
+
+  async createState(input: { name: string; code: string }) {
+    const name = this.trimMasterName(input.name, 'State name', 100);
+    const code = this.trimMasterName(input.code, 'State code', 5).toUpperCase();
+
+    try {
+      const row = await this.prisma.client.state.create({
+        data: { name, code, isActive: true },
+      });
+      return this.mapState(row);
+    } catch (error) {
+      if (isPrismaUniqueConflict(error)) {
+        throw new ConflictException('A state with this name or code already exists.');
+      }
+      throw error;
+    }
+  }
+
+  async updateState(id: number, dto: UpdateStateMasterDto) {
+    if (dto.name === undefined && dto.code === undefined && dto.isActive === undefined) {
+      throw new BadRequestException('Provide name, code, and/or isActive to update.');
+    }
+
+    const existing = await this.prisma.client.state.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('State not found');
+    }
+
+    const data: { name?: string; code?: string; isActive?: boolean } = {};
+    if (dto.name !== undefined) {
+      data.name = this.trimMasterName(dto.name, 'State name', 100);
+    }
+    if (dto.code !== undefined) {
+      data.code = this.trimMasterName(dto.code, 'State code', 5).toUpperCase();
+    }
+    if (dto.isActive !== undefined) {
+      data.isActive = dto.isActive;
+    }
+
+    try {
+      const row = await this.prisma.client.state.update({
+        where: { id },
+        data,
+      });
+      return this.mapState(row);
+    } catch (error) {
+      if (isPrismaUniqueConflict(error)) {
+        throw new ConflictException('A state with this name or code already exists.');
+      }
+      throw error;
+    }
+  }
+
+  private async assertStateExists(stateId: number) {
+    const row = await this.prisma.client.state.findUnique({
+      where: { id: stateId },
+      select: { id: true },
+    });
+    if (!row) {
+      throw new NotFoundException('State not found');
+    }
+  }
+
+  private cityInclude() {
+    return { state: true } as const;
+  }
+
+  async createCity(input: { name: string; stateId: number }) {
+    const name = this.trimMasterName(input.name, 'City name', 100);
+    await this.assertStateExists(input.stateId);
+
+    try {
+      const row = await this.prisma.client.city.create({
+        data: { name, stateId: input.stateId, isActive: true },
+        include: this.cityInclude(),
+      });
+      return this.mapCity(row);
+    } catch (error) {
+      if (isPrismaUniqueConflict(error)) {
+        throw new ConflictException('A city with this name already exists in that state.');
+      }
+      throw error;
+    }
+  }
+
+  async updateCity(id: number, dto: UpdateCityMasterDto) {
+    if (dto.name === undefined && dto.stateId === undefined && dto.isActive === undefined) {
+      throw new BadRequestException('Provide name, stateId, and/or isActive to update.');
+    }
+
+    const existing = await this.prisma.client.city.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('City not found');
+    }
+
+    if (dto.stateId !== undefined) {
+      await this.assertStateExists(dto.stateId);
+    }
+
+    const data: { name?: string; stateId?: number; isActive?: boolean } = {};
+    if (dto.name !== undefined) {
+      data.name = this.trimMasterName(dto.name, 'City name', 100);
+    }
+    if (dto.stateId !== undefined) {
+      data.stateId = dto.stateId;
+    }
+    if (dto.isActive !== undefined) {
+      data.isActive = dto.isActive;
+    }
+
+    try {
+      const row = await this.prisma.client.city.update({
+        where: { id },
+        data,
+        include: this.cityInclude(),
+      });
+      return this.mapCity(row);
+    } catch (error) {
+      if (isPrismaUniqueConflict(error)) {
+        throw new ConflictException('A city with this name already exists in that state.');
+      }
+      throw error;
+    }
+  }
+
+  private parseDueDateInMonth(raw: string, year: number, month: number): Date {
+    const parsed = parseIsoDateUtc(raw);
+    if (!parsed) {
+      throw new BadRequestException('Due date must be a valid calendar date (YYYY-MM-DD).');
+    }
+    if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() + 1 !== month) {
+      throw new BadRequestException('Due date must fall in the selected year and month.');
+    }
+    return parsed;
+  }
+
+  async createRepaymentDueDate(input: { year: number; month: number; dueDate: string }) {
+    const dueDate = this.parseDueDateInMonth(input.dueDate, input.year, input.month);
+    try {
+      const row = await this.prisma.client.repaymentDueDate.create({
+        data: { year: input.year, month: input.month, dueDate, isActive: true },
+      });
+      return this.mapRepaymentDueDate(row);
+    } catch (error) {
+      if (isPrismaUniqueConflict(error)) {
+        throw new ConflictException('A due date for this month already exists.');
+      }
+      throw error;
+    }
+  }
+
+  async updateRepaymentDueDate(id: number, dto: UpdateRepaymentDueDateDto) {
+    if (dto.dueDate === undefined && dto.isActive === undefined) {
+      throw new BadRequestException('Provide dueDate and/or isActive to update.');
+    }
+
+    const existing = await this.prisma.client.repaymentDueDate.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('Due date override not found');
+    }
+
+    const data: { dueDate?: Date; isActive?: boolean } = {};
+    if (dto.dueDate !== undefined) {
+      data.dueDate = this.parseDueDateInMonth(dto.dueDate, existing.year, existing.month);
+    }
+    if (dto.isActive !== undefined) {
+      data.isActive = dto.isActive;
+    }
+
+    const row = await this.prisma.client.repaymentDueDate.update({
+      where: { id },
+      data,
+    });
+    return this.mapRepaymentDueDate(row);
   }
 
   async createLeadSource(input: { name: string; type: LeadSourceType }) {
@@ -377,7 +830,10 @@ export class LosMasterService {
       if (!trimmed) {
         throw new BadRequestException('Value cannot be empty.');
       }
-      data.value = trimmed;
+      data.value =
+        existing.key === ELIGIBILITY_CRITERIA.REJECTED_CREDIT_ASSESSMENT_GRADES
+          ? normalizeRejectedCreditAssessmentGrades(trimmed)
+          : trimmed;
     }
     if (hasActive) {
       data.isActive = dto.isActive;

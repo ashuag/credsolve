@@ -16,6 +16,7 @@ import {
   createLeadSource,
   createOccupation,
   createReasonForLoan,
+  createRepaymentDueDate,
   createState,
   deleteBank,
   getMasters,
@@ -24,6 +25,7 @@ import {
   type LosLeadSourceType,
   type LosMastersPayload,
   type LosNamedMaster,
+  type LosRepaymentDueDateMaster,
   type LosStateMaster,
   type LosStatusMaster,
   updateApplicationStatus,
@@ -34,6 +36,7 @@ import {
   updateLeadStatus,
   updateOccupation,
   updateReasonForLoan,
+  updateRepaymentDueDate,
   updateState,
 } from '@/lib/api';
 import { getLosToken } from '@/lib/auth';
@@ -50,7 +53,8 @@ type ModalState =
   | { kind: 'occupation'; item?: LosNamedMaster }
   | { kind: 'reasonForLoan'; item?: LosNamedMaster }
   | { kind: 'gender'; item?: LosNamedMaster }
-  | { kind: 'bank'; item?: LosNamedMaster };
+  | { kind: 'bank'; item?: LosNamedMaster }
+  | { kind: 'dueDate'; item?: LosRepaymentDueDateMaster };
 
 function formatLeadSourceType(type: LosLeadSourceType) {
   return type
@@ -431,6 +435,148 @@ function CityModal({
   );
 }
 
+const MONTH_LABELS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const;
+
+function formatDueMonth(year: number, month: number) {
+  return `${MONTH_LABELS[month - 1]?.slice(0, 3) ?? month} ${year}`;
+}
+
+function lastIsoDateOfMonth(year: number, month: number) {
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${year}-${String(month).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
+}
+
+function formatIsoDisplay(iso: string) {
+  const [year, month, day] = iso.split('-');
+  if (!year || !month || !day) return iso;
+  return `${day} ${MONTH_LABELS[Number(month) - 1]?.slice(0, 3) ?? month} ${year}`;
+}
+
+function DueDateModal({
+  initial,
+  onClose,
+  onSubmit,
+}: {
+  initial?: LosRepaymentDueDateMaster;
+  onClose: () => void;
+  onSubmit: (payload: { year: number; month: number; dueDate: string }) => Promise<unknown>;
+}) {
+  const now = new Date();
+  const [year, setYear] = useState(initial?.year ?? now.getFullYear());
+  const [month, setMonth] = useState(initial?.month ?? now.getMonth() + 1);
+  const [dueDate, setDueDate] = useState(initial?.dueDate ?? lastIsoDateOfMonth(now.getFullYear(), now.getMonth() + 1));
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const locked = Boolean(initial);
+
+  function applyMonth(nextYear: number, nextMonth: number) {
+    setYear(nextYear);
+    setMonth(nextMonth);
+    setDueDate((prev) => {
+      const day = Number(prev.slice(8, 10)) || 1;
+      const last = Number(lastIsoDateOfMonth(nextYear, nextMonth).slice(8, 10));
+      return lastIsoDateOfMonth(nextYear, nextMonth).slice(0, 8) + String(Math.min(day, last)).padStart(2, '0');
+    });
+  }
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      await onSubmit({ year, month, dueDate });
+      onClose();
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'Unable to save due date.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const minDate = `${year}-${String(month).padStart(2, '0')}-01`;
+  const maxDate = lastIsoDateOfMonth(year, month);
+
+  return (
+    <ModalShell
+      title={initial ? 'Edit Due Date' : 'Add Due Date'}
+      subtitle="When this month still has this due date ahead (or today), new applications use it instead of rolling to next month-end."
+      onClose={onClose}
+    >
+      <form className="grid gap-4" onSubmit={handleSubmit}>
+        <label className="grid gap-1.5">
+          <span className="text-[0.9rem] font-bold">Year</span>
+          <input
+            className="los-input"
+            type="number"
+            min={2020}
+            max={2100}
+            value={year}
+            onChange={(event) => applyMonth(Number(event.target.value), month)}
+            disabled={locked}
+            required
+          />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="text-[0.9rem] font-bold">Month</span>
+          <select
+            className="los-input"
+            value={month}
+            onChange={(event) => applyMonth(year, Number(event.target.value))}
+            disabled={locked}
+            required
+          >
+            {MONTH_LABELS.map((label, index) => (
+              <option key={label} value={index + 1}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1.5">
+          <span className="text-[0.9rem] font-bold">Due date</span>
+          <input
+            className="los-input"
+            type="date"
+            min={minDate}
+            max={maxDate}
+            value={dueDate}
+            onChange={(event) => setDueDate(event.target.value)}
+            required
+          />
+        </label>
+
+        {error ? (
+          <div className="rounded-[10px] border border-[rgba(231,95,95,0.22)] bg-[rgba(255,241,241,0.92)] p-[10px_14px] text-[0.86rem] text-[#8d3434]">
+            {error}
+          </div>
+        ) : null}
+
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose} className="min-h-[40px] flex-1 cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent font-bold text-brand-text">
+            Cancel
+          </button>
+          <button type="submit" className="los-btn-primary flex-1" disabled={saving}>
+            {saving ? 'Saving...' : initial ? 'Save Changes' : 'Add Due Date'}
+          </button>
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
 function NamedMasterModal({
   noun,
   initial,
@@ -710,6 +856,8 @@ export function MasterDetailPanel({ master }: { master: MasterSlug }) {
         return masters?.genders ?? [];
       case 'banks':
         return masters?.banks ?? [];
+      case 'due-dates':
+        return masters?.repaymentDueDates ?? [];
       default:
         return [];
     }
@@ -1024,6 +1172,50 @@ export function MasterDetailPanel({ master }: { master: MasterSlug }) {
     [busyKey],
   );
 
+  const dueDateColumns = useMemo((): DataTableColumn<LosRepaymentDueDateMaster>[] => [
+    {
+      key: 'month',
+      label: 'Month',
+      getFilterValue: (item) => formatDueMonth(item.year, item.month),
+      getSortValue: (item) => item.year * 100 + item.month,
+      filter: { type: 'text', placeholder: 'Search month…' },
+      render: (item) => <strong>{formatDueMonth(item.year, item.month)}</strong>,
+    },
+    {
+      key: 'dueDate',
+      label: 'Due date',
+      getFilterValue: (item) => item.dueDate,
+      getSortValue: (item) => item.dueDate,
+      filter: { type: 'text', placeholder: 'Search date…' },
+      cellClassName: 'text-brand-muted',
+      render: (item) => formatIsoDisplay(item.dueDate),
+    },
+    statusColumn<LosRepaymentDueDateMaster>(),
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      filter: false,
+      render: (item) => (
+        <ToggleActions
+          busy={busyKey === `due-date-${item.id}`}
+          isActive={item.isActive}
+          editTitle="Edit due date"
+          onEdit={() => setModal({ kind: 'dueDate', item })}
+          activateTitle="Activate due date"
+          deactivateTitle="Deactivate due date"
+          onToggle={(next) => {
+            void handleSoftToggle(
+              `due-date-${item.id}`,
+              (token) => updateRepaymentDueDate(token, item.id, { isActive: next }),
+              `Mark ${formatDueMonth(item.year, item.month)} as ${next ? 'active' : 'inactive'}?`,
+            );
+          }}
+        />
+      ),
+    },
+  ], [busyKey]);
+
   if (!definition) return null;
 
   return (
@@ -1224,6 +1416,26 @@ export function MasterDetailPanel({ master }: { master: MasterSlug }) {
             />
           </MasterSection>
         ) : null}
+
+        {master === 'due-dates' ? (
+          <MasterSection
+            title="Due Dates"
+            description=""
+            actionLabel="+ Add Due Date"
+            onAction={() => setModal({ kind: 'dueDate' })}
+          >
+            <DataTable
+              items={masters?.repaymentDueDates ?? []}
+              columns={dueDateColumns}
+              getRowKey={(item) => item.id}
+              entityLabel="due dates"
+              loading={loading && !masters}
+              error={fetchError}
+              onRetry={() => void loadMasters()}
+              emptyMessage="No due date overrides yet. Month-end is used until you add one."
+            />
+          </MasterSection>
+        ) : null}
       </div>
 
       {modal?.kind === 'leadStatus' ? (
@@ -1344,6 +1556,19 @@ export function MasterDetailPanel({ master }: { master: MasterSlug }) {
             onSubmit={(payload) => item
               ? runAction(`bank-${item.id}`, (token) => updateBank(token, item.id, payload))
               : runAction('bank-create', (token) => createBank(token, payload))}
+          />
+        );
+      })() : null}
+
+      {modal?.kind === 'dueDate' ? (() => {
+        const item = modal.item;
+        return (
+          <DueDateModal
+            initial={item}
+            onClose={() => setModal(null)}
+            onSubmit={(payload) => item
+              ? runAction(`due-date-${item.id}`, (token) => updateRepaymentDueDate(token, item.id, { dueDate: payload.dueDate }))
+              : runAction('due-date-create', (token) => createRepaymentDueDate(token, payload))}
           />
         );
       })() : null}

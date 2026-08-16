@@ -111,6 +111,27 @@ function CibilBadge({ score }: { score: number | null | undefined }) {
   );
 }
 
+const GRADE_TONE: Record<string, { background: string; color: string }> = {
+  A: { background: 'rgba(16,185,129,0.1)', color: '#10b981' },
+  B: { background: 'rgba(16,185,129,0.1)', color: '#10b981' },
+  C: { background: 'rgba(16,185,129,0.1)', color: '#10b981' },
+  D: { background: 'rgba(245,158,11,0.1)', color: '#f59e0b' },
+  E: { background: 'rgba(245,158,11,0.1)', color: '#f59e0b' },
+  F: { background: 'rgba(245,158,11,0.1)', color: '#f59e0b' },
+  G: { background: 'rgba(239,68,68,0.1)', color: '#ef4444' },
+  H: { background: 'rgba(239,68,68,0.1)', color: '#ef4444' },
+};
+
+function GradeBadge({ category }: { category: string | null | undefined }) {
+  if (!category) return <span className="text-brand-muted">—</span>;
+  const style = GRADE_TONE[category] ?? { background: 'rgba(99,102,241,0.12)', color: '#4f46e5' };
+  return (
+    <span className="inline-flex items-center justify-center min-w-[32px] h-7 px-2 rounded-[7px] text-[0.8rem] font-extrabold" style={style}>
+      {category}
+    </span>
+  );
+}
+
 function applicationStageLabel(app: LosApplication): string {
   return resolveApplicationStageLabel({
     statusCode: app.statusCode,
@@ -266,6 +287,19 @@ export function ApplicationsPanel() {
       getSortValue: (row) => row.cibilScore,
       filter: { type: 'number', placeholder: 'Score…' },
       render: (app) => <CibilBadge score={app.cibilScore} />,
+    },
+    {
+      key: 'grade',
+      label: 'Grade',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.cibilCreditAssessmentCategory ?? '',
+      getSortValue: (row) => row.cibilCreditAssessmentCategory ?? '',
+      filter: {
+        type: 'select',
+        options: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((g) => ({ value: g, label: g })),
+        matches: (row, value) => row.cibilCreditAssessmentCategory === value,
+      },
+      render: (app) => <GradeBadge category={app.cibilCreditAssessmentCategory} />,
     },
     {
       key: 'loan',

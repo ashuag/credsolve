@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PostBreCheckService } from '../../../../common/bre/post-bre-check.service';
 import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
+import { CibilCreditAssessmentService } from '../../../../common/cibil/cibil-credit-assessment.service';
 import { SmsService } from '../../../../common/sms/sms.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { ApplicationRepository } from '../../infrastructure/repositories/application.repository';
@@ -23,6 +24,7 @@ export class PostBureauOfferService {
 
   constructor(
     private readonly postBreCheck: PostBreCheckService,
+    private readonly cibilCreditAssessment: CibilCreditAssessmentService,
     private readonly checkLoanEligibility: CheckLoanEligibilityUseCase,
     private readonly applications: ApplicationRepository,
     private readonly prisma: PrismaService,
@@ -30,14 +32,29 @@ export class PostBureauOfferService {
   ) {}
 
   /**
-   * After bureau data is available: run post-BRE, then persist a draft application
-   * with pre-approved ceiling from bureau credit-limit tier (same as `/loans/eligibility`).
+   * After bureau data is available: run the CIBIL credit assessment (category, payment
+   * probability, hard-underwriting decision), then post-BRE, then persist a draft
+   * application with pre-approved ceiling from bureau credit-limit tier (same as
+   * `/loans/eligibility`).
+   *
+   * The CIBIL credit assessment is informational only for now — it persists its result
+   * to `cibil_credit_assessment` but does not gate the pipeline; post-BRE remains the
+   * sole pass/reject decision.
    */
   async runAfterSuccessfulBureauFetch(params: {
     leadId: bigint;
     customerId: bigint;
     leadUuid: string;
   }): Promise<PostBureauOfferResult> {
+    try {
+      await this.cibilCreditAssessment.runForLead(params.leadId);
+    } catch (err) {
+      this.logger.error(
+        `CIBIL credit assessment failed (leadId=${params.leadId.toString()}); continuing to post-BRE.`,
+        err instanceof Error ? err.stack : err,
+      );
+    }
+
     const postBre = await this.postBreCheck.run({
       leadId: params.leadId,
       customerId: params.customerId,

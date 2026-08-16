@@ -61,11 +61,11 @@ export function buildPostBreUnsecuredExposureGuide(input: {
   return {
     phaseLabel: 'After bureau (pre-approved offer)',
     summary:
-      'Open unsecured exposure is not a post-BRE pass/fail rule. It drives credit-limit tier lookup and the pre-approved bullet loan amount after post-BRE passes.',
+      'Total open unsecured exposure is a post-BRE pass/fail gate (MIN_UNSECURED_LOAN_AMOUNT). After post-BRE passes, max/total exposure also drives credit-limit tier lookup and the pre-approved bullet loan amount.',
     maxExposureDefinition:
-      'maxOpenUnsecuredExposureInr = maximum exposure (INR) among all open tradelines whose TUEF account type is in the unsecured set (Appendix E). This value selects the credit_limit_tier row.',
+      'maxOpenUnsecuredExposureInr = maximum exposure (INR) among all open tradelines whose TUEF account type is in the unsecured set (Appendix E). This value is shown for inspection.',
     totalExposureDefinition:
-      'totalOpenUnsecuredExposureInr = sum of exposure on every open unsecured tradeline (informational; tier uses max only).',
+      'totalOpenUnsecuredExposureInr = sum of exposure on every open unsecured tradeline. Post-BRE rejects when this is below MIN_UNSECURED_LOAN_AMOUNT; credit-limit tier lookup also uses this total.',
     tierSelectionRule:
       'First active credit_limit_tier (sortOrder asc) where minUnsecuredLoan ≤ max exposure ≤ maxUnsecuredLoan (null max = no upper bound).',
     preApprovedFormula:

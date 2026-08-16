@@ -13,12 +13,62 @@ import {
 } from '@/lib/api';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  cx,
   getLosToken,
   IconButton,
   ModalShell,
   StatusPill,
   SummaryCards,
 } from './eligibility-ui';
+
+const REJECTED_CREDIT_ASSESSMENT_GRADES_KEY = 'REJECTED_CREDIT_ASSESSMENT_GRADES';
+
+const CREDIT_ASSESSMENT_GRADES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
+
+const CREDIT_ASSESSMENT_GRADE_LABEL: Record<(typeof CREDIT_ASSESSMENT_GRADES)[number], string> = {
+  A: 'Credit-active prime',
+  B: 'Near-prime active',
+  C: 'Mid-prime',
+  D: 'Below-average credit',
+  E: 'Subprime',
+  F: 'High-risk',
+  G: 'Very high-risk',
+  H: 'Thin-file / NTC / Distressed',
+};
+
+function parseCreditAssessmentGrades(value: string): string[] {
+  const selected = new Set(
+    value
+      .split(',')
+      .map((part) => part.trim().toUpperCase())
+      .filter((part) => CREDIT_ASSESSMENT_GRADES.includes(part as (typeof CREDIT_ASSESSMENT_GRADES)[number])),
+  );
+  return CREDIT_ASSESSMENT_GRADES.filter((grade) => selected.has(grade));
+}
+
+function serializeCreditAssessmentGrades(grades: string[]) {
+  return CREDIT_ASSESSMENT_GRADES.filter((grade) => grades.includes(grade)).join(',');
+}
+
+function GradeValuePills({ value }: { value: string }) {
+  const grades = parseCreditAssessmentGrades(value);
+  if (!grades.length) {
+    return <span>—</span>;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {grades.map((grade) => (
+        <span
+          key={grade}
+          className="inline-flex min-w-[1.6rem] justify-center rounded-[6px] bg-[rgba(239,68,68,0.1)] px-1.5 py-0.5 text-[0.78rem] font-extrabold text-[#991b1b]"
+        >
+          {grade}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 function ProfileCriterionModal({
   item,
@@ -29,16 +79,30 @@ function ProfileCriterionModal({
   onClose: () => void;
   onSubmit: (value: string) => Promise<unknown>;
 }) {
+  const isGradeRule = item.key === REJECTED_CREDIT_ASSESSMENT_GRADES_KEY;
   const [value, setValue] = useState(item.value);
+  const [selectedGrades, setSelectedGrades] = useState(() => parseCreditAssessmentGrades(item.value));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function toggleGrade(grade: string) {
+    setSelectedGrades((current) =>
+      current.includes(grade) ? current.filter((selected) => selected !== grade) : [...current, grade],
+    );
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    const nextValue = isGradeRule ? serializeCreditAssessmentGrades(selectedGrades) : value.trim();
+    if (!nextValue) {
+      setError(isGradeRule ? 'Select at least one grade, or deactivate the rule instead.' : 'Value cannot be empty.');
+      return;
+    }
+
     setSaving(true);
     setError(null);
     try {
-      await onSubmit(value);
+      await onSubmit(nextValue);
       onClose();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Unable to save profile eligibility criterion.');
@@ -49,8 +113,12 @@ function ProfileCriterionModal({
 
   return (
     <ModalShell
-      title="Edit Profile Eligibility Rule"
-      subtitle="Update the stored rule value while keeping the internal rule key and label fixed."
+      title={isGradeRule ? 'Edit rejected credit-assessment grades' : 'Edit Profile Eligibility Rule'}
+      subtitle={
+        isGradeRule
+          ? 'Select the CIBIL credit-assessment grades (A–H) that should fail post-BRE. The rule key stays fixed.'
+          : 'Update the stored rule value while keeping the internal rule key and label fixed.'
+      }
       onClose={onClose}
     >
       <form className="grid gap-4" onSubmit={handleSubmit}>
@@ -70,17 +138,55 @@ function ProfileCriterionModal({
           </div>
         ) : null}
 
-        <label className="grid gap-1.5">
-          <span className="text-[0.9rem] font-bold">Rule value</span>
-          <input
-            className="los-input"
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            minLength={1}
-            maxLength={100}
-            required
-          />
-        </label>
+        {isGradeRule ? (
+          <fieldset className="grid gap-2">
+            <legend className="text-[0.9rem] font-bold">Rejected grades</legend>
+            <p className="m-0 text-[0.8rem] leading-[1.45] text-brand-muted">
+              Applications whose credit-assessment category matches a selected grade are rejected.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {CREDIT_ASSESSMENT_GRADES.map((grade) => {
+                const checked = selectedGrades.includes(grade);
+                return (
+                  <label
+                    key={grade}
+                    className={cx(
+                      'flex cursor-pointer items-start gap-2.5 rounded-[10px] border px-3 py-2.5',
+                      checked
+                        ? 'border-[rgba(239,68,68,0.28)] bg-[rgba(239,68,68,0.06)]'
+                        : 'border-[rgba(23,44,113,0.1)] bg-white',
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={checked}
+                      onChange={() => toggleGrade(grade)}
+                    />
+                    <span className="grid gap-0.5">
+                      <span className="text-[0.88rem] font-extrabold tracking-wide">{grade}</span>
+                      <span className="text-[0.76rem] leading-[1.35] text-brand-muted">
+                        {CREDIT_ASSESSMENT_GRADE_LABEL[grade]}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        ) : (
+          <label className="grid gap-1.5">
+            <span className="text-[0.9rem] font-bold">Rule value</span>
+            <input
+              className="los-input"
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              minLength={1}
+              maxLength={100}
+              required
+            />
+          </label>
+        )}
 
         {error ? (
           <div className="rounded-[10px] border border-[rgba(231,95,95,0.22)] bg-[rgba(255,241,241,0.92)] p-[10px_14px] text-[0.86rem] text-[#8d3434]">
@@ -180,7 +286,7 @@ export function ProfileEligibilityPanel({
       ? {
           title: 'Post BRE',
           description:
-            'Manage post-bureau eligibility thresholds used after CIBIL pull, including score floors, DPD windows, enquiry limits, and tradeline rules.',
+            'Manage post-bureau eligibility thresholds used after CIBIL pull, including score floors, DPD windows, enquiry limits, tradeline rules, and rejected credit-assessment grades.',
         }
       : breType === 'PRE_BRE'
         ? {
@@ -218,7 +324,8 @@ export function ProfileEligibilityPanel({
       getSortValue: (item) => item.value.toLowerCase(),
       filter: { type: 'text', placeholder: 'Search values…' },
       cellClassName: 'text-brand-muted',
-      render: (item) => item.value,
+      render: (item) =>
+        item.key === REJECTED_CREDIT_ASSESSMENT_GRADES_KEY ? <GradeValuePills value={item.value} /> : item.value,
     },
     {
       key: 'status',

@@ -178,7 +178,10 @@ export default function LoanSelectionPage() {
   );
 
   const today = useMemo(() => new Date(), []);
-  const fixedRepaymentDate = useMemo(() => computeFixedRepaymentDate(today), [today]);
+  const fixedRepaymentDate = useMemo(
+    () => computeFixedRepaymentDate(today, settings.repaymentDueDate),
+    [today, settings.repaymentDueDate],
+  );
   const selectedEndDate = useMemo(() => toDateInputValue(fixedRepaymentDate), [fixedRepaymentDate]);
 
   const [loanPurpose, setLoanPurpose] = useState('');

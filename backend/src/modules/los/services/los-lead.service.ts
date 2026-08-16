@@ -4,6 +4,7 @@ import { BUREAU_FETCHED } from '../../../common/constants/bureau-fetch.constants
 import { LEAD_STATUS } from '../../../common/constants/lead.constants';
 import { PAN_VERIFIED } from '../../../common/constants/pan-verification.constants';
 import { BureauReportPdfService } from '../../../common/cibil/bureau-report-pdf.service';
+import { CibilCreditAssessmentService } from '../../../common/cibil/cibil-credit-assessment.service';
 import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
@@ -48,6 +49,7 @@ export class LosLeadService {
     private readonly prisma: PrismaService,
     private readonly bureauReportPdf: BureauReportPdfService,
     private readonly kycFiles: KycFilesService,
+    private readonly cibilCreditAssessment: CibilCreditAssessmentService,
   ) {}
 
   async listLeads() {
@@ -267,6 +269,7 @@ export class LosLeadService {
       where: { leadId: lead.id },
       orderBy: { createdAt: 'desc' },
       select: {
+        id: true,
         uuid: true,
         htmlUrl: true,
         rawPayload: true,
@@ -288,6 +291,7 @@ export class LosLeadService {
     });
 
     const report = await this.bureauReportPdf.buildReportViewData(bureauReportRow.rawPayload);
+    const creditAssessment = await this.cibilCreditAssessment.getViewForBureauReportId(bureauReportRow.id);
 
     return {
       bureauReportUuid: bureauReportRow.uuid,
@@ -296,6 +300,7 @@ export class LosLeadService {
       htmlUrl: bureauReportRow.htmlUrl,
       rawPayload: bureauReportRow.rawPayload,
       report,
+      creditAssessment,
     };
   }
 

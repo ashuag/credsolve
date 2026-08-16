@@ -14,7 +14,9 @@ import {
   TUEF_RESTRUCTURED_WRITTEN_OFF_SETTLED_CODES,
   TUEF_SMA_PWOS_ASSET_CLASSIFICATION_CODES,
   TUEF_SUIT_FILED_WILFUL_DEFAULT_LABELS,
-  ACCOUNT_TYPE_LABELS
+  ACCOUNT_TYPE_LABELS,
+  CIBIL_CREDIT_CARD_ACCOUNT_TYPE_SYMBOLS,
+  CIBIL_UNSECURED_ACCOUNT_TYPE_SYMBOLS,
 } from './cibil-tuef.constants';
 import { ELIGIBILITY_CRITERIA as EC } from '../constants/eligibility-criteria.constants';
 import {
@@ -748,11 +750,11 @@ export function countTradelines(body: unknown): number {
 }
 
 export type BureauDpdThresholds = {
-  /** No DPD > 0 on open loan tradelines within this many months. */
-  openDpdMonths: number;
-  dpd30PlusMonths: number;
-  dpd60PlusMonths: number;
-  dpd90PlusMonths: number;
+  /** No DPD > 0 on open loan tradelines within this many months. Null skips the rule. */
+  openDpdMonths: number | null;
+  dpd30PlusMonths: number | null;
+  dpd60PlusMonths: number | null;
+  dpd90PlusMonths: number | null;
 };
 
 type MonthlyDpdEntry = {
@@ -876,6 +878,7 @@ export function checkBureauDpdRules(
 
   for (const { thresholdKey, minDpd, onlyOpenLoan, detailLabel } of DPD_WINDOW_RULES) {
     const lookback = thresholds[thresholdKey];
+    if (lookback == null) continue;
     const hit = entries.find(
       (e) =>
         (!onlyOpenLoan || e.isOpen) &&
@@ -914,8 +917,10 @@ export function evaluateBureauDpdRulesDetailed(
 ): BureauDpdRuleResult[] {
   const entries = collectMonthlyDpdEntries(body, asOf);
 
-  return DPD_WINDOW_RULES.map(({ ruleKey, thresholdKey, minDpd, onlyOpenLoan }) => {
+  const results: BureauDpdRuleResult[] = [];
+  for (const { ruleKey, thresholdKey, minDpd, onlyOpenLoan } of DPD_WINDOW_RULES) {
     const lookback = thresholds[thresholdKey];
+    if (lookback == null) continue;
     const findings: BureauRuleFinding[] = entries
       .filter(
         (e) =>
@@ -936,10 +941,14 @@ export function evaluateBureauDpdRulesDetailed(
         },
       }));
 
-    if (!findings.length) return { ruleKey, passed: true, detail: null, findings: [] };
+    if (!findings.length) {
+      results.push({ ruleKey, passed: true, detail: null, findings: [] });
+      continue;
+    }
     const detail = findings.map((f) => `${f.title}: ${f.detail ?? ''}`.trim()).join(' ');
-    return { ruleKey, passed: false, detail, findings };
-  });
+    results.push({ ruleKey, passed: false, detail, findings });
+  }
+  return results;
 }
 
 export type BureauTradelineRuleCheck = BureauAdverseTradelineCheck & {
@@ -1231,6 +1240,7 @@ function tradelineHasSmaPwosSignal(lineRec: Record<string, unknown>): boolean {
 function resolveTradelineEvaluatedRules(input: {
   isOpen: boolean;
   isMfiAccount: boolean;
+  isUnsecured: boolean;
   activeRuleIds: Set<string>;
 }): string[] {
   const always = [EC.SETTLED_MONTHS, EC.NO_RESTRUCTURED_LOANS, EC.NO_SMA_PWOS].filter((k) =>
@@ -1243,7 +1253,11 @@ function resolveTradelineEvaluatedRules(input: {
   const dpd = [EC.OPEN_DPD_MONTHS, EC.DPD_30PLUS_MONTHS, EC.DPD_60PLUS_MONTHS, EC.DPD_90PLUS_MONTHS].filter(
     (k) => input.activeRuleIds.has(k),
   );
-  return [...always, ...mfi, ...dpd];
+  const unsecuredMin =
+    input.activeRuleIds.has(EC.MIN_UNSECURED_LOAN_AMOUNT) && input.isOpen && input.isUnsecured
+      ? [EC.MIN_UNSECURED_LOAN_AMOUNT]
+      : [];
+  return [...always, ...mfi, ...dpd, ...unsecuredMin];
 }
 
 /** Every tradeline on the bureau report with flags and which post-BRE rules evaluate it. */
@@ -1277,6 +1291,9 @@ export function buildPostBreTradelineInspection(
       evaluatedByRules: resolveTradelineEvaluatedRules({
         isOpen,
         isMfiAccount: isMfi,
+        isUnsecured: Boolean(
+          partitionSymbol && CIBIL_UNSECURED_ACCOUNT_TYPE_SYMBOLS.has(partitionSymbol),
+        ),
         activeRuleIds: active,
       }),
     });
@@ -1336,5 +1353,201 @@ export function buildPostBreBureauSummary(
     totalEnquiryCount: enquiries.length,
     loanEnquiryCountInWindow: loanInWindow,
     enquiryWindowDays: windowDays,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// CIBIL credit-assessment signals (loan-count category, hard/conditional
+// underwriting rules, payment-probability model — the "before post-BRE" engine).
+// ---------------------------------------------------------------------------
+
+function classifyAssetStatusCode(raw: unknown): 'SMA' | 'SUB' | 'DBT' | 'LSS' | null {
+  const code = normalizePayStatus(raw);
+  if (!code) return null;
+  if (code === 'SMA' || code.startsWith('SMA')) return 'SMA';
+  if (code === 'SUB') return 'SUB';
+  if (code === 'DBT') return 'DBT';
+  if (code === 'LSS' || code === 'LOSS') return 'LSS';
+  return null;
+}
+
+/** Parses a CIBIL amount field to a non-negative INR number, treating the `-1` sentinel as 0. */
+function parseAssessmentAmountInr(raw: unknown): number {
+  if (isCibilSentinelAmount(raw)) return 0;
+  const n = Number.parseInt(String(raw).replace(/,/g, ''), 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+export type CibilAssessmentSignals = {
+  riskScore: number | null;
+  noOfLoans: number;
+  noOfCreditCards: number;
+  noOfSecuredLoans: number;
+  noOfUnsecuredLoans: number;
+  noOfGoldLoans: number;
+  sixMonthEnquiries: number;
+  totalEnquiries: number;
+  totalOverdueAmountInr: number;
+  /** TUEF Tag 34 codes 02/03 — wilful default, with or without suit filed. */
+  hasWilfulDefault: boolean;
+  /** TUEF Tag 34 code 01 only — suit filed without wilful default. */
+  hasSuitFiledOnly: boolean;
+  /** Current pay status / account condition classified as Doubtful. */
+  hasActiveDbt: boolean;
+  /** Current pay status / account condition classified as Loss. */
+  hasActiveLss: boolean;
+  /** Current pay status / account condition classified as Substandard. */
+  hasActiveSub: boolean;
+  /** SUB/DBT/LSS classification (current or monthly history) within the last 18 months. */
+  doubtfulOrLossInLast18MonthsCount: number;
+  /** Wilful/suit-filed/settled events within the last 18 months. */
+  defaultsInLast18MonthsCount: number;
+  restructuredLoansCount: number;
+  /** TUEF Tag 33 code 04 — Post (Write-Off) Settled. */
+  pwosTradelinesCount: number;
+  /** TUEF Tag 33 codes 03/04/09 — Settled family. */
+  settledLoansCount: number;
+  writeoffPresent: boolean;
+  writeoffTotalAmountInr: number;
+  dpd30InLast3MonthsCount: number;
+  dpd60InLast9MonthsCount: number;
+  dpd90InLast12MonthsCount: number;
+  openLoanDpdInLast6MonthsCount: number;
+  missedPaymentsInLast6MonthsCount: number;
+};
+
+const SETTLED_WRITTEN_OFF_STATUS_CODES = new Set(['03', '04', '09']);
+const WRITEOFF_WRITTEN_OFF_STATUS_CODES = new Set(['02', '06', '08']);
+const PWOS_WRITTEN_OFF_STATUS_CODE = '04';
+
+/**
+ * Derives every input signal the CIBIL credit-assessment engine (category, hard/conditional
+ * rejection rules, payment probability) needs directly from the raw bureau payload — the
+ * "before post-BRE" equivalent of the flattened CSV columns in the CIBIL assessment doc.
+ */
+export function computeCibilAssessmentSignals(
+  body: unknown,
+  riskScore: number | null,
+  asOf: Date = new Date(),
+): CibilAssessmentSignals {
+  const parsedReport = parseBureauReport(body, asOf);
+  const bureauAsOf = parsedReport.bureauAsOfDate;
+
+  let noOfLoans = 0;
+  let noOfCreditCards = 0;
+  let noOfSecuredLoans = 0;
+  let noOfUnsecuredLoans = 0;
+  let noOfGoldLoans = 0;
+  let totalOverdueAmountInr = 0;
+  let hasWilfulDefault = false;
+  let hasSuitFiledOnly = false;
+  let hasActiveDbt = false;
+  let hasActiveLss = false;
+  let hasActiveSub = false;
+  let doubtfulOrLossInLast18MonthsCount = 0;
+  let defaultsInLast18MonthsCount = 0;
+  let pwosTradelinesCount = 0;
+  let settledLoansCount = 0;
+  let writeoffPresent = false;
+  let writeoffTotalAmountInr = 0;
+
+  walkTradelines(parsedReport, ({ lineRec, partitionSymbol }) => {
+    noOfLoans += 1;
+
+    const parsed = parseCibilTradeline(lineRec, partitionSymbol);
+    if (parsed) {
+      if (parsed.accountTypeSymbol && CIBIL_CREDIT_CARD_ACCOUNT_TYPE_SYMBOLS.has(parsed.accountTypeSymbol)) {
+        noOfCreditCards += 1;
+      }
+      if (parsed.accountTypeSymbol === '07') noOfGoldLoans += 1;
+      if (parsed.isUnsecured) noOfUnsecuredLoans += 1;
+      else noOfSecuredLoans += 1;
+    }
+
+    const granted = asRecord(lineRec.GrantedTrade);
+    totalOverdueAmountInr += parseAssessmentAmountInr(granted?.amountPastDue);
+
+    const reported = parseCibilDate(lineRec.dateReported);
+    const reportedInLast18Months = !reported || isWithinLookbackMonths(reported, bureauAsOf, 18);
+
+    const suitFiledCode = readSuitFiledWilfulDefaultCode(lineRec);
+    const isWilful = suitFiledCode === '02' || suitFiledCode === '03';
+    const isSuitFiledOnly = suitFiledCode === '01';
+    if (isWilful) hasWilfulDefault = true;
+    if (isSuitFiledOnly) hasSuitFiledOnly = true;
+
+    const writtenOffCodes = readTradelineWrittenOffSettledStatusCodes(lineRec);
+    const isSettled = writtenOffCodes.some((c) => SETTLED_WRITTEN_OFF_STATUS_CODES.has(c));
+    const isWriteoff = writtenOffCodes.some((c) => WRITEOFF_WRITTEN_OFF_STATUS_CODES.has(c));
+    const isPwos = writtenOffCodes.includes(PWOS_WRITTEN_OFF_STATUS_CODE);
+    if (isSettled) settledLoansCount += 1;
+    if (isPwos) pwosTradelinesCount += 1;
+    if (isWriteoff) {
+      writeoffPresent = true;
+      writeoffTotalAmountInr += parseAssessmentAmountInr(lineRec.writtenOffAmtTotal);
+    }
+
+    if (reportedInLast18Months && ((isWilful || isSuitFiledOnly) || isSettled)) {
+      defaultsInLast18MonthsCount += 1;
+    }
+
+    const currentClass =
+      classifyAssetStatusCode(readSymbol(lineRec.PayStatus)) ??
+      classifyAssetStatusCode(readSymbol(lineRec.AccountCondition));
+    if (currentClass === 'DBT') hasActiveDbt = true;
+    if (currentClass === 'LSS') hasActiveLss = true;
+    if (currentClass === 'SUB') hasActiveSub = true;
+    if (currentClass && ['SUB', 'DBT', 'LSS'].includes(currentClass) && reportedInLast18Months) {
+      doubtfulOrLossInLast18MonthsCount += 1;
+    }
+
+    for (const entry of collectMonthlyPayStatusRows(lineRec)) {
+      const monthClass = classifyAssetStatusCode(entry.status);
+      if (monthClass && ['SUB', 'DBT', 'LSS'].includes(monthClass) && isWithinLookbackMonths(entry.monthDate, bureauAsOf, 18)) {
+        doubtfulOrLossInLast18MonthsCount += 1;
+      }
+    }
+  });
+
+  const restructuredLoansCount = auditNoRestructuredLoans(parsedReport).findings.length;
+  const missedPaymentsInLast6MonthsCount = auditMissedPayments(parsedReport, 6, Number.MAX_SAFE_INTEGER, bureauAsOf).findings.length;
+  const sixMonthEnquiries = auditBureauEnquiriesInLastDays(parsedReport, 183, Number.MAX_SAFE_INTEGER, bureauAsOf).count;
+  const totalEnquiries = extractBureauInquiries(parsedReport).length;
+
+  const dpdByRule = new Map<string, number>(
+    evaluateBureauDpdRulesDetailed(
+      parsedReport,
+      { dpd30PlusMonths: 3, dpd60PlusMonths: 9, dpd90PlusMonths: 12, openDpdMonths: 6 },
+      bureauAsOf,
+    ).map((r): [string, number] => [r.ruleKey, r.findings.length]),
+  );
+
+  return {
+    riskScore,
+    noOfLoans,
+    noOfCreditCards,
+    noOfSecuredLoans,
+    noOfUnsecuredLoans,
+    noOfGoldLoans,
+    sixMonthEnquiries,
+    totalEnquiries,
+    totalOverdueAmountInr,
+    hasWilfulDefault,
+    hasSuitFiledOnly,
+    hasActiveDbt,
+    hasActiveLss,
+    hasActiveSub,
+    doubtfulOrLossInLast18MonthsCount,
+    defaultsInLast18MonthsCount,
+    restructuredLoansCount,
+    pwosTradelinesCount,
+    settledLoansCount,
+    writeoffPresent,
+    writeoffTotalAmountInr,
+    dpd30InLast3MonthsCount: dpdByRule.get(EC.DPD_30PLUS_MONTHS) ?? 0,
+    dpd60InLast9MonthsCount: dpdByRule.get(EC.DPD_60PLUS_MONTHS) ?? 0,
+    dpd90InLast12MonthsCount: dpdByRule.get(EC.DPD_90PLUS_MONTHS) ?? 0,
+    openLoanDpdInLast6MonthsCount: dpdByRule.get(EC.OPEN_DPD_MONTHS) ?? 0,
+    missedPaymentsInLast6MonthsCount,
   };
 }

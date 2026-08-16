@@ -35,6 +35,8 @@ export type LosApplication = {
   email: string | null;
   fullName: string | null;
   cibilScore: number | null;
+  /** Rule-based CIBIL credit-assessment category (A best .. H worst); null if not yet computed. */
+  cibilCreditAssessmentCategory: string | null;
   eligibleLoanAmount: string | null;
   selectedLoanAmount: string | null;
   repayDate: string | null;
@@ -307,6 +309,9 @@ export type LosApplicationDetails = {
     htmlUrl: string | null;
     reportPdfUrl: string | null;
     fetchedAt: string;
+    /** Rule-based CIBIL credit-assessment category (A best .. H worst); null if not yet computed. */
+    creditAssessmentCategory: string | null;
+    creditAssessmentRecommendation: 'Approved' | 'Rejected' | null;
   } | null;
   agreement: {
     documentName: string | null;
