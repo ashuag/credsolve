@@ -25,6 +25,15 @@ function stripPageBreakMarkers(html: string): string {
   return html.replace(/<div class="page-break"[\s\S]*?<\/div>\s*/gi, '');
 }
 
+/** Removes a whole `<div class="doc-section" id="{id}">…</div><!-- /{id} -->` block, if present. */
+function removeSectionById(html: string, id: string): string {
+  const pattern = new RegExp(
+    `<div class="doc-section" id="${id}">[\\s\\S]*?</div><!--\\s*/${id}\\s*-->\\s*`,
+    'i',
+  );
+  return html.replace(pattern, '');
+}
+
 function stripExternalFonts(html: string): string {
   return html
     .replace(/<link rel="preconnect"[^>]*>\s*/gi, '')
@@ -74,7 +83,24 @@ export function loanDocumentTemplatesDir(): string {
   return path.join(process.cwd(), 'assets', 'loan-documents', 'templates');
 }
 
-export async function renderLoanDocumentHtml(merge: LoanDocumentMergeInput): Promise<string> {
+/**
+ * `sanction-kfs` — Sanction Letter + KFS (Sections A+B), the document the customer reviews
+ *   and eSigns in-app. `commercial-terms` — Loan cum Commercial Terms (Section C) alone,
+ *   generated only to attach to the sanction-letter email.
+ */
+export type LoanDocumentRenderSection = 'sanction-kfs' | 'commercial-terms';
+
+export type LoanDocumentRenderOptions = {
+  section?: LoanDocumentRenderSection;
+  /** Include the borrower eSign / NBFC DSC block. Only meaningful for `sanction-kfs`; set once acceptance has happened. */
+  includeAcceptanceBlock?: boolean;
+};
+
+export async function renderLoanDocumentHtml(
+  merge: LoanDocumentMergeInput,
+  options: LoanDocumentRenderOptions = {},
+): Promise<string> {
+  const section = options.section ?? 'sanction-kfs';
   const templatePath = path.join(loanDocumentTemplatesDir(), LOAN_DOCUMENT_HTML_TEMPLATE);
   let html = await readFile(templatePath, 'utf8');
 
@@ -83,6 +109,17 @@ export async function renderLoanDocumentHtml(merge: LoanDocumentMergeInput): Pro
   html = stripExternalFonts(html);
   html = stripClientScripts(html);
   html = injectPrintFieldStyles(html);
+
+  if (section === 'commercial-terms') {
+    html = removeSectionById(html, 'sec-a');
+    html = removeSectionById(html, 'sec-b');
+    html = removeSectionById(html, 'sec-close');
+  } else {
+    html = removeSectionById(html, 'sec-c');
+    if (!options.includeAcceptanceBlock) {
+      html = removeSectionById(html, 'sec-close');
+    }
+  }
 
   const fields = buildLoanDocumentHtmlFieldValues(merge);
   for (const [id, value] of Object.entries(fields)) {

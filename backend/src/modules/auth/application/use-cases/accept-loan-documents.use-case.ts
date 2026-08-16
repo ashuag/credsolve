@@ -8,6 +8,7 @@ import {
 import type { Request } from 'express';
 import { OTP_TYPE } from '../../../../common/constants/otp.constants';
 import {
+  LOAN_COMMERCIAL_TERMS_PDF_FILENAME,
   LOAN_DOCUMENT_PDF_FILES,
   LOAN_DOCUMENT_TYPE,
 } from '../../../../common/constants/loan-document.constants';
@@ -187,9 +188,20 @@ export class AcceptLoanDocumentsUseCase {
       }
 
       const content = await this.kycFiles.readBytes(rel);
+
+      const merge = this.loanDocs.buildMergeInput({
+        customer: ctx.customer,
+        lead: ctx.lead,
+        application: ctx.application,
+      });
+      const commercialTerms = await this.loanDocs.generateCommercialTermsPdf(merge);
+
       await this.emailService.sendSanctionedLetterEmail(
         email,
-        [{ filename: LOAN_DOCUMENT_PDF_FILES[docType], content }],
+        [
+          { filename: LOAN_DOCUMENT_PDF_FILES[docType], content },
+          { filename: LOAN_COMMERCIAL_TERMS_PDF_FILENAME, content: commercialTerms },
+        ],
         { leadId },
       );
       this.logger.log(

@@ -96,9 +96,6 @@ function LoanDocumentsContent() {
             <h1 className="mb-2 text-2xl font-extrabold leading-[1.1] tracking-tight text-brand-navy md:text-[2.1rem]">
               Review your sanction letter
             </h1>
-            <p className="text-[0.95rem] leading-relaxed text-slate-500">
-              Read the Key Fact Statement. Legal acceptance happens later by eSign OTP.
-            </p>
             {error ? (
               <div className="mt-3">
                 <AlertBanner variant="error">{error}</AlertBanner>

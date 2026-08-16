@@ -70,3 +70,6 @@ export const LOAN_DOCUMENT_PDF_FILES: Record<LoanDocumentType, string> = {
   [LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT]: 'key-fact-statement-disbursement.pdf',
   [LOAN_DOCUMENT_TYPE.LOAN_AGREEMENT]: 'loan-agreement.pdf',
 };
+
+/** Loan cum Commercial Terms — emailed alongside the sanction letter, not persisted separately. */
+export const LOAN_COMMERCIAL_TERMS_PDF_FILENAME = 'loan-cum-commercial-terms.pdf';

@@ -3,7 +3,7 @@ import { PDFDocument } from 'pdf-lib';
 import { accessSync, constants, existsSync } from 'node:fs';
 import puppeteer from 'puppeteer';
 import { resolvePuppeteerExecutablePath } from '../utils/puppeteer-executable.util';
-import { renderLoanDocumentHtml } from './loan-document-html-render.util';
+import { renderLoanDocumentHtml, type LoanDocumentRenderOptions } from './loan-document-html-render.util';
 import type { LoanDocumentMergeInput } from './loan-document.types';
 import { BounceChargeTierResolverService } from '../loan/bounce-charge-tier.resolver';
 
@@ -15,17 +15,23 @@ export class LoanDocumentHtmlPdfGeneratorService {
 
   constructor(private readonly bounceChargeTiers: BounceChargeTierResolverService) {}
 
-  async generatePdf(merge: LoanDocumentMergeInput): Promise<Buffer> {
+  async generatePdf(
+    merge: LoanDocumentMergeInput,
+    options: LoanDocumentRenderOptions = {},
+  ): Promise<Buffer> {
     const needsTiers = merge.bounceChargeTiers == null;
     const needsPenal = merge.penalCharges == null;
     const context =
       needsTiers || needsPenal ? await this.bounceChargeTiers.loadContext() : null;
 
-    const html = await renderLoanDocumentHtml({
-      ...merge,
-      bounceChargeTiers: merge.bounceChargeTiers ?? context?.tiers,
-      penalCharges: merge.penalCharges ?? context?.penal,
-    });
+    const html = await renderLoanDocumentHtml(
+      {
+        ...merge,
+        bounceChargeTiers: merge.bounceChargeTiers ?? context?.tiers,
+        penalCharges: merge.penalCharges ?? context?.penal,
+      },
+      options,
+    );
     let rawPdf: Buffer;
     try {
       rawPdf = await this.htmlToPdfBuffer(html);

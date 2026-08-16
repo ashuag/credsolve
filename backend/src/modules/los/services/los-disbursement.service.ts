@@ -10,6 +10,7 @@ import {
   APPLICATION_STATUS,
 } from '../../../common/constants/application.constants';
 import {
+  LOAN_COMMERCIAL_TERMS_PDF_FILENAME,
   LOAN_DOCUMENT_PDF_FILES,
   LOAN_DOCUMENT_TYPE,
 } from '../../../common/constants/loan-document.constants';
@@ -571,9 +572,14 @@ export class LosDisbursementService {
       }
 
       const content = await this.kycFiles.readBytes(rel);
+      const commercialTerms = await this.loanDocs.generateCommercialTermsPdf(merge);
+
       await this.emailService.sendFinalSanctionLetterEmail(
         email,
-        [{ filename: LOAN_DOCUMENT_PDF_FILES[LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT], content }],
+        [
+          { filename: LOAN_DOCUMENT_PDF_FILES[LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT], content },
+          { filename: LOAN_COMMERCIAL_TERMS_PDF_FILENAME, content: commercialTerms },
+        ],
         { leadId: application.leadId },
       );
       this.logger.log(

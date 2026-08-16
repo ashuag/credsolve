@@ -52,12 +52,24 @@ export class LoanDocumentGeneratorService {
       }
     }
 
-    const pdf = await this.htmlPdfGenerator.generatePdf(preparedMerge);
+    const pdf = await this.htmlPdfGenerator.generatePdf(preparedMerge, {
+      section: 'sanction-kfs',
+      includeAcceptanceBlock: digitallySign,
+    });
     if (!digitallySign) {
       return { pdf, esigned: false };
     }
     const htmlStampRendered = Boolean(preparedMerge.lenderDscSignedAt);
     return this.signer.sign(pdf, { drawVisualStamp: !htmlStampRendered });
+  }
+
+  /**
+   * Loan cum Commercial Terms alone (Section C), plain — no NBFC DSC signature.
+   * Generated fresh at send time and attached alongside the sanction letter email;
+   * not persisted to storage and not shown in the customer's in-app review/eSign PDF.
+   */
+  async generateCommercialTermsPdf(merge: LoanDocumentMergeInput): Promise<Buffer> {
+    return this.htmlPdfGenerator.generatePdf(merge, { section: 'commercial-terms' });
   }
 
   pdfFileName(docType: LoanDocumentType): string {

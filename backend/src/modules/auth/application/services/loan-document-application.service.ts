@@ -334,6 +334,11 @@ export class LoanDocumentApplicationService {
     return `/auth/loan-documents/${docType}/pdf`;
   }
 
+  /** Loan cum Commercial Terms PDF, generated fresh (not persisted) for email attachment. */
+  async generateCommercialTermsPdf(merge: LoanDocumentMergeInput): Promise<Buffer> {
+    return this.generator.generateCommercialTermsPdf(merge);
+  }
+
   documentTitle(docType: LoanDocumentType): string {
     if (docType === LOAN_DOCUMENT_TYPE.KEY_FACT) {
       return 'Sanction letter cum Key Fact Statement (acceptance)';

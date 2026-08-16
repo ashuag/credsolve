@@ -1124,10 +1124,54 @@ th.teal-hdr { background: var(--teal); }
 
 </div><!-- /sec-b -->
 
+<!-- ============================================================
+     ACCEPTANCE / eSIGN BLOCK — appended only when the document
+     is emailed after OTP acceptance (see loan-document-html-render.util.ts).
+     Kept out of Sections A/B/C so the customer-facing preview never
+     shows blank signature fields.
+     ============================================================ -->
+<div class="doc-section" id="sec-close">
+  <div class="doc-closing-block">
+    <div class="sig-block">
+      <div class="sig-row">
+        <span class="sig-label">Digitally Signed by:</span>
+        <input type="text" id="sig_signed_by" class="field cf xl" placeholder="" title="Filled on eSign acceptance" autocomplete="off">
+      </div>
+      <div class="sig-row">
+        <span class="sig-label">Name:</span>
+        <input type="text" id="sig_name" class="field cf xl" placeholder="" title="Filled on eSign acceptance" autocomplete="off">
+      </div>
+      <div class="sig-row">
+        <span class="sig-label">IP Address:</span>
+        <input type="text" id="sig_ip" class="field lf sm" placeholder="" title="Captured at eSign acceptance" readonly style="color:var(--muted)">
+      </div>
+      <div class="sig-row">
+        <span class="sig-label">Timestamp:</span>
+        <input type="text" id="sig_ts" class="field lf md" placeholder="" title="Captured at eSign acceptance" readonly style="color:var(--muted)">
+      </div>
+    </div>
+
+    <div class="lender-dsc-stamp-wrap hidden" aria-hidden="true">
+      <div class="lender-dsc-stamp">
+        <img class="lender-dsc-logo" src="__LENDER_DSC_LOGO_SRC__" alt="Aasra Fincorp">
+        <div class="lender-dsc-body">
+          <div class="lender-dsc-muted">Digitally signed by</div>
+          <div class="lender-dsc-name"><input type="text" id="lender_dsc_signer" class="field fx" placeholder="Aasra Fincorp Pvt. Ltd." title="NBFC signer" autocomplete="off"></div>
+          <div class="lender-dsc-line">Date: <input type="text" id="lender_dsc_date" class="field fx" placeholder="On acceptance" title="DSC signing time" autocomplete="off"></div>
+          <div class="lender-dsc-line">DSC Serial: <input type="text" id="lender_dsc_serial" class="field fx" placeholder="Certificate serial" title="DSC serial number" autocomplete="off"></div>
+          <div class="lender-dsc-legal">Valid under the IT Act, 2000</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div><!-- /sec-close -->
+
 <div class="page-break" data-label="Loan cum Commercial Terms"></div>
 
 <!-- ============================================================
      SECTION C — LOAN CUM COMMERCIAL TERMS
+     (Emailed separately with the sanction letter; not shown in the
+     customer's in-app review/eSign PDF.)
      ============================================================ -->
 <div class="doc-section" id="sec-c">
   <div class="sec-band"><div class="sec-band-title">Loan cum Commercial Terms</div></div>
@@ -1311,40 +1355,6 @@ th.teal-hdr { background: var(--teal); }
   </div>
 
   <div class="accept-cta">"I Accept"</div>
-
-  <div class="doc-closing-block">
-    <div class="sig-block">
-      <div class="sig-row">
-        <span class="sig-label">Digitally Signed by:</span>
-        <input type="text" id="sig_signed_by" class="field cf xl" placeholder="" title="Filled on eSign acceptance" autocomplete="off">
-      </div>
-      <div class="sig-row">
-        <span class="sig-label">Name:</span>
-        <input type="text" id="sig_name" class="field cf xl" placeholder="" title="Filled on eSign acceptance" autocomplete="off">
-      </div>
-      <div class="sig-row">
-        <span class="sig-label">IP Address:</span>
-        <input type="text" id="sig_ip" class="field lf sm" placeholder="" title="Captured at eSign acceptance" readonly style="color:var(--muted)">
-      </div>
-      <div class="sig-row">
-        <span class="sig-label">Timestamp:</span>
-        <input type="text" id="sig_ts" class="field lf md" placeholder="" title="Captured at eSign acceptance" readonly style="color:var(--muted)">
-      </div>
-    </div>
-
-    <div class="lender-dsc-stamp-wrap hidden" aria-hidden="true">
-      <div class="lender-dsc-stamp">
-        <img class="lender-dsc-logo" src="__LENDER_DSC_LOGO_SRC__" alt="Aasra Fincorp">
-        <div class="lender-dsc-body">
-          <div class="lender-dsc-muted">Digitally signed by</div>
-          <div class="lender-dsc-name"><input type="text" id="lender_dsc_signer" class="field fx" placeholder="Aasra Fincorp Pvt. Ltd." title="NBFC signer" autocomplete="off"></div>
-          <div class="lender-dsc-line">Date: <input type="text" id="lender_dsc_date" class="field fx" placeholder="On acceptance" title="DSC signing time" autocomplete="off"></div>
-          <div class="lender-dsc-line">DSC Serial: <input type="text" id="lender_dsc_serial" class="field fx" placeholder="Certificate serial" title="DSC serial number" autocomplete="off"></div>
-          <div class="lender-dsc-legal">Valid under the IT Act, 2000</div>
-        </div>
-      </div>
-    </div>
-  </div>
 
 </div><!-- /sec-c -->
 
