@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class PostBureauBreCheckFromHtmlDto {
   @ApiProperty({
@@ -26,4 +26,15 @@ export class PostBureauBreCheckFromHtmlDto {
   @IsOptional()
   @IsBoolean()
   isExistingCustomer?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Applicant mobile for bureau phone-match dry-run (India: 10 digits, optional +91/0). When omitted, phone match is reported as skipped.',
+    example: '9876543210',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  @Matches(/^[\d+\-\s()]*$/, { message: 'applicantMobile must look like a phone number' })
+  applicantMobile?: string;
 }

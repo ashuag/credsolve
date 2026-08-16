@@ -46,6 +46,13 @@ import type { VerifyPanDto } from '../dto/verify-pan.dto';
 
 const INDIAN_MOBILE = /^[6-9]\d{9}$/;
 
+/** Last 10 digits so `+91` / leading `0` still compare equal. */
+function normalizeIndianMobile(raw: string): string | null {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length < 10) return null;
+  return digits.slice(-10);
+}
+
 const BUREAU_THANK_YOU_MESSAGE =
   'Thank you for your interest. Unfortunately, we are unable to proceed with your application at this time.';
 
@@ -300,6 +307,25 @@ export class VerifyPanUseCase {
       );
     }
 
+    // Pre-NSDL: reject when this PAN is already linked to a different (second) phone number.
+    const panPhoneConflict = await this.findPanLinkedToOtherPhone(panUpper, customer.id, customer.mobileNumber);
+    if (panPhoneConflict) {
+      this.logger.warn(
+        `PAN linked to second phone (leadId=${leadRow.id.toString()}): pan=******${panUpper.slice(-4)} existing=******${panPhoneConflict.mobileNumber.slice(-4)} source=${panPhoneConflict.source}`,
+      );
+      await this.rejectLead(
+        leadRow.id,
+        `PAN already linked to another phone ******${panPhoneConflict.mobileNumber.slice(-4)} (${panPhoneConflict.source}).`.slice(0, 256),
+        REJECTION_REASON.PAN_ALREADY_LINKED_TO_PHONE,
+      );
+      this.fireRejectionSms(customer.mobileNumber, leadRow.id);
+      return {
+        success: true,
+        rejected: true,
+        message: BUREAU_THANK_YOU_MESSAGE,
+      };
+    }
+
     const verification: PanVerificationResult = alreadyVerifiedSamePan
       ? VERIFIED_VENDOR_SKIPPED
       : await this.panVerification.verifyWithVendor({
@@ -506,6 +532,68 @@ export class VerifyPanUseCase {
       annualTurnover,
       annualProfit,
     };
+  }
+
+  /**
+   * True when another customer already has this PAN on a lead or DigiLocker KYC
+   * (and therefore a phone — `customer.mobile_number` is required). Current
+   * customer is excluded so same phone+PAN re-apply does not falsely reject.
+   */
+  /**
+   * Before NSDL: if this PAN already exists on another customer with a phone that
+   * differs from the current applicant mobile (a "second" phone), reject.
+   * Same customer / same phone may continue.
+   */
+  private async findPanLinkedToOtherPhone(
+    panNumber: string,
+    currentCustomerId: bigint,
+    currentMobile: string,
+  ): Promise<{ mobileNumber: string; source: 'lead_detail' | 'customer_kyc' } | null> {
+    const currentNorm = normalizeIndianMobile(currentMobile);
+    if (!currentNorm) {
+      return null;
+    }
+
+    const [otherLeads, otherKycs] = await Promise.all([
+      this.prisma.client.leadDetail.findMany({
+        where: {
+          panNumber,
+          lead: { customerId: { not: currentCustomerId } },
+        },
+        select: {
+          lead: { select: { customer: { select: { mobileNumber: true } } } },
+        },
+        take: 25,
+      }),
+      this.prisma.client.customerKyc.findMany({
+        where: {
+          panCardNumber: panNumber,
+          customerId: { not: currentCustomerId },
+        },
+        select: {
+          customer: { select: { mobileNumber: true } },
+        },
+        take: 25,
+      }),
+    ]);
+
+    for (const row of otherLeads) {
+      const mobile = row.lead?.customer?.mobileNumber?.trim() ?? '';
+      const otherNorm = normalizeIndianMobile(mobile);
+      if (otherNorm && otherNorm !== currentNorm) {
+        return { mobileNumber: mobile, source: 'lead_detail' };
+      }
+    }
+
+    for (const row of otherKycs) {
+      const mobile = row.customer?.mobileNumber?.trim() ?? '';
+      const otherNorm = normalizeIndianMobile(mobile);
+      if (otherNorm && otherNorm !== currentNorm) {
+        return { mobileNumber: mobile, source: 'customer_kyc' };
+      }
+    }
+
+    return null;
   }
 
   private async handlePanVerificationFailure(

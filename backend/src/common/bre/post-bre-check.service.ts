@@ -184,6 +184,8 @@ export class PostBreCheckService {
   async evaluateFromBureauPayload(input: {
     rawPayload: unknown;
     isExistingCustomer: boolean;
+    /** Optional; when set, dry-run evaluates bureau phone match against this mobile. */
+    applicantMobile?: string | null;
   }): Promise<PostBreDryRunResult> {
     const postBreRows = await this.loadPostBreRows();
     const thresholds = this.buildPostBreThresholds(postBreRows);
@@ -210,6 +212,37 @@ export class PostBreCheckService {
         : 'No bureau score found in payload.',
       meta: { cibilScore },
     });
+
+    const applicantMobile = input.applicantMobile?.trim() || null;
+    if (applicantMobile) {
+      const phoneCheck = this.checkBureauPhoneMatch(input.rawPayload, applicantMobile);
+      push({
+        id: 'bureau_phone_match',
+        label: 'Applicant phone matches bureau report',
+        passed: phoneCheck.passed,
+        rejectionReasonCode: phoneCheck.passed ? null : REJECTION_REASON.BUREAU_PHONE_MISMATCH,
+        detail: phoneCheck.detail,
+        meta: { applicantMobile },
+        findings: phoneCheck.passed
+          ? undefined
+          : [
+              {
+                title: 'Phone mismatch',
+                detail: phoneCheck.rejectReason,
+                data: { applicantMobile },
+              },
+            ],
+      });
+    } else {
+      push({
+        id: 'bureau_phone_match',
+        label: 'Applicant phone matches bureau report',
+        passed: true,
+        rejectionReasonCode: null,
+        detail: 'Skipped: no applicant mobile provided for dry-run comparison.',
+        meta: { applicantMobile: null },
+      });
+    }
 
     if (isCibilNewToCreditScore(cibilScore)) {
       push({
@@ -614,6 +647,7 @@ export class PostBreCheckService {
         where: { id: input.leadId },
         select: {
           leadDetail: { select: { panNumber: true, dateOfBirth: true } },
+          customer: { select: { mobileNumber: true } },
         },
       }),
     ]);
@@ -625,6 +659,16 @@ export class PostBreCheckService {
           passed: false,
           rejectReason: identityCheck.rejectReason,
           rejectionReasonCode: REJECTION_REASON.BUREAU_IDENTITY_MISMATCH,
+          cibilScore: bureauRow.cibilScore ?? null,
+        };
+      }
+
+      const phoneCheck = this.checkBureauPhoneMatch(bureauRow.rawPayload, lead.customer?.mobileNumber ?? null);
+      if (!phoneCheck.passed) {
+        return {
+          passed: false,
+          rejectReason: phoneCheck.rejectReason,
+          rejectionReasonCode: REJECTION_REASON.BUREAU_PHONE_MISMATCH,
           cibilScore: bureauRow.cibilScore ?? null,
         };
       }
@@ -855,6 +899,57 @@ export class PostBreCheckService {
     return { passed: true, rejectReason: '' };
   }
 
+  /**
+   * Rejects when the bureau report lists phone number(s) and none match the applicant mobile.
+   * Skipped (passes) when the report has no phone data or the applicant has no usable mobile —
+   * same missing-data pattern as PAN/DOB identity checks.
+   */
+  private checkBureauPhoneMatch(
+    rawPayload: unknown,
+    applicantMobile: string | null,
+  ): { passed: boolean; rejectReason: string; detail: string | null } {
+    let reportData: ReturnType<typeof extractCibilReportData>;
+    try {
+      reportData = extractCibilReportData(rawPayload);
+    } catch {
+      return { passed: true, rejectReason: '', detail: 'Bureau payload could not be parsed for phones; skipped.' };
+    }
+
+    const normalizedApplicant = normalizePhoneForMatch(applicantMobile ?? '');
+    if (!normalizedApplicant) {
+      return { passed: true, rejectReason: '', detail: 'No usable applicant mobile; phone match skipped.' };
+    }
+
+    const reportNumbers = reportData.phones
+      .map((p) => normalizePhoneForMatch(p.number))
+      .filter((n): n is string => Boolean(n));
+    if (reportNumbers.length === 0) {
+      return { passed: true, rejectReason: '', detail: 'No phone numbers on bureau report; phone match skipped.' };
+    }
+
+    const reportedNumbers = [...new Set(reportData.phones.map((p) => p.number).filter(Boolean))].join(', ');
+
+    if (reportNumbers.includes(normalizedApplicant)) {
+      this.logger.log(
+        `Bureau phone match: application mobile ${applicantMobile} found among bureau number(s) ${reportedNumbers}.`,
+      );
+      return {
+        passed: true,
+        rejectReason: '',
+        detail: `Applicant mobile ${applicantMobile} matches bureau-reported number(s) ${reportedNumbers}.`,
+      };
+    }
+
+    this.logger.warn(
+      `Bureau phone mismatch: application mobile ${applicantMobile} not found among bureau number(s) ${reportedNumbers}.`,
+    );
+    return {
+      passed: false,
+      rejectReason: `Bureau phone mismatch: application mobile ${applicantMobile} does not match bureau-reported number(s) ${reportedNumbers}.`,
+      detail: `Bureau phone mismatch: application mobile ${applicantMobile} does not match bureau-reported number(s) ${reportedNumbers}.`,
+    };
+  }
+
   private async findLatestBureauReportForLead(leadId: bigint): Promise<{
     cibilScore: number | null;
     rawPayload: unknown;
@@ -972,3 +1067,10 @@ export class PostBreCheckService {
 }
 
 export type PostBreThresholds = import('./post-bre-rules.catalog').PostBreThresholdsSnapshot;
+
+/** Strips non-digits and keeps the last 10 so `+91`/`0`-prefixed bureau numbers still compare equal. */
+function normalizePhoneForMatch(raw: string): string | null {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length < 10) return null;
+  return digits.slice(-10);
+}

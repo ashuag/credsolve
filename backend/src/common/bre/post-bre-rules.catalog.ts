@@ -113,6 +113,27 @@ export function buildPostBreRulesCatalog(thresholds: PostBreThresholdsSnapshot):
       notes: null,
     },
     {
+      id: 'bureau_phone_match',
+      label: 'Applicant phone matches bureau report',
+      category: 'diagnostic',
+      informationalOnly: false,
+      alwaysEvaluated: true,
+      toggleCriteriaKey: null,
+      criteriaKeys: [],
+      rejectionReasonCode: REJECTION_REASON.BUREAU_PHONE_MISMATCH,
+      condition:
+        'Applicant mobile (customer.mobile_number) does not match any BorrowerTelephone.PhoneNumber on the bureau report (last-10-digit compare after stripping +91 / leading 0 / non-digits).',
+      passCondition:
+        'At least one bureau phone matches the applicant mobile, or either side has no usable phone data (skipped).',
+      dataSources: [
+        'customer.mobile_number',
+        'TrueLinkCreditReport → Borrower → BorrowerTelephone → PhoneNumber.Number',
+      ],
+      tuefReference: 'Borrower telephone segment (PhoneType 01/02/03)',
+      notes:
+        'Production always evaluates after bureau pull. Dry-run evaluates when applicantMobile is supplied; otherwise reports skipped.',
+    },
+    {
       id: EC.CIBIL_MIN_NEW,
       label: 'Minimum CIBIL score (new customer)',
       category: 'score',

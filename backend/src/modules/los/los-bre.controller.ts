@@ -75,6 +75,7 @@ export class LosBreController {
     return this.postBreCheck.evaluateFromBureauPayload({
       rawPayload: body.bureauPayload,
       isExistingCustomer: body.isExistingCustomer ?? false,
+      applicantMobile: body.applicantMobile ?? null,
     });
   }
 
@@ -99,6 +100,7 @@ export class LosBreController {
     const result = await this.postBreCheck.evaluateFromBureauPayload({
       rawPayload: bureauPayload,
       isExistingCustomer: body.isExistingCustomer ?? false,
+      applicantMobile: body.applicantMobile ?? null,
     });
 
     return {

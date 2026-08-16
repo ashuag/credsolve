@@ -10,6 +10,7 @@ export function PostBreHtmlPanel() {
   const [filename, setFilename] = useState<string | null>(null);
   const [htmlText, setHtmlText] = useState('');
   const [isExistingCustomer, setIsExistingCustomer] = useState(false);
+  const [applicantMobile, setApplicantMobile] = useState('');
   const [loading, setLoading] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [result, setResult] = useState<PostBreFromHtmlResult | null>(null);
@@ -65,6 +66,7 @@ export function PostBreHtmlPanel() {
         html: htmlText,
         filename: filename ?? undefined,
         isExistingCustomer,
+        applicantMobile: applicantMobile.trim() || null,
       });
       setResult(response);
     } catch (error) {
@@ -114,6 +116,21 @@ export function PostBreHtmlPanel() {
               {htmlText ? ` · ${(htmlText.length / 1024).toFixed(1)} KB` : null}
             </p>
           ) : null}
+        </label>
+
+        <label className="grid gap-1.5">
+          <span className="text-[0.84rem] font-bold text-brand-muted">
+            Applicant mobile (optional — bureau phone match)
+          </span>
+          <input
+            type="text"
+            inputMode="tel"
+            className="los-input font-mono text-[0.88rem]"
+            value={applicantMobile}
+            onChange={(event) => setApplicantMobile(event.target.value)}
+            placeholder="9876543210"
+            maxLength={20}
+          />
         </label>
 
         <label className="flex cursor-pointer items-center gap-2 text-[0.88rem] font-semibold text-brand-navy">

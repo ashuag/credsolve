@@ -171,9 +171,18 @@ function CibilReportUnavailable({
   );
 }
 
-function PostBreView({ rawPayload }: { rawPayload: unknown }) {
+function PostBreView({
+  rawPayload,
+  applicantMobile: applicantMobileProp,
+  applicationUuid,
+}: {
+  rawPayload: unknown;
+  applicantMobile?: string;
+  applicationUuid?: string;
+}) {
   const [result, setResult] = useState<PostBreDryRunResult | null>(null);
   const [isExistingCustomer, setIsExistingCustomer] = useState(false);
+  const [applicantMobile, setApplicantMobile] = useState(applicantMobileProp?.trim() ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -188,9 +197,20 @@ function PostBreView({ rawPayload }: { rawPayload: unknown }) {
     setError(null);
     setResult(null);
     try {
+      let mobile = applicantMobile.trim();
+      if (!mobile && applicationUuid) {
+        try {
+          const details = await getApplicationDetails(token, applicationUuid);
+          mobile = details.mobileNumber?.trim() ?? '';
+          if (mobile) setApplicantMobile(mobile);
+        } catch {
+          // non-blocking — phone match will be skipped if mobile stays empty
+        }
+      }
       const res = await runPostBureauBreCheck(token, {
         bureauPayload: rawPayload as Record<string, unknown>,
         isExistingCustomer,
+        applicantMobile: mobile || null,
       });
       setResult(res);
     } catch (e) {
@@ -208,6 +228,18 @@ function PostBreView({ rawPayload }: { rawPayload: unknown }) {
           <p className="m-0 mt-0.5 text-[0.8rem] text-brand-muted">Runs all post-bureau rules against the stored bureau payload.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <label className="grid gap-1">
+            <span className="text-[0.72rem] font-bold text-brand-muted">Applicant mobile</span>
+            <input
+              type="text"
+              inputMode="tel"
+              className="los-input min-h-9 w-[11rem] font-mono text-[0.84rem]"
+              value={applicantMobile}
+              onChange={(e) => setApplicantMobile(e.target.value)}
+              placeholder="9876543210"
+              maxLength={20}
+            />
+          </label>
           <label className="flex cursor-pointer items-center gap-2 text-[0.84rem] font-semibold text-brand-navy">
             <input
               type="checkbox"
@@ -394,7 +426,13 @@ export function ApplicationCibilReportTab({
       </nav>
 
       {activeView === 'report' ? <CibilReportViewer payload={payload} pdfDownloadUrl={pdfDownloadUrl} /> : null}
-      {activeView === 'bre' ? <PostBreView rawPayload={payload.rawPayload} /> : null}
+      {activeView === 'bre' ? (
+        <PostBreView
+          rawPayload={payload.rawPayload}
+          applicantMobile={mobileNumber}
+          applicationUuid={applicationUuid}
+        />
+      ) : null}
       {activeView === 'json' ? <CibilJsonViewer rawPayload={payload.rawPayload} /> : null}
     </div>
   );

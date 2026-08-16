@@ -231,6 +231,7 @@ export function PostBreResultsSummary({ result }: { result: PostBreDryRunResult 
 export function PostBureauBrePanel() {
   const [jsonText, setJsonText] = useState('');
   const [isExistingCustomer, setIsExistingCustomer] = useState(false);
+  const [applicantMobile, setApplicantMobile] = useState('');
   const [loading, setLoading] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
@@ -266,6 +267,7 @@ export function PostBureauBrePanel() {
       const response = await runPostBureauBreCheck(token, {
         bureauPayload,
         isExistingCustomer,
+        applicantMobile: applicantMobile.trim() || null,
       });
       setResult(response);
     } catch (error) {
@@ -300,6 +302,21 @@ export function PostBureauBrePanel() {
             onChange={(event) => setJsonText(event.target.value)}
             placeholder='{"requestId":"...","data":{"cibilData":{...}}}'
             spellCheck={false}
+          />
+        </label>
+
+        <label className="grid gap-1.5">
+          <span className="text-[0.84rem] font-bold text-brand-muted">
+            Applicant mobile (optional — bureau phone match)
+          </span>
+          <input
+            type="text"
+            inputMode="tel"
+            className="los-input font-mono text-[0.88rem]"
+            value={applicantMobile}
+            onChange={(event) => setApplicantMobile(event.target.value)}
+            placeholder="9876543210"
+            maxLength={20}
           />
         </label>
 

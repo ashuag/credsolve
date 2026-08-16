@@ -1,17 +1,18 @@
 import './globals.css';
 import type {Metadata, Viewport} from 'next';
-import {Inter} from 'next/font/google';
+import localFont from 'next/font/local';
 import {ReactNode} from 'react';
 import {CustomerUtmBootstrap} from '@/components/auth/customer-utm-bootstrap';
 import { LayoutWrapper } from '@/components/layout/LayoutWrapper';
 import {CustomerSessionProvider} from '@/components/providers/customer-session-provider';
 import { MAX_LOAN_DISPLAY } from '@/lib/brand';
 
-const inter = Inter({
-    subsets: ['latin'],
+const inter = localFont({
+    src: './fonts/Inter-Variable.ttf',
+    weight: '100 900',
     display: 'swap',
     variable: '--font-inter',
-    adjustFontFallback: true,
+    adjustFontFallback: 'Arial',
 });
 
 export const metadata: Metadata = {

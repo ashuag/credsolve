@@ -250,7 +250,11 @@ export async function fetchPostBreRulesCatalog(token: string): Promise<PostBreRu
 
 export async function runPostBureauBreCheck(
   token: string,
-  body: { bureauPayload: Record<string, unknown>; isExistingCustomer: boolean },
+  body: {
+    bureauPayload: Record<string, unknown>;
+    isExistingCustomer: boolean;
+    applicantMobile?: string | null;
+  },
 ): Promise<PostBreDryRunResult> {
   return authorizedLosRequest<PostBreDryRunResult>(
     token,
@@ -278,7 +282,12 @@ export type PostBreFromHtmlResult = PostBreDryRunResult & {
 
 export async function runPostBureauBreCheckFromHtml(
   token: string,
-  body: { html: string; filename?: string; isExistingCustomer: boolean },
+  body: {
+    html: string;
+    filename?: string;
+    isExistingCustomer: boolean;
+    applicantMobile?: string | null;
+  },
 ): Promise<PostBreFromHtmlResult> {
   return authorizedLosRequest<PostBreFromHtmlResult>(
     token,

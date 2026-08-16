@@ -1,16 +1,16 @@
-import { Hanken_Grotesk, Sora } from 'next/font/google';
+import localFont from 'next/font/local';
 import type { Metadata } from 'next';
 
-const sora = Sora({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
+const sora = localFont({
+  src: '../fonts/Sora-Variable.ttf',
+  weight: '100 800',
   variable: '--font-sora',
   display: 'swap',
 });
 
-const hanken = Hanken_Grotesk({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+const hanken = localFont({
+  src: '../fonts/HankenGrotesk-Variable.ttf',
+  weight: '100 900',
   variable: '--font-hanken',
   display: 'swap',
 });
