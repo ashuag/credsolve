@@ -20,9 +20,12 @@ import { CibilVendorFetchCheckDto } from './dto/cibil-vendor-fetch-check.dto';
 import { FaceLivenessCheckDto } from './dto/face-liveness-check.dto';
 import { KycFaceMatchCheckDto } from './dto/kyc-face-match-check.dto';
 import { ListVendorApiLogsQueryDto } from './dto/list-vendor-api-logs-query.dto';
+import { TenacioFaceLivenessCheckDto } from './dto/tenacio-face-liveness-check.dto';
+import { TenacioFaceMatchCheckDto } from './dto/tenacio-face-match-check.dto';
 import { LosCibilDevToolsService } from './services/los-cibil-dev-tools.service';
 import { LosFaceLivenessDevToolsService } from './services/los-face-liveness-dev-tools.service';
 import { LosKycDevToolsService } from './services/los-kyc-dev-tools.service';
+import { LosTenacioFaceDevToolsService } from './services/los-tenacio-face-dev-tools.service';
 import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
 
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
@@ -35,6 +38,7 @@ export class LosDeveloperToolsController {
     private readonly cibilDevTools: LosCibilDevToolsService,
     private readonly kycDevTools: LosKycDevToolsService,
     private readonly faceLivenessDevTools: LosFaceLivenessDevToolsService,
+    private readonly tenacioFaceDevTools: LosTenacioFaceDevToolsService,
     private readonly vendorApiLogs: LosVendorApiLogService,
   ) {}
 
@@ -121,6 +125,50 @@ export class LosDeveloperToolsController {
       file,
       link: body.link,
       usePdf: body.usePdf,
+    });
+  }
+
+  @Post('tenacio-face-liveness-check')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_IMAGE_BYTES } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Live Tenacio face-liveness check',
+    description:
+      'Calls the Tenacio liveness endpoint directly using TENACIO_* env config. Tenacio fetches the selfie itself from a public URL — an uploaded file is first pushed to S3 (dev-tools/los-uploads/…) and resolved to a URL; a link is used as-is. The call is live and audited in vendor_api_log; no lead or KYC record is created or updated.',
+  })
+  async tenacioFaceLivenessCheck(
+    @UploadedFile() file: UploadedFileLike | undefined,
+    @Body() body: TenacioFaceLivenessCheckDto,
+  ) {
+    return this.tenacioFaceDevTools.runFaceLivenessCheck(body, file);
+  }
+
+  @Post('tenacio-face-match-check')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'file1', maxCount: 1 },
+        { name: 'file2', maxCount: 1 },
+      ],
+      { limits: { fileSize: MAX_IMAGE_BYTES } },
+    ),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Live Tenacio face-match check',
+    description:
+      'Calls the Tenacio face-match endpoint directly using TENACIO_* env config. Tenacio fetches both photos itself from public URLs — uploaded files are first pushed to S3 (dev-tools/los-uploads/…) and resolved to URLs; links are used as-is. The call is live and audited in vendor_api_log; no lead or KYC record is created or updated.',
+  })
+  async tenacioFaceMatchCheck(
+    @UploadedFiles()
+    files: { file1?: UploadedFileLike[]; file2?: UploadedFileLike[] } | undefined,
+    @Body() body: TenacioFaceMatchCheckDto,
+  ) {
+    return this.tenacioFaceDevTools.runFaceMatchCheck(body, {
+      file1: files?.file1?.[0],
+      file2: files?.file2?.[0],
     });
   }
 }

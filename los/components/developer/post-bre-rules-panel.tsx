@@ -170,7 +170,7 @@ function UnsecuredExposureSection({ guide }: { guide: PostBreUnsecuredExposureGu
     <section className="grid gap-3">
       <div>
         <h2 className="m-0 text-[1rem] font-extrabold tracking-[-0.03em] text-brand-navy">
-          Open unsecured loans & pre-approved offer
+          Unsecured loans & pre-approved offer
         </h2>
         <p className="m-0 mt-1 text-[0.82rem] leading-[1.5] text-brand-muted">
           <span className="font-semibold text-[#7c3aed]">{guide.phaseLabel}</span> — {guide.summary}
@@ -179,7 +179,7 @@ function UnsecuredExposureSection({ guide }: { guide: PostBreUnsecuredExposureGu
 
       <div className="grid gap-2 rounded-[12px] border border-[rgba(20,150,243,0.18)] bg-[rgba(20,150,243,0.05)] p-4 text-[0.8rem] leading-[1.5] text-brand-text">
         <p className="m-0">
-          <strong className="text-brand-navy">Max exposure (tier driver):</strong> {guide.maxExposureDefinition}
+          <strong className="text-brand-navy">Max open exposure (inspection):</strong> {guide.maxExposureDefinition}
         </p>
         <p className="m-0">
           <strong className="text-brand-navy">Total exposure:</strong> {guide.totalExposureDefinition}
@@ -243,7 +243,7 @@ function UnsecuredExposureSection({ guide }: { guide: PostBreUnsecuredExposureGu
           <thead>
             <tr className="bg-[rgba(248,250,255,0.95)] text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
               <th className="px-2.5 py-2">#</th>
-              <th className="px-2.5 py-2">Max open unsecured band</th>
+              <th className="px-2.5 py-2">Total unsecured band</th>
               <th className="px-2.5 py-2">Max bullet loan</th>
               <th className="px-2.5 py-2">Active</th>
             </tr>

@@ -327,7 +327,7 @@ export function CreditLimitEligibilityPanel() {
         <div>
           <h2 className="m-0 text-[1.15rem] font-extrabold tracking-[-0.03em]">Credit Limit Eligibility Check</h2>
           <p className="m-0 mt-1 max-w-[70ch] text-[0.86rem] leading-[1.5] text-brand-muted">
-            Manage the unsecured credit-limit tiers used to determine approved bullet-loan ceilings and rule priority during eligibility checks.
+            Manage the unsecured credit-limit tiers used to determine approved bullet-loan ceilings. Bands are matched against total unsecured tradeline exposure (open and closed).
           </p>
         </div>
 

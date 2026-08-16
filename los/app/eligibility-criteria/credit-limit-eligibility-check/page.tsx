@@ -5,7 +5,7 @@ export default function CreditLimitEligibilityCheckPage() {
   return (
     <CrmShell
       title="Credit Limit Eligibility Check"
-      subtitle="Edit unsecured credit-limit tiers and active status used during eligibility decisions."
+      subtitle="Edit unsecured credit-limit tiers matched against total unsecured tradeline exposure (open and closed)."
     >
       <CreditLimitEligibilityPanel />
     </CrmShell>

@@ -32,8 +32,8 @@ export class CheckLoanEligibilityUseCase {
   ) {}
 
   /**
-   * Pre-approved ceiling from the latest bureau pull: max open unsecured tradeline exposure
-   * → `credit_limit_tier.max_bullet_loan`, clamped to product min/max loan settings.
+   * Pre-approved ceiling from the latest bureau pull: total unsecured tradeline exposure
+   * (open + closed) → `credit_limit_tier.max_bullet_loan`, clamped to product min/max loan settings.
    */
   async computeForLead(leadId: bigint): Promise<LoanEligibilityResult> {
     await this.assertLeadEligibleForOffer(leadId);
@@ -44,8 +44,8 @@ export class CheckLoanEligibilityUseCase {
       throw new ForbiddenException(LOAN_OFFER_UNAVAILABLE_MESSAGE);
     }
 
-    const { totalOpenUnsecuredExposureInr } = computeOpenUnsecuredExposureBreakdown(rawPayload);
-    const tier = await this.creditLimitTiers.resolveMaxBulletLoan(totalOpenUnsecuredExposureInr);
+    const { totalUnsecuredExposureInr } = computeOpenUnsecuredExposureBreakdown(rawPayload);
+    const tier = await this.creditLimitTiers.resolveMaxBulletLoan(totalUnsecuredExposureInr);
     if (!tier) {
       throw new ForbiddenException(LOAN_OFFER_UNAVAILABLE_MESSAGE);
     }

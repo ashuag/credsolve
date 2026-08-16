@@ -94,6 +94,7 @@ export type PostBreDryRunResult = {
   checks: PostBreRuleCheck[];
   inspection: PostBreInspection;
   unsecuredExposure: {
+    totalUnsecuredExposureInr: number;
     totalOpenUnsecuredExposureInr: number;
     maxOpenUnsecuredExposureInr: number;
   } | null;
@@ -101,6 +102,7 @@ export type PostBreDryRunResult = {
     preApprovedAmountInr: number;
     minLoanAmountInr: number;
     maxLoanAmountInr: number;
+    totalUnsecuredExposureInr: number;
     totalOpenUnsecuredExposureInr: number;
     maxOpenUnsecuredExposureInr: number;
   } | null;
@@ -125,6 +127,7 @@ export type OpenUnsecuredTradelineRow = {
   accountTypeLabel: string;
   dateOpened: string | null;
   dateClosed: string | null;
+  isOpen: boolean;
   exposureInr: number;
   drivesTier: boolean;
 };
@@ -133,6 +136,7 @@ export type PreApprovedOfferDryRunResult = {
   cibilScore: number | null;
   maxOpenUnsecuredExposureInr: number;
   totalOpenUnsecuredExposureInr: number;
+  totalUnsecuredExposureInr: number;
   openUnsecuredTradelines: OpenUnsecuredTradelineRow[];
   tier: {
     tierId: number;

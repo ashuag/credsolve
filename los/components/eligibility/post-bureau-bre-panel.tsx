@@ -152,7 +152,15 @@ export function PostBreResultsSummary({ result }: { result: PostBreDryRunResult 
 
       {result.unsecuredExposure && (
         <div className="rounded-[14px] border border-[rgba(20,150,243,0.22)] bg-[rgba(20,150,243,0.06)] px-4 py-4 grid gap-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div>
+              <p className="m-0 text-[0.7rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
+                Total Unsecured Loan
+              </p>
+              <p className="m-0 mt-0.5 text-[1.1rem] font-extrabold text-brand-navy">
+                ₹{result.unsecuredExposure.totalUnsecuredExposureInr.toLocaleString('en-IN')}
+              </p>
+            </div>
             <div>
               <p className="m-0 text-[0.7rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
                 Total Open Unsecured Loan
@@ -181,8 +189,10 @@ export function PostBreResultsSummary({ result }: { result: PostBreDryRunResult 
                   ₹{result.creditLimit.preApprovedAmountInr.toLocaleString('en-IN')}
                 </p>
                 <p className="m-0 mt-1 text-[0.82rem] text-brand-muted">
-                  Product range: ₹{result.creditLimit.minLoanAmountInr.toLocaleString('en-IN')} –{' '}
-                  ₹{result.creditLimit.maxLoanAmountInr.toLocaleString('en-IN')}
+                  From total unsecured ₹
+                  {result.creditLimit.totalUnsecuredExposureInr.toLocaleString('en-IN')}. Product range: ₹
+                  {result.creditLimit.minLoanAmountInr.toLocaleString('en-IN')} – ₹
+                  {result.creditLimit.maxLoanAmountInr.toLocaleString('en-IN')}
                 </p>
               </div>
             </div>

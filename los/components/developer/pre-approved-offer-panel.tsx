@@ -54,8 +54,8 @@ export function PreApprovedOfferPanel() {
   return (
     <div className="grid gap-5">
       <p className="m-0 text-[0.88rem] leading-[1.55] text-brand-muted">
-        Paste bureau JSON to see each open unsecured account, total vs max exposure, the matching credit-limit tier,
-        and pre-approved offer (same logic as customer loan eligibility after bureau pull).
+        Paste bureau JSON to see each unsecured account (open and closed), total exposure, the matching credit-limit
+        tier, and pre-approved offer (same logic as customer loan eligibility after bureau pull).
       </p>
 
       <form onSubmit={handleSubmit} className="grid gap-3">
@@ -114,21 +114,27 @@ export function PreApprovedOfferPanel() {
 
           <section className="rounded-[14px] border border-[rgba(23,44,113,0.1)] bg-white p-4">
             <h3 className="m-0 text-[0.8rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-              Open unsecured exposure
+              Unsecured exposure
             </h3>
             <p className="m-0 mt-2 text-[0.78rem] leading-[1.5] text-brand-muted">
-              Tier lookup uses the <strong className="font-bold text-brand-navy">largest single</strong> open
-              unsecured exposure (not the sum).
+              Tier lookup uses the <strong className="font-bold text-brand-navy">sum of all unsecured</strong>{' '}
+              tradelines (open and closed), not open-only and not the largest single account.
             </p>
-            <dl className="m-0 mt-3 grid gap-2 text-[0.84rem] sm:grid-cols-2">
+            <dl className="m-0 mt-3 grid gap-2 text-[0.84rem] sm:grid-cols-3">
+              <div className="rounded-[10px] bg-[rgba(20,150,243,0.06)] p-3">
+                <dt className="font-bold text-brand-muted">Total unsecured (tier driver)</dt>
+                <dd className="m-0 mt-1 text-[1.1rem] font-extrabold text-brand-navy">
+                  {formatInr(result.totalUnsecuredExposureInr)}
+                </dd>
+              </div>
               <div className="rounded-[10px] bg-[rgba(248,250,255,0.9)] p-3">
-                <dt className="font-bold text-brand-muted">Total (all open unsecured)</dt>
+                <dt className="font-bold text-brand-muted">Total open unsecured</dt>
                 <dd className="m-0 mt-1 text-[1.1rem] font-extrabold text-brand-navy">
                   {formatInr(result.totalOpenUnsecuredExposureInr)}
                 </dd>
               </div>
-              <div className="rounded-[10px] bg-[rgba(20,150,243,0.06)] p-3">
-                <dt className="font-bold text-brand-muted">Max (tier driver)</dt>
+              <div className="rounded-[10px] bg-[rgba(248,250,255,0.9)] p-3">
+                <dt className="font-bold text-brand-muted">Max single open</dt>
                 <dd className="m-0 mt-1 text-[1.1rem] font-extrabold text-brand-navy">
                   {formatInr(result.maxOpenUnsecuredExposureInr)}
                 </dd>
@@ -143,24 +149,22 @@ export function PreApprovedOfferPanel() {
                       <th className="py-2 pr-3">Lender</th>
                       <th className="py-2 pr-3">Account</th>
                       <th className="py-2 pr-3">Type</th>
+                      <th className="py-2 pr-3">Status</th>
                       <th className="py-2 pr-3 whitespace-nowrap">Opened</th>
                       <th className="py-2 pr-3 whitespace-nowrap">Closed</th>
                       <th className="py-2 pr-3 text-right">Exposure</th>
-                      <th className="py-2 text-right">Tier</th>
                     </tr>
                   </thead>
                   <tbody>
                     {result.openUnsecuredTradelines.map((row, idx) => (
                       <tr
                         key={`${row.creditorName}-${row.accountNumber}-${idx}`}
-                        className={cx(
-                          'border-b border-[rgba(23,44,113,0.06)]',
-                          row.drivesTier && 'bg-[rgba(20,150,243,0.05)]',
-                        )}
+                        className="border-b border-[rgba(23,44,113,0.06)]"
                       >
                         <td className="py-2.5 pr-3 font-semibold text-brand-navy">{row.creditorName}</td>
                         <td className="py-2.5 pr-3 font-mono text-[0.75rem] text-brand-text">{row.accountNumber}</td>
                         <td className="py-2.5 pr-3 text-brand-text">{row.accountTypeLabel}</td>
+                        <td className="py-2.5 pr-3 text-brand-text">{row.isOpen ? 'Open' : 'Closed'}</td>
                         <td className="py-2.5 pr-3 whitespace-nowrap text-brand-text">
                           {row.dateOpened ?? '—'}
                         </td>
@@ -170,33 +174,23 @@ export function PreApprovedOfferPanel() {
                         <td className="py-2.5 pr-3 text-right font-semibold text-brand-navy">
                           {formatInr(row.exposureInr)}
                         </td>
-                        <td className="py-2.5 text-right">
-                          {row.drivesTier ? (
-                            <span className="rounded-full bg-[rgba(20,150,243,0.12)] px-2 py-0.5 text-[0.68rem] font-extrabold uppercase text-brand-blue">
-                              Driver
-                            </span>
-                          ) : (
-                            <span className="text-brand-muted">—</span>
-                          )}
-                        </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr className="font-bold text-brand-navy">
-                      <td className="pt-3 pr-3" colSpan={5}>
+                      <td className="pt-3 pr-3" colSpan={6}>
                         Total ({result.openUnsecuredTradelines.length} account
                         {result.openUnsecuredTradelines.length === 1 ? '' : 's'})
                       </td>
-                      <td className="pt-3 pr-3 text-right">{formatInr(result.totalOpenUnsecuredExposureInr)}</td>
-                      <td className="pt-3" />
+                      <td className="pt-3 pr-3 text-right">{formatInr(result.totalUnsecuredExposureInr)}</td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
             ) : (
               <p className="m-0 mt-3 text-[0.84rem] font-semibold text-brand-muted">
-                No open unsecured tradelines found in bureau JSON.
+                No unsecured tradelines found in bureau JSON.
               </p>
             )}
           </section>

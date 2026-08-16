@@ -61,13 +61,13 @@ export function buildPostBreUnsecuredExposureGuide(input: {
   return {
     phaseLabel: 'After bureau (pre-approved offer)',
     summary:
-      'Total open unsecured exposure is a post-BRE pass/fail gate (MIN_UNSECURED_LOAN_AMOUNT). After post-BRE passes, max/total exposure also drives credit-limit tier lookup and the pre-approved bullet loan amount.',
+      'Total open unsecured exposure is a post-BRE pass/fail gate (MIN_UNSECURED_LOAN_AMOUNT). After post-BRE passes, total unsecured exposure (open + closed) drives credit-limit tier lookup and the pre-approved bullet loan amount.',
     maxExposureDefinition:
-      'maxOpenUnsecuredExposureInr = maximum exposure (INR) among all open tradelines whose TUEF account type is in the unsecured set (Appendix E). This value is shown for inspection.',
+      'maxOpenUnsecuredExposureInr = maximum exposure (INR) among open unsecured tradelines. Inspection only — not used for the offer.',
     totalExposureDefinition:
-      'totalOpenUnsecuredExposureInr = sum of exposure on every open unsecured tradeline. Post-BRE rejects when this is below MIN_UNSECURED_LOAN_AMOUNT; credit-limit tier lookup also uses this total.',
+      'totalUnsecuredExposureInr = sum of exposure on every unsecured tradeline (open and closed). This is the credit-limit tier lookup input. totalOpenUnsecuredExposureInr is the open-only sum used by MIN_UNSECURED_LOAN_AMOUNT.',
     tierSelectionRule:
-      'First active credit_limit_tier (sortOrder asc) where minUnsecuredLoan ≤ max exposure ≤ maxUnsecuredLoan (null max = no upper bound).',
+      'First active credit_limit_tier (sortOrder asc) where minUnsecuredLoan ≤ total unsecured exposure ≤ maxUnsecuredLoan (null max = no upper bound).',
     preApprovedFormula:
       'preApprovedAmountInr = clamp(tier.maxBulletLoan, min_loan_amount, max_loan_amount) from eligibility criteria / BRE settings.',
     minLoanAmountInr: input.minLoanAmountInr,

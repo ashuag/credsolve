@@ -12,6 +12,7 @@ export type PreApprovedOfferDryRunResult = {
   cibilScore: number | null;
   maxOpenUnsecuredExposureInr: number;
   totalOpenUnsecuredExposureInr: number;
+  totalUnsecuredExposureInr: number;
   openUnsecuredTradelines: OpenUnsecuredTradelineRow[];
   tier: {
     tierId: number;
@@ -36,21 +37,23 @@ export class PreApprovedOfferDryRunService {
     const parsed = parseTenacioBureauVendorBody(rawPayload);
     const bounds = await loadLoanAmountBounds(this.prisma);
     const exposure = computeOpenUnsecuredExposureBreakdown(rawPayload);
+    const totalUnsecuredExposureInr = exposure.totalUnsecuredExposureInr;
     const maxOpenUnsecuredExposureInr = exposure.maxOpenUnsecuredExposureInr;
-    const resolved = await this.creditLimitTiers.resolveMaxBulletLoan(maxOpenUnsecuredExposureInr);
+    const resolved = await this.creditLimitTiers.resolveMaxBulletLoan(totalUnsecuredExposureInr);
 
     if (!resolved) {
       return {
         cibilScore: parsed.bureauScore,
         maxOpenUnsecuredExposureInr,
         totalOpenUnsecuredExposureInr: exposure.totalOpenUnsecuredExposureInr,
+        totalUnsecuredExposureInr,
         openUnsecuredTradelines: exposure.lines,
         tier: null,
         preApprovedAmountInr: null,
         minLoanAmountInr: bounds.minLoanAmountInr,
         maxLoanAmountInr: bounds.maxLoanAmountInr,
         detail:
-          'No active credit-limit tier matches max open unsecured exposure. Check Credit Limit Eligibility tiers in Configuration.',
+          'No active credit-limit tier matches total unsecured exposure. Check Credit Limit Eligibility tiers in Configuration.',
       };
     }
 
@@ -70,6 +73,7 @@ export class PreApprovedOfferDryRunService {
       cibilScore: parsed.bureauScore,
       maxOpenUnsecuredExposureInr,
       totalOpenUnsecuredExposureInr: exposure.totalOpenUnsecuredExposureInr,
+      totalUnsecuredExposureInr,
       openUnsecuredTradelines: exposure.lines,
       tier: tierRow
         ? {

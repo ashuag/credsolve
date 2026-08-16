@@ -9,6 +9,8 @@ export const DEVELOPER_TOOL_LINKS = [
   { href: '/developer-tools/post-bre-rules', label: 'Post BRE Rules' },
   { href: '/developer-tools/kyc-face-match-check', label: 'KYC Face Match Check' },
   { href: '/developer-tools/face-liveness-check', label: 'Surepass Face Liveness' },
+  { href: '/developer-tools/tenacio-face-liveness-check', label: 'Tenacio Face Liveness' },
+  { href: '/developer-tools/tenacio-face-match-check', label: 'Tenacio Face Match' },
   { href: '/developer-tools/vendor-api-logs', label: 'Vendor API Logs' },
 ] as const;
 

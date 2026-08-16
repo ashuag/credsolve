@@ -208,43 +208,47 @@ export type OpenUnsecuredTradelineRow = {
   accountTypeLabel: string;
   dateOpened: string | null;
   dateClosed: string | null;
+  isOpen: boolean;
   exposureInr: number;
-  /** True when this line's exposure equals the max used for tier lookup. */
+  /** @deprecated Tier lookup uses the sum of all unsecured lines, not a single driver. */
   drivesTier: boolean;
 };
 
 export type OpenUnsecuredExposureBreakdown = {
   lines: OpenUnsecuredTradelineRow[];
-  /** Sum of exposure across all open unsecured tradelines. */
+  /** Sum of exposure across every unsecured tradeline (open + closed). Pre-approved tier input. */
+  totalUnsecuredExposureInr: number;
+  /** Sum of exposure across open unsecured tradelines (post-BRE MIN_UNSECURED_LOAN_AMOUNT). */
   totalOpenUnsecuredExposureInr: number;
-  /** Largest single open unsecured exposure (tier lookup input). */
+  /** Largest single open unsecured exposure (inspection only). */
   maxOpenUnsecuredExposureInr: number;
 };
 
+const EMPTY_UNSECURED_EXPOSURE: OpenUnsecuredExposureBreakdown = {
+  lines: [],
+  totalUnsecuredExposureInr: 0,
+  totalOpenUnsecuredExposureInr: 0,
+  maxOpenUnsecuredExposureInr: 0,
+};
+
 /**
- * Lists each open unsecured tradeline with exposure, plus total (sum) and max (tier driver).
+ * Lists every unsecured tradeline with exposure, plus total (all / open) and max open.
  */
 export function computeOpenUnsecuredExposureBreakdown(body: unknown): OpenUnsecuredExposureBreakdown {
   const root = asRecord(body);
-  if (!root) {
-    return { lines: [], totalOpenUnsecuredExposureInr: 0, maxOpenUnsecuredExposureInr: 0 };
-  }
+  if (!root) return EMPTY_UNSECURED_EXPOSURE;
 
   const data = asRecord(root.data);
   const cibilData = data ? asRecord(data.cibilData) : null;
   const gcr = cibilData ? asRecord(cibilData.GetCustomerAssetsResponse) : null;
   const success = gcr ? asRecord(gcr.GetCustomerAssetsSuccess) : null;
-  if (!success) {
-    return { lines: [], totalOpenUnsecuredExposureInr: 0, maxOpenUnsecuredExposureInr: 0 };
-  }
+  if (!success) return EMPTY_UNSECURED_EXPOSURE;
 
   let asset = success.Asset;
   if (Array.isArray(asset)) asset = asset[0];
   const assetRec = asRecord(asset);
   const tlr = assetRec ? asRecord(assetRec.TrueLinkCreditReport) : null;
-  if (!tlr) {
-    return { lines: [], totalOpenUnsecuredExposureInr: 0, maxOpenUnsecuredExposureInr: 0 };
-  }
+  if (!tlr) return EMPTY_UNSECURED_EXPOSURE;
 
   const rows: OpenUnsecuredTradelineRow[] = [];
 
@@ -262,7 +266,7 @@ export function computeOpenUnsecuredExposureBreakdown(body: unknown): OpenUnsecu
       if (!lineRec) continue;
 
       const parsed = parseCibilTradeline(rawLine, partitionSymbol);
-      if (!parsed || !parsed.isUnsecured || !parsed.isOpen) continue;
+      if (!parsed || !parsed.isUnsecured) continue;
 
       const accountNumber = String(lineRec.accountNumber ?? '').trim() || '-';
       const dateOpened = formatTradelineDateDisplay(lineRec.dateOpened ?? lineRec.DateOpened);
@@ -274,6 +278,7 @@ export function computeOpenUnsecuredExposureBreakdown(body: unknown): OpenUnsecu
         accountTypeLabel: accountTypeLabel(parsed.accountTypeSymbol),
         dateOpened,
         dateClosed,
+        isOpen: parsed.isOpen,
         exposureInr: parsed.exposureInr,
         drivesTier: false,
       });
@@ -282,29 +287,27 @@ export function computeOpenUnsecuredExposureBreakdown(body: unknown): OpenUnsecu
 
   rows.sort((a, b) => b.exposureInr - a.exposureInr);
 
-  let max = 0;
-  let total = 0;
+  let totalUnsecured = 0;
+  let totalOpen = 0;
+  let maxOpen = 0;
   for (const row of rows) {
-    total += row.exposureInr;
-    if (row.exposureInr > max) max = row.exposureInr;
-  }
-
-  if (max > 0) {
-    for (const row of rows) {
-      if (row.exposureInr === max) row.drivesTier = true;
+    totalUnsecured += row.exposureInr;
+    if (row.isOpen) {
+      totalOpen += row.exposureInr;
+      if (row.exposureInr > maxOpen) maxOpen = row.exposureInr;
     }
   }
 
   return {
     lines: rows,
-    totalOpenUnsecuredExposureInr: total,
-    maxOpenUnsecuredExposureInr: max,
+    totalUnsecuredExposureInr: totalUnsecured,
+    totalOpenUnsecuredExposureInr: totalOpen,
+    maxOpenUnsecuredExposureInr: maxOpen,
   };
 }
 
 /**
  * Maximum exposure (INR) across open, unsecured tradelines.
- * Used to select a row from `credit_limit_tier` (`min_unsecured_loan` … `max_unsecured_loan`).
  */
 export function computeMaxOpenUnsecuredExposureInr(body: unknown): number {
   return computeOpenUnsecuredExposureBreakdown(body).maxOpenUnsecuredExposureInr;

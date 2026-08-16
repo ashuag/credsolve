@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 export type ResolvedCreditLimitTier = {
   tierId: number;
   maxBulletLoan: number;
+  /** Exposure used to pick the band (total unsecured, open + closed). */
   maxOpenUnsecuredExposureInr: number;
 };
 
@@ -12,11 +13,11 @@ export class CreditLimitTierResolverService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Pick the active tier whose unsecured band contains `maxOpenUnsecuredExposureInr`.
+   * Pick the active tier whose unsecured band contains `unsecuredExposureInr`.
    * Tiers are ordered by `sortOrder` ascending; first match wins.
    */
-  async resolveMaxBulletLoan(maxOpenUnsecuredExposureInr: number): Promise<ResolvedCreditLimitTier | null> {
-    const exposure = Math.max(0, Math.floor(maxOpenUnsecuredExposureInr));
+  async resolveMaxBulletLoan(unsecuredExposureInr: number): Promise<ResolvedCreditLimitTier | null> {
+    const exposure = Math.max(0, Math.floor(unsecuredExposureInr));
     const tiers = await this.prisma.client.creditLimitTier.findMany({
       where: { isActive: true },
       orderBy: { sortOrder: 'asc' },

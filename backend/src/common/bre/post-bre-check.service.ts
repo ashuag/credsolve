@@ -105,6 +105,7 @@ export type PostBreDryRunResult = {
   inspection: PostBreInspection;
   /** Always populated when the bureau payload is parseable. */
   unsecuredExposure: {
+    totalUnsecuredExposureInr: number;
     totalOpenUnsecuredExposureInr: number;
     maxOpenUnsecuredExposureInr: number;
   } | null;
@@ -113,6 +114,7 @@ export type PostBreDryRunResult = {
     preApprovedAmountInr: number;
     minLoanAmountInr: number;
     maxLoanAmountInr: number;
+    totalUnsecuredExposureInr: number;
     totalOpenUnsecuredExposureInr: number;
     maxOpenUnsecuredExposureInr: number;
   } | null;
@@ -567,6 +569,7 @@ export class PostBreCheckService {
 
     let creditLimit: PostBreDryRunResult['creditLimit'] = null;
     const unsecuredExposure: PostBreDryRunResult['unsecuredExposure'] = {
+      totalUnsecuredExposureInr: exposure.totalUnsecuredExposureInr,
       totalOpenUnsecuredExposureInr: exposure.totalOpenUnsecuredExposureInr,
       maxOpenUnsecuredExposureInr: exposure.maxOpenUnsecuredExposureInr,
     };
@@ -574,7 +577,7 @@ export class PostBreCheckService {
       try {
         const [bounds, tier] = await Promise.all([
           loadLoanAmountBounds(this.prisma),
-          this.creditLimitTiers.resolveMaxBulletLoan(exposure.totalOpenUnsecuredExposureInr),
+          this.creditLimitTiers.resolveMaxBulletLoan(exposure.totalUnsecuredExposureInr),
         ]);
         if (tier) {
           const pre = Math.min(Math.max(tier.maxBulletLoan, bounds.minLoanAmountInr), bounds.maxLoanAmountInr);
@@ -582,6 +585,7 @@ export class PostBreCheckService {
             preApprovedAmountInr: pre,
             minLoanAmountInr: bounds.minLoanAmountInr,
             maxLoanAmountInr: bounds.maxLoanAmountInr,
+            totalUnsecuredExposureInr: exposure.totalUnsecuredExposureInr,
             totalOpenUnsecuredExposureInr: exposure.totalOpenUnsecuredExposureInr,
             maxOpenUnsecuredExposureInr: exposure.maxOpenUnsecuredExposureInr,
           };

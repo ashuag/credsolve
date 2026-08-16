@@ -314,7 +314,7 @@ export function buildPostBreRulesCatalog(thresholds: PostBreThresholdsSnapshot):
       ],
       tuefReference: 'Appendix E unsecured account types',
       notes:
-        'Uses totalOpenUnsecuredExposureInr (sum of every open unsecured tradeline), not max. Aligns with credit-limit tier lookup input.',
+        'Uses totalOpenUnsecuredExposureInr (sum of every open unsecured tradeline). Pre-approved offer uses total unsecured (open + closed), not this open-only total.',
     },
     {
       id: EC.REJECTED_CREDIT_ASSESSMENT_GRADES,
