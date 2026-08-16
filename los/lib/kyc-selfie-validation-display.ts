@@ -43,6 +43,9 @@ export function formatSelfieFaceValidationSummary(row: {
       v.meanFaceLuminance != null ? ` (${formatLaplacianVariance(v.meanFaceLuminance)} mean luminance)` : '';
     return `Failed · too dark${mean}`;
   }
+  if (v.eyesOpenPassed === false) return 'Failed · eyes closed';
+  if (v.faceNotMaskedPassed === false) return 'Failed · mask detected';
+  if (v.aiModifiedPassed === false) return 'Failed · image looks digitally altered';
   return `Failed · computed ${formatConfidencePercent(v.bestComputedConfidence)}`;
 }
 

@@ -1,5 +1,7 @@
 'use client';
 
+import { DatetimeRangeFilter } from '@/components/ui/datetime-range-filter';
+import { matchesDatetimeRange } from '@/lib/datetime-range';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 export const LOS_TABLE_PAGE_SIZE = 20;
@@ -8,7 +10,7 @@ export type SortDirection = 'asc' | 'desc';
 export type SortState<T extends string = string> = { key: T; dir: SortDirection } | null;
 export type ColumnFilters = Partial<Record<string, string>>;
 
-export type DataTableFilterType = 'text' | 'select' | 'date' | 'number';
+export type DataTableFilterType = 'text' | 'select' | 'date' | 'datetime-range' | 'number';
 
 export type DataTableColumnFilterConfig<T> = {
   type: DataTableFilterType;
@@ -184,6 +186,17 @@ export function DataTableColumnFilter({
         onChange={(e) => onChange(e.target.value)}
         className={FILTER_CONTROL_CLASS}
         aria-label={ariaLabel ?? placeholder ?? 'Filter by date'}
+      />
+    );
+  }
+
+  if (type === 'datetime-range') {
+    return (
+      <DatetimeRangeFilter
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder ?? 'Date & time'}
+        aria-label={ariaLabel ?? placeholder ?? 'Filter by date and time range'}
       />
     );
   }
@@ -371,6 +384,9 @@ function defaultColumnMatches<T, K extends string>(
   const raw = column.getFilterValue?.(item);
   if (filter.type === 'date') {
     return isoDateKey(raw == null ? null : String(raw)) === filterValue;
+  }
+  if (filter.type === 'datetime-range') {
+    return matchesDatetimeRange(raw, filterValue);
   }
   if (filter.type === 'number') {
     const target = Number(filterValue);

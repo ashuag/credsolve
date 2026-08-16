@@ -145,6 +145,10 @@ export type LosSelfieFaceValidation = {
   minMeanFaceLuminanceRequired: number;
   maxDarkPixelRatioAllowed: number;
   lightingPassed: boolean | null;
+  eyesOpenPassed: boolean | null;
+  eyeAspectRatio: number | null;
+  faceNotMaskedPassed: boolean | null;
+  aiModifiedPassed: boolean | null;
   confidenceBreakdown: {
     detection: number;
     faceSize: number;

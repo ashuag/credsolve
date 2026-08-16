@@ -38,6 +38,12 @@ export function toPersistedSelfieFaceInspection(
     minMeanFaceLuminanceRequired: inspection.minMeanFaceLuminanceRequired,
     maxDarkPixelRatioAllowed: inspection.maxDarkPixelRatioAllowed,
     lightingPassed: inspection.lightingPassed,
+    eyesOpenPassed: inspection.eyesOpenPassed,
+    eyeAspectRatio: inspection.eyeAspectRatio,
+    eyePupilDarkness: inspection.eyePupilDarkness,
+    faceNotMaskedPassed: inspection.faceNotMaskedPassed,
+    lipSeamStrength: inspection.lipSeamStrength,
+    aiModifiedPassed: inspection.aiModifiedPassed,
     topDetectionScore: topScore,
     checkedAt: new Date().toISOString(),
   };
@@ -57,6 +63,12 @@ export type PersistedSelfieFaceValidation = {
   minMeanFaceLuminanceRequired: number;
   maxDarkPixelRatioAllowed: number;
   lightingPassed: boolean | null;
+  eyesOpenPassed: boolean | null;
+  eyeAspectRatio: number | null;
+  eyePupilDarkness: number | null;
+  faceNotMaskedPassed: boolean | null;
+  lipSeamStrength: number | null;
+  aiModifiedPassed: boolean | null;
   confidenceBreakdown: {
     detection: number;
     faceSize: number;
@@ -87,6 +99,12 @@ export function parsePersistedSelfieFaceValidation(
       minMeanFaceLuminanceRequired: KYC_SELFIE_MIN_MEAN_FACE_LUMINANCE,
       maxDarkPixelRatioAllowed: KYC_SELFIE_MAX_DARK_PIXEL_RATIO,
       lightingPassed: null,
+      eyesOpenPassed: null,
+      eyeAspectRatio: null,
+      eyePupilDarkness: null,
+      faceNotMaskedPassed: null,
+      lipSeamStrength: null,
+      aiModifiedPassed: null,
       confidenceBreakdown: null,
     };
   }
@@ -130,6 +148,12 @@ export function parsePersistedSelfieFaceValidation(
         ? row.maxDarkPixelRatioAllowed
         : KYC_SELFIE_MAX_DARK_PIXEL_RATIO,
     lightingPassed: typeof row.lightingPassed === 'boolean' ? row.lightingPassed : null,
+    eyesOpenPassed: typeof row.eyesOpenPassed === 'boolean' ? row.eyesOpenPassed : null,
+    eyeAspectRatio: typeof row.eyeAspectRatio === 'number' ? row.eyeAspectRatio : null,
+    eyePupilDarkness: typeof row.eyePupilDarkness === 'number' ? row.eyePupilDarkness : null,
+    faceNotMaskedPassed: typeof row.faceNotMaskedPassed === 'boolean' ? row.faceNotMaskedPassed : null,
+    lipSeamStrength: typeof row.lipSeamStrength === 'number' ? row.lipSeamStrength : null,
+    aiModifiedPassed: typeof row.aiModifiedPassed === 'boolean' ? row.aiModifiedPassed : null,
     confidenceBreakdown,
   };
 }

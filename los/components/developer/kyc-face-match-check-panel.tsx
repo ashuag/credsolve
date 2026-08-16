@@ -18,10 +18,42 @@ function formatQualityScore(value: number | null | undefined): string {
   return `${(value * 100).toFixed(1)}%`;
 }
 
+function passFail(value: boolean | null | undefined, pass: string, fail: string) {
+  if (value == null) return { value: '—', tone: undefined as 'ok' | 'bad' | undefined };
+  return value
+    ? { value: pass, tone: 'ok' as const }
+    : { value: fail, tone: 'bad' as const };
+}
+
 function buildPhotoQualityExtraRows(quality: PhotoQualityChecks) {
+  const blur = passFail(quality.blurPassed, 'Pass', 'Fail (too blurry)');
+  const lighting = passFail(
+    quality.lightingPassed,
+    'Pass (skin-tone aware)',
+    'Fail (too dark / crushed blacks)',
+  );
+  const eyes = passFail(quality.eyesOpenPassed, 'Open', 'Fail (eyes closed)');
+  const mask = passFail(quality.faceNotMaskedPassed, 'No mask', 'Fail (mask / mouth covered)');
+  const ai = passFail(quality.aiModifiedPassed, 'Pass', 'Fail (looks digitally altered)');
+  const liveness = passFail(
+    quality.passiveLivenessPassed,
+    'Pass (still-image gates)',
+    'Fail',
+  );
+  const identity = passFail(
+    quality.identityMatchPassed,
+    'Person correctly identified',
+    'Fail (does not match Aadhaar)',
+  );
+
   return [
     {
-      label: 'Photo quality score',
+      label: 'Passive liveness',
+      value: liveness.value,
+      tone: liveness.tone,
+    },
+    {
+      label: 'AI check confidence',
       value: formatQualityScore(quality.qualityScore),
       tone:
         quality.qualityScore != null && quality.qualityScore >= 0.55
@@ -32,25 +64,13 @@ function buildPhotoQualityExtraRows(quality: PhotoQualityChecks) {
     },
     {
       label: 'Blur check',
-      value:
-        quality.blurPassed == null ? '—' : quality.blurPassed ? 'Pass' : 'Fail (too blurry)',
-      tone:
-        quality.blurPassed === true ? ('ok' as const) : quality.blurPassed === false ? ('bad' as const) : undefined,
+      value: blur.value,
+      tone: blur.tone,
     },
     {
-      label: 'Lighting (underexposure)',
-      value:
-        quality.lightingPassed == null
-          ? '—'
-          : quality.lightingPassed
-            ? 'Pass (skin-tone aware)'
-            : 'Fail (too dark / crushed blacks)',
-      tone:
-        quality.lightingPassed === true
-          ? ('ok' as const)
-          : quality.lightingPassed === false
-            ? ('bad' as const)
-            : undefined,
+      label: 'Lighting',
+      value: lighting.value,
+      tone: lighting.tone,
     },
     {
       label: 'Dual face check',
@@ -60,14 +80,34 @@ function buildPhotoQualityExtraRows(quality: PhotoQualityChecks) {
       tone: quality.dualFaceDetected ? ('bad' as const) : ('ok' as const),
     },
     {
-      label: 'Full face detected',
+      label: 'Full face visible',
       value: quality.fullFaceDetected ? 'Yes' : 'No',
       tone: quality.fullFaceDetected ? ('ok' as const) : ('bad' as const),
     },
     {
-      label: 'Face not covered',
+      label: 'No face covering',
       value: quality.faceNotCovered ? 'Yes' : 'No',
       tone: quality.faceNotCovered ? ('ok' as const) : ('bad' as const),
+    },
+    {
+      label: 'No masking',
+      value: mask.value,
+      tone: mask.tone,
+    },
+    {
+      label: 'Eyes open',
+      value: eyes.value,
+      tone: eyes.tone,
+    },
+    {
+      label: 'AI-modified image',
+      value: ai.value,
+      tone: ai.tone,
+    },
+    {
+      label: 'Person correctly identified',
+      value: identity.value,
+      tone: identity.tone,
     },
     {
       label: 'Mean face luminance',
@@ -104,7 +144,95 @@ function buildPhotoQualityExtraRows(quality: PhotoQualityChecks) {
           ? '—'
           : quality.inspection.laplacianVariance.toFixed(1),
     },
+    {
+      label: 'Eye aspect ratio',
+      value:
+        quality.inspection.eyeAspectRatio == null
+          ? '—'
+          : quality.inspection.eyeAspectRatio.toFixed(3),
+    },
   ];
+}
+
+function buildAdvisoryReferenceRows(quality: PhotoQualityChecks) {
+  const blur = passFail(quality.blurPassed, 'Pass', 'Fail (too blurry — allowed on government ID)');
+  const lighting = passFail(
+    quality.lightingPassed,
+    'Pass',
+    'Fail (too dark — allowed on government ID)',
+  );
+  const identity = passFail(
+    quality.identityMatchPassed,
+    'Person correctly identified',
+    'Fail (does not match selfie)',
+  );
+  return [
+    {
+      label: 'Quality gates KYC?',
+      value: 'No — advisory only. Face match still runs.',
+    },
+    {
+      label: 'Photo quality',
+      value: quality.ok ? 'Pass' : 'Failed (allowed for government photo)',
+      tone: quality.ok ? ('ok' as const) : ('default' as const),
+    },
+    {
+      label: 'Blur check',
+      value: blur.value,
+      tone: quality.blurPassed === false ? ('default' as const) : blur.tone,
+    },
+    {
+      label: 'Lighting',
+      value: lighting.value,
+      tone: quality.lightingPassed === false ? ('default' as const) : lighting.tone,
+    },
+    {
+      label: 'Face found for matching',
+      value: quality.fullFaceDetected
+        ? `Yes${quality.faceCount > 0 ? ` (${quality.faceCount})` : ''}`
+        : 'No',
+      tone: quality.fullFaceDetected ? ('ok' as const) : ('bad' as const),
+    },
+    {
+      label: 'AI check confidence',
+      value: formatQualityScore(quality.qualityScore),
+    },
+    {
+      label: 'Person correctly identified',
+      value: identity.value,
+      tone: identity.tone,
+    },
+  ];
+}
+
+function IdentityReferenceCard({ quality }: { quality: PhotoQualityChecks }) {
+  return (
+    <div className="grid gap-2">
+      <KycFaceMatchResultCard
+        result={{
+          configured: true,
+          ok: true,
+          httpStatus: null,
+          vendor: quality.inspection,
+          businessOk: true,
+          summary: {},
+        }}
+        sectionTitle="Aadhaar / ID (identity reference)"
+        rawJsonLabel="Aadhaar inspection JSON"
+        showHttpRows={false}
+        passLabel={
+          quality.ok
+            ? 'Identity reference — quality does not gate face match'
+            : 'Photo quality failed — allowed for government ID; face match still runs'
+        }
+        failLabel="Identity reference — quality does not gate face match"
+        extraRows={buildAdvisoryReferenceRows(quality)}
+      />
+      {quality.reason && !quality.ok ? (
+        <p className="m-0 text-[0.84rem] leading-[1.5] text-brand-muted">{quality.reason}</p>
+      ) : null}
+    </div>
+  );
 }
 
 function PhotoQualityResultCard({
@@ -128,8 +256,8 @@ function PhotoQualityResultCard({
         sectionTitle={title}
         rawJsonLabel="Photo inspection JSON"
         showHttpRows={false}
-        passLabel="Photo quality would pass"
-        failLabel="Photo quality would fail"
+        passLabel="Selfie quality would pass"
+        failLabel="Selfie quality would fail"
         extraRows={buildPhotoQualityExtraRows(quality)}
       />
       {quality.reason && !quality.ok ? (
@@ -491,9 +619,11 @@ export function KycFaceMatchCheckPanel() {
   return (
     <div className="grid gap-5">
       <p className="m-0 text-[0.88rem] leading-[1.55] text-brand-muted">
-        Local face-api only (no Tenacio). Both photos are checked for <strong>quality score</strong>,{' '}
-        <strong>blur</strong>, <strong>lighting</strong> (not too dark), <strong>full face</strong>, and{' '}
-        <strong>no covering</strong>, then matched. For each side choose <strong>Upload image</strong>, capture a{' '}
+        Local face-api only (no Tenacio). The <strong>Aadhaar / ID</strong> photo is an identity
+        reference — government scans are often blurry, so photo quality may fail and that is
+        allowed. Face match still runs against the selfie. The <strong>selfie</strong> is checked
+        for liveness, blur, lighting, dual face, full face, covering, mask, eyes open, AI-modified
+        image, and confidence. For each side choose <strong>Upload image</strong>, capture a{' '}
         <strong>Selfie</strong>, or paste a <strong>URL</strong>.
       </p>
 
@@ -508,8 +638,8 @@ export function KycFaceMatchCheckPanel() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <FaceMatchSideInput
-          label="Reference photo (url1)"
-          hint="Document / Aadhaar / ID photo"
+          label="Reference photo (Aadhaar / ID)"
+          hint="Government ID — quality may fail; face match still runs"
           mode={reference.mode}
           onModeChange={reference.setMode}
           previewUrl={reference.preview}
@@ -528,8 +658,8 @@ export function KycFaceMatchCheckPanel() {
           cameraError={selfieSide === 'reference' ? cameraError : null}
         />
         <FaceMatchSideInput
-          label="Probe photo (url2)"
-          hint="Live selfie or second face to compare"
+          label="Probe photo (selfie)"
+          hint="Live selfie — liveness, quality, covering, and AI checks run here"
           mode={probe.mode}
           onModeChange={probe.setMode}
           previewUrl={probe.preview}
@@ -555,14 +685,14 @@ export function KycFaceMatchCheckPanel() {
         onClick={() => void handleRunCheck()}
         className="w-fit cursor-pointer rounded-[12px] bg-brand-blue px-5 py-2.5 text-[0.88rem] font-extrabold text-white disabled:opacity-60"
       >
-        {loading ? 'Running quality + face match…' : 'Run quality + face match'}
+        {loading ? 'Running selfie checks + face match…' : 'Run selfie checks + face match'}
       </button>
 
       {result ? (
         <div className="grid gap-4">
           <div className="grid gap-4 lg:grid-cols-2">
-            <PhotoQualityResultCard title="Reference photo quality (Aadhaar)" quality={result.referenceQuality} />
-            <PhotoQualityResultCard title="Probe photo quality (selfie)" quality={result.probeQuality} />
+            <IdentityReferenceCard quality={result.referenceQuality} />
+            <PhotoQualityResultCard title="Selfie quality + liveness" quality={result.probeQuality} />
           </div>
 
           {result.local ? (
@@ -586,10 +716,21 @@ export function KycFaceMatchCheckPanel() {
               {result.local.reason && !result.local.matchPassed ? (
                 <p className="m-0 text-[0.84rem] leading-[1.5] text-brand-text">{result.local.reason}</p>
               ) : null}
+              {!result.probeQuality.ok ? (
+                <p className="m-0 text-[0.84rem] leading-[1.5] text-brand-muted">
+                  Selfie quality or liveness failed. Face match still ran so you can inspect the
+                  score; the overall check still fails until the selfie passes.
+                </p>
+              ) : !result.referenceQuality.ok ? (
+                <p className="m-0 text-[0.84rem] leading-[1.5] text-brand-muted">
+                  Aadhaar photo quality failed (typical for government scans). Face match still ran
+                  and is what decides identity.
+                </p>
+              ) : null}
             </>
           ) : (
             <p className="m-0 text-[0.84rem] text-brand-muted">
-              Face match skipped — fix photo quality first (blur / lighting / full face / covering / quality score).
+              Face match could not run. Check the server logs or try again with JPEG photos.
             </p>
           )}
 

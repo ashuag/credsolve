@@ -41,7 +41,7 @@ export function FinancialFields({
           <SearchableCityInput id="currentCity" name="currentCity"
             value={fields.currentCity ?? ''} onChange={onCityChange}
             className={inputCls(Boolean(errors.currentCity))}
-            placeholder={cityFromPincode ? 'Auto-filled from pincode' : 'Type 2+ chars to search city'}
+            placeholder={cityFromPincode ? 'Auto-filled from pincode' : 'Enter your city'}
             disabled={cityFromPincode || isLookingUpPincode}
             ariaInvalid={Boolean(errors.currentCity)} ariaDescribedBy={errors.currentCity ? 'currentCity-error' : undefined} />
           {errors.currentCity && <p id="currentCity-error" className="text-[#b2372d] text-[0.75rem] pl-1 font-medium m-0">{errors.currentCity}</p>}

@@ -178,10 +178,10 @@ export function BureauReportsPanel() {
     {
       key: 'fetched',
       label: 'Fetched',
-      headerClassName: 'whitespace-nowrap',
+      headerClassName: 'min-w-[168px] whitespace-nowrap',
       getFilterValue: (row) => row.fetchedAt,
       getSortValue: (row) => isoDateTimestamp(row.fetchedAt),
-      filter: { type: 'date' },
+      filter: { type: 'datetime-range', placeholder: 'Date & time' },
       cellClassName: 'text-brand-muted text-[0.78rem] whitespace-nowrap',
       render: (row) => formatDateTime(row.fetchedAt),
     },

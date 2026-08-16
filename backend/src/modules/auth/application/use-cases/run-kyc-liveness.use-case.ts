@@ -20,7 +20,6 @@ import {
 } from '../../../../common/kyc/kyc-selfie-face-inspection-persist.util';
 import type { KycSelfieFaceInspection } from '../../../../common/kyc/kyc-selfie-face-validation.util';
 import {
-  summarizePhotoQuality,
   type PhotoQualityChecks,
 } from '../../../../common/kyc/kyc-photo-quality-summary.util';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
@@ -58,7 +57,10 @@ export type RunKycLivenessResult = {
   bestComputedConfidence?: number | null;
   /** Per-gate blur / lighting / dual-face / framing verdicts for the captured selfie. */
   selfieQuality?: KycPhotoQualitySummary;
-  /** Same gates run against the DigiLocker Aadhaar photo (advisory — the customer cannot retake it). */
+  /**
+   * Identity-reference metadata for the DigiLocker Aadhaar photo.
+   * Quality and liveness are not applied — the customer cannot retake it.
+   */
   aadhaarQuality?: KycPhotoQualitySummary;
   /** MoneyCash active liveness (head movement) recorded by `POST kyc/liveness-video`. */
   headMovementPassed?: boolean;
@@ -310,23 +312,6 @@ export class RunKycLivenessUseCase {
           faceValidationPassed: false,
           faceValidationMessage: isInfraFailure ? reason : `${reason} ${KYC_SELFIE_FACE_RETRY_HINT}`,
           suggestRetrySelfie: !isInfraFailure,
-          bestComputedConfidence,
-          selfieQuality,
-          aadhaarQuality,
-        };
-      }
-
-      // Retaking the selfie cannot fix the Aadhaar photo, so this is reported as a match failure
-      // rather than a capture problem.
-      if (!verification.referenceQuality.ok) {
-        const reason =
-          verification.referenceQuality.reason ??
-          'Your Aadhaar photo could not be read clearly enough to compare faces.';
-        return {
-          ok: false,
-          faceValidationPassed: true,
-          faceMatchPassed: false,
-          faceMatchMessage: reason,
           bestComputedConfidence,
           selfieQuality,
           aadhaarQuality,

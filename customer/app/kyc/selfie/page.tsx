@@ -699,7 +699,13 @@ function selfieQualityIssues(quality: KycPhotoQualitySummary): Array<{ title: st
   if (!quality.faceNotCovered) {
     issues.push({
       title: 'Face is covered',
-      hint: 'Remove masks, sunglasses, hats, or anything covering your eyes, nose, or mouth.',
+      hint: 'Remove sunglasses, hats, or anything covering your eyes, nose, or mouth.',
+    });
+  }
+  if (quality.faceNotMaskedPassed === false) {
+    issues.push({
+      title: 'Mask detected',
+      hint: 'Remove any mask covering your mouth and try again.',
     });
   }
   if (quality.blurPassed === false) {
@@ -712,6 +718,18 @@ function selfieQualityIssues(quality: KycPhotoQualitySummary): Array<{ title: st
     issues.push({
       title: 'Lighting is too dark',
       hint: 'Move to a brighter place and face a window or lamp so your face is clearly lit.',
+    });
+  }
+  if (quality.eyesOpenPassed === false) {
+    issues.push({
+      title: 'Eyes look closed',
+      hint: 'Keep both eyes open and look straight at the camera.',
+    });
+  }
+  if (quality.aiModifiedPassed === false) {
+    issues.push({
+      title: 'Photo looks digitally altered',
+      hint: 'Capture a live selfie from your camera. Do not use a filter, screenshot, or AI image.',
     });
   }
 

@@ -39,7 +39,7 @@ describe('validateKycSelfieFaceDetections', () => {
     }
   });
 
-  it('rejects multiple qualifying faces', () => {
+  it('rejects multiple qualifying faces of comparable size', () => {
     const result = validateKycSelfieFaceDetections({
       detections: [sampleFace(), sampleFace({ box: { x: 40, y: 40, width: 200, height: 240 } })],
       imageWidth: 720,
@@ -49,6 +49,29 @@ describe('validateKycSelfieFaceDetections', () => {
     if (!result.ok) {
       expect(result.reason).toMatch(/only one person/i);
     }
+  });
+
+  it('ignores a small background face (e.g. a framed photo on the wall)', () => {
+    // Primary face fills 360x420 of a 720x720 frame; the second detection is ~1/16th its area,
+    // representative of a framed photo or poster visible behind the subject.
+    const result = validateKycSelfieFaceDetections({
+      detections: [
+        sampleFace(),
+        sampleFace({
+          score: 0.6,
+          box: { x: 550, y: 40, width: 60, height: 70 },
+          landmarks: {
+            leftEye: { x: 565, y: 65 },
+            rightEye: { x: 595, y: 65 },
+            noseTip: { x: 580, y: 85 },
+            mouthCenter: { x: 580, y: 100 },
+          },
+        }),
+      ],
+      imageWidth: 720,
+      imageHeight: 720,
+    });
+    expect(result).toEqual({ ok: true });
   });
 
   it('rejects when mouth landmarks sit above the nose', () => {

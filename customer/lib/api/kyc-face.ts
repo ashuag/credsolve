@@ -20,8 +20,14 @@ export type PostKycLivenessVideoResponse = {
 
 /** Per-gate verdicts from the on-server face-api pipeline (same checks the LOS tool reports). */
 export type KycPhotoQualitySummary = {
+  qualityChecksApplied?: boolean;
   blurPassed: boolean | null;
   lightingPassed: boolean | null;
+  eyesOpenPassed?: boolean | null;
+  faceNotMaskedPassed?: boolean | null;
+  aiModifiedPassed?: boolean | null;
+  passiveLivenessPassed?: boolean | null;
+  identityMatchPassed?: boolean | null;
   fullFaceDetected: boolean;
   faceNotCovered: boolean;
   dualFaceDetected: boolean;
@@ -47,7 +53,7 @@ export type PostKycLivenessResponse = {
   bestComputedConfidence?: number | null;
   /** Blur / lighting / dual-face / framing verdicts for the captured selfie. */
   selfieQuality?: KycPhotoQualitySummary;
-  /** Same gates against the DigiLocker Aadhaar photo. */
+  /** Identity-reference metadata for the DigiLocker Aadhaar photo (quality is not applied). */
   aadhaarQuality?: KycPhotoQualitySummary;
   /** MoneyCash active liveness (head movement) recorded before this call. */
   headMovementPassed?: boolean;

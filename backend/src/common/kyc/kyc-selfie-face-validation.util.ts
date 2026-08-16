@@ -24,6 +24,9 @@ export type SelfieFaceDetectionInput = {
     rightEye: SelfieFaceLandmarkPoint;
     noseTip: SelfieFaceLandmarkPoint;
     mouthCenter: SelfieFaceLandmarkPoint;
+    leftEyeContour?: SelfieFaceLandmarkPoint[];
+    rightEyeContour?: SelfieFaceLandmarkPoint[];
+    mouthContour?: SelfieFaceLandmarkPoint[];
   };
   /** Composite confidence from detection + geometry. */
   confidence?: SelfieFaceConfidenceBreakdown;
@@ -56,6 +59,14 @@ export type KycSelfieFaceInspection = {
   minMeanFaceLuminanceRequired: number;
   maxDarkPixelRatioAllowed: number;
   lightingPassed: boolean | null;
+  eyesOpenPassed: boolean | null;
+  eyeAspectRatio: number | null;
+  /** Center-of-eye pupil darkness (pixel-based, occlusion-aware complement to {@link eyeAspectRatio}). */
+  eyePupilDarkness: number | null;
+  faceNotMaskedPassed: boolean | null;
+  /** Mouth lip-seam edge strength (pixel-based, occlusion-aware complement to the mouth geometry gate). */
+  lipSeamStrength: number | null;
+  aiModifiedPassed: boolean | null;
   rawDetectionCount: number;
   qualifyingDetectionCount: number;
   detections: SelfieFaceDetectionInput[];
@@ -70,16 +81,36 @@ export const KYC_SELFIE_MIN_COMPUTED_CONFIDENCE = 0.55;
 /** Face bounding box must cover at least this fraction of the image area. */
 export const KYC_SELFIE_MIN_FACE_AREA_RATIO = 0.08;
 
+/**
+ * A second confident detection only counts as another person in frame when it's at least this
+ * fraction of the largest detected face's area. A framed photo, poster, or phone/TV screen
+ * visible behind the subject can clear the confidence gates on its own (it's a real face image)
+ * but is reliably much smaller in the shot than the primary subject leaning toward the camera —
+ * without this, that background photo would trip the "only one person" dual-face gate.
+ */
+export const KYC_SELFIE_SECONDARY_FACE_MIN_AREA_RATIO = 0.2;
+
 export function filterQualifyingSelfieFaceDetections(
   detections: SelfieFaceDetectionInput[],
   minConfidence: number = KYC_SELFIE_MIN_FACE_CONFIDENCE,
 ): SelfieFaceDetectionInput[] {
-  return detections.filter((d) => {
+  const confident = detections.filter((d) => {
     const detectionOk = d.score >= minConfidence;
     const computedOk =
       d.confidence?.computed == null || d.confidence.computed >= KYC_SELFIE_MIN_COMPUTED_CONFIDENCE;
     return detectionOk && computedOk;
   });
+  return dropBackgroundFaces(confident);
+}
+
+function dropBackgroundFaces(
+  detections: SelfieFaceDetectionInput[],
+): SelfieFaceDetectionInput[] {
+  if (detections.length <= 1) return detections;
+  const areaOf = (d: SelfieFaceDetectionInput) => d.box.width * d.box.height;
+  const maxArea = Math.max(...detections.map(areaOf));
+  if (!Number.isFinite(maxArea) || maxArea <= 0) return detections;
+  return detections.filter((d) => areaOf(d) / maxArea >= KYC_SELFIE_SECONDARY_FACE_MIN_AREA_RATIO);
 }
 
 const MAX_EYE_LEVEL_DELTA_RATIO = 0.3;

@@ -23,6 +23,7 @@ export type LosFaceMatchCheckResult = {
  * LOS developer dry-run. Resolves the two images, then defers to
  * {@link KycPhotoVerificationService} — the same pipeline the customer KYC selfie step runs —
  * so this tool predicts the real verdict rather than approximating it. No Tenacio, no DB writes.
+ * Aadhaar quality is advisory (government photos are often low-res); face match still runs.
  */
 @Injectable()
 export class LosKycDevToolsService {
@@ -50,6 +51,7 @@ export class LosKycDevToolsService {
       probeBuffer,
       referenceLabel: 'Reference photo',
       probeLabel: 'Selfie',
+      compareEvenIfQualityFails: true,
     });
 
     return {

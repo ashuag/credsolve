@@ -26,6 +26,14 @@ import {
   measureSelfieFaceLighting,
   validateSelfieFaceLighting,
 } from './kyc-selfie-face-lighting.util';
+import {
+  combineFaceChecks,
+  evaluateSelfieAiModified,
+  evaluateSelfieEyesOpen,
+  evaluateSelfieEyesOpenFromPixels,
+  evaluateSelfieMouthOcclusionFromPixels,
+  evaluateSelfieMouthVisible,
+} from './kyc-selfie-face-occlusion.util';
 
 type FaceApiLandmarks = {
   getLeftEye(): Array<{ x: number; y: number }>;
@@ -122,11 +130,18 @@ export class KycSelfieFaceValidationService implements OnModuleDestroy {
       let luminanceStd: number | null = null;
       let highlightP90: number | null = null;
       let lightingPassed: boolean | null = null;
+      let eyesOpenPassed: boolean | null = null;
+      let eyeAspectRatio: number | null = null;
+      let eyePupilDarkness: number | null = null;
+      let faceNotMaskedPassed: boolean | null = null;
+      let lipSeamStrength: number | null = null;
+      let aiModifiedPassed: boolean | null = null;
       let finalOk = validation.ok;
       let finalReason = validation.ok ? undefined : validation.reason;
 
       if (validation.ok && qualifying.length === 1) {
-        const faceBox = qualifying[0]!.box;
+        const face = qualifying[0]!;
+        const faceBox = face.box;
         const blur = measureSelfieFaceBlur(tensor, faceBox);
         laplacianVariance = blur.laplacianVariance;
         blurPassed = blur.passed;
@@ -156,6 +171,54 @@ export class KycSelfieFaceValidationService implements OnModuleDestroy {
             finalReason = lightingValidation.reason;
           }
         }
+
+        // Landmark geometry alone can't see occlusion — face-api still predicts a plausible
+        // eye/mouth shape even when a hand, mask, or shut eyelid covers it — so both gates
+        // combine the geometric check with a pixel-contrast check on the actual crop.
+        const eyesGeometry = evaluateSelfieEyesOpen(face.landmarks);
+        const eyesPixels = evaluateSelfieEyesOpenFromPixels({
+          tensor,
+          leftEyeContour: face.landmarks.leftEyeContour,
+          rightEyeContour: face.landmarks.rightEyeContour,
+          imageWidth,
+          imageHeight,
+        });
+        eyeAspectRatio = eyesGeometry.eyeAspectRatio;
+        eyePupilDarkness = eyesPixels.eyePupilDarkness;
+        eyesOpenPassed = combineFaceChecks(eyesGeometry.eyesOpenPassed, eyesPixels.eyesOpenPassed);
+        if (finalOk && eyesOpenPassed === false) {
+          finalOk = false;
+          finalReason = 'Keep your eyes open and look at the camera.';
+        }
+
+        const mouthGeometry = evaluateSelfieMouthVisible(face.landmarks);
+        const mouthPixels = evaluateSelfieMouthOcclusionFromPixels({
+          tensor,
+          mouthContour: face.landmarks.mouthContour,
+          imageWidth,
+          imageHeight,
+        });
+        lipSeamStrength = mouthPixels.lipSeamStrength;
+        faceNotMaskedPassed = combineFaceChecks(
+          mouthGeometry.faceNotMaskedPassed,
+          mouthPixels.faceNotMaskedPassed,
+        );
+        if (finalOk && faceNotMaskedPassed === false) {
+          finalOk = false;
+          finalReason = 'Remove any mask or hand covering your mouth and try again.';
+        }
+
+        const ai = evaluateSelfieAiModified({
+          luminanceStd,
+          meanFaceLuminance,
+          blurPassed,
+        });
+        aiModifiedPassed = ai.aiModifiedPassed;
+        if (finalOk && ai.aiModifiedPassed === false) {
+          finalOk = false;
+          finalReason =
+            'This photo looks digitally altered. Capture a live selfie from your camera — do not use a filtered or AI image.';
+        }
       }
 
       return {
@@ -179,6 +242,12 @@ export class KycSelfieFaceValidationService implements OnModuleDestroy {
         minMeanFaceLuminanceRequired: KYC_SELFIE_MIN_MEAN_FACE_LUMINANCE,
         maxDarkPixelRatioAllowed: KYC_SELFIE_MAX_DARK_PIXEL_RATIO,
         lightingPassed,
+        eyesOpenPassed,
+        eyeAspectRatio,
+        eyePupilDarkness,
+        faceNotMaskedPassed,
+        lipSeamStrength,
+        aiModifiedPassed,
         rawDetectionCount: enriched.length,
         qualifyingDetectionCount: qualifying.length,
         detections: enriched,
@@ -273,7 +342,14 @@ function toLandmarkInput(landmarks: FaceApiLandmarks): SelfieFaceDetectionInput[
     rightEye,
     noseTip: { x: noseTip.x, y: noseTip.y },
     mouthCenter: centerPoint(mouth),
+    leftEyeContour: copyPoints(landmarks.getLeftEye()),
+    rightEyeContour: copyPoints(landmarks.getRightEye()),
+    mouthContour: copyPoints(mouth),
   };
+}
+
+function copyPoints(points: Array<{ x: number; y: number }>): Array<{ x: number; y: number }> {
+  return points.map((p) => ({ x: p.x, y: p.y }));
 }
 
 function centerPoint(points: Array<{ x: number; y: number }>): { x: number; y: number } {
@@ -304,6 +380,12 @@ function emptyInspection(reason: string): KycSelfieFaceInspection {
     minMeanFaceLuminanceRequired: KYC_SELFIE_MIN_MEAN_FACE_LUMINANCE,
     maxDarkPixelRatioAllowed: KYC_SELFIE_MAX_DARK_PIXEL_RATIO,
     lightingPassed: null,
+    eyesOpenPassed: null,
+    eyeAspectRatio: null,
+    eyePupilDarkness: null,
+    faceNotMaskedPassed: null,
+    lipSeamStrength: null,
+    aiModifiedPassed: null,
     rawDetectionCount: 0,
     qualifyingDetectionCount: 0,
     detections: [],
@@ -319,6 +401,9 @@ function skippedInspection(): KycSelfieFaceInspection {
     productionValidationDisabled: true,
     blurPassed: true,
     lightingPassed: true,
+    eyesOpenPassed: true,
+    faceNotMaskedPassed: true,
+    aiModifiedPassed: true,
     qualifyingDetectionCount: 1,
     rawDetectionCount: 1,
   };

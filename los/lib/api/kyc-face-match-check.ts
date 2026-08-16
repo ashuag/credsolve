@@ -34,8 +34,15 @@ export type KycFaceMatchLocalResult = {
 };
 
 export type PhotoQualityChecks = {
+  /** False for Aadhaar / ID — quality and liveness are not applied. */
+  qualityChecksApplied: boolean;
   blurPassed: boolean | null;
   lightingPassed: boolean | null;
+  eyesOpenPassed: boolean | null;
+  faceNotMaskedPassed: boolean | null;
+  aiModifiedPassed: boolean | null;
+  passiveLivenessPassed: boolean | null;
+  identityMatchPassed: boolean | null;
   fullFaceDetected: boolean;
   faceNotCovered: boolean;
   /** True when 2+ qualifying faces were detected. */
@@ -62,6 +69,10 @@ export type PhotoQualityChecks = {
     minMeanFaceLuminanceRequired?: number;
     maxDarkPixelRatioAllowed?: number;
     lightingPassed: boolean | null;
+    eyesOpenPassed?: boolean | null;
+    eyeAspectRatio?: number | null;
+    faceNotMaskedPassed?: boolean | null;
+    aiModifiedPassed?: boolean | null;
     rawDetectionCount: number;
     qualifyingDetectionCount: number;
   };
@@ -77,7 +88,7 @@ export type LosFaceMatchCheckResult = {
   businessOk: boolean;
 };
 
-/** Dry-run photo quality (both sides) + Aadhaar↔selfie face match via local face-api. */
+/** Dry-run: selfie quality + liveness gates, then Aadhaar↔selfie face match via local face-api. */
 export async function runKycFaceMatchCheck(
   token: string,
   payload: FaceMatchCheckPayload,
