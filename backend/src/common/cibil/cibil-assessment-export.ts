@@ -420,7 +420,6 @@ export function buildCibilAssessmentExportRow(
     recent_dateOpened: formatRawIstDate(recentDateOpened),
     oldest_dateOpened: formatRawIstDate(oldestDateOpened),
     Closed_Dates: pyQuotedList(closedDates),
-    personal_email: null,
     no_of_creditcards: insights.noOfCreditcards,
     cc_loans_loan_amount: creditCards.reduce((sum, t) => sum + t.sanctionedAmount, 0),
     no_of_microfinance_loans: mfiLoans.length,

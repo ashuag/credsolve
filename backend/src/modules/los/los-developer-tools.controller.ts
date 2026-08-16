@@ -7,18 +7,21 @@ import {
   Param,
   Post,
   Query,
+  UploadedFile,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { UploadedFileLike } from '../../common/types/uploaded-file';
 import { LosAuthGuard } from './auth/los-auth.guard';
 import { CibilVendorFetchCheckDto } from './dto/cibil-vendor-fetch-check.dto';
+import { FaceLivenessCheckDto } from './dto/face-liveness-check.dto';
 import { KycFaceMatchCheckDto } from './dto/kyc-face-match-check.dto';
 import { ListVendorApiLogsQueryDto } from './dto/list-vendor-api-logs-query.dto';
 import { LosCibilDevToolsService } from './services/los-cibil-dev-tools.service';
+import { LosFaceLivenessDevToolsService } from './services/los-face-liveness-dev-tools.service';
 import { LosKycDevToolsService } from './services/los-kyc-dev-tools.service';
 import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
 
@@ -31,6 +34,7 @@ export class LosDeveloperToolsController {
   constructor(
     private readonly cibilDevTools: LosCibilDevToolsService,
     private readonly kycDevTools: LosKycDevToolsService,
+    private readonly faceLivenessDevTools: LosFaceLivenessDevToolsService,
     private readonly vendorApiLogs: LosVendorApiLogService,
   ) {}
 
@@ -97,6 +101,26 @@ export class LosDeveloperToolsController {
       probe: files?.probe?.[0],
       referenceUrl: body.referenceUrl,
       probeUrl: body.probeUrl,
+    });
+  }
+
+  @Post('face-liveness-check')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_IMAGE_BYTES } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Live Surepass face-liveness check',
+    description:
+      'Calls the Surepass face-liveness endpoint directly using SUREPASS_* env config. The call is live and audited in vendor_api_log; no lead or KYC record is created or updated.',
+  })
+  async faceLivenessCheck(
+    @UploadedFile() file: UploadedFileLike | undefined,
+    @Body() body: FaceLivenessCheckDto,
+  ) {
+    return this.faceLivenessDevTools.runFaceLivenessCheck({
+      file,
+      link: body.link,
+      usePdf: body.usePdf,
     });
   }
 }

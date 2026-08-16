@@ -206,6 +206,7 @@ const BREADCRUMBS: Record<string, string> = {
   '/developer-tools/cibil-surepass-fetch': 'Surepass CIBIL Fetch',
   '/developer-tools/post-bre-rules': 'Post BRE Rules',
   '/developer-tools/kyc-face-match-check': 'KYC Face Match Check',
+  '/developer-tools/face-liveness-check': 'Surepass Face Liveness',
   '/developer-tools/vendor-api-logs': 'Vendor API Logs',
   ...Object.fromEntries(ELIGIBILITY_SECTION_DEFINITIONS.map((item) => [item.href, item.label])),
   '/eligibility-criteria/credit-limit-eligibility-check': 'Credit Limit Tier',

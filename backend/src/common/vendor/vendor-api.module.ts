@@ -7,6 +7,7 @@ import { DigilockerVendorService } from './digilocker-vendor.service';
 import { PanVerificationService } from './pan-verification.service';
 import { SurepassCibilModule } from './surepass/surepass-cibil.module';
 import { SurepassDigilockerModule } from './surepass/surepass-digilocker.module';
+import { SurepassFaceLivenessModule } from './surepass/surepass-face-liveness.module';
 import { VendorApiService } from './vendor-api.service';
 import { VendorApiConfigService } from './vendor-api-config.service';
 import { VendorInternalErrorService } from './vendor-internal-error.service';
@@ -22,7 +23,7 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
  */
 @Global()
 @Module({
-  imports: [SurepassCibilModule, SurepassDigilockerModule],
+  imports: [SurepassCibilModule, SurepassDigilockerModule, SurepassFaceLivenessModule],
   providers: [
     VendorApiService,
     VendorApiConfigService,
@@ -46,6 +47,7 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
     EasebuzzWireService,
     SurepassCibilModule,
     SurepassDigilockerModule,
+    SurepassFaceLivenessModule,
   ],
 })
 export class VendorApiModule {}

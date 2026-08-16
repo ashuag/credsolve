@@ -32,8 +32,6 @@ COPY . .
 ENV DATABASE_URL="mysql://dummy:dummy@localhost:3306/dummy"
 RUN npx prisma generate --config prisma.config.ts
 RUN npm run build
-# Precompile seeds so production image can seed without TypeScript (devDependency).
-RUN npm run seed:build
 
 # ── Stage 3: Production runtime ──
 FROM node:22-bookworm-slim AS runner
@@ -62,7 +60,6 @@ COPY --from=deps /app/node_modules ./node_modules
 
 # Copy built app (output is build/, not dist/)
 COPY --from=builder /app/build ./build
-COPY --from=builder /app/build-seed ./build-seed
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./
@@ -78,5 +75,5 @@ USER appuser
 
 EXPOSE 4001
 
-# Migrate → seed (idempotent upserts) → start. Set SKIP_SEED=1 to skip seeding.
-CMD ["sh", "-c", "npx prisma migrate deploy --config prisma.config.ts && if [ \"${SKIP_SEED:-0}\" != \"1\" ]; then npm run seed:prod; fi && node build/src/main.js"]
+# Migrate → start.
+CMD ["sh", "-c", "npx prisma migrate deploy --config prisma.config.ts && node build/src/main.js"]
