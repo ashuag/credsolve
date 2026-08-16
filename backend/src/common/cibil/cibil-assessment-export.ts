@@ -36,7 +36,7 @@ export const CIBIL_ASSESSMENT_EXPORT_HEADERS = [
   'no_of_pan_cards',
   'no_of_address',
   'reported_dates_addr',
-  'official_email',
+  'personal_email',
   'employment_type',
   'no_of_loans',
   'no_of_loans_amount',
@@ -184,21 +184,41 @@ type RawTradeline = {
   dateClosed: Date | null;
 };
 
+/**
+ * Export-only exposure amount. For credit cards, this workbook's amount columns
+ * (sanction_amount, unsecured_loans_amount, etc.) should reflect credit limit
+ * utilization — i.e. the "High Credit" field — rather than the sanctioned
+ * CreditLimit. Falls back to the shared exposure logic when High Credit is
+ * missing/zero, or for non-credit-card tradelines.
+ */
+function getExportTradelineAmount(
+  tradeline: Record<string, unknown>,
+  accountTypeSymbol: string | null,
+  isCreditCard: boolean,
+): number {
+  if (isCreditCard) {
+    const highCredit = parseInrAmount(tradeline.highBalance ?? tradeline.HighBalance);
+    if (highCredit != null && highCredit > 0) return highCredit;
+  }
+  return getTradelineExposureInr(tradeline, accountTypeSymbol);
+}
+
 function walkRawTradelines(tradelines: ParsedBureauTradeline[]): RawTradeline[] {
   return tradelines.map(({ lineRec, partitionSymbol }) => {
     const parsedLine = parseCibilTradeline(lineRec, partitionSymbol);
     const accountType = parsedLine?.accountTypeSymbol ?? normalizeCibilAccountTypeSymbol(partitionSymbol);
     const granted = asRecord(lineRec.GrantedTrade);
+    const isCreditCard = accountType != null && CREDIT_CARD_ACCOUNT_TYPES.has(accountType);
 
     return {
       accountType,
       isUnsecured: accountType != null && CIBIL_UNSECURED_ACCOUNT_TYPE_SYMBOLS.has(accountType),
       isOpen: parsedLine?.isOpen ?? isCibilTradelineOpen(lineRec),
-      isCreditCard: accountType != null && CREDIT_CARD_ACCOUNT_TYPES.has(accountType),
+      isCreditCard,
       isGoldLoan: accountType === GOLD_LOAN_ACCOUNT_TYPE,
       isMicrofinance: accountType != null && TUEF_MFI_ACCOUNT_TYPE_SYMBOLS.has(accountType),
       designator: readSymbol(lineRec.AccountDesignator),
-      sanctionedAmount: getTradelineExposureInr(lineRec, accountType),
+      sanctionedAmount: getExportTradelineAmount(lineRec, accountType, isCreditCard),
       currentBalance: parseInrAmount(lineRec.currentBalance),
       writtenOffPrincipal: parseInrAmount(lineRec.writtenOffPrincipal),
       overdueAmount: parseInrAmount(granted?.amountPastDue ?? lineRec.amountPastDue),
@@ -352,7 +372,7 @@ export function buildCibilAssessmentExportRow(
     no_of_pan_cards: borrower.panCount,
     no_of_address: borrower.addressReportedDates.length,
     reported_dates_addr: pyQuotedList(borrower.addressReportedDates),
-    official_email: pyQuotedList(borrower.emails),
+    personal_email: pyQuotedList(borrower.emails),
     employment_type: borrower.employmentType,
     no_of_loans: insights.noOfLoans,
     no_of_loans_amount: pyQuotedList(sanctionedAmounts.map(String)),
