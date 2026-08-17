@@ -44,6 +44,18 @@ function stripClientScripts(html: string): string {
   return html.replace(/<script>[\s\S]*?<\/script>\s*/gi, '');
 }
 
+function injectOnScreenPreviewStyles(html: string): string {
+  const css = `
+html, body { background: #fff !important; }
+.page-wrapper { padding: 8px 4px 28px !important; }
+.document { box-shadow: none !important; border-radius: 0 !important; max-width: 100% !important; }
+.doc-section { padding: 22px 16px 18px !important; }
+table { width: 100% !important; max-width: 100% !important; }
+img { max-width: 100% !important; height: auto !important; }
+`;
+  return html.replace('</style>', `${css}\n</style>`);
+}
+
 function injectPrintFieldStyles(html: string): string {
   const css = `
 .filled-val {
@@ -94,6 +106,8 @@ export type LoanDocumentRenderOptions = {
   section?: LoanDocumentRenderSection;
   /** Include the borrower eSign / NBFC DSC block. Only meaningful for `sanction-kfs`; set once acceptance has happened. */
   includeAcceptanceBlock?: boolean;
+  /** Extra CSS for in-app mobile/desktop reading (not used when printing to PDF). */
+  onScreenPreview?: boolean;
 };
 
 export async function renderLoanDocumentHtml(
@@ -109,6 +123,9 @@ export async function renderLoanDocumentHtml(
   html = stripExternalFonts(html);
   html = stripClientScripts(html);
   html = injectPrintFieldStyles(html);
+  if (options.onScreenPreview) {
+    html = injectOnScreenPreviewStyles(html);
+  }
 
   if (section === 'commercial-terms') {
     html = removeSectionById(html, 'sec-a');

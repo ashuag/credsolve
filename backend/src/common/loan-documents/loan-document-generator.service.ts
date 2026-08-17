@@ -63,6 +63,13 @@ export class LoanDocumentGeneratorService {
     return this.signer.sign(pdf, { drawVisualStamp: !htmlStampRendered });
   }
 
+  async renderPreviewHtml(merge: LoanDocumentMergeInput): Promise<string> {
+    return this.htmlPdfGenerator.renderPreviewHtml(merge, {
+      section: 'sanction-kfs',
+      includeAcceptanceBlock: false,
+    });
+  }
+
   /**
    * Loan cum Commercial Terms alone (Section C), plain — no NBFC DSC signature.
    * Generated fresh at send time and attached alongside the sanction letter email;

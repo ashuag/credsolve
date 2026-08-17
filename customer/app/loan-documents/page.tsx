@@ -111,6 +111,7 @@ function LoanDocumentsContent() {
             key={current.type}
             title={current.title}
             pdfUrlFragment={current.pdfUrl}
+            htmlUrlFragment={current.htmlUrl}
             onViewingChange={setPdfViewing}
             onReadyChange={(ready) => {
               setScrolledToEnd(ready);

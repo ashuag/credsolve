@@ -1,11 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { loanDocumentPdfAbsoluteUrl } from '@/lib/api/loan-documents';
+import { loanDocumentHtmlAbsoluteUrl } from '@/lib/api/loan-documents';
 
 type LoanDocumentScrollPanelProps = {
   title: string;
   pdfUrlFragment: string;
+  htmlUrlFragment?: string;
   onReadyChange?: (ready: boolean) => void;
   onViewingChange?: (viewing: boolean) => void;
 };
@@ -34,13 +35,15 @@ function DocumentGlyph() {
 export function LoanDocumentScrollPanel({
   title,
   pdfUrlFragment,
+  htmlUrlFragment,
   onReadyChange,
   onViewingChange,
 }: LoanDocumentScrollPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const endSentinelRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const [scrolledToEnd, setScrolledToEnd] = useState(false);
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [html, setHtml] = useState<string | null>(null);
   const [loadError, setLoadError] = useState('');
   const [isMobile, setIsMobile] = useState(false);
   const [hostReady, setHostReady] = useState(false);
@@ -60,7 +63,9 @@ export function LoanDocumentScrollPanel({
     return () => mq.removeEventListener('change', apply);
   }, []);
 
-  const pdfSrc = loanDocumentPdfAbsoluteUrl(pdfUrlFragment);
+  const htmlSrc = loanDocumentHtmlAbsoluteUrl(
+    htmlUrlFragment?.trim() || pdfUrlFragment.replace(/\/pdf\/?$/i, '/html'),
+  );
   const showInlineViewer = hostReady && (!isMobile || mobileViewerOpen);
   const canContinue = scrolledToEnd;
 
@@ -75,39 +80,40 @@ export function LoanDocumentScrollPanel({
 
   const checkScroll = useCallback(() => {
     const el = scrollRef.current;
-    if (!el || !blobUrl) return;
-    const atEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 32;
+    if (!el || !html) return;
+    const atEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 48;
     if (atEnd) setScrolledToEnd(true);
-  }, [blobUrl]);
+  }, [html]);
 
   useEffect(() => {
     setScrolledToEnd(false);
     setLoadError('');
     onReadyChangeRef.current?.(false);
 
-    if (!pdfSrc || (isMobile && !mobileViewerOpen)) {
-      setBlobUrl(null);
+    if (!htmlSrc || (isMobile && !mobileViewerOpen)) {
+      setHtml(null);
       return;
     }
 
-    let revoked: string | null = null;
     let cancelled = false;
 
     (async () => {
       try {
-        const res = await fetch(pdfSrc, {
+        const res = await fetch(htmlSrc, {
           credentials: 'include',
           cache: 'no-store',
+          headers: { Accept: 'text/html' },
           signal: AbortSignal.timeout(90_000),
         });
         if (!res.ok) {
-          throw new Error(`Unable to load PDF (${res.status}).`);
+          throw new Error(`Unable to load letter (${res.status}).`);
         }
-        const blob = await res.blob();
+        const text = await res.text();
         if (cancelled) return;
-        const url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
-        revoked = url;
-        setBlobUrl(url);
+        if (!text.trim()) {
+          throw new Error('The sanction letter is empty.');
+        }
+        setHtml(text);
       } catch (e) {
         if (!cancelled) {
           const timedOut =
@@ -118,7 +124,7 @@ export function LoanDocumentScrollPanel({
               ? 'The sanction letter is taking too long to generate. Please retry.'
               : e instanceof Error
                 ? e.message
-                : 'Unable to load PDF.',
+                : 'Unable to load letter.',
           );
         }
       }
@@ -126,12 +132,49 @@ export function LoanDocumentScrollPanel({
 
     return () => {
       cancelled = true;
-      if (revoked) URL.revokeObjectURL(revoked);
     };
-  }, [pdfSrc, pdfUrlFragment, isMobile, mobileViewerOpen]);
+  }, [htmlSrc, isMobile, mobileViewerOpen]);
+
+  const fitIframeHeight = useCallback(() => {
+    const iframe = iframeRef.current;
+    const doc = iframe?.contentDocument;
+    if (!iframe || !doc?.body) return;
+    const height = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight, 400);
+    iframe.style.height = `${height}px`;
+  }, []);
 
   useEffect(() => {
-    if (!blobUrl) return;
+    if (!html) return;
+    const iframe = iframeRef.current;
+    const t1 = window.setTimeout(fitIframeHeight, 50);
+    const t2 = window.setTimeout(fitIframeHeight, 400);
+    const t3 = window.setTimeout(fitIframeHeight, 1200);
+    const onLoad = () => {
+      fitIframeHeight();
+      const doc = iframe?.contentDocument;
+      if (!doc) return;
+      doc.querySelectorAll('img').forEach((img) => {
+        img.addEventListener('load', fitIframeHeight);
+      });
+      const scrolling = doc.scrollingElement ?? doc.documentElement;
+      const onInnerScroll = () => {
+        if (scrolling.scrollTop + scrolling.clientHeight >= scrolling.scrollHeight - 48) {
+          setScrolledToEnd(true);
+        }
+      };
+      doc.addEventListener('scroll', onInnerScroll, { passive: true });
+    };
+    iframe?.addEventListener('load', onLoad);
+    return () => {
+      iframe?.removeEventListener('load', onLoad);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
+    };
+  }, [html, fitIframeHeight]);
+
+  useEffect(() => {
+    if (!html) return;
     const root = scrollRef.current;
     const sentinel = endSentinelRef.current;
     if (!root || !sentinel) return;
@@ -150,7 +193,7 @@ export function LoanDocumentScrollPanel({
       observer.disconnect();
       window.clearTimeout(t);
     };
-  }, [blobUrl, checkScroll]);
+  }, [html, checkScroll]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -174,7 +217,7 @@ export function LoanDocumentScrollPanel({
             >
               View sanction letter
             </button>
-            <p className="mt-3 mb-0 text-xs font-medium text-amber-700">Open the PDF to continue.</p>
+            <p className="mt-3 mb-0 text-xs font-medium text-amber-700">Open the letter to continue.</p>
           </div>
         </div>
       ) : null}
@@ -184,26 +227,19 @@ export function LoanDocumentScrollPanel({
           <div
             ref={scrollRef}
             onScroll={checkScroll}
-            className="h-[min(70dvh,640px)] overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white"
+            className="h-[min(72dvh,720px)] overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white"
           >
-            {blobUrl ? (
-              <div className="relative" style={{ minHeight: '4800px' }}>
-                {/* Cover native PDF chrome (Safari/Chrome toolbar, page, zoom, annotate). */}
-                <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-12 bg-white" aria-hidden />
-                <object
+            {html ? (
+              <div className="relative bg-white">
+                <iframe
+                  ref={iframeRef}
                   title={title}
-                  data={`${blobUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
-                  type="application/pdf"
-                  className="pointer-events-none block w-full border-0 bg-white"
-                  style={{ height: '4800px' }}
-                >
-                  <iframe
-                    title={title}
-                    src={`${blobUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
-                    className="pointer-events-none block w-full border-0 bg-white"
-                    style={{ height: '4800px' }}
-                  />
-                </object>
+                  srcDoc={html}
+                  sandbox="allow-same-origin"
+                  className="block w-full border-0 bg-white"
+                  style={{ minHeight: '480px' }}
+                  onLoad={fitIframeHeight}
+                />
                 <div ref={endSentinelRef} className="h-10 w-full bg-white" aria-hidden />
               </div>
             ) : (

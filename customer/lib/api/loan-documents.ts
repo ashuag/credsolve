@@ -7,6 +7,7 @@ export type LoanDocumentItem = {
   type: LoanDocumentType;
   title: string;
   pdfUrl: string;
+  htmlUrl?: string;
 };
 
 export type LoanDocumentsResponse = {
@@ -47,6 +48,10 @@ export function loanDocumentPdfAbsoluteUrl(pdfUrlFragment: string): string {
   }
 
   return `${getApiUrl()}${fragment}`;
+}
+
+export function loanDocumentHtmlAbsoluteUrl(htmlUrlFragment: string): string {
+  return loanDocumentPdfAbsoluteUrl(htmlUrlFragment);
 }
 
 export async function acknowledgeLoanDocuments(): Promise<{ success: boolean; reviewedAt: string }> {

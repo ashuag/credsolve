@@ -36,6 +36,7 @@ import { ServeDigilockerAadhaarPhotoUseCase } from './application/use-cases/serv
 import { ServeKycSelfiePhotoUseCase } from './application/use-cases/serve-kyc-selfie-photo.use-case';
 import { GetLoanDocumentsUseCase } from './application/use-cases/get-loan-documents.use-case';
 import { ServeLoanDocumentPdfUseCase } from './application/use-cases/serve-loan-document-pdf.use-case';
+import { ServeLoanDocumentHtmlUseCase } from './application/use-cases/serve-loan-document-html.use-case';
 import { SendLoanDocumentsOtpUseCase } from './application/use-cases/send-loan-documents-otp.use-case';
 import { AcceptLoanDocumentsUseCase } from './application/use-cases/accept-loan-documents.use-case';
 import { AcknowledgeLoanDocumentsUseCase } from './application/use-cases/acknowledge-loan-documents.use-case';
@@ -122,6 +123,7 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     ServeKycSelfiePhotoUseCase,
     GetLoanDocumentsUseCase,
     ServeLoanDocumentPdfUseCase,
+    ServeLoanDocumentHtmlUseCase,
     SendLoanDocumentsOtpUseCase,
     AcceptLoanDocumentsUseCase,
     AcknowledgeLoanDocumentsUseCase,

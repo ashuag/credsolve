@@ -44,6 +44,25 @@ export class LoanDocumentHtmlPdfGeneratorService {
     return this.normalizePdfForSigning(rawPdf);
   }
 
+  async renderPreviewHtml(
+    merge: LoanDocumentMergeInput,
+    options: LoanDocumentRenderOptions = {},
+  ): Promise<string> {
+    const needsTiers = merge.bounceChargeTiers == null;
+    const needsPenal = merge.penalCharges == null;
+    const context =
+      needsTiers || needsPenal ? await this.bounceChargeTiers.loadContext() : null;
+
+    return renderLoanDocumentHtml(
+      {
+        ...merge,
+        bounceChargeTiers: merge.bounceChargeTiers ?? context?.tiers,
+        penalCharges: merge.penalCharges ?? context?.penal,
+      },
+      { ...options, onScreenPreview: true },
+    );
+  }
+
   private resolveLaunchExecutablePath(): string | undefined {
     const systemPath = resolvePuppeteerExecutablePath();
     if (systemPath) return systemPath;

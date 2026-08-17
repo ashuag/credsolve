@@ -334,6 +334,14 @@ export class LoanDocumentApplicationService {
     return `/auth/loan-documents/${docType}/pdf`;
   }
 
+  htmlUrlFragment(docType: LoanDocumentType): string {
+    return `/auth/loan-documents/${docType}/html`;
+  }
+
+  async renderPreviewHtml(merge: LoanDocumentMergeInput): Promise<string> {
+    return this.generator.renderPreviewHtml(merge);
+  }
+
   /** Loan cum Commercial Terms PDF, generated fresh (not persisted) for email attachment. */
   async generateCommercialTermsPdf(merge: LoanDocumentMergeInput): Promise<Buffer> {
     return this.generator.generateCommercialTermsPdf(merge);

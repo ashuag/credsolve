@@ -33,6 +33,7 @@ import { ServeDigilockerAadhaarPhotoUseCase } from '../application/use-cases/ser
 import { ServeKycSelfiePhotoUseCase } from '../application/use-cases/serve-kyc-selfie-photo.use-case';
 import { GetLoanDocumentsUseCase } from '../application/use-cases/get-loan-documents.use-case';
 import { ServeLoanDocumentPdfUseCase } from '../application/use-cases/serve-loan-document-pdf.use-case';
+import { ServeLoanDocumentHtmlUseCase } from '../application/use-cases/serve-loan-document-html.use-case';
 import { SendLoanDocumentsOtpUseCase } from '../application/use-cases/send-loan-documents-otp.use-case';
 import { AcceptLoanDocumentsUseCase } from '../application/use-cases/accept-loan-documents.use-case';
 import { AcknowledgeLoanDocumentsUseCase } from '../application/use-cases/acknowledge-loan-documents.use-case';
@@ -72,6 +73,7 @@ export class AuthController {
     private readonly serveKycSelfiePhotoFlow: ServeKycSelfiePhotoUseCase,
     private readonly getLoanDocumentsFlow: GetLoanDocumentsUseCase,
     private readonly serveLoanDocumentPdfFlow: ServeLoanDocumentPdfUseCase,
+    private readonly serveLoanDocumentHtmlFlow: ServeLoanDocumentHtmlUseCase,
     private readonly sendLoanDocumentsOtpFlow: SendLoanDocumentsOtpUseCase,
     private readonly acceptLoanDocumentsFlow: AcceptLoanDocumentsUseCase,
     private readonly acknowledgeLoanDocumentsFlow: AcknowledgeLoanDocumentsUseCase,
@@ -177,6 +179,20 @@ export class AuthController {
     @Param('docType') docType: string,
   ): Promise<void> {
     await this.serveLoanDocumentPdfFlow.execute(req, res, docType);
+  }
+
+  @Get('loan-documents/:docType/html')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @RateLimitByRoute('loan-documents')
+  @ApiOperation({
+    summary: 'Stream Key Fact Statement HTML for in-app reading (requires session cookie)',
+  })
+  async loanDocumentHtmlRoute(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Param('docType') docType: string,
+  ): Promise<void> {
+    await this.serveLoanDocumentHtmlFlow.execute(req, res, docType);
   }
 
   @Post('loan-documents/acknowledge')
