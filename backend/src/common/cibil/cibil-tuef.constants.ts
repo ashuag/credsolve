@@ -157,6 +157,7 @@ export const ACCOUNT_TYPE_LABELS: Record<string, string> = {
   '58': 'Business Non-Funded Credit Facility - Priority Sector - Others',
   '59': 'Business Loan Against Bank Deposits',
   '61': 'Business Loan - Unsecured',
+  '69': 'Short Term Personal Loan',
   '80': 'Microfinance Detailed Report',
   '81': 'Summary Report (Applicable to Enquiry Purpose only)',
   '88': 'Locate Plus for Insurance (Applicable to Enquiry Purpose only)',
@@ -204,6 +205,7 @@ export const CIBIL_UNSECURED_ACCOUNT_TYPE_SYMBOLS = new Set([
   '47', // P2P Consumer Loan
   '51', // Business Loan – Secured
   '61', // Business Loan – Unsecured
+  '69', // Short Term Personal Loan
   '99', // Current Unsecured (portfolio group)
 ]);
 
