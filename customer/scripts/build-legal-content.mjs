@@ -18,7 +18,12 @@ function rebrand(text) {
     .replaceAll('https://www.moneycash.in', 'https://www.moneycash.in')
     .replaceAll('www.moneycash.in', 'www.moneycash.in')
     .replaceAll('moneycash.in', 'moneycash.in')
-    .replaceAll('saurabh@moneycash.in', 'grievance@moneycash.in')
+    .replaceAll('saurabh@moneycash.in', 'uvaid@moneycash.in')
+    .replaceAll('grievance@moneycash.in', 'uvaid@moneycash.in')
+    .replaceAll('Mr. Saurabh Agarwal', 'Mohammad Uvaid')
+    .replaceAll('Saurabh Agarwal', 'Mohammad Uvaid')
+    .replaceAll('+91-8882911939', '+91-8826370278')
+    .replaceAll('8882911939', '8826370278')
     .replace(/\(\s*Hereinafter\s*[“"]MoneyCash[”"]\s*\)/gi, '')
     .replace(/\bMoneycash's\b/g, "MoneyCash's")
     .replace(/\bMoneycash\b/g, 'MoneyCash')
@@ -102,9 +107,9 @@ const docs = [
       'CREDSOLVE Technologies Private Limited, Flat No. E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh — 201009',
     contactEmail: 'legal@moneycash.in',
     grievanceOfficer: {
-      name: 'Mr. Saurabh Agarwal',
-      email: 'grievance@moneycash.in',
-      phone: '+91-8882911939',
+      name: 'Mohammad Uvaid',
+      email: 'uvaid@moneycash.in',
+      phone: '+91-8826370278',
     },
   }),
 ];

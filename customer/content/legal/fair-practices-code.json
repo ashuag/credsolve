@@ -5,11 +5,11 @@
   "title": "Fair Practices Code",
   "description": "The principles and standards that govern how MoneyCash treats customers fairly, transparently, and responsibly across the loan lifecycle.",
   "registeredOffice": "CREDSOLVE Technologies Private Limited, Flat No. E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh — 201009",
-  "contactEmail": "grievance@moneycash.in",
+  "contactEmail": "uvaid@moneycash.in",
   "grievanceOfficer": {
-    "name": "Mr. Saurabh Agarwal",
-    "email": "grievance@moneycash.in",
-    "phone": "+91-8882911939"
+    "name": "Mohammad Uvaid",
+    "email": "uvaid@moneycash.in",
+    "phone": "+91-8826370278"
   },
   "sections": [
     {
@@ -217,7 +217,7 @@
         "Complaint handling timelines:",
         "Level 1: Customers can raise a complaint by creating a support ticket by going to www.moneycash.in Our support team will respond during business hours, which are Monday to Friday, 10:00 AM to 6:00 PM.",
         "Level 2: In the event that the complaint remains pending at Level 1 for a period of more than 5 working days, or if the customer is not satisfied with the outcome of Level 1 resolution, the customer can mail on: support@moneycash.in",
-        "Level 3: In the event that the complaint remains pending at Level 2 for a period of more than 5 working days, or if the customer is not satisfied with the outcome of Level 2 resolution, the customer can contact grievance@moneycash.in",
+        "Level 3: In the event that the complaint remains pending at Level 2 for a period of more than 5 working days, or if the customer is not satisfied with the outcome of Level 2 resolution, the customer can contact uvaid@moneycash.in",
         "Level 4: In the event that the complaint remains pending at Level 3 for a period of more than 5 working days, or if the customer is not satisfied with the outcome of Level 3 resolution, the customer can contact the Regional Office of the Reserve Bank of India (or via RBI’s website www.rbi.org.in):"
       ]
     },
@@ -262,7 +262,9 @@
       "title": "Contact Information",
       "paragraphs": [
         "## Grievance Officer",
-        "Email: grievance@moneycash.in",
+        "Name: Mohammad Uvaid",
+        "Phone: +91-8826370278",
+        "Email: uvaid@moneycash.in",
         "## Customer Support",
         "Email: support@moneycash.in",
         "Website: www.moneycash.in"

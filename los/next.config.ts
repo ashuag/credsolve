@@ -20,7 +20,11 @@ function withOptionalSentry(config: NextConfig): NextConfig {
       silent: !process.env.CI,
       tunnelRoute: '/sentry-tunnel',
       widenClientFileUpload: true,
-      disableLogger: true,
+      webpack: {
+        treeshake: {
+          removeDebugLogging: true,
+        },
+      },
     });
   } catch {
     return config;

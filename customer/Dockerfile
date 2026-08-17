@@ -11,6 +11,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # next.config must have: output: 'standalone'
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 # ── Stage 3: Production runtime ──

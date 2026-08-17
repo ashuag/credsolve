@@ -14,12 +14,12 @@ export const RECOVERY_AGENT_NAME = 'CREDSOLVE TECHNOLOGIES PRIVATE LIMITED';
 export const PAYABLE_TO = 'Aasra Fincorp Pvt. Ltd.';
 
 /** Grievance / nodal contacts shown on KFS (LSP = NBFC/MoneyCash, RE = Lender). */
-export const LSP_GRO_NAME = 'Saurabh Agarwal';
-export const LSP_GRO_PHONE = '+91-8882911939';
-export const LSP_GRO_EMAIL = 'saurabh@moneycash.in';
-export const LSP_NODAL_NAME = 'Saurabh Agarwal';
-export const LSP_NODAL_PHONE = '+91-8882911939';
-export const LSP_NODAL_EMAIL = 'saurabh@moneycash.in';
+export const LSP_GRO_NAME = 'Mohammad Uvaid';
+export const LSP_GRO_PHONE = '+91-8826370278';
+export const LSP_GRO_EMAIL = 'uvaid@moneycash.in';
+export const LSP_NODAL_NAME = 'Mohammad Uvaid';
+export const LSP_NODAL_PHONE = '+91-8826370278';
+export const LSP_NODAL_EMAIL = 'uvaid@moneycash.in';
 export const LENDER_GRO_NAME = 'Subash Patel';
 export const LENDER_GRO_PHONE = '+91-7318066022';
 export const LENDER_GRO_EMAIL = 'grievance.nodal@aasrafincorp.com';

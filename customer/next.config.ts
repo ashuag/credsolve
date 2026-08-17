@@ -21,7 +21,13 @@ function withOptionalSentry(config: NextConfig): NextConfig {
       // Tunnel through Next to reduce ad-blocker drops of browser events.
       tunnelRoute: '/sentry-tunnel',
       widenClientFileUpload: true,
-      disableLogger: true,
+      // Webpack production builds: drop Sentry debug logger calls from the bundle.
+      // (No-op under Turbopack — tree-shaking is webpack-only.)
+      webpack: {
+        treeshake: {
+          removeDebugLogging: true,
+        },
+      },
     });
   } catch {
     return config;
