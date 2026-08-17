@@ -6,13 +6,13 @@ import { loanDocumentPdfAbsoluteUrl } from '@/lib/api/loan-documents';
 type LoanDocumentScrollPanelProps = {
   title: string;
   pdfUrlFragment: string;
-  onReadyChange: (ready: boolean) => void;
+  onReadyChange?: (ready: boolean) => void;
+  onViewingChange?: (viewing: boolean) => void;
 };
 
 function isMobilePdfHost(): boolean {
   if (typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent || '';
-  // iOS Safari/Chrome never render PDFs inside iframes; many Android WebViews are unreliable too.
   const ios = /iPad|iPhone|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const android = /Android/i.test(ua);
   return ios || android;
@@ -35,14 +35,16 @@ export function LoanDocumentScrollPanel({
   title,
   pdfUrlFragment,
   onReadyChange,
+  onViewingChange,
 }: LoanDocumentScrollPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const endSentinelRef = useRef<HTMLDivElement>(null);
   const [scrolledToEnd, setScrolledToEnd] = useState(false);
-  const [openedExternally, setOpenedExternally] = useState(false);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState('');
-  // Start false for SSR/hydration safety; flip to native viewer on mobile after mount.
-  const [useNativeViewer, setUseNativeViewer] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [hostReady, setHostReady] = useState(false);
+  const [mobileViewerOpen, setMobileViewerOpen] = useState(false);
   const onReadyChangeRef = useRef(onReadyChange);
 
   useEffect(() => {
@@ -50,35 +52,40 @@ export function LoanDocumentScrollPanel({
   }, [onReadyChange]);
 
   useEffect(() => {
-    if (isMobilePdfHost()) setUseNativeViewer(true);
+    const mq = window.matchMedia('(max-width: 1023px)');
+    const apply = () => setIsMobile(isMobilePdfHost() || mq.matches);
+    apply();
+    setHostReady(true);
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
   }, []);
 
   const pdfSrc = loanDocumentPdfAbsoluteUrl(pdfUrlFragment);
-  const canContinue = scrolledToEnd || openedExternally;
+  const showInlineViewer = hostReady && (!isMobile || mobileViewerOpen);
+  const canContinue = scrolledToEnd;
 
   useEffect(() => {
-    onReadyChangeRef.current(canContinue);
+    if (!hostReady) return;
+    onViewingChange?.(showInlineViewer);
+  }, [hostReady, showInlineViewer, onViewingChange]);
+
+  useEffect(() => {
+    onReadyChangeRef.current?.(canContinue);
   }, [canContinue]);
 
   const checkScroll = useCallback(() => {
     const el = scrollRef.current;
-    if (!el) return;
-    // Short documents (or empty frames) still unlock after a full visible pass.
-    if (el.scrollHeight <= el.clientHeight + 8) {
-      setScrolledToEnd(true);
-      return;
-    }
-    const atEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
+    if (!el || !blobUrl) return;
+    const atEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 32;
     if (atEnd) setScrolledToEnd(true);
-  }, []);
+  }, [blobUrl]);
 
   useEffect(() => {
     setScrolledToEnd(false);
-    setOpenedExternally(false);
     setLoadError('');
-    onReadyChangeRef.current(false);
+    onReadyChangeRef.current?.(false);
 
-    if (!pdfSrc || useNativeViewer) {
+    if (!pdfSrc || (isMobile && !mobileViewerOpen)) {
       setBlobUrl(null);
       return;
     }
@@ -98,7 +105,7 @@ export function LoanDocumentScrollPanel({
         }
         const blob = await res.blob();
         if (cancelled) return;
-        const url = URL.createObjectURL(blob);
+        const url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
         revoked = url;
         setBlobUrl(url);
       } catch (e) {
@@ -108,12 +115,11 @@ export function LoanDocumentScrollPanel({
             (e instanceof Error && e.name === 'TimeoutError');
           setLoadError(
             timedOut
-              ? 'The sanction letter is taking too long to generate. Open it in a new tab, or retry.'
+              ? 'The sanction letter is taking too long to generate. Please retry.'
               : e instanceof Error
                 ? e.message
                 : 'Unable to load PDF.',
           );
-          setUseNativeViewer(true);
         }
       }
     })();
@@ -122,33 +128,33 @@ export function LoanDocumentScrollPanel({
       cancelled = true;
       if (revoked) URL.revokeObjectURL(revoked);
     };
-  }, [pdfSrc, useNativeViewer, pdfUrlFragment]);
+  }, [pdfSrc, pdfUrlFragment, isMobile, mobileViewerOpen]);
 
   useEffect(() => {
-    if (useNativeViewer) return;
-    const t = window.setTimeout(checkScroll, 400);
-    return () => window.clearTimeout(t);
-  }, [blobUrl, checkScroll, useNativeViewer]);
+    if (!blobUrl) return;
+    const root = scrollRef.current;
+    const sentinel = endSentinelRef.current;
+    if (!root || !sentinel) return;
 
-  function handleOpenPdf() {
-    setOpenedExternally(true);
-  }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setScrolledToEnd(true);
+        }
+      },
+      { root, threshold: 0.01 },
+    );
+    observer.observe(sentinel);
+    const t = window.setTimeout(checkScroll, 400);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(t);
+    };
+  }, [blobUrl, checkScroll]);
 
   return (
     <div className="flex flex-col gap-4">
-      {!useNativeViewer ? (
-        <a
-          href={pdfSrc}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={handleOpenPdf}
-          className="w-fit shrink-0 text-sm font-semibold text-brand-blue hover:underline"
-        >
-          Open PDF in new tab
-        </a>
-      ) : null}
-
-      {useNativeViewer ? (
+      {isMobile && !mobileViewerOpen ? (
         <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(18,36,79,0.06)]">
           <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-[#1496f3]/10" aria-hidden />
           <div className="pointer-events-none absolute -bottom-16 -left-8 h-28 w-28 rounded-full bg-[#ffc519]/15" aria-hidden />
@@ -159,50 +165,55 @@ export function LoanDocumentScrollPanel({
             </div>
             <p className="m-0 mb-1 text-[0.98rem] font-extrabold leading-snug text-brand-navy">{title}</p>
             <p className="m-0 mb-5 max-w-sm text-sm font-medium leading-relaxed text-slate-500">
-              Your Key Fact Statement opens in a new tab. Read it fully, then come back here to continue.
+              Your Key Fact Statement opens on this page. Read it fully, then continue.
             </p>
-            {loadError ? <p className="mb-3 text-xs font-semibold text-amber-700">{loadError}</p> : null}
-            <a
-              href={pdfSrc}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={handleOpenPdf}
+            <button
+              type="button"
+              onClick={() => setMobileViewerOpen(true)}
               className="mc-btn-primary inline-flex min-h-[48px] w-full items-center justify-center px-6 py-3 text-sm"
             >
-              {openedExternally ? 'Reopen sanction letter' : 'View sanction letter'}
-            </a>
-            {openedExternally ? (
-              <p className="mt-3 mb-0 text-xs font-semibold text-emerald-700">
-                Document opened — you can continue below.
-              </p>
-            ) : (
-              <p className="mt-3 mb-0 text-xs font-medium text-amber-700">Open the PDF to continue.</p>
-            )}
+              View sanction letter
+            </button>
+            <p className="mt-3 mb-0 text-xs font-medium text-amber-700">Open the PDF to continue.</p>
           </div>
         </div>
-      ) : (
-        <div
-          ref={scrollRef}
-          onScroll={checkScroll}
-          className="h-[min(52dvh,480px)] overflow-y-auto rounded-2xl border border-slate-200 bg-white"
-        >
-          {blobUrl ? (
-            <iframe
-              title={title}
-              src={`${blobUrl}#view=FitH`}
-              className="block w-full border-0 bg-white"
-              style={{ height: '4800px' }}
-            />
-          ) : (
-            <div className="flex h-full min-h-[200px] items-center justify-center text-sm font-medium text-slate-500">
-              Preparing your sanction letter…
-            </div>
-          )}
-        </div>
-      )}
+      ) : null}
 
-      {!useNativeViewer && !scrolledToEnd ? (
-        <p className="shrink-0 text-xs font-medium text-amber-700">Scroll to the bottom to continue.</p>
+      {showInlineViewer ? (
+        <>
+          <div
+            ref={scrollRef}
+            onScroll={checkScroll}
+            className="h-[min(70dvh,640px)] overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white"
+          >
+            {blobUrl ? (
+              <div className="relative" style={{ minHeight: '4800px' }}>
+                {/* Cover native PDF chrome (Safari/Chrome toolbar, page, zoom, annotate). */}
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-12 bg-white" aria-hidden />
+                <object
+                  title={title}
+                  data={`${blobUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
+                  type="application/pdf"
+                  className="pointer-events-none block w-full border-0 bg-white"
+                  style={{ height: '4800px' }}
+                >
+                  <iframe
+                    title={title}
+                    src={`${blobUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
+                    className="pointer-events-none block w-full border-0 bg-white"
+                    style={{ height: '4800px' }}
+                  />
+                </object>
+                <div ref={endSentinelRef} className="h-10 w-full bg-white" aria-hidden />
+              </div>
+            ) : (
+              <div className="flex h-full min-h-[200px] items-center justify-center px-4 text-center text-sm font-medium text-slate-500">
+                {loadError || 'Preparing your sanction letter…'}
+              </div>
+            )}
+          </div>
+          {loadError ? <p className="text-xs font-semibold text-amber-700">{loadError}</p> : null}
+        </>
       ) : null}
     </div>
   );

@@ -37,7 +37,9 @@ function LoanDocumentsContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [documents, setDocuments] = useState<LoanDocumentItem[]>([]);
-  const [readyByType, setReadyByType] = useState<Record<string, boolean>>({});
+  const [pdfViewing, setPdfViewing] = useState(false);
+  const [scrolledToEnd, setScrolledToEnd] = useState(false);
+  const [accepted, setAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -64,11 +66,9 @@ function LoanDocumentsContent() {
   }, [refreshSession, router]);
 
   const current = documents[0];
-  const allReviewed =
-    documents.length > 0 && documents.every((d) => readyByType[d.type] === true);
 
   async function handleContinue() {
-    if (!allReviewed) return;
+    if (!scrolledToEnd || !accepted) return;
     setError('');
     setIsSubmitting(true);
     try {
@@ -91,6 +91,7 @@ function LoanDocumentsContent() {
         </div>
       ) : current ? (
         <div className="flex w-full min-w-0 flex-1 flex-col gap-5 pb-2 lg:gap-4 lg:pb-0">
+          {!pdfViewing ? (
           <div>
             <p className="mc-chip mb-3">Sanction letter</p>
             <h1 className="mb-2 text-2xl font-extrabold leading-[1.1] tracking-tight text-brand-navy md:text-[2.1rem]">
@@ -102,20 +103,44 @@ function LoanDocumentsContent() {
               </div>
             ) : null}
           </div>
+          ) : error ? (
+            <AlertBanner variant="error">{error}</AlertBanner>
+          ) : null}
 
           <LoanDocumentScrollPanel
             key={current.type}
             title={current.title}
             pdfUrlFragment={current.pdfUrl}
-            onReadyChange={(next) =>
-              setReadyByType((prev) => ({ ...prev, [current.type]: next }))
-            }
+            onViewingChange={setPdfViewing}
+            onReadyChange={(ready) => {
+              setScrolledToEnd(ready);
+              if (!ready) setAccepted(false);
+            }}
           />
 
+          {pdfViewing ? (
           <div className="sticky bottom-0 z-20 -mx-5 mt-auto border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur-md lg:static lg:mx-0 lg:mt-2 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0 lg:backdrop-blur-none">
+            <label
+              className={[
+                'mb-3 flex items-start gap-3 text-[0.82rem] font-medium leading-snug',
+                scrolledToEnd ? 'cursor-pointer text-slate-700' : 'cursor-not-allowed text-slate-400',
+              ].join(' ')}
+            >
+              <input
+                type="checkbox"
+                checked={accepted}
+                disabled={!scrolledToEnd}
+                onChange={(e) => setAccepted(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-brand-blue focus:ring-brand-blue disabled:opacity-40"
+              />
+              <span>I have read and understood the sanction letter and Key Fact Statement.</span>
+            </label>
+            {!scrolledToEnd ? (
+              <p className="mb-3 mt-0 text-xs font-medium text-amber-700">Scroll to the bottom of the letter to enable this.</p>
+            ) : null}
             <button
               type="button"
-              disabled={!allReviewed || isSubmitting}
+              disabled={!scrolledToEnd || !accepted || isSubmitting}
               onClick={() => void handleContinue()}
               className="mc-btn-primary w-full shrink-0 py-4"
             >
@@ -128,6 +153,7 @@ function LoanDocumentsContent() {
               )}
             </button>
           </div>
+          ) : null}
         </div>
       ) : (
         <AlertBanner variant="error">{error || 'No documents available.'}</AlertBanner>
@@ -145,7 +171,8 @@ function LoanDocumentsContent() {
 
         <LoanLandingShell
           fullBleedPanel
-          showSpeedometer
+          showSpeedometer={!pdfViewing}
+          hideMobileChrome={pdfViewing}
           journeyPanel={journeyPanel}
           leftTitle={
             <>

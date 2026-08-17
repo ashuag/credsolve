@@ -26,8 +26,8 @@ export type LoanLandingShellProps = {
   mobileStepLabel?: string;
   /** Mobile app bar: called when the back arrow is tapped. If omitted, back arrow is hidden. */
   mobileOnBack?: () => void;
-  /** Use full right-panel width (e.g. embedded PDF viewer) instead of the default 480px form column. */
-  fullBleedPanel?: boolean;
+  /** Hide the mobile logo bar and progress strip (e.g. while a PDF fills the screen). */
+  hideMobileChrome?: boolean;
 };
 
 /* ── Mobile progress bar driven by journey context ──────────────────────── */
@@ -55,6 +55,7 @@ export function LoanLandingShell({
   mobileStepLabel,
   mobileOnBack,
   fullBleedPanel = false,
+  hideMobileChrome = false,
 }: LoanLandingShellProps) {
   const defaultTitle = (
     <>Fast. Secure. <span className="text-transparent bg-clip-text bg-gradient-to-br from-[#1fa2ff] to-[#1496f3] drop-shadow-[0_0_12px_rgba(20,150,243,0.3)]">Instant.</span></>
@@ -77,6 +78,7 @@ export function LoanLandingShell({
       ].join(' ')}
     >
       {/* ── Mobile app bar (hidden on lg+) ────────────────────────────────── */}
+      {!hideMobileChrome ? (
       <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 pt-[env(safe-area-inset-top)] shadow-[0_1px_0_rgba(18,36,79,0.06)] backdrop-blur-md lg:hidden">
         <div className="relative flex h-14 items-center px-4">
           <Link href="/" className="absolute left-1/2 -translate-x-1/2">
@@ -95,9 +97,10 @@ export function LoanLandingShell({
 
         <MobileProgressBar />
       </header>
+      ) : null}
 
       {/* Mobile / narrow: full gauge (desktop shows this in the dark left rail). */}
-      {showSpeedometer ? (
+      {showSpeedometer && !hideMobileChrome ? (
         <div className="lg:hidden shrink-0 border-b border-white/10 bg-[#0a1628] py-3 flex justify-center">
           <JourneySpeedometer />
         </div>
