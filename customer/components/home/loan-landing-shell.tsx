@@ -28,6 +28,8 @@ export type LoanLandingShellProps = {
   mobileOnBack?: () => void;
   /** Hide the mobile logo bar and progress strip (e.g. while a PDF fills the screen). */
   hideMobileChrome?: boolean;
+  /** Stretch the journey panel to fill remaining height (PDF / document review). */
+  fullBleedPanel?: boolean;
 };
 
 /* ── Mobile progress bar driven by journey context ──────────────────────── */
