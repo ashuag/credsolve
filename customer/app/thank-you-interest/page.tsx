@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import { Spinner } from '@/components/ui/spinner';
@@ -8,21 +8,26 @@ import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 
 export default function ThankYouInterestPage() {
   const router = useRouter();
-  const { loading, session } = useCustomerSession();
+  const { loading, session, signOut } = useCustomerSession();
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const signedOutRef = useRef(false);
 
   useEffect(() => {
     if (loading) return;
 
-    if (!session?.authenticated) {
-      router.replace('/apply-for-loan');
+    if (session?.authenticated) {
+      setCustomerName(session.profile?.fullName?.trim() || null);
+      setReady(true);
+      if (!signedOutRef.current) {
+        signedOutRef.current = true;
+        void signOut();
+      }
       return;
     }
 
-    setCustomerName(session.profile?.fullName?.trim() || null);
     setReady(true);
-  }, [loading, session, router]);
+  }, [loading, session, signOut]);
 
   if (loading || !ready) {
     return (
@@ -65,22 +70,13 @@ export default function ThankYouInterestPage() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-3">
-          <button
-            type="button"
-            onClick={() => router.push('/my-account')}
-            className="mc-btn-primary block w-full py-4 text-center text-[1rem]"
-          >
-            Go to My Account
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push('/')}
-            className="mc-btn-secondary block w-full py-4 text-center text-[1rem]"
-          >
-            Back to Home
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => router.push('/')}
+          className="mc-btn-primary block w-full py-4 text-center text-[1rem]"
+        >
+          Back to Home
+        </button>
       </div>
     </div>
   );

@@ -148,7 +148,8 @@ export function getCustomerAccountMenuTriggerLabel(
 
 /** Customer has started a loan application (active lead exists after mobile OTP / onboarding). */
 export function hasActiveLoanLead(session: CustomerSessionResponse | null | undefined): boolean {
-  return Boolean(session && session.authenticated && session.lead != null);
+  if (!session || session.authenticated !== true || !session.lead) return false;
+  return !isLeadRejectedAndLocked(session.lead);
 }
 
 /** Active lead escalated for vendor / internal processing failure (e.g. Tenacio `api 505`). */
@@ -234,12 +235,10 @@ export function canResumeKycAfterInternalError(
   return !kyc?.digilockerAadhaarCaptured;
 }
 
-/** Returns `true` when the lead is REJECTED or BLACKLISTED and the reapply window hasn't elapsed yet. */
+/** True when the active lead is REJECTED or BLACKLISTED (cooldown still applies server-side). */
 export function isLeadRejectedAndLocked(lead: CustomerPortalLead | null | undefined): boolean {
   if (!lead) return false;
-  if (lead.status !== 'REJECTED' && lead.status !== 'BLACKLISTED') return false;
-  if (!lead.rejectedUntil) return false;
-  return new Date(lead.rejectedUntil).getTime() > Date.now();
+  return lead.status === 'REJECTED' || lead.status === 'BLACKLISTED';
 }
 
 /** True when the customer still has loan-application steps left (hub should show "Complete your journey"). */
@@ -350,9 +349,8 @@ function resumePathFromOtpLeadStatus(otpLeadStatus: string): string | null {
  * After mobile OTP: resume an in-flight application (including `INTERNAL_ERROR` → thank-you),
  * or fall back to the account hub when there is no active lead.
  *
- * My Account login (`accountHubFallback` = `/my-account`) must keep rejected / KYC-failed
- * customers on the hub. Sending them to `/thank-you-interest` logs them out and loops them
- * back to the login screen.
+ * Rejected / blacklisted leads always go to `/thank-you-interest` (then logout),
+ * including My Account login — never the in-progress hub.
  *
  * Prefer `otpLeadStatus` from verify-otp when the session cookie is not visible to `/auth/me` yet.
  */
@@ -375,25 +373,17 @@ export function getCustomerPostMobileOtpRedirectPath(
     return '/thank-you';
   }
 
+  if (isLeadRejectedAndLocked(lead) || statusHint === CUSTOMER_LEAD_STATUS.REJECTED || statusHint === CUSTOMER_LEAD_STATUS.BLACKLISTED) {
+    return '/thank-you-interest';
+  }
+
   if (session?.authenticated && lead) {
-    if (isLeadRejectedAndLocked(lead)) {
-      if (isAccountHubFallback(accountHubFallback)) {
-        return accountHubFallback;
-      }
-      return '/thank-you-interest';
-    }
     return getCustomerJourneyResumePath(session);
   }
 
   // Session missing or lead not loaded yet — trust verify-otp lead status.
   const fromOtp = statusHint ? resumePathFromOtpLeadStatus(statusHint) : null;
   if (fromOtp) {
-    if (
-      fromOtp === '/thank-you-interest' &&
-      isAccountHubFallback(accountHubFallback)
-    ) {
-      return accountHubFallback;
-    }
     return fromOtp;
   }
 

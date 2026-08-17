@@ -17,30 +17,18 @@ export function mapLookupToOption(entry: { key: string; name: string }): Custome
   return { value: entry.key, label: entry.name.trim() };
 }
 
-const ANNUAL_METRIC_OCCUPATIONS = new Set(
-  ['SELF_EMPLOYED_PROFESSIONAL', 'SELF_EMPLOYED_BUSINESS']
-);
-
-const MONTHLY_METRIC_OCCUPATIONS = new Set(
-  ['SALARIED', 'STUDENT', 'HOMEMAKER', 'RETIRED']
-);
-
-export function usesAnnualFinancialMetric(occupation?: string) {
-  return occupation != null && ANNUAL_METRIC_OCCUPATIONS.has(occupation);
+export function usesAnnualFinancialMetric(_occupation?: string) {
+  return false;
 }
 
 export function usesMonthlyIncomeMetric(occupation?: string) {
-  return occupation != null && MONTHLY_METRIC_OCCUPATIONS.has(occupation);
+  return occupation != null && occupation.trim() !== '';
 }
 
-export function getFinancialMetricLabel(occupation?: string) {
-  if (usesAnnualFinancialMetric(occupation)) return 'Annual turnover / annual profit';
-  if (usesMonthlyIncomeMetric(occupation)) return 'Monthly income';
-  return 'Income details';
+export function getFinancialMetricLabel(_occupation?: string) {
+  return 'Monthly income';
 }
 
-export function getFinancialMetricHelp(occupation?: string) {
-  if (usesAnnualFinancialMetric(occupation)) return 'Share your latest annual turnover and annual profit in INR.';
-  if (usesMonthlyIncomeMetric(occupation)) return 'Share your current take-home monthly income in INR.';
-  return 'Share your income details if applicable.';
+export function getFinancialMetricHelp(_occupation?: string) {
+  return 'Share your current take-home monthly income in INR.';
 }

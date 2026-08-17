@@ -1,26 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import type { PrismaService } from '../../prisma/prisma.service';
-import { OCCUPATION } from '../constants/occupation.constants';
-
-/** Minimum annual turnover for self-employed applicants (INR). */
-export const MIN_ANNUAL_TURNOVER = 120_000;
-
-/** Minimum annual profit for self-employed applicants (INR). */
-export const MIN_ANNUAL_PROFIT = 10_000;
 
 const ADDRESS_ALLOWED_PATTERN = /^[\p{L}\p{N} .,#\-/]+$/u;
-
-const SELF_EMPLOYED_KEYS = new Set<string>([
-  OCCUPATION.SELF_EMPLOYED_PROFESSIONAL.key,
-  OCCUPATION.SELF_EMPLOYED_BUSINESS.key,
-]);
-
-const MONTHLY_INCOME_KEYS = new Set<string>([
-  OCCUPATION.SALARIED.key,
-  OCCUPATION.STUDENT.key,
-  OCCUPATION.HOMEMAKER.key,
-  OCCUPATION.RETIRED.key,
-]);
 
 export function validateAddressLine1(value: string): string | null {
   const trimmed = value.trim();
@@ -44,36 +25,17 @@ export function validateOccupationIncome(
     annualProfit?: number | null;
   },
 ): string | null {
-  if (occupationKey === OCCUPATION.SALARIED.key) {
-    const income = amounts.monthlyIncome;
-    if (income == null || !Number.isFinite(income)) {
-      return 'Monthly income is required for salaried applicants.';
-    }
-    if (income < 0) {
-      return 'Monthly income must be a valid amount (0 is allowed).';
-    }
-    return null;
+  if (!occupationKey) {
+    return 'Occupation is required.';
   }
 
-  if (SELF_EMPLOYED_KEYS.has(occupationKey)) {
-    const turnover = amounts.annualTurnover;
-    const profit = amounts.annualProfit;
-    if (turnover == null || !Number.isFinite(turnover) || turnover < MIN_ANNUAL_TURNOVER) {
-      return `Annual turnover must be at least ₹${MIN_ANNUAL_TURNOVER.toLocaleString('en-IN')}.`;
-    }
-    if (profit == null || !Number.isFinite(profit) || profit < MIN_ANNUAL_PROFIT) {
-      return `Annual profit must be at least ₹${MIN_ANNUAL_PROFIT.toLocaleString('en-IN')}.`;
-    }
-    return null;
+  const income = amounts.monthlyIncome;
+  if (income == null || !Number.isFinite(income)) {
+    return 'Monthly income is required.';
   }
-
-  if (MONTHLY_INCOME_KEYS.has(occupationKey)) {
-    const income = amounts.monthlyIncome;
-    if (income == null || !Number.isFinite(income) || income < 0) {
-      return 'Monthly income must be a valid amount (0 is allowed).';
-    }
+  if (income < 0) {
+    return 'Monthly income must be a valid amount (0 is allowed).';
   }
-
   return null;
 }
 

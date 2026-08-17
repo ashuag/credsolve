@@ -30,7 +30,8 @@ function isGuestAccessiblePath(path: string): boolean {
     path === '/' ||
     path === '/apply-for-loan' ||
     path === '/my-account' ||
-    path === '/login'
+    path === '/login' ||
+    path === '/thank-you-interest'
   );
 }
 
@@ -112,18 +113,6 @@ function isPathAllowedForStage(stage: JourneyStage, path: string): boolean {
   }
 }
 
-/** Routes a rejected / locked lead may still open (account hub — not the apply journey). */
-function isRejectedLeadHubPath(path: string): boolean {
-  return (
-    path === '/' ||
-    path === '/my-account' ||
-    path === '/dashboard' ||
-    path === '/payments' ||
-    path === '/active-loan' ||
-    path === '/thank-you-interest'
-  );
-}
-
 export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -182,11 +171,9 @@ export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
     }
 
     if (isLeadRejectedAndLocked(session.lead)) {
-      // Keep account hub usable (past loans / repayments); only leave the apply journey.
-      if (isRejectedLeadHubPath(pathname)) {
-        return;
+      if (pathname !== '/thank-you-interest') {
+        router.replace('/thank-you-interest');
       }
-      router.replace('/thank-you-interest');
       return;
     }
 

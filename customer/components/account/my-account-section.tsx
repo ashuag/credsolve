@@ -17,6 +17,7 @@ import {
   isCustomerJourneyIncomplete,
   isCustomerPortalSignedIn,
   hasOpenCustomerLoan,
+  isLeadRejectedAndLocked,
 } from '@/lib/api/customer-session';
 import {
   buildCustomerJourneyProgress,
@@ -728,6 +729,7 @@ export function MyAccountSection({
     hasOpenCustomerLoan(session) || dash.activeLoans.length > 0;
   const showIncompleteJourney = useMemo(() => {
     if (hasOpenLoan) return false;
+    if (session?.authenticated === true && isLeadRejectedAndLocked(session.lead)) return false;
     return isCustomerJourneyIncomplete(session);
   }, [hasOpenLoan, session]);
 

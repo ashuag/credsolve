@@ -25,7 +25,7 @@ import {
   truncateUuid,
 } from '@/lib/application-review-format';
 import { isApplicationJourneyStepActive } from '@/lib/customer-journey';
-import { usesAnnualFinancialMetric, usesMonthlyIncomeMetric, resolveOccupationKey } from '@/lib/customer-details';
+import { usesMonthlyIncomeMetric, resolveOccupationKey } from '@/lib/customer-details';
 import {
   combineMatchVerdicts,
   compareGenders,
@@ -961,17 +961,11 @@ export function ReviewPersonalPanel({
             <ReviewField label="Occupation" value={profile.occupation ?? '—'} />
             {usesMonthlyIncomeMetric(occupationKey) ? (
               <ReviewField
-                label="Monthly salary"
+                label="Monthly income"
                 value={<span className="mono">{formatReviewInr(profile.netMonthlyIncome)}</span>}
                 tone={salaryFlag ? 'flag' : undefined}
                 sub={salaryFlag ? 'Below threshold' : undefined}
               />
-            ) : null}
-            {usesAnnualFinancialMetric(occupationKey) ? (
-              <>
-                <ReviewField label="Annual turnover" value={<span className="mono">{formatReviewInr(profile.annualTurnover)}</span>} />
-                <ReviewField label="Annual profit" value={<span className="mono">{formatReviewInr(profile.annualProfit)}</span>} />
-              </>
             ) : null}
           </div>
         </ReviewCard>

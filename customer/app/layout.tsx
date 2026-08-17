@@ -5,6 +5,7 @@ import {ReactNode} from 'react';
 import {CustomerUtmBootstrap} from '@/components/auth/customer-utm-bootstrap';
 import { LayoutWrapper } from '@/components/layout/LayoutWrapper';
 import {CustomerSessionProvider} from '@/components/providers/customer-session-provider';
+import {RejectedLeadSessionGate} from '@/components/auth/rejected-lead-session-gate';
 import { MAX_LOAN_DISPLAY } from '@/lib/brand';
 
 const inter = localFont({
@@ -57,9 +58,11 @@ export default function RootLayout({children}: Readonly<{ children: ReactNode }>
         <body suppressHydrationWarning>
             <CustomerSessionProvider>
                 <CustomerUtmBootstrap/>
-                <LayoutWrapper>
-                    {children}
-                </LayoutWrapper>
+                <RejectedLeadSessionGate>
+                    <LayoutWrapper>
+                        {children}
+                    </LayoutWrapper>
+                </RejectedLeadSessionGate>
             </CustomerSessionProvider>
         </body>
         </html>

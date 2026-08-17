@@ -3,7 +3,6 @@
 import { ApplicationCibilReportTab } from '@/components/applications/application-cibil-report-tab';
 import { KycComparedValue } from '@/components/applications/kyc-field-match-badge';
 import { cx } from '@/components/eligibility/eligibility-ui';
-import { usesAnnualFinancialMetric, usesMonthlyIncomeMetric, resolveOccupationKey } from '@/lib/customer-details';
 import {
   compareGenders,
   compareIsoDates,
@@ -106,21 +105,10 @@ function formatInr(value: string | null | undefined): string {
 }
 
 function buildEmploymentRows(profile: NonNullable<LosApplicationDetails['lead']['profile']>) {
-  const occupationKey = resolveOccupationKey(profile.occupationKey, profile.occupation);
-  const rows: Array<{ label: string; value: ReactNode }> = [
+  return [
     { label: 'Occupation', value: profile.occupation ?? '—' },
+    { label: 'Monthly income', value: formatInr(profile.netMonthlyIncome) },
   ];
-
-  if (usesMonthlyIncomeMetric(occupationKey)) {
-    rows.push({ label: 'Monthly salary', value: formatInr(profile.netMonthlyIncome) });
-  } else if (usesAnnualFinancialMetric(occupationKey)) {
-    rows.push(
-      { label: 'Annual turnover', value: formatInr(profile.annualTurnover) },
-      { label: 'Annual profit', value: formatInr(profile.annualProfit) },
-    );
-  }
-
-  return rows;
 }
 
 function ProfileSection({ title, children }: { title: string; children: ReactNode }) {

@@ -8,10 +8,6 @@ const OCCUPATION_NAME_TO_KEY: Record<string, string> = {
   Unemployed: 'UNEMPLOYED',
 };
 
-const ANNUAL_METRIC_KEYS = new Set(['SELF_EMPLOYED_PROFESSIONAL', 'SELF_EMPLOYED_BUSINESS']);
-
-const MONTHLY_METRIC_KEYS = new Set(['SALARIED', 'STUDENT', 'HOMEMAKER', 'RETIRED']);
-
 export function resolveOccupationKey(
   occupationKey?: string | null,
   occupationName?: string | null,
@@ -21,14 +17,10 @@ export function resolveOccupationKey(
   return OCCUPATION_NAME_TO_KEY[occupationName.trim()];
 }
 
-export function usesAnnualFinancialMetric(occupationKeyOrName?: string) {
-  if (!occupationKeyOrName) return false;
-  const key = resolveOccupationKey(occupationKeyOrName, occupationKeyOrName) ?? occupationKeyOrName;
-  return ANNUAL_METRIC_KEYS.has(key);
+export function usesAnnualFinancialMetric(_occupationKeyOrName?: string) {
+  return false;
 }
 
 export function usesMonthlyIncomeMetric(occupationKeyOrName?: string) {
-  if (!occupationKeyOrName) return false;
-  const key = resolveOccupationKey(occupationKeyOrName, occupationKeyOrName) ?? occupationKeyOrName;
-  return MONTHLY_METRIC_KEYS.has(key);
+  return Boolean(occupationKeyOrName?.trim());
 }

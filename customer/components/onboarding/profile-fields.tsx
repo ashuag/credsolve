@@ -1,6 +1,6 @@
 import type { ChangeEvent } from 'react';
 import { DatePickerField } from '@/components/ui/date-picker-field';
-import { FormInput, FormSelect, StickyActions, secondaryBtn } from './_form-ui';
+import { FormInput, FormSelect, StickyActions } from './_form-ui';
 import type { Fields, FieldError, SelectOption, OnChange } from './_types';
 
 type Props = {
@@ -11,8 +11,6 @@ type Props = {
   isLoadingLookups: boolean;
   maxDob: Date;
   dobDisplay: string;
-  usesMonthlyIncome: boolean;
-  isSelfEmployed: boolean;
   onDobChange: (v: string) => void;
   onPanChange: (e: ChangeEvent<HTMLInputElement>) => void;
   onFieldChange: OnChange;
@@ -26,7 +24,7 @@ const inrField = { type: 'text' as const, inputMode: 'numeric' as const, placeho
 
 export function ProfileFields({
   fields, errors, genderOptions, occupationOptions, isLoadingLookups, maxDob,
-  dobDisplay, usesMonthlyIncome, isSelfEmployed,
+  dobDisplay,
   onDobChange, onPanChange, onFieldChange, onBack, onContinue, isBusy, busyLabel,
 }: Props) {
   return (
@@ -63,20 +61,9 @@ export function ProfileFields({
           {occupationOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </FormSelect>
 
-        {usesMonthlyIncome && (
-          <FormInput span2 id="monthlyIncome" error={errors.monthlyIncome}
-            label={fields.occupation === 'SALARIED' ? 'Monthly salary' : 'Monthly income'}
-            value={fields.monthlyIncome} onChange={onFieldChange('monthlyIncome')} {...inrField} />
-        )}
-
-        {isSelfEmployed && (
-          <>
-            <FormInput id="annualTurnover" label="Annual turnover" error={errors.annualTurnover}
-              value={fields.annualTurnover} onChange={onFieldChange('annualTurnover')} {...inrField} />
-            <FormInput id="annualProfit" label="Annual profit" error={errors.annualProfit}
-              value={fields.annualProfit} onChange={onFieldChange('annualProfit')} {...inrField} />
-          </>
-        )}
+        <FormInput span2 id="monthlyIncome" error={errors.monthlyIncome}
+          label="Monthly income"
+          value={fields.monthlyIncome} onChange={onFieldChange('monthlyIncome')} {...inrField} />
       </div>
 
       <StickyActions>

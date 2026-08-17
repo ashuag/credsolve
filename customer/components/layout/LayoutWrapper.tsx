@@ -29,6 +29,7 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
 
   const isLandingPage = pathname === '/';
   const isApplyPage = pathname === '/apply-for-loan';
+  const isRejectionPage = pathname === '/thank-you-interest';
   /** Offer / selection steps use the full journey shell (no account tab bar). */
   const isOfferJourneyPage =
     pathname === '/pre-approved-loan' || pathname === '/loan-selection';
@@ -47,6 +48,7 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
   if (
     isLandingPage ||
     isApplyPage ||
+    isRejectionPage ||
     isOfferJourneyPage ||
     (isAccountLoginPage && !signedIn)
   ) {

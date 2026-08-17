@@ -17,10 +17,9 @@ import type { CityInputChange } from '@/components/ui/searchable-city-input';
 import type { CustomerPortalProfile } from '@/lib/api/customer-session';
 import { saveLeadDetails, saveLeadProfile, verifyLeadPan } from '@/lib/api/lead';
 import { fetchPincodeLookup } from '@/lib/api/lookup';
-import { usesAnnualFinancialMetric, usesMonthlyIncomeMetric } from '@/lib/customer-details';
 import { formatDateDisplay, formatDateIso, getAge, parseDobDisplay, parseIsoDate } from '@/lib/date-utils';
 import { useCustomerDetailLookups } from '@/lib/use-customer-detail-lookups';
-import { isValidPan, isValidPersonName, PERSON_NAME_VALIDATION_MESSAGE, PINCODE_REGEX, sanitizePersonNameInput, isValidAddressLine1, ADDRESS_LINE1_VALIDATION_MESSAGE, MIN_ANNUAL_TURNOVER, MIN_ANNUAL_PROFIT } from '@/lib/validators';
+import { isValidPan, isValidPersonName, PERSON_NAME_VALIDATION_MESSAGE, PINCODE_REGEX, sanitizePersonNameInput, isValidAddressLine1, ADDRESS_LINE1_VALIDATION_MESSAGE } from '@/lib/validators';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 import { ProfileFields } from './profile-fields';
 import { FinancialFields } from './financial-fields';
@@ -78,14 +77,9 @@ function profileCompletion(fields: Fields, dobDisplay: string): number {
   ];
 
   const occ = fields.occupation;
-  if (occ && usesMonthlyIncomeMetric(occ)) {
+  if (occ) {
     const m = fields.monthlyIncome.trim();
     checks.push(m !== '' && Number.isFinite(Number(m)) && Number(m) >= 0);
-  }
-
-  if (occ && usesAnnualFinancialMetric(occ)) {
-    checks.push(Boolean(fields.annualTurnover && Number(fields.annualTurnover) >= MIN_ANNUAL_TURNOVER));
-    checks.push(Boolean(fields.annualProfit && Number(fields.annualProfit) >= MIN_ANNUAL_PROFIT));
   }
 
   return checks.filter((v) => Boolean(v)).length / checks.length;
@@ -138,8 +132,6 @@ export function PersonalDetailsStep(
   const draftKey = `${DRAFT_KEY_PREFIX}${leadUuid}`;
 
   const maxDob = useMemo(() => { const d = new Date(); d.setFullYear(d.getFullYear() - 18); return d; }, []);
-  const isSelfEmployed = usesAnnualFinancialMetric(fields.occupation || undefined);
-  const usesMonthlyIncome = usesMonthlyIncomeMetric(fields.occupation || undefined);
 
   useEffect(() => {
     if (!setCompletion01) return;
@@ -227,10 +219,8 @@ export function PersonalDetailsStep(
       setFields((prev) => {
         const next = { ...prev, [key]: v } as Fields;
         if (key === 'occupation') {
-          const occ = v;
-          if (usesAnnualFinancialMetric(occ || undefined)) next.monthlyIncome = '';
-          else if (usesMonthlyIncomeMetric(occ || undefined)) { next.annualTurnover = ''; next.annualProfit = ''; }
-          else { next.monthlyIncome = ''; next.annualTurnover = ''; next.annualProfit = ''; }
+          next.annualTurnover = '';
+          next.annualProfit = '';
         }
         return next;
       });
@@ -267,19 +257,9 @@ export function PersonalDetailsStep(
     if (!fields.gender) err.gender = 'Please select your gender.';
     if (!isValidPan(fields.panNumber.trim())) err.panNumber = 'Please enter a valid 10-character PAN.';
     if (!fields.occupation) err.occupation = 'Please select your occupation.';
-    if (usesMonthlyIncome) {
-      const m = fields.monthlyIncome.trim();
-      if (!m || !Number.isFinite(Number(m)) || Number(m) < 0) {
-        err.monthlyIncome = 'Please enter your monthly income (0 is allowed).';
-      }
-    }
-    if (isSelfEmployed) {
-      if (!fields.annualTurnover || Number(fields.annualTurnover) < MIN_ANNUAL_TURNOVER) {
-        err.annualTurnover = `Please enter annual turnover of at least ₹${MIN_ANNUAL_TURNOVER.toLocaleString('en-IN')}.`;
-      }
-      if (!fields.annualProfit || Number(fields.annualProfit) < MIN_ANNUAL_PROFIT) {
-        err.annualProfit = `Please enter annual profit of at least ₹${MIN_ANNUAL_PROFIT.toLocaleString('en-IN')}.`;
-      }
+    const m = fields.monthlyIncome.trim();
+    if (!m || !Number.isFinite(Number(m)) || Number(m) < 0) {
+      err.monthlyIncome = 'Please enter your monthly income (0 is allowed).';
     }
     return err;
   }
@@ -304,9 +284,7 @@ export function PersonalDetailsStep(
       gender: fields.gender,
       occupation: fields.occupation,
       panNumber: pan,
-      ...(usesMonthlyIncome ? { monthlyIncome: fields.monthlyIncome.trim() } : {}),
-      ...(isSelfEmployed ? { annualTurnover: fields.annualTurnover.trim(), 
-      annualProfit: fields.annualProfit.trim() } : {}),
+      monthlyIncome: fields.monthlyIncome.trim(),
     };
   }
 
@@ -361,8 +339,7 @@ export function PersonalDetailsStep(
         fullName: fields.fullName.trim(), dob: fields.dob,
         gender: fields.gender, occupation: fields.occupation,
         creditConsentAccepted: fields.creditConsentAccepted,
-        ...(usesMonthlyIncome ? { monthlyIncome: fields.monthlyIncome.trim() } : {}),
-        ...(isSelfEmployed ? { annualTurnover: fields.annualTurnover.trim(), annualProfit: fields.annualProfit.trim() } : {}),
+        monthlyIncome: fields.monthlyIncome.trim(),
       });
       await advanceCheckStep(1);
       await advanceCheckStep(LAST_ELIGIBILITY_STEP);
@@ -428,9 +405,7 @@ export function PersonalDetailsStep(
               occupationOptions={occupationOptions}
               isLoadingLookups={isLoadingLookups} 
               maxDob={maxDob}
-              dobDisplay={dobDisplay} 
-              usesMonthlyIncome={usesMonthlyIncome} 
-              isSelfEmployed={isSelfEmployed}
+              dobDisplay={dobDisplay}
               onDobChange={handleDobChange} 
               onPanChange={handlePanChange} 
               onFieldChange={setField}
