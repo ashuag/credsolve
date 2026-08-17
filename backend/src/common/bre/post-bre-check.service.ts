@@ -542,7 +542,7 @@ export class PostBreCheckService {
     if (thresholds.minUnsecuredLoanAmount != null) {
       activeTradelineRuleIds.push(EC.MIN_UNSECURED_LOAN_AMOUNT);
       const minAmount = thresholds.minUnsecuredLoanAmount;
-      const total = exposure.totalOpenUnsecuredExposureInr;
+      const total = exposure.totalUnsecuredExposureInr;
       const passed = total >= minAmount;
       const shortfall = minAmount - total;
       push({
@@ -551,12 +551,12 @@ export class PostBreCheckService {
         passed,
         rejectionReasonCode: passed ? null : REJECTION_REASON.MIN_UNSECURED_LOAN_AMOUNT_FAILED,
         detail: passed
-          ? `Total open unsecured exposure ${total} INR meets minimum ${minAmount} INR.`
-          : `Total open unsecured exposure ${total} INR is below minimum ${minAmount} INR.`,
+          ? `Total unsecured exposure ${total} INR meets minimum ${minAmount} INR.`
+          : `Total unsecured exposure ${total} INR is below minimum ${minAmount} INR.`,
         meta: {
-          totalOpenUnsecuredExposureInr: total,
+          totalUnsecuredExposureInr: total,
           minUnsecuredLoanAmount: minAmount,
-          openUnsecuredTradelineCount: exposure.lines.length,
+          unsecuredTradelineCount: exposure.lines.length,
         },
         criteriaKeys: [EC.MIN_UNSECURED_LOAN_AMOUNT],
         findings: passed
@@ -564,12 +564,12 @@ export class PostBreCheckService {
           : [
               {
                 title: 'Unsecured exposure below minimum',
-                detail: `Need at least ${minAmount} INR total open unsecured exposure; shortfall of ${shortfall} INR.`,
+                detail: `Need at least ${minAmount} INR total unsecured exposure; shortfall of ${shortfall} INR.`,
                 data: {
-                  totalOpenUnsecuredExposureInr: total,
+                  totalUnsecuredExposureInr: total,
                   minUnsecuredLoanAmount: minAmount,
                   shortfallInr: shortfall,
-                  openUnsecuredTradelineCount: exposure.lines.length,
+                  unsecuredTradelineCount: exposure.lines.length,
                 },
               },
               ...exposure.lines.map((line) => ({
@@ -839,11 +839,11 @@ export class PostBreCheckService {
 
     if (thresholds.minUnsecuredLoanAmount != null) {
       const exposure = computeOpenUnsecuredExposureBreakdown(rawPayload);
-      const total = exposure.totalOpenUnsecuredExposureInr;
+      const total = exposure.totalUnsecuredExposureInr;
       if (total < thresholds.minUnsecuredLoanAmount) {
         return {
           passed: false,
-          rejectReason: `Total open unsecured exposure ${total} INR is below minimum ${thresholds.minUnsecuredLoanAmount} INR.`,
+          rejectReason: `Total unsecured exposure ${total} INR is below minimum ${thresholds.minUnsecuredLoanAmount} INR.`,
           rejectionReasonCode: REJECTION_REASON.MIN_UNSECURED_LOAN_AMOUNT_FAILED,
         };
       }

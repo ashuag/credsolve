@@ -327,15 +327,15 @@ export function buildPostBreRulesCatalog(thresholds: PostBreThresholdsSnapshot):
       toggleCriteriaKey: null,
       criteriaKeys: [EC.MIN_UNSECURED_LOAN_AMOUNT],
       rejectionReasonCode: REJECTION_REASON.MIN_UNSECURED_LOAN_AMOUNT_FAILED,
-      condition: `Total open unsecured tradeline exposure < ₹${thresholds.minUnsecuredLoanAmount}.`,
-      passCondition: `Sum of open unsecured exposure ≥ ₹${thresholds.minUnsecuredLoanAmount}.`,
+      condition: `Total unsecured tradeline exposure < ₹${thresholds.minUnsecuredLoanAmount}.`,
+      passCondition: `Sum of unsecured exposure (open + closed) ≥ ₹${thresholds.minUnsecuredLoanAmount}.`,
       dataSources: [
-        'TradeLinePartition → Tradeline (open unsecured TUEF Appendix E types)',
+        'TradeLinePartition → Tradeline (unsecured TUEF Appendix E types, open and closed)',
         'highBalance / currentBalance / GrantedTrade.CreditLimit',
       ],
       tuefReference: 'Appendix E unsecured account types',
       notes:
-        'Uses totalOpenUnsecuredExposureInr (sum of every open unsecured tradeline). Pre-approved offer uses total unsecured (open + closed), not this open-only total.',
+        'Uses totalUnsecuredExposureInr (sum of every unsecured tradeline, open and closed) — the same figure the pre-approved offer/credit-limit tier lookup uses.',
     },
     {
       id: EC.REJECTED_CREDIT_ASSESSMENT_GRADES,

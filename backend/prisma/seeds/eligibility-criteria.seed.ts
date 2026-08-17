@@ -27,7 +27,7 @@ const CRITERIA: Array<{ key: string; label: string; value: string; breType: stri
   { key: 'NO_ACTIVE_MFI', label: 'No active MFI loans', value: 'true', breType: POST_BRE, description: 'Customer must not have an active microfinance loan' },
   { key: 'MAX_ENQUIRIES_30_DAYS', label: 'Max loan enquiries in last 30 days', value: '10', breType: POST_BRE, description: 'Customer must have ≤ this many credit enquiries in the past 30 days' },
   { key: 'MAX_MISSED_PAYMENTS_6_MONTHS', label: 'Max missed payments in last 6 months', value: '1', breType: POST_BRE, description: 'Customer must have ≤ this many months with any DPD > 0 across all tradelines in the past 6 months' },
-  { key: 'MIN_UNSECURED_LOAN_AMOUNT', label: 'Min total unsecured loan amount (₹)', value: '20000', breType: POST_BRE, description: 'Post-BRE rejects when the sum of open unsecured tradeline exposure is below this INR amount' },
+  { key: 'MIN_UNSECURED_LOAN_AMOUNT', label: 'Min total unsecured loan amount (₹)', value: '20000', breType: POST_BRE, description: 'Post-BRE rejects when the sum of unsecured tradeline exposure (open + closed) is below this INR amount' },
   { key: 'REJECTED_CREDIT_ASSESSMENT_GRADES', label: 'Rejected credit assessment grades', value: 'E,F,G,H', breType: POST_BRE, description: 'Comma-separated list of CIBIL credit-assessment grades (A–H) that fail post-BRE' },
 ];
 
