@@ -64,10 +64,18 @@ export type PanVerificationResult = {
 };
 
 export type PanVerificationInput = {
-  leadId: bigint;
+  leadId: bigint | null;
   panNumber: string;
   fullName: string;
   dobIso: string;
+  consent?: boolean;
+};
+
+export type PanNsdlVendorCallResult = PanVerificationResult & {
+  configured: boolean;
+  skipReason: string | null;
+  httpStatus: number | null;
+  vendorBody: unknown | null;
 };
 
 /**
@@ -94,26 +102,14 @@ export class PanVerificationService {
    * Client-side PAN structural check before hitting the vendor:
    * - Must be 10 chars: 5 alpha, 4 numeric, 1 alpha
    * - 4th character must be 'P' (individual PAN)
-   * - 5th character must match the first letter of the last word in fullName
    */
-  validatePanStructure(pan: string, fullName: string): { valid: boolean; note: string } {
+  validatePanStructure(pan: string, _fullName?: string): { valid: boolean; note: string } {
     const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
     if (!PAN_REGEX.test(pan)) {
       return { valid: false, note: 'Invalid PAN format' };
     }
     if (pan[3] !== 'P') {
       return { valid: false, note: `PAN 4th character must be P (individual PAN), got '${pan[3]}'` };
-    }
-    const nameParts = fullName.trim().toUpperCase().split(/\s+/).filter(Boolean);
-    if (nameParts.length === 0) {
-      return { valid: false, note: 'Full name is required for PAN validation' };
-    }
-    const lastNameInitial = nameParts[nameParts.length - 1]![0]!;
-    if (pan[4] !== lastNameInitial) {
-      return {
-        valid: false,
-        note: `PAN 5th character '${pan[4]}' does not match last name initial '${lastNameInitial}'`,
-      };
     }
     return { valid: true, note: '' };
   }
@@ -122,7 +118,7 @@ export class PanVerificationService {
     const structCheck = this.validatePanStructure(input.panNumber, input.fullName);
     if (!structCheck.valid) {
       this.logger.warn(
-        `PAN structural validation failed (leadId=${input.leadId.toString()}): ${structCheck.note}`,
+        `PAN structural validation failed (leadId=${input.leadId?.toString() ?? 'n/a'}): ${structCheck.note}`,
       );
       return {
         panVerifiedStatus: PAN_VERIFIED.NOT_VERIFIED,
@@ -139,7 +135,7 @@ export class PanVerificationService {
   }
 
   /** Calls Tenacio NSDL only — run `validatePanStructure` first when checks are ordered separately. */
-  async verifyWithVendor(input: PanVerificationInput): Promise<PanVerificationResult> {
+  async verifyWithVendor(input: PanVerificationInput): Promise<PanNsdlVendorCallResult> {
     const notChecked: PanVerificationResult = {
       panVerifiedStatus: PAN_VERIFIED.NOT_CHECKED,
       nameMatch: false,
@@ -149,18 +145,25 @@ export class PanVerificationService {
       vendorRequestId: null,
       note: null,
     };
+    const leadRef = input.leadId?.toString() ?? 'n/a';
 
     try {
       const baseUrl = (process.env.VENDOR_HOST ?? '').trim();
       const clientId = (process.env.TENACIO_CLIENT_ID ?? '').trim();
       const apiKey = (process.env.TENACIO_API_KEY ?? '').trim();
       const workflowId = (process.env.TENACIO_PAN_NSDL_WORKFLOW_ID ?? '').trim();
-      const logger = new Logger(PanVerificationService.name);
       if (!baseUrl || !clientId || !apiKey || !workflowId) {
-        this.logger.warn(
-          'Tenacio credentials missing — skipping PAN verification. Set VENDOR_HOST, TENACIO_CLIENT_ID, TENACIO_API_KEY, TENACIO_PAN_NSDL_WORKFLOW_ID.',
-        );
-        return { ...notChecked, note: 'Vendor credentials not configured' };
+        const skipReason =
+          'Tenacio credentials missing — skipping PAN verification. Set VENDOR_HOST, TENACIO_CLIENT_ID, TENACIO_API_KEY, TENACIO_PAN_NSDL_WORKFLOW_ID.';
+        this.logger.warn(skipReason);
+        return {
+          ...notChecked,
+          note: 'Vendor credentials not configured',
+          configured: false,
+          skipReason,
+          httpStatus: null,
+          vendorBody: null,
+        };
       }
 
       const serviceName = (process.env.TENACIO_PAN_NSDL_SERVICE ?? '').trim();
@@ -182,7 +185,7 @@ export class PanVerificationService {
             panNumber: input.panNumber,
             name: input.fullName.trim().toUpperCase(),
             dob: formatDobDdMmYyyy(input.dobIso),
-            consent: true,
+            consent: input.consent ?? true,
           },
         },
         leadId: input.leadId,
@@ -191,18 +194,36 @@ export class PanVerificationService {
       if (!result.ok || !result.body) {
         const httpNote = `HTTP ${result.httpStatus ?? 'N/A'} — vendor unreachable or returned error`;
         this.logger.warn(
-          `PAN verification HTTP failure (leadId=${input.leadId.toString()}, HTTP ${result.httpStatus ?? 'N/A'}). Will retry later.`,
+          `PAN verification HTTP failure (leadId=${leadRef}, HTTP ${result.httpStatus ?? 'N/A'}). Will retry later.`,
         );
-        return { ...notChecked, note: httpNote };
+        return {
+          ...notChecked,
+          note: httpNote,
+          configured: true,
+          skipReason: null,
+          httpStatus: result.httpStatus,
+          vendorBody: result.body,
+        };
       }
 
-      return this.parseVendorResponse(result.body);
+      return {
+        ...this.parseVendorResponse(result.body),
+        configured: true,
+        skipReason: null,
+        httpStatus: result.httpStatus,
+        vendorBody: result.body,
+      };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(
-        `PAN verification unexpected error (leadId=${input.leadId.toString()}): ${message}`,
-      );
-      return { ...notChecked, note: `Unexpected error: ${message}`.slice(0, 500) };
+      this.logger.warn(`PAN verification unexpected error (leadId=${leadRef}): ${message}`);
+      return {
+        ...notChecked,
+        note: `Unexpected error: ${message}`.slice(0, 500),
+        configured: true,
+        skipReason: null,
+        httpStatus: null,
+        vendorBody: null,
+      };
     }
   }
 

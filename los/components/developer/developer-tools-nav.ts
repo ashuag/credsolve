@@ -6,6 +6,7 @@ export const DEVELOPER_TOOL_LINKS = [
   { href: '/developer-tools/cibil-report-download', label: 'Bureau Report Generate' },
   { href: '/developer-tools/cibil-tenacio-fetch', label: 'Tenacio CIBIL Fetch' },
   { href: '/developer-tools/cibil-surepass-fetch', label: 'Surepass CIBIL Fetch' },
+  { href: '/developer-tools/nsdl-pan-verification', label: 'NSDL PAN Verification' },
   { href: '/developer-tools/post-bre-rules', label: 'Post BRE Rules' },
   { href: '/developer-tools/kyc-face-match-check', label: 'KYC Face Match Check' },
   { href: '/developer-tools/face-liveness-check', label: 'Surepass Face Liveness' },

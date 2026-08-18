@@ -20,11 +20,13 @@ import { CibilVendorFetchCheckDto } from './dto/cibil-vendor-fetch-check.dto';
 import { FaceLivenessCheckDto } from './dto/face-liveness-check.dto';
 import { KycFaceMatchCheckDto } from './dto/kyc-face-match-check.dto';
 import { ListVendorApiLogsQueryDto } from './dto/list-vendor-api-logs-query.dto';
+import { NsdlPanVerificationDto } from './dto/nsdl-pan-verification.dto';
 import { TenacioFaceLivenessCheckDto } from './dto/tenacio-face-liveness-check.dto';
 import { TenacioFaceMatchCheckDto } from './dto/tenacio-face-match-check.dto';
 import { LosCibilDevToolsService } from './services/los-cibil-dev-tools.service';
 import { LosFaceLivenessDevToolsService } from './services/los-face-liveness-dev-tools.service';
 import { LosKycDevToolsService } from './services/los-kyc-dev-tools.service';
+import { LosPanDevToolsService } from './services/los-pan-dev-tools.service';
 import { LosTenacioFaceDevToolsService } from './services/los-tenacio-face-dev-tools.service';
 import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
 
@@ -38,6 +40,7 @@ export class LosDeveloperToolsController {
     private readonly cibilDevTools: LosCibilDevToolsService,
     private readonly kycDevTools: LosKycDevToolsService,
     private readonly faceLivenessDevTools: LosFaceLivenessDevToolsService,
+    private readonly panDevTools: LosPanDevToolsService,
     private readonly tenacioFaceDevTools: LosTenacioFaceDevToolsService,
     private readonly vendorApiLogs: LosVendorApiLogService,
   ) {}
@@ -76,6 +79,17 @@ export class LosDeveloperToolsController {
   })
   async cibilSurepassFetch(@Body() body: CibilVendorFetchCheckDto) {
     return this.cibilDevTools.runSurepassFetch(body);
+  }
+
+  @Post('nsdl-pan-verification')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Live Tenacio NSDL PAN name/DOB verification',
+    description:
+      'Calls the Tenacio NSDL PAN endpoint directly using TENACIO_* env config. The call is live and audited in vendor_api_log; no lead or PAN status record is created or updated.',
+  })
+  async nsdlPanVerification(@Body() body: NsdlPanVerificationDto) {
+    return this.panDevTools.runNsdlPanVerification(body);
   }
 
   @Post('kyc-face-match-check')

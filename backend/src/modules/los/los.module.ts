@@ -31,6 +31,7 @@ import { LosBureauReportService } from './services/los-bureau-report.service';
 import { LosCibilDevToolsService } from './services/los-cibil-dev-tools.service';
 import { LosFaceLivenessDevToolsService } from './services/los-face-liveness-dev-tools.service';
 import { LosKycDevToolsService } from './services/los-kyc-dev-tools.service';
+import { LosPanDevToolsService } from './services/los-pan-dev-tools.service';
 import { LosTenacioFaceDevToolsService } from './services/los-tenacio-face-dev-tools.service';
 import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
 
@@ -64,6 +65,7 @@ import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
     LosCibilDevToolsService,
     LosFaceLivenessDevToolsService,
     LosKycDevToolsService,
+    LosPanDevToolsService,
     LosTenacioFaceDevToolsService,
     LosVendorApiLogService,
   ],

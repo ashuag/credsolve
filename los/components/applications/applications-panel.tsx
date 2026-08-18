@@ -423,12 +423,25 @@ export function ApplicationsPanel() {
         }
         toolbarActions={
           <div className="flex items-center gap-2">
-            <a
-              href={getApplicationsExportUrl(getToken() ?? '')}
-              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text no-underline transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+            <button
+              type="button"
+              onClick={() => {
+                const token = getToken();
+                if (!token) {
+                  setFetchError('Session expired — please log in again.');
+                  return;
+                }
+                const link = document.createElement('a');
+                link.href = getApplicationsExportUrl(token);
+                link.rel = 'noopener';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+              }}
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
             >
               ⬇ Download dump
-            </a>
+            </button>
             <button
               type="button"
               onClick={() => void loadApplications()}
