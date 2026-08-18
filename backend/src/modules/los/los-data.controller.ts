@@ -68,6 +68,19 @@ export class LosDataController {
     return this.losApplication.listApplications();
   }
 
+  @Get('applications/export')
+  @ApiOperation({ summary: 'Download LOS applications as an Excel dump workbook (.xlsx)' })
+  async applicationsExport(@Res() res: Response): Promise<void> {
+    const buffer = await this.losApplication.exportApplicationsWorkbook();
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', 'attachment; filename="Applications dump.xlsx"');
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.send(buffer);
+  }
+
   @Get('loans')
   @ApiOperation({ summary: 'List disbursed loans for LOS loan management' })
   loans() {

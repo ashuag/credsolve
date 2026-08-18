@@ -13,6 +13,9 @@ import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import { resolveLivenessVideoRelativePath } from '../../../common/kyc/kyc-liveness-video-path.util';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
+import { BUREAU_FETCHED } from '../../../common/constants/bureau-fetch.constants';
+import { PAN_VERIFIED } from '../../../common/constants/pan-verification.constants';
+import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 import { LoanDocumentApplicationService } from '../../auth/application/services/loan-document-application.service';
 import { LOAN_DOCUMENT_ACCEPTANCE_NAME, LOAN_DOCUMENT_TYPE, type LoanDocumentType } from '../../../common/constants/loan-document.constants';
 import {
@@ -156,6 +159,145 @@ function applicationKycStatusLabel(code: number): string {
   }
 }
 
+function panVerifiedStatusLabel(code: number): string {
+  switch (code) {
+    case PAN_VERIFIED.NOT_CHECKED:
+      return 'Not checked';
+    case PAN_VERIFIED.VERIFIED:
+      return 'Verified';
+    case PAN_VERIFIED.NOT_VERIFIED:
+      return 'Not verified';
+    case PAN_VERIFIED.API_FAILURE:
+      return 'API failure';
+    case PAN_VERIFIED.API_DISABLED:
+      return 'Disabled';
+    default:
+      return `Unknown (${code})`;
+  }
+}
+
+function bureauFetchedStatusLabel(code: number): string {
+  switch (code) {
+    case BUREAU_FETCHED.NOT_FETCHED:
+      return 'Not fetched';
+    case BUREAU_FETCHED.SUCCESS:
+      return 'Fetched';
+    case BUREAU_FETCHED.FAILED:
+      return 'Failed';
+    default:
+      return `Unknown (${code})`;
+  }
+}
+
+const APPLICATION_DUMP_STAGE_ORDER = [
+  { id: 'profile', label: 'Profile' },
+  { id: 'credit', label: 'PAN & bureau' },
+  { id: 'loan', label: 'Loan offer' },
+  { id: 'email', label: 'Email OTP' },
+  { id: 'letter', label: 'Sanction letter' },
+  { id: 'kyc', label: 'KYC' },
+  { id: 'bank', label: 'Bank details' },
+  { id: 'refs', label: 'References' },
+  { id: 'esign', label: 'eSign' },
+] as const;
+
+function dumpApplicationStageLabel(input: {
+  statusCode: string;
+  statusLabel: string;
+  kycStatus: number;
+  kycStatusLabel: string;
+  kycCompletedAt: string | null;
+  emailVerifiedAt: string | null;
+  loanDocumentsReviewedAt: string | null;
+  loanDocumentsAcceptedAt: string | null;
+  selectedLoanAmount: string | null;
+  referencesCount: number;
+  bankAccountNumber: string | null;
+  disbursedAt: string | null;
+  fullName: string | null;
+  leadStatusCode: string;
+  leadStatusLabel: string;
+  panVerified: number;
+  bureauFetched: number;
+}): string {
+  const leadRejected = input.leadStatusCode.toUpperCase() === 'REJECTED';
+  const appRejected = input.statusCode.toUpperCase().includes('REJECT');
+  const kycFailed = input.statusCode.toUpperCase() === 'KYC_FAILED' || input.kycStatus === 2;
+
+  if (leadRejected || appRejected || kycFailed) {
+    if (input.leadStatusCode.toUpperCase().includes('REJECT')) return input.leadStatusLabel;
+    if (input.statusCode.toUpperCase().includes('REJECT')) return input.statusLabel;
+    if (input.statusCode.toUpperCase() === 'KYC_FAILED') return input.kycStatusLabel;
+    return 'Rejected';
+  }
+
+  const doneById = {
+    profile: Boolean(input.fullName?.trim()),
+    credit: input.panVerified === PAN_VERIFIED.VERIFIED && input.bureauFetched === BUREAU_FETCHED.SUCCESS,
+    loan: Boolean(input.selectedLoanAmount),
+    email: Boolean(input.emailVerifiedAt),
+    letter: Boolean(input.loanDocumentsReviewedAt ?? input.loanDocumentsAcceptedAt),
+    kyc: input.kycStatus === 1 && input.kycCompletedAt != null,
+    bank: Boolean(input.bankAccountNumber || input.disbursedAt),
+    refs: input.referencesCount >= 2,
+    esign: Boolean(input.loanDocumentsAcceptedAt),
+  } as const;
+
+  const active = APPLICATION_DUMP_STAGE_ORDER.find((stage) => !doneById[stage.id]);
+  return active?.label ?? input.statusLabel;
+}
+
+function dumpApplicationStatusLabel(input: {
+  leadStatusCode: string;
+  leadStatusLabel: string;
+  statusLabel: string;
+}): string {
+  if (input.leadStatusCode.toUpperCase().includes('REJECT')) return input.leadStatusLabel;
+  return input.statusLabel;
+}
+
+function toExcelDate(iso: string | null | undefined): Date | null {
+  if (!iso) return null;
+  const parsed = new Date(iso);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
+function toExcelNumber(value: string | number | null | undefined): number | null {
+  if (value == null || value === '') return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+const APPLICATION_DUMP_HEADERS = [
+  'Application ID',
+  'Name',
+  'Mobile',
+  'Email',
+  'CIBIL score',
+  'Grade',
+  'Eligible loan amount',
+  'Selected loan amount',
+  'Repay date',
+  'Repayment amount',
+  'Processing fee %',
+  'Processing fee amount',
+  'Bank details',
+  'Stage',
+  'Status',
+  'Lead status',
+  'Rejection reason',
+  'Rejection note',
+  'KYC status',
+  'PAN verified',
+  'Bureau fetched',
+  'Created',
+  'Last modified',
+  'Disbursed at',
+  'Application UUID',
+  'Customer UUID',
+  'Lead UUID',
+] as const;
+
 @Injectable()
 export class LosApplicationService {
   constructor(
@@ -187,7 +329,7 @@ export class LosApplicationService {
             bureauReports: {
               orderBy: { createdAt: 'desc' },
               take: 1,
-              select: { cibilCreditAssessment: { select: { category: true } } },
+              select: { cibilScore: true, cibilCreditAssessment: { select: { category: true } } },
             },
           },
         },
@@ -244,7 +386,7 @@ export class LosApplicationService {
         mobileNumber: application.customer.mobileNumber,
         email: appDetails?.emailId ?? null,
         fullName: formatLosPersonName(application.lead.leadDetail?.fullName),
-        cibilScore: null,
+        cibilScore: application.lead.bureauReports[0]?.cibilScore ?? null,
         cibilCreditAssessmentCategory: application.lead.bureauReports[0]?.cibilCreditAssessment?.category ?? null,
         eligibleLoanAmount,
         selectedLoanAmount: appDetails?.selectedLoanAmount?.toString() ?? null,
@@ -288,6 +430,44 @@ export class LosApplicationService {
         updatedAt: application.updatedAt.toISOString(),
       };
     });
+  }
+
+  /** Builds an applications dump workbook for LOS Application → Download dump. */
+  async exportApplicationsWorkbook(): Promise<Buffer> {
+    const applications = await this.listApplications();
+    const rows: SimpleXlsxCell[][] = [
+      [...APPLICATION_DUMP_HEADERS],
+      ...applications.map((app) => [
+        app.applicationNumber,
+        app.fullName,
+        app.mobileNumber,
+        app.email,
+        toExcelNumber(app.cibilScore),
+        app.cibilCreditAssessmentCategory,
+        toExcelNumber(app.eligibleLoanAmount),
+        toExcelNumber(app.selectedLoanAmount),
+        app.repayDate,
+        toExcelNumber(app.repaymentAmount),
+        toExcelNumber(app.processingFeePercent),
+        toExcelNumber(app.processingFeeAmount),
+        app.bankDetails,
+        dumpApplicationStageLabel(app),
+        dumpApplicationStatusLabel(app),
+        app.leadStatusLabel,
+        app.leadRejectionReason?.label ?? null,
+        app.leadStatusNote,
+        app.kycStatusLabel,
+        panVerifiedStatusLabel(app.panVerified),
+        bureauFetchedStatusLabel(app.bureauFetched),
+        toExcelDate(app.createdAt),
+        toExcelDate(app.updatedAt),
+        toExcelDate(app.disbursedAt),
+        app.uuid,
+        app.customerUuid,
+        app.leadUuid,
+      ]),
+    ];
+    return buildSimpleXlsxWorkbook(rows, 'Applications');
   }
 
   async getApplicationDetails(applicationUuid: string) {

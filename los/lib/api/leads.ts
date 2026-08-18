@@ -1,4 +1,4 @@
-import { authorizedLosRequest, cachedAuthorizedLosGet, clientApiUrl, fetchWithTimeout, invalidateClientReadCache, messageFromBody, parseJsonResponse } from './_shared';
+import { authorizedLosRequest, cachedAuthorizedLosGet, clientApiUrl, fetchWithTimeout, invalidateClientReadCache, messageFromBody, parseJsonResponse, resolveLosClientApiUrl } from './_shared';
 
 export type LosLead = {
   uuid: string;
@@ -371,6 +371,13 @@ export async function getNewLeads(token: string): Promise<LosLead[]> {
 
 export async function getApplications(token: string): Promise<LosApplication[]> {
   return cachedAuthorizedLosGet<LosApplication[]>(token, '/applications', 'Failed to fetch applications');
+}
+
+/** URL for the applications dump workbook download (LOS Application). */
+export function getApplicationsExportUrl(token: string): string {
+  const params = new URLSearchParams();
+  params.set('access_token', token);
+  return `${resolveLosClientApiUrl('/applications/export')}?${params.toString()}`;
 }
 
 export async function getLeadDetails(token: string, leadUuid: string): Promise<LosLeadDetails> {

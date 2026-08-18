@@ -5,7 +5,7 @@ import {
   isoDateTimestamp,
   type DataTableColumn,
 } from '@/components/ui/data-table';
-import { getApplications, getMasters, type LosApplication } from '@/lib/api';
+import { getApplications, getApplicationsExportUrl, getMasters, type LosApplication } from '@/lib/api';
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { APPLICATION_JOURNEY_STAGE_FILTER_OPTIONS } from '@/lib/constants/application-journey-stages';
@@ -422,13 +422,21 @@ export function ApplicationsPanel() {
             : undefined
         }
         toolbarActions={
-          <button
-            type="button"
-            onClick={() => void loadApplications()}
-            className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
-          >
-            ↺ Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <a
+              href={getApplicationsExportUrl(getToken() ?? '')}
+              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text no-underline transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+            >
+              ⬇ Download dump
+            </a>
+            <button
+              type="button"
+              onClick={() => void loadApplications()}
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+            >
+              ↺ Refresh
+            </button>
+          </div>
         }
       />
     </div>
