@@ -1,6 +1,7 @@
 import {
   compareJourneyNameToPennyDrop,
   extractPennyDropBankName,
+  stripPersonNameHonorifics,
 } from './penny-drop-name-match.util';
 
 describe('penny-drop-name-match.util', () => {
@@ -13,12 +14,35 @@ describe('penny-drop-name-match.util', () => {
     ).toBe('Saurabh Agarwal');
   });
 
+  it('strips honorifics with or without a period and extra spaces', () => {
+    expect(stripPersonNameHonorifics('Mr. Saurabh Agarwal')).toBe('Saurabh Agarwal');
+    expect(stripPersonNameHonorifics('Mr Saurabh Agarwal')).toBe('Saurabh Agarwal');
+    expect(stripPersonNameHonorifics('Ms. Saurabh Agarwal')).toBe('Saurabh Agarwal');
+    expect(stripPersonNameHonorifics('Ms Saurabh Agarwal')).toBe('Saurabh Agarwal');
+    expect(stripPersonNameHonorifics('Miss Saurabh Agarwal')).toBe('Saurabh Agarwal');
+    expect(stripPersonNameHonorifics('Miss. Saurabh Agarwal')).toBe('Saurabh Agarwal');
+    expect(stripPersonNameHonorifics('Mrs. Saurabh Agarwal')).toBe('Saurabh Agarwal');
+    expect(stripPersonNameHonorifics('Mrs Saurabh Agarwal')).toBe('Saurabh Agarwal');
+    expect(stripPersonNameHonorifics('mrs.  Saurabh Agarwal')).toBe('Saurabh Agarwal');
+    expect(stripPersonNameHonorifics('  Mr.  Saurabh   Agarwal  ')).toBe('Saurabh Agarwal');
+    expect(stripPersonNameHonorifics('Mr.Saurabh Agarwal')).toBe('Saurabh Agarwal');
+  });
+
   it('matches journey name ignoring token order and case', () => {
     const result = compareJourneyNameToPennyDrop({
       journeyFullName: 'Saurabh Agarwal',
       vendor: { status: 'success', data: { nameAtBank: 'AGARWAL SAURABH' } },
     });
     expect(result.matched).toBe(true);
+  });
+
+  it('matches when the bank name includes an honorific title', () => {
+    const result = compareJourneyNameToPennyDrop({
+      journeyFullName: 'Saurabh Agarwal',
+      vendor: { status: 'success', data: { name_at_bank: 'Mr. Saurabh Agarwal' } },
+    });
+    expect(result.matched).toBe(true);
+    expect(result.bankName).toBe('Mr. Saurabh Agarwal');
   });
 
   it('rejects name mismatch', () => {

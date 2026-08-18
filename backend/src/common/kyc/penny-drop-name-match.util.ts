@@ -1,5 +1,22 @@
 import { personNamesMatch } from './aadhaar-lead-identity-match.util';
 
+/** Leading honorifics banks often prefix on account-holder names (longest first so Miss ≠ Ms). */
+const HONORIFIC_PREFIX = /^(?:miss|mrs|ms|mr)\b\.?\s*/i;
+
+/**
+ * Strip titles such as Mr / Ms / Miss / Mrs (with or without ".") and collapse extra spaces
+ * so penny-drop names can be compared to the customer journey name.
+ */
+export function stripPersonNameHonorifics(raw: string): string {
+  let name = raw.trim().replace(/\s+/g, ' ');
+  for (;;) {
+    const next = name.replace(HONORIFIC_PREFIX, '').trim();
+    if (next === name) break;
+    name = next;
+  }
+  return name.replace(/\s+/g, ' ');
+}
+
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
@@ -105,7 +122,7 @@ export function compareJourneyNameToPennyDrop(input: {
   journeyFullName: string | null | undefined;
   vendor: unknown;
 }): PennyDropNameMatchResult {
-  const journeyName = input.journeyFullName?.trim() ?? '';
+  const journeyName = stripPersonNameHonorifics(input.journeyFullName ?? '');
   if (!journeyName) {
     return {
       matched: false,
@@ -142,7 +159,7 @@ export function compareJourneyNameToPennyDrop(input: {
     };
   }
 
-  if (!personNamesMatch(journeyName, bankName)) {
+  if (!personNamesMatch(journeyName, stripPersonNameHonorifics(bankName))) {
     return {
       matched: false,
       reason: 'name_mismatch',
