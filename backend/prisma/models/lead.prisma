@@ -7,6 +7,7 @@ model Lead {
   rejectionReasonId                 Int?      @map("rejection_reason_id") @db.SmallInt
   sourceId                          Int?      @map("source_id")
   isActive                          Boolean   @default(true) @map("is_active")
+  isInternalTesting                 Boolean   @default(false) @map("is_internal_testing")
   expiredAt                         DateTime? @map("expired_at")
   createdAt                         DateTime  @default(now()) @map("created_at")
   updatedAt                         DateTime  @updatedAt @map("updated_at")
@@ -27,6 +28,7 @@ model Lead {
   @@index([sourceId])
   @@index([expiredAt])
   @@index([createdAt])
+  @@index([isInternalTesting])
   @@map("lead")
 }
 

@@ -109,6 +109,7 @@ export class LosLeadService {
     const leads = await this.prisma.client.lead.findMany({
       where: {
         isActive: true,
+        isInternalTesting: false,
         // Handed off to Applications — hide from lead queue once converted with an app row.
         NOT: {
           leadStatus: { name: LEAD_STATUS.CONVERTED },
@@ -489,6 +490,23 @@ export class LosLeadService {
     });
 
     return this.getLeadDetails(leadUuid);
+  }
+
+  async markInternalTesting(leadUuid: string): Promise<{ success: true; leadUuid: string }> {
+    const lead = await this.prisma.client.lead.findUnique({
+      where: { uuid: leadUuid },
+      select: { id: true, uuid: true, isInternalTesting: true },
+    });
+    if (!lead) {
+      throw new NotFoundException('Lead not found');
+    }
+    if (!lead.isInternalTesting) {
+      await this.prisma.client.lead.update({
+        where: { id: lead.id },
+        data: { isInternalTesting: true },
+      });
+    }
+    return { success: true, leadUuid: lead.uuid };
   }
 }
 

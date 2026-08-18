@@ -7,12 +7,13 @@ import {
   LOS_LISTING_PAGE_SIZE_OPTIONS,
   type DataTableColumn,
 } from '@/components/ui/data-table';
-import { getApplications, getApplicationsExportUrl, getMasters, type LosApplication } from '@/lib/api';
+import { getApplications, getApplicationsExportUrl, getMasters, markApplicationInternalTesting, type LosApplication } from '@/lib/api';
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { APPLICATION_JOURNEY_STAGE_FILTER_OPTIONS } from '@/lib/constants/application-journey-stages';
 import { resolveApplicationStageLabel } from '@/lib/customer-journey';
 import { formatPersonName } from '@/lib/format-person-name';
+import { MarkInternalTestingButton } from '@/components/shared/mark-internal-testing-button';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -209,6 +210,7 @@ export function ApplicationsPanel() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Array<{ code: string; displayName: string }>>([]);
+  const [busyUuid, setBusyUuid] = useState<string | null>(null);
 
   const loadApplications = useCallback(async () => {
     setLoading(true);
@@ -225,6 +227,24 @@ export function ApplicationsPanel() {
   }, []);
 
   useEffect(() => { void loadApplications(); }, [loadApplications]);
+
+  const markAsInternalTesting = useCallback(async (applicationUuid: string) => {
+    const token = getToken();
+    if (!token) {
+      setFetchError('Session expired — please log in again.');
+      return;
+    }
+    setBusyUuid(applicationUuid);
+    setFetchError(null);
+    try {
+      await markApplicationInternalTesting(token, applicationUuid);
+      setApplications((prev) => prev.filter((row) => row.uuid !== applicationUuid));
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : 'Failed to mark application as internal testing');
+    } finally {
+      setBusyUuid(null);
+    }
+  }, []);
 
   const columns = useMemo((): DataTableColumn<LosApplication>[] => [
     {
@@ -390,7 +410,20 @@ export function ApplicationsPanel() {
       cellClassName: 'text-brand-muted whitespace-nowrap text-[0.78rem]',
       render: (app) => formatDateTime(app.updatedAt),
     },
-  ], [statuses]);
+    {
+      key: 'actions',
+      label: 'Actions',
+      headerClassName: 'whitespace-nowrap',
+      sortable: false,
+      filter: false,
+      render: (app) => (
+        <MarkInternalTestingButton
+          busy={busyUuid === app.uuid}
+          onConfirm={() => void markAsInternalTesting(app.uuid)}
+        />
+      ),
+    },
+  ], [statuses, busyUuid, markAsInternalTesting]);
 
   const withLoan = applications.filter((a) => a.selectedLoanAmount != null).length;
   const totalDisbursed = applications.reduce((sum, a) => sum + (Number(a.selectedLoanAmount) || 0), 0);
@@ -417,7 +450,7 @@ export function ApplicationsPanel() {
         onRetry={() => void loadApplications()}
         emptyMessage="No applications available right now."
         noResultsMessage="No applications match your filters or sort."
-        minWidth="1280px"
+        minWidth="1480px"
         pageSize={LOS_LISTING_PAGE_SIZE}
         pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         renderRowClassName={(app) =>

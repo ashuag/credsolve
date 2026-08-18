@@ -7,10 +7,11 @@ import {
   LOS_LISTING_PAGE_SIZE_OPTIONS,
   type DataTableColumn,
 } from '@/components/ui/data-table';
-import { getNewLeads, getLeadsExportUrl, getMasters, type LosLead } from '@/lib/api';
+import { getNewLeads, getLeadsExportUrl, getMasters, markLeadInternalTesting, type LosLead } from '@/lib/api';
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
+import { MarkInternalTestingButton } from '@/components/shared/mark-internal-testing-button';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -140,6 +141,7 @@ export function LeadsPanel() {
   const [loading,          setLoading]          = useState(true);
   const [fetchError,       setFetchError]       = useState<string | null>(null);
   const [statuses,         setStatuses]         = useState<Array<{ code: string; displayName: string }>>([]);
+  const [busyUuid,         setBusyUuid]         = useState<string | null>(null);
 
   const loadLeads = useCallback(async () => {
     setLoading(true);
@@ -158,6 +160,24 @@ export function LeadsPanel() {
   }, []);
 
   useEffect(() => { void loadLeads(); }, [loadLeads]);
+
+  const markAsInternalTesting = useCallback(async (leadUuid: string) => {
+    const token = getToken();
+    if (!token) {
+      setFetchError('Session expired — please log in again.');
+      return;
+    }
+    setBusyUuid(leadUuid);
+    setFetchError(null);
+    try {
+      await markLeadInternalTesting(token, leadUuid);
+      setLeads((prev) => prev.filter((row) => row.uuid !== leadUuid));
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : 'Failed to mark lead as internal testing');
+    } finally {
+      setBusyUuid(null);
+    }
+  }, []);
 
   const columns = useMemo((): DataTableColumn<LosLead>[] => [
     {
@@ -322,7 +342,20 @@ export function LeadsPanel() {
       cellClassName: 'text-brand-muted text-[0.78rem] whitespace-nowrap',
       render: (lead) => formatDateTime(lead.createdAt),
     },
-  ], [statuses]);
+    {
+      key: 'actions',
+      label: 'Actions',
+      headerClassName: 'whitespace-nowrap',
+      sortable: false,
+      filter: false,
+      render: (lead) => (
+        <MarkInternalTestingButton
+          busy={busyUuid === lead.uuid}
+          onConfirm={() => void markAsInternalTesting(lead.uuid)}
+        />
+      ),
+    },
+  ], [statuses, busyUuid, markAsInternalTesting]);
 
   const verified    = leads.filter((l) => l.panVerified === 1).length;
   const highCibil   = leads.filter((l) => (l.cibilScore ?? 0) >= 700).length;
@@ -353,7 +386,7 @@ export function LeadsPanel() {
         onRetry={() => void loadLeads()}
         emptyMessage="No leads available right now."
         noResultsMessage="No leads match your filters."
-        minWidth="1280px"
+        minWidth="1480px"
         pageSize={LOS_LISTING_PAGE_SIZE}
         pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         toolbarActions={

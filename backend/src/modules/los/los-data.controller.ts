@@ -118,6 +118,14 @@ export class LosDataController {
     return this.losRejection.rejectApplication(applicationUuid, body);
   }
 
+  @Post('applications/:applicationUuid/mark-internal-testing')
+  @ApiOperation({
+    summary: 'Hide an application (and its lead) from LOS listings and data dumps as internal testing',
+  })
+  markApplicationInternalTesting(@Param('applicationUuid') applicationUuid: string) {
+    return this.losApplication.markInternalTesting(applicationUuid);
+  }
+
   @Post('applications/:applicationUuid/approve')
   @ApiOperation({
     summary: 'Approve an application after the customer journey is complete (status → APPROVED)',
@@ -225,6 +233,12 @@ export class LosDataController {
   @ApiOperation({ summary: 'Reject a lead with reason and ops note (LOS auth)' })
   rejectLead(@Param('leadUuid') leadUuid: string, @Body() body: RejectWorkspaceRecordDto) {
     return this.losRejection.rejectLead(leadUuid, body);
+  }
+
+  @Post('leads/:leadUuid/mark-internal-testing')
+  @ApiOperation({ summary: 'Hide a lead from LOS listings and data dumps as internal testing' })
+  markLeadInternalTesting(@Param('leadUuid') leadUuid: string) {
+    return this.losLead.markInternalTesting(leadUuid);
   }
 
   @Get('masters')

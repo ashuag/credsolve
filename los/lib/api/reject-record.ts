@@ -38,3 +38,27 @@ export async function rejectApplication(
     'Failed to reject application.',
   );
 }
+
+export async function markLeadInternalTesting(
+  token: string,
+  leadUuid: string,
+): Promise<{ success: true; leadUuid: string }> {
+  return authorizedLosRequest(
+    token,
+    `/leads/${encodeURIComponent(leadUuid)}/mark-internal-testing`,
+    { method: 'POST' },
+    'Failed to mark lead as internal testing.',
+  );
+}
+
+export async function markApplicationInternalTesting(
+  token: string,
+  applicationUuid: string,
+): Promise<{ success: true; applicationUuid: string; leadUuid: string }> {
+  return authorizedLosRequest(
+    token,
+    `/applications/${encodeURIComponent(applicationUuid)}/mark-internal-testing`,
+    { method: 'POST' },
+    'Failed to mark application as internal testing.',
+  );
+}

@@ -311,6 +311,9 @@ export class LosApplicationService {
 
   async listApplications() {
     const applications = await this.prisma.client.application.findMany({
+      where: {
+        lead: { isInternalTesting: false },
+      },
       orderBy: { createdAt: 'desc' },
       include: {
         customer: { select: { uuid: true, mobileNumber: true } },
@@ -1251,6 +1254,26 @@ export class LosApplicationService {
       leadRecovered: leadWasInternalError || leadWasRejected,
       applicationRecovered: appWasInternalError || appWasKycFailed,
     };
+  }
+
+  async markInternalTesting(applicationUuid: string): Promise<{ success: true; applicationUuid: string; leadUuid: string }> {
+    const application = await this.prisma.client.application.findUnique({
+      where: { uuid: applicationUuid },
+      select: {
+        uuid: true,
+        lead: { select: { id: true, uuid: true, isInternalTesting: true } },
+      },
+    });
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+    if (!application.lead.isInternalTesting) {
+      await this.prisma.client.lead.update({
+        where: { id: application.lead.id },
+        data: { isInternalTesting: true },
+      });
+    }
+    return { success: true, applicationUuid: application.uuid, leadUuid: application.lead.uuid };
   }
 
   /** Public CDN/presigned URL, or LOS-authenticated download path when the bucket is private. */
