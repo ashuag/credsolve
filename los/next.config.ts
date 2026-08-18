@@ -64,6 +64,13 @@ if (isProductionRuntime) {
 const nextConfig: NextConfig = {
   output: 'standalone',
   poweredByHeader: false,
+  experimental: {
+    // Caps how many CPU cores `next build`'s webpack/SWC workers use. Default
+    // (unset) is most/all host cores, which on a shared deploy host competes
+    // with already-running containers and spikes CPU during deploys. Override
+    // with NEXT_BUILD_CPUS if the build host has more headroom to spare.
+    cpus: Number(process.env.NEXT_BUILD_CPUS) || 2,
+  },
   // Let the edge reverse proxy handle compression — avoids double-compression 500s
   // and ERR_HTTP_HEADERS_SENT when Next and the proxy both gzip the same response.
   compress: false,

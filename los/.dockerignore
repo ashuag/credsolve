@@ -1,0 +1,18 @@
+node_modules
+.next
+.git
+# NOT .env — next.config.ts reads API_SERVER_URL/NEXT_PUBLIC_API_URL via
+# Next's build-time .env loading; the deploy platform relies on that file
+# being present in the build context. Only ignore variants that are never
+# needed for the build itself.
+.env.example
+.env.local
+*.md
+.cache
+.dockerignore
+Dockerfile*
+docker-compose*
+npm-debug.log*
+coverage
+.vscode
+.DS_Store

@@ -72,19 +72,20 @@ export class RedisIpRateLimitGuard implements CanActivate {
       await this.redis.client.expire(redisKey, windowSec);
     }
 
-    if (count > max) {
-      const ttl = await this.redis.client.ttl(redisKey);
-      const retryAfter = ttl > 0 ? ttl : windowSec;
-      res.setHeader('Retry-After', String(retryAfter));
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.TOO_MANY_REQUESTS,
-          message: 'Too many requests from this address. Try again later.',
-          retryAfterSeconds: retryAfter,
-        },
-        HttpStatus.TOO_MANY_REQUESTS
-      );
-    }
+    // Disabled — no need to check as of now.
+    // if (count > max) {
+    //   const ttl = await this.redis.client.ttl(redisKey);
+    //   const retryAfter = ttl > 0 ? ttl : windowSec;
+    //   res.setHeader('Retry-After', String(retryAfter));
+    //   throw new HttpException(
+    //     {
+    //       statusCode: HttpStatus.TOO_MANY_REQUESTS,
+    //       message: 'Too many requests from this address. Try again later.',
+    //       retryAfterSeconds: retryAfter,
+    //     },
+    //     HttpStatus.TOO_MANY_REQUESTS
+    //   );
+    // }
 
     return true;
   }

@@ -15,10 +15,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     ca-certificates
 
 COPY package.json package-lock.json* ./
-RUN --mount=type=cache,target=/root/.npm npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
 COPY . .
 ENV DATABASE_URL="mysql://dummy:dummy@localhost:3306/dummy"
-RUN npx prisma generate --config prisma.config.ts
+RUN --mount=type=cache,target=/root/.cache/prisma npx prisma generate --config prisma.config.ts
 RUN npm run build
 
 # Strip devDependencies in place instead of a second `npm ci --omit=dev` —
