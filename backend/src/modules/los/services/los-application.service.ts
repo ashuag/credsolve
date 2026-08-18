@@ -269,6 +269,7 @@ function toExcelNumber(value: string | number | null | undefined): number | null
 }
 
 const APPLICATION_DUMP_HEADERS = [
+  'Lead ID',
   'Application ID',
   'Name',
   'Mobile',
@@ -381,6 +382,7 @@ export class LosApplicationService {
       return {
         uuid: application.uuid,
         applicationNumber: application.applicationNumber,
+        leadId: Number(application.leadId),
         customerUuid: application.customer.uuid,
         leadUuid: application.lead.uuid,
         mobileNumber: application.customer.mobileNumber,
@@ -438,6 +440,7 @@ export class LosApplicationService {
     const rows: SimpleXlsxCell[][] = [
       [...APPLICATION_DUMP_HEADERS],
       ...applications.map((app) => [
+        app.leadId,
         app.applicationNumber,
         app.fullName,
         app.mobileNumber,

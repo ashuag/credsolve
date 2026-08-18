@@ -72,6 +72,8 @@ function leadSourceLabel(lead: {
 }
 
 const LEAD_DUMP_HEADERS = [
+  'Lead ID',
+  'Application ID',
   'Name',
   'Mobile',
   'Email',
@@ -138,6 +140,7 @@ export class LosLeadService {
           orderBy: { createdAt: 'desc' },
           take: 1,
           select: {
+            applicationNumber: true,
             details: { select: { emailId: true } },
           },
         },
@@ -155,8 +158,10 @@ export class LosLeadService {
       const cibilScore = lead.bureauReports[0]?.cibilScore ?? null;
 
       return {
+        id: Number(lead.id),
         uuid: lead.uuid,
         customerUuid: lead.customer.uuid,
+        applicationNumber: lead.applications[0]?.applicationNumber ?? null,
         fullName: formatLosPersonName(detail?.fullName),
         panNumber: detail?.panNumber?.trim().toUpperCase() || null,
         mobileNumber: lead.customer.mobileNumber,
@@ -192,6 +197,8 @@ export class LosLeadService {
     const rows: SimpleXlsxCell[][] = [
       [...LEAD_DUMP_HEADERS],
       ...leads.map((lead) => [
+        lead.id,
+        lead.applicationNumber,
         lead.fullName,
         lead.mobileNumber,
         lead.email,
