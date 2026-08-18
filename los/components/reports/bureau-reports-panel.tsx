@@ -3,6 +3,8 @@
 import {
   DataTable,
   isoDateTimestamp,
+  LOS_LISTING_PAGE_SIZE,
+  LOS_LISTING_PAGE_SIZE_OPTIONS,
   type DataTableColumn,
 } from '@/components/ui/data-table';
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
@@ -250,6 +252,8 @@ export function BureauReportsPanel() {
         emptyMessage="No bureau reports have been stored yet."
         noResultsMessage="No bureau reports match your filters."
         minWidth="1100px"
+        pageSize={LOS_LISTING_PAGE_SIZE}
+        pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         initialSort={{ key: 'fetched', dir: 'desc' }}
         toolbarActions={
           <div className="flex items-center gap-2">

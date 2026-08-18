@@ -5,6 +5,8 @@ import { matchesDatetimeRange } from '@/lib/datetime-range';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 export const LOS_TABLE_PAGE_SIZE = 20;
+export const LOS_LISTING_PAGE_SIZE = 100;
+export const LOS_LISTING_PAGE_SIZE_OPTIONS = [50, 100, 150, 200, 250, 500];
 
 export type SortDirection = 'asc' | 'desc';
 export type SortState<T extends string = string> = { key: T; dir: SortDirection } | null;

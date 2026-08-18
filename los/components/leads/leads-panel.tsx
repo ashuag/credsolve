@@ -3,6 +3,8 @@
 import {
   DataTable,
   isoDateTimestamp,
+  LOS_LISTING_PAGE_SIZE,
+  LOS_LISTING_PAGE_SIZE_OPTIONS,
   type DataTableColumn,
 } from '@/components/ui/data-table';
 import { getNewLeads, getLeadsExportUrl, getMasters, type LosLead } from '@/lib/api';
@@ -352,6 +354,8 @@ export function LeadsPanel() {
         emptyMessage="No leads available right now."
         noResultsMessage="No leads match your filters."
         minWidth="1280px"
+        pageSize={LOS_LISTING_PAGE_SIZE}
+        pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         toolbarActions={
           <div className="flex items-center gap-2">
             <button

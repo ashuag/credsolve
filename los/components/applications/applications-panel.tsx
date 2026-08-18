@@ -3,6 +3,8 @@
 import {
   DataTable,
   isoDateTimestamp,
+  LOS_LISTING_PAGE_SIZE,
+  LOS_LISTING_PAGE_SIZE_OPTIONS,
   type DataTableColumn,
 } from '@/components/ui/data-table';
 import { getApplications, getApplicationsExportUrl, getMasters, type LosApplication } from '@/lib/api';
@@ -416,6 +418,8 @@ export function ApplicationsPanel() {
         emptyMessage="No applications available right now."
         noResultsMessage="No applications match your filters or sort."
         minWidth="1280px"
+        pageSize={LOS_LISTING_PAGE_SIZE}
+        pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         renderRowClassName={(app) =>
           isApplicationRowRejected(app)
             ? 'border-l-[3px] border-l-[#ef4444] bg-[rgba(254,242,242,0.55)] hover:bg-[rgba(254,226,226,0.65)]'

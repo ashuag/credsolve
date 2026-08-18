@@ -3,6 +3,8 @@
 import {
   DataTable,
   isoDateTimestamp,
+  LOS_LISTING_PAGE_SIZE,
+  LOS_LISTING_PAGE_SIZE_OPTIONS,
   type DataTableColumn,
 } from '@/components/ui/data-table';
 import { getLoans, type LosLoan } from '@/lib/api';
@@ -329,6 +331,8 @@ export function LoansPanel() {
         onRetry={() => void loadLoans()}
         emptyMessage="No disbursed loans yet. Approve and disburse an application to see it here."
         noResultsMessage="No loans match your filters."
+        pageSize={LOS_LISTING_PAGE_SIZE}
+        pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         renderRowClassName={(loan) =>
           isLoanPastDue(loan)
             ? 'border-b border-[rgba(239,68,68,0.12)] bg-[rgba(239,68,68,0.06)] transition-colors hover:bg-[rgba(239,68,68,0.1)]'
