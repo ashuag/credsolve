@@ -5,7 +5,7 @@ import {
   isoDateTimestamp,
   type DataTableColumn,
 } from '@/components/ui/data-table';
-import { getNewLeads, getMasters, type LosLead } from '@/lib/api';
+import { getNewLeads, getLeadsExportUrl, getMasters, type LosLead } from '@/lib/api';
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
@@ -353,13 +353,34 @@ export function LeadsPanel() {
         noResultsMessage="No leads match your filters."
         minWidth="1280px"
         toolbarActions={
-          <button
-            type="button"
-            onClick={() => void loadLeads()}
-            className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
-          >
-            ↺ Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const token = getToken();
+                if (!token) {
+                  setFetchError('Session expired — please log in again.');
+                  return;
+                }
+                const link = document.createElement('a');
+                link.href = getLeadsExportUrl(token);
+                link.rel = 'noopener';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+              }}
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+            >
+              ⬇ Download dump
+            </button>
+            <button
+              type="button"
+              onClick={() => void loadLeads()}
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+            >
+              ↺ Refresh
+            </button>
+          </div>
         }
       />
     </div>

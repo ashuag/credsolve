@@ -62,6 +62,19 @@ export class LosDataController {
     return this.losLead.listLeads();
   }
 
+  @Get('leads/export')
+  @ApiOperation({ summary: 'Download LOS leads as an Excel dump workbook (.xlsx)' })
+  async leadsExport(@Res() res: Response): Promise<void> {
+    const buffer = await this.losLead.exportLeadsWorkbook();
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', 'attachment; filename="Leads dump.xlsx"');
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.send(buffer);
+  }
+
   @Get('applications')
   @ApiOperation({ summary: 'List latest applications for LOS application management' })
   applications() {

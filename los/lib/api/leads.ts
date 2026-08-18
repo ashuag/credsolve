@@ -369,6 +369,13 @@ export async function getNewLeads(token: string): Promise<LosLead[]> {
   return cachedAuthorizedLosGet<LosLead[]>(token, '/leads/new', 'Failed to fetch new leads');
 }
 
+/** URL for the leads dump workbook download (LOS Leads). */
+export function getLeadsExportUrl(token: string): string {
+  const params = new URLSearchParams();
+  params.set('access_token', token);
+  return `${resolveLosClientApiUrl('/leads/export')}?${params.toString()}`;
+}
+
 export async function getApplications(token: string): Promise<LosApplication[]> {
   return cachedAuthorizedLosGet<LosApplication[]>(token, '/applications', 'Failed to fetch applications');
 }

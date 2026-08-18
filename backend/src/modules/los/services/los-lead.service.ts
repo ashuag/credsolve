@@ -8,6 +8,7 @@ import { CibilCreditAssessmentService } from '../../../common/cibil/cibil-credit
 import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
+import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -42,6 +43,56 @@ function bureauFetchedStatusLabel(code: number): string {
       return `Unknown (${code})`;
   }
 }
+
+function toExcelDate(iso: string | null | undefined): Date | null {
+  if (!iso) return null;
+  const parsed = new Date(iso);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
+function toExcelNumber(value: string | number | null | undefined): number | null {
+  if (value == null || value === '') return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function leadSourceLabel(lead: {
+  sourceName: string | null;
+  sourceType: string | null;
+  utmSource: string | null;
+  utmMedium: string | null;
+}): string | null {
+  if (lead.sourceName) {
+    return lead.sourceType ? `${lead.sourceName} · ${lead.sourceType}` : lead.sourceName;
+  }
+  if (lead.utmSource) {
+    return lead.utmMedium ? `${lead.utmSource} · ${lead.utmMedium}` : lead.utmSource;
+  }
+  return null;
+}
+
+const LEAD_DUMP_HEADERS = [
+  'Name',
+  'Mobile',
+  'Email',
+  'PAN',
+  'PAN verified',
+  'CIBIL score',
+  'Occupation',
+  'City',
+  'Status',
+  'Rejection reason',
+  'Rejection note',
+  'Source',
+  'Source type',
+  'UTM source',
+  'UTM medium',
+  'UTM campaign',
+  'Created',
+  'Last modified',
+  'Lead UUID',
+  'Customer UUID',
+] as const;
 
 @Injectable()
 export class LosLeadService {
@@ -133,6 +184,37 @@ export class LosLeadService {
         updatedAt: lead.updatedAt.toISOString(),
       };
     });
+  }
+
+  /** Builds a leads dump workbook for LOS Leads → Download dump. */
+  async exportLeadsWorkbook(): Promise<Buffer> {
+    const leads = await this.listLeads();
+    const rows: SimpleXlsxCell[][] = [
+      [...LEAD_DUMP_HEADERS],
+      ...leads.map((lead) => [
+        lead.fullName,
+        lead.mobileNumber,
+        lead.email,
+        lead.panNumber,
+        lead.panVerifiedLabel,
+        toExcelNumber(lead.cibilScore),
+        lead.occupation,
+        lead.city,
+        lead.statusLabel,
+        lead.rejectionReason?.label ?? null,
+        lead.leadStatusNote,
+        leadSourceLabel(lead),
+        lead.sourceType,
+        lead.utmSource,
+        lead.utmMedium,
+        lead.utmCampaign,
+        toExcelDate(lead.createdAt),
+        toExcelDate(lead.updatedAt),
+        lead.uuid,
+        lead.customerUuid,
+      ]),
+    ];
+    return buildSimpleXlsxWorkbook(rows, 'Leads');
   }
 
   async getLeadDetails(leadUuid: string) {
