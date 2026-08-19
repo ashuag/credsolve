@@ -353,6 +353,41 @@ export class EmailService {
     });
   }
 
+  async sendLosInvitationEmail(
+    to: string,
+    invitation: { fullName: string; inviteUrl: string; expiresAt: Date },
+  ): Promise<void> {
+    const subject = 'Set up your MoneyCash LOS account';
+    const expires = invitation.expiresAt.toISOString();
+    const text = [
+      `Hi ${invitation.fullName},`,
+      '',
+      'You have been invited to MoneyCash LOS. Open the link below to set your password:',
+      invitation.inviteUrl,
+      '',
+      `This link expires at ${expires} (UTC).`,
+      '',
+      'If you did not expect this invitation, you can ignore this email.',
+    ].join('\n');
+
+    const html = `
+      <p>Hi ${escapeHtml(invitation.fullName)},</p>
+      <p>You have been invited to MoneyCash LOS. Click the button below to set your password.</p>
+      <p><a href="${escapeHtml(invitation.inviteUrl)}" style="display:inline-block;padding:10px 16px;background:#172c71;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Set your password</a></p>
+      <p style="color:#555;font-size:0.9em;">Or copy this link: ${escapeHtml(invitation.inviteUrl)}</p>
+      <p style="color:#555;font-size:0.9em;">This link expires at ${escapeHtml(expires)} (UTC).</p>
+      <p style="color:#555;font-size:0.85em;">If you did not expect this invitation, you can ignore this email.</p>
+    `.trim();
+
+    await this.sendEmail({
+      to,
+      subject,
+      text,
+      html,
+      audit: { serviceName: 'email-los-invitation' },
+    });
+  }
+
   async sendContactUsNotificationEmail(
     to: string,
     submission: {

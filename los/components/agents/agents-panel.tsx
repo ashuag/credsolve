@@ -5,7 +5,7 @@ import {
   isoDateTimestamp,
   type DataTableColumn,
 } from '@/components/ui/data-table';
-import { createUser, getRoles, getUsers, toggleUserStatus, updateUser, type LosRole, type LosUser } from '@/lib/api';
+import { createUser, getRoles, getUsers, resendUserInvitation, toggleUserStatus, updateUser, type LosRole, type LosUser } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -458,8 +458,10 @@ export function AgentsPanel() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [modal, setModal] = useState<{ mode: ModalMode; agent?: LosUser } | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
   const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null);
   const [signedInTodayOnly, setSignedInTodayOnly] = useState(false);
 
@@ -493,6 +495,23 @@ export function AgentsPanel() {
     }
   }
 
+  async function handleResendInvitation(agent: LosUser) {
+    const token = getToken();
+    if (!token || resendingId !== null) return;
+    setResendingId(agent.id);
+    try {
+      const updated = await resendUserInvitation(token, agent.id);
+      setAgents((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+      setActionError(null);
+      setNotice(`Invitation email sent to ${updated.email}.`);
+    } catch (err) {
+      setNotice(null);
+      setActionError(err instanceof Error ? err.message : 'Failed to resend invitation');
+    } finally {
+      setResendingId(null);
+    }
+  }
+
   function handleSaved(saved: LosUser, meta: SaveMeta) {
     setAgents((prev) => {
       const idx = prev.findIndex((a) => a.id === saved.id);
@@ -505,6 +524,7 @@ export function AgentsPanel() {
         ? `Agent details updated. Registration email sent to ${saved.email}.`
         : 'Agent details updated.'
     );
+    setActionError(null);
     setModal(null);
   }
 
@@ -677,15 +697,16 @@ export function AgentsPanel() {
             {status === 'pending' ? (
               <button
                 type="button"
-                disabled
-                title="Pending invitation"
-                className="inline-flex items-center justify-center w-7 h-7 rounded-[6px] border border-[rgba(245,158,11,0.2)] bg-[rgba(255,247,237,0.95)] text-[#9a6700] opacity-80"
+                onClick={() => void handleResendInvitation(agent)}
+                disabled={resendingId === agent.id}
+                title="Resend invitation email"
+                className="inline-flex items-center justify-center w-7 h-7 rounded-[6px] border border-[rgba(20,150,243,0.2)] bg-[rgba(239,246,255,0.95)] text-brand-blue cursor-pointer hover:border-[rgba(20,150,243,0.36)] transition-colors disabled:opacity-50 disabled:cursor-wait"
               >
                 <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 7 12 12 15 15" />
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                  <polyline points="22,6 12,13 2,6" />
                 </svg>
-                <span className="sr-only">Pending invitation</span>
+                <span className="sr-only">Resend invitation email</span>
               </button>
             ) : (
               <button
@@ -718,7 +739,7 @@ export function AgentsPanel() {
         );
       },
     },
-  ], [directReportsByManager, expandedAgentId, roleFilterOptions, togglingId]);
+  ], [directReportsByManager, expandedAgentId, resendingId, roleFilterOptions, togglingId]);
 
   return (
     <>
@@ -772,6 +793,13 @@ export function AgentsPanel() {
           <div className="rounded-[10px] border border-[rgba(34,197,94,0.22)] bg-[rgba(240,253,244,0.92)] p-[10px_14px] text-[0.86rem] text-[#166534]">
             {notice}
             <button type="button" className="ml-3 underline" onClick={() => setNotice(null)}>Dismiss</button>
+          </div>
+        ) : null}
+
+        {actionError ? (
+          <div className="rounded-[10px] border border-[rgba(239,68,68,0.22)] bg-[rgba(254,242,242,0.92)] p-[10px_14px] text-[0.86rem] text-[#991b1b]">
+            {actionError}
+            <button type="button" className="ml-3 underline" onClick={() => setActionError(null)}>Dismiss</button>
           </div>
         ) : null}
 

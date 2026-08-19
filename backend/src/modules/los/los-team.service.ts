@@ -1,6 +1,16 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
+import { EmailService } from '../../common/email/email.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CreateLosRoleDto } from './dto/create-los-role.dto';
 import type { CreateLosUserDto } from './dto/create-los-user.dto';
@@ -12,13 +22,26 @@ const USER_INCLUDE = {
   manager: { include: { userRole: true } },
 } as const;
 
-const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_INVITE_TTL_HOURS = 7 * 24;
 
 type UserWithRelations = Prisma.UserGetPayload<{ include: typeof USER_INCLUDE }>;
 
+type InvitationSecrets = {
+  rawToken: string;
+  invitationTokenHash: string;
+  invitationSentAt: Date;
+  invitationExpiresAt: Date;
+};
+
 @Injectable()
 export class LosTeamService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(LosTeamService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+    private readonly config: ConfigService,
+  ) {}
 
   private mapRole(role: UserWithRelations['userRole']): {
     id: number;
@@ -184,17 +207,70 @@ export class LosTeamService {
     return rows.map((u) => this.mapUser(u));
   }
 
-  private newInvitation(): { invitationTokenHash: string; invitationSentAt: Date; invitationExpiresAt: Date } {
-    const raw = randomBytes(32).toString('base64url');
-    const invitationTokenHash = createHash('sha256').update(raw).digest('hex');
+  private invitationTtlMs(): number {
+    const raw = this.config.get<string>('LOS_INVITATION_EXPIRY_HOURS')?.trim();
+    const hours = Number.parseInt(raw ?? '', 10);
+    const ttlHours = Number.isFinite(hours) && hours > 0 ? hours : DEFAULT_INVITE_TTL_HOURS;
+    return ttlHours * 60 * 60 * 1000;
+  }
+
+  private resolveLosFrontendUrl(): string | null {
+    const raw = this.config.get<string>('LOS_FRONTEND_URL')?.trim();
+    if (!raw) return null;
+    return raw.replace(/\/+$/, '');
+  }
+
+  private assertInvitationEmailReady() {
+    if (!this.emailService.isConfigured()) {
+      throw new ServiceUnavailableException('Email is not configured; invitation cannot be sent.');
+    }
+    if (!this.resolveLosFrontendUrl()) {
+      throw new ServiceUnavailableException('LOS_FRONTEND_URL is not configured; invitation cannot be sent.');
+    }
+  }
+
+  private newInvitation(): InvitationSecrets {
+    const rawToken = randomBytes(32).toString('base64url');
+    const invitationTokenHash = createHash('sha256').update(rawToken).digest('hex');
     const invitationSentAt = new Date();
-    const invitationExpiresAt = new Date(invitationSentAt.getTime() + INVITE_TTL_MS);
-    return { invitationTokenHash, invitationSentAt, invitationExpiresAt };
+    const invitationExpiresAt = new Date(invitationSentAt.getTime() + this.invitationTtlMs());
+    return { rawToken, invitationTokenHash, invitationSentAt, invitationExpiresAt };
+  }
+
+  private async sendInvitationEmail(params: {
+    to: string;
+    fullName: string;
+    rawToken: string;
+    expiresAt: Date;
+  }) {
+    this.assertInvitationEmailReady();
+    const frontendUrl = this.resolveLosFrontendUrl();
+    if (!frontendUrl) {
+      throw new ServiceUnavailableException('LOS_FRONTEND_URL is not configured; invitation cannot be sent.');
+    }
+    const inviteUrl = `${frontendUrl}/invite/${params.rawToken}`;
+    try {
+      await this.emailService.sendLosInvitationEmail(params.to, {
+        fullName: params.fullName,
+        inviteUrl,
+        expiresAt: params.expiresAt,
+      });
+      this.logger.log(`LOS invitation emailed to ${maskEmail(params.to)}.`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to email LOS invitation to ${maskEmail(params.to)}`,
+        error instanceof Error ? error.stack : error,
+      );
+      throw new InternalServerErrorException(
+        'User was saved but the invitation email could not be sent. Use Resend invitation from the agents table.',
+      );
+    }
   }
 
   async createUser(dto: CreateLosUserDto) {
     const email = dto.email.trim().toLowerCase();
     await this.assertManagerForRole(dto.roleId, dto.managerId ?? null);
+    this.assertInvitationEmailReady();
 
     const invite = this.newInvitation();
 
@@ -215,6 +291,12 @@ export class LosTeamService {
           invitationExpiresAt: invite.invitationExpiresAt,
         },
         include: USER_INCLUDE,
+      });
+      await this.sendInvitationEmail({
+        to: email,
+        fullName: user.fullName,
+        rawToken: invite.rawToken,
+        expiresAt: invite.invitationExpiresAt,
       });
       return this.mapUser(user);
     } catch (error) {
@@ -268,8 +350,10 @@ export class LosTeamService {
 
     const emailChanging = dto.email !== undefined && dto.email.trim().toLowerCase() !== existing.email;
     const needsNewInvite = emailChanging && !existing.registrationCompletedAt;
+    let invite: InvitationSecrets | null = null;
     if (needsNewInvite) {
-      const invite = this.newInvitation();
+      this.assertInvitationEmailReady();
+      invite = this.newInvitation();
       data.invitationTokenHash = invite.invitationTokenHash;
       data.invitationSentAt = invite.invitationSentAt;
       data.invitationExpiresAt = invite.invitationExpiresAt;
@@ -281,6 +365,14 @@ export class LosTeamService {
         data,
         include: USER_INCLUDE,
       });
+      if (invite) {
+        await this.sendInvitationEmail({
+          to: user.email,
+          fullName: user.fullName,
+          rawToken: invite.rawToken,
+          expiresAt: invite.invitationExpiresAt,
+        });
+      }
       return this.mapUser(user);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -313,6 +405,7 @@ export class LosTeamService {
     if (existing.password) {
       throw new BadRequestException('This user has already completed registration.');
     }
+    this.assertInvitationEmailReady();
     const invite = this.newInvitation();
     const user = await this.prisma.client.user.update({
       where: { id: userId },
@@ -323,6 +416,20 @@ export class LosTeamService {
       },
       include: USER_INCLUDE,
     });
+    await this.sendInvitationEmail({
+      to: user.email,
+      fullName: user.fullName,
+      rawToken: invite.rawToken,
+      expiresAt: invite.invitationExpiresAt,
+    });
     return this.mapUser(user);
   }
+}
+
+function maskEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  if (!domain || !local) {
+    return '***';
+  }
+  return `${local.slice(0, 2)}***@${domain}`;
 }
