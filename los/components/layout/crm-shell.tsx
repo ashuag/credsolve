@@ -2,13 +2,14 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   type FormEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -17,11 +18,22 @@ import { DEVELOPER_TOOL_LINKS } from '@/components/developer/developer-tools-nav
 import { useNavigationProgress } from '@/components/ui/navigation-progress-provider';
 import { LogoutButton } from '@/components/ui/logout-button';
 import { updateLosPassword } from '@/lib/api';
+import {
+  canAccessLosConfigModules,
+  isLosConfigPath,
+  LOS_AGENT_HIDDEN_NAV_SECTIONS,
+} from '@/lib/access';
 import { LOS_STORAGE_KEY, LOS_THEME_KEY } from '@/lib/auth';
 import { cx } from '@/lib/cx';
 
 type SessionUser = {
-  user?: { fullName?: string; email?: string; role?: string; roleName?: string };
+  user?: {
+    fullName?: string;
+    email?: string;
+    role?: string;
+    roleName?: string;
+    hierarchyLevel?: number | null;
+  };
 };
 
 type SidebarMode = 'expanded' | 'icons' | 'hidden';
@@ -441,8 +453,10 @@ export function CrmShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { isNavigating, startNavigation } = useNavigationProgress();
   const [session, setSession] = useState<SessionUser | null>(null);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>('expanded');
   const [isMobileLayout, setIsMobileLayout] = useState(false);
@@ -466,6 +480,7 @@ export function CrmShell({
     if (raw) {
       try { setSession(JSON.parse(raw) as SessionUser); } catch { /* ignore */ }
     }
+    setSessionLoaded(true);
 
     const stored = window.localStorage.getItem(SIDEBAR_MODE_KEY);
     if (stored) {
@@ -616,7 +631,23 @@ export function CrmShell({
 
   const isIcons  = !isMobileLayout && sidebarMode === 'icons';
   const isHidden = !isMobileLayout && sidebarMode === 'hidden';
-  const activeGroup = navGroups.find((g) => g.items.some((i) => isNavActive(pathname, i)));
+  const roleName = session?.user?.roleName ?? session?.user?.role;
+  const canSeeConfigModules =
+    sessionLoaded && canAccessLosConfigModules(roleName, session?.user?.hierarchyLevel);
+  const visibleNavGroups = useMemo(
+    () =>
+      canSeeConfigModules
+        ? navGroups
+        : navGroups.filter((group) => !LOS_AGENT_HIDDEN_NAV_SECTIONS.has(group.section)),
+    [canSeeConfigModules],
+  );
+  const activeGroup = visibleNavGroups.find((g) => g.items.some((i) => isNavActive(pathname, i)));
+  const blockConfigContent = isLosConfigPath(pathname) && !canSeeConfigModules;
+
+  useEffect(() => {
+    if (!sessionLoaded || canSeeConfigModules || !isLosConfigPath(pathname)) return;
+    router.replace('/dashboard');
+  }, [sessionLoaded, canSeeConfigModules, pathname, router]);
 
   const sidebarWrapClass = cx(
     'transition-all duration-[200ms]',
@@ -675,7 +706,7 @@ export function CrmShell({
 
           {/* Nav groups */}
           <nav className={cx('flex flex-col', isIcons ? 'gap-1 items-center w-full' : 'gap-0 flex-1')} aria-label="Primary navigation">
-            {navGroups.map((group) => {
+            {visibleNavGroups.map((group) => {
               const accent = GROUP_ACCENT[group.section] ?? GROUP_ACCENT['Overview'];
               return (
                 <div key={group.section} className={isIcons ? 'w-full' : 'pt-3'}>
@@ -976,7 +1007,7 @@ export function CrmShell({
           </div>
 
           {/* Page head */}
-          {showPageHead && (
+          {showPageHead && !blockConfigContent && (
             <div
               className="flex items-center gap-4 px-4 py-3 rounded-[12px] border border-[rgba(23,44,113,0.09)] shadow-[0_2px_8px_rgba(23,44,113,0.05)]"
               style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(239,247,255,0.96))' }}
@@ -997,7 +1028,7 @@ export function CrmShell({
           )}
         </header>
 
-        <main className="pt-3">{children}</main>
+        <main className="pt-3">{blockConfigContent ? null : children}</main>
       </div>
 
       {showPasswordModal && (

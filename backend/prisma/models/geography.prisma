@@ -72,5 +72,6 @@ model Pincode {
   negativeRemovedBy User? @relation("PincodeNegativeRemovedBy", fields: [negativeRemovedByUserId], references: [id])
 
   @@index([cityId])
+  @@index([isNegative, negativeAddedAt])
   @@map("pincode")
 }

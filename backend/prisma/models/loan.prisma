@@ -3,8 +3,8 @@
 // ============================================================
 //
 // `loan_account` is created at disbursement (one per application).
-// `loan_number` and `loan_account_number` are set from `application.application_number`
-// (see resolveLoanAccountNumberAtDisbursement).
+// `loan_number` and `loan_account_number` are set from `lead.lead_id`
+// via `application.application_number` (see resolveLoanAccountNumberAtDisbursement).
 // `loan_repayment` records individual payment events against an account.
 
 model LoanAccount {
@@ -12,7 +12,7 @@ model LoanAccount {
   uuid                 String    @unique @default(uuid()) @db.Char(36)
   applicationId        BigInt    @unique @map("application_id") @db.UnsignedBigInt
   customerId           BigInt    @map("customer_id") @db.UnsignedBigInt
-  /// Public loan reference — same value as `application.application_number` (e.g. APP2026K7M2Q).
+  /// Public loan reference — same value as `lead.lead_id` / `application.application_number` (e.g. APP2026K7M2Q).
   loanNumber           String    @unique @map("loan_number") @db.VarChar(12)
   loanAccountNumber    String    @unique @map("loan_account_number") @db.VarChar(30)
   principalAmount      Decimal   @map("principal_amount") @db.Decimal(12, 2)
@@ -38,6 +38,8 @@ model LoanAccount {
   repayments  LoanRepayment[]
 
   @@index([customerId, loanStatusId])
+  @@index([disbursedAt])
+  @@index([loanStatusId, closedAt, loanMaturityDate])
   @@map("loan_account")
 }
 

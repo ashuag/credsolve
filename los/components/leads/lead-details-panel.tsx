@@ -326,6 +326,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
         createdAt={formatDateTime(lead.createdAt)}
         updatedAt={formatDateTime(lead.updatedAt)}
         quickStats={[
+          { label: 'Lead ID', value: lead.leadNumber },
           { label: 'PAN', value: lead.panVerifiedLabel ?? '—' },
           { label: 'Bureau', value: lead.bureauFetchedLabel ?? '—' },
           { label: 'CIBIL', value: formatCibilScoreLabel(lead.bureauReport?.cibilScore) },
@@ -342,6 +343,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
               <div className="grid gap-x-6 gap-y-0 sm:grid-cols-2">
                 <DetailGrid
                   rows={[
+                    { label: 'Lead ID', value: lead.leadNumber },
                     { label: 'Full name', value: formatPersonName(profile.fullName) },
                     { label: 'Date of birth', value: formatDateOnly(profile.dateOfBirth ?? undefined) },
                     { label: 'Age', value: ageFromDateOfBirth(profile.dateOfBirth ?? undefined) },

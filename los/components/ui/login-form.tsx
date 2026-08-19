@@ -16,6 +16,7 @@ type LoginResponse = {
     email?: string;
     role?: string | null;
     roleName?: string | null;
+    hierarchyLevel?: number | null;
   };
   message?: string;
 };
@@ -23,7 +24,7 @@ type LoginResponse = {
 export function LoginForm() {
   const router = useRouter();
   const { startNavigation } = useNavigationProgress();
-  const [email, setEmail] = useState('admin@moneycash.in');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,17 +85,19 @@ export function LoginForm() {
   }
 
   return (
-    <form className="grid gap-4" onSubmit={onSubmit}>
+    <form className="grid gap-4" onSubmit={onSubmit} autoComplete="off">
       <div className="grid gap-2">
         <label htmlFor="email" className="text-[0.92rem] font-bold text-brand-text">
           Email
         </label>
         <input
           id="email"
+          name="los-email"
           className="los-input"
           type="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
+          autoComplete="off"
           required
         />
       </div>
@@ -104,10 +107,12 @@ export function LoginForm() {
         </label>
         <input
           id="password"
+          name="los-password"
           className="los-input"
           type="password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
+          autoComplete="new-password"
         />
       </div>
       {error ? (

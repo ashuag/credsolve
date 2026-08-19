@@ -5,7 +5,7 @@
 model Application {
   id                    BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
   uuid                  String    @unique @default(uuid()) @db.Char(36)
-  /// Public alphanumeric reference (exactly 12 chars, e.g. APP2026K7M2Q). Becomes loan_account_number at disbursement.
+  /// Public alphanumeric reference (exactly 12 chars, e.g. APP2026K7M2Q). Same value as `lead.lead_id`; becomes loan_number at disbursement.
   applicationNumber     String    @unique @map("application_number") @db.VarChar(12)
   customerId            BigInt    @map("customer_id") @db.UnsignedBigInt
   leadId                BigInt    @map("lead_id") @db.UnsignedBigInt
@@ -31,6 +31,8 @@ model Application {
   @@index([leadId, applicationStatusId])
   @@index([applicationStatusId])
   @@index([rejectionReasonId])
+  @@index([createdAt])
+  @@index([updatedAt])
   @@map("application")
 }
 
@@ -94,6 +96,7 @@ model ApplicationKyc {
 
   application Application @relation(fields: [applicationId], references: [id])
 
+  @@index([kycStatus, livenessPassed])
   @@map("application_kyc")
 }
 

@@ -16,6 +16,7 @@ import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express
 import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { UploadedFileLike } from '../../common/types/uploaded-file';
 import { LosAuthGuard } from './auth/los-auth.guard';
+import { LosDenyAgentGuard } from './auth/los-deny-agent.guard';
 import { CibilVendorFetchCheckDto } from './dto/cibil-vendor-fetch-check.dto';
 import { FaceLivenessCheckDto } from './dto/face-liveness-check.dto';
 import { KycFaceMatchCheckDto } from './dto/kyc-face-match-check.dto';
@@ -34,7 +35,7 @@ const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 
 @ApiTags('LOS Developer Tools')
 @Controller(['los/developer-tools', 'los/los/developer-tools'])
-@UseGuards(LosAuthGuard)
+@UseGuards(LosAuthGuard, LosDenyAgentGuard)
 export class LosDeveloperToolsController {
   constructor(
     private readonly cibilDevTools: LosCibilDevToolsService,

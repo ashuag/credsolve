@@ -13,6 +13,7 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { LosAuthGuard } from './auth/los-auth.guard';
+import { LosDenyAgentGuard } from './auth/los-deny-agent.guard';
 import type { LosSessionPayload } from './auth/los-session.service';
 import { CreateLosRoleDto } from './dto/create-los-role.dto';
 import { CreateLosUserDto } from './dto/create-los-user.dto';
@@ -24,7 +25,7 @@ type LosRequest = Request & { losUser: LosSessionPayload };
 
 @ApiTags('LOS Team')
 @Controller('los')
-@UseGuards(LosAuthGuard)
+@UseGuards(LosAuthGuard, LosDenyAgentGuard)
 export class LosTeamController {
   constructor(private readonly team: LosTeamService) {}
 

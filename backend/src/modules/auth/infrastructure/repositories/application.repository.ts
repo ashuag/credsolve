@@ -1,11 +1,9 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Prisma, type EmailVerificationType } from '@prisma/client';
 import { APPLICATION_KYC_STATUS, APPLICATION_STATUS } from '../../../../common/constants/application.constants';
-import { generateApplicationNumber } from '../../../../common/loan/application-number.util';
+import { generateLeadNumber } from '../../../../common/loan/application-number.util';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import type { DbClient } from './db.client';
-
-const APPLICATION_NUMBER_CREATE_ATTEMPTS = 8;
 
 @Injectable()
 export class ApplicationRepository {
@@ -16,44 +14,74 @@ export class ApplicationRepository {
   }
 
   /**
-   * Creates an application with a unique `applicationNumber`.
-   * Retries on rare unique collisions of the random suffix.
+   * Creates an application whose public number is the lead's `lead_id`.
+   * Lead, application, and loan then share one unique journey ID.
    */
   async createDraftApplication(
     params: { leadId: bigint; customerId: bigint; applicationStatusId: number },
     tx?: DbClient,
   ) {
+    const journeyNumber = await this.resolveLeadJourneyNumber(params.leadId, tx);
+    try {
+      return await this.db(tx).application.create({
+        data: {
+          customerId: params.customerId,
+          leadId: params.leadId,
+          applicationStatusId: params.applicationStatusId,
+          applicationNumber: journeyNumber,
+        },
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError
+        && err.code === 'P2002'
+      ) {
+        const target = err.meta?.target;
+        const targets = Array.isArray(target)
+          ? target.map(String)
+          : [String(target ?? '')];
+        if (targets.some((t) => /application_number|applicationNumber/i.test(t))) {
+          throw new InternalServerErrorException(
+            `Application id ${journeyNumber} is already in use.`,
+          );
+        }
+      }
+      throw err;
+    }
+  }
+
+  private async resolveLeadJourneyNumber(leadId: bigint, tx?: DbClient): Promise<string> {
+    const lead = await this.db(tx).lead.findUnique({
+      where: { id: leadId },
+      select: { id: true, leadNumber: true },
+    });
+    if (!lead) {
+      throw new NotFoundException('Lead not found.');
+    }
+    if (lead.leadNumber) {
+      return lead.leadNumber;
+    }
+
     let lastError: unknown;
-    for (let attempt = 0; attempt < APPLICATION_NUMBER_CREATE_ATTEMPTS; attempt += 1) {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const leadNumber = generateLeadNumber();
       try {
-        return await this.db(tx).application.create({
-          data: {
-            customerId: params.customerId,
-            leadId: params.leadId,
-            applicationStatusId: params.applicationStatusId,
-            applicationNumber: generateApplicationNumber(),
-          },
+        await this.db(tx).lead.update({
+          where: { id: lead.id },
+          data: { leadNumber },
         });
+        return leadNumber;
       } catch (err) {
         lastError = err;
-        if (
-          err instanceof Prisma.PrismaClientKnownRequestError
-          && err.code === 'P2002'
-        ) {
-          const target = err.meta?.target;
-          const targets = Array.isArray(target)
-            ? target.map(String)
-            : [String(target ?? '')];
-          if (targets.some((t) => /application_number|applicationNumber/i.test(t))) {
-            continue;
-          }
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+          continue;
         }
         throw err;
       }
     }
     throw lastError instanceof Error
       ? lastError
-      : new InternalServerErrorException('Failed to allocate a unique application number.');
+      : new InternalServerErrorException('Failed to allocate a unique lead id.');
   }
 
   async ensureDraftApplicationForLead(

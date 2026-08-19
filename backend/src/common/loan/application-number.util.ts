@@ -1,15 +1,13 @@
 import { randomBytes } from 'node:crypto';
 
 /**
- * Public application reference, persisted at application creation.
+ * Public journey reference, allocated once at lead creation and reused as
+ * `application.application_number` and `loan_account.loan_number`.
  *
  * Format (exactly 12 alphanumeric chars, no hyphens):
  *   APP + YYYY + 5 chars from [A-HJ-NP-Z2-9] (excludes I/O/0/1)
  *
  * Example: `APP2026K7M2Q`
- *
- * At disbursement, the same value becomes `loan_account.loan_account_number`
- * so application → loan stay linked by one public identifier.
  */
 export const APPLICATION_NUMBER_PREFIX = 'APP';
 export const APPLICATION_NUMBER_SUFFIX_LENGTH = 5;
@@ -28,7 +26,7 @@ function randomSuffix(length: number): string {
   return out;
 }
 
-/** Generates a new 12-character application number for the given calendar year (UTC). */
+/** Generates a new 12-character journey ID for the given calendar year (UTC). */
 export function generateApplicationNumber(now: Date = new Date()): string {
   const year = now.getUTCFullYear();
   const value = `${APPLICATION_NUMBER_PREFIX}${year}${randomSuffix(APPLICATION_NUMBER_SUFFIX_LENGTH)}`;
@@ -38,6 +36,11 @@ export function generateApplicationNumber(now: Date = new Date()): string {
     );
   }
   return value;
+}
+
+/** Same generator as {@link generateApplicationNumber}; allocated on `lead.lead_id`. */
+export function generateLeadNumber(now: Date = new Date()): string {
+  return generateApplicationNumber(now);
 }
 
 /**

@@ -37,7 +37,7 @@ model OtpRequest {
 
   type OtpType @relation(fields: [typeId], references: [id])
 
-  @@index([value, typeId])
+  @@index([value, typeId, lastSentAt])
   @@index([expiresAt])
   @@index([verifiedAt])
   @@index([smsMessageId])

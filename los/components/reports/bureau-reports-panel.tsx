@@ -8,7 +8,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui/data-table';
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
-import { getBureauReports, getBureauReportsExportUrl, type LosBureauReportListItem } from '@/lib/api';
+import { downloadBureauReportsExport, getBureauReports, type LosBureauReportListItem } from '@/lib/api';
 import { getLosToken } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
 import Link from 'next/link';
@@ -257,12 +257,22 @@ export function BureauReportsPanel() {
         initialSort={{ key: 'fetched', dir: 'desc' }}
         toolbarActions={
           <div className="flex items-center gap-2">
-            <a
-              href={getBureauReportsExportUrl(getLosToken() ?? '')}
-              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text no-underline transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+            <button
+              type="button"
+              onClick={() => {
+                const token = getLosToken();
+                if (!token) {
+                  setFetchError('Session expired — please log in again.');
+                  return;
+                }
+                void downloadBureauReportsExport(token).catch((err) => {
+                  setFetchError(err instanceof Error ? err.message : 'Failed to download bureau reports');
+                });
+              }}
+              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
             >
               ⬇ Download
-            </a>
+            </button>
             <button
               type="button"
               onClick={() => void load()}

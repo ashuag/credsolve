@@ -4,18 +4,28 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DashboardDailyCharts } from '@/components/dashboard/dashboard-daily-charts';
 import { getDashboardCrm, type LosCrmDashboardPayload } from '@/lib/api';
+import { canAccessLosConfigModules } from '@/lib/access';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import styles from '@/app/dashboard/dashboard.module.css';
 
-function readToken(): string | null {
+type StoredLosSession = {
+  token?: string;
+  user?: { role?: string; roleName?: string; hierarchyLevel?: number | null };
+};
+
+function readSession(): StoredLosSession | null {
   if (typeof window === 'undefined') return null;
   try {
     const raw = window.localStorage.getItem(LOS_STORAGE_KEY);
     if (!raw) return null;
-    return (JSON.parse(raw) as { token?: string }).token ?? null;
+    return JSON.parse(raw) as StoredLosSession;
   } catch {
     return null;
   }
+}
+
+function readToken(): string | null {
+  return readSession()?.token ?? null;
 }
 
 function moneyFromDecimalString(s: string | null | undefined): string {
@@ -74,6 +84,10 @@ export function CrmDashboardClient() {
 
   const leadTotal = useMemo(() => (data ? tableTotal(data.leadsByStatus) : 0), [data]);
   const appStatusTotal = useMemo(() => (data ? tableTotal(data.applicationsByStatus) : 0), [data]);
+  const canSeeTeamShortcut = useMemo(() => {
+    const user = readSession()?.user;
+    return canAccessLosConfigModules(user?.roleName ?? user?.role, user?.hierarchyLevel);
+  }, []);
 
   if (loading && !data) {
     return (
@@ -132,9 +146,11 @@ export function CrmDashboardClient() {
           <Link href="/applications" className={styles.quickLink}>
             Applications
           </Link>
-          <Link href="/agents" className={styles.quickLink}>
-            Team
-          </Link>
+          {canSeeTeamShortcut ? (
+            <Link href="/agents" className={styles.quickLink}>
+              Team
+            </Link>
+          ) : null}
         </div>
         <div className={styles.reportHeaderMeta}>
           <span className={styles.reportStamp}>

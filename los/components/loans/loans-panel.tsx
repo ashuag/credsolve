@@ -10,7 +10,7 @@ import {
 import { getLoans, markApplicationInternalTesting, type LosLoan } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
-import { MarkInternalTestingButton } from '@/components/shared/mark-internal-testing-button';
+import { MarkInternalTestingButton, useCanMarkInternalTesting } from '@/components/shared/mark-internal-testing-button';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -128,6 +128,7 @@ export function LoansPanel() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [busyUuid, setBusyUuid] = useState<string | null>(null);
+  const canMarkTesting = useCanMarkInternalTesting();
 
   const loadLoans = useCallback(async () => {
     setLoading(true);
@@ -169,7 +170,7 @@ export function LoansPanel() {
     }
   }, []);
 
-  const columns = useMemo((): DataTableColumn<LosLoan>[] => [
+  const allColumns = useMemo((): DataTableColumn<LosLoan>[] => [
     {
       key: 'loan',
       label: 'Loan',
@@ -333,6 +334,10 @@ export function LoansPanel() {
       ),
     },
   ], [busyUuid, markAsInternalTesting]);
+
+  const columns = canMarkTesting
+    ? allColumns
+    : allColumns.filter((column) => column.key !== 'actions');
 
   const overdueCount = loans.filter((loan) => isLoanPastDue(loan)).length;
   const activeCount = loans.filter((loan) => effectiveStatusCode(loan).toUpperCase() === 'ACTIVE').length;

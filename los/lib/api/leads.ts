@@ -2,6 +2,7 @@ import { authorizedLosRequest, cachedAuthorizedLosGet, clientApiUrl, fetchWithTi
 
 export type LosLead = {
   uuid: string;
+  leadNumber: string;
   customerUuid: string;
   fullName: string | null;
   panNumber: string | null;
@@ -31,6 +32,7 @@ export type LosApplication = {
   applicationNumber: string;
   customerUuid: string;
   leadUuid: string | null;
+  leadNumber: string | null;
   mobileNumber: string;
   email: string | null;
   fullName: string | null;
@@ -70,6 +72,7 @@ export type LosApplication = {
 
 export type LosLeadDetails = {
   uuid: string;
+  leadNumber: string;
   customerUuid: string;
   mobileNumber: string;
   email: string | null;
@@ -215,6 +218,7 @@ export type LosApplicationDetails = {
   applicationNumber: string;
   customerUuid: string;
   leadUuid: string;
+  leadNumber: string;
   mobileNumber: string;
   email: string | null;
   emailVerifiedAt: string | null;

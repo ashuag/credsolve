@@ -1270,10 +1270,10 @@ export function ReviewRecordIdsPanel({ row }: { row: LosApplicationDetails }) {
       display: truncateUuid(row.uuid),
     },
     {
-      label: 'Lead',
-      value: row.leadUuid,
+      label: 'Lead ID',
+      value: row.leadNumber,
       href: `/leads/${row.leadUuid}`,
-      display: truncateUuid(row.leadUuid),
+      display: row.leadNumber.trim().toUpperCase(),
     },
     {
       label: 'Customer',

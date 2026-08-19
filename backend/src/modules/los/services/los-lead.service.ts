@@ -161,6 +161,7 @@ export class LosLeadService {
       return {
         id: Number(lead.id),
         uuid: lead.uuid,
+        leadNumber: lead.leadNumber,
         customerUuid: lead.customer.uuid,
         applicationNumber: lead.applications[0]?.applicationNumber ?? null,
         fullName: formatLosPersonName(detail?.fullName),
@@ -193,7 +194,7 @@ export class LosLeadService {
     const rows: SimpleXlsxCell[][] = [
       [...LEAD_DUMP_HEADERS],
       ...leads.map((lead) => [
-        lead.id,
+        lead.leadNumber,
         lead.applicationNumber,
         lead.fullName,
         lead.mobileNumber,
@@ -267,6 +268,7 @@ export class LosLeadService {
 
     return {
       uuid: lead.uuid,
+      leadNumber: lead.leadNumber,
       customerUuid: lead.customer.uuid,
       mobileNumber: lead.customer.mobileNumber,
       email: lead.applications[0]?.details?.emailId ?? null,

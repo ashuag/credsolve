@@ -15,7 +15,7 @@ import { resolveApplicationStageLabel } from '@/lib/customer-journey';
 import { formatPersonName } from '@/lib/format-person-name';
 import { BANK_DETAIL_FAILED_LABEL, PENNY_DROP_FAILED_LABEL } from '@/lib/penny-drop-grant-retry-eligibility';
 import { rejectionReasonDisplayLabel } from '@/lib/rejection-reason-label';
-import { MarkInternalTestingButton } from '@/components/shared/mark-internal-testing-button';
+import { MarkInternalTestingButton, useCanMarkInternalTesting } from '@/components/shared/mark-internal-testing-button';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -226,6 +226,7 @@ export function ApplicationsPanel() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Array<{ code: string; displayName: string }>>([]);
   const [busyUuid, setBusyUuid] = useState<string | null>(null);
+  const canMarkTesting = useCanMarkInternalTesting();
 
   const loadApplications = useCallback(async () => {
     setLoading(true);
@@ -261,7 +262,7 @@ export function ApplicationsPanel() {
     }
   }, []);
 
-  const columns = useMemo((): DataTableColumn<LosApplication>[] => [
+  const allColumns = useMemo((): DataTableColumn<LosApplication>[] => [
     {
       key: 'app-id',
       label: 'Application ID',
@@ -439,6 +440,10 @@ export function ApplicationsPanel() {
       ),
     },
   ], [statuses, busyUuid, markAsInternalTesting]);
+
+  const columns = canMarkTesting
+    ? allColumns
+    : allColumns.filter((column) => column.key !== 'actions');
 
   const withLoan = applications.filter((a) => a.selectedLoanAmount != null).length;
   const totalDisbursed = applications.reduce((sum, a) => sum + (Number(a.selectedLoanAmount) || 0), 0);

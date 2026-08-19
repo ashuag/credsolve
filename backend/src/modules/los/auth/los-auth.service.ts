@@ -51,6 +51,7 @@ export class LosAuthService {
       email: serializedUser.email,
       roleId: serializedUser.roleId,
       roleName: serializedUser.roleName,
+      hierarchyLevel: serializedUser.hierarchyLevel,
     });
 
     return {

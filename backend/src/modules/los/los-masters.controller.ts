@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { LosAuthGuard } from './auth/los-auth.guard';
+import { LosDenyAgentWritesGuard } from './auth/los-deny-agent.guard';
 import { CreateBankMasterDto } from './dto/create-bank-master.dto';
 import { CreateLeadSourceMasterDto } from './dto/create-lead-source-master.dto';
 import { UpdateLeadSourceMasterDto } from './dto/update-lead-source-master.dto';
@@ -36,7 +37,7 @@ import { VendorApiConfigService } from '../../common/vendor/vendor-api-config.se
 
 @ApiTags('LOS Masters')
 @Controller('los/masters')
-@UseGuards(LosAuthGuard)
+@UseGuards(LosAuthGuard, LosDenyAgentWritesGuard)
 export class LosMastersController {
   constructor(
     private readonly losMaster: LosMasterService,

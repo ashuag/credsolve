@@ -10,6 +10,7 @@ import { PreApprovedOfferDryRunService } from '../../common/bre/pre-approved-off
 import { PreBreCheckService } from '../../common/bre/pre-bre-check.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LosAuthGuard } from './auth/los-auth.guard';
+import { LosDenyAgentGuard } from './auth/los-deny-agent.guard';
 import { PostBureauBreCheckDto } from './dto/post-bureau-bre-check.dto';
 import { PostBureauBreCheckFromHtmlDto } from './dto/post-bureau-bre-check-from-html.dto';
 import { PreApprovedOfferCheckDto } from './dto/pre-approved-offer-check.dto';
@@ -28,6 +29,7 @@ export class LosBreController {
   ) {}
 
   @Post('pre-bre-check')
+  @UseGuards(LosDenyAgentGuard)
   @ApiOperation({
     summary: 'Dry-run pre-bureau BRE (age, gender, occupation, negative lists)',
   })
@@ -52,6 +54,7 @@ export class LosBreController {
   }
 
   @Post('pre-approved-offer-check')
+  @UseGuards(LosDenyAgentGuard)
   @ApiOperation({
     summary: 'Dry-run pre-approved offer from bureau JSON (CIBIL score + credit-limit tier)',
   })
@@ -60,6 +63,7 @@ export class LosBreController {
   }
 
   @Get('post-bre-rules-catalog')
+  @UseGuards(LosDenyAgentGuard)
   @ApiOperation({
     summary: 'Post-BRE rule reference (keys, conditions, live thresholds)',
   })
@@ -80,6 +84,7 @@ export class LosBreController {
   }
 
   @Post('post-bureau-check-html')
+  @UseGuards(LosDenyAgentGuard)
   @ApiOperation({
     summary: 'Convert CIBIL HTML to bureau JSON and dry-run all post-BRE rules',
   })
@@ -111,6 +116,7 @@ export class LosBreController {
   }
 
   @Post('cibil-report-download')
+  @UseGuards(LosDenyAgentGuard)
   @ApiOperation({
     summary: 'Generate CIBIL summary PDF from bureau JSON (download only, not saved)',
   })

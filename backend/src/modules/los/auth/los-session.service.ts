@@ -7,6 +7,7 @@ export type LosSessionPayload = {
   email: string;
   roleId: number;
   roleName: string | null;
+  hierarchyLevel?: number | null;
 };
 
 const LOS_SESSION_TTL_SECONDS = 60 * 60 * 24;
@@ -19,7 +20,8 @@ function isLosSessionPayload(value: unknown): value is LosSessionPayload {
     typeof v.userId === 'string' &&
     typeof v.email === 'string' &&
     typeof v.roleId === 'number' &&
-    (v.roleName === null || typeof v.roleName === 'string')
+    (v.roleName === null || typeof v.roleName === 'string') &&
+    (v.hierarchyLevel === undefined || v.hierarchyLevel === null || typeof v.hierarchyLevel === 'number')
   );
 }
 

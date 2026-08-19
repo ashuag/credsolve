@@ -347,6 +347,7 @@ export class LosApplicationService {
         lead: {
           select: {
             uuid: true,
+            leadNumber: true,
             leadStatusNote: true,
             leadDetail: {
               select: {
@@ -413,6 +414,7 @@ export class LosApplicationService {
         uuid: application.uuid,
         applicationNumber: application.applicationNumber,
         leadId: Number(application.leadId),
+        leadNumber: application.lead.leadNumber,
         customerUuid: application.customer.uuid,
         leadUuid: application.lead.uuid,
         mobileNumber: application.customer.mobileNumber,
@@ -468,7 +470,7 @@ export class LosApplicationService {
     const rows: SimpleXlsxCell[][] = [
       [...APPLICATION_DUMP_HEADERS],
       ...applications.map((app) => [
-        app.leadId,
+        app.leadNumber,
         app.applicationNumber,
         app.fullName,
         app.mobileNumber,
@@ -621,6 +623,7 @@ export class LosApplicationService {
       applicationNumber: application.applicationNumber,
       customerUuid: application.customer.uuid,
       leadUuid: lead.uuid,
+      leadNumber: lead.leadNumber,
       mobileNumber: application.customer.mobileNumber,
       email: application.details?.emailId ?? null,
       emailVerifiedAt: application.details?.emailVerifiedAt?.toISOString() ?? null,

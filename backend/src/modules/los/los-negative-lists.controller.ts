@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Req, UseGuard
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { LosAuthGuard } from './auth/los-auth.guard';
+import { LosDenyAgentGuard } from './auth/los-deny-agent.guard';
 import type { LosSessionPayload } from './auth/los-session.service';
 import { CreateNegativeCityDto } from './dto/create-negative-city.dto';
 import { CreateNegativePincodeDto } from './dto/create-negative-pincode.dto';
@@ -12,7 +13,7 @@ type LosRequest = Request & { losUser: LosSessionPayload };
 
 @ApiTags('LOS Negative Lists')
 @Controller('los/negative-lists')
-@UseGuards(LosAuthGuard)
+@UseGuards(LosAuthGuard, LosDenyAgentGuard)
 export class LosNegativeListsController {
   constructor(private readonly losNegativeList: LosNegativeListService) {}
 

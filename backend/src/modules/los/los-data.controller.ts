@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Res, UseGuards } from '@nestjs/comm
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { LosAuthGuard } from './auth/los-auth.guard';
+import { LosDenyAgentGuard } from './auth/los-deny-agent.guard';
 import { RejectWorkspaceRecordDto } from './dto/reject-workspace-record.dto';
 import { LosLeadService } from './services/los-lead.service';
 import { LosApplicationService } from './services/los-application.service';
@@ -36,12 +37,14 @@ export class LosDataController {
   }
 
   @Get('bureau-reports')
+  @UseGuards(LosDenyAgentGuard)
   @ApiOperation({ summary: 'List stored CIBIL bureau reports for LOS Reports' })
   bureauReports() {
     return this.losBureauReport.listBureauReports();
   }
 
   @Get('bureau-reports/export')
+  @UseGuards(LosDenyAgentGuard)
   @ApiOperation({ summary: 'Download stored CIBIL bureau reports as a Credit Assessment data workbook (.xlsx)' })
   async bureauReportsExport(@Res() res: Response): Promise<void> {
     const buffer = await this.losBureauReport.exportBureauReportsWorkbook();
@@ -119,6 +122,7 @@ export class LosDataController {
   }
 
   @Post('applications/:applicationUuid/mark-internal-testing')
+  @UseGuards(LosDenyAgentGuard)
   @ApiOperation({
     summary: 'Hide an application (and its lead) from LOS listings and data dumps as internal testing',
   })
@@ -245,6 +249,7 @@ export class LosDataController {
   }
 
   @Post('leads/:leadUuid/mark-internal-testing')
+  @UseGuards(LosDenyAgentGuard)
   @ApiOperation({ summary: 'Hide a lead from LOS listings and data dumps as internal testing' })
   markLeadInternalTesting(@Param('leadUuid') leadUuid: string) {
     return this.losLead.markInternalTesting(leadUuid);

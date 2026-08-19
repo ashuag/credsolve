@@ -11,7 +11,7 @@ import { getNewLeads, getLeadsExportUrl, getMasters, markLeadInternalTesting, ty
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
-import { MarkInternalTestingButton } from '@/components/shared/mark-internal-testing-button';
+import { MarkInternalTestingButton, useCanMarkInternalTesting } from '@/components/shared/mark-internal-testing-button';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -142,6 +142,7 @@ export function LeadsPanel() {
   const [fetchError,       setFetchError]       = useState<string | null>(null);
   const [statuses,         setStatuses]         = useState<Array<{ code: string; displayName: string }>>([]);
   const [busyUuid,         setBusyUuid]         = useState<string | null>(null);
+  const canMarkTesting = useCanMarkInternalTesting();
 
   const loadLeads = useCallback(async () => {
     setLoading(true);
@@ -179,7 +180,24 @@ export function LeadsPanel() {
     }
   }, []);
 
-  const columns = useMemo((): DataTableColumn<LosLead>[] => [
+  const allColumns = useMemo((): DataTableColumn<LosLead>[] => [
+    {
+      key: 'lead-id',
+      label: 'Lead ID',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.leadNumber?.trim() ?? '',
+      getSortValue: (row) => (row.leadNumber ?? '').toUpperCase(),
+      filter: { type: 'text', placeholder: 'Search…' },
+      render: (lead) => (
+        <Link
+          href={`/leads/${lead.uuid}`}
+          className="font-mono text-[0.82rem] font-semibold text-brand-blue no-underline hover:underline whitespace-nowrap"
+          title={lead.leadNumber}
+        >
+          {lead.leadNumber}
+        </Link>
+      ),
+    },
     {
       key: 'customer',
       label: 'Customer',
@@ -356,6 +374,10 @@ export function LeadsPanel() {
       ),
     },
   ], [statuses, busyUuid, markAsInternalTesting]);
+
+  const columns = canMarkTesting
+    ? allColumns
+    : allColumns.filter((column) => column.key !== 'actions');
 
   const verified    = leads.filter((l) => l.panVerified === 1).length;
   const highCibil   = leads.filter((l) => (l.cibilScore ?? 0) >= 700).length;

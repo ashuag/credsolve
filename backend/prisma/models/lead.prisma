@@ -1,6 +1,8 @@
 model Lead {
   id                                BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
   uuid                              String    @unique @default(uuid()) @db.Char(36)
+  /// Public journey ID (exactly 12 chars, e.g. APP2026K7M2Q). Copied to application_number and loan_number.
+  leadNumber                        String    @unique @map("lead_id") @db.VarChar(12)
   customerId                        BigInt    @map("customer_id") @db.UnsignedBigInt
   leadStatusId                      Int       @default(1) @map("lead_status_id") @db.SmallInt
   leadStatusNote                    String?   @map("lead_status_note") @db.VarChar(256)
@@ -29,6 +31,9 @@ model Lead {
   @@index([expiredAt])
   @@index([createdAt])
   @@index([isInternalTesting])
+  @@index([isActive, isInternalTesting, createdAt])
+  @@index([isActive, leadStatusId])
+  @@index([isActive, createdAt])
   @@map("lead")
 }
 
@@ -66,6 +71,7 @@ model LeadDetail {
   @@index([cityId])
   @@index([pincode])
   @@index([panVerified, panVerifiedAt])
+  @@index([panNumber])
   @@map("lead_detail")
 }
 
@@ -91,6 +97,8 @@ model VendorApiLog {
 
   @@index([leadId])
   @@index([providerName, requestedAt])
+  @@index([requestedAt])
+  @@index([httpStatus, requestedAt])
   @@map("vendor_api_log")
 }
 

@@ -1,7 +1,11 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
+import { generateLeadNumber } from '../../../../common/loan/application-number.util';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import type { DbClient } from './db.client';
+
+const LEAD_NUMBER_CREATE_ATTEMPTS = 8;
 
 @Injectable()
 export class LeadRepository {
@@ -48,26 +52,45 @@ export class LeadRepository {
     });
   }
 
-  createForCustomer(
+  async createForCustomer(
     params: { customerId: bigint; leadStatusId: number },
     tx?: DbClient
   ) {
-    return this.db(tx).lead.create({
-      data: {
-        customerId: params.customerId,
-        leadStatusId: params.leadStatusId,
-      },
-      include: {
-        leadStatus: { select: { name: true } },
-        leadDetail: {
-          include: {
-            gender: { select: { name: true } },
-            occupation: { select: { name: true } },
-            city: { select: { name: true, state: { select: { code: true } } } },
+    let lastError: unknown;
+    for (let attempt = 0; attempt < LEAD_NUMBER_CREATE_ATTEMPTS; attempt += 1) {
+      try {
+        return await this.db(tx).lead.create({
+          data: {
+            customerId: params.customerId,
+            leadStatusId: params.leadStatusId,
+            leadNumber: generateLeadNumber(),
           },
-        },
-      },
-    });
+          include: {
+            leadStatus: { select: { name: true } },
+            leadDetail: {
+              include: {
+                gender: { select: { name: true } },
+                occupation: { select: { name: true } },
+                city: { select: { name: true, state: { select: { code: true } } } },
+              },
+            },
+          },
+        });
+      } catch (err) {
+        lastError = err;
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+          const target = err.meta?.target;
+          const targets = Array.isArray(target) ? target.map(String) : [String(target ?? '')];
+          if (targets.some((t) => /lead_id|leadNumber/i.test(t))) {
+            continue;
+          }
+        }
+        throw err;
+      }
+    }
+    throw lastError instanceof Error
+      ? lastError
+      : new InternalServerErrorException('Failed to allocate a unique lead id.');
   }
 
   /**
