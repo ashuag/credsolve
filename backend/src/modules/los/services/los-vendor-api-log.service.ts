@@ -30,6 +30,7 @@ export type ListVendorApiLogsQuery = {
   httpStatus?: string;
   id?: string;
   leadId?: string;
+  applicationNumber?: string;
   requestPath?: string;
   outcome?: string;
   requestedFrom?: string;
@@ -44,6 +45,8 @@ export type VendorApiLogListItem = {
   requestMethod: string;
   requestPath: string | null;
   leadId: string | null;
+  applicationUuid: string | null;
+  applicationNumber: string | null;
   httpStatus: number | null;
   requestedAt: string;
   respondedAt: string;
@@ -99,6 +102,15 @@ export class LosVendorApiLogService {
           httpStatus: true,
           requestedAt: true,
           respondedAt: true,
+          lead: {
+            select: {
+              applications: {
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+                select: { uuid: true, applicationNumber: true },
+              },
+            },
+          },
         },
       }),
     ]);
@@ -119,6 +131,17 @@ export class LosVendorApiLogService {
 
     const row = await this.prisma.client.vendorApiLog.findUnique({
       where: { uuid: id },
+      include: {
+        lead: {
+          select: {
+            applications: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: { uuid: true, applicationNumber: true },
+            },
+          },
+        },
+      },
     });
     if (!row) throw new NotFoundException('Vendor API log not found.');
 
@@ -143,6 +166,9 @@ export class LosVendorApiLogService {
       httpStatus: number | null;
       requestedAt: Date;
       respondedAt: Date;
+      lead?: {
+        applications: Array<{ uuid: string; applicationNumber: string }>;
+      } | null;
     },
     responsePayload?: unknown,
   ): VendorApiLogListItem {
@@ -151,6 +177,7 @@ export class LosVendorApiLogService {
       responsePayload !== undefined
         ? classifyVendorApiLogOutcome(row.httpStatus, responsePayload)
         : this.outcomeFromHttpStatus(row.httpStatus);
+    const application = row.lead?.applications[0] ?? null;
     return {
       id: row.id.toString(),
       uuid: row.uuid,
@@ -159,6 +186,8 @@ export class LosVendorApiLogService {
       requestMethod: row.requestMethod,
       requestPath: row.requestPath,
       leadId: row.leadId != null ? row.leadId.toString() : null,
+      applicationUuid: application?.uuid ?? null,
+      applicationNumber: application?.applicationNumber ?? null,
       httpStatus: row.httpStatus,
       requestedAt: row.requestedAt.toISOString(),
       respondedAt: row.respondedAt.toISOString(),
@@ -221,6 +250,17 @@ export class LosVendorApiLogService {
         throw new BadRequestException('leadId must be a numeric id.');
       }
       where.leadId = BigInt(leadIdRaw);
+    }
+
+    const applicationNumber = query.applicationNumber?.trim();
+    if (applicationNumber) {
+      where.lead = {
+        applications: {
+          some: {
+            applicationNumber: { contains: applicationNumber },
+          },
+        },
+      };
     }
 
     const requestPath = query.requestPath?.trim();

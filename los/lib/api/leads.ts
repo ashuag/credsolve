@@ -243,6 +243,26 @@ export type LosApplicationDetails = {
   };
   /** True when LOS ops may grant one more customer KYC liveness attempt. */
   canGrantKycLivenessRetry: boolean;
+  /** Penny-drop bank verification attempts for the current application. */
+  pennyDropVerification?: {
+    attemptsUsed: number;
+    attemptsAllowed: number;
+    retryLimitReached: boolean;
+    bankVerified: boolean;
+  } | null;
+  /** True when LOS ops may grant one more penny-drop (bank verification) attempt. */
+  canGrantPennyDropAttempt?: boolean;
+  /** Every penny-drop try from `application_bank_account_detail` (pass and fail). */
+  bankAccountAttempts?: Array<{
+    id: string;
+    bankAccountNumber: string;
+    ifscCode: string;
+    bankName: string | null;
+    accountHolderName: string | null;
+    nameAtBank: string | null;
+    status: boolean;
+    createdAt: string;
+  }>;
   /** True when LOS ops may re-enable KYC selfie (DigiLocker Aadhaar is kept if already captured). */
   canEnableReKyc?: boolean;
   preApprovedLoanAmount: string | null;

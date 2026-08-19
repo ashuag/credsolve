@@ -27,7 +27,9 @@ import { PrismaService } from '../../../../prisma/prisma.service';
 
 function isTerminalApplicationStatus(statusName: string): boolean {
   return (
-    statusName === APPLICATION_STATUS.REJECTED || statusName === APPLICATION_STATUS.KYC_FAILED
+    statusName === APPLICATION_STATUS.REJECTED ||
+    statusName === APPLICATION_STATUS.KYC_FAILED ||
+    statusName === APPLICATION_STATUS.PENNYDROP_FAILED
   );
 }
 

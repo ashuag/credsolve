@@ -152,6 +152,15 @@ export class LosDataController {
     return this.losApplication.enableReKyc(applicationUuid);
   }
 
+  @Post('applications/:applicationUuid/bank/grant-penny-drop-attempt')
+  @ApiOperation({
+    summary:
+      'Grant one more penny-drop (bank verification) attempt when the customer has used the configured maximum',
+  })
+  grantPennyDropAttempt(@Param('applicationUuid') applicationUuid: string) {
+    return this.losApplication.grantPennyDropAttempt(applicationUuid);
+  }
+
   @Get('applications/:applicationUuid/kyc/selfie-photo')
   @ApiOperation({ summary: 'Stream customer selfie for an application (LOS auth)' })
   async applicationSelfiePhoto(

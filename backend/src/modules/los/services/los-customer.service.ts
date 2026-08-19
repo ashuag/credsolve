@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PAN_VERIFIED } from '../../../common/constants/pan-verification.constants';
+import { toRejectionReasonDto } from '../../../common/constants/rejection-reason.constants';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
 
@@ -150,12 +151,7 @@ export class LosCustomerService {
         statusCode: lead.leadStatus.name,
         statusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
         isActive: lead.isActive,
-        rejectionReason: lead.rejectionReason
-          ? {
-              code: lead.rejectionReason.name,
-              label: lead.rejectionReason.name.replace(/_/g, ' '),
-            }
-          : null,
+        rejectionReason: toRejectionReasonDto(lead.rejectionReason),
         leadStatusNote: lead.leadStatusNote?.trim() || null,
         sourceName: lead.source?.name ?? null,
         sourceType: lead.source?.type ?? null,

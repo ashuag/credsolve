@@ -216,7 +216,12 @@ export function ApplicationReviewDashboard({
             <ReviewKycPanel row={row} applicationUuid={applicationUuid} authToken={authToken} onRefresh={onRefresh} />
           </div>
           <div className={`panel${activeTab === 'bank' ? ' on' : ''}`}>
-            <ReviewBankPanel row={row} />
+            <ReviewBankPanel
+              row={row}
+              applicationUuid={applicationUuid}
+              authToken={authToken}
+              onRefresh={onRefresh}
+            />
           </div>
           <div className={`panel${activeTab === 'refs' ? ' on' : ''}`}>
             <ReviewReferencesPanel row={row} />

@@ -10,6 +10,8 @@ export type LosVendorApiLogListItem = {
   requestMethod: string;
   requestPath: string | null;
   leadId: string | null;
+  applicationUuid: string | null;
+  applicationNumber: string | null;
   httpStatus: number | null;
   requestedAt: string;
   respondedAt: string;
@@ -34,6 +36,7 @@ export type ListVendorApiLogsParams = {
   httpStatus?: string;
   id?: string;
   leadId?: string;
+  applicationNumber?: string;
   requestPath?: string;
   outcome?: string;
   requestedFrom?: string;

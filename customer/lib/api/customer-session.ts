@@ -103,6 +103,17 @@ export type CustomerSessionResponse =
     }
   | { authenticated: false };
 
+/** Penny-drop failed (or retries exhausted) and bank details were never saved. */
+export function isBankVerificationRetryExhausted(
+  session: CustomerSessionResponse | null | undefined,
+): boolean {
+  if (!session?.authenticated) return false;
+  if (session.journey.bankDetailsCompleted) return false;
+  const progress = session.bankVerificationProgress;
+  if (!progress) return false;
+  return progress.retryLimitReached === true;
+}
+
 /** Email entry + OTP during the loan journey (after loan selection). */
 export const CUSTOMER_EMAIL_JOURNEY_PATH = '/email-verify';
 
@@ -249,6 +260,7 @@ export function isCustomerJourneyIncomplete(
   if (session.hasOpenLoan) return false;
   if (!session.lead) return true;
   if (isLeadRejectedAndLocked(session.lead)) return false;
+  if (isBankVerificationRetryExhausted(session)) return false;
   const j = session.journey;
   return !(
     j.detailsCompleted &&
@@ -316,6 +328,7 @@ export function getCustomerJourneyResumePath(
   }
 
   if (!journey.kycCompleted) return resolveKycStagePath(session);
+  if (isBankVerificationRetryExhausted(session)) return '/thank-you-interest';
   if (!journey.bankDetailsCompleted) return '/bank-details';
   if (!journey.referencesCompleted || !journey.loanDocumentsAccepted) return '/references';
   return '/thank-you';

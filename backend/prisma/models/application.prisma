@@ -24,6 +24,7 @@ model Application {
   kyc               ApplicationKyc?
   references        ApplicationReference[]
   loanAccount       LoanAccount?
+  bankAccountDetails ApplicationBankAccountDetail[]
 
   @@index([customerId, applicationStatusId])
   @@index([leadId, createdAt])
@@ -112,4 +113,26 @@ model ApplicationReference {
   @@unique([applicationId, referenceIndex])
   @@index([applicationId])
   @@map("application_reference")
+}
+
+model ApplicationBankAccountDetail {
+  id                  BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  applicationId       BigInt   @map("application_id") @db.UnsignedBigInt
+  bankAccountNumber   String   @map("bank_account_number") @db.VarChar(20)
+  ifscCode            String   @map("ifsc_code") @db.VarChar(11)
+  bankName            String?  @map("bank_name") @db.VarChar(100)
+  accountHolderName   String?  @map("account_holder_name") @db.VarChar(100)
+  /// Account-holder name returned by the penny-drop vendor, when present.
+  nameAtBank          String?  @map("name_at_bank") @db.VarChar(150)
+  /// True when penny-drop and name match succeeded.
+  status              Boolean
+  pennyDropVendorJson Json?    @map("penny_drop_vendor_json")
+  createdAt           DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  application Application @relation(fields: [applicationId], references: [id])
+
+  @@index([applicationId, createdAt])
+  @@index([applicationId, status])
+  @@map("application_bank_account_detail")
 }

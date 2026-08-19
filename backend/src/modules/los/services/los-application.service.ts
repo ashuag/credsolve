@@ -24,11 +24,27 @@ import {
   mapLosLoanDetailsFromStaging,
 } from '../../../common/loan/loan-disbursement-view.util';
 import { APPLICATION_KYC_STATUS, APPLICATION_STATUS } from '../../../common/constants/application.constants';
+import { BANK_DETAIL_FAILED_NOTE, PENNY_DROP_FAILED_NOTE } from '../../../common/constants/bank.constants';
+import { SettingKey } from '../../../common/constants/setting.constants';
 import { LEAD_STATUS } from '../../../common/constants/lead.constants';
+import { REJECTION_REASON, toRejectionReasonDto } from '../../../common/constants/rejection-reason.constants';
 import { canEnableReKyc } from '../kyc-grant-retry.util';
+import { canGrantPennyDropAttempt } from '../penny-drop-grant-retry.util';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
+}
+
+function mapLeadRejectionReason(
+  reason: { name: string } | null | undefined,
+  applicationStatusName?: string,
+): { code: string; label: string } | null {
+  const mapped = toRejectionReasonDto(reason ?? null);
+  if (mapped) return mapped;
+  if (applicationStatusName === APPLICATION_STATUS.PENNYDROP_FAILED) {
+    return toRejectionReasonDto({ name: REJECTION_REASON.PENNYDROP_FAILED });
+  }
+  return null;
 }
 
 const loanDocumentApplicationSelect = {
@@ -217,18 +233,29 @@ function dumpApplicationStageLabel(input: {
   fullName: string | null;
   leadStatusCode: string;
   leadStatusLabel: string;
+  leadStatusNote?: string | null;
   panVerified: number;
   bureauFetched: number;
 }): string {
   const leadRejected = input.leadStatusCode.toUpperCase() === 'REJECTED';
   const appRejected = input.statusCode.toUpperCase().includes('REJECT');
   const kycFailed = input.statusCode.toUpperCase() === 'KYC_FAILED' || input.kycStatus === 2;
+  const pennyFailed = input.statusCode.toUpperCase() === 'PENNYDROP_FAILED';
 
-  if (leadRejected || appRejected || kycFailed) {
+  if (leadRejected || appRejected || kycFailed || pennyFailed) {
     if (input.leadStatusCode.toUpperCase().includes('REJECT')) return input.leadStatusLabel;
     if (input.statusCode.toUpperCase().includes('REJECT')) return input.statusLabel;
     if (input.statusCode.toUpperCase() === 'KYC_FAILED') return input.kycStatusLabel;
+    if (pennyFailed) return input.statusLabel || BANK_DETAIL_FAILED_NOTE;
     return 'Rejected';
+  }
+
+  if (
+    (input.leadStatusNote?.trim().toLowerCase() === BANK_DETAIL_FAILED_NOTE.toLowerCase() ||
+      input.leadStatusNote?.trim().toLowerCase() === PENNY_DROP_FAILED_NOTE.toLowerCase()) &&
+    !input.bankAccountNumber
+  ) {
+    return BANK_DETAIL_FAILED_NOTE;
   }
 
   const doneById = {
@@ -411,12 +438,10 @@ export class LosApplicationService {
         statusLabel: displayName(application.applicationStatus.name, application.applicationStatus.displayName),
         leadStatusCode: application.lead.leadStatus.name,
         leadStatusLabel: displayName(application.lead.leadStatus.name, application.lead.leadStatus.displayName),
-        leadRejectionReason: application.lead.rejectionReason
-          ? {
-              code: application.lead.rejectionReason.name,
-              label: application.lead.rejectionReason.name.replace(/_/g, ' '),
-            }
-          : null,
+        leadRejectionReason: mapLeadRejectionReason(
+          application.lead.rejectionReason,
+          application.applicationStatus.name,
+        ),
         leadStatusNote: application.lead.leadStatusNote?.trim() || null,
         kycStatus,
         kycStatusLabel: applicationKycStatusLabel(kycStatus),
@@ -477,9 +502,10 @@ export class LosApplicationService {
   }
 
   async getApplicationDetails(applicationUuid: string) {
-    const application = await this.prisma.client.application.findUnique({
-      where: { uuid: applicationUuid },
-      include: {
+    const [application, pennyDropAttemptsAllowed] = await Promise.all([
+      this.prisma.client.application.findUnique({
+        where: { uuid: applicationUuid },
+        include: {
         customer: { select: { uuid: true, mobileNumber: true } },
         lead: {
           include: {
@@ -513,8 +539,23 @@ export class LosApplicationService {
           },
         },
         loanAccount: true,
+        bankAccountDetails: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            bankAccountNumber: true,
+            ifscCode: true,
+            bankName: true,
+            accountHolderName: true,
+            nameAtBank: true,
+            status: true,
+            createdAt: true,
+          },
+        },
       },
-    });
+    }),
+      this.loadPennyDropRetryCount(),
+    ]);
 
     if (!application) {
       throw new NotFoundException('Application not found');
@@ -620,6 +661,30 @@ export class LosApplicationService {
             : null),
       },
       canGrantKycLivenessRetry: false,
+      pennyDropVerification: {
+        attemptsUsed: application.details?.pennyDropAttempts ?? 0,
+        attemptsAllowed: pennyDropAttemptsAllowed,
+        retryLimitReached: (application.details?.pennyDropAttempts ?? 0) >= pennyDropAttemptsAllowed,
+        bankVerified: Boolean(application.details?.bankAccountNumber?.trim()),
+      },
+      canGrantPennyDropAttempt: canGrantPennyDropAttempt({
+        attemptsUsed: application.details?.pennyDropAttempts ?? 0,
+        attemptsAllowed: pennyDropAttemptsAllowed,
+        bankVerified: Boolean(application.details?.bankAccountNumber?.trim()),
+        disbursed: Boolean(application.loanAccount?.disbursedAt),
+        applicationStatusCode: application.applicationStatus.name,
+        leadStatusCode: lead.leadStatus.name,
+      }),
+      bankAccountAttempts: application.bankAccountDetails.map((attempt) => ({
+        id: attempt.id.toString(),
+        bankAccountNumber: attempt.bankAccountNumber,
+        ifscCode: attempt.ifscCode,
+        bankName: attempt.bankName,
+        accountHolderName: attempt.accountHolderName,
+        nameAtBank: attempt.nameAtBank,
+        status: attempt.status,
+        createdAt: attempt.createdAt.toISOString(),
+      })),
       canEnableReKyc: canEnableReKyc({
         kycStatus: application.kyc?.kycStatus ?? 0,
         livenessPassed: application.kyc?.livenessPassed ?? false,
@@ -640,12 +705,7 @@ export class LosApplicationService {
         leadStatusNote: lead.leadStatusNote?.trim() || null,
         bureauFetchedNote: detail?.bureauFetchedNote?.trim() || null,
         bureauFetched: detail?.bureauFetched ?? 0,
-        rejectionReason: lead.rejectionReason
-          ? {
-              code: lead.rejectionReason.name,
-              label: lead.rejectionReason.name.replace(/_/g, ' '),
-            }
-          : null,
+        rejectionReason: mapLeadRejectionReason(lead.rejectionReason, application.applicationStatus.name),
         sourceName: lead.source?.name ?? null,
         sourceType: lead.source?.type ?? null,
         utms: lead.leadUtms.map((utm) => ({
@@ -1256,6 +1316,119 @@ export class LosApplicationService {
     };
   }
 
+  /**
+   * Grants one more penny-drop attempt when the customer has used the configured maximum
+   * and is stuck on bank details. Sets attempts used to (allowed - 1) so one try remains.
+   */
+  async grantPennyDropAttempt(applicationUuid: string): Promise<{
+    success: true;
+    applicationUuid: string;
+    attemptsUsed: number;
+    attemptsAllowed: number;
+    attemptsRemaining: number;
+  }> {
+    const [application, attemptsAllowed] = await Promise.all([
+      this.prisma.client.application.findUnique({
+        where: { uuid: applicationUuid },
+        select: {
+          id: true,
+          uuid: true,
+          details: { select: { pennyDropAttempts: true, bankAccountNumber: true, selectedLoanAmount: true } },
+          loanAccount: { select: { disbursedAt: true } },
+          applicationStatus: { select: { name: true } },
+          lead: { select: { id: true, leadStatusNote: true, leadStatus: { select: { name: true } } } },
+        },
+      }),
+      this.loadPennyDropRetryCount(),
+    ]);
+
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+    if (!application.details) {
+      throw new BadRequestException('Application details not found.');
+    }
+
+    const attemptsUsed = application.details.pennyDropAttempts ?? 0;
+    if (
+      !canGrantPennyDropAttempt({
+        attemptsUsed,
+        attemptsAllowed,
+        bankVerified: Boolean(application.details.bankAccountNumber?.trim()),
+        disbursed: Boolean(application.loanAccount?.disbursedAt),
+        applicationStatusCode: application.applicationStatus.name,
+        leadStatusCode: application.lead.leadStatus.name,
+      })
+    ) {
+      throw new BadRequestException('This application is not eligible for another bank verification attempt.');
+    }
+
+    const nextAttemptsUsed = Math.max(0, attemptsAllowed - 1);
+    const leadWasRejected = application.lead.leadStatus.name === LEAD_STATUS.REJECTED;
+    const appWasPennyDropFailed =
+      application.applicationStatus.name === APPLICATION_STATUS.PENNYDROP_FAILED;
+    const loanSelectionCompleted = application.details.selectedLoanAmount != null;
+
+    const [convertedLeadStatus, inProgressLeadStatus, draftAppStatus] = await Promise.all([
+      this.prisma.client.leadStatus.findFirst({
+        where: { name: LEAD_STATUS.CONVERTED, isActive: true },
+        select: { id: true },
+      }),
+      this.prisma.client.leadStatus.findFirst({
+        where: { name: LEAD_STATUS.IN_PROGRESS, isActive: true },
+        select: { id: true },
+      }),
+      this.prisma.client.applicationStatus.findFirst({
+        where: { name: APPLICATION_STATUS.DRAFT, isActive: true },
+        select: { id: true },
+      }),
+    ]);
+
+    const recoveryLeadStatus =
+      loanSelectionCompleted && convertedLeadStatus ? convertedLeadStatus : inProgressLeadStatus;
+
+    if (leadWasRejected && !recoveryLeadStatus) {
+      throw new BadRequestException('Lead status CONVERTED/IN_PROGRESS is not configured.');
+    }
+    if (appWasPennyDropFailed && !draftAppStatus) {
+      throw new BadRequestException('Application status DRAFT is not configured.');
+    }
+
+    await this.prisma.client.$transaction(async (tx) => {
+      await tx.applicationDetail.update({
+        where: { applicationId: application.id },
+        data: { pennyDropAttempts: nextAttemptsUsed },
+      });
+      if (leadWasRejected || application.lead.leadStatusNote?.trim() === BANK_DETAIL_FAILED_NOTE || application.lead.leadStatusNote?.trim() === PENNY_DROP_FAILED_NOTE) {
+        await tx.lead.update({
+          where: { id: application.lead.id },
+          data: {
+            ...(recoveryLeadStatus && leadWasRejected ? { leadStatusId: recoveryLeadStatus.id } : {}),
+            leadStatusNote: null,
+            rejectionReasonId: null,
+          },
+        });
+      }
+      if (appWasPennyDropFailed && draftAppStatus) {
+        await tx.application.update({
+          where: { id: application.id },
+          data: {
+            applicationStatusId: draftAppStatus.id,
+            rejectionReasonId: null,
+          },
+        });
+      }
+    });
+
+    return {
+      success: true,
+      applicationUuid: application.uuid,
+      attemptsUsed: nextAttemptsUsed,
+      attemptsAllowed,
+      attemptsRemaining: Math.max(0, attemptsAllowed - nextAttemptsUsed),
+    };
+  }
+
   async markInternalTesting(applicationUuid: string): Promise<{ success: true; applicationUuid: string; leadUuid: string }> {
     const application = await this.prisma.client.application.findUnique({
       where: { uuid: applicationUuid },
@@ -1274,6 +1447,17 @@ export class LosApplicationService {
       });
     }
     return { success: true, applicationUuid: application.uuid, leadUuid: application.lead.uuid };
+  }
+
+  private async loadPennyDropRetryCount(): Promise<number> {
+    const row = await this.prisma.client.setting.findFirst({
+      where: { key: SettingKey.PENNY_DROP_RETRY_COUNT.key, isActive: true },
+      select: { value: true },
+    });
+    const n = row ? Number.parseInt(row.value.trim(), 10) : NaN;
+    return Number.isFinite(n) && n > 0
+      ? n
+      : Number.parseInt(SettingKey.PENNY_DROP_RETRY_COUNT.default, 10);
   }
 
   /** Public CDN/presigned URL, or LOS-authenticated download path when the bucket is private. */

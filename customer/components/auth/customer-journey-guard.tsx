@@ -9,6 +9,7 @@ import {
   canResumeKycAfterInternalError,
   resolveKycStagePath,
   shouldResumeKycSelfie,
+  isBankVerificationRetryExhausted,
   CUSTOMER_EMAIL_JOURNEY_PATH,
   hasOpenCustomerLoan,
 } from '@/lib/api/customer-session';
@@ -188,6 +189,20 @@ export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
       if (pathname !== '/thank-you') {
         router.replace('/thank-you');
       }
+      return;
+    }
+
+    if (isBankVerificationRetryExhausted(session)) {
+      if (
+        pathname === '/thank-you-interest' ||
+        pathname === '/my-account' ||
+        pathname === '/dashboard' ||
+        pathname === '/payments' ||
+        pathname === '/'
+      ) {
+        return;
+      }
+      router.replace('/thank-you-interest');
       return;
     }
 

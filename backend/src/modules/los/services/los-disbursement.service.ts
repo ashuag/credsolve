@@ -82,7 +82,8 @@ export class LosDisbursementService {
     if (
       statusName === APPLICATION_STATUS.REJECTED ||
       statusName === APPLICATION_STATUS.CANCELLED ||
-      statusName === APPLICATION_STATUS.KYC_FAILED
+      statusName === APPLICATION_STATUS.KYC_FAILED ||
+      statusName === APPLICATION_STATUS.PENNYDROP_FAILED
     ) {
       throw new ConflictException(`Cannot approve an application in ${statusName} status.`);
     }

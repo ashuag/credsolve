@@ -1,6 +1,7 @@
 'use client';
 
 import { getMasters, rejectApplication, rejectLead } from '@/lib/api';
+import { rejectionReasonDisplayLabel } from '@/lib/rejection-reason-label';
 import { FormEvent, useEffect, useState } from 'react';
 
 type RejectionReasonOption = { code: string; label: string };
@@ -51,7 +52,7 @@ export function RejectRecordModal({
           .filter((item) => item.isActive)
           .map((item) => ({
             code: item.name,
-            label: item.name.replace(/_/g, ' '),
+            label: rejectionReasonDisplayLabel(item.name),
           }));
         setReasons(options);
         if (options.length > 0) {
@@ -211,10 +212,10 @@ export function canRejectLeadStatus(statusCode: string): boolean {
 
 export function canRejectApplicationStatus(statusCode: string): boolean {
   const code = statusCode.toUpperCase();
-  return !['REJECTED', 'KYC_FAILED', 'CANCELLED', 'DISBURSED', 'ACTIVE'].includes(code);
+  return !['REJECTED', 'KYC_FAILED', 'PENNYDROP_FAILED', 'CANCELLED', 'DISBURSED', 'ACTIVE'].includes(code);
 }
 
 export function canApproveApplicationStatus(statusCode: string): boolean {
   const code = statusCode.toUpperCase();
-  return !['APPROVED', 'REJECTED', 'KYC_FAILED', 'CANCELLED', 'DISBURSED', 'ACTIVE'].includes(code);
+  return !['APPROVED', 'REJECTED', 'KYC_FAILED', 'PENNYDROP_FAILED', 'CANCELLED', 'DISBURSED', 'ACTIVE'].includes(code);
 }

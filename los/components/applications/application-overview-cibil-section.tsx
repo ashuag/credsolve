@@ -27,7 +27,10 @@ import {
   type LosApplicationDetails,
 } from '@/lib/api';
 import { KycEnableReKycButton } from '@/components/applications/kyc-enable-re-kyc-button';
+import { GrantPennyDropAttemptButton } from '@/components/applications/grant-penny-drop-attempt-button';
+import { PennyDropAttemptHistory } from '@/components/applications/penny-drop-attempt-history';
 import { canEnableReKycFromRow } from '@/lib/kyc-grant-retry-eligibility';
+import { BANK_DETAIL_FAILED_LABEL, canGrantPennyDropAttemptFromRow, isBankDetailFailed } from '@/lib/penny-drop-grant-retry-eligibility';
 import { KycPipelineSteps } from '@/components/applications/kyc-pipeline-steps';
 import { KycPhotoGallery } from '@/components/shared/kyc-photo-gallery';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
@@ -877,25 +880,66 @@ function SourcesUtmPanel({ row }: { row: LosApplicationDetails }) {
   );
 }
 
-function BankDetailsPanel({ row }: { row: LosApplicationDetails }) {
+function BankDetailsPanel({
+  row,
+  applicationUuid,
+  authToken,
+  onRefresh,
+}: {
+  row: LosApplicationDetails;
+  applicationUuid: string;
+  authToken: string | null;
+  onRefresh?: () => void;
+}) {
   const bank = row.disbursement;
-
-  if (!bank?.accountNumber?.trim() && !bank?.ifscCode?.trim()) {
-    return <p className="m-0 text-[0.88rem] text-brand-muted">Bank details have not been submitted yet.</p>;
-  }
+  const hasBank = Boolean(bank?.accountNumber?.trim() || bank?.ifscCode?.trim());
+  const attempts = row.pennyDropVerification;
+  const showGrant = row.canGrantPennyDropAttempt || canGrantPennyDropAttemptFromRow(row);
+  const bankFailed = isBankDetailFailed(row);
 
   return (
-    <DetailGrid
-      rows={[
-        { label: 'Bank name', value: bank.bankName ?? '—' },
-        { label: 'Account number', value: bank.accountNumber ?? '—' },
-        { label: 'IFSC', value: bank.ifscCode ?? '—' },
-        { label: 'Disbursement amount', value: formatInr(bank.disburseAmount ?? bank.amount) },
-        { label: 'Expected repay date', value: formatDateOnly(bank.expectedRepaymentDate) },
-        { label: 'Repayment amount', value: formatInr(bank.repaymentAmount) },
-        { label: 'Disbursed at', value: formatDateTime(bank.disbursedAt) },
-      ]}
-    />
+    <div className="grid gap-4">
+      <GrantPennyDropAttemptButton
+        row={row}
+        applicationUuid={applicationUuid}
+        authToken={authToken}
+        onSuccess={onRefresh}
+      />
+      {attempts ? (
+        <DetailGrid
+          rows={[
+            {
+              label: 'Penny-drop attempts',
+              value: `${attempts.attemptsUsed} / ${attempts.attemptsAllowed}${
+                attempts.retryLimitReached && !attempts.bankVerified ? ' (exhausted)' : ''
+              }`,
+            },
+          ]}
+        />
+      ) : null}
+      <PennyDropAttemptHistory attempts={row.bankAccountAttempts} />
+      {!hasBank ? (
+        <p className="m-0 text-[0.88rem] text-brand-muted">
+          {bankFailed
+            ? BANK_DETAIL_FAILED_LABEL
+            : showGrant
+              ? 'The customer used all bank verification attempts. Grant one more so they can retry penny drop.'
+              : 'Bank details have not been submitted yet.'}
+        </p>
+      ) : (
+        <DetailGrid
+          rows={[
+            { label: 'Bank name', value: bank?.bankName ?? '—' },
+            { label: 'Account number', value: bank?.accountNumber ?? '—' },
+            { label: 'IFSC', value: bank?.ifscCode ?? '—' },
+            { label: 'Disbursement amount', value: formatInr(bank?.disburseAmount ?? bank?.amount) },
+            { label: 'Expected repay date', value: formatDateOnly(bank?.expectedRepaymentDate) },
+            { label: 'Repayment amount', value: formatInr(bank?.repaymentAmount) },
+            { label: 'Disbursed at', value: formatDateTime(bank?.disbursedAt) },
+          ]}
+        />
+      )}
+    </div>
   );
 }
 
@@ -972,7 +1016,14 @@ export function ApplicationOverviewCibilSection({
             onRefresh={onReportCreated}
           />
         ) : null}
-        {activeTab === 'bank' ? <BankDetailsPanel row={row} /> : null}
+        {activeTab === 'bank' ? (
+          <BankDetailsPanel
+            row={row}
+            applicationUuid={applicationUuid}
+            authToken={authToken}
+            onRefresh={onReportCreated}
+          />
+        ) : null}
         {activeTab === 'references' ? <ReferenceDetailsPanel row={row} /> : null}
         {activeTab === 'sources' ? <SourcesUtmPanel row={row} /> : null}
       </div>

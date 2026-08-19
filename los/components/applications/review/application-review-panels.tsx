@@ -52,7 +52,10 @@ import {
 } from '@/lib/kyc-selfie-validation-display';
 import { KycPhotoGallery } from '@/components/shared/kyc-photo-gallery';
 import { KycEnableReKycButton } from '@/components/applications/kyc-enable-re-kyc-button';
+import { GrantPennyDropAttemptButton } from '@/components/applications/grant-penny-drop-attempt-button';
+import { PennyDropAttemptHistory } from '@/components/applications/penny-drop-attempt-history';
 import { canEnableReKycFromRow } from '@/lib/kyc-grant-retry-eligibility';
+import { BANK_DETAIL_FAILED_LABEL, canGrantPennyDropAttemptFromRow, isBankDetailFailed } from '@/lib/penny-drop-grant-retry-eligibility';
 import { KycPipelineSteps } from '@/components/applications/kyc-pipeline-steps';
 import { LosStatusPill } from '@/components/shared/los-status-pill';
 import { formatPersonName } from '@/lib/format-person-name';
@@ -590,24 +593,23 @@ export function ReviewKycPanel({
   );
 }
 
-export function ReviewBankPanel({ row }: { row: LosApplicationDetails }) {
+export function ReviewBankPanel({
+  row,
+  applicationUuid,
+  authToken,
+  onRefresh,
+}: {
+  row: LosApplicationDetails;
+  applicationUuid: string;
+  authToken: string | null;
+  onRefresh?: () => void;
+}) {
   const bank = row.disbursement;
-  if (!bank?.accountNumber?.trim() && !bank?.ifscCode?.trim()) {
-    return (
-      <ReviewCard
-        icon={
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <path d="M3 21h18M5 21V10M19 21V10M3 10l9-6 9 6M9 21v-6h6v6" />
-          </svg>
-        }
-        title="Disbursement account"
-      >
-        <ReviewEmptyState title="Bank details pending" subtitle="The customer has not submitted disbursement account details yet." />
-      </ReviewCard>
-    );
-  }
-
-  const pending = !bank.disbursedAt;
+  const hasBank = Boolean(bank?.accountNumber?.trim() || bank?.ifscCode?.trim());
+  const attempts = row.pennyDropVerification;
+  const showGrant = row.canGrantPennyDropAttempt || canGrantPennyDropAttemptFromRow(row);
+  const bankFailed = isBankDetailFailed(row);
+  const pending = hasBank && !bank?.disbursedAt;
 
   return (
     <ReviewCard
@@ -617,36 +619,75 @@ export function ReviewBankPanel({ row }: { row: LosApplicationDetails }) {
         </svg>
       }
       title="Disbursement account"
-      right={pending ? <ReviewPill tone="warn">Awaiting disbursement</ReviewPill> : <ReviewPill tone="ok">Disbursed</ReviewPill>}
+      right={
+        !hasBank ? (
+          bankFailed || showGrant ? (
+            <ReviewPill tone="warn">{BANK_DETAIL_FAILED_LABEL}</ReviewPill>
+          ) : (
+            <ReviewPill tone="warn">Pending</ReviewPill>
+          )
+        ) : pending ? (
+          <ReviewPill tone="warn">Awaiting disbursement</ReviewPill>
+        ) : (
+          <ReviewPill tone="ok">Disbursed</ReviewPill>
+        )
+      }
     >
-      <div className="fgrid">
-        <ReviewField label="Bank name" value={bank.bankName ?? '—'} />
-        <ReviewField label="IFSC" value={<span className="mono">{bank.ifscCode ?? '—'}</span>} />
-        <ReviewField
-          label="Account number"
-          value={
-            bank.accountNumber ? (
-              <MaskedSecret value={bank.accountNumber} mask={maskAccount(bank.accountNumber)} />
-            ) : (
-              '—'
-            )
+      <GrantPennyDropAttemptButton
+        row={row}
+        applicationUuid={applicationUuid}
+        authToken={authToken}
+        onSuccess={onRefresh}
+      />
+      {attempts ? (
+        <div className="fgrid" style={{ marginBottom: 12 }}>
+          <ReviewField
+            label="Penny-drop attempts"
+            value={`${attempts.attemptsUsed} / ${attempts.attemptsAllowed}`}
+            tone={attempts.retryLimitReached && !attempts.bankVerified ? 'flag' : undefined}
+          />
+        </div>
+      ) : null}
+      <PennyDropAttemptHistory attempts={row.bankAccountAttempts} variant="review" />
+      {!hasBank ? (
+        <ReviewEmptyState
+          title={bankFailed ? BANK_DETAIL_FAILED_LABEL : 'Bank details pending'}
+          subtitle={
+            showGrant
+              ? 'The customer used all bank verification attempts. Grant one more so they can retry penny drop.'
+              : 'The customer has not submitted disbursement account details yet.'
           }
         />
-        <ReviewField label="Disbursement amount" value={<span className="mono">{formatReviewInr(bank.disburseAmount ?? bank.amount ?? row.details?.disbursedAmount)}</span>} tone="accent" />
-        <ReviewField
-          label="Expected repay date"
-          value={bank.expectedRepaymentDate ? formatReviewDateOnly(bank.expectedRepaymentDate) : '—'}
-        />
-        <ReviewField
-          label="Repayment amount"
-          value={<span className="mono">{formatReviewInr(bank.repaymentAmount ?? row.details?.repaymentAmount)}</span>}
-        />
-        <ReviewField
-          label="Disbursed at"
-          value={bank.disbursedAt ? formatReviewDateTime(bank.disbursedAt) : 'Pending'}
-          tone={!bank.disbursedAt ? 'flag' : undefined}
-        />
-      </div>
+      ) : (
+        <div className="fgrid">
+          <ReviewField label="Bank name" value={bank?.bankName ?? '—'} />
+          <ReviewField label="IFSC" value={<span className="mono">{bank?.ifscCode ?? '—'}</span>} />
+          <ReviewField
+            label="Account number"
+            value={
+              bank?.accountNumber ? (
+                <MaskedSecret value={bank.accountNumber} mask={maskAccount(bank.accountNumber)} />
+              ) : (
+                '—'
+              )
+            }
+          />
+          <ReviewField label="Disbursement amount" value={<span className="mono">{formatReviewInr(bank?.disburseAmount ?? bank?.amount ?? row.details?.disbursedAmount)}</span>} tone="accent" />
+          <ReviewField
+            label="Expected repay date"
+            value={bank?.expectedRepaymentDate ? formatReviewDateOnly(bank.expectedRepaymentDate) : '—'}
+          />
+          <ReviewField
+            label="Repayment amount"
+            value={<span className="mono">{formatReviewInr(bank?.repaymentAmount ?? row.details?.repaymentAmount)}</span>}
+          />
+          <ReviewField
+            label="Disbursed at"
+            value={bank?.disbursedAt ? formatReviewDateTime(bank.disbursedAt) : 'Pending'}
+            tone={!bank?.disbursedAt ? 'flag' : undefined}
+          />
+        </div>
+      )}
     </ReviewCard>
   );
 }

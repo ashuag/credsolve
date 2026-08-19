@@ -9,6 +9,7 @@ import {
   extractCibilPan,
   nameMatchVerdict,
 } from '@/lib/kyc-field-match';
+import { BANK_DETAIL_FAILED_LABEL, isBankDetailFailed } from '@/lib/penny-drop-grant-retry-eligibility';
 
 export type ReviewFlag = {
   icon: string;
@@ -24,6 +25,12 @@ export function buildReviewFlags(row: LosApplicationDetails, bureauPan?: string 
       icon: '✕',
       title: applicationRejectionHeadline(row),
       detail: buildApplicationWorkspaceAlertText(row) ?? 'This application has been rejected and cannot proceed.',
+    });
+  } else if (isBankDetailFailed(row)) {
+    flags.push({
+      icon: '✕',
+      title: BANK_DETAIL_FAILED_LABEL,
+      detail: 'Penny-drop verification failed and the customer has no attempts remaining.',
     });
   }
 

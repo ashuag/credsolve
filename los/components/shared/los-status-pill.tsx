@@ -21,7 +21,7 @@ export function losStatusPillStyles(code: string): { bg: string; text: string; r
   if (c === 'CONVERTED' || c.includes('APPROVED') || c.includes('DISBURS')) {
     return { bg: 'rgba(29,157,112,0.14)', text: '#14523a', ring: 'rgba(29,157,112,0.32)' };
   }
-  if (c.includes('REJECT') || c.includes('DECLIN') || c.includes('CANCEL') || c === 'KYC_FAILED') {
+  if (c.includes('REJECT') || c.includes('DECLIN') || c.includes('CANCEL') || c === 'KYC_FAILED' || c === 'PENNYDROP_FAILED') {
     return { bg: 'rgba(231,95,95,0.14)', text: '#8d3434', ring: 'rgba(231,95,95,0.28)' };
   }
   if (c === 'IN_REVIEW' || c === 'INTERNAL_ERROR') {

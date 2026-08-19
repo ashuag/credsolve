@@ -1,11 +1,13 @@
 import type { LosApplicationDetails } from '@/lib/api';
 import { buildWorkspaceAlertText, isWorkspaceRecordRejected } from '@/lib/workspace-alert';
+import { BANK_DETAIL_FAILED_LABEL, isBankDetailFailed, isPennyDropFailedNote } from '@/lib/penny-drop-grant-retry-eligibility';
 
 export function isApplicationRecordRejected(row: LosApplicationDetails): boolean {
   return (
     isWorkspaceRecordRejected(row.statusCode) ||
     isWorkspaceRecordRejected(row.lead.statusCode, row.lead.rejectionReason?.label) ||
-    row.statusCode.toUpperCase() === 'KYC_FAILED'
+    row.statusCode.toUpperCase() === 'KYC_FAILED' ||
+    row.statusCode.toUpperCase() === 'PENNYDROP_FAILED'
   );
 }
 
@@ -13,16 +15,21 @@ export function applicationRejectionHeadline(row: LosApplicationDetails): string
   if (row.lead.statusCode.toUpperCase().includes('REJECT')) return row.lead.statusLabel;
   if (row.statusCode.toUpperCase().includes('REJECT')) return row.statusLabel;
   if (row.statusCode.toUpperCase() === 'KYC_FAILED') return row.kycStatusLabel;
+  if (row.statusCode.toUpperCase() === 'PENNYDROP_FAILED') {
+    return row.lead.rejectionReason?.label || row.statusLabel || BANK_DETAIL_FAILED_LABEL;
+  }
   return 'Rejected';
 }
 
 /** Human-readable rejection / failure context for the application workspace banner. */
 export function buildApplicationWorkspaceAlertText(row: LosApplicationDetails): string | null {
   if (row.lead.statusCode.toUpperCase().includes('REJECT')) {
+    const reasonLabel = row.lead.rejectionReason?.label;
     return buildWorkspaceAlertText({
       statusCode: row.lead.statusCode,
-      rejectionReason: row.lead.rejectionReason?.label,
-      leadStatusNote: row.lead.leadStatusNote,
+      rejectionReason: reasonLabel,
+      leadStatusNote:
+        reasonLabel && isPennyDropFailedNote(row.lead.leadStatusNote) ? null : row.lead.leadStatusNote,
       bureauFetchedNote: row.lead.bureauFetchedNote,
       panVerified: row.lead.panVerified,
       bureauFetched: row.lead.bureauFetched,
@@ -35,6 +42,10 @@ export function buildApplicationWorkspaceAlertText(row: LosApplicationDetails): 
 
   if (row.statusCode.toUpperCase() === 'KYC_FAILED') {
     return row.kycStatusLabel || 'KYC verification failed.';
+  }
+
+  if (row.statusCode.toUpperCase() === 'PENNYDROP_FAILED' || isBankDetailFailed(row)) {
+    return row.lead.rejectionReason?.label || BANK_DETAIL_FAILED_LABEL;
   }
 
   return null;

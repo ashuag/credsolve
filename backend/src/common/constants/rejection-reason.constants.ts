@@ -22,9 +22,27 @@ export const REJECTION_REASON = {
   MIN_UNSECURED_LOAN_AMOUNT_FAILED: 'MIN_UNSECURED_LOAN_AMOUNT_FAILED',
   CREDIT_ASSESSMENT_GRADE_FAILED: 'CREDIT_ASSESSMENT_GRADE_FAILED',
   KYC_FAILED: 'KYC_FAILED',
+  PENNYDROP_FAILED: 'PENNYDROP_FAILED',
   KYC_AADHAAR_MISMATCH: 'KYC_AADHAAR_MISMATCH',
   KYC_VERIFICATION_FAILED: 'KYC_VERIFICATION_FAILED',
   EXPIRED: 'EXPIRED',
 } as const;
 
 export type RejectionReason = (typeof REJECTION_REASON)[keyof typeof REJECTION_REASON];
+
+const REJECTION_REASON_LABEL: Partial<Record<string, string>> = {
+  [REJECTION_REASON.PENNYDROP_FAILED]: 'Penny drop failed',
+  [REJECTION_REASON.KYC_FAILED]: 'KYC failed',
+};
+
+/** Human-readable LOS label for a `rejection_reason.name` code. */
+export function rejectionReasonDisplayLabel(name: string): string {
+  return REJECTION_REASON_LABEL[name] ?? name.replace(/_/g, ' ');
+}
+
+export function toRejectionReasonDto(
+  reason: { name: string } | null | undefined,
+): { code: string; label: string } | null {
+  if (!reason) return null;
+  return { code: reason.name, label: rejectionReasonDisplayLabel(reason.name) };
+}

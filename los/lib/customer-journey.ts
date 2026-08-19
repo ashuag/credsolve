@@ -5,6 +5,7 @@ import {
   applicationJourneyStageLabel,
 } from '@/lib/constants/application-journey-stages';
 import { formatPersonName } from '@/lib/format-person-name';
+import { BANK_DETAIL_FAILED_LABEL, PENNY_DROP_FAILED_LABEL, isBankDetailFailed } from '@/lib/penny-drop-grant-retry-eligibility';
 
 export type JourneyStepState = 'done' | 'active' | 'pending' | 'failed';
 
@@ -112,6 +113,8 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
   const appRejected = row.statusCode.toUpperCase().includes('REJECT');
   const rejected = appRejected || leadRejected;
   const kycFailed = row.statusCode.toUpperCase() === 'KYC_FAILED' || row.kycStatus === 2;
+  const pennyFailed = row.statusCode.toUpperCase() === 'PENNYDROP_FAILED';
+  const bankFailed = isBankDetailFailed(row) || pennyFailed;
 
   const profileDone = Boolean(profile?.fullName?.trim());
   const panDone = (row.lead.panVerified ?? 0) === PAN_VERIFIED.VERIFIED;
@@ -149,7 +152,7 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
     email: false,
     letter: false,
     kyc: kycFailed,
-    bank: false,
+    bank: bankFailed,
     refs: false,
     esign: false,
   } as const;
@@ -158,6 +161,7 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
     loan: row.details?.loanAmount ? `₹${row.details.loanAmount}` : undefined,
     letter: letterAccepted ? 'Accepted' : letterReviewed ? 'Reviewed' : undefined,
     kyc: kycJourneyDetail(row, kycDone),
+    bank: bankFailed ? BANK_DETAIL_FAILED_LABEL : undefined,
     refs: refsDone ? `${row.referencesCount} saved` : undefined,
     esign: letterAccepted ? 'Verified' : undefined,
   };
@@ -166,8 +170,14 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
     step(stage.id, stage.label, doneById[stage.id], failedById[stage.id], detailById[stage.id]),
   );
 
-  if (rejected || kycFailed) {
-    const label = kycFailed && !rejected ? 'KYC failed' : leadRejected ? 'Lead rejected' : 'Application rejected';
+  if (rejected || kycFailed || pennyFailed) {
+    const label = kycFailed && !rejected
+      ? 'KYC failed'
+      : pennyFailed && !rejected
+        ? BANK_DETAIL_FAILED_LABEL
+        : leadRejected
+          ? 'Lead rejected'
+          : 'Application rejected';
     steps.push(step('outcome', label, false, true, rejectionDetail));
     return steps;
   }
@@ -205,6 +215,7 @@ export type ApplicationListStageInput = {
   fullName: string | null;
   leadStatusCode: string;
   leadStatusLabel: string;
+  leadStatusNote?: string | null;
   panVerified: number;
   bureauFetched: number;
 };
@@ -215,12 +226,22 @@ export function resolveApplicationStageLabel(input: ApplicationListStageInput): 
   const appRejected = input.statusCode.toUpperCase().includes('REJECT');
   const rejected = appRejected || leadRejected;
   const kycFailed = input.statusCode.toUpperCase() === 'KYC_FAILED' || input.kycStatus === 2;
+  const pennyFailed = input.statusCode.toUpperCase() === 'PENNYDROP_FAILED';
 
-  if (rejected || kycFailed) {
+  if (rejected || kycFailed || pennyFailed) {
     if (input.leadStatusCode.toUpperCase().includes('REJECT')) return input.leadStatusLabel;
     if (input.statusCode.toUpperCase().includes('REJECT')) return input.statusLabel;
     if (input.statusCode.toUpperCase() === 'KYC_FAILED') return input.kycStatusLabel;
+    if (pennyFailed) return input.statusLabel || BANK_DETAIL_FAILED_LABEL;
     return 'Rejected';
+  }
+
+  if (
+    (input.leadStatusNote?.trim().toLowerCase() === BANK_DETAIL_FAILED_LABEL.toLowerCase() ||
+      input.leadStatusNote?.trim().toLowerCase() === PENNY_DROP_FAILED_LABEL.toLowerCase()) &&
+    !input.bankAccountNumber
+  ) {
+    return BANK_DETAIL_FAILED_LABEL;
   }
 
   const profileDone = Boolean(input.fullName?.trim());

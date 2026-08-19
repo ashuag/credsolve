@@ -2,13 +2,19 @@ import { BadRequestException, Injectable, Logger, NotFoundException, Unauthorize
 import { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
+import { PENNY_DROP_FAILED_NOTE } from '../../../../common/constants/bank.constants';
+import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
+import { REJECTION_REASON } from '../../../../common/constants/rejection-reason.constants';
 import { SmsService } from '../../../../common/sms/sms.service';
 import { BankTenacioVendorService } from '../../../../common/vendor/bank-tenacio-vendor.service';
 import {
+  isPennyDropInvalidInputOrAttemptLimit,
+  pennyDropVendorFailMessage,
+} from '../../../../common/vendor/penny-drop-vendor.util';
+import {
   isTenacioVendorBusinessSuccess,
-  pickTenacioVendorErrorMessage,
 } from '../../../../common/kyc/aadhaar-vendor-parse.util';
-import { compareJourneyNameToPennyDrop } from '../../../../common/kyc/penny-drop-name-match.util';
+import { compareJourneyNameToPennyDrop, extractPennyDropBankName } from '../../../../common/kyc/penny-drop-name-match.util';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
@@ -93,12 +99,15 @@ export class SubmitVerifiedBankUseCase {
 
     const attemptsUsed = applicationRow.details?.pennyDropAttempts ?? 0;
     if (attemptsUsed >= attemptsAllowed) {
+      const applicationStatus = await this.markPennyDropFailed({
+        applicationId: applicationRow.id,
+        leadId: lead.id,
+        customerMobile: customer.mobileNumber,
+      });
       return {
         success: false,
         pennyDropOk: false,
-        applicationStatus: null,
-        message:
-          'You have reached the maximum number of bank verification attempts. Please contact support to continue.',
+        applicationStatus,
         vendor: null,
         attemptsUsed,
         attemptsAllowed,
@@ -137,25 +146,44 @@ export class SubmitVerifiedBankUseCase {
 
     if (!pennyOk) {
       const nextAttemptsUsed = attemptsUsed + 1;
-      await this.prisma.client.applicationDetail.update({
-        where: { applicationId: applicationRow.id },
-        data: {
-          pennyDropAttempts: nextAttemptsUsed,
-          pennyDropVendorJson:
-            vendor === null ? Prisma.JsonNull : (vendor as Prisma.InputJsonValue),
-        },
+      await this.prisma.client.$transaction(async (tx: Prisma.TransactionClient) => {
+        await tx.applicationDetail.update({
+          where: { applicationId: applicationRow.id },
+          data: {
+            pennyDropAttempts: nextAttemptsUsed,
+            pennyDropVendorJson:
+              vendor === null ? Prisma.JsonNull : (vendor as Prisma.InputJsonValue),
+          },
+        });
+        await this.recordBankAccountAttempt(tx, {
+          applicationId: applicationRow.id,
+          accountNumber,
+          ifsc,
+          bankName: verifiedBankName,
+          accountHolderName: holderName,
+          nameAtBank: extractPennyDropBankName(vendor),
+          matched: false,
+          vendor,
+        });
       });
       const retryLimitReached = nextAttemptsUsed >= attemptsAllowed;
-      const baseMessage =
-        pickTenacioVendorErrorMessage(vendor) ??
-        `Bank verification failed.`;
+      const terminal =
+        retryLimitReached || isPennyDropInvalidInputOrAttemptLimit(vendor);
+      const applicationStatus = terminal
+        ? await this.markPennyDropFailed({
+            applicationId: applicationRow.id,
+            leadId: lead.id,
+            customerMobile: customer.mobileNumber,
+          })
+        : null;
       return {
         success: false,
         pennyDropOk: false,
-        applicationStatus: null,
-        message: retryLimitReached
-          ? `${baseMessage} You have reached the maximum number of verification attempts. Please contact support.`
-          : baseMessage,
+        applicationStatus,
+        message: terminal
+          ? undefined
+          : pennyDropVendorFailMessage(vendor) ??
+            'Bank verification failed. Please check your account details and try again.',
         vendor,
         attemptsUsed: nextAttemptsUsed,
         attemptsAllowed,
@@ -169,26 +197,45 @@ export class SubmitVerifiedBankUseCase {
     });
     if (!nameMatch.matched) {
       const nextAttemptsUsed = attemptsUsed + 1;
-      await this.prisma.client.applicationDetail.update({
-        where: { applicationId: applicationRow.id },
-        data: {
-          pennyDropAttempts: nextAttemptsUsed,
-          pennyDropVendorJson:
-            vendor === null ? Prisma.JsonNull : (vendor as Prisma.InputJsonValue),
-        },
+      await this.prisma.client.$transaction(async (tx: Prisma.TransactionClient) => {
+        await tx.applicationDetail.update({
+          where: { applicationId: applicationRow.id },
+          data: {
+            pennyDropAttempts: nextAttemptsUsed,
+            pennyDropVendorJson:
+              vendor === null ? Prisma.JsonNull : (vendor as Prisma.InputJsonValue),
+          },
+        });
+        await this.recordBankAccountAttempt(tx, {
+          applicationId: applicationRow.id,
+          accountNumber,
+          ifsc,
+          bankName: verifiedBankName,
+          accountHolderName: holderName,
+          nameAtBank: nameMatch.bankName,
+          matched: false,
+          vendor,
+        });
       });
       const retryLimitReached = nextAttemptsUsed >= attemptsAllowed;
       this.logger.warn(
         `[penny-drop] Name mismatch lead=${lead.id.toString()} reason=${nameMatch.reason} ` +
           `bankName=${nameMatch.bankName ? '[present]' : '[missing]'}`,
       );
+      const applicationStatus = retryLimitReached
+        ? await this.markPennyDropFailed({
+            applicationId: applicationRow.id,
+            leadId: lead.id,
+            customerMobile: customer.mobileNumber,
+          })
+        : null;
       return {
         success: false,
         pennyDropOk: false,
-        applicationStatus: null,
+        applicationStatus,
         message: retryLimitReached
-          ? `${nameMatch.message} You have reached the maximum number of verification attempts. Please contact support.`
-          : nameMatch.message,
+          ? undefined
+          : 'Bank verification failed: account holder name does not match.',
         vendor,
         attemptsUsed: nextAttemptsUsed,
         attemptsAllowed,
@@ -231,6 +278,17 @@ export class SubmitVerifiedBankUseCase {
         },
       });
 
+      await this.recordBankAccountAttempt(tx, {
+        applicationId: application.id,
+        accountNumber,
+        ifsc,
+        bankName: verifiedBankName,
+        accountHolderName: holderName,
+        nameAtBank: nameMatch.bankName,
+        matched: true,
+        vendor,
+      });
+
       await tx.application.update({
         where: { id: application.id },
         data: { applicationStatusId: inReview.id },
@@ -250,5 +308,143 @@ export class SubmitVerifiedBankUseCase {
       attemptsAllowed,
       retryLimitReached: false,
     };
+  }
+
+  /**
+   * Same pattern as KYC_FAILED: reject the lead, set application PENNYDROP_FAILED,
+   * and send the rejection SMS. Customer portal then shows /thank-you-interest.
+   */
+  private async markPennyDropFailed(params: {
+    applicationId: bigint;
+    leadId: bigint;
+    customerMobile: string;
+  }): Promise<string | null> {
+    const application = await this.prisma.client.application.findUnique({
+      where: { id: params.applicationId },
+      select: {
+        applicationStatus: { select: { name: true } },
+        lead: {
+          select: {
+            leadStatus: { select: { name: true } },
+            leadStatusNote: true,
+          },
+        },
+      },
+    });
+    if (!application) return null;
+
+    const currentStatus = application.applicationStatus.name;
+    if (
+      currentStatus === APPLICATION_STATUS.PENNYDROP_FAILED &&
+      application.lead.leadStatus.name === LEAD_STATUS.REJECTED
+    ) {
+      return APPLICATION_STATUS.PENNYDROP_FAILED;
+    }
+
+    const [rejectedLeadStatus, pennyFailedAppStatus, pennyFailedReason] = await Promise.all([
+      this.prisma.client.leadStatus.findFirst({
+        where: { name: LEAD_STATUS.REJECTED, isActive: true },
+        select: { id: true },
+      }),
+      this.prisma.client.applicationStatus.findFirst({
+        where: { name: APPLICATION_STATUS.PENNYDROP_FAILED, isActive: true },
+        select: { id: true },
+      }),
+      this.prisma.client.rejectionReason.findFirst({
+        where: { name: REJECTION_REASON.PENNYDROP_FAILED, isActive: true },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!rejectedLeadStatus) {
+      this.logger.warn('LeadStatus REJECTED not found — skipping penny-drop rejection.');
+      return currentStatus;
+    }
+    if (!pennyFailedAppStatus) {
+      this.logger.warn(
+        `ApplicationStatus ${APPLICATION_STATUS.PENNYDROP_FAILED} not found — run seed; skipping application status update.`,
+      );
+    }
+
+    const alreadyRejected = application.lead.leadStatus.name === LEAD_STATUS.REJECTED;
+
+    await this.prisma.client.$transaction(async (tx: Prisma.TransactionClient) => {
+      await tx.lead.update({
+        where: { id: params.leadId },
+        data: {
+          leadStatusId: rejectedLeadStatus.id,
+          leadStatusNote: PENNY_DROP_FAILED_NOTE,
+          ...(pennyFailedReason ? { rejectionReasonId: pennyFailedReason.id } : {}),
+        },
+      });
+
+      const canSetAppStatus =
+        currentStatus === APPLICATION_STATUS.DRAFT ||
+        currentStatus === APPLICATION_STATUS.IN_REVIEW ||
+        currentStatus === APPLICATION_STATUS.PENNYDROP_FAILED;
+      if (pennyFailedAppStatus && canSetAppStatus) {
+        await tx.application.update({
+          where: { id: params.applicationId },
+          data: {
+            applicationStatusId: pennyFailedAppStatus.id,
+            ...(pennyFailedReason ? { rejectionReasonId: pennyFailedReason.id } : {}),
+          },
+        });
+      }
+    });
+
+    if (!alreadyRejected) {
+      void this.sms.sendRejectionSms(params.customerMobile, params.leadId).catch((err) => {
+        this.logger.error('Failed to send rejection SMS', err instanceof Error ? err.stack : err);
+      });
+    }
+
+    return pennyFailedAppStatus ? APPLICATION_STATUS.PENNYDROP_FAILED : currentStatus;
+  }
+
+  /**
+   * Insert one penny-drop attempt. When matched, also copy bank fields onto
+   * `loan_account` if that row already exists (disbursed applications).
+   */
+  private async recordBankAccountAttempt(
+    tx: Prisma.TransactionClient,
+    params: {
+      applicationId: bigint;
+      accountNumber: string;
+      ifsc: string;
+      bankName: string;
+      accountHolderName: string;
+      nameAtBank: string | null;
+      matched: boolean;
+      vendor: unknown;
+    },
+  ): Promise<void> {
+    const bankName = params.bankName.trim().slice(0, 100);
+    const accountHolderName = params.accountHolderName.trim().slice(0, 100);
+    const nameAtBank = params.nameAtBank?.trim().slice(0, 150) ?? '';
+
+    await tx.applicationBankAccountDetail.create({
+      data: {
+        applicationId: params.applicationId,
+        bankAccountNumber: params.accountNumber,
+        ifscCode: params.ifsc,
+        bankName: bankName.length > 0 ? bankName : null,
+        accountHolderName: accountHolderName.length > 0 ? accountHolderName : null,
+        nameAtBank: nameAtBank.length > 0 ? nameAtBank : null,
+        status: params.matched,
+        pennyDropVendorJson:
+          params.vendor === null ? Prisma.JsonNull : (params.vendor as Prisma.InputJsonValue),
+      },
+    });
+
+    if (!params.matched) return;
+
+    await tx.loanAccount.updateMany({
+      where: { applicationId: params.applicationId },
+      data: {
+        bankAccountNumber: params.accountNumber,
+        ifscCode: params.ifsc,
+      },
+    });
   }
 }

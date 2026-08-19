@@ -7,6 +7,7 @@ import { lookupBankIfsc, submitVerifiedBankDetails } from '@/lib/api/lead';
 import { formatAddressForDisplay } from '@/lib/format-address';
 import { IFSC_CODE_LENGTH, getIfscValidationError, isValidIfscCode, normalizeIfscInput } from '@/lib/ifsc';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
+import { isBankVerificationRetryExhausted } from '@/lib/api/customer-session';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 
 const DETAIL_LABELS: Record<string, string> = {
@@ -115,6 +116,10 @@ export default function BankDetailsPage() {
     // DigiLocker capture alone is not full KYC — keep users off bank until journey.kycCompleted.
     if (!session.journey.kycCompleted) {
       router.replace('/kyc');
+      return;
+    }
+    if (isBankVerificationRetryExhausted(session)) {
+      router.replace('/thank-you-interest');
     }
   }, [router, session, sessionLoading]);
 
@@ -241,9 +246,18 @@ export default function BankDetailsPage() {
         retryLimitReached: res.retryLimitReached,
       });
       if (!res.success || !res.pennyDropOk) {
-        // Close confirm so the form shows the mismatch / failure message.
         setConfirmOpen(false);
-        setError(res.message ?? 'Bank verification did not succeed. Please check your details.');
+        const terminal =
+          res.applicationStatus === 'PENNYDROP_FAILED' || res.retryLimitReached === true;
+        await refresh();
+        if (terminal) {
+          router.replace('/thank-you-interest');
+          return;
+        }
+        setError(
+          res.message?.trim() ||
+            'Bank verification failed. Please check your account details and try again.',
+        );
         return;
       }
       setConfirmOpen(false);

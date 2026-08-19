@@ -15,8 +15,10 @@ import {
   type LosVendorApiLogDetail,
   type LosVendorApiLogListItem,
 } from '@/lib/api';
+import { formatApplicationDisplayId } from '@/lib/application-review-format';
 import { getLosToken } from '@/lib/auth';
 import { cx } from '@/lib/cx';
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type SortKey =
@@ -133,6 +135,9 @@ function DetailModal({
             {detail ? (
               <p className="m-0 mt-1 text-[0.82rem] text-brand-muted">
                 Log #{detail.id}
+                {detail.applicationNumber
+                  ? ` · ${formatApplicationDisplayId(detail.applicationNumber)}`
+                  : ' · Application —'}
                 {detail.leadId ? ` · Lead #${detail.leadId}` : ' · Lead —'}
                 {' · '}
                 {detail.requestMethod} · HTTP {detail.httpStatus ?? '—'} · {formatDateTime(detail.requestedAt)}
@@ -161,6 +166,23 @@ function DetailModal({
                 <div>
                   <span className="font-bold text-brand-muted">Log ID</span>
                   <p className="m-0 mt-0.5 font-mono font-bold">{detail.id}</p>
+                </div>
+                <div>
+                  <span className="font-bold text-brand-muted">Application ID</span>
+                  <p className="m-0 mt-0.5 font-mono font-bold">
+                    {detail.applicationUuid && detail.applicationNumber ? (
+                      <Link
+                        href={`/applications/${detail.applicationUuid}`}
+                        className="text-brand-blue no-underline hover:underline"
+                      >
+                        {formatApplicationDisplayId(detail.applicationNumber)}
+                      </Link>
+                    ) : (
+                      (detail.applicationNumber
+                        ? formatApplicationDisplayId(detail.applicationNumber)
+                        : '—')
+                    )}
+                  </p>
                 </div>
                 <div>
                   <span className="font-bold text-brand-muted">Lead ID</span>
@@ -261,6 +283,7 @@ export function VendorApiLogsPanel() {
         httpStatus: debouncedFilters.httpStatus,
         id: debouncedFilters.id,
         leadId: debouncedFilters.leadId,
+        applicationNumber: debouncedFilters.applicationNumber,
         requestPath: debouncedFilters.requestPath,
         outcome: debouncedFilters.outcome,
         requestedFrom: debouncedFilters.requestedFrom,
@@ -355,7 +378,7 @@ export function VendorApiLogsPanel() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1180px] border-collapse text-left text-[0.84rem]">
+            <table className="w-full min-w-[1320px] border-collapse text-left text-[0.84rem]">
               <thead className="sticky top-0 z-[1] bg-[rgba(248,250,255,0.96)]">
                 <tr className="border-b border-[rgba(23,44,113,0.08)]">
                   <th className="px-3 py-2 align-bottom">
@@ -368,6 +391,17 @@ export function VendorApiLogsPanel() {
                         aria-label="Filter log id"
                       />
                     </DataTableColumnHeader>
+                  </th>
+                  <th className="px-3 py-2 align-bottom">
+                    <span className="block text-[0.68rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted">
+                      Application ID
+                    </span>
+                    <DataTableColumnFilter
+                      value={columnFilters.applicationNumber ?? ''}
+                      onChange={(value) => setColumnFilter('applicationNumber', value)}
+                      placeholder="App id…"
+                      aria-label="Filter application id"
+                    />
                   </th>
                   <th className="px-3 py-2 align-bottom">
                     <DataTableColumnHeader label="Lead ID" sortKey="leadId" sort={sort} onSort={toggleSort}>
@@ -483,14 +517,14 @@ export function VendorApiLogsPanel() {
               <tbody>
                 {loading && items.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-4 py-8 text-center text-brand-muted">
+                    <td colSpan={12} className="px-4 py-8 text-center text-brand-muted">
                       Loading logs…
                     </td>
                   </tr>
                 ) : null}
                 {!loading && items.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-4 py-8 text-center text-brand-muted">
+                    <td colSpan={12} className="px-4 py-8 text-center text-brand-muted">
                       No vendor API logs match the current filters.
                     </td>
                   </tr>
@@ -502,6 +536,21 @@ export function VendorApiLogsPanel() {
                   >
                     <td className="whitespace-nowrap px-3 py-2.5 font-mono text-[0.78rem] font-bold">
                       {row.id}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5 font-mono text-[0.78rem]">
+                      {row.applicationUuid && row.applicationNumber ? (
+                        <Link
+                          href={`/applications/${row.applicationUuid}`}
+                          className="font-semibold text-brand-blue no-underline hover:underline"
+                          title={row.applicationNumber}
+                        >
+                          {formatApplicationDisplayId(row.applicationNumber)}
+                        </Link>
+                      ) : row.applicationNumber ? (
+                        formatApplicationDisplayId(row.applicationNumber)
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5 font-mono text-[0.78rem]">
                       {row.leadId ?? '—'}

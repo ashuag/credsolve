@@ -13,6 +13,8 @@ import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { APPLICATION_JOURNEY_STAGE_FILTER_OPTIONS } from '@/lib/constants/application-journey-stages';
 import { resolveApplicationStageLabel } from '@/lib/customer-journey';
 import { formatPersonName } from '@/lib/format-person-name';
+import { BANK_DETAIL_FAILED_LABEL, PENNY_DROP_FAILED_LABEL } from '@/lib/penny-drop-grant-retry-eligibility';
+import { rejectionReasonDisplayLabel } from '@/lib/rejection-reason-label';
 import { MarkInternalTestingButton } from '@/components/shared/mark-internal-testing-button';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -153,6 +155,7 @@ function applicationStageLabel(app: LosApplication): string {
     fullName: app.fullName,
     leadStatusCode: app.leadStatusCode,
     leadStatusLabel: app.leadStatusLabel,
+    leadStatusNote: app.leadStatusNote,
     panVerified: app.panVerified,
     bureauFetched: app.bureauFetched,
   });
@@ -163,7 +166,9 @@ function StageCell({ app }: { app: LosApplication }) {
   const rejected =
     app.leadStatusCode.toUpperCase().includes('REJECT') ||
     app.statusCode.toUpperCase().includes('REJECT') ||
-    app.statusCode.toUpperCase() === 'KYC_FAILED';
+    app.statusCode.toUpperCase() === 'KYC_FAILED' ||
+    app.statusCode.toUpperCase() === 'PENNYDROP_FAILED' ||
+    label === BANK_DETAIL_FAILED_LABEL;
   const style = rejected
     ? { background: 'rgba(239,68,68,0.1)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.2)' }
     : { background: 'rgba(99,102,241,0.1)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.2)' };
@@ -180,7 +185,17 @@ function StageCell({ app }: { app: LosApplication }) {
 }
 
 function RejectionReasonCell({ app }: { app: LosApplication }) {
-  const label = app.leadRejectionReason?.label?.trim();
+  const note = app.leadStatusNote?.trim().toLowerCase() ?? '';
+  const pennyDropFailed =
+    app.statusCode.toUpperCase() === 'PENNYDROP_FAILED' ||
+    app.leadRejectionReason?.code === 'PENNYDROP_FAILED' ||
+    note === BANK_DETAIL_FAILED_LABEL.toLowerCase() ||
+    note === PENNY_DROP_FAILED_LABEL.toLowerCase();
+  const label =
+    (app.leadRejectionReason?.code
+      ? rejectionReasonDisplayLabel(app.leadRejectionReason.code)
+      : app.leadRejectionReason?.label?.trim()) ||
+    (pennyDropFailed ? PENNY_DROP_FAILED_LABEL : '');
   if (!label) {
     return <span className="text-brand-muted">—</span>;
   }

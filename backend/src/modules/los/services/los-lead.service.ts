@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import type { Response } from 'express';
 import { BUREAU_FETCHED } from '../../../common/constants/bureau-fetch.constants';
 import { LEAD_STATUS } from '../../../common/constants/lead.constants';
+import { toRejectionReasonDto } from '../../../common/constants/rejection-reason.constants';
 import { PAN_VERIFIED } from '../../../common/constants/pan-verification.constants';
 import { BureauReportPdfService } from '../../../common/cibil/bureau-report-pdf.service';
 import { CibilCreditAssessmentService } from '../../../common/cibil/cibil-credit-assessment.service';
@@ -172,12 +173,7 @@ export class LosLeadService {
         cibilScore,
         panVerified: detail?.panVerified ?? 0,
         panVerifiedLabel: panVerifiedStatusLabel(detail?.panVerified ?? 0),
-        rejectionReason: lead.rejectionReason
-          ? {
-              code: lead.rejectionReason.name,
-              label: lead.rejectionReason.name.replace(/_/g, ' '),
-            }
-          : null,
+        rejectionReason: toRejectionReasonDto(lead.rejectionReason),
         leadStatusNote: lead.leadStatusNote?.trim() || null,
         statusCode: lead.leadStatus.name,
         statusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
@@ -283,12 +279,7 @@ export class LosLeadService {
       bureauFetchedLabel: bureauFetchedStatusLabel(detail?.bureauFetched ?? 0),
       leadStatusNote: noteTrimmed,
       bureauFetchedNote: bureauNoteTrimmed,
-      rejectionReason: lead.rejectionReason
-        ? {
-            code: lead.rejectionReason.name,
-            label: lead.rejectionReason.name.replace(/_/g, ' '),
-          }
-        : null,
+      rejectionReason: toRejectionReasonDto(lead.rejectionReason),
       sourceName: lead.source?.name ?? null,
       sourceType: lead.source?.type ?? null,
       utm: latestUtm
