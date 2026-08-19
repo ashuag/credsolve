@@ -71,7 +71,7 @@ async function loadActiveOverride(
 /**
  * Repayment due date:
  * 1. If this calendar month has an active override and that date is still on/after today, use it
- *    (so 16 Aug with Aug 29 override stays 29 Aug instead of rolling to September).
+ *    (so 20 Aug with a 10 Sep override stays 10 Sep instead of rolling to month-end).
  * 2. Else month-end rule (1–15 this month / 16+ next month), then apply that month's override if still on/after today.
  */
 export async function resolveRepaymentDueDateUtc(

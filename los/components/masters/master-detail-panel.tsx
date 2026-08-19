@@ -125,7 +125,7 @@ function ModalShell({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(10,28,66,0.42)] p-4 backdrop-blur-[4px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(10,28,66,0.42)] p-4"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -459,6 +459,10 @@ function lastIsoDateOfMonth(year: number, month: number) {
   return `${year}-${String(month).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
 }
 
+function firstIsoDateOfMonth(year: number, month: number) {
+  return `${year}-${String(month).padStart(2, '0')}-01`;
+}
+
 function formatIsoDisplay(iso: string) {
   const [year, month, day] = iso.split('-');
   if (!year || !month || !day) return iso;
@@ -486,9 +490,9 @@ function DueDateModal({
     setYear(nextYear);
     setMonth(nextMonth);
     setDueDate((prev) => {
-      const day = Number(prev.slice(8, 10)) || 1;
-      const last = Number(lastIsoDateOfMonth(nextYear, nextMonth).slice(8, 10));
-      return lastIsoDateOfMonth(nextYear, nextMonth).slice(0, 8) + String(Math.min(day, last)).padStart(2, '0');
+      const start = firstIsoDateOfMonth(nextYear, nextMonth);
+      if (prev >= start) return prev;
+      return lastIsoDateOfMonth(nextYear, nextMonth);
     });
   }
 
@@ -506,18 +510,15 @@ function DueDateModal({
     }
   }
 
-  const minDate = `${year}-${String(month).padStart(2, '0')}-01`;
-  const maxDate = lastIsoDateOfMonth(year, month);
-
   return (
     <ModalShell
       title={initial ? 'Edit Due Date' : 'Add Due Date'}
-      subtitle="When this month still has this due date ahead (or today), new applications use it instead of rolling to next month-end."
+      subtitle="Year and month are the application month this override covers. The repayment date can be later — for example Aug 2026 → 10 Sep 2026."
       onClose={onClose}
     >
       <form className="grid gap-4" onSubmit={handleSubmit}>
         <label className="grid gap-1.5">
-          <span className="text-[0.9rem] font-bold">Year</span>
+          <span className="text-[0.9rem] font-bold">Applies to year</span>
           <input
             className="los-input"
             type="number"
@@ -530,28 +531,36 @@ function DueDateModal({
           />
         </label>
         <label className="grid gap-1.5">
-          <span className="text-[0.9rem] font-bold">Month</span>
-          <select
-            className="los-input"
-            value={month}
-            onChange={(event) => applyMonth(year, Number(event.target.value))}
-            disabled={locked}
-            required
-          >
-            {MONTH_LABELS.map((label, index) => (
-              <option key={label} value={index + 1}>
-                {label}
-              </option>
-            ))}
-          </select>
+          <span className="text-[0.9rem] font-bold">Applies to month</span>
+          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+            {MONTH_LABELS.map((label, index) => {
+              const value = index + 1;
+              const selected = month === value;
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  disabled={locked}
+                  onClick={() => applyMonth(year, value)}
+                  className={`min-h-[36px] rounded-[8px] border text-[0.8rem] font-bold transition-colors ${
+                    selected
+                      ? 'border-[rgba(20,150,243,0.55)] bg-[rgba(20,150,243,0.12)] text-brand-navy'
+                      : 'border-[rgba(23,44,113,0.12)] bg-white text-brand-text hover:border-[rgba(20,150,243,0.35)]'
+                  } disabled:cursor-not-allowed disabled:opacity-60`}
+                >
+                  {label.slice(0, 3)}
+                </button>
+              );
+            })}
+          </div>
         </label>
         <label className="grid gap-1.5">
-          <span className="text-[0.9rem] font-bold">Due date</span>
+          <span className="text-[0.9rem] font-bold">Repayment due date</span>
           <input
             className="los-input"
             type="date"
-            min={minDate}
-            max={maxDate}
+            min={firstIsoDateOfMonth(year, month)}
+            max="2100-12-31"
             value={dueDate}
             onChange={(event) => setDueDate(event.target.value)}
             required

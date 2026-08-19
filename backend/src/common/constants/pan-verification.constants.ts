@@ -3,10 +3,11 @@
  *
  *   0 → NOT_CHECKED   — API not yet called, or network/timeout error.
  *                        Safe to retry later.
- *   1 → VERIFIED      — Vendor confirmed: panStatus=valid, nameMatch=true,
- *                        dobMatch=true, category=Individual.
+ *   1 → VERIFIED      — Vendor confirmed: panStatus=valid, dobMatch=true,
+ *                        category=Individual. NSDL `nameMatch` is stored for
+ *                        LOS display and does not block verification.
  *   2 → NOT_VERIFIED  — Vendor responded successfully but PAN is invalid,
- *                        name/DOB didn't match, or category is wrong.
+ *                        DOB didn't match, or category is wrong.
  *   3 → API_FAILURE   — Vendor returned `success: false` / non-success
  *                        envelope (e.g. 400 bad request, malformed input).
  *                        Safe to retry after fixing input.

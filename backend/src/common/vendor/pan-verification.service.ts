@@ -87,10 +87,11 @@ export type PanNsdlVendorCallResult = PanVerificationResult & {
  * - Vendor returns HTTP error / network failure / missing creds →
  *   `panVerifiedStatus = 0` (NOT_CHECKED). The caller should keep the DB
  *   value at 0 so the check can be retried later.
- * - Vendor returns a success response with panStatus=valid + all matches →
- *   `panVerifiedStatus = 1` (VERIFIED).
- * - Vendor returns a success response but PAN invalid / mismatches →
- *   `panVerifiedStatus = 2` (NOT_VERIFIED).
+ * - Vendor returns a success response with panStatus=valid, dobMatch, and
+ *   category=Individual → `panVerifiedStatus = 1` (VERIFIED). NSDL
+ *   `nameMatch` is returned for display and does not block verification.
+ * - Vendor returns a success response but PAN invalid / DOB mismatch /
+ *   non-Individual category → `panVerifiedStatus = 2` (NOT_VERIFIED).
  */
 @Injectable()
 export class PanVerificationService {
@@ -272,9 +273,9 @@ export class PanVerificationService {
     const dobMatch = data.dobMatch === true;
     const category = data.category ?? null;
 
+    // NSDL `nameMatch` does not block verification; LOS reads it from vendor_api_log.
     const isVerified =
       panStatus === 'valid' &&
-      nameMatch &&
       dobMatch &&
       category === 'Individual';
 

@@ -64,4 +64,23 @@ describe('repayment-due-date.util', () => {
     const priorMonth = await resolveRepaymentDueDateUtc(prisma, new Date('2026-07-20T10:00:00+05:30'));
     expect(priorMonth.toISOString().slice(0, 10)).toBe('2026-08-29');
   });
+
+  it('uses a current-month override whose due date falls in a later month', async () => {
+    const prisma = {
+      repaymentDueDate: {
+        findFirst: jest.fn(async ({ where }: { where: { year: number; month: number } }) => {
+          if (where.year === 2026 && where.month === 8) {
+            return { dueDate: new Date('2026-09-10T00:00:00.000Z') };
+          }
+          return null;
+        }),
+      },
+    };
+
+    const restOfAugust = await resolveRepaymentDueDateUtc(
+      prisma,
+      new Date('2026-08-20T10:00:00+05:30'),
+    );
+    expect(restOfAugust.toISOString().slice(0, 10)).toBe('2026-09-10');
+  });
 });

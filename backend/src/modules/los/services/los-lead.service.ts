@@ -10,6 +10,7 @@ import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
 import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
+import { TENACIO_SERVICE_PAN_NAME_DOB } from '../../../common/vendor/tenacio/tenacio-client.service';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -43,6 +44,25 @@ function bureauFetchedStatusLabel(code: number): string {
     default:
       return `Unknown (${code})`;
   }
+}
+
+function panNsdlServiceNames(): string[] {
+  return [...new Set(
+    [(process.env.TENACIO_PAN_NSDL_SERVICE ?? '').trim(), TENACIO_SERVICE_PAN_NAME_DOB].filter(Boolean),
+  )];
+}
+
+/** Reads Tenacio NSDL `data.nameMatch` from a stored vendor_api_log payload. */
+function extractNsdlNameMatch(payload: unknown): boolean | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const root = payload as Record<string, unknown>;
+  const data = root.data;
+  const nested =
+    data && typeof data === 'object' && !Array.isArray(data)
+      ? (data as Record<string, unknown>).nameMatch
+      : undefined;
+  const value = nested ?? root.nameMatch;
+  return typeof value === 'boolean' ? value : null;
 }
 
 function toExcelDate(iso: string | null | undefined): Date | null {
@@ -254,6 +274,12 @@ export class LosLeadService {
             createdAt: true,
           },
         },
+        vendorApiLogs: {
+          where: { serviceName: { in: panNsdlServiceNames() } },
+          orderBy: [{ respondedAt: 'desc' }, { id: 'desc' }],
+          take: 1,
+          select: { responsePayload: true },
+        },
       },
     });
 
@@ -276,6 +302,7 @@ export class LosLeadService {
       statusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
       panVerified: detail?.panVerified ?? 0,
       panVerifiedLabel: panVerifiedStatusLabel(detail?.panVerified ?? 0),
+      panNameMatch: extractNsdlNameMatch(lead.vendorApiLogs[0]?.responsePayload),
       bureauFetched: detail?.bureauFetched ?? 0,
       bureauFetchedLabel: bureauFetchedStatusLabel(detail?.bureauFetched ?? 0),
       leadStatusNote: noteTrimmed,

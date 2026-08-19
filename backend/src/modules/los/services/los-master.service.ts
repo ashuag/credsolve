@@ -628,19 +628,20 @@ export class LosMasterService {
     }
   }
 
-  private parseDueDateInMonth(raw: string, year: number, month: number): Date {
+  private parseDueDateForMonth(raw: string, year: number, month: number): Date {
     const parsed = parseIsoDateUtc(raw);
     if (!parsed) {
       throw new BadRequestException('Due date must be a valid calendar date (YYYY-MM-DD).');
     }
-    if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() + 1 !== month) {
-      throw new BadRequestException('Due date must fall in the selected year and month.');
+    const monthStart = new Date(Date.UTC(year, month - 1, 1));
+    if (parsed.getTime() < monthStart.getTime()) {
+      throw new BadRequestException('Due date cannot be before the selected month.');
     }
     return parsed;
   }
 
   async createRepaymentDueDate(input: { year: number; month: number; dueDate: string }) {
-    const dueDate = this.parseDueDateInMonth(input.dueDate, input.year, input.month);
+    const dueDate = this.parseDueDateForMonth(input.dueDate, input.year, input.month);
     try {
       const row = await this.prisma.client.repaymentDueDate.create({
         data: { year: input.year, month: input.month, dueDate, isActive: true },
@@ -666,7 +667,7 @@ export class LosMasterService {
 
     const data: { dueDate?: Date; isActive?: boolean } = {};
     if (dto.dueDate !== undefined) {
-      data.dueDate = this.parseDueDateInMonth(dto.dueDate, existing.year, existing.month);
+      data.dueDate = this.parseDueDateForMonth(dto.dueDate, existing.year, existing.month);
     }
     if (dto.isActive !== undefined) {
       data.isActive = dto.isActive;

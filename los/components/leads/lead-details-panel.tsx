@@ -75,6 +75,21 @@ function formatInr(value: string | null | undefined): string {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
 }
 
+function NsdlNameMatchMark({ matched }: { matched: boolean | null }) {
+  if (matched == null) return null;
+  return (
+    <span
+      className={`inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[0.72rem] font-black leading-none ${
+        matched ? 'bg-[rgba(29,157,112,0.14)] text-[#16a34a]' : 'bg-[rgba(220,38,38,0.12)] text-[#dc2626]'
+      }`}
+      title={matched ? 'NSDL name match' : 'NSDL name mismatch'}
+      aria-label={matched ? 'NSDL name match' : 'NSDL name mismatch'}
+    >
+      {matched ? '✓' : '✕'}
+    </span>
+  );
+}
+
 function sourceSummary(lead: LosLeadDetails) {
   if (lead.sourceName) {
     return lead.sourceType ? `${lead.sourceName} · ${lead.sourceType}` : lead.sourceName;
@@ -344,7 +359,15 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
                 <DetailGrid
                   rows={[
                     { label: 'Lead ID', value: lead.leadNumber },
-                    { label: 'Full name', value: formatPersonName(profile.fullName) },
+                    {
+                      label: 'Full name',
+                      value: (
+                        <span className="inline-flex items-center gap-2">
+                          {formatPersonName(profile.fullName)}
+                          <NsdlNameMatchMark matched={lead.panNameMatch} />
+                        </span>
+                      ),
+                    },
                     { label: 'Date of birth', value: formatDateOnly(profile.dateOfBirth ?? undefined) },
                     { label: 'Age', value: ageFromDateOfBirth(profile.dateOfBirth ?? undefined) },
                     { label: 'PAN', value: profile.panNumber ?? '—' },

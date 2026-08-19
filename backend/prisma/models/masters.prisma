@@ -158,8 +158,9 @@ model LoanStatus {
   @@map("loan_status")
 }
 
-/// Month-specific repayment due date override. When active, the due date for
-/// that calendar month replaces the default last-day-of-month rule.
+/// Month-specific repayment due date override. `year`/`month` is the application
+/// month this override applies to; `dueDate` may be in a later month
+/// (e.g. Aug 2026 → 10 Sep 2026).
 model RepaymentDueDate {
   id        Int      @id @default(autoincrement()) @db.SmallInt
   year      Int      @db.SmallInt

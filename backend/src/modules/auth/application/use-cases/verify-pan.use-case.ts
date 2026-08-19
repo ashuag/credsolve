@@ -170,7 +170,7 @@ export type VerifyPanResult =
 /**
  * Status written to `lead_detail.pan_verified` (SmallInt):
  *   0 = NOT_CHECKED — vendor call failed or was skipped; safe to retry.
- *   1 = VERIFIED    — panStatus=valid, nameMatch, dobMatch, category=Individual.
+ *   1 = VERIFIED    — panStatus=valid, dobMatch, category=Individual (nameMatch is display-only).
  *   2 = NOT_VERIFIED — vendor confirmed the PAN doesn't match.
  */
 @Injectable()

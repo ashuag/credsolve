@@ -80,6 +80,8 @@ export type LosLeadDetails = {
   statusLabel: string;
   panVerified: number;
   panVerifiedLabel: string;
+  /** Tenacio NSDL `nameMatch` from the latest PAN vendor_api_log for this lead. */
+  panNameMatch: boolean | null;
   bureauFetched: number;
   bureauFetchedLabel: string;
   /** LOS / ops note on the lead row (`lead.lead_status_note`). */

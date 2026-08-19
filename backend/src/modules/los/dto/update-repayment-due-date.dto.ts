@@ -2,7 +2,10 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsOptional, IsString, Matches } from 'class-validator';
 
 export class UpdateRepaymentDueDateDto {
-  @ApiPropertyOptional({ example: '2026-08-29', description: 'Due date (YYYY-MM-DD) within the row month' })
+  @ApiPropertyOptional({
+    example: '2026-09-10',
+    description: 'Repayment due date (YYYY-MM-DD). May fall in a later month than the row month.',
+  })
   @IsOptional()
   @IsString()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)

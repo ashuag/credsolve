@@ -10,14 +10,17 @@ export class CreateRepaymentDueDateDto {
   @Max(2100)
   year!: number;
 
-  @ApiProperty({ example: 8, minimum: 1, maximum: 12, description: 'Calendar month 1–12' })
+  @ApiProperty({ example: 8, minimum: 1, maximum: 12, description: 'Calendar month this override applies to (1–12)' })
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(12)
   month!: number;
 
-  @ApiProperty({ example: '2026-08-29', description: 'Due date (YYYY-MM-DD) within the given month' })
+  @ApiProperty({
+    example: '2026-09-10',
+    description: 'Repayment due date (YYYY-MM-DD). May fall in a later month, e.g. Aug 2026 → 10 Sep 2026.',
+  })
   @IsString()
   @IsNotEmpty()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
