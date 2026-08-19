@@ -1,6 +1,8 @@
 'use client';
 
 import { enableReKyc, type LosApplicationDetails } from '@/lib/api';
+import { canRetryLosApplicationSteps } from '@/lib/access';
+import { getLosStoredUser } from '@/lib/auth';
 import { canEnableReKycFromRow } from '@/lib/kyc-grant-retry-eligibility';
 import { useState } from 'react';
 
@@ -31,8 +33,12 @@ export function KycEnableReKycButton({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [allowed] = useState(() => {
+    const user = getLosStoredUser();
+    return canRetryLosApplicationSteps(user?.roleName ?? user?.role, user?.hierarchyLevel);
+  });
 
-  const eligible = row.canEnableReKyc || canEnableReKycFromRow(row);
+  const eligible = allowed && (row.canEnableReKyc || canEnableReKycFromRow(row));
 
   if (!eligible) return null;
 

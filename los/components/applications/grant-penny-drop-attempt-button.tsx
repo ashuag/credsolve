@@ -1,6 +1,8 @@
 'use client';
 
 import { grantPennyDropAttempt, type LosApplicationDetails } from '@/lib/api';
+import { canRetryLosApplicationSteps } from '@/lib/access';
+import { getLosStoredUser } from '@/lib/auth';
 import { canGrantPennyDropAttemptFromRow } from '@/lib/penny-drop-grant-retry-eligibility';
 import { useState } from 'react';
 
@@ -23,8 +25,12 @@ export function GrantPennyDropAttemptButton({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [allowed] = useState(() => {
+    const user = getLosStoredUser();
+    return canRetryLosApplicationSteps(user?.roleName ?? user?.role, user?.hierarchyLevel);
+  });
 
-  const eligible = row.canGrantPennyDropAttempt || canGrantPennyDropAttemptFromRow(row);
+  const eligible = allowed && (row.canGrantPennyDropAttempt || canGrantPennyDropAttemptFromRow(row));
 
   if (!eligible && !message) return null;
 

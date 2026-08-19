@@ -44,6 +44,14 @@ export function canDecideLosApplication(
   return !isAgentRole(roleName, hierarchyLevel);
 }
 
+/** Re-enable KYC selfie / bank verification retries — not available to Agent. */
+export function canRetryLosApplicationSteps(
+  roleName?: string | null,
+  hierarchyLevel?: number | null,
+): boolean {
+  return !isAgentRole(roleName, hierarchyLevel);
+}
+
 export function isLosConfigPath(pathname: string): boolean {
   return LOS_AGENT_RESTRICTED_PATH_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),

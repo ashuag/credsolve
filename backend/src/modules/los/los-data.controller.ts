@@ -151,6 +151,7 @@ export class LosDataController {
   }
 
   @Post('applications/:applicationUuid/kyc/enable-re-kyc')
+  @UseGuards(LosDenyAgentGuard)
   @ApiOperation({
     summary:
       'Enable re-KYC selfie: reset selfie / liveness so the customer can retake the face step (DigiLocker Aadhaar is kept if already captured)',
@@ -160,6 +161,7 @@ export class LosDataController {
   }
 
   @Post('applications/:applicationUuid/bank/grant-penny-drop-attempt')
+  @UseGuards(LosDenyAgentGuard)
   @ApiOperation({
     summary:
       'Grant one more penny-drop (bank verification) attempt when the customer has used the configured maximum',
