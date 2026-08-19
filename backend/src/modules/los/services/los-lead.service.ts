@@ -147,7 +147,6 @@ export class LosLeadService {
           },
         },
       },
-      take: 500,
     });
 
     return leads.map((lead) => {
