@@ -116,6 +116,7 @@ export class LosDataController {
   }
 
   @Post('applications/:applicationUuid/reject')
+  @UseGuards(LosDenyAgentGuard)
   @ApiOperation({ summary: 'Reject an application with reason and ops note (LOS auth)' })
   rejectApplication(@Param('applicationUuid') applicationUuid: string, @Body() body: RejectWorkspaceRecordDto) {
     return this.losRejection.rejectApplication(applicationUuid, body);
@@ -131,6 +132,7 @@ export class LosDataController {
   }
 
   @Post('applications/:applicationUuid/approve')
+  @UseGuards(LosDenyAgentGuard)
   @ApiOperation({
     summary: 'Approve an application after the customer journey is complete (status → APPROVED)',
   })
@@ -139,6 +141,7 @@ export class LosDataController {
   }
 
   @Post('applications/:applicationUuid/disburse')
+  @UseGuards(LosDenyAgentGuard)
   @ApiOperation({
     summary:
       'Disburse an APPROVED application: create loan_account (loan_number = application_number), set DISBURSED, email final sanction letter (payment gateway skipped)',

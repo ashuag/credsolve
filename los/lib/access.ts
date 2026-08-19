@@ -36,6 +36,14 @@ export function canMarkInternalTesting(
   return !isAgentRole(roleName, hierarchyLevel);
 }
 
+/** Reject / Approve / Disburse on LOS applications — not available to Agent. */
+export function canDecideLosApplication(
+  roleName?: string | null,
+  hierarchyLevel?: number | null,
+): boolean {
+  return !isAgentRole(roleName, hierarchyLevel);
+}
+
 export function isLosConfigPath(pathname: string): boolean {
   return LOS_AGENT_RESTRICTED_PATH_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),

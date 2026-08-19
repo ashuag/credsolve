@@ -16,6 +16,7 @@ import {
 import { ApplicationReviewHero } from '@/components/applications/review/application-review-hero';
 import { ApplicationReviewToolbar } from '@/components/applications/review/application-review-ui';
 import { canRejectApplicationStatus, RejectRecordModal } from '@/components/shared/reject-record-modal';
+import { canDecideLosApplication } from '@/lib/access';
 import { buildReviewFlags } from '@/lib/application-review-flags';
 import { isApplicationRecordRejected } from '@/lib/application-workspace-status';
 import { buildApplicationJourney, journeyProgressPercent } from '@/lib/customer-journey';
@@ -27,6 +28,7 @@ import {
   getApplicationCibilReport,
   type LosApplicationDetails,
 } from '@/lib/api';
+import { getLosStoredUser } from '@/lib/auth';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type ReviewTab = 'personal' | 'cibil' | 'loan' | 'kyc' | 'bank' | 'refs' | 'utm' | 'ids' | 'timeline';
@@ -48,6 +50,10 @@ export function ApplicationReviewDashboard({
   const [actionError, setActionError] = useState<string | null>(null);
   const [approveBusy, setApproveBusy] = useState(false);
   const [disburseBusy, setDisburseBusy] = useState(false);
+  const [canDecide] = useState(() => {
+    const user = getLosStoredUser();
+    return canDecideLosApplication(user?.roleName ?? user?.role, user?.hierarchyLevel);
+  });
 
   const profile = row.lead.profile;
   const displayName = formatPersonName(profile?.fullName, 'Applicant (name pending)');
@@ -63,8 +69,10 @@ export function ApplicationReviewDashboard({
     !isRejected &&
     journeySteps.length > 0 &&
     journeySteps.every((step) => step.state === 'done');
-  const canApprove = journeyComplete && statusCode !== 'APPROVED' && statusCode !== 'DISBURSED';
-  const canDisburse = statusCode === 'APPROVED' && !row.loanAccount;
+  const canApprove =
+    canDecide && journeyComplete && statusCode !== 'APPROVED' && statusCode !== 'DISBURSED';
+  const canDisburse = canDecide && statusCode === 'APPROVED' && !row.loanAccount;
+  const canReject = canDecide && canRejectApplicationStatus(row.statusCode);
 
   const loadBureauPan = useCallback(async () => {
     if (!authToken || !row.bureauReport) {
@@ -191,8 +199,8 @@ export function ApplicationReviewDashboard({
         <div className="ar-toolbar">
           <ApplicationReviewToolbar
             onRefresh={onRefresh}
-            onReject={canRejectApplicationStatus(row.statusCode) ? () => setRejectOpen(true) : undefined}
-            rejectDisabled={!canRejectApplicationStatus(row.statusCode)}
+            onReject={canReject ? () => setRejectOpen(true) : undefined}
+            rejectDisabled={!canReject}
             onApprove={canApprove ? () => void handleApprove() : undefined}
             approveBusy={approveBusy}
             onDisburse={canDisburse ? () => void handleDisburse() : undefined}
