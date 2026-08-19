@@ -7,9 +7,10 @@ import {
   LOS_LISTING_PAGE_SIZE_OPTIONS,
   type DataTableColumn,
 } from '@/components/ui/data-table';
-import { getLoans, type LosLoan } from '@/lib/api';
+import { getLoans, markApplicationInternalTesting, type LosLoan } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
+import { MarkInternalTestingButton } from '@/components/shared/mark-internal-testing-button';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -126,6 +127,7 @@ export function LoansPanel() {
   const [loans, setLoans] = useState<LosLoan[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [busyUuid, setBusyUuid] = useState<string | null>(null);
 
   const loadLoans = useCallback(async () => {
     setLoading(true);
@@ -148,6 +150,24 @@ export function LoansPanel() {
   useEffect(() => {
     void loadLoans();
   }, [loadLoans]);
+
+  const markAsInternalTesting = useCallback(async (loan: LosLoan) => {
+    const token = getToken();
+    if (!token) {
+      setFetchError('Session expired — please log in again.');
+      return;
+    }
+    setBusyUuid(loan.uuid);
+    setFetchError(null);
+    try {
+      await markApplicationInternalTesting(token, loan.applicationUuid);
+      setLoans((prev) => prev.filter((row) => row.uuid !== loan.uuid));
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : 'Failed to mark loan as internal testing');
+    } finally {
+      setBusyUuid(null);
+    }
+  }, []);
 
   const columns = useMemo((): DataTableColumn<LosLoan>[] => [
     {
@@ -299,7 +319,20 @@ export function LoansPanel() {
       cellClassName: 'whitespace-nowrap text-brand-muted',
       render: (loan) => formatDateTime(loan.disbursedAt),
     },
-  ], []);
+    {
+      key: 'actions',
+      label: 'Actions',
+      headerClassName: 'whitespace-nowrap',
+      sortable: false,
+      filter: false,
+      render: (loan) => (
+        <MarkInternalTestingButton
+          busy={busyUuid === loan.uuid}
+          onConfirm={() => void markAsInternalTesting(loan)}
+        />
+      ),
+    },
+  ], [busyUuid, markAsInternalTesting]);
 
   const overdueCount = loans.filter((loan) => isLoanPastDue(loan)).length;
   const activeCount = loans.filter((loan) => effectiveStatusCode(loan).toUpperCase() === 'ACTIVE').length;

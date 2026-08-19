@@ -1,10 +1,12 @@
 'use client';
 
-import { getLoanDetails, type LosLoanDetails } from '@/lib/api';
+import { getLoanDetails, markApplicationInternalTesting, type LosLoanDetails } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
 import { LosStatusPill, losStatusPillStyles } from '@/components/shared/los-status-pill';
+import { MarkInternalTestingButton } from '@/components/shared/mark-internal-testing-button';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 function getToken(): string | null {
@@ -457,9 +459,11 @@ function FeeStack({ row }: { row: LosLoanDetails }) {
 }
 
 export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
+  const router = useRouter();
   const [row, setRow] = useState<LosLoanDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [markingInternal, setMarkingInternal] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -482,6 +486,25 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const markAsInternalTesting = useCallback(async () => {
+    if (!row) return;
+    const token = getToken();
+    if (!token) {
+      setError('Session expired — please log in again.');
+      return;
+    }
+    setMarkingInternal(true);
+    setError(null);
+    try {
+      await markApplicationInternalTesting(token, row.applicationUuid);
+      router.replace('/loans');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to mark loan as internal testing');
+    } finally {
+      setMarkingInternal(false);
+    }
+  }, [row, router]);
 
   const name = useMemo(
     () => (row ? formatPersonName(row.fullName, 'Borrower (name pending)') : ''),
@@ -625,6 +648,10 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
                   Open application
                 </ActionBtn>
                 <ActionBtn onClick={() => void load()}>Refresh</ActionBtn>
+                <MarkInternalTestingButton
+                  busy={markingInternal}
+                  onConfirm={() => void markAsInternalTesting()}
+                />
               </div>
             </div>
           </div>

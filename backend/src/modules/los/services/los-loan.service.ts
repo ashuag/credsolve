@@ -39,6 +39,9 @@ export class LosLoanService {
 
   async listLoans() {
     const loans = await this.prisma.client.loanAccount.findMany({
+      where: {
+        application: { lead: { isInternalTesting: false } },
+      },
       orderBy: { disbursedAt: 'desc' },
       take: 500,
       include: {
