@@ -3,6 +3,8 @@ import { cachedAuthorizedLosGet, fetchWithTimeout, messageFromBody, parseJsonRes
 export type LosBureauReportListItem = {
   uuid: string;
   leadUuid: string;
+  /** Public journey ID (`lead.lead_id`); same value as application ID when an application exists. */
+  leadNumber: string;
   customerUuid: string;
   applicationUuid: string | null;
   applicationNumber: string | null;

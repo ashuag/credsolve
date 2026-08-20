@@ -20,6 +20,7 @@ export class LosBureauReportService {
         lead: {
           select: {
             uuid: true,
+            leadNumber: true,
             leadDetail: { select: { fullName: true, panNumber: true } },
             applications: {
               orderBy: { createdAt: 'desc' },
@@ -35,6 +36,7 @@ export class LosBureauReportService {
     return reports.map((row) => ({
       uuid: row.uuid,
       leadUuid: row.lead.uuid,
+      leadNumber: row.lead.leadNumber,
       customerUuid: row.customer.uuid,
       applicationUuid: row.lead.applications[0]?.uuid ?? null,
       applicationNumber: row.lead.applications[0]?.applicationNumber ?? null,
@@ -53,14 +55,19 @@ export class LosBureauReportService {
     const reports = await this.prisma.client.bureauReport.findMany({
       orderBy: { createdAt: 'desc' },
       take: 500,
-      select: { rawPayload: true, cibilScore: true },
+      select: {
+        rawPayload: true,
+        cibilScore: true,
+        lead: { select: { leadNumber: true } },
+      },
     });
 
     const rows = [
-      [...CIBIL_ASSESSMENT_EXPORT_HEADERS],
-      ...reports.map((report, index) =>
-        buildCibilAssessmentExportRow(report.rawPayload, index + 1, report.cibilScore),
-      ),
+      ['Lead ID', ...CIBIL_ASSESSMENT_EXPORT_HEADERS],
+      ...reports.map((report, index) => [
+        report.lead.leadNumber,
+        ...buildCibilAssessmentExportRow(report.rawPayload, index + 1, report.cibilScore),
+      ]),
     ];
     return buildSimpleXlsxWorkbook(rows, 'Sheet1');
   }

@@ -108,6 +108,22 @@ export function BureauReportsPanel() {
 
   const columns = useMemo((): DataTableColumn<LosBureauReportListItem>[] => [
     {
+      key: 'lead',
+      label: 'Lead ID',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.leadNumber,
+      getSortValue: (row) => row.leadNumber.toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search lead…' },
+      render: (row) => (
+        <Link
+          href={`/reports/bureau-report/${row.leadUuid}`}
+          className="font-mono text-[0.82rem] font-semibold text-brand-blue no-underline hover:underline whitespace-nowrap"
+        >
+          {row.leadNumber}
+        </Link>
+      ),
+    },
+    {
       key: 'customer',
       label: 'Customer',
       headerClassName: 'whitespace-nowrap',
@@ -251,7 +267,7 @@ export function BureauReportsPanel() {
         onRetry={() => void load()}
         emptyMessage="No bureau reports have been stored yet."
         noResultsMessage="No bureau reports match your filters."
-        minWidth="1100px"
+        minWidth="1220px"
         pageSize={LOS_LISTING_PAGE_SIZE}
         pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         initialSort={{ key: 'fetched', dir: 'desc' }}
