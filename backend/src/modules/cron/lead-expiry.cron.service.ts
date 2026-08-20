@@ -80,10 +80,7 @@ export class LeadExpiryCronService implements OnModuleInit {
         where: { name: APPLICATION_STATUS.REJECTED, isActive: true },
         select: { id: true },
       }),
-      this.prisma.client.rejectionReason.findFirst({
-        where: { name: REJECTION_REASON.EXPIRED, isActive: true },
-        select: { id: true },
-      }),
+      this.ensureExpiredRejectionReason(),
     ]);
 
     if (!rejectedLeadStatus) {
@@ -114,6 +111,29 @@ export class LeadExpiryCronService implements OnModuleInit {
     });
 
     return openLeadCount + convertedCount;
+  }
+
+  /**
+   * `rejection_reason.name` is unique under utf8mb4_unicode_ci, so a legacy
+   * 'Expired' row is the same key as 'EXPIRED'. Activate / canonicalize it.
+   */
+  private async ensureExpiredRejectionReason(): Promise<{ id: number } | null> {
+    try {
+      const row = await this.prisma.client.rejectionReason.upsert({
+        where: { name: REJECTION_REASON.EXPIRED },
+        create: { name: REJECTION_REASON.EXPIRED, isActive: true },
+        update: { name: REJECTION_REASON.EXPIRED, isActive: true },
+        select: { id: true },
+      });
+      return row;
+    } catch (err) {
+      this.logger.error(
+        `Unable to ensure rejection reason ${REJECTION_REASON.EXPIRED}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+      return null;
+    }
   }
 
   private async rejectExpiredOpenLeads(params: {

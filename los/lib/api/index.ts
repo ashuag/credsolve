@@ -21,6 +21,8 @@ export * from './negative-lists';
 export * from './bre';
 export * from './cibil-report';
 export * from './bureau-reports';
+export * from './lead-reports';
+export * from './transaction-reports';
 export * from './reject-record';
 export * from './disbursement';
 export * from './kyc-enable-re-kyc';

@@ -82,7 +82,11 @@ const navGroups: { section: string; color: string; items: NavItem[] }[] = [
         href: '/reports',
         label: 'Reports',
         icon: 'reports',
-        children: [{ href: '/reports/bureau-report', label: 'Bureau Report' }],
+        children: [
+          { href: '/reports/lead-report', label: 'Lead Report' },
+          { href: '/reports/transaction-report', label: 'Transaction Report' },
+          { href: '/reports/bureau-report', label: 'Bureau Report' },
+        ],
       },
     ],
   },
@@ -194,6 +198,8 @@ const BREADCRUMBS: Record<string, string> = {
   '/loans': 'Loan Management',
   '/customers': 'Customer Management',
   '/reports': 'Reports',
+  '/reports/lead-report': 'Lead Report',
+  '/reports/transaction-report': 'Transaction Report',
   '/reports/bureau-report': 'Bureau Report',
   '/partners': 'Partners',
   '/agents': 'Agent Management',
@@ -264,6 +270,7 @@ function breadcrumbLabel(pathname: string): string {
   if (/^\/applications\/[^/]+$/.test(pathname)) return 'Application detail';
   if (/^\/loans\/[^/]+$/.test(pathname)) return 'Loan detail';
   if (/^\/customers\/[^/]+$/.test(pathname)) return 'Customer detail';
+  if (/^\/reports\/lead-report\/[^/]+$/.test(pathname)) return 'Report detail';
   if (/^\/reports\/bureau-report\/[^/]+$/.test(pathname)) return 'Report detail';
   const seg = pathname.replace(/^\//, '').split('/')[0];
   return seg ? seg.charAt(0).toUpperCase() + seg.slice(1) : 'Home';
@@ -295,6 +302,13 @@ function breadcrumbTrail(pathname: string): BreadcrumbItem[] {
     return [
       { label: 'Customers', href: '/customers' },
       { label: 'Customer detail' },
+    ];
+  }
+  if (/^\/reports\/lead-report\/[^/]+$/.test(pathname)) {
+    return [
+      { label: 'Reports', href: '/reports' },
+      { label: 'Lead Report', href: '/reports/lead-report' },
+      { label: 'Report detail' },
     ];
   }
   if (/^\/reports\/bureau-report\/[^/]+$/.test(pathname)) {

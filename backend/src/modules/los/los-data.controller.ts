@@ -13,6 +13,8 @@ import { LosRejectionService } from './services/los-rejection.service';
 import { LosDisbursementService } from './services/los-disbursement.service';
 import { LosLoanService } from './services/los-loan.service';
 import { LosBureauReportService } from './services/los-bureau-report.service';
+import { LosLeadReportService } from './services/los-lead-report.service';
+import { LosTransactionReportService } from './services/los-transaction-report.service';
 
 @ApiTags('LOS Data')
 @Controller('los')
@@ -28,6 +30,8 @@ export class LosDataController {
     private readonly losDisbursement: LosDisbursementService,
     private readonly losLoan: LosLoanService,
     private readonly losBureauReport: LosBureauReportService,
+    private readonly losLeadReport: LosLeadReportService,
+    private readonly losTransactionReport: LosTransactionReportService,
   ) {}
 
   @Get('dashboard/crm')
@@ -53,6 +57,57 @@ export class LosDataController {
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
     res.setHeader('Content-Disposition', 'attachment; filename="Credit Assessment data.xlsx"');
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.send(buffer);
+  }
+
+  @Get('lead-reports')
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({ summary: 'List leads with application, loan, and repayment status for LOS Reports' })
+  leadReports() {
+    return this.losLeadReport.listLeadReports();
+  }
+
+  @Get('lead-reports/export')
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({ summary: 'Download the lead report as an Excel workbook (.xlsx)' })
+  async leadReportsExport(@Res() res: Response): Promise<void> {
+    const buffer = await this.losLeadReport.exportLeadReportsWorkbook();
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', 'attachment; filename="Lead report.xlsx"');
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.send(buffer);
+  }
+
+  @Get('lead-reports/:leadUuid')
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({ summary: 'Lead report detail: profile, offer, loan, and repayment status' })
+  leadReportByUuid(@Param('leadUuid') leadUuid: string) {
+    return this.losLeadReport.getLeadReportDetails(leadUuid);
+  }
+
+  @Get('transaction-reports')
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({
+    summary: 'List disbursed-loan transactions with fees, repayment, and penal charges for LOS Reports',
+  })
+  transactionReports() {
+    return this.losTransactionReport.listTransactionReports();
+  }
+
+  @Get('transaction-reports/export')
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({ summary: 'Download the transaction report as an Excel workbook (.xlsx)' })
+  async transactionReportsExport(@Res() res: Response): Promise<void> {
+    const buffer = await this.losTransactionReport.exportTransactionReportsWorkbook();
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', 'attachment; filename="Transaction report.xlsx"');
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     res.send(buffer);
   }
