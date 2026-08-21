@@ -15,14 +15,13 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   private replicaClient: PrismaClient | null = createReplicaPrismaClient();
   private replicaReads: PrismaClient | null = null;
 
-  constructor() {
-    this.replicaReads = this.wrapReplicaReads(this.replicaClient);
-  }
-
   /**
    * MySQL replica for LOS list/detail reads. Falls back to primary when the replica
    * is not configured, unreachable, or later hits a pool/socket timeout.
    * Writes and customer-journey queries must keep using {@link client}.
+   *
+   * Reads stay on primary until a background ping succeeds so a dead replica cannot
+   * delay Nest listen / health checks (Firefox then reports that as CORS).
    */
   get read(): PrismaClient {
     return this.replicaReads ?? this.client;
@@ -36,11 +35,28 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
     const replicaUrl = resolveReplicaDatabaseUrl();
     const target = replicaUrl ? describeDatabaseTarget(replicaUrl) : '(replica)';
+    this.logger.log(`Replica configured at ${target}; LOS reads use primary until ping succeeds`);
+    void this.activateReplicaIfHealthy(target);
+  }
+
+  private async activateReplicaIfHealthy(target: string): Promise<void> {
+    if (!this.replicaClient) return;
+    const pingMs = Number(process.env.DB_REPLICA_CONNECT_TIMEOUT_MS ?? 3_000) + 2_000;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      await this.replicaClient.$queryRaw`SELECT 1`;
+      await Promise.race([
+        this.replicaClient.$queryRaw`SELECT 1`,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('replica startup ping timed out')), pingMs);
+        }),
+      ]);
+      if (!this.replicaClient) return;
+      this.replicaReads = this.wrapReplicaReads(this.replicaClient);
       this.logger.log(`LOS reads use replica ${target}`);
     } catch (err) {
       this.disableReplica(err, `startup ping failed for ${target}`);
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 
