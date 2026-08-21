@@ -8,12 +8,8 @@ import { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
-import { OCCUPATION } from '../../../../common/constants/occupation.constants';
-
-const OCCUPATION_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
-  Object.values(OCCUPATION).map(({ key, name }) => [key, name]),
-);
 import { parseOptionalInrAmount } from '../../../../common/utils/parse-inr-amount';
+import { resolveOccupationId } from '../../../../common/utils/resolve-gender-occupation-ids.util';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { ApplicationRepository } from '../../infrastructure/repositories/application.repository';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
@@ -61,25 +57,14 @@ export class SubmitProfessionalApplicationUseCase {
       throw new NotFoundException('No matching active lead was found.');
     }
 
-    const occupationName = OCCUPATION_KEY_TO_NAME[dto.occupation];
-    if (!occupationName) {
-      throw new BadRequestException('Invalid occupation.');
-    }
-
-    const occupation = await this.prisma.client.occupation.findUnique({
-      where: { name: occupationName },
-      select: { id: true },
-    });
-    if (!occupation) {
-      throw new BadRequestException('Occupation is not available in the system.');
-    }
+    const { occupationId } = await resolveOccupationId(this.prisma.client, dto.occupation);
 
     const netMonthlyIncome = parseOptionalInrAmount(dto.monthlyIncome);
     const annualTurnover = parseOptionalInrAmount(dto.annualTurnover);
     const annualProfit = parseOptionalInrAmount(dto.annualProfit);
 
     const leadDetailIncomePatch: Prisma.LeadDetailUpdateInput = {
-      occupation: { connect: { id: occupation.id } },
+      occupation: { connect: { id: occupationId } },
     };
     if (dto.monthlyIncome !== undefined) {
       leadDetailIncomePatch.netMonthlyIncome = netMonthlyIncome;

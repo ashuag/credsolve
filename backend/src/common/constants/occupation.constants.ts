@@ -10,3 +10,13 @@ export const OCCUPATION = {
 
 export type OccupationKey = typeof OCCUPATION[keyof typeof OCCUPATION]['key'];
 export type Occupation = typeof OCCUPATION[keyof typeof OCCUPATION]['name'];
+
+export const OCCUPATION_KEYS = [
+  OCCUPATION.SALARIED.key,
+  OCCUPATION.SELF_EMPLOYED_PROFESSIONAL.key,
+  OCCUPATION.SELF_EMPLOYED_BUSINESS.key,
+  OCCUPATION.STUDENT.key,
+  OCCUPATION.HOMEMAKER.key,
+  OCCUPATION.RETIRED.key,
+  OCCUPATION.UNEMPLOYED.key,
+] as const;

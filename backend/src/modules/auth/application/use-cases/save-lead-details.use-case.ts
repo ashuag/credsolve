@@ -6,15 +6,6 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { parseOptionalInrAmount } from '../../../../common/utils/parse-inr-amount';
-import { GENDER } from '../../../../common/constants/gender.constants';
-import { OCCUPATION } from '../../../../common/constants/occupation.constants';
-
-const GENDER_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
-  Object.values(GENDER).map(({ key, name }) => [key, name]),
-);
-const OCCUPATION_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
-  Object.values(OCCUPATION).map(({ key, name }) => [key, name]),
-);
 import { PrismaService } from '../../../../prisma/prisma.service';
 import {
   assertPincodeMatchesCity,
@@ -23,6 +14,7 @@ import {
   validateOccupationIncome,
 } from '../../../../common/validation/lead-intake.validation';
 import { resolveLeadCityId } from '../../../../common/utils/resolve-lead-city-id.util';
+import { resolveGenderOccupationIds } from '../../../../common/utils/resolve-gender-occupation-ids.util';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import type { SaveLeadDetailsDto } from '../dto/save-lead-details.dto';
@@ -62,26 +54,11 @@ export class SaveLeadDetailsUseCase {
       throw new NotFoundException('No matching active lead was found.');
     }
 
-    const genderName = GENDER_KEY_TO_NAME[dto.gender];
-    const occupationName = OCCUPATION_KEY_TO_NAME[dto.occupation];
-    if (!genderName || !occupationName) {
-      throw new BadRequestException('Invalid gender or occupation.');
-    }
-
-    const [gender, occupation] = await Promise.all([
-      this.prisma.client.gender.findUnique({
-        where: { name: genderName },
-        select: { id: true },
-      }),
-      this.prisma.client.occupation.findUnique({
-        where: { name: occupationName },
-        select: { id: true },
-      }),
-    ]);
-
-    if (!gender || !occupation) {
-      throw new BadRequestException('Gender or occupation is not available in the system.');
-    }
+    const { genderId, occupationId } = await resolveGenderOccupationIds(
+      this.prisma.client,
+      dto.gender,
+      dto.occupation,
+    );
 
     throwIfLeadIntakeInvalid(validateAddressLine1(dto.addressLine1));
     throwIfLeadIntakeInvalid(
@@ -121,8 +98,8 @@ export class SaveLeadDetailsUseCase {
         leadId: leadRow.id,
         fullName: dto.fullName.trim(),
         dateOfBirth,
-        genderId: gender.id,
-        occupationId: occupation.id,
+        genderId,
+        occupationId,
         cityId,
         pincode: dto.pincode,
         addressLine1: dto.addressLine1.trim(),
@@ -136,8 +113,8 @@ export class SaveLeadDetailsUseCase {
       update: {
         fullName: dto.fullName.trim(),
         dateOfBirth,
-        genderId: gender.id,
-        occupationId: occupation.id,
+        genderId,
+        occupationId,
         cityId,
         pincode: dto.pincode,
         addressLine1: dto.addressLine1.trim(),

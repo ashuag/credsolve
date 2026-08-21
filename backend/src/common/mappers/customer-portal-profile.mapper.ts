@@ -82,8 +82,8 @@ export function formatLeadDetailForPortal(detail: {
   annualTurnover: { toString(): string } | null;
   annualProfit: { toString(): string } | null;
   cibilConsentAt: Date | null;
-  gender: { name: string } | null;
-  occupation: { name: string } | null;
+  gender: { key?: string; name: string } | null;
+  occupation: { key?: string; name: string } | null;
   city: { name: string; state: { code: string } } | null;
 } | null): {
   fullName: string | null;
@@ -117,8 +117,10 @@ export function formatLeadDetailForPortal(detail: {
     panNumber: detail.panNumber,
     panVerified: isPanVerifiedFromDb(detail.panVerified),
     panVerifiedAt: detail.panVerifiedAt?.toISOString() ?? null,
-    gender: mapGenderDbNameToPortalSlug(detail.gender?.name),
-    occupation: mapOccupationDbNameToPortalSlug(detail.occupation?.name),
+    gender: (detail.gender?.key as CustomerPortalGenderSlug | undefined)
+      ?? mapGenderDbNameToPortalSlug(detail.gender?.name),
+    occupation: (detail.occupation?.key as CustomerPortalOccupationSlug | undefined)
+      ?? mapOccupationDbNameToPortalSlug(detail.occupation?.name),
     addressLine1: detail.addressLine1,
     addressLine2: detail.addressLine2,
     currentCity,

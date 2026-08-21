@@ -9,17 +9,9 @@ import { PAN_VERIFIED } from '../../../../common/constants/pan-verification.cons
 import { REJECTION_REASON } from '../../../../common/constants/rejection-reason.constants';
 import { SettingKey } from '../../../../common/constants/setting.constants';
 import { isPanVerifiedFromDb } from '../../../../common/mappers/customer-portal-profile.mapper';
-import { GENDER } from '../../../../common/constants/gender.constants';
-import { OCCUPATION } from '../../../../common/constants/occupation.constants';
 import { parseOptionalInrAmount } from '../../../../common/utils/parse-inr-amount';
-
-const GENDER_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
-  Object.values(GENDER).map(({ key, name }) => [key, name]),
-);
-const OCCUPATION_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
-  Object.values(OCCUPATION).map(({ key, name }) => [key, name]),
-);
 import { resolveLeadCityId } from '../../../../common/utils/resolve-lead-city-id.util';
+import { resolveGenderOccupationIds } from '../../../../common/utils/resolve-gender-occupation-ids.util';
 import {
   assertPincodeMatchesCity,
   throwIfLeadIntakeInvalid,
@@ -234,8 +226,8 @@ export class VerifyPanUseCase {
         dateOfBirth: leadDetailPayload.dateOfBirth,
         genderId: leadDetailPayload.genderId,
         occupationId: leadDetailPayload.occupationId,
-        genderDisplay: GENDER_KEY_TO_NAME[dto.gender] ?? dto.gender,
-        occupationDisplay: OCCUPATION_KEY_TO_NAME[dto.occupation] ?? dto.occupation,
+        genderDisplay: dto.gender,
+        occupationDisplay: dto.occupation,
         pincode: leadDetailPayload.pincode,
         cityId: cityRow?.id ?? null,
         stateId: cityRow?.stateId ?? null,
@@ -459,7 +451,11 @@ export class VerifyPanUseCase {
     annualTurnover?: Prisma.Decimal | null;
     annualProfit?: Prisma.Decimal | null;
   }> {
-    const { genderId, occupationId } = await this.resolveGenderOccupationIds(dto);
+    const { genderId, occupationId } = await resolveGenderOccupationIds(
+      this.prisma.client,
+      dto.gender,
+      dto.occupation,
+    );
     const { netMonthlyIncome, annualTurnover, annualProfit } = this.buildIncomeFields(dto);
     throwIfLeadIntakeInvalid(
       validateOccupationIncome(dto.occupation, {
@@ -849,24 +845,6 @@ export class VerifyPanUseCase {
     }
   }
 
-  private async resolveGenderOccupationIds(
-    dto: VerifyPanDto,
-  ): Promise<{ genderId: number; occupationId: number }> {
-    const genderName = GENDER_KEY_TO_NAME[dto.gender];
-    const occupationName = OCCUPATION_KEY_TO_NAME[dto.occupation];
-    if (!genderName || !occupationName) {
-      throw new BadRequestException('Invalid gender or occupation.');
-    }
-    const [gender, occupation] = await Promise.all([
-      this.prisma.client.gender.findUnique({ where: { name: genderName }, select: { id: true } }),
-      this.prisma.client.occupation.findUnique({ where: { name: occupationName }, select: { id: true } }),
-    ]);
-    if (!gender || !occupation) {
-      throw new BadRequestException('Gender or occupation is not available in the system.');
-    }
-    return { genderId: gender.id, occupationId: occupation.id };
-  }
-
   private buildIncomeFields(dto: VerifyPanDto): {
     netMonthlyIncome?: Prisma.Decimal | null;
     annualTurnover?: Prisma.Decimal | null;
@@ -890,8 +868,8 @@ export class VerifyPanUseCase {
   }
 
   private buildPanRejectLeadNote(dto: VerifyPanDto, verification: PanVerificationResult): string {
-    const occ = OCCUPATION_KEY_TO_NAME[dto.occupation] ?? dto.occupation;
-    const gen = GENDER_KEY_TO_NAME[dto.gender] ?? dto.gender;
+    const occ = dto.occupation;
+    const gen = dto.gender;
     const category = verification.category ? ` category=${verification.category}` : '';
     return `PAN not verified: panStatus=${verification.panStatus ?? 'n/a'} nameMatch=${verification.nameMatch} dobMatch=${verification.dobMatch}${category} | occ=${occ} | gender=${gen}`.slice(0, 256);
   }

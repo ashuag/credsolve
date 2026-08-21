@@ -1,3 +1,5 @@
+import { GENDER_KEYS } from '../../../../common/constants/gender.constants';
+import { OCCUPATION_KEYS } from '../../../../common/constants/occupation.constants';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { Equals, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, MaxLength, MinLength, Min } from 'class-validator';
@@ -5,16 +7,6 @@ import {
   PERSON_NAME_PATTERN,
   PERSON_NAME_VALIDATION_MESSAGE,
 } from '../../../../common/utils/person-name.util';
-
-const GENDERS = ['MALE', 'FEMALE', 'OTHERS'] as const;
-const OCCUPATIONS = [
-  'SALARIED',
-  'SELF_EMPLOYED_PROFESSIONAL',
-  'SELF_EMPLOYED_BUSINESS',
-  'STUDENT',
-  'HOMEMAKER',
-  'RETIRED',
-] as const;
 
 export class VerifyPanDto {
   @ApiPropertyOptional({ format: 'uuid', description: 'Defaults to the customer’s active lead when omitted.' })
@@ -40,13 +32,13 @@ export class VerifyPanDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   dob!: string;
 
-  @ApiProperty({ enum: GENDERS, description: 'Persisted as gender_id on lead_detail.' })
-  @IsIn(GENDERS)
-  gender!: (typeof GENDERS)[number];
+  @ApiProperty({ enum: GENDER_KEYS, description: 'Persisted as gender_id on lead_detail.' })
+  @IsIn(GENDER_KEYS)
+  gender!: (typeof GENDER_KEYS)[number];
 
-  @ApiProperty({ enum: OCCUPATIONS, description: 'Persisted as occupation_id on lead_detail.' })
-  @IsIn(OCCUPATIONS)
-  occupation!: (typeof OCCUPATIONS)[number];
+  @ApiProperty({ enum: OCCUPATION_KEYS, description: 'Persisted as occupation_id on lead_detail.' })
+  @IsIn(OCCUPATION_KEYS)
+  occupation!: (typeof OCCUPATION_KEYS)[number];
 
   @ApiProperty({
     description:

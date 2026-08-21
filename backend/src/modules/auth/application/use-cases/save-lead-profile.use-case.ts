@@ -6,20 +6,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { GENDER } from '../../../../common/constants/gender.constants';
-import { OCCUPATION } from '../../../../common/constants/occupation.constants';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { REJECTION_REASON } from '../../../../common/constants/rejection-reason.constants';
 import { SettingKey } from '../../../../common/constants/setting.constants';
 import { parseOptionalInrAmount } from '../../../../common/utils/parse-inr-amount';
 import { throwIfLeadIntakeInvalid, validateOccupationIncome } from '../../../../common/validation/lead-intake.validation';
-
-const GENDER_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
-  Object.values(GENDER).map(({ key, name }) => [key, name]),
-);
-const OCCUPATION_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
-  Object.values(OCCUPATION).map(({ key, name }) => [key, name]),
-);
+import { resolveGenderOccupationIds } from '../../../../common/utils/resolve-gender-occupation-ids.util';
 import { PanVerificationService } from '../../../../common/vendor/pan-verification.service';
 import { SmsService } from '../../../../common/sms/sms.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
@@ -66,20 +58,11 @@ export class SaveLeadProfileUseCase {
       throw new NotFoundException('No matching active lead was found.');
     }
 
-    const genderName = GENDER_KEY_TO_NAME[dto.gender];
-    const occupationName = OCCUPATION_KEY_TO_NAME[dto.occupation];
-    if (!genderName || !occupationName) {
-      throw new BadRequestException('Invalid gender or occupation.');
-    }
-
-    const [gender, occupation] = await Promise.all([
-      this.prisma.client.gender.findUnique({ where: { name: genderName }, select: { id: true } }),
-      this.prisma.client.occupation.findUnique({ where: { name: occupationName }, select: { id: true } }),
-    ]);
-
-    if (!gender || !occupation) {
-      throw new BadRequestException('Gender or occupation is not available in the system.');
-    }
+    const { genderId, occupationId } = await resolveGenderOccupationIds(
+      this.prisma.client,
+      dto.gender,
+      dto.occupation,
+    );
 
     throwIfLeadIntakeInvalid(
       validateOccupationIncome(dto.occupation, {
@@ -98,8 +81,8 @@ export class SaveLeadProfileUseCase {
     const profilePayload = {
       fullName: dto.fullName.trim(),
       dateOfBirth,
-      genderId: gender.id,
-      occupationId: occupation.id,
+      genderId,
+      occupationId,
       netMonthlyIncome,
       annualTurnover,
       annualProfit,

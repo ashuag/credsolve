@@ -1,19 +1,11 @@
+import { GENDER_KEYS } from '../../../../common/constants/gender.constants';
+import { OCCUPATION_KEYS } from '../../../../common/constants/occupation.constants';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
 import {
   PERSON_NAME_PATTERN,
   PERSON_NAME_VALIDATION_MESSAGE,
 } from '../../../../common/utils/person-name.util';
-
-const GENDERS = ['MALE', 'FEMALE', 'OTHERS'] as const;
-const OCCUPATIONS = [
-  'SALARIED',
-  'SELF_EMPLOYED_PROFESSIONAL',
-  'SELF_EMPLOYED_BUSINESS',
-  'STUDENT',
-  'HOMEMAKER',
-  'RETIRED',
-] as const;
 
 export class SaveLeadProfileDto {
   @ApiPropertyOptional({ format: 'uuid' })
@@ -32,13 +24,13 @@ export class SaveLeadProfileDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   dob!: string;
 
-  @ApiProperty({ enum: GENDERS })
-  @IsIn(GENDERS)
-  gender!: (typeof GENDERS)[number];
+  @ApiProperty({ enum: GENDER_KEYS })
+  @IsIn(GENDER_KEYS)
+  gender!: (typeof GENDER_KEYS)[number];
 
-  @ApiProperty({ enum: OCCUPATIONS })
-  @IsIn(OCCUPATIONS)
-  occupation!: (typeof OCCUPATIONS)[number];
+  @ApiProperty({ enum: OCCUPATION_KEYS })
+  @IsIn(OCCUPATION_KEYS)
+  occupation!: (typeof OCCUPATION_KEYS)[number];
 
   @ApiProperty()
   @IsString()

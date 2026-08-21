@@ -43,8 +43,8 @@ export class LeadRepository {
         leadStatus: { select: { name: true } },
         leadDetail: {
           include: {
-            gender: { select: { name: true } },
-            occupation: { select: { name: true } },
+            gender: { select: { key: true, name: true } },
+            occupation: { select: { key: true, name: true } },
             city: { select: { name: true, state: { select: { code: true } } } },
           },
         },
@@ -69,8 +69,8 @@ export class LeadRepository {
             leadStatus: { select: { name: true } },
             leadDetail: {
               include: {
-                gender: { select: { name: true } },
-                occupation: { select: { name: true } },
+                gender: { select: { key: true, name: true } },
+                occupation: { select: { key: true, name: true } },
                 city: { select: { name: true, state: { select: { code: true } } } },
               },
             },

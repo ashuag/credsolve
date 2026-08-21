@@ -1,14 +1,6 @@
+import { OCCUPATION_KEYS } from '../../../../common/constants/occupation.constants';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, IsUUID, MaxLength, Matches } from 'class-validator';
-
-const OCCUPATIONS = [
-  'SALARIED',
-  'SELF_EMPLOYED_PROFESSIONAL',
-  'SELF_EMPLOYED_BUSINESS',
-  'STUDENT',
-  'HOMEMAKER',
-  'RETIRED',
-] as const;
 
 export class SaveProfessionalDetailsDto {
   @ApiPropertyOptional({ format: 'uuid' })
@@ -16,9 +8,9 @@ export class SaveProfessionalDetailsDto {
   @IsUUID()
   leadUuid?: string;
 
-  @ApiProperty({ enum: OCCUPATIONS })
-  @IsIn(OCCUPATIONS)
-  occupation!: (typeof OCCUPATIONS)[number];
+  @ApiProperty({ enum: OCCUPATION_KEYS })
+  @IsIn(OCCUPATION_KEYS)
+  occupation!: (typeof OCCUPATION_KEYS)[number];
 
   @ApiPropertyOptional()
   @IsOptional()
