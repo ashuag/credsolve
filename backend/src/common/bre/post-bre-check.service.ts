@@ -143,12 +143,12 @@ export class PostBreCheckService {
     rules: PostBreRuleCatalogEntry[];
     unsecuredExposure: PostBreUnsecuredExposureGuide;
   }> {
-    const postBreRows = await this.loadPostBreRows();
+    const postBreRows = await this.loadPostBreRows(this.prisma.read);
     const thresholds = this.buildPostBreThresholds(postBreRows);
     const criteria = this.buildPostBreCriteriaConfig(postBreRows, thresholds);
     const { rules, enquiryWindowDays } = buildPostBreRulesCatalog(thresholds);
     const [tierRows, bounds] = await Promise.all([
-      this.prisma.client.creditLimitTier.findMany({
+      this.prisma.read.creditLimitTier.findMany({
         orderBy: { sortOrder: 'asc' },
         select: {
           id: true,
@@ -159,7 +159,7 @@ export class PostBreCheckService {
           isActive: true,
         },
       }),
-      loadLoanAmountBounds(this.prisma),
+      loadLoanAmountBounds({ client: this.prisma.read }),
     ]);
     const creditLimitTiers: CreditLimitTierRef[] = tierRows.map((t) => ({
       id: t.id,
@@ -187,7 +187,7 @@ export class PostBreCheckService {
     /** Optional; when set, dry-run evaluates bureau phone match against this mobile. */
     applicantMobile?: string | null;
   }): Promise<PostBreDryRunResult> {
-    const postBreRows = await this.loadPostBreRows();
+    const postBreRows = await this.loadPostBreRows(this.prisma.read);
     const thresholds = this.buildPostBreThresholds(postBreRows);
     const criteriaConfig = this.buildPostBreCriteriaConfig(postBreRows, thresholds);
     
@@ -609,7 +609,7 @@ export class PostBreCheckService {
     if (overallPassed) {
       try {
         const [bounds, tier] = await Promise.all([
-          loadLoanAmountBounds(this.prisma),
+          loadLoanAmountBounds({ client: this.prisma.read }),
           this.creditLimitTiers.resolveMaxBulletLoan(exposure.totalUnsecuredExposureInr),
         ]);
         if (tier) {
@@ -971,8 +971,10 @@ export class PostBreCheckService {
     return row;
   }
 
-  private async loadPostBreRows(): Promise<{ key: string; label: string; description: string | null; value: string }[]> {
-    return this.prisma.client.eligibilityCriteria.findMany({
+  private async loadPostBreRows(
+    db: PrismaService['client'] = this.prisma.client,
+  ): Promise<{ key: string; label: string; description: string | null; value: string }[]> {
+    return db.eligibilityCriteria.findMany({
       where: { breType: 'POST_BRE', isActive: true },
       select: { key: true, label: true, description: true, value: true },
     });

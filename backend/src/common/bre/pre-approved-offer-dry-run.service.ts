@@ -35,7 +35,7 @@ export class PreApprovedOfferDryRunService {
 
   async evaluateFromBureauPayload(rawPayload: unknown): Promise<PreApprovedOfferDryRunResult> {
     const parsed = parseTenacioBureauVendorBody(rawPayload);
-    const bounds = await loadLoanAmountBounds(this.prisma);
+    const bounds = await loadLoanAmountBounds({ client: this.prisma.read });
     const exposure = computeOpenUnsecuredExposureBreakdown(rawPayload);
     const totalUnsecuredExposureInr = exposure.totalUnsecuredExposureInr;
     const maxOpenUnsecuredExposureInr = exposure.maxOpenUnsecuredExposureInr;
@@ -57,7 +57,7 @@ export class PreApprovedOfferDryRunService {
       };
     }
 
-    const tierRow = await this.prisma.client.creditLimitTier.findUnique({
+    const tierRow = await this.prisma.read.creditLimitTier.findUnique({
       where: { id: resolved.tierId },
       select: {
         id: true,

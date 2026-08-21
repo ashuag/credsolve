@@ -55,7 +55,7 @@ export class VendorApiConfigService {
   constructor(private readonly prisma: PrismaService) {}
 
   async list(): Promise<VendorApiConfigRow[]> {
-    const rows = await this.prisma.client.vendorApiConfig.findMany({
+    const rows = await this.prisma.read.vendorApiConfig.findMany({
       where: { isActive: true },
       orderBy: [{ apiCode: 'asc' }, { priority: 'asc' }, { id: 'asc' }],
     });

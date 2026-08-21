@@ -127,7 +127,7 @@ export class ContactService {
   }
 
   async listForLos(): Promise<{ submissions: ContactSubmissionView[] }> {
-    const rows = await this.prisma.client.contactSubmission.findMany({
+    const rows = await this.prisma.read.contactSubmission.findMany({
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,

@@ -163,7 +163,7 @@ export class LosDashboardService {
       return { leadRows: [], appRows: [], disbRows: [] };
     }
 
-    const prisma = this.prisma.client;
+    const prisma = this.prisma.read;
     const { gte: seriesSince } = utcDayBounds(dayKeys[0]!);
     const { lt: seriesUntil } = utcDayBounds(dayKeys[dayKeys.length - 1]!);
 
@@ -210,7 +210,7 @@ export class LosDashboardService {
 
   /** Aggregated LOS CRM dashboard (counts + small activity feed). */
   async getDashboardCrm() {
-    const prisma = this.prisma.client;
+    const prisma = this.prisma.read;
     const startOfDay = new Date();
     startOfDay.setUTCHours(0, 0, 0, 0);
     const endOfDay = new Date(startOfDay);

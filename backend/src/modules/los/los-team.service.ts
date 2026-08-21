@@ -133,7 +133,7 @@ export class LosTeamService {
   }
 
   async listRoles() {
-    const rows = await this.prisma.client.userRole.findMany({
+    const rows = await this.prisma.read.userRole.findMany({
       orderBy: [{ hierarchyLevel: 'asc' }, { id: 'asc' }],
     });
     return rows.map((r) => ({
@@ -199,7 +199,7 @@ export class LosTeamService {
   }
 
   async listUsers() {
-    const rows = await this.prisma.client.user.findMany({
+    const rows = await this.prisma.read.user.findMany({
       include: USER_INCLUDE,
       orderBy: { createdAt: 'desc' },
       take: 500,

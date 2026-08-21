@@ -55,7 +55,7 @@ export class LosTransactionReportService {
   ) {}
 
   async listTransactionReports() {
-    const loans = await this.prisma.client.loanAccount.findMany({
+    const loans = await this.prisma.read.loanAccount.findMany({
       where: {
         application: { lead: { isInternalTesting: false } },
       },

@@ -3,7 +3,7 @@ import { SettingKey } from '../constants/setting.constants';
 import type { BreSettings } from '../../modules/auth/infrastructure/repositories/settings.repository';
 import { PrismaService } from '../../prisma/prisma.service';
 
-export async function loadBreSettings(prisma: PrismaService): Promise<BreSettings> {
+export async function loadBreSettings(prisma: Pick<PrismaService, 'client'>): Promise<BreSettings> {
   const criteriaKeys = [EC.MIN_AGE, EC.MAX_AGE, EC.REJECTED_GENDERS, EC.REJECTED_OCCUPATIONS];
 
   const criteriaRows = await prisma.client.eligibilityCriteria.findMany({
@@ -44,7 +44,7 @@ export async function loadBreSettings(prisma: PrismaService): Promise<BreSetting
 }
 
 export async function loadLoanAmountBounds(
-  prisma: PrismaService,
+  prisma: Pick<PrismaService, 'client'>,
 ): Promise<{ minLoanAmountInr: number; maxLoanAmountInr: number }> {
   const keys = [SettingKey.MIN_LOAN_AMOUNT.key, SettingKey.MAX_LOAN_AMOUNT.key] as const;
   const rows = await prisma.client.setting.findMany({

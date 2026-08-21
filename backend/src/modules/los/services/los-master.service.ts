@@ -80,7 +80,7 @@ export class LosMasterService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getMasters() {
-    const prismaAny = this.prisma.client as any;
+    const prismaAny = this.prisma.read as any;
 
     const [
       leadStatuses,
@@ -96,21 +96,21 @@ export class LosMasterService {
       sourceUtms,
       repaymentDueDates,
     ] = await Promise.all([
-      this.prisma.client.leadStatus.findMany({ orderBy: { id: 'asc' } }),
-      this.prisma.client.applicationStatus.findMany({ orderBy: { id: 'asc' } }),
-      this.prisma.client.leadSource.findMany({ orderBy: { name: 'asc' } }),
-      this.prisma.client.state.findMany({ orderBy: { name: 'asc' } }),
-      this.prisma.client.city.findMany({ include: { state: true }, orderBy: [{ state: { name: 'asc' } }, { name: 'asc' }] }),
-      this.prisma.client.occupation.findMany({ orderBy: { name: 'asc' } }),
-      this.prisma.client.reasonForLoan.findMany({ orderBy: { name: 'asc' } }),
-      this.prisma.client.gender.findMany({ orderBy: { name: 'asc' } }),
-      this.prisma.client.bank.findMany({ orderBy: { name: 'asc' } }),
-      this.prisma.client.rejectionReason.findMany({ orderBy: { name: 'asc' } }),
+      this.prisma.read.leadStatus.findMany({ orderBy: { id: 'asc' } }),
+      this.prisma.read.applicationStatus.findMany({ orderBy: { id: 'asc' } }),
+      this.prisma.read.leadSource.findMany({ orderBy: { name: 'asc' } }),
+      this.prisma.read.state.findMany({ orderBy: { name: 'asc' } }),
+      this.prisma.read.city.findMany({ include: { state: true }, orderBy: [{ state: { name: 'asc' } }, { name: 'asc' }] }),
+      this.prisma.read.occupation.findMany({ orderBy: { name: 'asc' } }),
+      this.prisma.read.reasonForLoan.findMany({ orderBy: { name: 'asc' } }),
+      this.prisma.read.gender.findMany({ orderBy: { name: 'asc' } }),
+      this.prisma.read.bank.findMany({ orderBy: { name: 'asc' } }),
+      this.prisma.read.rejectionReason.findMany({ orderBy: { name: 'asc' } }),
       prismaAny.sourceUtm.findMany({
         include: { leadSource: { select: { name: true } } },
         orderBy: [{ leadSource: { name: 'asc' } }, { id: 'asc' }],
       }),
-      this.prisma.client.repaymentDueDate.findMany({ orderBy: [{ year: 'desc' }, { month: 'desc' }] }),
+      this.prisma.read.repaymentDueDate.findMany({ orderBy: [{ year: 'desc' }, { month: 'desc' }] }),
     ]);
 
     return {
@@ -796,7 +796,7 @@ export class LosMasterService {
   }
 
   async getEligibilityCriteriaForLos() {
-    const rows = await this.prisma.client.eligibilityCriteria.findMany({
+    const rows = await this.prisma.read.eligibilityCriteria.findMany({
       orderBy: { id: 'asc' },
     });
 
@@ -857,7 +857,7 @@ export class LosMasterService {
   }
 
   async getCreditLimitTiersForLos() {
-    const rows = await this.prisma.client.creditLimitTier.findMany({
+    const rows = await this.prisma.read.creditLimitTier.findMany({
       orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
     });
 
@@ -922,7 +922,7 @@ export class LosMasterService {
   }
 
   async getSmsTemplatesForLos() {
-    const rows = await this.prisma.client.smsTemplate.findMany({
+    const rows = await this.prisma.read.smsTemplate.findMany({
       orderBy: { id: 'asc' },
     });
 

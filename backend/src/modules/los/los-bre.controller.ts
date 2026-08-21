@@ -34,7 +34,7 @@ export class LosBreController {
     summary: 'Dry-run pre-bureau BRE (age, gender, occupation, negative lists)',
   })
   async preBreCheckEndpoint(@Body() body: PreBreCheckDto) {
-    const settings = await loadBreSettings(this.prisma);
+    const settings = await loadBreSettings({ client: this.prisma.read });
     const result = await this.preBreCheck.run(
       {
         dateOfBirth: new Date(`${body.dateOfBirth}T00:00:00.000Z`),
@@ -49,6 +49,7 @@ export class LosBreController {
         stateCode: body.stateCode ?? null,
       },
       settings,
+      this.prisma.read,
     );
     return { ...result, thresholds: settings };
   }

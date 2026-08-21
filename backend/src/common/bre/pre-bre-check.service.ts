@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { REJECTION_REASON } from '../constants/rejection-reason.constants';
 import type { BreSettings } from '../../modules/auth/infrastructure/repositories/settings.repository';
+import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
 export interface PreBreCheckInput {
@@ -30,7 +31,11 @@ export class PreBreCheckService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async run(input: PreBreCheckInput, settings: BreSettings): Promise<PreBreCheckResult> {
+  async run(
+    input: PreBreCheckInput,
+    settings: BreSettings,
+    db: PrismaClient = this.prisma.client,
+  ): Promise<PreBreCheckResult> {
     const ageResult = this.checkAge(input, settings.minAge, settings.maxAge);
     if (!ageResult.passed) return ageResult;
 
@@ -45,19 +50,19 @@ export class PreBreCheckService {
 
     const [blockedPincode, blockedCity, blockedState] = await Promise.all([
       pincodeOk
-        ? this.prisma.client.pincode.findFirst({
+        ? db.pincode.findFirst({
             where: { code: pincodeNorm, isNegative: true },
             select: { id: true },
           })
         : Promise.resolve(null),
       input.cityId != null
-        ? this.prisma.client.city.findFirst({
+        ? db.city.findFirst({
             where: { id: input.cityId, isNegative: true },
             select: { id: true },
           })
         : Promise.resolve(null),
       input.stateId != null
-        ? this.prisma.client.state.findFirst({
+        ? db.state.findFirst({
             where: { id: input.stateId, isNegative: true },
             select: { id: true },
           })

@@ -7,6 +7,7 @@ import { PAN_VERIFIED } from '../../../common/constants/pan-verification.constan
 import { BureauReportPdfService } from '../../../common/cibil/bureau-report-pdf.service';
 import { CibilCreditAssessmentService } from '../../../common/cibil/cibil-credit-assessment.service';
 import { KycFilesService } from '../../../common/kyc/kyc-files.service';
+import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
 import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
@@ -127,7 +128,7 @@ export class LosLeadService {
   ) {}
 
   async listLeads() {
-    const leads = await this.prisma.client.lead.findMany({
+    const leads = await this.prisma.read.lead.findMany({
       where: {
         isActive: true,
         isInternalTesting: false,
@@ -241,8 +242,8 @@ export class LosLeadService {
     return buildSimpleXlsxWorkbook(rows, 'Leads');
   }
 
-  async getLeadDetails(leadUuid: string) {
-    const lead = await this.prisma.client.lead.findUnique({
+  async getLeadDetails(leadUuid: string, db: PrismaClient = this.prisma.read) {
+    const lead = await db.lead.findUnique({
       where: { uuid: leadUuid },
       include: {
         customer: { select: { uuid: true, mobileNumber: true, createdAt: true } },
@@ -362,7 +363,7 @@ export class LosLeadService {
   }
 
   async getLeadCibilReport(leadUuid: string) {
-    const lead = await this.prisma.client.lead.findUnique({
+    const lead = await this.prisma.read.lead.findUnique({
       where: { uuid: leadUuid },
       select: {
         id: true,
@@ -374,7 +375,7 @@ export class LosLeadService {
       throw new NotFoundException('Lead not found');
     }
 
-    const bureauReportRow = await this.prisma.client.bureauReport.findFirst({
+    const bureauReportRow = await this.prisma.read.bureauReport.findFirst({
       where: { leadId: lead.id },
       orderBy: { createdAt: 'desc' },
       select: {
@@ -400,7 +401,10 @@ export class LosLeadService {
     });
 
     const report = await this.bureauReportPdf.buildReportViewData(bureauReportRow.rawPayload);
-    const creditAssessment = await this.cibilCreditAssessment.getViewForBureauReportId(bureauReportRow.id);
+    const creditAssessment = await this.cibilCreditAssessment.getViewForBureauReportId(
+      bureauReportRow.id,
+      this.prisma.read,
+    );
 
     return {
       bureauReportUuid: bureauReportRow.uuid,
@@ -414,7 +418,7 @@ export class LosLeadService {
   }
 
   async serveLeadCibilReportPdf(leadUuid: string, res: Response): Promise<void> {
-    const lead = await this.prisma.client.lead.findUnique({
+    const lead = await this.prisma.read.lead.findUnique({
       where: { uuid: leadUuid },
       select: {
         id: true,
@@ -508,7 +512,7 @@ export class LosLeadService {
       },
     });
 
-    return this.getLeadDetails(leadUuid);
+    return this.getLeadDetails(leadUuid, this.prisma.client);
   }
 
   async markInternalTesting(leadUuid: string): Promise<{ success: true; leadUuid: string }> {

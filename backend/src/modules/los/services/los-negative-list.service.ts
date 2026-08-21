@@ -133,17 +133,17 @@ export class LosNegativeListService {
     const negativeFilter = { OR: [{ isNegative: true }, { negativeRemovedAt: { not: null } }] };
 
     const [pincodes, cities, states] = await Promise.all([
-      this.prisma.client.pincode.findMany({
+      this.prisma.read.pincode.findMany({
         where: negativeFilter,
         include: negativePincodeInclude,
         orderBy: [{ isNegative: 'desc' }, { negativeAddedAt: 'desc' }],
       }),
-      this.prisma.client.city.findMany({
+      this.prisma.read.city.findMany({
         where: negativeFilter,
         include: negativeCityInclude,
         orderBy: [{ isNegative: 'desc' }, { negativeAddedAt: 'desc' }],
       }),
-      this.prisma.client.state.findMany({
+      this.prisma.read.state.findMany({
         where: negativeFilter,
         include: negativeStateInclude,
         orderBy: [{ isNegative: 'desc' }, { negativeAddedAt: 'desc' }],

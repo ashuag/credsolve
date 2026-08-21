@@ -12,10 +12,16 @@ export class LosBureauReportService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listBureauReports() {
-    const reports = await this.prisma.client.bureauReport.findMany({
+    const reports = await this.prisma.read.bureauReport.findMany({
       orderBy: { createdAt: 'desc' },
       take: 500,
-      include: {
+      // Do not `include` the parent row: Prisma would pull `raw_payload` (full CIBIL JSON)
+      // for every report and stall this listing.
+      select: {
+        uuid: true,
+        cibilScore: true,
+        dummyFetched: true,
+        createdAt: true,
         customer: { select: { uuid: true, mobileNumber: true } },
         lead: {
           select: {
@@ -52,7 +58,7 @@ export class LosBureauReportService {
 
   /** Builds the "Credit Assessment data" workbook (raw per-report feature columns) for LOS Reports → Bureau Report. */
   async exportBureauReportsWorkbook(): Promise<Buffer> {
-    const reports = await this.prisma.client.bureauReport.findMany({
+    const reports = await this.prisma.read.bureauReport.findMany({
       orderBy: { createdAt: 'desc' },
       take: 500,
       select: {

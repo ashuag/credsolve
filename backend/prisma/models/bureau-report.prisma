@@ -25,6 +25,7 @@ model BureauReport {
 
   @@index([customerId, createdAt])
   @@index([leadId, createdAt])
+  @@index([createdAt])
   @@map("bureau_report")
 }
 

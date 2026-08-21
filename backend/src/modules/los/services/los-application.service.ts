@@ -337,7 +337,7 @@ export class LosApplicationService {
   ) {}
 
   async listApplications() {
-    const applications = await this.prisma.client.application.findMany({
+    const applications = await this.prisma.read.application.findMany({
       where: {
         lead: { isInternalTesting: false },
       },
@@ -505,7 +505,7 @@ export class LosApplicationService {
 
   async getApplicationDetails(applicationUuid: string) {
     const [application, pennyDropAttemptsAllowed] = await Promise.all([
-      this.prisma.client.application.findUnique({
+      this.prisma.read.application.findUnique({
         where: { uuid: applicationUuid },
         include: {
         customer: { select: { uuid: true, mobileNumber: true } },
@@ -566,7 +566,7 @@ export class LosApplicationService {
     const lead = application.lead;
     const detail = lead.leadDetail;
 
-    const bureauReportRow = await this.prisma.client.bureauReport.findFirst({
+    const bureauReportRow = await this.prisma.read.bureauReport.findFirst({
       where: { leadId: application.leadId },
       orderBy: { createdAt: 'desc' },
       select: {
@@ -587,7 +587,7 @@ export class LosApplicationService {
       bureauReportPdfUrl = this.resolveBureauReportPdfUrl(application.uuid, pdfResult, true);
     }
 
-    const customerKyc = await this.prisma.client.customerKyc.findFirst({
+    const customerKyc = await this.prisma.read.customerKyc.findFirst({
       where: { customerId: application.customerId },
       orderBy: { createdAt: 'desc' },
       select: {
@@ -809,7 +809,7 @@ export class LosApplicationService {
   }
 
   async serveApplicationSelfiePhoto(applicationUuid: string, res: Response): Promise<void> {
-    const application = await this.prisma.client.application.findUnique({
+    const application = await this.prisma.read.application.findUnique({
       where: { uuid: applicationUuid },
       select: { kyc: { select: { livenessSelfiePath: true } } },
     });
@@ -824,14 +824,14 @@ export class LosApplicationService {
   }
 
   async serveApplicationAadhaarPhoto(applicationUuid: string, res: Response): Promise<void> {
-    const application = await this.prisma.client.application.findUnique({
+    const application = await this.prisma.read.application.findUnique({
       where: { uuid: applicationUuid },
       select: { customerId: true },
     });
     if (!application) {
       throw new NotFoundException('Application not found');
     }
-    const customerKyc = await this.prisma.client.customerKyc.findFirst({
+    const customerKyc = await this.prisma.read.customerKyc.findFirst({
       where: { customerId: application.customerId },
       orderBy: { createdAt: 'desc' },
       select: { aadhaarPhotoPath: true },
@@ -844,7 +844,7 @@ export class LosApplicationService {
   }
 
   async serveApplicationLivenessVideo(applicationUuid: string, res: Response): Promise<void> {
-    const application = await this.prisma.client.application.findUnique({
+    const application = await this.prisma.read.application.findUnique({
       where: { uuid: applicationUuid },
       select: {
         uuid: true,
@@ -878,7 +878,7 @@ export class LosApplicationService {
     }
     const docType = docTypeRaw as LoanDocumentType;
 
-    const application = await this.prisma.client.application.findUnique({
+    const application = await this.prisma.read.application.findUnique({
       where: { uuid: applicationUuid },
       select: loanDocumentApplicationSelect,
     });
@@ -980,7 +980,7 @@ export class LosApplicationService {
   }
 
   async serveApplicationCibilReportPdf(applicationUuid: string, res: Response): Promise<void> {
-    const application = await this.prisma.client.application.findUnique({
+    const application = await this.prisma.read.application.findUnique({
       where: { uuid: applicationUuid },
       select: {
         leadId: true,
@@ -1017,7 +1017,7 @@ export class LosApplicationService {
   }
 
   async getApplicationCibilReport(applicationUuid: string) {
-    const application = await this.prisma.client.application.findUnique({
+    const application = await this.prisma.read.application.findUnique({
       where: { uuid: applicationUuid },
       select: {
         leadId: true,
@@ -1029,7 +1029,7 @@ export class LosApplicationService {
       throw new NotFoundException('Application not found');
     }
 
-    const bureauReportRow = await this.prisma.client.bureauReport.findFirst({
+    const bureauReportRow = await this.prisma.read.bureauReport.findFirst({
       where: { leadId: application.leadId },
       orderBy: { createdAt: 'desc' },
       select: {
@@ -1055,7 +1055,10 @@ export class LosApplicationService {
     });
 
     const report = await this.bureauReportPdf.buildReportViewData(bureauReportRow.rawPayload);
-    const creditAssessment = await this.cibilCreditAssessment.getViewForBureauReportId(bureauReportRow.id);
+    const creditAssessment = await this.cibilCreditAssessment.getViewForBureauReportId(
+      bureauReportRow.id,
+      this.prisma.read,
+    );
 
     return {
       bureauReportUuid: bureauReportRow.uuid,

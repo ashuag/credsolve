@@ -38,7 +38,7 @@ export class LosLoanService {
   ) {}
 
   async listLoans() {
-    const loans = await this.prisma.client.loanAccount.findMany({
+    const loans = await this.prisma.read.loanAccount.findMany({
       where: {
         application: { lead: { isInternalTesting: false } },
       },
@@ -161,7 +161,7 @@ export class LosLoanService {
   }
 
   async getLoanDetails(loanUuid: string) {
-    const loan = await this.prisma.client.loanAccount.findUnique({
+    const loan = await this.prisma.read.loanAccount.findUnique({
       where: { uuid: loanUuid },
       include: {
         loanStatus: { select: { name: true, displayName: true } },
@@ -214,7 +214,7 @@ export class LosLoanService {
 
     let gatewayTransferJson: unknown = (loan as { gatewayTransferJson?: unknown }).gatewayTransferJson ?? null;
     try {
-      const gatewayRows = await this.prisma.client.$queryRaw<
+      const gatewayRows = await this.prisma.read.$queryRaw<
         Array<{ gateway_transfer_json: unknown }>
       >`
         SELECT gateway_transfer_json
@@ -229,7 +229,7 @@ export class LosLoanService {
       // Column may not exist until migration is applied; loan detail still loads.
     }
 
-    const repaymentRows = await this.prisma.client.$queryRaw<
+    const repaymentRows = await this.prisma.read.$queryRaw<
       Array<{
         uuid: string;
         amount: string | number;

@@ -84,9 +84,9 @@ export class LosVendorApiLogService {
     const sortDir = query.sortDir?.trim().toLowerCase() === 'asc' ? 'asc' : 'desc';
     const where = this.buildWhere(query);
 
-    const [total, rows] = await this.prisma.client.$transaction([
-      this.prisma.client.vendorApiLog.count({ where }),
-      this.prisma.client.vendorApiLog.findMany({
+    const [total, rows] = await this.prisma.read.$transaction([
+      this.prisma.read.vendorApiLog.count({ where }),
+      this.prisma.read.vendorApiLog.findMany({
         where,
         orderBy: { [sortBy]: sortDir },
         skip: (page - 1) * pageSize,
@@ -129,7 +129,7 @@ export class LosVendorApiLogService {
     const id = uuid.trim();
     if (!id) throw new BadRequestException('uuid is required.');
 
-    const row = await this.prisma.client.vendorApiLog.findUnique({
+    const row = await this.prisma.read.vendorApiLog.findUnique({
       where: { uuid: id },
       include: {
         lead: {

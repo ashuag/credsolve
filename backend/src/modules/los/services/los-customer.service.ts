@@ -45,7 +45,7 @@ export class LosCustomerService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listCustomers() {
-    const customers = await this.prisma.client.customer.findMany({
+    const customers = await this.prisma.read.customer.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
         leads: {
@@ -82,7 +82,7 @@ export class LosCustomerService {
   }
 
   async getCustomerDetails(customerUuid: string) {
-    const customer = await this.prisma.client.customer.findUnique({
+    const customer = await this.prisma.read.customer.findUnique({
       where: { uuid: customerUuid },
       include: {
         leads: {

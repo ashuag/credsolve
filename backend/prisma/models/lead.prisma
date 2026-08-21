@@ -96,6 +96,7 @@ model VendorApiLog {
   lead Lead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
 
   @@index([leadId])
+  @@index([leadId, serviceName, respondedAt])
   @@index([providerName, requestedAt])
   @@index([requestedAt])
   @@index([httpStatus, requestedAt])

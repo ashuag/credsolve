@@ -306,7 +306,7 @@ export class LosLeadReportService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listLeadReports() {
-    const leads = await this.prisma.client.lead.findMany({
+    const leads = await this.prisma.read.lead.findMany({
       where: { isInternalTesting: false },
       orderBy: { createdAt: 'desc' },
       take: 2000,
@@ -316,7 +316,7 @@ export class LosLeadReportService {
   }
 
   async getLeadReportDetails(leadUuid: string) {
-    const lead = await this.prisma.client.lead.findUnique({
+    const lead = await this.prisma.read.lead.findUnique({
       where: { uuid: leadUuid },
       include: leadReportInclude,
     });

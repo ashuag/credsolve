@@ -40,6 +40,8 @@ npm run seed
 
 `DATABASE_URL` / `DIRECT_DATABASE_URL` in the container must point at the Compose DB host `**db**` (e.g. `mysql://moneyCash:moneyCash@db:3306/moneyCash`), not `localhost`.
 
+LOS list/detail queries use a MySQL replica when `DATABASE_REPLICA_URL` (or `DATABASE_REPLICA_HOST` + user `moneycash_repl` / db `moneycash`) is set. Writes and the customer journey stay on `DATABASE_URL`.
+
 If `npx prisma …` ever says it cannot find the executable, run `npm install` once in the container (named volume `backend_node_modules` may be empty on first run after dependency changes), then use the `npm run prisma:*` scripts again.
 
 ### “Table `otp_type` does not exist” (or API fails on first query)

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { computeCibilAssessmentSignals, type CibilAssessmentSignals } from './cibil-bureau-rules.parser';
 import { runCibilCreditAssessment, type CibilCreditAssessmentResult } from './cibil-credit-assessment.engine';
@@ -54,8 +55,11 @@ export class CibilCreditAssessmentService {
   }
 
   /** Reads the persisted assessment for a bureau report, if one has been computed. */
-  async getViewForBureauReportId(bureauReportId: bigint): Promise<CibilCreditAssessmentView | null> {
-    const row = await this.prisma.client.cibilCreditAssessment.findUnique({ where: { bureauReportId } });
+  async getViewForBureauReportId(
+    bureauReportId: bigint,
+    db: PrismaClient = this.prisma.client,
+  ): Promise<CibilCreditAssessmentView | null> {
+    const row = await db.cibilCreditAssessment.findUnique({ where: { bureauReportId } });
     if (!row) return null;
 
     return {
