@@ -14,6 +14,7 @@ export * from './loans';
 export * from './customers';
 export * from './invitations';
 export * from './masters';
+export * from './settings';
 export * from './sms-templates';
 export * from './vendor-api-configs';
 export * from './contact';

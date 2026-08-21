@@ -4,6 +4,7 @@ import {
   ACTIVE_INACTIVE_FILTER_OPTIONS,
   DataTable,
   DataTableStatusPill,
+  LOS_LISTING_PAGE_SIZE,
   matchesActiveInactiveFilter,
   type DataTableColumn,
 } from '@/components/ui/data-table';
@@ -292,6 +293,7 @@ export function SettingsPanel() {
           error={fetchError}
           onRetry={() => void loadSettings()}
           emptyMessage="No settings available."
+          pageSize={LOS_LISTING_PAGE_SIZE}
         />
       </div>
 

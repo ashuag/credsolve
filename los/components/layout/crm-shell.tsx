@@ -107,6 +107,7 @@ const navGroups: { section: string; color: string; items: NavItem[] }[] = [
         label: 'Masters',
         icon: 'masters',
         children: [
+          { href: '/masters/settings', label: 'Settings' },
           { href: '/masters/sms-templates', label: 'SMS Templates' },
           { href: '/masters/vendor-apis', label: 'Vendor APIs' },
           { href: '/masters/due-dates', label: 'Due Dates' },
@@ -205,6 +206,7 @@ const BREADCRUMBS: Record<string, string> = {
   '/agents': 'Agent Management',
   '/roles': 'Role Management',
   '/masters': 'Masters',
+  '/masters/settings': 'Settings',
   '/masters/sms-templates': 'SMS Templates',
   '/masters/due-dates': 'Due Dates',
   '/masters/lead-sources': 'Source Management',

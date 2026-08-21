@@ -1,5 +1,15 @@
 export const MASTER_DEFINITIONS = [
   {
+    slug: 'settings',
+    label: 'Settings',
+    eyebrow: 'Application',
+    description: 'Edit runtime setting values and activate or deactivate each key without changing the key itself.',
+    pageTitle: 'Settings',
+    pageSubtitle: 'Edit application setting values and activate or deactivate each key.',
+    searchPlaceholder: 'Search settings...',
+    canCreate: false,
+  },
+  {
     slug: 'lead-statuses',
     label: 'Lead Status',
     eyebrow: 'Statuses',

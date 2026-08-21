@@ -12,6 +12,7 @@ import type { UpdateRepaymentDueDateDto } from '../dto/update-repayment-due-date
 import type { UpdateEligibilityCriterionDto } from '../dto/update-eligibility-criterion.dto';
 import type { UpdateCreditLimitTierDto } from '../dto/update-credit-limit-tier.dto';
 import type { UpdateSmsTemplateDto } from '../dto/update-sms-template.dto';
+import type { UpdateSettingDto } from '../dto/update-setting.dto';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -1005,6 +1006,67 @@ export class LosMasterService {
       bearerToken: maskBearerToken(row.bearerToken),
       message: row.message,
       product: row.product,
+      isActive: row.isActive,
+    };
+  }
+
+  async getSettingsForLos() {
+    const rows = await this.prisma.read.setting.findMany({
+      orderBy: { key: 'asc' },
+    });
+
+    const settings = rows.map((row) => ({
+      id: row.id,
+      key: row.key,
+      value: row.value,
+      description: row.description,
+      isActive: row.isActive,
+    }));
+
+    return { settings };
+  }
+
+  async updateSetting(id: number, dto: UpdateSettingDto) {
+    const hasValue = dto.value !== undefined;
+    const hasDescription = dto.description !== undefined;
+    const hasActive = dto.isActive !== undefined;
+
+    if (!hasValue && !hasDescription && !hasActive) {
+      throw new BadRequestException('Provide value, description, and/or isActive to update.');
+    }
+
+    const existing = await this.prisma.client.setting.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('Setting not found');
+    }
+
+    const data: { value?: string; description?: string | null; isActive?: boolean } = {};
+
+    if (hasValue) {
+      const trimmed = dto.value!.trim();
+      if (!trimmed) {
+        throw new BadRequestException('Value cannot be empty.');
+      }
+      data.value = trimmed;
+    }
+    if (hasDescription) {
+      const trimmed = dto.description!.trim();
+      data.description = trimmed || null;
+    }
+    if (hasActive) {
+      data.isActive = dto.isActive;
+    }
+
+    const row = await this.prisma.client.setting.update({
+      where: { id },
+      data,
+    });
+
+    return {
+      id: row.id,
+      key: row.key,
+      value: row.value,
+      description: row.description,
       isActive: row.isActive,
     };
   }

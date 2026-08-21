@@ -30,6 +30,7 @@ import { UpdateBankMasterDto } from './dto/update-bank-master.dto';
 import { UpdateEligibilityCriterionDto } from './dto/update-eligibility-criterion.dto';
 import { UpdateCreditLimitTierDto } from './dto/update-credit-limit-tier.dto';
 import { UpdateSmsTemplateDto } from './dto/update-sms-template.dto';
+import { UpdateSettingDto } from './dto/update-setting.dto';
 import { CreateVendorApiConfigDto } from './dto/create-vendor-api-config.dto';
 import { UpdateVendorApiConfigDto } from './dto/update-vendor-api-config.dto';
 import { LosMasterService } from './services/los-master.service';
@@ -192,6 +193,18 @@ export class LosMastersController {
   @ApiOperation({ summary: 'Update a source UTM record' })
   updateSourceUtm(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateSourceUtmDto) {
     return this.losMaster.updateSourceUtm(id, body);
+  }
+
+  @Get('settings')
+  @ApiOperation({ summary: 'List application settings for LOS' })
+  settingsList() {
+    return this.losMaster.getSettingsForLos();
+  }
+
+  @Patch('settings/:id')
+  @ApiOperation({ summary: 'Update setting value, description, and/or active flag' })
+  settingsPatch(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateSettingDto) {
+    return this.losMaster.updateSetting(id, body);
   }
 
   @Get('sms-templates')

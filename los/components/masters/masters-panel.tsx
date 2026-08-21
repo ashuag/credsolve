@@ -10,13 +10,7 @@ export function MastersPanel() {
       {MASTER_DEFINITIONS.map((master) => (
         <Link
           key={master.slug}
-          href={
-            master.slug === 'sms-templates'
-              ? '/masters/sms-templates'
-              : master.slug === 'vendor-apis'
-                ? '/masters/vendor-apis'
-                : `/masters/${master.slug}`
-          }
+          href={`/masters/${master.slug}`}
           className={cx(
             'group rounded-[18px] border border-[rgba(23,44,113,0.1)] p-5 no-underline transition-transform',
             'hover:-translate-y-[1px] hover:border-[rgba(20,150,243,0.26)]',
@@ -52,7 +46,7 @@ export function MastersPanel() {
               </span>
             ) : (
               <span className="rounded-full border border-[rgba(23,44,113,0.08)] bg-[rgba(255,255,255,0.84)] px-3 py-1 text-[0.77rem] font-bold text-brand-navy">
-                Edit Label
+                {master.slug === 'settings' ? 'Edit Value' : 'Edit Label'}
               </span>
             )}
           </div>
