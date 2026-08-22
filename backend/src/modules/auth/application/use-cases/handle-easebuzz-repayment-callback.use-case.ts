@@ -18,12 +18,14 @@ import { LOAN_STATUS } from '../../../../common/constants/loan.constants';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import {
   computeAmountDueNowInr,
+  computeTenureDays,
   decimalToNumber,
 } from '../../../../common/loan/loan-calculation.util';
 import { canDeactivateConvertedLeadForReapply } from '../../../../common/loan/customer-open-loan.util';
 import { RedisService } from '../../../../common/redis/redis.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
+import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
 
 const SETTLE_LOCK_TTL_SEC = 120;
 
@@ -67,6 +69,7 @@ export class HandleEasebuzzRepaymentCallbackUseCase {
     private readonly easebuzzWire: EasebuzzWireService,
     private readonly redis: RedisService,
     private readonly config: ConfigService,
+    private readonly settings: SettingsRepository,
   ) {}
 
   /**
@@ -151,6 +154,7 @@ export class HandleEasebuzzRepaymentCallbackUseCase {
         principalAmount: true,
         interestRate: true,
         disbursedAt: true,
+        loanMaturityDate: true,
         closedAt: true,
         loanStatus: { select: { name: true } },
         application: {
@@ -248,9 +252,13 @@ export class HandleEasebuzzRepaymentCallbackUseCase {
 
     const principal = decimalToNumber(loan.principalAmount);
     const dailyRate = decimalToNumber(loan.interestRate);
+    const coolingPeriodDays = await this.settings.loadRepayCoolingPeriodDays();
     const due =
       principal != null && dailyRate != null
-        ? computeAmountDueNowInr(principal, dailyRate, loan.disbursedAt)
+        ? computeAmountDueNowInr(principal, dailyRate, loan.disbursedAt, {
+            coolingPeriodDays,
+            tenureDays: computeTenureDays(loan.disbursedAt, loan.loanMaturityDate),
+          })
         : null;
     const amountInr = intent.amountInr;
 

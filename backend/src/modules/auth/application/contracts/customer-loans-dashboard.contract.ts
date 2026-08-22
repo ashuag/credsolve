@@ -24,10 +24,12 @@ export type CustomerLoanCard = {
   amountDueAtMaturity: string | null;
   /** Inclusive days from disbursement through today (disbursement day = day 1). */
   daysOutstanding: number | null;
-  /** Interest accrued from disbursement through today (min 1 day on disbursement day). */
+  /** Interest charged if paid today (actual days inside cooling; full tenure after). */
   interestTillToday: string | null;
-  /** Principal + interest till today (pay-now amount). Includes bounce fee when past due. */
+  /** Principal + interest due if paid today (actual days inside cooling; full tenure after). Includes bounce fee when past due. */
   amountDueToday: string | null;
+  /** True when pay-now interest is the contracted full tenure (cooling period has passed). */
+  usedFullTenureInterest: boolean;
   /** Bounce fee included in amountDueToday when repayment is past maturity (else `0.00` / null). */
   bounceFeeInr: string | null;
   processingFeeAmount: string | null;

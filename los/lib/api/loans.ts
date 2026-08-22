@@ -80,10 +80,12 @@ export type LosLoanDetails = LosLoan & {
   gstPercentage: string | null;
   /** Inclusive days from disbursement through today (or closedAt if closed). */
   daysOutstanding: number | null;
-  /** Interest accrued through today (principal × daily rate × days). */
+  /** Interest charged if paid today (actual days inside cooling; full tenure after). */
   interestTillToday: string | null;
-  /** Principal + interest till today. */
+  /** Principal + interest due today. */
   amountDueToday: string | null;
+  /** True when pay-now interest is the contracted full tenure (cooling period has passed). */
+  usedFullTenureInterest: boolean;
   bounceFeeInr: string | null;
   isDisbursedApplication: boolean;
   disbursementTransfer: LosLoanDisbursementTransfer | null;

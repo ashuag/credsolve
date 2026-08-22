@@ -699,7 +699,9 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
         subtitle={
           row.closedAt
             ? 'Interest charged for the days the loan was open'
-            : 'Accrued interest from disbursement through today'
+            : row.usedFullTenureInterest
+              ? 'Cooling period has passed — interest is the full contracted tenure'
+              : 'Accrued interest from disbursement through today (within cooling period)'
         }
       >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -724,7 +726,9 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
             <p className="m-0 mt-1 text-[0.72rem] font-semibold text-brand-muted">
               {Number(row.bounceFeeInr) > 0
                 ? `Principal + interest + bounce (${formatINRExact(row.bounceRatePerDayInr)}/day × ${row.overdueDays} = ${formatINRExact(row.bounceFeeInr)})`
-                : 'Principal + interest till today'}
+                : row.usedFullTenureInterest
+                  ? 'Principal + full tenure interest'
+                  : 'Principal + interest till today'}
             </p>
           </div>
           <div className="rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[#fbfcff] px-4 py-3.5">

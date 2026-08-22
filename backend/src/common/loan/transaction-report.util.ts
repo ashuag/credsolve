@@ -1,8 +1,8 @@
 import { overdueDaysFromMaturity } from './bounce-charge.util';
-import { computeAccruedInterestInr } from './loan-calculation.util';
+import { computeAmountDueNowInr, computeTenureDays } from './loan-calculation.util';
 
 export type TransactionReportMetrics = {
-  /** Accrued interest through repayment; 0 until a repayment is recorded. */
+  /** Interest charged through repayment; 0 until a repayment is recorded. */
   interestReceived: number;
   /** IST calendar days past due as of repayment (or `asOf` if unpaid). */
   daysExceeded: number;
@@ -19,6 +19,7 @@ export function resolveTransactionReportMetrics(input: {
   interestRatePerDay: number | null;
   repaymentAt: Date | null;
   asOf?: Date;
+  coolingPeriodDays: number;
 }): TransactionReportMetrics {
   const delayAsOf = input.repaymentAt ?? input.asOf ?? new Date();
   const daysExceeded = overdueDaysFromMaturity(input.dueDate, delayAsOf);
@@ -31,11 +32,15 @@ export function resolveTransactionReportMetrics(input: {
     return { interestReceived: 0, daysExceeded };
   }
 
-  const { interestAmount } = computeAccruedInterestInr(
+  const { interestAmount } = computeAmountDueNowInr(
     input.principal,
     input.interestRatePerDay,
     input.disbursedAt,
-    input.repaymentAt,
+    {
+      asOf: input.repaymentAt,
+      coolingPeriodDays: input.coolingPeriodDays,
+      tenureDays: computeTenureDays(input.disbursedAt, input.dueDate),
+    },
   );
   return { interestReceived: interestAmount, daysExceeded };
 }

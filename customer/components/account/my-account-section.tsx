@@ -67,6 +67,66 @@ function statusBadgeLabel(status: string): string {
   return status.replace(/_/g, ' ');
 }
 
+function parseAmount(value: string | null | undefined): number | null {
+  if (value == null || value === '') return null;
+  const n = Number.parseFloat(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function startOfLocalDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function parseIsoDateOnly(iso: string | null | undefined): Date | null {
+  if (!iso?.trim()) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso.trim());
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : startOfLocalDay(d);
+}
+
+function calendarDaysFromToday(iso: string | null | undefined): number | null {
+  const target = parseIsoDateOnly(iso);
+  if (!target) return null;
+  return Math.round((target.getTime() - startOfLocalDay(new Date()).getTime()) / 86_400_000);
+}
+
+function formatFriendlyDate(iso: string | null | undefined): string {
+  const d = parseIsoDateOnly(iso);
+  if (!d) return formatIsoDateDdMmYyyy(iso);
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function dueTiming(
+  days: number | null,
+  overdueStatus: boolean,
+  maturityDate: string | null,
+): { label: string; tone: 'ok' | 'soon' | 'today' | 'overdue' } {
+  if (overdueStatus || (days != null && days < 0)) {
+    const past = days != null && days < 0 ? Math.abs(days) : null;
+    return {
+      label: past != null ? `${past} day${past === 1 ? '' : 's'} overdue` : 'Overdue',
+      tone: 'overdue',
+    };
+  }
+  if (days === 0) return { label: 'Due today', tone: 'today' };
+  if (days === 1) return { label: 'Due tomorrow', tone: 'soon' };
+  if (days != null && days > 1) {
+    return { label: `Due in ${days} days`, tone: days <= 3 ? 'soon' : 'ok' };
+  }
+  return {
+    label: maturityDate ? formatFriendlyDate(maturityDate) : 'Due date pending',
+    tone: 'ok',
+  };
+}
+
 function ResumeArrow() {
   return (
     <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
@@ -144,18 +204,38 @@ function JourneyTracker({
   );
 }
 
-function DetailRow({ label, value, emphasize }: { label: string; value: ReactNode; emphasize?: boolean }) {
+function LoanLifeBar({
+  disbursedAt,
+  maturityDate,
+  overdue,
+}: {
+  disbursedAt: string | null;
+  maturityDate: string | null;
+  overdue: boolean;
+}) {
+  const start = parseIsoDateOnly(disbursedAt);
+  const end = parseIsoDateOnly(maturityDate);
+  if (!start || !end) return null;
+  const span = end.getTime() - start.getTime();
+  if (span <= 0) return null;
+  const elapsed = startOfLocalDay(new Date()).getTime() - start.getTime();
+  const pct = overdue ? 100 : Math.min(100, Math.max(6, Math.round((elapsed / span) * 100)));
+
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-[rgba(18,36,79,0.06)] py-3 last:border-b-0">
-      <dt className="text-[0.78rem] font-semibold text-slate-500">{label}</dt>
-      <dd
-        className={cn(
-          'text-right text-[0.92rem] font-extrabold text-brand-navy',
-          emphasize && 'text-[1.05rem] text-[#1c347d]',
-        )}
-      >
-        {value}
-      </dd>
+    <div className="space-y-2">
+      <div className="relative h-1.5 overflow-hidden rounded-full bg-[rgba(18,36,79,0.08)]">
+        <div
+          className={cn(
+            'absolute inset-y-0 left-0 rounded-full transition-[width] duration-500',
+            overdue ? 'bg-rose-500' : 'bg-gradient-to-r from-[#1496f3] to-[#38bdf8]',
+          )}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className="flex items-center justify-between text-[0.68rem] font-semibold text-slate-500">
+        <span>Disbursed {formatFriendlyDate(disbursedAt)}</span>
+        <span>{overdue ? 'Past due' : `Due ${formatFriendlyDate(maturityDate)}`}</span>
+      </div>
     </div>
   );
 }
@@ -242,10 +322,17 @@ function ActiveLoanCard({
   const { refresh } = useCustomerSession();
   const amountDueToday = loan.amountDueToday ?? loan.totalRepayment;
   const amountAtMaturity = loan.amountDueAtMaturity ?? loan.totalRepayment;
-  const daysLabel =
-    loan.daysOutstanding == null
-      ? null
-      : `${loan.daysOutstanding} day${loan.daysOutstanding === 1 ? '' : 's'} of interest accrued`;
+  const todayN = parseAmount(amountDueToday);
+  const maturityN = parseAmount(amountAtMaturity);
+  const bounceN = parseAmount(loan.bounceFeeInr);
+  const showBounce = bounceN != null && bounceN > 0;
+  const savings =
+    todayN != null && maturityN != null ? Math.round((maturityN - todayN) * 100) / 100 : null;
+  const showSavings = loan.usedFullTenureInterest !== true && savings != null && savings > 0.009;
+  const daysUntilDue = calendarDaysFromToday(loan.maturityDate);
+  const isOverdue = loan.status.toUpperCase() === 'OVERDUE' || (daysUntilDue != null && daysUntilDue < 0);
+  const timing = dueTiming(daysUntilDue, isOverdue, loan.maturityDate);
+  const daysUsed = loan.daysOutstanding;
 
   const onPayNow = async () => {
     if (paying) return;
@@ -271,170 +358,193 @@ function ActiveLoanCard({
     }
   };
 
+  const timingChipClass =
+    timing.tone === 'overdue'
+      ? 'bg-rose-100 text-rose-800 ring-rose-200'
+      : timing.tone === 'today'
+        ? 'bg-amber-100 text-amber-900 ring-amber-200'
+        : timing.tone === 'soon'
+          ? 'bg-[#fff4d6] text-[#8a5a00] ring-[#ffc519]/40'
+          : 'bg-[#eef6ff] text-brand-navy ring-[rgba(20,150,243,0.18)]';
+
   return (
-    <div className="relative overflow-hidden rounded-[28px] border border-[rgba(18,36,79,0.1)] bg-white shadow-[0_20px_50px_rgba(23,44,113,0.1)]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[rgba(18,36,79,0.06)] px-6 py-4">
-        <div>
-          <p className="text-[0.62rem] font-black uppercase tracking-[0.16em] text-slate-400">Loan number</p>
-          <p className="mt-0.5 font-mono text-[0.95rem] font-extrabold tracking-wide text-brand-navy">
+    <article
+      className={cn(
+        'overflow-hidden rounded-[24px] border bg-white shadow-[0_16px_40px_rgba(23,44,113,0.08)]',
+        isOverdue ? 'border-rose-200' : 'border-[rgba(18,36,79,0.1)]',
+      )}
+    >
+      <header
+        className={cn(
+          'flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3.5 sm:px-6',
+          isOverdue ? 'border-rose-100 bg-rose-50/70' : 'border-[rgba(18,36,79,0.06)] bg-[#f8fafd]',
+        )}
+      >
+        <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+          <span
+            className={cn(
+              'inline-flex items-center rounded-full border px-2.5 py-0.5 text-[0.62rem] font-extrabold uppercase tracking-wider',
+              statusBadgeClass(loan.status),
+            )}
+          >
+            {statusBadgeLabel(loan.status)}
+          </span>
+          <p className="truncate font-mono text-[0.82rem] font-bold tracking-wide text-brand-navy">
             {loan.loanNumber ?? loan.applicationUuid}
           </p>
         </div>
         <span
           className={cn(
-            'inline-flex items-center rounded-full border px-3 py-1 text-[0.65rem] font-extrabold uppercase tracking-wider',
-            statusBadgeClass(loan.status),
+            'inline-flex items-center rounded-full px-2.5 py-1 text-[0.68rem] font-extrabold ring-1',
+            timingChipClass,
           )}
         >
-          {statusBadgeLabel(loan.status)}
+          {timing.label}
         </span>
-      </div>
+      </header>
 
-      <div className="grid gap-0 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#12244f] via-[#1c347d] to-[#0a1628] p-6 text-white lg:min-h-full">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(255,197,25,0.2),transparent_70%)]"
-          />
-          <p className="relative text-[0.65rem] font-black uppercase tracking-[0.14em] text-slate-300">
-            Amount to be paid today
-          </p>
-          <p className="relative mt-2 text-[clamp(2rem,4vw,2.6rem)] font-black leading-none tracking-tight text-[#ffc519]">
-            {amountDueToday ? formatInr(amountDueToday) : '—'}
-          </p>
-          <p className="relative mt-3 max-w-sm text-[0.85rem] leading-relaxed text-slate-300">
-            Principal plus interest accrued till today.
-            {daysLabel ? (
-              <>
-                <br />
-                <span className="text-slate-400">{daysLabel}</span>
-              </>
-            ) : null}
-          </p>
-
-          <dl className="relative mt-6 grid grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-white/10 px-3.5 py-3 ring-1 ring-white/10">
-              <dt className="text-[0.58rem] font-black uppercase tracking-wider text-slate-400">
-                Interest till today
-              </dt>
-              <dd className="mt-1 text-[1.05rem] font-extrabold text-white">
-                {loan.interestTillToday != null ? formatInr(loan.interestTillToday) : '—'}
-              </dd>
-            </div>
-            <div className="rounded-2xl bg-white/10 px-3.5 py-3 ring-1 ring-white/10">
-              <dt className="text-[0.58rem] font-black uppercase tracking-wider text-slate-400">
-                Principal
-              </dt>
-              <dd className="mt-1 text-[1.05rem] font-extrabold text-white">
-                {loan.loanAmount ? formatInr(loan.loanAmount) : '—'}
-              </dd>
-            </div>
-          </dl>
-
+      <div className="px-5 pb-5 pt-5 sm:px-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.14em] text-slate-400">
+              Pay today
+            </p>
+            <p className="mt-1 text-[clamp(2rem,5vw,2.55rem)] font-black leading-none tracking-tight text-brand-navy">
+              {amountDueToday ? formatInr(amountDueToday) : '—'}
+            </p>
+            <p className="mt-2 text-[0.8rem] font-medium text-slate-500">
+              Principal + interest
+              {showBounce ? ' + bounce fee' : ''}
+            </p>
+          </div>
           <button
             type="button"
             onClick={() => void onPayNow()}
             disabled={paying}
-            className="relative mt-6 flex w-full items-center justify-center rounded-2xl bg-[#ffc519] px-5 py-3.5 text-[1rem] font-extrabold text-[#12244f] shadow-[0_12px_28px_rgba(255,197,25,0.28)] transition hover:brightness-105 disabled:cursor-wait disabled:opacity-70"
+            className="inline-flex w-full min-w-[11.5rem] items-center justify-center rounded-2xl bg-[#ffc519] px-5 py-3.5 text-[1rem] font-extrabold text-[#12244f] shadow-[0_10px_24px_rgba(255,197,25,0.32)] transition hover:brightness-105 disabled:cursor-wait disabled:opacity-70 sm:w-auto"
           >
-            {paying ? 'Preparing payment…' : 'Pay Now'}
+            {paying ? 'Preparing payment…' : 'Pay now'}
           </button>
-          {payError ? (
-            <p className="relative mt-3 text-[0.8rem] font-semibold text-rose-200" role="alert">
-              {payError}
-            </p>
-          ) : null}
         </div>
 
-        <div className="flex flex-col gap-5 p-6">
-          <div>
-            <h3 className="text-[0.72rem] font-black uppercase tracking-[0.14em] text-slate-400">
-              Scheduled at maturity
-            </h3>
-            <dl className="mt-1">
-              <DetailRow
-                label="Principal amount"
-                value={loan.loanAmount ? formatInr(loan.loanAmount) : '—'}
-              />
-              <DetailRow
-                label="Interest at due date"
-                value={loan.interestAmount ? formatInr(loan.interestAmount) : '—'}
-              />
-              <DetailRow
-                label="Amount to be paid on maturity"
-                value={amountAtMaturity ? formatInr(amountAtMaturity) : '—'}
-                emphasize
-              />
-              <DetailRow
-                label="Repayment due date"
-                value={formatIsoDateDdMmYyyy(loan.maturityDate)}
-              />
-            </dl>
-          </div>
+        {payError ? (
+          <p className="mt-3 text-[0.8rem] font-semibold text-rose-700" role="alert">
+            {payError}
+          </p>
+        ) : null}
 
-          <div className="rounded-2xl bg-[#f4f8ff] p-4 ring-1 ring-[rgba(20,150,243,0.12)]">
-            <h3 className="text-[0.72rem] font-black uppercase tracking-[0.14em] text-brand-blue">
-              Accrued till today
-            </h3>
-            <dl className="mt-1">
-              <DetailRow
-                label="Interest till today"
-                value={loan.interestTillToday != null ? formatInr(loan.interestTillToday) : '—'}
-              />
-              <DetailRow
-                label="Amount to be paid today"
-                value={amountDueToday ? formatInr(amountDueToday) : '—'}
-                emphasize
-              />
-            </dl>
+        <dl className="mt-5 grid grid-cols-3 overflow-hidden rounded-2xl bg-[#f4f7fb] ring-1 ring-[rgba(18,36,79,0.06)]">
+          <div className="px-3 py-3 sm:px-4">
+            <dt className="text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-slate-400">
+              Principal
+            </dt>
+            <dd className="mt-1 text-[0.92rem] font-extrabold text-brand-navy sm:text-[1.02rem]">
+              {loan.loanAmount ? formatInr(loan.loanAmount) : '—'}
+            </dd>
           </div>
-
-          {(loan.bankDisplay || loan.disbursedAt) && (
-            <p className="text-[0.78rem] leading-relaxed text-brand-muted">
-              {loan.bankDisplay ? (
-                <>
-                  Credited to <span className="font-semibold text-brand-navy">{loan.bankDisplay}</span>
-                </>
-              ) : null}
-              {loan.disbursedAt ? (
-                <>
-                  {loan.bankDisplay ? ' · ' : null}
-                  Disbursed{' '}
-                  {new Date(loan.disbursedAt).toLocaleString('en-IN', {
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
-                  })}
-                </>
-              ) : null}
+          <div className="border-x border-[rgba(18,36,79,0.06)] px-3 py-3 sm:px-4">
+            <dt className="text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-slate-400">
+              Interest
+            </dt>
+            <dd className="mt-1 text-[0.92rem] font-extrabold text-brand-navy sm:text-[1.02rem]">
+              {loan.interestTillToday != null ? formatInr(loan.interestTillToday) : '—'}
+            </dd>
+            <p className="mt-0.5 text-[0.62rem] font-semibold text-slate-400">
+              {loan.usedFullTenureInterest
+                ? 'Full tenure'
+                : daysUsed != null
+                  ? `${daysUsed} day${daysUsed === 1 ? '' : 's'} used`
+                  : 'Till today'}
             </p>
-          )}
+          </div>
+          <div className="px-3 py-3 sm:px-4">
+            <dt className="text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-slate-400">
+              Due date
+            </dt>
+            <dd className="mt-1 text-[0.92rem] font-extrabold text-brand-navy sm:text-[1.02rem]">
+              {formatFriendlyDate(loan.maturityDate)}
+            </dd>
+            <p className="mt-0.5 text-[0.62rem] font-semibold text-slate-400">{timing.label}</p>
+          </div>
+        </dl>
+
+        {showBounce ? (
+          <p className="mt-3 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[0.78rem] font-semibold text-rose-800 ring-1 ring-rose-100">
+            Includes a bounce fee of {formatInr(loan.bounceFeeInr)} for days past the due date.
+          </p>
+        ) : null}
+
+        {showSavings ? (
+          <p className="mt-3 rounded-xl bg-emerald-50 px-3.5 py-2.5 text-[0.78rem] font-semibold text-emerald-800 ring-1 ring-emerald-100">
+            Paying today saves {formatInr(savings.toFixed(2))} versus waiting until{' '}
+            {formatFriendlyDate(loan.maturityDate)}.
+          </p>
+        ) : loan.usedFullTenureInterest ? (
+          <p className="mt-3 rounded-xl bg-[#f4f8ff] px-3.5 py-2.5 text-[0.78rem] font-medium leading-relaxed text-slate-600 ring-1 ring-[rgba(20,150,243,0.1)]">
+            The early-repay window has closed, so interest is charged for the
+            {loan.tenureDays != null ? ` full ${loan.tenureDays}-day` : ' full'} tenure.
+            {daysUsed != null
+              ? ` ${daysUsed} day${daysUsed === 1 ? '' : 's'} since disbursement.`
+              : null}
+          </p>
+        ) : daysUsed != null ? (
+          <p className="mt-3 rounded-xl bg-[#f4f8ff] px-3.5 py-2.5 text-[0.78rem] font-medium leading-relaxed text-slate-600 ring-1 ring-[rgba(20,150,243,0.1)]">
+            Still in the early-repay window — interest is charged only for the {daysUsed} day
+            {daysUsed === 1 ? '' : 's'} used so far.
+          </p>
+        ) : null}
+
+        <div className="mt-4">
+          <LoanLifeBar
+            disbursedAt={loan.disbursedAt}
+            maturityDate={loan.maturityDate}
+            overdue={isOverdue}
+          />
         </div>
+
+        {(loan.bankDisplay || loan.disbursedAt) && (
+          <p className="mt-4 text-[0.75rem] leading-relaxed text-slate-500">
+            {loan.bankDisplay ? (
+              <>
+                Credited to <span className="font-semibold text-brand-navy">{loan.bankDisplay}</span>
+              </>
+            ) : null}
+            {loan.disbursedAt ? (
+              <>
+                {loan.bankDisplay ? ' · ' : null}
+                Disbursed {formatDateTime(loan.disbursedAt)}
+              </>
+            ) : null}
+          </p>
+        )}
       </div>
-    </div>
+    </article>
   );
 }
 
 function InProgressLoanCard({ loan }: { loan: CustomerLoanCard }) {
   return (
-    <div className="rounded-[20px] border border-[rgba(20,150,243,0.18)] bg-gradient-to-br from-white to-[#f4f9ff] p-5 shadow-[0_10px_28px_rgba(23,44,113,0.06)]">
+    <div className="rounded-[20px] border border-[rgba(20,150,243,0.16)] bg-white p-5 shadow-[0_8px_22px_rgba(23,44,113,0.05)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[0.65rem] font-black uppercase tracking-wider text-slate-400">In review</p>
-          <p className="mt-1 text-lg font-extrabold text-brand-navy">
-            {loan.loanAmount ? formatInr(loan.loanAmount) : 'Application pending'}
+          <p className="text-[0.62rem] font-black uppercase tracking-[0.14em] text-slate-400">
+            Application
+          </p>
+          <p className="mt-1 text-xl font-extrabold tracking-tight text-brand-navy">
+            {loan.loanAmount ? formatInr(loan.loanAmount) : 'Pending review'}
           </p>
         </div>
         <span
           className={cn(
-            'inline-flex items-center rounded-full border px-3 py-1 text-[0.65rem] font-extrabold uppercase tracking-wider',
+            'inline-flex items-center rounded-full border px-2.5 py-0.5 text-[0.62rem] font-extrabold uppercase tracking-wider',
             statusBadgeClass(loan.status),
           )}
         >
           {statusBadgeLabel(loan.status)}
         </span>
       </div>
-      <p className="mt-3 text-sm text-brand-muted">
-        We will notify you once your application moves to the next stage.
+      <p className="mt-3 text-[0.82rem] leading-relaxed text-slate-500">
+        We will notify you once this application moves to the next stage.
       </p>
     </div>
   );
@@ -445,70 +555,53 @@ function LoanSummaryCard({ loan }: { loan: CustomerLoanCard }) {
   const repaymentDays = isPaidFully
     ? (loan.daysOutstanding ?? loan.tenureDays)
     : loan.tenureDays;
+  const accent =
+    isPaidFully
+      ? 'bg-emerald-400'
+      : loan.status.toUpperCase() === 'WRITTEN_OFF'
+        ? 'bg-slate-400'
+        : 'bg-brand-blue';
 
   return (
-    <div className="rounded-[20px] border border-[rgba(18,36,79,0.1)] bg-white p-5 shadow-sm transition-all hover:shadow-[0_8px_24px_rgba(23,44,113,0.06)]">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+    <div className="relative overflow-hidden rounded-[20px] border border-[rgba(18,36,79,0.08)] bg-white p-5 shadow-[0_6px_18px_rgba(23,44,113,0.04)]">
+      <span aria-hidden className={cn('absolute inset-y-0 left-0 w-1', accent)} />
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 pl-2">
         <span
           className={cn(
-            'inline-flex items-center rounded-full border px-3 py-1 text-[0.68rem] font-extrabold uppercase tracking-wider',
+            'inline-flex items-center rounded-full border px-2.5 py-0.5 text-[0.62rem] font-extrabold uppercase tracking-wider',
             statusBadgeClass(loan.status),
           )}
         >
           {statusBadgeLabel(loan.status)}
         </span>
-        <span className="font-mono text-[0.72rem] font-bold text-brand-navy">
+        <span className="font-mono text-[0.7rem] font-bold text-slate-500">
           {loan.loanNumber ?? `${loan.applicationUuid.slice(0, 13)}…`}
         </span>
       </div>
 
-      <dl className="grid gap-3 text-sm sm:grid-cols-2">
+      <div className="flex flex-wrap items-end justify-between gap-3 pl-2">
         <div>
-          <dt className="text-[0.7rem] font-bold uppercase tracking-wider text-slate-400">Principal</dt>
-          <dd className="text-base font-extrabold text-brand-navy">{formatInr(loan.loanAmount)}</dd>
+          <p className="text-[0.62rem] font-bold uppercase tracking-wider text-slate-400">Principal</p>
+          <p className="text-lg font-extrabold text-brand-navy">{formatInr(loan.loanAmount)}</p>
         </div>
-        <div>
-          <dt className="text-[0.7rem] font-bold uppercase tracking-wider text-slate-400">Total repayment</dt>
-          <dd className="text-base font-extrabold text-brand-navy">{formatInr(loan.totalRepayment)}</dd>
+        <div className="text-right">
+          <p className="text-[0.62rem] font-bold uppercase tracking-wider text-slate-400">
+            {isPaidFully ? 'Repaid' : 'Repayment'}
+          </p>
+          <p className="text-lg font-extrabold text-brand-navy">{formatInr(loan.totalRepayment)}</p>
         </div>
-        <div>
-          <dt className="text-[0.7rem] font-bold uppercase tracking-wider text-slate-400">
-            {isPaidFully ? 'Repayment days' : 'Tenure'}
-          </dt>
-          <dd className="font-semibold text-brand-navy">
-            {repaymentDays != null ? `${repaymentDays} days` : '—'}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-[0.7rem] font-bold uppercase tracking-wider text-slate-400">
-            {isPaidFully ? 'Repaid on' : 'Maturity'}
-          </dt>
-          <dd className="font-semibold text-brand-navy">
-            {isPaidFully
-              ? loan.repaidAt
-                ? new Date(loan.repaidAt).toLocaleString('en-IN', {
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
-                  })
-                : '—'
-              : formatIsoDateDdMmYyyy(loan.maturityDate)}
-          </dd>
-        </div>
-        {loan.disbursedAt ? (
-          <div className="flex justify-between border-t border-slate-50 pt-2 sm:col-span-2">
-            <dt className="text-[0.7rem] font-bold uppercase tracking-wider text-slate-400">Disbursed</dt>
-            <dd className="text-xs font-semibold text-brand-navy">
-              {new Date(loan.disbursedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
-            </dd>
-          </div>
-        ) : null}
-        {loan.bankDisplay ? (
-          <div className="flex justify-between sm:col-span-2">
-            <dt className="text-[0.7rem] font-bold uppercase tracking-wider text-slate-400">Bank</dt>
-            <dd className="text-xs font-semibold text-brand-navy">{loan.bankDisplay}</dd>
-          </div>
-        ) : null}
-      </dl>
+      </div>
+
+      <p className="mt-3 pl-2 text-[0.75rem] leading-relaxed text-slate-500">
+        {repaymentDays != null ? `${repaymentDays} days` : '—'}
+        {' · '}
+        {isPaidFully
+          ? loan.repaidAt
+            ? `Closed ${formatDateTime(loan.repaidAt)}`
+            : 'Closed'
+          : `Due ${formatFriendlyDate(loan.maturityDate)}`}
+        {loan.bankDisplay ? ` · ${loan.bankDisplay}` : null}
+      </p>
     </div>
   );
 }
@@ -568,49 +661,34 @@ function AccountHero({
   greetingName,
   mobileNumber,
   journeyPct,
-  hasOpenLoan,
-  amountDueToday,
+  showJourneyPct,
 }: {
   greetingName: string | null;
   mobileNumber: string | null;
   journeyPct: number;
-  hasOpenLoan: boolean;
-  amountDueToday: string | null;
+  showJourneyPct: boolean;
 }) {
   const initial = greetingName?.charAt(0)?.toUpperCase() ?? 'M';
   return (
-    <div className="relative overflow-hidden rounded-[28px] border border-[rgba(18,36,79,0.08)] bg-[linear-gradient(135deg,#12244f_0%,#1c347d_55%,#0f1f45_100%)] p-6 text-white shadow-[0_24px_60px_rgba(18,36,79,0.28)] sm:p-7">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(255,197,25,0.22),transparent_68%)]"
-      />
-      <div className="relative flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-xl font-black text-[#12244f] shadow-[0_10px_24px_rgba(246,180,0,0.35)]">
-            {initial}
-          </span>
-          <div>
-            <p className="text-[0.65rem] font-black uppercase tracking-[0.2em] text-slate-300">My account</p>
-            <h1 className="text-[clamp(1.4rem,3.5vw,2rem)] font-extrabold tracking-tight">
-              {greetingName ? `Welcome, ${greetingName}` : 'Welcome back'}
-            </h1>
-            {mobileNumber ? (
-              <p className="mt-1 text-sm text-slate-300">+91 {mobileNumber}</p>
-            ) : null}
-          </div>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-lg font-black text-[#12244f] shadow-[0_8px_18px_rgba(246,180,0,0.28)]">
+          {initial}
+        </span>
+        <div>
+          <h1 className="text-[clamp(1.25rem,3vw,1.65rem)] font-extrabold tracking-tight text-brand-navy">
+            {greetingName ? `Hi, ${greetingName}` : 'Welcome back'}
+          </h1>
+          {mobileNumber ? (
+            <p className="text-[0.82rem] font-medium text-slate-500">+91 {mobileNumber}</p>
+          ) : null}
         </div>
-        {hasOpenLoan && amountDueToday ? (
-          <div className="rounded-2xl bg-white/10 px-4 py-3 text-right ring-1 ring-white/15 backdrop-blur">
-            <p className="text-[0.6rem] font-black uppercase tracking-wider text-slate-300">Due today</p>
-            <p className="text-xl font-black text-[#ffc519] sm:text-2xl">{formatInr(amountDueToday)}</p>
-          </div>
-        ) : (
-          <div className="rounded-2xl bg-white/10 px-4 py-3 text-center ring-1 ring-white/15 backdrop-blur">
-            <p className="text-[0.6rem] font-black uppercase tracking-wider text-slate-300">Journey</p>
-            <p className="text-2xl font-black text-[#ffc519]">{journeyPct}%</p>
-          </div>
-        )}
       </div>
+      {showJourneyPct ? (
+        <span className="rounded-full bg-[#eef6ff] px-3 py-1.5 text-[0.72rem] font-extrabold text-brand-blue ring-1 ring-[rgba(20,150,243,0.16)]">
+          Journey {journeyPct}%
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -631,20 +709,42 @@ function TabButton({
       type="button"
       onClick={onClick}
       className={cn(
-        'relative flex items-center gap-2 pb-4 px-1 font-extrabold text-[0.95rem] transition-colors outline-none',
-        active ? 'text-brand-blue' : 'text-slate-400 hover:text-brand-navy',
+        'flex flex-1 items-center justify-center gap-2 rounded-[14px] px-3 py-2.5 text-[0.88rem] font-extrabold outline-none transition-colors',
+        active ? 'bg-white text-brand-navy shadow-[0_4px_14px_rgba(23,44,113,0.08)]' : 'text-slate-500 hover:text-brand-navy',
       )}
     >
       {label}
       {badge != null && badge > 0 ? (
-        <span className="rounded-full bg-[rgba(20,150,243,0.12)] px-2 py-0.5 text-[0.65rem] font-black text-brand-blue">
+        <span
+          className={cn(
+            'rounded-full px-1.5 py-0.5 text-[0.62rem] font-black',
+            active ? 'bg-[rgba(20,150,243,0.12)] text-brand-blue' : 'bg-white/70 text-slate-500',
+          )}
+        >
           {badge}
         </span>
       ) : null}
-      {active ? (
-        <span className="absolute bottom-0 left-0 right-0 h-[3px] rounded-t-full bg-brand-blue" />
-      ) : null}
     </button>
+  );
+}
+
+function FlashBanner({
+  tone,
+  children,
+}: {
+  tone: 'success' | 'failed' | 'error';
+  children: ReactNode;
+}) {
+  const styles =
+    tone === 'success'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+      : tone === 'failed'
+        ? 'border-rose-200 bg-rose-50 text-rose-900'
+        : 'border-amber-200 bg-amber-50 text-amber-950';
+  return (
+    <div className={cn('rounded-2xl border px-4 py-3.5 text-[0.9rem] font-bold', styles)} role="status">
+      {children}
+    </div>
   );
 }
 
@@ -781,40 +881,31 @@ export function MyAccountSection({
   const journeyPct = journeySteps.percent;
   const overviewBadge =
     (showIncompleteJourney ? 1 : 0) + dash.activeLoans.length + dash.inProgress.length;
-  const primaryDueToday =
-    dash.activeLoans[0]?.amountDueToday ?? dash.activeLoans[0]?.totalRepayment ?? null;
 
   return (
-    <div className="mx-auto w-full max-w-5xl animate-fade-in-up px-4 py-6 sm:px-6 sm:py-8">
-      <div className="grid gap-6">
+    <div className="mx-auto w-full max-w-3xl animate-fade-in-up px-4 py-6 sm:px-6 sm:py-8">
+      <div className="grid gap-5">
         {repayFlash === 'success' ? (
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-emerald-900">
-            <p className="font-bold">Payment successful. Your loan has been closed.</p>
-          </div>
+          <FlashBanner tone="success">Payment successful. Your loan has been closed.</FlashBanner>
         ) : null}
         {repayFlash === 'failed' ? (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-rose-900">
-            <p className="font-bold">Payment was unsuccessful. You can try Pay Now again.</p>
-          </div>
+          <FlashBanner tone="failed">Payment was unsuccessful. You can try Pay now again.</FlashBanner>
         ) : null}
         {repayFlash === 'error' ? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-950">
-            <p className="font-bold">
-              We could not confirm this payment yet. If money was deducted, contact support with your
-              loan number.
-            </p>
-          </div>
+          <FlashBanner tone="error">
+            We could not confirm this payment yet. If money was deducted, contact support with your
+            loan number.
+          </FlashBanner>
         ) : null}
 
         <AccountHero
           greetingName={greetingName}
           mobileNumber={mobileNumber}
           journeyPct={journeyPct}
-          hasOpenLoan={hasOpenLoan}
-          amountDueToday={primaryDueToday}
+          showJourneyPct={showIncompleteJourney && !hasOpenLoan}
         />
 
-        <div className="flex gap-6 border-b border-[rgba(18,36,79,0.08)]">
+        <div className="grid grid-cols-2 rounded-2xl bg-[rgba(18,36,79,0.05)] p-1">
           <TabButton
             active={activeTab === 'overview'}
             label="Overview"
@@ -830,7 +921,7 @@ export function MyAccountSection({
         </div>
 
         {activeTab === 'overview' ? (
-          <div className="grid gap-6">
+          <div className="grid gap-5">
             {showIncompleteJourney ? (
               <CompleteJourneyCard
                 steps={journeySteps.steps}
@@ -842,12 +933,11 @@ export function MyAccountSection({
             ) : null}
 
             {dash.inProgress.length > 0 && !hasOpenLoan ? (
-              <section className="grid gap-4">
-                <div>
-                  <h2 className="text-lg font-extrabold text-brand-navy">Applications in progress</h2>
-                  <p className="mt-1 text-sm text-brand-muted">Track submissions that are still under review.</p>
-                </div>
-                <div className="grid gap-4 lg:grid-cols-2">
+              <section className="grid gap-3">
+                <h2 className="text-[0.72rem] font-black uppercase tracking-[0.14em] text-slate-400">
+                  Applications in progress
+                </h2>
+                <div className="grid gap-3 sm:grid-cols-2">
                   {dash.inProgress.map((loan) => (
                     <InProgressLoanCard key={loan.applicationUuid} loan={loan} />
                   ))}
@@ -856,16 +946,13 @@ export function MyAccountSection({
             ) : null}
 
             {dash.activeLoans.length > 0 ? (
-              <section className="grid gap-4">
-                <div>
-                  <h2 className="text-lg font-extrabold text-brand-navy">
-                    Your active loan{dash.activeLoans.length > 1 ? 's' : ''}
+              <section className="grid gap-3">
+                {dash.activeLoans.length > 1 ? (
+                  <h2 className="text-[0.72rem] font-black uppercase tracking-[0.14em] text-slate-400">
+                    Active loans
                   </h2>
-                  <p className="mt-1 text-sm text-brand-muted">
-                    Pay any time — interest accrues daily until repayment.
-                  </p>
-                </div>
-                <div className="grid gap-5">
+                ) : null}
+                <div className="grid gap-4">
                   {dash.activeLoans.map((loan) => (
                     <ActiveLoanCard
                       key={loan.applicationUuid}
@@ -885,36 +972,28 @@ export function MyAccountSection({
             ) : null}
           </div>
         ) : (
-          <div className="grid gap-6">
-            <section className="grid gap-4">
-              <div>
-                <h2 className="text-lg font-extrabold text-brand-navy">Previous loans</h2>
-                <p className="mt-1 text-sm text-brand-muted">
-                  Closed, matured, and past applications in one place.
-                </p>
+          <section className="grid gap-3">
+            {dash.pastLoans.length === 0 ? (
+              <EmptyStateCard
+                icon={<HistoryIcon />}
+                title="No loan history yet"
+                description="Your previous loans and closed applications will appear here once you complete a loan cycle."
+                action={
+                  showIncompleteJourney
+                    ? { label: 'Complete your journey', href: COMPLETE_JOURNEY_HREF }
+                    : hasOpenLoan
+                      ? undefined
+                      : { label: 'Apply for a loan', href: COMPLETE_JOURNEY_HREF }
+                }
+              />
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {dash.pastLoans.map((loan) => (
+                  <LoanSummaryCard key={loan.applicationUuid} loan={loan} />
+                ))}
               </div>
-              {dash.pastLoans.length === 0 ? (
-                <EmptyStateCard
-                  icon={<HistoryIcon />}
-                  title="No loan history yet"
-                  description="Your previous loans and closed applications will appear here once you complete a loan cycle."
-                  action={
-                    showIncompleteJourney
-                      ? { label: 'Complete your journey', href: COMPLETE_JOURNEY_HREF }
-                      : hasOpenLoan
-                        ? undefined
-                        : { label: 'Apply for a loan', href: COMPLETE_JOURNEY_HREF }
-                  }
-                />
-              ) : (
-                <div className="grid gap-4 lg:grid-cols-2">
-                  {dash.pastLoans.map((loan) => (
-                    <LoanSummaryCard key={loan.applicationUuid} loan={loan} />
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
+            )}
+          </section>
         )}
 
         {session && isCustomerPortalSignedIn(session) && showIncompleteJourney ? (

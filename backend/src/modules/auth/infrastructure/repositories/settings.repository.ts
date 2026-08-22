@@ -7,6 +7,7 @@ import {
   type BureauFetchMode,
 } from '../../../../common/constants/bureau-fetch-settings.util';
 import {SettingKey} from '../../../../common/constants/setting.constants';
+import {loadRepayCoolingPeriodDays as readRepayCoolingPeriodDays} from '../../../../common/loan/repay-cooling-period.util';
 import {RedisService} from '../../../../common/redis/redis.service';
 import {PrismaService} from '../../../../prisma/prisma.service';
 import {
@@ -497,5 +498,13 @@ export class SettingsRepository implements OnModuleInit {
     return Number.isFinite(n) && n > 0
       ? n
       : Number.parseInt(SettingKey.PENNY_DROP_RETRY_COUNT.default, 10);
+  }
+
+  /**
+   * Inclusive days from disbursement for actual-day early-repay interest.
+   * After this window, repayment charges full contracted tenure interest.
+   */
+  async loadRepayCoolingPeriodDays(): Promise<number> {
+    return readRepayCoolingPeriodDays(this.prisma.client);
   }
 }

@@ -61,6 +61,30 @@ export function resolveLiveTenureDays(
   return fallbackStored ?? null;
 }
 
+/**
+ * Contracted bullet tenure. Days are never an independent input — they come from dates.
+ * After disbursement: inclusive calendar days from disbursement through maturity
+ * (same formula as pay-now / cooling-period full tenure).
+ * Before disbursement: IST today through the expected repay date (live, not the
+ * selection-day snapshot in `expected_repayment_days`).
+ */
+export function resolveContractedTenureDays(input: {
+  disbursedAt?: Date | null;
+  maturityDate?: Date | null;
+  expectedRepaymentDate?: Date | null;
+  storedDays?: number | null;
+  asOf?: Date;
+}): number | null {
+  if (input.disbursedAt != null && input.maturityDate != null) {
+    return computeTenureDays(input.disbursedAt, input.maturityDate);
+  }
+  return resolveLiveTenureDays(
+    input.expectedRepaymentDate,
+    input.asOf ?? new Date(),
+    input.storedDays,
+  );
+}
+
 function roundInr2(n: number): number {
   return Math.round(n * 100) / 100;
 }
@@ -99,22 +123,47 @@ export function computeAccruedInterestInr(
   return { daysOutstanding, interestAmount };
 }
 
-/** Bullet amount due now: principal + interest accrued till `asOf` (fees taken at disbursement). */
+/** Bullet amount due now: principal + interest (fees taken at disbursement).
+ *
+ * Interest days:
+ * - within `coolingPeriodDays` (inclusive, disbursement day = day 1): days outstanding
+ * - after the cooling period: full contracted `tenureDays`
+ *
+ * `coolingPeriodDays = 0` means no concession (always full tenure).
+ */
 export function computeAmountDueNowInr(
   principal: number,
   interestRatePercentagePerDay: number,
   disbursedAt: Date,
-  asOf: Date = new Date(),
-): { daysOutstanding: number; interestAmount: number; amountDue: number } {
-  const accrued = computeAccruedInterestInr(
+  options: {
+    asOf?: Date;
+    coolingPeriodDays: number;
+    tenureDays: number;
+  },
+): {
+  daysOutstanding: number;
+  interestDays: number;
+  interestAmount: number;
+  amountDue: number;
+  usedFullTenureInterest: boolean;
+} {
+  const asOf = options.asOf ?? new Date();
+  const daysOutstanding = Math.max(1, calendarDaysBetween(disbursedAt, asOf) + 1);
+  const cooling = Math.max(0, Math.floor(options.coolingPeriodDays));
+  const tenure = Math.max(1, Math.floor(options.tenureDays));
+  const usedFullTenureInterest = !(cooling > 0 && daysOutstanding <= cooling);
+  const interestDays = usedFullTenureInterest ? tenure : daysOutstanding;
+  const interestAmount = computeInterestAmountInr(
     principal,
     interestRatePercentagePerDay,
-    disbursedAt,
-    asOf,
+    interestDays,
   );
   return {
-    ...accrued,
-    amountDue: roundInr2(principal + accrued.interestAmount),
+    daysOutstanding,
+    interestDays,
+    interestAmount,
+    amountDue: roundInr2(principal + interestAmount),
+    usedFullTenureInterest,
   };
 }
 

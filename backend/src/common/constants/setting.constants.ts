@@ -139,5 +139,11 @@ export const SettingKey = {
         key: 'PENAL_MAX_INR',
         default: '3000',
         description: 'Maximum penal charge in INR — caps the accrued bounce charge and is printed on the sanction letter / KFS',
-    }
+    },
+    REPAY_COOLING_PERIOD: {
+        key: 'REPAY_COOLING_PERIOD',
+        default: '7',
+        description:
+            'Inclusive days from disbursement during which early repayment charges interest only for days used; after this, full contracted tenure interest applies',
+    },
 } as const;

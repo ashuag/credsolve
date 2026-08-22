@@ -30,6 +30,30 @@ export function isValidPersonName(value: string): boolean {
   return trimmed.length >= 2 && PERSON_NAME_REGEX.test(trimmed);
 }
 
+function normalizePersonNameForMatch(raw: string): string {
+  return raw
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** True when two names are the same person (case, punctuation, and token order ignored). */
+export function personNamesMatch(left: string, right: string): boolean {
+  const a = normalizePersonNameForMatch(left);
+  const b = normalizePersonNameForMatch(right);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const sorted = (value: string) =>
+    value
+      .split(' ')
+      .filter(Boolean)
+      .sort()
+      .join(' ');
+  return sorted(a) === sorted(b);
+}
+
 export function isValidEmail(value: string): boolean {
   return EMAIL_REGEX.test(value.trim());
 }

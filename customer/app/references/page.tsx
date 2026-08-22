@@ -21,6 +21,7 @@ import { useOtpInput } from '@/lib/hooks/use-otp-input';
 import {
   isValidPersonName,
   PERSON_NAME_VALIDATION_MESSAGE,
+  personNamesMatch,
   sanitizePersonNameInput,
 } from '@/lib/validators';
 
@@ -142,18 +143,23 @@ export default function ReferencesPage() {
   function validate(): boolean {
     const nextErrors: Array<Partial<Record<keyof ReferenceForm, string>>> = [{}, {}];
     const mobiles: string[] = [];
-    const customerMobile = session?.authenticated ? session.mobileNumber.trim() : '';
+    const customerMobile = session?.authenticated
+      ? session.mobileNumber.replace(/\D/g, '').slice(-10)
+      : '';
+    const customerName = session?.authenticated ? session.profile?.fullName?.trim() ?? '' : '';
 
     refs.forEach((ref, index) => {
       if (!isValidPersonName(ref.fullName)) {
         nextErrors[index]!.fullName =
           ref.fullName.trim().length === 0 ? 'Enter the reference name.' : PERSON_NAME_VALIDATION_MESSAGE;
+      } else if (customerName && personNamesMatch(ref.fullName, customerName)) {
+        nextErrors[index]!.fullName = 'Reference name cannot match your name.';
       }
       const mobile = ref.mobileNumber.replace(/\D/g, '').slice(0, 10);
       if (!INDIAN_MOBILE_RE.test(mobile)) {
         nextErrors[index]!.mobileNumber = 'Enter a valid 10-digit mobile number.';
       } else if (mobile === customerMobile) {
-        nextErrors[index]!.mobileNumber = 'Use a number other than your own mobile.';
+        nextErrors[index]!.mobileNumber = 'Reference mobile cannot match your mobile number.';
       } else if (mobiles.includes(mobile)) {
         nextErrors[index]!.mobileNumber = 'Each reference needs a different mobile number.';
       } else {
@@ -318,8 +324,8 @@ export default function ReferencesPage() {
             Personal <span className="text-brand-blue">References</span>
           </h2>
           <p className="m-0 text-[0.88rem] text-slate-600 leading-relaxed">
-            Add two people we can contact. Next you will verify one OTP to receive your sanctioned letter and
-            submit your application.
+            Add two people we can contact. Their name and mobile cannot match yours. Next you will verify one
+            OTP to receive your sanctioned letter and submit your application.
           </p>
         </div>
 

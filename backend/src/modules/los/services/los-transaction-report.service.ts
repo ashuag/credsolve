@@ -3,6 +3,7 @@ import { BounceChargeTierResolverService } from '../../../common/loan/bounce-cha
 import { computeBounceChargeInr } from '../../../common/loan/bounce-charge.util';
 import { decimalToNumber } from '../../../common/loan/loan-calculation.util';
 import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbursement-view.util';
+import { loadRepayCoolingPeriodDays } from '../../../common/loan/repay-cooling-period.util';
 import { resolveTransactionReportMetrics } from '../../../common/loan/transaction-report.util';
 import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -97,6 +98,7 @@ export class LosTransactionReportService {
     });
 
     const { tiers: bounceTiers, penal } = await this.bounceChargeTiers.loadContext();
+    const coolingPeriodDays = await loadRepayCoolingPeriodDays(this.prisma.client);
 
     return loans.map((loan) => {
       const details = loan.application.details;
@@ -123,6 +125,7 @@ export class LosTransactionReportService {
         principal,
         interestRatePerDay: dailyRate,
         repaymentAt,
+        coolingPeriodDays,
       });
       const penalCharges =
         principal != null

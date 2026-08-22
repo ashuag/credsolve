@@ -5,12 +5,17 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { personNamesMatch } from '../../../../common/kyc/aadhaar-lead-identity-match.util';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import type { SaveLeadReferencesDto } from '../dto/save-lead-references.dto';
 
 const INDIAN_MOBILE = /^[6-9]\d{9}$/;
+
+function last10Digits(raw: string): string {
+  return raw.replace(/\D/g, '').slice(-10);
+}
 
 @Injectable()
 export class SaveLeadReferencesUseCase {
@@ -42,15 +47,23 @@ export class SaveLeadReferencesUseCase {
       throw new NotFoundException('No matching active lead was found.');
     }
 
-    const customerMobile = customer.mobileNumber.trim();
+    const customerMobile = last10Digits(customer.mobileNumber);
+    const customerName = leadRow.leadDetail?.fullName?.trim() ?? '';
     const refs = dto.references.map((ref, index) => {
       const fullName = ref.fullName.trim();
-      const mobileNumber = ref.mobileNumber.trim();
+      const mobileNumber = last10Digits(ref.mobileNumber);
       if (!INDIAN_MOBILE.test(mobileNumber)) {
         throw new BadRequestException(`Reference ${index + 1}: enter a valid 10-digit mobile number.`);
       }
+      if (customerName && personNamesMatch(fullName, customerName)) {
+        throw new BadRequestException(
+          `Reference ${index + 1}: name cannot match your name.`,
+        );
+      }
       if (mobileNumber === customerMobile) {
-        throw new BadRequestException(`Reference ${index + 1}: use a number other than your own mobile.`);
+        throw new BadRequestException(
+          `Reference ${index + 1}: mobile number cannot match your mobile number.`,
+        );
       }
       return {
         referenceIndex: index + 1,

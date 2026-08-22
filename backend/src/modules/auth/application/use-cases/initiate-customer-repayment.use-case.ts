@@ -16,6 +16,7 @@ import { LOAN_STATUS } from '../../../../common/constants/loan.constants';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import {
   computeAmountDueNowInr,
+  computeTenureDays,
   decimalToNumber,
 } from '../../../../common/loan/loan-calculation.util';
 import {
@@ -28,6 +29,7 @@ import { RedisService } from '../../../../common/redis/redis.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
+import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
 
 const REPAY_LOCK_TTL_SEC = 90;
 
@@ -53,6 +55,7 @@ export class InitiateCustomerRepaymentUseCase {
     private readonly easebuzzWire: EasebuzzWireService,
     private readonly redis: RedisService,
     private readonly bounceChargeTiers: BounceChargeTierResolverService,
+    private readonly settings: SettingsRepository,
   ) {}
 
   async execute(
@@ -145,7 +148,11 @@ export class InitiateCustomerRepaymentUseCase {
       throw new BadRequestException('Unable to compute repayment amount for this loan.');
     }
 
-    const due = computeAmountDueNowInr(principal, dailyRate, loan.disbursedAt);
+    const coolingPeriodDays = await this.settings.loadRepayCoolingPeriodDays();
+    const due = computeAmountDueNowInr(principal, dailyRate, loan.disbursedAt, {
+      coolingPeriodDays,
+      tenureDays: computeTenureDays(loan.disbursedAt, loan.loanMaturityDate),
+    });
     if (!(due.amountDue > 0)) {
       throw new BadRequestException('Nothing due on this loan right now.');
     }

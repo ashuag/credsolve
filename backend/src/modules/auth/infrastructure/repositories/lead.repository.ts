@@ -168,7 +168,7 @@ export class LeadRepository {
       select: {
         id: true,
         uuid: true,
-        leadDetail: { select: { panNumber: true } },
+        leadDetail: { select: { panNumber: true, fullName: true } },
       },
     });
   }
@@ -179,7 +179,7 @@ export class LeadRepository {
       select: {
         id: true,
         uuid: true,
-        leadDetail: { select: { panNumber: true } },
+        leadDetail: { select: { panNumber: true, fullName: true } },
       },
     });
   }

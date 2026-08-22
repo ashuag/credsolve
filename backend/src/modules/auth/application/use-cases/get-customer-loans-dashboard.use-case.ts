@@ -7,6 +7,7 @@ import {
   computeAmountDueNowInr,
   computeInterestAmountInr,
   calendarDaysBetween,
+  resolveContractedTenureDays,
   decimalToNumber,
 } from '../../../../common/loan/loan-calculation.util';
 import {
@@ -24,6 +25,7 @@ import type {
 } from '../contracts/customer-loans-dashboard.contract';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { PrismaService } from '../../../../prisma/prisma.service';
+import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
 
 function isTerminalApplicationStatus(statusName: string): boolean {
   return (
@@ -95,6 +97,7 @@ function mapRow(
   },
   bounceTiers: BounceChargeTierRow[],
   penalMaxInr: number,
+  coolingPeriodDays: number,
 ): CustomerLoanCard {
   const loanDetail = r.details;
   const loanAccount = r.loanAccount;
@@ -107,19 +110,23 @@ function mapRow(
     decimalToNumber(loanDetail?.selectedLoanAmount);
   const dailyRate =
     decimalToNumber(loanAccount?.interestRate) ?? decimalToNumber(loanDetail?.interestRate);
-  const tenureDays = fees.tenureDays ?? loanDetail?.expectedRepaymentDays ?? null;
+  // After disbursement, contracted tenure is disbursedAt → maturity (not the
+  // stored expected_repayment_days snapshot, which can be the shorter selection-day count).
+  const tenureDays = resolveContractedTenureDays({
+    disbursedAt: loanAccount?.disbursedAt,
+    maturityDate: loanAccount?.loanMaturityDate,
+    expectedRepaymentDate: loanDetail?.expectedRepaymentDate,
+    storedDays: fees.tenureDays ?? loanDetail?.expectedRepaymentDays ?? null,
+  });
 
-  // Full-tenure interest / amount due on maturity (KFS / scheduled).
-  let interestAtMaturity =
-    fees.interestAmount ??
-    (loanAccount != null ? decimalToNumber(loanAccount.interestAmount) : null);
-  if (
-    interestAtMaturity == null &&
-    principal != null &&
-    dailyRate != null &&
-    tenureDays != null
-  ) {
+  // Full-tenure interest / amount due on maturity — always from the date-span tenure.
+  let interestAtMaturity: number | null = null;
+  if (principal != null && dailyRate != null && tenureDays != null) {
     interestAtMaturity = computeInterestAmountInr(principal, dailyRate, tenureDays);
+  } else {
+    interestAtMaturity =
+      fees.interestAmount ??
+      (loanAccount != null ? decimalToNumber(loanAccount.interestAmount) : null);
   }
 
   let amountDueAtMaturity: number | null =
@@ -132,11 +139,16 @@ function mapRow(
   let interestTillToday: number | null = null;
   let amountDueToday: number | null = null;
   let bounceFeeInr: number | null = null;
+  let usedFullTenureInterest = false;
 
   if (loanAccount && loanAccount.closedAt == null && principal != null && dailyRate != null) {
-    const due = computeAmountDueNowInr(principal, dailyRate, loanAccount.disbursedAt);
+    const due = computeAmountDueNowInr(principal, dailyRate, loanAccount.disbursedAt, {
+      coolingPeriodDays,
+      tenureDays: tenureDays ?? 1,
+    });
     daysOutstanding = due.daysOutstanding;
     interestTillToday = due.interestAmount;
+    usedFullTenureInterest = due.usedFullTenureInterest;
     const pastDue =
       loanAccount.loanStatus.name === LOAN_STATUS.OVERDUE ||
       isRepaymentPastDue(loanAccount.loanMaturityDate);
@@ -180,6 +192,7 @@ function mapRow(
     daysOutstanding,
     interestTillToday: interestTillTodayStr,
     amountDueToday: amountDueTodayStr,
+    usedFullTenureInterest,
     bounceFeeInr: bounceFeeStr,
     processingFeeAmount: fees.processingFeeAmount != null ? fees.processingFeeAmount.toFixed(2) : null,
     gstAmount: fees.gstAmount != null ? fees.gstAmount.toFixed(2) : null,
@@ -202,6 +215,7 @@ export class GetCustomerLoansDashboardUseCase {
     private readonly customers: CustomerRepository,
     private readonly prisma: PrismaService,
     private readonly bounceChargeTiers: BounceChargeTierResolverService,
+    private readonly settings: SettingsRepository,
   ) {}
 
   async execute(req: Request): Promise<CustomerLoansDashboardResult> {
@@ -252,8 +266,9 @@ export class GetCustomerLoansDashboardUseCase {
     });
 
     const { tiers: bounceTiers, penal } = await this.bounceChargeTiers.loadContext();
+    const coolingPeriodDays = await this.settings.loadRepayCoolingPeriodDays();
     const todayStart = startOfTodayUtc();
-    const cards = rows.map((row) => mapRow(row, bounceTiers, penal.maxInr));
+    const cards = rows.map((row) => mapRow(row, bounceTiers, penal.maxInr, coolingPeriodDays));
 
     const maturityFor = (raw: (typeof rows)[number]) =>
       raw.loanAccount?.loanMaturityDate ?? raw.details?.expectedRepaymentDate ?? null;
