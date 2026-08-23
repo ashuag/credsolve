@@ -157,8 +157,8 @@ export class InitiateCustomerRepaymentUseCase {
       throw new BadRequestException('Nothing due on this loan right now.');
     }
 
-    // Late repayment (after maturity / OVERDUE): bounce accrues per overdue day at the rate for
-    // the principal band, capped. A loan flagged OVERDUE bills at least one day.
+    // Late repayment (after maturity / OVERDUE): penal charge is rate % of principal,
+    // clamped between PENAL_MIN_INR and PENAL_MAX_INR. A loan flagged OVERDUE bills at least one day.
     const pastDue =
       loan.loanStatus.name === LOAN_STATUS.OVERDUE || isRepaymentPastDue(loan.loanMaturityDate);
     const overdueDays = pastDue
@@ -182,7 +182,7 @@ export class InitiateCustomerRepaymentUseCase {
     if (this.easebuzzWire.isPayInitiateSkipped()) {
       this.logger.warn(
         `[repay] EASEBUZZ_PAY_SKIP — settling loan=${loan.loanNumber} amount=${amountInr} ` +
-          `bounce=${bounceFeeInrStr} (${overdueDays}d overdue) without vendor call`,
+          `penal=${bounceFeeInrStr} (${overdueDays}d overdue) without vendor call`,
       );
     } else {
       const payeeName = application.lead.leadDetail?.fullName?.trim();
@@ -195,7 +195,7 @@ export class InitiateCustomerRepaymentUseCase {
       }
 
       try {
-        // Amount = principal + interest (+ bounce fee when past due), always 2 decimal places.
+        // Amount = principal + interest (+ penal charge when past due), always 2 decimal places.
         // txnid = loan_number + current timestamp (unique per attempt).
         const created = await this.easebuzzWire.initiatePaymentLink({
           txnid,

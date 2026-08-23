@@ -1,5 +1,5 @@
 import {
-  computeBounceChargeInr,
+  computePenalChargeInr,
   daysToMaturityIst,
   DEFAULT_PENAL_CHARGE_CONFIG,
   formatBounceAmountBand,
@@ -9,8 +9,6 @@ import {
   resolveBounceRatePerDayInr,
   renderBounceChargeTierHtmlRows,
 } from './bounce-charge.util';
-
-const MAX_BOUNCE_CHARGE_INR = DEFAULT_PENAL_CHARGE_CONFIG.maxInr;
 
 describe('bounce-charge.util', () => {
   const tiers = [
@@ -28,35 +26,38 @@ describe('bounce-charge.util', () => {
     expect(resolveBounceRatePerDayInr(12_000, tiers)).toBe(500);
   });
 
-  it('accrues bounce charge per overdue day', () => {
-    // ₹2,001–5,000 band bills ₹200/day, so two days overdue is ₹400.
-    expect(computeBounceChargeInr(3_000, 2, tiers)).toBe(400);
-    expect(computeBounceChargeInr(3_000, 1, tiers)).toBe(200);
-    expect(computeBounceChargeInr(12_000, 4, tiers)).toBe(2_000);
+  it('applies penal rate percent of principal when overdue', () => {
+    // ₹5,000 × 10% = ₹500, inside the ₹100–₹3,000 band.
+    expect(computePenalChargeInr(5_000, 1)).toBe(500);
+    expect(computePenalChargeInr(5_000, 10)).toBe(500);
+  });
+
+  it('raises a small percentage up to PENAL_MIN_INR', () => {
+    // ₹500 × 10% = ₹50 → floor ₹100.
+    expect(computePenalChargeInr(500, 1)).toBe(DEFAULT_PENAL_CHARGE_CONFIG.minInr);
+  });
+
+  it('caps a large percentage at PENAL_MAX_INR', () => {
+    // ₹50,000 × 10% = ₹5,000 → ceiling ₹3,000.
+    expect(computePenalChargeInr(50_000, 1)).toBe(DEFAULT_PENAL_CHARGE_CONFIG.maxInr);
+    expect(computePenalChargeInr(50_000, 400)).toBe(DEFAULT_PENAL_CHARGE_CONFIG.maxInr);
   });
 
   it('charges nothing while the loan is within term', () => {
-    expect(computeBounceChargeInr(3_000, 0, tiers)).toBe(0);
-    expect(computeBounceChargeInr(3_000, -5, tiers)).toBe(0);
-    expect(computeBounceChargeInr(3_000, Number.NaN, tiers)).toBe(0);
+    expect(computePenalChargeInr(5_000, 0)).toBe(0);
+    expect(computePenalChargeInr(5_000, -5)).toBe(0);
+    expect(computePenalChargeInr(5_000, Number.NaN)).toBe(0);
   });
 
-  it('caps accrual at the maximum penal charge', () => {
-    // ₹500/day hits the ₹3,000 ceiling on day 6 and stays there.
-    expect(computeBounceChargeInr(12_000, 5, tiers)).toBe(2_500);
-    expect(computeBounceChargeInr(12_000, 6, tiers)).toBe(MAX_BOUNCE_CHARGE_INR);
-    expect(computeBounceChargeInr(12_000, 400, tiers)).toBe(MAX_BOUNCE_CHARGE_INR);
-    // A tiny loan can still never accrue more than the ceiling.
-    expect(computeBounceChargeInr(10, 9_999, tiers)).toBe(MAX_BOUNCE_CHARGE_INR);
-  });
-
-  it('honours a cap supplied from the PENAL_MAX_INR setting', () => {
-    expect(computeBounceChargeInr(12_000, 9, tiers, 1_000)).toBe(1_000);
-    expect(computeBounceChargeInr(12_000, 9, tiers, 10_000)).toBe(4_500);
+  it('honours operator penal settings including min and max', () => {
+    const custom = { ratePercent: 12.5, minInr: 200, maxInr: 1_000 };
+    expect(computePenalChargeInr(5_000, 1, custom)).toBe(625);
+    expect(computePenalChargeInr(500, 1, custom)).toBe(200);
+    expect(computePenalChargeInr(20_000, 1, custom)).toBe(1_000);
     // A missing or nonsensical setting must fall back, never uncap or zero the charge.
-    for (const bad of [0, -1, Number.NaN, undefined]) {
-      expect(computeBounceChargeInr(12_000, 400, tiers, bad as number)).toBe(MAX_BOUNCE_CHARGE_INR);
-    }
+    expect(computePenalChargeInr(50_000, 1, { ratePercent: Number.NaN, minInr: -1, maxInr: 0 })).toBe(
+      DEFAULT_PENAL_CHARGE_CONFIG.maxInr,
+    );
   });
 
   it('formats penal parameters for the sanction letter', () => {

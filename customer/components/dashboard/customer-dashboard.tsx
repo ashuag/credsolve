@@ -447,7 +447,7 @@ export function CustomerDashboard() {
   }
 
   const dash = data ?? { activeLoans: [], pastLoans: [], inProgress: [], repaymentSchedule: [] };
-  const hasResumeable = dash.inProgress.length > 0;
+  const hasResumeable = dash.inProgress.length > 0 && dash.activeLoans.length === 0;
   const greetingName =
     session && session.authenticated ? session.profile?.fullName?.trim().split(/\s+/)[0] ?? null : null;
 

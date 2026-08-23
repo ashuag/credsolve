@@ -11,10 +11,10 @@ import {
   decimalToNumber,
 } from '../../../../common/loan/loan-calculation.util';
 import {
-  computeBounceChargeInr,
+  computePenalChargeInr,
   isRepaymentPastDue,
   overdueDaysFromMaturity,
-  type BounceChargeTierRow,
+  type PenalChargeConfig,
 } from '../../../../common/loan/bounce-charge.util';
 import { BounceChargeTierResolverService } from '../../../../common/loan/bounce-charge-tier.resolver';
 import { computeFeeAmountsFromLoanDetail } from '../../../../common/loan/loan-disbursement-view.util';
@@ -95,8 +95,7 @@ function mapRow(
       loanStatus: { name: string };
     } | null;
   },
-  bounceTiers: BounceChargeTierRow[],
-  penalMaxInr: number,
+  penal: PenalChargeConfig,
   coolingPeriodDays: number,
 ): CustomerLoanCard {
   const loanDetail = r.details;
@@ -155,7 +154,7 @@ function mapRow(
     const overdueDays = pastDue
       ? Math.max(overdueDaysFromMaturity(loanAccount.loanMaturityDate), 1)
       : 0;
-    bounceFeeInr = computeBounceChargeInr(principal, overdueDays, bounceTiers, penalMaxInr);
+    bounceFeeInr = computePenalChargeInr(principal, overdueDays, penal);
     amountDueToday = Math.round((due.amountDue + bounceFeeInr) * 100) / 100;
   } else if (loanAccount?.closedAt != null) {
     // Inclusive days from disbursement through repayment (disbursement day = day 1).
@@ -265,10 +264,10 @@ export class GetCustomerLoansDashboardUseCase {
       },
     });
 
-    const { tiers: bounceTiers, penal } = await this.bounceChargeTiers.loadContext();
+    const penal = await this.bounceChargeTiers.loadPenalConfig();
     const coolingPeriodDays = await this.settings.loadRepayCoolingPeriodDays();
     const todayStart = startOfTodayUtc();
-    const cards = rows.map((row) => mapRow(row, bounceTiers, penal.maxInr, coolingPeriodDays));
+    const cards = rows.map((row) => mapRow(row, penal, coolingPeriodDays));
 
     const maturityFor = (raw: (typeof rows)[number]) =>
       raw.loanAccount?.loanMaturityDate ?? raw.details?.expectedRepaymentDate ?? null;
@@ -278,19 +277,22 @@ export class GetCustomerLoansDashboardUseCase {
     const isOpenLoanAccount = (raw: (typeof rows)[number]): boolean =>
       Boolean(raw.loanAccount && raw.loanAccount.closedAt == null);
 
+    /** Open disbursed loan — still active even when repayment is overdue. */
+    const isActiveRow = (raw: (typeof rows)[number]): boolean => {
+      if (isTerminalApplicationStatus(raw.applicationStatus.name)) return false;
+      if (!isOpenLoanAccount(raw)) return false;
+      return isDisbursedRow(disbursedAtFor(raw), raw.applicationStatus.name);
+    };
+
+    /** Closed / rejected applications only — overdue open loans stay in active. */
+    const isPastRow = (raw: (typeof rows)[number]): boolean => {
+      if (isTerminalApplicationStatus(raw.applicationStatus.name)) return true;
+      return raw.loanAccount?.closedAt != null;
+    };
+
     const activeIndices = rows
       .map((raw, i) => ({ raw, i }))
-      .filter(({ raw }) => {
-        if (isTerminalApplicationStatus(raw.applicationStatus.name)) return false;
-        if (!isOpenLoanAccount(raw)) return false;
-        const maturity = maturityFor(raw);
-        if (!maturity) return false;
-        const maturityStart = new Date(
-          Date.UTC(maturity.getUTCFullYear(), maturity.getUTCMonth(), maturity.getUTCDate())
-        );
-        const disbursed = isDisbursedRow(disbursedAtFor(raw), raw.applicationStatus.name);
-        return disbursed && maturityStart >= todayStart;
-      })
+      .filter(({ raw }) => isActiveRow(raw))
       .sort((a, b) => {
         const da = disbursedAtFor(a.raw)?.getTime() ?? 0;
         const db = disbursedAtFor(b.raw)?.getTime() ?? 0;
@@ -300,43 +302,7 @@ export class GetCustomerLoansDashboardUseCase {
 
     const activeLoans = activeIndices.map((i) => cards[i]);
 
-    const pastLoans = cards.filter((c, i) => {
-      const raw = rows[i];
-      const status = raw.applicationStatus.name;
-      if (isTerminalApplicationStatus(status)) return true;
-      if (raw.loanAccount?.closedAt != null) return true;
-      const maturity = maturityFor(raw);
-      if (!maturity) return false;
-      const maturityStart = new Date(
-        Date.UTC(maturity.getUTCFullYear(), maturity.getUTCMonth(), maturity.getUTCDate())
-      );
-      const disbursed = isDisbursedRow(disbursedAtFor(raw), status);
-      return disbursed && maturityStart < todayStart;
-    });
-
-    const isActiveRow = (raw: (typeof rows)[number]): boolean => {
-      if (isTerminalApplicationStatus(raw.applicationStatus.name)) return false;
-      if (!isOpenLoanAccount(raw)) return false;
-      const maturity = maturityFor(raw);
-      if (!maturity) return false;
-      const maturityStart = new Date(
-        Date.UTC(maturity.getUTCFullYear(), maturity.getUTCMonth(), maturity.getUTCDate())
-      );
-      const disbursed = isDisbursedRow(disbursedAtFor(raw), raw.applicationStatus.name);
-      return disbursed && maturityStart >= todayStart;
-    };
-
-    const isPastRow = (raw: (typeof rows)[number]): boolean => {
-      if (isTerminalApplicationStatus(raw.applicationStatus.name)) return true;
-      if (raw.loanAccount?.closedAt != null) return true;
-      const maturity = maturityFor(raw);
-      if (!maturity) return false;
-      const maturityStart = new Date(
-        Date.UTC(maturity.getUTCFullYear(), maturity.getUTCMonth(), maturity.getUTCDate())
-      );
-      const disbursed = isDisbursedRow(disbursedAtFor(raw), raw.applicationStatus.name);
-      return disbursed && maturityStart < todayStart;
-    };
+    const pastLoans = cards.filter((_, i) => isPastRow(rows[i]));
 
     const inProgress = cards.filter((_, i) => {
       const raw = rows[i];

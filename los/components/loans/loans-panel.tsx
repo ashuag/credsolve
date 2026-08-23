@@ -254,7 +254,7 @@ export function LoansPanel() {
             </div>
             {hasPenal ? (
               <div className="text-[0.72rem] text-brand-muted mt-0.5">
-                incl. {formatINR(loan.penalAmount)} bounce ({formatINR(loan.bounceRatePerDayInr)}/day)
+                incl. {formatINR(loan.penalAmount)} penal charge
               </div>
             ) : null}
           </>

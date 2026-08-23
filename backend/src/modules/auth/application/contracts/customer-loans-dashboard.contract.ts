@@ -26,11 +26,11 @@ export type CustomerLoanCard = {
   daysOutstanding: number | null;
   /** Interest charged if paid today (actual days inside cooling; full tenure after). */
   interestTillToday: string | null;
-  /** Principal + interest due if paid today (actual days inside cooling; full tenure after). Includes bounce fee when past due. */
+  /** Principal + interest due if paid today (actual days inside cooling; full tenure after). Includes penal charge when past due. */
   amountDueToday: string | null;
   /** True when pay-now interest is the contracted full tenure (cooling period has passed). */
   usedFullTenureInterest: boolean;
-  /** Bounce fee included in amountDueToday when repayment is past maturity (else `0.00` / null). */
+  /** Penal charge included in amountDueToday when repayment is past maturity (else `0.00` / null). */
   bounceFeeInr: string | null;
   processingFeeAmount: string | null;
   gstAmount: string | null;
@@ -48,7 +48,7 @@ export type CustomerLoanCard = {
 };
 
 export type CustomerLoansDashboardResult = {
-  /** Disbursed loans whose maturity date is today or later (short-term bullet loans). */
+  /** Disbursed loans that are still open (including overdue / past maturity). */
   activeLoans: CustomerLoanCard[];
   pastLoans: CustomerLoanCard[];
   inProgress: CustomerLoanCard[];

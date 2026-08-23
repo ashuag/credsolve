@@ -16,9 +16,9 @@ export type LosLoan = {
   interestRate: string;
   interestAmount: string;
   totalRepaymentAmount: string;
-  /** Per-day bounce rate for this principal band, from `bounce_charge_tier`. */
+  /** Unused for overdue charges (penal % applies instead); kept for API compatibility. */
   bounceRatePerDayInr: string;
-  /** Accrued bounce charge (rate x overdue days, capped at ₹3,000); "0.00" unless past due. */
+  /** Penal charge (rate % of principal, min/max capped); "0.00" unless past due. */
   penalAmount: string;
   /** `totalRepaymentAmount` plus the penal charge. */
   totalRepaymentWithPenalAmount: string;

@@ -414,7 +414,7 @@ function ActiveLoanCard({
             </p>
             <p className="mt-2 text-[0.8rem] font-medium text-slate-500">
               Principal + interest
-              {showBounce ? ' + bounce fee' : ''}
+              {showBounce ? ' + penal charge' : ''}
             </p>
           </div>
           <button
@@ -470,7 +470,7 @@ function ActiveLoanCard({
 
         {showBounce ? (
           <p className="mt-3 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[0.78rem] font-semibold text-rose-800 ring-1 ring-rose-100">
-            Includes a bounce fee of {formatInr(loan.bounceFeeInr)} for days past the due date.
+            Includes a penal charge of {formatInr(loan.bounceFeeInr)} because repayment is overdue.
           </p>
         ) : null}
 
@@ -827,11 +827,15 @@ export function MyAccountSection({
   const dash = data ?? { activeLoans: [], pastLoans: [], inProgress: [], repaymentSchedule: [] };
   const hasOpenLoan =
     hasOpenCustomerLoan(session) || dash.activeLoans.length > 0;
+  const hasDisbursedLoan =
+    hasOpenLoan ||
+    dash.activeLoans.some((loan) => Boolean(loan.disbursedAt)) ||
+    dash.pastLoans.some((loan) => Boolean(loan.disbursedAt) && !loan.repaidAt);
   const showIncompleteJourney = useMemo(() => {
-    if (hasOpenLoan) return false;
+    if (hasDisbursedLoan) return false;
     if (session?.authenticated === true && isLeadRejectedAndLocked(session.lead)) return false;
     return isCustomerJourneyIncomplete(session);
-  }, [hasOpenLoan, session]);
+  }, [hasDisbursedLoan, session]);
 
   useEffect(() => {
     if (tabInitialized || fetching) return;
@@ -902,7 +906,7 @@ export function MyAccountSection({
           greetingName={greetingName}
           mobileNumber={mobileNumber}
           journeyPct={journeyPct}
-          showJourneyPct={showIncompleteJourney && !hasOpenLoan}
+          showJourneyPct={showIncompleteJourney && !hasDisbursedLoan}
         />
 
         <div className="grid grid-cols-2 rounded-2xl bg-[rgba(18,36,79,0.05)] p-1">

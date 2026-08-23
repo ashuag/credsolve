@@ -102,6 +102,7 @@ function ThankYouContent() {
   return (
     <div className="min-h-screen bg-[linear-gradient(135deg,#f0fdf4,#e6f0ff)] flex items-center justify-center p-4 sm:p-6 md:p-8">
       <LoanLandingShell
+        showSpeedometer={!hasOpenCustomerLoan(session)}
         journeyPanel={journeyPanel}
         leftTitle={
           <>

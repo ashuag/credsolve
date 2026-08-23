@@ -388,13 +388,7 @@ function FeeStack({ row }: { row: LosLoanDetails }) {
   const gstPct = formatPercent(row.gstPercentage);
   const penal = Number(row.penalAmount);
   const hasPenal = Number.isFinite(penal) && penal > 0;
-  const ratePerDay = Number(row.bounceRatePerDayInr);
-  // Flag the ceiling so an unchanging figure does not read as a stalled calculation.
-  const capped = hasPenal && ratePerDay > 0 && ratePerDay * row.overdueDays > penal;
-  const bounceLabel =
-    ratePerDay > 0
-      ? `Bounce charge (${formatINRExact(row.bounceRatePerDayInr)}/day × ${row.overdueDays})`
-      : 'Bounce charge';
+  const penalLabel = 'Penal charge';
   const lines: Array<{
     label: string;
     value: string;
@@ -420,12 +414,12 @@ function FeeStack({ row }: { row: LosLoanDetails }) {
     ...(hasPenal
       ? [
           {
-            label: capped ? `${bounceLabel} — capped` : bounceLabel,
+            label: penalLabel,
             value: `+ ${formatINRExact(row.penalAmount)}`,
             accent: '#b91c1c',
           },
           {
-            label: 'Total repayable + bounce',
+            label: 'Total repayable + penal',
             value: formatINR(row.totalRepaymentWithPenalAmount),
             accent: '#b91c1c',
             strong: true,
@@ -685,7 +679,7 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
             Number(row.outstandingAmount) <= 0
               ? 'Nothing due'
               : Number(row.penalAmount) > 0
-                ? `Incl. bounce ${formatINRExact(row.penalAmount)}`
+                ? `Incl. penal ${formatINRExact(row.penalAmount)}`
                 : 'Still to collect'
           }
           accent={Number(row.outstandingAmount) > 0 ? '#b45309' : '#047857'}
@@ -725,7 +719,7 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
             </p>
             <p className="m-0 mt-1 text-[0.72rem] font-semibold text-brand-muted">
               {Number(row.bounceFeeInr) > 0
-                ? `Principal + interest + bounce (${formatINRExact(row.bounceRatePerDayInr)}/day × ${row.overdueDays} = ${formatINRExact(row.bounceFeeInr)})`
+                ? `Principal + interest + penal charge (${formatINRExact(row.bounceFeeInr)})`
                 : row.usedFullTenureInterest
                   ? 'Principal + full tenure interest'
                   : 'Principal + interest till today'}

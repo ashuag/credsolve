@@ -24,11 +24,9 @@ export function formatBounceAmountBand(minAmountInr: number, maxAmountInr: numbe
 }
 
 /**
- * Penal charge parameters printed on the sanction letter cum KFS. `maxInr` additionally caps the
- * accrued bounce charge — without it a long-overdue small loan accrues more penalty than principal.
- *
- * Operators tune these through the `setting` table (`PENAL_*` keys); these values are only the
- * fallback used when the table cannot be read.
+ * Penal charge on overdue principal: `PENAL_RATE_PERCENT` of outstanding, then clamped between
+ * `PENAL_MIN_INR` and `PENAL_MAX_INR`. Operators tune these through the `setting` table; these
+ * values are only the fallback used when the table cannot be read.
  */
 export type PenalChargeConfig = {
   ratePercent: number;
@@ -41,6 +39,38 @@ export const DEFAULT_PENAL_CHARGE_CONFIG: PenalChargeConfig = {
   minInr: 100,
   maxInr: 3_000,
 };
+
+function resolvePenalConfig(penal: PenalChargeConfig = DEFAULT_PENAL_CHARGE_CONFIG): PenalChargeConfig {
+  const ratePercent =
+    Number.isFinite(penal.ratePercent) && penal.ratePercent >= 0
+      ? penal.ratePercent
+      : DEFAULT_PENAL_CHARGE_CONFIG.ratePercent;
+  const minInr =
+    Number.isFinite(penal.minInr) && penal.minInr >= 0
+      ? penal.minInr
+      : DEFAULT_PENAL_CHARGE_CONFIG.minInr;
+  const maxInr =
+    Number.isFinite(penal.maxInr) && penal.maxInr > 0
+      ? penal.maxInr
+      : DEFAULT_PENAL_CHARGE_CONFIG.maxInr;
+  return { ratePercent, minInr, maxInr };
+}
+
+/**
+ * Penal charge when repayment is overdue: `ratePercent` of principal, then min/max caps.
+ * Zero while the loan is still within term. Not multiplied by overdue days.
+ */
+export function computePenalChargeInr(
+  amountInr: number,
+  overdueDays: number,
+  penal: PenalChargeConfig = DEFAULT_PENAL_CHARGE_CONFIG,
+): number {
+  if (!Number.isFinite(overdueDays) || overdueDays <= 0) return 0;
+  if (!(amountInr >= 0) || !Number.isFinite(amountInr)) return 0;
+  const { ratePercent, minInr, maxInr } = resolvePenalConfig(penal);
+  const raw = Math.round(((amountInr * ratePercent) / 100) * 100) / 100;
+  return Math.round(Math.min(Math.max(raw, minInr), maxInr) * 100) / 100;
+}
 
 /** Display strings for penal parameters on the sanction letter / KFS (e.g. `10%`, `3,000`). */
 export function formatPenalChargeDisplay(config: PenalChargeConfig): {
@@ -80,26 +110,6 @@ export function resolveBounceRatePerDayInr(
     }
   }
   return 0;
-}
-
-/**
- * Bounce charge accrued over `overdueDays` at the tier rate for the principal band, capped at
- * `maxChargeInr` (the `PENAL_MAX_INR` setting). Zero while the loan is still within term.
- */
-export function computeBounceChargeInr(
-  amountInr: number,
-  overdueDays: number,
-  tiers: BounceChargeTierRow[],
-  maxChargeInr: number = DEFAULT_PENAL_CHARGE_CONFIG.maxInr,
-): number {
-  if (!Number.isFinite(overdueDays) || overdueDays <= 0) return 0;
-  const ratePerDay = resolveBounceRatePerDayInr(amountInr, tiers);
-  if (!(ratePerDay > 0)) return 0;
-  const cap =
-    Number.isFinite(maxChargeInr) && maxChargeInr > 0
-      ? maxChargeInr
-      : DEFAULT_PENAL_CHARGE_CONFIG.maxInr;
-  return Math.round(Math.min(ratePerDay * overdueDays, cap) * 100) / 100;
 }
 
 /** True when IST calendar day is after the loan maturity date (due day itself is still on time). */

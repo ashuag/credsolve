@@ -11,10 +11,9 @@ import {
 } from '../../../common/loan/loan-calculation.util';
 import { loadRepayCoolingPeriodDays } from '../../../common/loan/repay-cooling-period.util';
 import {
-  computeBounceChargeInr,
+  computePenalChargeInr,
   daysToMaturityIst,
   overdueDaysFromMaturity,
-  resolveBounceRatePerDayInr,
 } from '../../../common/loan/bounce-charge.util';
 import { BounceChargeTierResolverService } from '../../../common/loan/bounce-charge-tier.resolver';
 import { resolveEffectiveLoanStatus } from '../../../common/loan/effective-loan-status.util';
@@ -79,8 +78,7 @@ export class LosLoanService {
       },
     });
 
-    // Read once and resolve per row: the schedule is shared by every loan in the list.
-    const { tiers: bounceTiers, penal } = await this.bounceChargeTiers.loadContext();
+    const penal = await this.bounceChargeTiers.loadPenalConfig();
 
     return loans.map((loan) => {
       const details = loan.application.details;
@@ -110,12 +108,8 @@ export class LosLoanService {
         ? Math.max(overdueDaysFromMaturity(loan.loanMaturityDate), 1)
         : 0;
       const principal = decimalToNumber(loan.principalAmount);
-      const bounceRatePerDay =
-        principal != null ? resolveBounceRatePerDayInr(principal, bounceTiers) : 0;
       const penalAmount =
-        principal != null
-          ? computeBounceChargeInr(principal, overdueDays, bounceTiers, penal.maxInr)
-          : 0;
+        principal != null ? computePenalChargeInr(principal, overdueDays, penal) : 0;
       const totalRepayment = decimalToNumber(loan.totalRepaymentAmount) ?? 0;
 
       return {
@@ -134,9 +128,9 @@ export class LosLoanService {
         interestRate: loan.interestRate.toString(),
         interestAmount: loan.interestAmount.toString(),
         totalRepaymentAmount: loan.totalRepaymentAmount.toString(),
-        /** Per-day bounce rate for this principal band, charged only while overdue. */
-        bounceRatePerDayInr: bounceRatePerDay.toFixed(2),
-        /** Accrued bounce charge (rate x overdue days, capped); 0 unless past due and still open. */
+        /** Unused for overdue charges (penal % applies instead); kept for API compatibility. */
+        bounceRatePerDayInr: '0.00',
+        /** Penal charge (rate % of principal, min/max capped); 0 unless past due and still open. */
         penalAmount: penalAmount.toFixed(2),
         totalRepaymentWithPenalAmount: (
           Math.round((totalRepayment + penalAmount) * 100) / 100
@@ -304,13 +298,9 @@ export class LosLoanService {
     const overdueDays = pastDue
       ? Math.max(overdueDaysFromMaturity(loan.loanMaturityDate), 1)
       : 0;
-    const { tiers: bounceTiers, penal } = await this.bounceChargeTiers.loadContext();
-    const bounceRatePerDay =
-      principal != null ? resolveBounceRatePerDayInr(principal, bounceTiers) : 0;
+    const penal = await this.bounceChargeTiers.loadPenalConfig();
     const penalAmount =
-      principal != null
-        ? computeBounceChargeInr(principal, overdueDays, bounceTiers, penal.maxInr)
-        : 0;
+      principal != null ? computePenalChargeInr(principal, overdueDays, penal) : 0;
 
     let daysOutstanding: number | null = null;
     let interestTillToday: string | null = null;
@@ -335,7 +325,7 @@ export class LosLoanService {
     }
 
     const bookedTotal = amountDueAtMaturity ?? decimalToNumber(loan.totalRepaymentAmount) ?? 0;
-    // Carries the accrued bounce so this reflects the full collectable amount.
+    // Includes penal charge so this reflects the full collectable amount.
     const outstanding =
       loan.closedAt != null ? 0 : Math.max(bookedTotal + penalAmount - totalPaid, 0);
 
@@ -365,8 +355,7 @@ export class LosLoanService {
         amountDueAtMaturity != null
           ? amountDueAtMaturity.toFixed(2)
           : loan.totalRepaymentAmount.toString(),
-      /** Per-day bounce rate for this principal band, charged only while overdue. */
-      bounceRatePerDayInr: bounceRatePerDay.toFixed(2),
+      bounceRatePerDayInr: '0.00',
       penalAmount: penalAmount.toFixed(2),
       totalRepaymentWithPenalAmount: (
         Math.round((bookedTotal + penalAmount) * 100) / 100

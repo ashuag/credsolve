@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BounceChargeTierResolverService } from '../../../common/loan/bounce-charge-tier.resolver';
-import { computeBounceChargeInr } from '../../../common/loan/bounce-charge.util';
+import { computePenalChargeInr } from '../../../common/loan/bounce-charge.util';
 import { decimalToNumber } from '../../../common/loan/loan-calculation.util';
 import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbursement-view.util';
 import { loadRepayCoolingPeriodDays } from '../../../common/loan/repay-cooling-period.util';
@@ -97,7 +97,7 @@ export class LosTransactionReportService {
       },
     });
 
-    const { tiers: bounceTiers, penal } = await this.bounceChargeTiers.loadContext();
+    const penal = await this.bounceChargeTiers.loadPenalConfig();
     const coolingPeriodDays = await loadRepayCoolingPeriodDays(this.prisma.client);
 
     return loans.map((loan) => {
@@ -128,9 +128,7 @@ export class LosTransactionReportService {
         coolingPeriodDays,
       });
       const penalCharges =
-        principal != null
-          ? computeBounceChargeInr(principal, metrics.daysExceeded, bounceTiers, penal.maxInr)
-          : 0;
+        principal != null ? computePenalChargeInr(principal, metrics.daysExceeded, penal) : 0;
       const loanNumber =
         typeof loan.loanNumber === 'string' && loan.loanNumber.trim()
           ? loan.loanNumber.trim()
