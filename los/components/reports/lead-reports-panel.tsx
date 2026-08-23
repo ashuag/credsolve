@@ -9,11 +9,21 @@ import {
 } from '@/components/ui/data-table';
 import { losStatusPillStyles } from '@/components/shared/los-status-pill';
 import { downloadLeadReportsExport, getLeadReports, type LosLeadReportListItem } from '@/lib/api';
-import { formatReviewDateOnly, formatReviewInr } from '@/lib/application-review-format';
+import { formatCibilScoreLabel, formatReviewDateOnly, formatReviewInr, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { getLosToken } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+
+const EMPTY_FILTER_VALUE = '__none__';
+
+const CIBIL_RANGE_PRESETS = [
+  { label: '750+', min: 750 },
+  { label: '700–749', min: 700, max: 749 },
+  { label: '650–699', min: 650, max: 699 },
+  { label: 'Below 650', min: 300, max: 649 },
+  { label: 'NTC', min: -1, max: 1 },
+];
 
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString('en-IN', {
@@ -25,21 +35,52 @@ function formatDateTime(iso: string) {
   });
 }
 
-function uniqueStatusOptions(
+function uniqueValueOptions(
   rows: LosLeadReportListItem[],
-  getCode: (row: LosLeadReportListItem) => string | null,
-  getLabel: (row: LosLeadReportListItem) => string | null,
+  getValue: (row: LosLeadReportListItem) => string | null | undefined,
+  getLabel?: (row: LosLeadReportListItem) => string | null | undefined,
 ) {
   const seen = new Map<string, string>();
   for (const row of rows) {
-    const code = getCode(row);
+    const code = getValue(row)?.trim() ?? '';
     if (!code || code === 'NOT_APPLICABLE') {
-      seen.set('__none__', 'None');
+      seen.set(EMPTY_FILTER_VALUE, 'None');
       continue;
     }
-    if (!seen.has(code)) seen.set(code, getLabel(row) ?? code);
+    if (!seen.has(code)) seen.set(code, getLabel?.(row)?.trim() || code);
   }
-  return [...seen.entries()].map(([value, label]) => ({ value, label }));
+  return [...seen.entries()]
+    .sort((a, b) => {
+      if (a[0] === EMPTY_FILTER_VALUE) return 1;
+      if (b[0] === EMPTY_FILTER_VALUE) return -1;
+      return a[1].localeCompare(b[1], undefined, { sensitivity: 'base' });
+    })
+    .map(([value, label]) => ({ value, label }));
+}
+
+function emptyAwareValue(value: string | null | undefined): string {
+  const trimmed = value?.trim() ?? '';
+  return !trimmed || trimmed === 'NOT_APPLICABLE' ? EMPTY_FILTER_VALUE : trimmed;
+}
+
+function CibilScorePill({ score }: { score: number | null }) {
+  if (score == null) return <span className="text-brand-muted">—</span>;
+  return (
+    <span
+      className="inline-flex items-center justify-center min-w-[46px] h-7 px-2 rounded-[7px] text-[0.8rem] font-extrabold"
+      style={
+        isDisplayedNtcCibilScore(score)
+          ? { background: 'rgba(99,102,241,0.12)', color: '#4f46e5' }
+          : score >= 750
+            ? { background: 'rgba(16,185,129,0.1)', color: '#10b981' }
+            : score >= 650
+              ? { background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }
+              : { background: 'rgba(239,68,68,0.1)', color: '#ef4444' }
+      }
+    >
+      {formatCibilScoreLabel(score)}
+    </span>
+  );
 }
 
 function StatusBadge({ code, label }: { code: string | null; label: string | null }) {
@@ -98,20 +139,32 @@ export function LeadReportsPanel() {
     void load();
   }, [load]);
 
+  const cityOptions = useMemo(
+    () => uniqueValueOptions(reports, (row) => row.city),
+    [reports],
+  );
+  const stateOptions = useMemo(
+    () => uniqueValueOptions(reports, (row) => row.state),
+    [reports],
+  );
+  const purposeOptions = useMemo(
+    () => uniqueValueOptions(reports, (row) => row.purposeOfLoan),
+    [reports],
+  );
   const leadStatusOptions = useMemo(
-    () => uniqueStatusOptions(reports, (row) => row.leadStatusCode, (row) => row.leadStatusLabel),
+    () => uniqueValueOptions(reports, (row) => row.leadStatusCode, (row) => row.leadStatusLabel),
     [reports],
   );
   const applicationStatusOptions = useMemo(
-    () => uniqueStatusOptions(reports, (row) => row.applicationStatusCode, (row) => row.applicationStatusLabel),
+    () => uniqueValueOptions(reports, (row) => row.applicationStatusCode, (row) => row.applicationStatusLabel),
     [reports],
   );
   const loanStatusOptions = useMemo(
-    () => uniqueStatusOptions(reports, (row) => row.loanStatusCode, (row) => row.loanStatusLabel),
+    () => uniqueValueOptions(reports, (row) => row.loanStatusCode, (row) => row.loanStatusLabel),
     [reports],
   );
   const repaymentStatusOptions = useMemo(
-    () => uniqueStatusOptions(reports, (row) => row.repaymentStatusCode, (row) => row.repaymentStatusLabel),
+    () => uniqueValueOptions(reports, (row) => row.repaymentStatusCode, (row) => row.repaymentStatusLabel),
     [reports],
   );
 
@@ -158,6 +211,16 @@ export function LeadReportsPanel() {
       render: (row) => row.mobileNumber,
     },
     {
+      key: 'pan',
+      label: 'PAN',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.panNumber ?? '',
+      getSortValue: (row) => (row.panNumber ?? '').toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search PAN…' },
+      cellClassName: 'font-mono text-[0.82rem] whitespace-nowrap',
+      render: (row) => row.panNumber ?? '—',
+    },
+    {
       key: 'dob',
       label: 'DOB',
       headerClassName: 'whitespace-nowrap',
@@ -170,81 +233,86 @@ export function LeadReportsPanel() {
     {
       key: 'city',
       label: 'City',
-      headerClassName: 'whitespace-nowrap',
-      getFilterValue: (row) => row.city ?? '',
+      headerClassName: 'min-w-[108px] whitespace-nowrap',
+      getFilterValue: (row) => emptyAwareValue(row.city),
       getSortValue: (row) => (row.city ?? '').toLowerCase(),
-      filter: { type: 'text', placeholder: 'Search city…' },
+      filter: { type: 'multi-select', placeholder: 'Cities', options: cityOptions },
       cellClassName: 'whitespace-nowrap',
       render: (row) => row.city ?? '—',
     },
     {
       key: 'state',
       label: 'State',
-      headerClassName: 'whitespace-nowrap',
-      getFilterValue: (row) => row.state ?? '',
+      headerClassName: 'min-w-[108px] whitespace-nowrap',
+      getFilterValue: (row) => emptyAwareValue(row.state),
       getSortValue: (row) => (row.state ?? '').toLowerCase(),
-      filter: { type: 'text', placeholder: 'Search state…' },
+      filter: { type: 'multi-select', placeholder: 'States', options: stateOptions },
       cellClassName: 'whitespace-nowrap',
       render: (row) => row.state ?? '—',
     },
     {
       key: 'purpose',
       label: 'Purpose of loan',
-      headerClassName: 'whitespace-nowrap',
-      getFilterValue: (row) => row.purposeOfLoan ?? '',
+      headerClassName: 'min-w-[140px] whitespace-nowrap',
+      getFilterValue: (row) => emptyAwareValue(row.purposeOfLoan),
       getSortValue: (row) => (row.purposeOfLoan ?? '').toLowerCase(),
-      filter: { type: 'text', placeholder: 'Search purpose…' },
+      filter: { type: 'multi-select', placeholder: 'Purposes', options: purposeOptions },
       cellClassName: 'whitespace-nowrap',
       render: (row) => row.purposeOfLoan ?? '—',
     },
     {
       key: 'offerAmount',
       label: 'Loan offer amount',
-      headerClassName: 'whitespace-nowrap',
-      getFilterValue: (row) => row.loanOfferAmount,
-      getSortValue: (row) => row.loanOfferAmount == null ? null : Number(row.loanOfferAmount),
-      filter: { type: 'number', placeholder: 'Amount…' },
+      headerClassName: 'min-w-[128px] whitespace-nowrap',
+      getFilterValue: (row) => (row.loanOfferAmount == null ? null : Number(row.loanOfferAmount)),
+      getSortValue: (row) => (row.loanOfferAmount == null ? null : Number(row.loanOfferAmount)),
+      filter: { type: 'number-range', placeholder: 'Amount range', min: 0 },
       cellClassName: 'whitespace-nowrap font-semibold text-brand-navy',
       render: (row) => formatReviewInr(row.loanOfferAmount),
     },
     {
       key: 'selectedAmount',
       label: 'Loan selected amount',
-      headerClassName: 'whitespace-nowrap',
-      getFilterValue: (row) => row.loanSelectedAmount,
-      getSortValue: (row) => row.loanSelectedAmount == null ? null : Number(row.loanSelectedAmount),
-      filter: { type: 'number', placeholder: 'Amount…' },
+      headerClassName: 'min-w-[128px] whitespace-nowrap',
+      getFilterValue: (row) => (row.loanSelectedAmount == null ? null : Number(row.loanSelectedAmount)),
+      getSortValue: (row) => (row.loanSelectedAmount == null ? null : Number(row.loanSelectedAmount)),
+      filter: { type: 'number-range', placeholder: 'Amount range', min: 0 },
       cellClassName: 'whitespace-nowrap font-semibold text-brand-navy',
       render: (row) => formatReviewInr(row.loanSelectedAmount),
     },
     {
+      key: 'cibil',
+      label: 'CIBIL',
+      headerClassName: 'min-w-[128px] whitespace-nowrap',
+      getFilterValue: (row) => row.cibilScore,
+      getSortValue: (row) => row.cibilScore,
+      filter: {
+        type: 'number-range',
+        placeholder: 'Score range',
+        min: -1,
+        max: 900,
+        presets: CIBIL_RANGE_PRESETS,
+      },
+      cellClassName: 'whitespace-nowrap',
+      render: (row) => <CibilScorePill score={row.cibilScore} />,
+    },
+    {
       key: 'leadStatus',
       label: 'Lead status',
-      headerClassName: 'whitespace-nowrap',
-      getFilterValue: (row) => row.leadStatusCode,
+      headerClassName: 'min-w-[128px] whitespace-nowrap',
+      getFilterValue: (row) => emptyAwareValue(row.leadStatusCode),
       getSortValue: (row) => row.leadStatusLabel.toLowerCase(),
-      filter: {
-        type: 'select',
-        options: leadStatusOptions,
-        matches: (row, value) => row.leadStatusCode === value,
-      },
+      filter: { type: 'multi-select', placeholder: 'Statuses', options: leadStatusOptions },
       cellClassName: 'whitespace-nowrap',
       render: (row) => <StatusBadge code={row.leadStatusCode} label={row.leadStatusLabel} />,
     },
     {
       key: 'applicationStatus',
       label: 'Application status',
-      headerClassName: 'whitespace-nowrap',
-      getFilterValue: (row) => row.applicationStatusCode ?? '',
+      headerClassName: 'min-w-[148px] whitespace-nowrap',
+      getFilterValue: (row) => emptyAwareValue(row.applicationStatusCode),
       getSortValue: (row) => (row.applicationStatusLabel ?? '').toLowerCase(),
-      filter: {
-        type: 'select',
-        options: applicationStatusOptions,
-        matches: (row, value) => {
-          if (value === '__none__') return row.applicationStatusCode == null;
-          return row.applicationStatusCode === value;
-        },
-      },
+      filter: { type: 'multi-select', placeholder: 'Statuses', options: applicationStatusOptions },
       cellClassName: 'whitespace-nowrap',
       render: (row) => (
         <StatusBadge code={row.applicationStatusCode} label={row.applicationStatusLabel} />
@@ -253,34 +321,20 @@ export function LeadReportsPanel() {
     {
       key: 'loanStatus',
       label: 'Loan status',
-      headerClassName: 'whitespace-nowrap',
-      getFilterValue: (row) => row.loanStatusCode ?? '',
+      headerClassName: 'min-w-[128px] whitespace-nowrap',
+      getFilterValue: (row) => emptyAwareValue(row.loanStatusCode),
       getSortValue: (row) => (row.loanStatusLabel ?? '').toLowerCase(),
-      filter: {
-        type: 'select',
-        options: loanStatusOptions,
-        matches: (row, value) => {
-          if (value === '__none__') return row.loanStatusCode == null;
-          return row.loanStatusCode === value;
-        },
-      },
+      filter: { type: 'multi-select', placeholder: 'Statuses', options: loanStatusOptions },
       cellClassName: 'whitespace-nowrap',
       render: (row) => <StatusBadge code={row.loanStatusCode} label={row.loanStatusLabel} />,
     },
     {
       key: 'repaymentStatus',
       label: 'Repayment status',
-      headerClassName: 'whitespace-nowrap',
-      getFilterValue: (row) => row.repaymentStatusCode,
+      headerClassName: 'min-w-[148px] whitespace-nowrap',
+      getFilterValue: (row) => emptyAwareValue(row.repaymentStatusCode),
       getSortValue: (row) => row.repaymentStatusLabel.toLowerCase(),
-      filter: {
-        type: 'select',
-        options: repaymentStatusOptions,
-        matches: (row, value) => {
-          if (value === '__none__') return row.repaymentStatusCode === 'NOT_APPLICABLE';
-          return row.repaymentStatusCode === value;
-        },
-      },
+      filter: { type: 'multi-select', placeholder: 'Statuses', options: repaymentStatusOptions },
       cellClassName: 'whitespace-nowrap',
       render: (row) => (
         <StatusBadge code={row.repaymentStatusCode} label={row.repaymentStatusLabel} />
@@ -289,14 +343,14 @@ export function LeadReportsPanel() {
     {
       key: 'created',
       label: 'Created',
-      headerClassName: 'min-w-[168px] whitespace-nowrap',
+      headerClassName: 'min-w-[188px] whitespace-nowrap',
       getFilterValue: (row) => row.createdAt,
       getSortValue: (row) => isoDateTimestamp(row.createdAt),
-      filter: { type: 'datetime-range', placeholder: 'Date & time' },
+      filter: { type: 'datetime-range', placeholder: 'Date & time range' },
       cellClassName: 'text-brand-muted text-[0.78rem] whitespace-nowrap',
       render: (row) => formatDateTime(row.createdAt),
     },
-  ], [applicationStatusOptions, leadStatusOptions, loanStatusOptions, repaymentStatusOptions]);
+  ], [applicationStatusOptions, cityOptions, leadStatusOptions, loanStatusOptions, purposeOptions, repaymentStatusOptions, stateOptions]);
 
   const withApplication = reports.filter((row) => row.applicationUuid).length;
   const disbursed = reports.filter((row) => row.loanUuid).length;
@@ -325,7 +379,7 @@ export function LeadReportsPanel() {
         onRetry={() => void load()}
         emptyMessage="No leads have been recorded yet."
         noResultsMessage="No leads match your filters."
-        minWidth="1680px"
+        minWidth="1960px"
         pageSize={LOS_LISTING_PAGE_SIZE}
         pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         initialSort={{ key: 'created', dir: 'desc' }}

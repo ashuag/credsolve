@@ -309,7 +309,6 @@ export class LosLeadReportService {
     const leads = await this.prisma.read.lead.findMany({
       where: { isInternalTesting: false },
       orderBy: { createdAt: 'desc' },
-      take: 2000,
       include: leadReportInclude,
     });
     return leads.map(mapLeadReport);
