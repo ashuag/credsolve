@@ -1,7 +1,11 @@
 'use client';
 
 import { DatetimeRangeFilter } from '@/components/ui/datetime-range-filter';
+import { MultiSelectFilter } from '@/components/ui/multi-select-filter';
+import { NumberRangeFilter } from '@/components/ui/number-range-filter';
 import { matchesDatetimeRange } from '@/lib/datetime-range';
+import { matchesMultiSelect } from '@/lib/multi-select';
+import { matchesNumberRange, type NumberRangePreset } from '@/lib/number-range';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 export const LOS_TABLE_PAGE_SIZE = 20;
@@ -12,12 +16,24 @@ export type SortDirection = 'asc' | 'desc';
 export type SortState<T extends string = string> = { key: T; dir: SortDirection } | null;
 export type ColumnFilters = Partial<Record<string, string>>;
 
-export type DataTableFilterType = 'text' | 'select' | 'date' | 'datetime-range' | 'number';
+export type DataTableFilterType =
+  | 'text'
+  | 'select'
+  | 'multi-select'
+  | 'date'
+  | 'datetime-range'
+  | 'number'
+  | 'number-range';
 
 export type DataTableColumnFilterConfig<T> = {
   type: DataTableFilterType;
   placeholder?: string;
   options?: Array<{ value: string; label: string }>;
+  /** Inclusive bounds for `number-range` inputs. */
+  min?: number;
+  max?: number;
+  step?: number;
+  presets?: NumberRangePreset[];
   /** Custom match. When omitted, uses `getFilterValue` / `getSortValue` with type defaults. */
   matches?: (item: T, filterValue: string) => boolean;
 };
@@ -153,6 +169,11 @@ export function DataTableColumnFilter({
   placeholder,
   type = 'text',
   options,
+  min,
+  max,
+  step,
+  presets,
+  title,
   'aria-label': ariaLabel,
 }: {
   value: string;
@@ -160,6 +181,11 @@ export function DataTableColumnFilter({
   placeholder?: string;
   type?: DataTableFilterType;
   options?: Array<{ value: string; label: string }>;
+  min?: number;
+  max?: number;
+  step?: number;
+  presets?: NumberRangePreset[];
+  title?: string;
   'aria-label'?: string;
 }) {
   if (type === 'select') {
@@ -177,6 +203,18 @@ export function DataTableColumnFilter({
           </option>
         ))}
       </select>
+    );
+  }
+
+  if (type === 'multi-select') {
+    return (
+      <MultiSelectFilter
+        value={value}
+        onChange={onChange}
+        options={options}
+        placeholder={placeholder ?? 'All'}
+        aria-label={ariaLabel ?? placeholder ?? 'Filter by values'}
+      />
     );
   }
 
@@ -198,7 +236,23 @@ export function DataTableColumnFilter({
         value={value}
         onChange={onChange}
         placeholder={placeholder ?? 'Date & time'}
+        title={title}
         aria-label={ariaLabel ?? placeholder ?? 'Filter by date and time range'}
+      />
+    );
+  }
+
+  if (type === 'number-range') {
+    return (
+      <NumberRangeFilter
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder ?? 'Range'}
+        min={min}
+        max={max}
+        step={step}
+        presets={presets}
+        aria-label={ariaLabel ?? placeholder ?? 'Filter by numeric range'}
       />
     );
   }
@@ -389,6 +443,12 @@ function defaultColumnMatches<T, K extends string>(
   }
   if (filter.type === 'datetime-range') {
     return matchesDatetimeRange(raw, filterValue);
+  }
+  if (filter.type === 'number-range') {
+    return matchesNumberRange(raw, filterValue);
+  }
+  if (filter.type === 'multi-select') {
+    return matchesMultiSelect(raw, filterValue);
   }
   if (filter.type === 'number') {
     const target = Number(filterValue);
@@ -584,6 +644,11 @@ export function DataTable<T, K extends string = string>({
                               onChange={(value) => setColumnFilter(column.key, value)}
                               placeholder={filter.placeholder}
                               options={filter.options}
+                              min={filter.min}
+                              max={filter.max}
+                              step={filter.step}
+                              presets={filter.presets}
+                              title={column.label}
                               aria-label={`Filter ${column.label}`}
                             />
                           );

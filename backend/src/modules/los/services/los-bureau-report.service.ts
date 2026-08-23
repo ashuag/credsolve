@@ -14,9 +14,8 @@ export class LosBureauReportService {
   async listBureauReports() {
     const reports = await this.prisma.read.bureauReport.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 500,
-      // Do not `include` the parent row: Prisma would pull `raw_payload` (full CIBIL JSON)
-      // for every report and stall this listing.
+      // Uncapped listing: select only list columns (never `include` the parent row —
+      // Prisma would pull `raw_payload` / full CIBIL JSON and stall this endpoint).
       select: {
         uuid: true,
         cibilScore: true,
@@ -60,7 +59,6 @@ export class LosBureauReportService {
   async exportBureauReportsWorkbook(): Promise<Buffer> {
     const reports = await this.prisma.read.bureauReport.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 500,
       select: {
         rawPayload: true,
         cibilScore: true,

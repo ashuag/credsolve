@@ -161,45 +161,38 @@ export function BureauReportsPanel() {
     {
       key: 'cibil',
       label: 'CIBIL',
-      headerClassName: 'whitespace-nowrap',
+      headerClassName: 'min-w-[128px] whitespace-nowrap',
       getFilterValue: (row) => row.cibilScore,
       getSortValue: (row) => row.cibilScore,
-      filter: { type: 'number', placeholder: 'Score…' },
+      filter: {
+        type: 'number-range',
+        placeholder: 'Score range',
+        min: -1,
+        max: 900,
+        presets: [
+          { label: '750+', min: 750 },
+          { label: '700–749', min: 700, max: 749 },
+          { label: '650–699', min: 650, max: 699 },
+          { label: 'Below 650', min: 300, max: 649 },
+          { label: 'NTC', min: -1, max: 1 },
+        ],
+      },
       cellClassName: 'whitespace-nowrap',
       render: (row) => <CibilScorePill score={row.cibilScore} />,
     },
     {
       key: 'grade',
       label: 'Grade',
-      headerClassName: 'whitespace-nowrap',
+      headerClassName: 'min-w-[108px] whitespace-nowrap',
       getFilterValue: (row) => row.cibilCreditAssessmentCategory ?? '',
       getSortValue: (row) => row.cibilCreditAssessmentCategory ?? '',
       filter: {
-        type: 'select',
+        type: 'multi-select',
+        placeholder: 'Grades',
         options: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((g) => ({ value: g, label: g })),
-        matches: (row, value) => row.cibilCreditAssessmentCategory === value,
       },
       cellClassName: 'whitespace-nowrap',
       render: (row) => <GradeBadge category={row.cibilCreditAssessmentCategory} />,
-    },
-    {
-      key: 'application',
-      label: 'Application',
-      headerClassName: 'whitespace-nowrap',
-      getFilterValue: (row) => row.applicationNumber ?? '',
-      getSortValue: (row) => (row.applicationNumber ?? '').toLowerCase(),
-      filter: { type: 'text', placeholder: 'Search…' },
-      render: (row) =>
-        row.applicationUuid && row.applicationNumber ? (
-          <Link
-            href={`/applications/${row.applicationUuid}`}
-            className="font-mono text-[0.82rem] font-semibold text-brand-navy no-underline hover:underline whitespace-nowrap"
-          >
-            {row.applicationNumber}
-          </Link>
-        ) : (
-          <span className="text-brand-muted">—</span>
-        ),
     },
     {
       key: 'source',
@@ -231,10 +224,10 @@ export function BureauReportsPanel() {
     {
       key: 'fetched',
       label: 'Fetched',
-      headerClassName: 'min-w-[168px] whitespace-nowrap',
+      headerClassName: 'min-w-[188px] whitespace-nowrap',
       getFilterValue: (row) => row.fetchedAt,
       getSortValue: (row) => isoDateTimestamp(row.fetchedAt),
-      filter: { type: 'datetime-range', placeholder: 'Date & time' },
+      filter: { type: 'datetime-range', placeholder: 'Date & time range' },
       cellClassName: 'text-brand-muted text-[0.78rem] whitespace-nowrap',
       render: (row) => formatDateTime(row.fetchedAt),
     },
@@ -267,7 +260,7 @@ export function BureauReportsPanel() {
         onRetry={() => void load()}
         emptyMessage="No bureau reports have been stored yet."
         noResultsMessage="No bureau reports match your filters."
-        minWidth="1220px"
+        minWidth="1080px"
         pageSize={LOS_LISTING_PAGE_SIZE}
         pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         initialSort={{ key: 'fetched', dir: 'desc' }}

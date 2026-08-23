@@ -246,6 +246,12 @@ export function shiftMonth(year: number, month: number, delta: number): { year: 
   return { year: y, month: m + 1 };
 }
 
+export function ymdInRange(ymd: string, fromYmd: string, toYmd: string): boolean {
+  const start = fromYmd <= toYmd ? fromYmd : toYmd;
+  const end = fromYmd <= toYmd ? toYmd : fromYmd;
+  return ymd >= start && ymd <= end;
+}
+
 export function monthGrid(year: number, month: number): Array<{ ymd: string } | null> {
   const first = `${year}-${pad2(month)}-01`;
   const lead = istWeekdayMondayIndex(first);
