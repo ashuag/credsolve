@@ -3,6 +3,8 @@ import { REJECTION_REASON } from '../constants/rejection-reason.constants';
 import type { BreSettings } from '../../modules/auth/infrastructure/repositories/settings.repository';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { evaluatePreBreAge } from './pre-bre-age.util';
+import { resolveRepaymentDueDateUtc } from '../loan/repayment-due-date.util';
 
 export interface PreBreCheckInput {
   dateOfBirth: Date | null;
@@ -36,7 +38,8 @@ export class PreBreCheckService {
     settings: BreSettings,
     db: PrismaClient = this.prisma.client,
   ): Promise<PreBreCheckResult> {
-    const ageResult = this.checkAge(input, settings.minAge, settings.maxAge);
+    const tenureEnd = await resolveRepaymentDueDateUtc(db);
+    const ageResult = this.checkAge(input, settings.minAge, settings.maxAge, tenureEnd);
     if (!ageResult.passed) return ageResult;
 
     const genderResult = this.checkRejectedGender(input, settings.rejectedGenderIds);
@@ -166,7 +169,12 @@ export class PreBreCheckService {
     return { passed: true, rejectReason: null, rejectionReasonCode: null };
   }
 
-  private checkAge(input: PreBreCheckInput, minAge: number, maxAge: number): PreBreCheckResult {
+  private checkAge(
+    input: PreBreCheckInput,
+    minAge: number,
+    maxAge: number,
+    tenureEnd: Date,
+  ): PreBreCheckResult {
     const dob = input.dateOfBirth;
     if (!dob) {
       return {
@@ -176,38 +184,28 @@ export class PreBreCheckService {
       };
     }
 
-    const today = new Date();
-    let age = today.getUTCFullYear() - dob.getUTCFullYear();
-    const monthDiff = today.getUTCMonth() - dob.getUTCMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getUTCDate() < dob.getUTCDate())) {
-      age--;
+    const verdict = evaluatePreBreAge({ dateOfBirth: dob, tenureEnd, minAge, maxAge });
+    if (verdict.passed) {
+      return { passed: true, rejectReason: null, rejectionReasonCode: null };
     }
 
-    const dobIso = dob.toISOString().slice(0, 10);
-
-    if (age < minAge) {
-      this.logger.warn(`Pre-BRE min-age check failed: age=${age}, min=${minAge}`);
+    if (verdict.code === 'MAX_AGE_BRE_FAILED') {
+      this.logger.warn(
+        `Pre-BRE max-age check failed: ageAtTenureEnd=${verdict.ageAtTenureEnd}, currentAge=${verdict.currentAge}, max=${maxAge}`,
+      );
       return {
         passed: false,
-        rejectReason: this.withLeadContext(
-          input,
-          `Min-age rule: currentAge=${age}y, allowed=${minAge}-${maxAge}y, DOB=${dobIso}`,
-        ),
-        rejectionReasonCode: REJECTION_REASON.MIN_AGE_BRE_FAILED,
-      };
-    }
-    if (age > maxAge) {
-      this.logger.warn(`Pre-BRE max-age check failed: age=${age}, max=${maxAge}`);
-      return {
-        passed: false,
-        rejectReason: this.withLeadContext(
-          input,
-          `Max-age rule: currentAge=${age}y, allowed=${minAge}-${maxAge}y, DOB=${dobIso}`,
-        ),
+        rejectReason: this.withLeadContext(input, verdict.detail),
         rejectionReasonCode: REJECTION_REASON.MAX_AGE_BRE_FAILED,
       };
     }
-    return { passed: true, rejectReason: null, rejectionReasonCode: null };
+
+    this.logger.warn(`Pre-BRE min-age check failed: age=${verdict.currentAge}, min=${minAge}`);
+    return {
+      passed: false,
+      rejectReason: this.withLeadContext(input, verdict.detail),
+      rejectionReasonCode: REJECTION_REASON.MIN_AGE_BRE_FAILED,
+    };
   }
 
   /** Appends compact occupation/gender context for LOS `lead_status_note` (VARCHAR 256). */

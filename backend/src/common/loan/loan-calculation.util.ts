@@ -38,6 +38,18 @@ export function istCalendarDateUtc(at: Date = new Date()): Date {
   return new Date(Date.UTC(y, m - 1, d));
 }
 
+/** Completed age in years on an IST calendar day. */
+export function completedAgeYearsIst(dateOfBirth: Date, asOf: Date = new Date()): number {
+  const birth = istCalendarDateUtc(dateOfBirth);
+  const on = istCalendarDateUtc(asOf);
+  let age = on.getUTCFullYear() - birth.getUTCFullYear();
+  const monthDiff = on.getUTCMonth() - birth.getUTCMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && on.getUTCDate() < birth.getUTCDate())) {
+    age--;
+  }
+  return age;
+}
+
 /**
  * Inclusive tenure day count (disbursement / selection day = day 1).
  * e.g. 29 Jul → 31 Aug = 34 days; 13 Jul → 31 Jul = 19 days.

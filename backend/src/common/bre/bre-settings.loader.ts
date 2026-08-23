@@ -16,7 +16,7 @@ export async function loadBreSettings(prisma: Pick<PrismaService, 'client'>): Pr
     raw.split(',').map((s) => s.trim()).filter(Boolean);
 
   const minAge = Math.max(1, Number.parseInt(pickCriteria(EC.MIN_AGE, '21'), 10) || 21);
-  const maxAge = Math.max(1, Number.parseInt(pickCriteria(EC.MAX_AGE, '57'), 10) || 57);
+  const maxAge = Math.max(1, Number.parseInt(pickCriteria(EC.MAX_AGE, '58'), 10) || 58);
   const rejectedGenderKeys = parseKeyList(pickCriteria(EC.REJECTED_GENDERS, 'OTHERS'));
   const rejectedOccupationKeys = parseKeyList(pickCriteria(EC.REJECTED_OCCUPATIONS, 'STUDENT,HOMEMAKER,RETIRED'));
 

@@ -271,7 +271,6 @@ export class LosLeadService {
           select: {
             uuid: true,
             cibilScore: true,
-            htmlUrl: true,
             createdAt: true,
           },
         },
@@ -345,7 +344,6 @@ export class LosLeadService {
         ? {
             uuid: lead.bureauReports[0].uuid,
             cibilScore: lead.bureauReports[0].cibilScore,
-            htmlUrl: lead.bureauReports[0].htmlUrl,
             fetchedAt: lead.bureauReports[0].createdAt.toISOString(),
           }
         : null,
@@ -381,7 +379,6 @@ export class LosLeadService {
       select: {
         id: true,
         uuid: true,
-        htmlUrl: true,
         rawPayload: true,
         createdAt: true,
       },
@@ -410,7 +407,6 @@ export class LosLeadService {
       bureauReportUuid: bureauReportRow.uuid,
       fetchedAt: bureauReportRow.createdAt.toISOString(),
       reportPdfUrl: this.resolveBureauReportPdfUrl(leadUuid, pdfResult, true),
-      htmlUrl: bureauReportRow.htmlUrl,
       rawPayload: bureauReportRow.rawPayload,
       report,
       creditAssessment,

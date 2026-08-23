@@ -109,7 +109,7 @@ export function BureauReportsPanel() {
   const columns = useMemo((): DataTableColumn<LosBureauReportListItem>[] => [
     {
       key: 'lead',
-      label: 'Lead ID',
+      label: 'Application ID',
       headerClassName: 'whitespace-nowrap',
       getFilterValue: (row) => row.leadNumber,
       getSortValue: (row) => row.leadNumber.toLowerCase(),

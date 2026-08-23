@@ -26,7 +26,6 @@ export class BureauReportRepository {
       customerId: params.customerId,
       leadId: params.leadId,
       cibilScore: params.parsed.bureauScore,
-      htmlUrl: params.parsed.htmlUrl,
       vendorRequestId: params.parsed.vendorRequestId,
       serviceStatusCode: params.httpStatus,
       responseStatus: params.parsed.responseStatus,
@@ -48,7 +47,6 @@ export class BureauReportRepository {
     id: bigint;
     uuid: string;
     cibilScore: number | null;
-    htmlUrl: string | null;
     createdAt: Date;
   } | null> {
     return this.prisma.client.bureauReport.findFirst({
@@ -58,7 +56,6 @@ export class BureauReportRepository {
         id: true,
         uuid: true,
         cibilScore: true,
-        htmlUrl: true,
         createdAt: true,
       },
     });

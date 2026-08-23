@@ -572,7 +572,6 @@ export class LosApplicationService {
       select: {
         uuid: true,
         cibilScore: true,
-        htmlUrl: true,
         createdAt: true,
         cibilCreditAssessment: { select: { category: true, creditRecommendation: true } },
       },
@@ -766,7 +765,6 @@ export class LosApplicationService {
         ? {
             uuid: bureauReportRow.uuid,
             cibilScore: bureauReportRow.cibilScore,
-            htmlUrl: bureauReportRow.htmlUrl,
             reportPdfUrl: bureauReportPdfUrl,
             fetchedAt: bureauReportRow.createdAt.toISOString(),
             creditAssessmentCategory: bureauReportRow.cibilCreditAssessment?.category ?? null,
@@ -1035,7 +1033,6 @@ export class LosApplicationService {
       select: {
         id: true,
         uuid: true,
-        htmlUrl: true,
         rawPayload: true,
         createdAt: true,
       },
@@ -1064,7 +1061,6 @@ export class LosApplicationService {
       bureauReportUuid: bureauReportRow.uuid,
       fetchedAt: bureauReportRow.createdAt.toISOString(),
       reportPdfUrl: this.resolveBureauReportPdfUrl(applicationUuid, pdfResult, true),
-      htmlUrl: bureauReportRow.htmlUrl,
       rawPayload: bureauReportRow.rawPayload,
       report,
       creditAssessment,

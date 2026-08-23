@@ -1,4 +1,5 @@
 import {
+  completedAgeYearsIst,
   computeAmountDueNowInr,
   computeInterestAmountInr,
   computeTenureDays,
@@ -95,5 +96,14 @@ describe('resolveContractedTenureDays', () => {
         asOf: new Date('2026-07-24T06:00:00.000Z'),
       }),
     ).toBe(8);
+  });
+});
+
+describe('completedAgeYearsIst', () => {
+  it('counts a completed birthday on the IST calendar day', () => {
+    const dob = new Date('1968-07-10T00:00:00.000Z');
+    expect(completedAgeYearsIst(dob, new Date('2026-08-23T08:00:00.000Z'))).toBe(58);
+    expect(completedAgeYearsIst(dob, new Date('2026-07-10T00:00:00.000Z'))).toBe(58);
+    expect(completedAgeYearsIst(dob, new Date('2026-07-09T18:29:00.000Z'))).toBe(57);
   });
 });

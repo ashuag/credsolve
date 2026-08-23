@@ -212,12 +212,11 @@ export class VerifyPanUseCase {
     const leadDetailPayload = await this.buildLeadInputRequest(leadRow.id, dto);
     const fullNameTrimmed = leadDetailPayload.fullName;
 
-    const [cityRow, panVerificationEnabled, breSettings] = await Promise.all([
+    const [cityRow, breSettings] = await Promise.all([
       this.prisma.client.city.findUnique({
         where: { id: leadDetailPayload.cityId },
         select: { id: true, name: true, stateId: true, state: { select: { code: true } } },
       }),
-      this.settings.isPanVerificationEnabled(),
       this.settings.loadBreSettings(),
     ]);
 
@@ -249,7 +248,7 @@ export class VerifyPanUseCase {
 
     if (!preBreResult.passed) {
       this.logger.log(
-        `Pre-BRE rejected lead ${leadRow.id.toString()} before PAN checks: ${preBreResult.rejectionReasonCode ?? 'unknown'}`,
+        `Pre-BRE rejected lead ${leadRow.id.toString()} before PAN verification: ${preBreResult.rejectionReasonCode ?? 'unknown'}`,
       );
       await this.rejectLead(leadRow.id, preBreResult.rejectReason ?? 'BRE check failed', preBreResult.rejectionReasonCode);
       this.fireRejectionSms(customer.mobileNumber, leadRow.id);
@@ -259,6 +258,8 @@ export class VerifyPanUseCase {
         message: BUREAU_THANK_YOU_MESSAGE,
       };
     }
+
+    const panVerificationEnabled = await this.settings.isPanVerificationEnabled();
 
     if (!panVerificationEnabled) {
       const updatedLeadPan = await this.updatePanStatus(leadRow.id, PAN_VERIFIED.API_DISABLED, 'PAN verification disabled in settings');

@@ -123,7 +123,6 @@ export type LosLeadDetails = {
   bureauReport: {
     uuid: string;
     cibilScore: number | null;
-    htmlUrl: string | null;
     fetchedAt: string;
   } | null;
   applications: Array<{
@@ -332,7 +331,6 @@ export type LosApplicationDetails = {
   bureauReport: {
     uuid: string;
     cibilScore: number | null;
-    htmlUrl: string | null;
     reportPdfUrl: string | null;
     fetchedAt: string;
     /** Rule-based CIBIL credit-assessment category (A best .. H worst); null if not yet computed. */

@@ -7,7 +7,7 @@ const CRITERIA: Array<{ key: string; label: string; value: string; breType: stri
   { key: 'MIN_LOAN_AMOUNT', label: 'Minimum loan amount (₹)', value: '500', breType: PRE_BRE, description: 'Minimum permissible loan request amount in INR' },
   { key: 'MAX_LOAN_AMOUNT', label: 'Maximum loan amount (₹)', value: '30000', breType: PRE_BRE, description: 'Maximum permissible loan request amount in INR' },
   { key: 'MIN_AGE', label: 'Minimum borrower age (years)', value: '21', breType: PRE_BRE, description: 'Customer must be at least this age at loan origination' },
-  { key: 'MAX_AGE', label: 'Maximum borrower age at end of tenure', value: '58', breType: PRE_BRE, description: 'Customer age must not exceed this at end of loan tenure' },
+  { key: 'MAX_AGE', label: 'Maximum borrower age at end of tenure', value: '58', breType: PRE_BRE, description: 'Customer completed age must be less than this at end of loan tenure' },
   { key: 'ENFORCE_NEGATIVE_STATE', label: 'Enforce negative state list', value: 'true', breType: PRE_BRE, description: 'When true, origination is blocked when the customer address maps to a state present in the negative_state serviceability master.' },
   { key: 'ENFORCE_NEGATIVE_PINCODE', label: 'Enforce negative pincode list', value: 'true', breType: PRE_BRE, description: 'When true, origination is blocked when the customer pincode matches an active row in the negative_pincode serviceability master.' },
   { key: 'ENFORCE_NEGATIVE_CITY', label: 'Enforce negative city list', value: 'true', breType: PRE_BRE, description: 'When true, origination is blocked when the customer city matches an active row in the negative_city serviceability master.' },

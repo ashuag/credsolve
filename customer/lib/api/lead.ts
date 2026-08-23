@@ -158,7 +158,7 @@ export async function saveLeadDetails(payload: SaveLeadDetailsPayload): Promise<
   )) ?? { success: true };
 }
 
-/** Saves full profile, runs pre-BRE, then PAN-NSDL and bureau soft-pull when checks pass. */
+/** Saves full profile, runs pre-BRE first, then PAN-NSDL and bureau only if pre-BRE passes. */
 export async function verifyLeadPan(payload: VerifyLeadPanPayload): Promise<VerifyLeadPanResponse> {
   return (
     (await apiPost<VerifyLeadPanResponse>(

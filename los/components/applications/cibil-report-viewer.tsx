@@ -661,9 +661,9 @@ export function CibilReportViewer({
                 Download CIBIL report
               </a>
             ) : null}
-            {(payload.htmlUrl ?? report.vendorHtmlUrl) ? (
+            {report.vendorHtmlUrl ? (
               <a
-                href={payload.htmlUrl ?? report.vendorHtmlUrl ?? '#'}
+                href={report.vendorHtmlUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex min-h-[36px] items-center rounded-full border border-[rgba(23,44,113,0.12)] bg-white px-4 text-[0.8rem] font-bold text-brand-navy no-underline hover:border-[rgba(20,150,243,0.35)]"

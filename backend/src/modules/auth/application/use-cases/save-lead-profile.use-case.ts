@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { PreBreCheckService } from '../../../../common/bre/pre-bre-check.service';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { REJECTION_REASON } from '../../../../common/constants/rejection-reason.constants';
 import { SettingKey } from '../../../../common/constants/setting.constants';
@@ -17,6 +18,7 @@ import { SmsService } from '../../../../common/sms/sms.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
+import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
 import type { SaveLeadProfileDto } from '../dto/save-lead-profile.dto';
 
 function parseDobUtc(dob: string): Date {
@@ -36,10 +38,15 @@ export class SaveLeadProfileUseCase {
     private readonly leads: LeadRepository,
     private readonly prisma: PrismaService,
     private readonly panVerification: PanVerificationService,
+    private readonly preBreCheck: PreBreCheckService,
+    private readonly settings: SettingsRepository,
     private readonly sms: SmsService,
   ) {}
 
-  async execute(req: Request, dto: SaveLeadProfileDto): Promise<{ success: true; leadUuid: string } | { success: false; rejected: true }> {
+  async execute(
+    req: Request,
+    dto: SaveLeadProfileDto,
+  ): Promise<{ success: true; leadUuid: string } | { success: true; rejected: true }> {
     const session = req.customerSession;
     if (!session) {
       throw new UnauthorizedException('Sign in with mobile OTP before continuing.');
@@ -99,6 +106,37 @@ export class SaveLeadProfileUseCase {
       update: profilePayload,
     });
 
+    const breSettings = await this.settings.loadBreSettings();
+    const preBreResult = await this.preBreCheck.run(
+      {
+        dateOfBirth,
+        genderId,
+        occupationId,
+        genderDisplay: dto.gender,
+        occupationDisplay: dto.occupation,
+        pincode: null,
+        cityId: null,
+        stateId: null,
+        cityName: null,
+        stateCode: null,
+      },
+      breSettings,
+    );
+    if (!preBreResult.passed) {
+      this.logger.log(
+        `Pre-BRE rejected lead ${leadRow.id.toString()} before PAN verification: ${preBreResult.rejectionReasonCode ?? 'unknown'}`,
+      );
+      await this.rejectLead(
+        leadRow.id,
+        preBreResult.rejectReason ?? 'BRE check failed',
+        preBreResult.rejectionReasonCode,
+      );
+      void this.sms.sendRejectionSms(customer.mobileNumber, leadRow.id).catch((err) => {
+        this.logger.error('Failed to send rejection SMS', err instanceof Error ? err.stack : err);
+      });
+      return { success: true, rejected: true };
+    }
+
     const panCheck = this.panVerification.validatePanStructure(panUpper, dto.fullName.trim());
     if (!panCheck.valid) {
       const maxAttempts = await this.loadMaxPanAttempts();
@@ -122,7 +160,7 @@ export class SaveLeadProfileUseCase {
         void this.sms.sendRejectionSms(customer.mobileNumber, leadRow.id).catch((err) => {
           this.logger.error('Failed to send rejection SMS', err instanceof Error ? err.stack : err);
         });
-        return { success: false, rejected: true };
+        return { success: true, rejected: true };
       }
 
       const remaining = maxAttempts - attemptsUsed;
@@ -148,5 +186,32 @@ export class SaveLeadProfileUseCase {
     });
     const n = row ? Number.parseInt(row.value.trim(), 10) : NaN;
     return Number.isFinite(n) && n > 0 ? n : Number.parseInt(SettingKey.PAN_VALIDATION_ATTEMPTS.default, 10);
+  }
+
+  private async rejectLead(leadId: bigint, note: string, rejectionReasonCode?: string | null) {
+    const [rejected, reason] = await Promise.all([
+      this.prisma.client.leadStatus.findFirst({
+        where: { name: LEAD_STATUS.REJECTED, isActive: true },
+        select: { id: true },
+      }),
+      rejectionReasonCode
+        ? this.prisma.client.rejectionReason.findFirst({
+            where: { name: rejectionReasonCode, isActive: true },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+    ]);
+    if (!rejected) {
+      this.logger.warn('LeadStatus REJECTED not found in DB — skipping lead rejection.');
+      return;
+    }
+    await this.leads.updateLead({
+      where: { id: leadId },
+      data: {
+        leadStatusId: rejected.id,
+        leadStatusNote: note.slice(0, 256),
+        ...(reason ? { rejectionReasonId: reason.id } : {}),
+      },
+    });
   }
 }

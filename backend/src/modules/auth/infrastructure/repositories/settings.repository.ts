@@ -103,7 +103,7 @@ function settingRedisKey(settingKey: string): string {
  */
 const BRE_SETTING_FALLBACK = {
   BRE_MIN_AGE: { key: 'BRE_MIN_AGE', default: '21' },
-  BRE_MAX_AGE: { key: 'BRE_MAX_AGE', default: '57' },
+  BRE_MAX_AGE: { key: 'BRE_MAX_AGE', default: '58' },
   BRE_REJECTED_GENDERS: { key: 'BRE_REJECTED_GENDERS', default: '3' },
   BRE_REJECTED_OCCUPATIONS: { key: 'BRE_REJECTED_OCCUPATIONS', default: '4,5,6' },
 } as const;
@@ -334,7 +334,7 @@ export class SettingsRepository implements OnModuleInit {
       raw.split(',').map((s) => s.trim()).filter(Boolean);
 
     const minAge = Math.max(1, Number.parseInt(pickCriteria(EC.MIN_AGE, '21'), 10) || 21);
-    const maxAge = Math.max(1, Number.parseInt(pickCriteria(EC.MAX_AGE, '57'), 10) || 57);
+    const maxAge = Math.max(1, Number.parseInt(pickCriteria(EC.MAX_AGE, '58'), 10) || 58);
     const rejectedGenderKeys = parseKeyList(pickCriteria(EC.REJECTED_GENDERS, 'OTHERS'));
     const rejectedOccupationKeys = parseKeyList(pickCriteria(EC.REJECTED_OCCUPATIONS, 'STUDENT,HOMEMAKER,RETIRED'));
 

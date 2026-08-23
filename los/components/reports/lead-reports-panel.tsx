@@ -118,7 +118,7 @@ export function LeadReportsPanel() {
   const columns = useMemo((): DataTableColumn<LosLeadReportListItem>[] => [
     {
       key: 'lead',
-      label: 'Lead ID',
+      label: 'Application ID',
       headerClassName: 'whitespace-nowrap',
       getFilterValue: (row) => row.leadNumber,
       getSortValue: (row) => row.leadNumber.toLowerCase(),

@@ -331,7 +331,7 @@ export class AuthController {
   @UseGuards(RequiredCustomerSessionGuard)
   @RateLimitByRoute('save-lead-details')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Save basic profile fields before the address step (no PAN/CIBIL yet)' })
+  @ApiOperation({ summary: 'Save basic profile, run pre-BRE (age/gender/occupation); reject before PAN checks if it fails' })
   saveLeadProfileRoute(@Req() req: Request, @Body() body: SaveLeadProfileDto) {
     return this.saveLeadProfileFlow.execute(req, body);
   }
@@ -342,7 +342,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Save full profile, run pre-BRE, then PAN-NSDL and bureau soft-pull when checks pass',
+      'Run pre-BRE first; PAN-NSDL and bureau soft-pull only when pre-BRE passes',
   })
   verifyPanRoute(@Req() req: Request, @Body() body: VerifyPanDto) {
     const pan = body.panNumber?.trim().toUpperCase() ?? '';
