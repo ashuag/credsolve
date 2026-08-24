@@ -1,12 +1,15 @@
 import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import type { Response } from 'express';
 import { Prisma, type PrismaClient } from '@prisma/client';
+import { APPLICATION_STATUS } from '../../../common/constants/application.constants';
 import { BUREAU_FETCHED } from '../../../common/constants/bureau-fetch.constants';
 import { LEAD_STATUS } from '../../../common/constants/lead.constants';
 import { REJECTION_REASON, toRejectionReasonDto } from '../../../common/constants/rejection-reason.constants';
 import { PAN_VERIFIED } from '../../../common/constants/pan-verification.constants';
 import { generateLeadNumber } from '../../../common/loan/application-number.util';
 import { customerHasOpenLoan } from '../../../common/loan/customer-open-loan.util';
+import { computeTenureDays, istCalendarDateUtc } from '../../../common/loan/loan-calculation.util';
+import { resolveRepaymentDueDateUtc } from '../../../common/loan/repayment-due-date.util';
 import { BureauReportPdfService } from '../../../common/cibil/bureau-report-pdf.service';
 import { CibilCreditAssessmentService } from '../../../common/cibil/cibil-credit-assessment.service';
 import { KycFilesService } from '../../../common/kyc/kyc-files.service';
@@ -516,6 +519,8 @@ export class LosLeadService {
   /**
    * Admin-only: open a new NEW lead from a rejected case, copy profile/PAN where safe,
    * and deactivate the rejected lead. Bureau / KYC / bank are not copied.
+   * Loan amount/purpose are copied when present; repay date is always recomputed from
+   * today (1–15 → this month-end, 16+ → next month-end, plus any LOS due-date override).
    */
   async restartRejectedJourney(leadUuid: string) {
     return this.createRestartedLeadFromRejected({ leadUuid });
@@ -540,6 +545,11 @@ export class LosLeadService {
         rejectionReason: { select: { name: true } },
         leadDetail: true,
         leadUtms: { orderBy: { createdAt: 'desc' }, take: 1 },
+        applications: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: { details: true },
+        },
       },
     });
     if (!source) {
@@ -651,6 +661,41 @@ export class LosLeadService {
           },
         });
         copiedFields.push('UTM');
+      }
+
+      const sourceDetails = source.applications[0]?.details;
+      if (sourceDetails?.selectedLoanAmount != null && sourceDetails.reasonForLoanId != null) {
+        const tenureEndDate = await resolveRepaymentDueDateUtc(tx);
+        const tenureDays = computeTenureDays(istCalendarDateUtc(), tenureEndDate);
+        const draftStatus = tenureDays <= 62
+          ? await tx.applicationStatus.findFirst({
+              where: { name: APPLICATION_STATUS.DRAFT, isActive: true },
+              select: { id: true },
+            })
+          : null;
+        if (draftStatus) {
+          const application = await tx.application.create({
+            data: {
+              customerId: source.customerId,
+              leadId: created.id,
+              applicationStatusId: draftStatus.id,
+              applicationNumber: created.leadNumber,
+            },
+          });
+          await tx.applicationDetail.create({
+            data: {
+              applicationId: application.id,
+              selectedLoanAmount: sourceDetails.selectedLoanAmount,
+              interestRate: sourceDetails.interestRate,
+              processingFeePercentage: sourceDetails.processingFeePercentage,
+              gstPercentage: sourceDetails.gstPercentage,
+              reasonForLoanId: sourceDetails.reasonForLoanId,
+              expectedRepaymentDays: tenureDays,
+              expectedRepaymentDate: tenureEndDate,
+            },
+          });
+          copiedFields.push('loan amount', 'repay date');
+        }
       }
 
       return { created, copiedFields };

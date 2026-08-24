@@ -38,6 +38,8 @@ export function RestartRejectedJourneyButton({
     const confirmed = window.confirm(
       'Start a new customer journey from this rejected case?\n\n' +
         'Name, DOB, address, occupation, income, and PAN (when already verified) will be copied onto a new lead. ' +
+        'If a loan amount was already selected, it is copied and the repay date is recalculated from today ' +
+        '(1st–15th → end of this month; 16th onward → end of next month, or the active LOS due-date override). ' +
         'Bureau, KYC, and bank verification will run again. The rejected record stays in history.',
     );
     if (!confirmed) return;
