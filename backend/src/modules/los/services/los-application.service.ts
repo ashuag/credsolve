@@ -47,6 +47,19 @@ function mapLeadRejectionReason(
   return null;
 }
 
+/** Applications still in the ops queue — never drop these for the listing cap. */
+const OPEN_APPLICATION_QUEUE_STATUSES: readonly string[] = [
+  APPLICATION_STATUS.DRAFT,
+  APPLICATION_STATUS.IN_REVIEW,
+  APPLICATION_STATUS.APPROVED,
+  APPLICATION_STATUS.KYC_FAILED,
+  APPLICATION_STATUS.PENNYDROP_FAILED,
+  APPLICATION_STATUS.INTERNAL_ERROR,
+  APPLICATION_STATUS.ACTIVE,
+];
+
+const APPLICATION_LISTING_RECENT_CAP = 500;
+
 const loanDocumentApplicationSelect = {
   id: true,
   uuid: true,
@@ -337,9 +350,27 @@ export class LosApplicationService {
   ) {}
 
   async listApplications() {
+    const listingWhere: Prisma.ApplicationWhereInput = {
+      lead: { isInternalTesting: false },
+    };
+    const recentRows = await this.prisma.read.application.findMany({
+      where: listingWhere,
+      orderBy: { createdAt: 'desc' },
+      take: APPLICATION_LISTING_RECENT_CAP,
+      select: { id: true },
+    });
+    const recentIds = recentRows.map((row) => row.id);
     const applications = await this.prisma.read.application.findMany({
       where: {
-        lead: { isInternalTesting: false },
+        AND: [
+          listingWhere,
+          {
+            OR: [
+              { applicationStatus: { name: { in: [...OPEN_APPLICATION_QUEUE_STATUSES] } } },
+              ...(recentIds.length > 0 ? [{ id: { in: recentIds } }] : []),
+            ],
+          },
+        ],
       },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -395,7 +426,6 @@ export class LosApplicationService {
           },
         },
       },
-      take: 500,
     });
 
     return applications.map((application) => {

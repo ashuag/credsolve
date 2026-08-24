@@ -267,7 +267,8 @@ export function ApplicationsPanel() {
       key: 'app-id',
       label: 'Application ID',
       headerClassName: 'whitespace-nowrap',
-      getFilterValue: (row) => row.applicationNumber?.trim() ?? '',
+      getFilterValue: (row) =>
+        [row.applicationNumber, row.leadNumber, row.uuid, row.leadUuid].filter(Boolean).join(' '),
       getSortValue: (row) => (row.applicationNumber ?? '').toUpperCase(),
       filter: { type: 'text', placeholder: 'Search…' },
       render: (app) => (

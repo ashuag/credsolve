@@ -135,7 +135,10 @@ export class LosDataController {
   }
 
   @Get('applications')
-  @ApiOperation({ summary: 'List latest applications for LOS application management' })
+  @ApiOperation({
+    summary:
+      'List applications for LOS application management (all open statuses, plus the latest 500 overall)',
+  })
   applications() {
     return this.losApplication.listApplications();
   }
