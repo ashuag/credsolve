@@ -123,8 +123,11 @@ export class ApplicationsController {
   @Post('bank/ifsc-lookup')
   @RateLimitByRoute('bank-ifsc-lookup')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Resolve IFSC via Tenacio (input.ifscNumber + consent); returns data for customer review' })
-  @ApiOkResponse({ description: 'Vendor envelope + parsed `details` when present' })
+  @ApiOperation({
+    summary:
+      'Resolve IFSC from the ifsc_code table; on a miss call Tenacio, persist bank/address/city/state/pincode, then return details',
+  })
+  @ApiOkResponse({ description: 'Cached or vendor `details` (bank name, IFSC, address, city, state, pincode, …)' })
   lookupIfscRoute(@Req() req: Request, @Body() body: LookupIfscDto) {
     return this.lookupIfsc.execute(req, body);
   }

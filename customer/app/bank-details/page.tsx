@@ -18,6 +18,7 @@ const DETAIL_LABELS: Record<string, string> = {
   city: 'City',
   district: 'District',
   state: 'State',
+  pincode: 'Pincode',
   centre: 'Centre',
   micr: 'MICR',
   contact: 'Contact',

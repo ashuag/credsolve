@@ -884,17 +884,18 @@ export class PostBreCheckService {
       };
     }
 
-    const leadDob = lead.leadDetail?.dateOfBirth;
-    const reportDobStr = reportData.dateOfBirth;
-    if (leadDob && reportDobStr) {
-      const leadDobIso = leadDob.toISOString().slice(0, 10);
-      if (leadDobIso !== reportDobStr) {
-        return {
-          passed: false,
-          rejectReason: `Bureau DOB mismatch: entered ${leadDobIso} but bureau report contains ${reportDobStr}.`,
-        };
-      }
-    }
+    // Bureau DOB vs customer DOB is not used for identity mismatch.
+    // const leadDob = lead.leadDetail?.dateOfBirth;
+    // const reportDobStr = reportData.dateOfBirth;
+    // if (leadDob && reportDobStr) {
+    //   const leadDobIso = leadDob.toISOString().slice(0, 10);
+    //   if (leadDobIso !== reportDobStr) {
+    //     return {
+    //       passed: false,
+    //       rejectReason: `Bureau DOB mismatch: entered ${leadDobIso} but bureau report contains ${reportDobStr}.`,
+    //     };
+    //   }
+    // }
 
     return { passed: true, rejectReason: '' };
   }
@@ -902,7 +903,7 @@ export class PostBreCheckService {
   /**
    * Rejects when the bureau report lists phone number(s) and none match the applicant mobile.
    * Skipped (passes) when the report has no phone data or the applicant has no usable mobile —
-   * same missing-data pattern as PAN/DOB identity checks.
+   * same missing-data pattern as the PAN identity check.
    */
   private checkBureauPhoneMatch(
     rawPayload: unknown,

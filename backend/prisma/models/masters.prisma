@@ -45,6 +45,24 @@ model Bank {
   @@map("bank")
 }
 
+/// Cached IFSC branch lookup. Customer bank step reads this first; a miss calls the
+/// vendor and stores bank name, IFSC, address, city, state, pincode, plus remaining API fields.
+model IfscCode {
+  id         Int      @id @default(autoincrement())
+  ifscCode   String   @unique @map("ifsc_code") @db.VarChar(11)
+  bankName   String   @map("bank_name") @db.VarChar(150)
+  address    String?  @db.VarChar(500)
+  city       String?  @db.VarChar(100)
+  state      String?  @db.VarChar(100)
+  pincode    String?  @db.VarChar(10)
+  /// Full vendor `data` object so a cache hit matches a live API response (branch, MICR, …).
+  apiPayload Json?    @map("api_payload")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("ifsc_code")
+}
+
 model ReasonForLoan {
   id                Int                 @id @default(autoincrement()) @db.SmallInt
   name              String              @unique @db.VarChar(50)

@@ -7,7 +7,7 @@
 //
 //   models/enums.prisma         — shared enums
 //   models/config.prisma        — Setting, EligibilityCriteria, CreditLimitTier, BounceChargeTier
-//   models/masters.prisma       — small reference tables (Gender, Bank, statuses, repayment due dates, …)
+//   models/masters.prisma       — small reference tables (Gender, Bank, IfscCode, statuses, repayment due dates, …)
 //   models/geography.prisma     — State, City, Pincode (negative flags on each master)
 //   models/otp.prisma           — OtpRequest
 //   models/customer.prisma      — Customer + KYC

@@ -51,6 +51,7 @@ import { OtpCodeGenerator } from './infrastructure/crypto/otp-code.generator';
 import { CustomerGoogleOauthService } from './infrastructure/google/customer-google-oauth.service';
 import { CustomerRepository } from './infrastructure/repositories/customer.repository';
 import { BankRepository } from './infrastructure/repositories/bank.repository';
+import { IfscCodeRepository } from './infrastructure/repositories/ifsc-code.repository';
 import { LeadRepository } from './infrastructure/repositories/lead.repository';
 import { ApplicationRepository } from './infrastructure/repositories/application.repository';
 import { BureauReportRepository } from './infrastructure/repositories/bureau-report.repository';
@@ -84,6 +85,7 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     OtpRequestRepository,
     CustomerRepository,
     BankRepository,
+    IfscCodeRepository,
     LeadRepository,
     ApplicationRepository,
     SettingsRepository,
