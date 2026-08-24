@@ -1,13 +1,15 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import type { Response } from 'express';
+import { Prisma, type PrismaClient } from '@prisma/client';
 import { BUREAU_FETCHED } from '../../../common/constants/bureau-fetch.constants';
 import { LEAD_STATUS } from '../../../common/constants/lead.constants';
-import { toRejectionReasonDto } from '../../../common/constants/rejection-reason.constants';
+import { REJECTION_REASON, toRejectionReasonDto } from '../../../common/constants/rejection-reason.constants';
 import { PAN_VERIFIED } from '../../../common/constants/pan-verification.constants';
+import { generateLeadNumber } from '../../../common/loan/application-number.util';
+import { customerHasOpenLoan } from '../../../common/loan/customer-open-loan.util';
 import { BureauReportPdfService } from '../../../common/cibil/bureau-report-pdf.service';
 import { CibilCreditAssessmentService } from '../../../common/cibil/cibil-credit-assessment.service';
 import { KycFilesService } from '../../../common/kyc/kyc-files.service';
-import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
 import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
@@ -509,6 +511,196 @@ export class LosLeadService {
     });
 
     return this.getLeadDetails(leadUuid, this.prisma.client);
+  }
+
+  /**
+   * Admin-only: open a new NEW lead from a rejected case, copy profile/PAN where safe,
+   * and deactivate the rejected lead. Bureau / KYC / bank are not copied.
+   */
+  async restartRejectedJourney(leadUuid: string) {
+    return this.createRestartedLeadFromRejected({ leadUuid });
+  }
+
+  async restartRejectedJourneyFromApplication(applicationUuid: string) {
+    const application = await this.prisma.client.application.findUnique({
+      where: { uuid: applicationUuid },
+      select: { uuid: true, lead: { select: { uuid: true } } },
+    });
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+    return this.createRestartedLeadFromRejected({ leadUuid: application.lead.uuid });
+  }
+
+  private async createRestartedLeadFromRejected(params: { leadUuid: string }) {
+    const source = await this.prisma.client.lead.findUnique({
+      where: { uuid: params.leadUuid },
+      include: {
+        leadStatus: { select: { name: true } },
+        rejectionReason: { select: { name: true } },
+        leadDetail: true,
+        leadUtms: { orderBy: { createdAt: 'desc' }, take: 1 },
+      },
+    });
+    if (!source) {
+      throw new NotFoundException('Lead not found');
+    }
+    if (source.leadStatus.name !== LEAD_STATUS.REJECTED) {
+      throw new BadRequestException('Reapply is only available for rejected leads.');
+    }
+
+    if (await customerHasOpenLoan(this.prisma.client, source.customerId)) {
+      throw new ConflictException(
+        'This customer has an active or overdue loan. Close that loan before reapplying.',
+      );
+    }
+
+    const otherActive = await this.prisma.client.lead.findFirst({
+      where: {
+        customerId: source.customerId,
+        isActive: true,
+        id: { not: source.id },
+        leadStatus: { name: { notIn: [LEAD_STATUS.REJECTED, LEAD_STATUS.BLACKLISTED] } },
+      },
+      include: { leadStatus: { select: { name: true } } },
+    });
+    if (otherActive) {
+      throw new ConflictException(
+        `Customer already has an active ${otherActive.leadStatus.name} lead (${otherActive.leadNumber}). Use that journey instead.`,
+      );
+    }
+
+    const newStatus = await this.prisma.client.leadStatus.findFirst({
+      where: { name: LEAD_STATUS.NEW, isActive: true },
+      select: { id: true },
+    });
+    if (!newStatus) {
+      throw new InternalServerErrorException('Lead status NEW is missing. Run database seeds.');
+    }
+
+    const panRejection =
+      source.rejectionReason?.name === REJECTION_REASON.PAN_VERIFICATION_FAILED ||
+      source.rejectionReason?.name === REJECTION_REASON.PAN_ALREADY_LINKED_TO_PHONE;
+    const detail = source.leadDetail;
+    const keepPanVerified =
+      !panRejection &&
+      detail != null &&
+      (detail.panVerified === PAN_VERIFIED.VERIFIED || detail.panVerified === PAN_VERIFIED.API_DISABLED);
+
+    const cloned = await this.prisma.client.$transaction(async (tx) => {
+      await tx.lead.updateMany({
+        where: { customerId: source.customerId, isActive: true },
+        data: { isActive: false },
+      });
+
+      const created = await this.insertLeadWithUniqueNumber(tx, {
+        customerId: source.customerId,
+        leadStatusId: newStatus.id,
+        sourceId: source.sourceId,
+        isInternalTesting: source.isInternalTesting,
+        leadStatusNote: `Reapplied by LOS admin from rejected lead ${source.leadNumber}.`,
+      });
+
+      const copiedFields: string[] = [];
+      if (detail) {
+        const panVerified = keepPanVerified ? detail.panVerified : PAN_VERIFIED.NOT_CHECKED;
+        await tx.leadDetail.create({
+          data: {
+            leadId: created.id,
+            fullName: detail.fullName,
+            dateOfBirth: detail.dateOfBirth,
+            genderId: detail.genderId,
+            cityId: detail.cityId,
+            pincode: detail.pincode,
+            addressLine1: detail.addressLine1,
+            addressLine2: detail.addressLine2,
+            occupationId: detail.occupationId,
+            netMonthlyIncome: detail.netMonthlyIncome,
+            annualTurnover: detail.annualTurnover,
+            annualProfit: detail.annualProfit,
+            cibilConsentAt: detail.cibilConsentAt,
+            panNumber: detail.panNumber,
+            panVerified,
+            panVerifiedAt: keepPanVerified ? detail.panVerifiedAt : null,
+            panValidationAttempts: 0,
+            bureauFetched: BUREAU_FETCHED.NOT_FETCHED,
+            bureauFetchedAt: null,
+            bureauFetchedNote: null,
+          },
+        });
+        if (detail.fullName?.trim()) copiedFields.push('name');
+        if (detail.dateOfBirth) copiedFields.push('date of birth');
+        if (detail.genderId) copiedFields.push('gender');
+        if (detail.cityId || detail.pincode || detail.addressLine1) copiedFields.push('address');
+        if (detail.occupationId) copiedFields.push('occupation');
+        if (detail.netMonthlyIncome != null || detail.annualTurnover != null) copiedFields.push('income');
+        if (detail.panNumber) copiedFields.push(keepPanVerified ? 'verified PAN' : 'PAN number');
+        if (detail.cibilConsentAt) copiedFields.push('bureau consent');
+      }
+
+      const utm = source.leadUtms[0];
+      if (utm) {
+        await tx.leadUtm.create({
+          data: {
+            leadId: created.id,
+            utmSource: utm.utmSource,
+            utmMedium: utm.utmMedium,
+            utmCampaign: utm.utmCampaign,
+            utmTerm: utm.utmTerm,
+            utmContent: utm.utmContent,
+          },
+        });
+        copiedFields.push('UTM');
+      }
+
+      return { created, copiedFields };
+    });
+
+    return {
+      success: true as const,
+      sourceLeadUuid: source.uuid,
+      sourceLeadNumber: source.leadNumber,
+      newLeadUuid: cloned.created.uuid,
+      newLeadNumber: cloned.created.leadNumber,
+      copiedFields: cloned.copiedFields,
+    };
+  }
+
+  private async insertLeadWithUniqueNumber(
+    tx: Prisma.TransactionClient,
+    data: {
+      customerId: bigint;
+      leadStatusId: number;
+      sourceId: number | null;
+      isInternalTesting: boolean;
+      leadStatusNote: string;
+    },
+  ) {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      try {
+        return await tx.lead.create({
+          data: {
+            customerId: data.customerId,
+            leadStatusId: data.leadStatusId,
+            leadNumber: generateLeadNumber(),
+            sourceId: data.sourceId,
+            isInternalTesting: data.isInternalTesting,
+            leadStatusNote: data.leadStatusNote,
+            isActive: true,
+          },
+        });
+      } catch (err) {
+        lastError = err;
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw lastError instanceof Error
+      ? lastError
+      : new InternalServerErrorException('Failed to allocate a unique lead id.');
   }
 
   async markInternalTesting(leadUuid: string): Promise<{ success: true; leadUuid: string }> {

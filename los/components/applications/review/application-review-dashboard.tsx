@@ -15,6 +15,7 @@ import {
 } from '@/components/applications/review/application-review-panels';
 import { ApplicationReviewHero } from '@/components/applications/review/application-review-hero';
 import { ApplicationReviewToolbar } from '@/components/applications/review/application-review-ui';
+import { RestartRejectedJourneyButton } from '@/components/shared/restart-rejected-journey-button';
 import { canRejectApplicationStatus, RejectRecordModal } from '@/components/shared/reject-record-modal';
 import { canDecideLosApplication } from '@/lib/access';
 import { buildReviewFlags } from '@/lib/application-review-flags';
@@ -196,7 +197,16 @@ export function ApplicationReviewDashboard({
           ))}
         </nav>
 
-        <div className="ar-toolbar">
+        <div className="ar-toolbar flex flex-wrap items-center justify-end gap-2">
+          <RestartRejectedJourneyButton
+            token={authToken}
+            applicationUuid={applicationUuid}
+            statusCode={
+              row.lead.statusCode.toUpperCase() === 'REJECTED' || row.statusCode.toUpperCase() === 'REJECTED'
+                ? 'REJECTED'
+                : row.lead.statusCode
+            }
+          />
           <ApplicationReviewToolbar
             onRefresh={onRefresh}
             onReject={canReject ? () => setRejectOpen(true) : undefined}

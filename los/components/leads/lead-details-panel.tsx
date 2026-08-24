@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { WorkspaceRecordHeader } from '@/components/shared/workspace-record-header';
 import { LosStatusPill } from '@/components/shared/los-status-pill';
 import { canRejectLeadStatus, RejectRecordModal } from '@/components/shared/reject-record-modal';
+import { RestartRejectedJourneyButton } from '@/components/shared/restart-rejected-journey-button';
 import { ApplicationCibilReportTab } from '@/components/applications/application-cibil-report-tab';
 import { buildLeadIntakeJourney } from '@/lib/customer-journey';
 import { formatCibilScoreLabel } from '@/lib/application-review-format';
@@ -306,6 +307,11 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
           <button type="button" onClick={() => void load()} className="los-btn-primary min-h-[38px] px-4 text-[0.82rem]">
             Refresh data
           </button>
+          <RestartRejectedJourneyButton
+            token={getToken()}
+            leadUuid={lead.uuid}
+            statusCode={lead.statusCode}
+          />
           {canRejectLeadStatus(lead.statusCode) ? (
             <button
               type="button"

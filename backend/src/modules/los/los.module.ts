@@ -10,6 +10,7 @@ import { LosAuthController } from './auth/los-auth.controller';
 import { LosAuthService } from './auth/los-auth.service';
 import { LosAuthGuard } from './auth/los-auth.guard';
 import { LosDenyAgentGuard, LosDenyAgentWritesGuard } from './auth/los-deny-agent.guard';
+import { LosAdminGuard } from './auth/los-admin.guard';
 import { LosSessionService } from './auth/los-session.service';
 import { LosDataController } from './los-data.controller';
 import { LosLeadService } from './services/los-lead.service';
@@ -56,6 +57,7 @@ import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
     LosAuthGuard,
     LosDenyAgentGuard,
     LosDenyAgentWritesGuard,
+    LosAdminGuard,
     LosTeamService,
     LosLeadService,
     LosApplicationService,

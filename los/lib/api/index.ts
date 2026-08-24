@@ -28,6 +28,7 @@ export * from './reject-record';
 export * from './disbursement';
 export * from './kyc-enable-re-kyc';
 export * from './grant-penny-drop-attempt';
+export * from './restart-rejected-journey';
 export * from './cibil-vendor-checks';
 export * from './kyc-face-match-check';
 export * from './face-liveness-check';

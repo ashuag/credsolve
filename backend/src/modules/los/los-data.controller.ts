@@ -3,6 +3,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { LosAuthGuard } from './auth/los-auth.guard';
 import { LosDenyAgentGuard } from './auth/los-deny-agent.guard';
+import { LosAdminGuard } from './auth/los-admin.guard';
 import { RejectWorkspaceRecordDto } from './dto/reject-workspace-record.dto';
 import { LosLeadService } from './services/los-lead.service';
 import { LosApplicationService } from './services/los-application.service';
@@ -177,6 +178,16 @@ export class LosDataController {
     return this.losRejection.rejectApplication(applicationUuid, body);
   }
 
+  @Post('applications/:applicationUuid/restart-journey')
+  @UseGuards(LosAdminGuard)
+  @ApiOperation({
+    summary:
+      'Admin: start a new customer journey from a rejected application’s lead, copying profile/PAN where possible',
+  })
+  restartApplicationJourney(@Param('applicationUuid') applicationUuid: string) {
+    return this.losLead.restartRejectedJourneyFromApplication(applicationUuid);
+  }
+
   @Post('applications/:applicationUuid/mark-internal-testing')
   @UseGuards(LosDenyAgentGuard)
   @ApiOperation({
@@ -306,6 +317,15 @@ export class LosDataController {
   @ApiOperation({ summary: 'Reject a lead with reason and ops note (LOS auth)' })
   rejectLead(@Param('leadUuid') leadUuid: string, @Body() body: RejectWorkspaceRecordDto) {
     return this.losRejection.rejectLead(leadUuid, body);
+  }
+
+  @Post('leads/:leadUuid/restart-journey')
+  @UseGuards(LosAdminGuard)
+  @ApiOperation({
+    summary: 'Admin: start a new customer journey from a rejected lead, copying profile/PAN where possible',
+  })
+  restartLeadJourney(@Param('leadUuid') leadUuid: string) {
+    return this.losLead.restartRejectedJourney(leadUuid);
   }
 
   @Post('leads/:leadUuid/mark-internal-testing')

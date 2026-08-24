@@ -52,6 +52,22 @@ export function canRetryLosApplicationSteps(
   return !isAgentRole(roleName, hierarchyLevel);
 }
 
+export function isLosAdminRole(
+  roleName?: string | null,
+  hierarchyLevel?: number | null,
+): boolean {
+  if ((roleName ?? '').trim().toUpperCase() === 'ADMIN') return true;
+  return hierarchyLevel === 1;
+}
+
+/** Start a new journey from a rejected case — Admin only. */
+export function canRestartRejectedJourney(
+  roleName?: string | null,
+  hierarchyLevel?: number | null,
+): boolean {
+  return isLosAdminRole(roleName, hierarchyLevel);
+}
+
 export function isLosConfigPath(pathname: string): boolean {
   return LOS_AGENT_RESTRICTED_PATH_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
