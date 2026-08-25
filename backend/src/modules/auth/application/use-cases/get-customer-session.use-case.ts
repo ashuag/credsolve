@@ -7,10 +7,8 @@ import {
 } from '../../../../common/loan/customer-open-loan.util';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { getRejectedUntilIso } from '../../../../common/lead/lead-reapply-policy.util';
-import {
-  APPLICATION_KYC_STATUS,
-  APPLICATION_STATUS,
-} from '../../../../common/constants/application.constants';
+import { APPLICATION_KYC_STATUS } from '../../../../common/constants/application.constants';
+import { isBankNameMatchReviewPending } from '../../../../common/constants/bank.constants';
 import { isDigilockerAadhaarCaptureComplete } from '../../../../common/kyc/aadhaar-vendor-parse.util';
 import {
   formatLeadDetailForPortal,
@@ -193,6 +191,7 @@ export class GetCustomerSessionUseCase {
             select: {
               updatedAt: true,
               preApprovedLoanAmount: true,
+              applicationStatusNote: true,
               applicationStatus: { select: { name: true } },
               details: {
                 select: {
@@ -328,7 +327,10 @@ export class GetCustomerSessionUseCase {
     const referencesCompleted = leadReferences.length >= 2;
 
     const applicationStatusName = applicationExtras?.applicationStatus.name ?? null;
-    const bankNameReviewPending = applicationStatusName === APPLICATION_STATUS.UNDER_REVIEW;
+    const bankNameReviewPending = isBankNameMatchReviewPending({
+      statusName: applicationStatusName,
+      statusNote: applicationExtras?.applicationStatusNote,
+    });
     const bankDetailsCompleted = Boolean(
       appDetails?.bankAccountNumber?.trim() && appDetails?.ifscCode?.trim() && !bankNameReviewPending,
     );

@@ -34,4 +34,5 @@ export * from './kyc-face-match-check';
 export * from './face-liveness-check';
 export * from './tenacio-face-checks';
 export * from './nsdl-pan-verification';
+export * from './name-match-fuzz-score';
 export * from './vendor-api-logs';

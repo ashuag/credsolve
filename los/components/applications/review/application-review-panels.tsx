@@ -28,6 +28,7 @@ import { isApplicationJourneyStepActive } from '@/lib/customer-journey';
 import { usesMonthlyIncomeMetric, resolveOccupationKey } from '@/lib/customer-details';
 import {
   combineMatchVerdicts,
+  combinedNameMatchScore,
   compareGenders,
   compareIsoDates,
   comparePan,
@@ -36,6 +37,7 @@ import {
   extractCibilPan,
   formatAadhaarNumberDisplay,
   formatDobWithAge,
+  nameMatchScoreDetail,
   nameMatchVerdict,
   normalizeAadhaarGender,
   type KycMatchVerdict,
@@ -598,17 +600,23 @@ export function ReviewBankPanel({
   applicationUuid,
   authToken,
   onRefresh,
+  onApproveNameMatch,
+  approveNameMatchBusy,
+  canApproveNameMatch,
 }: {
   row: LosApplicationDetails;
   applicationUuid: string;
   authToken: string | null;
   onRefresh?: () => void;
+  onApproveNameMatch?: () => void;
+  approveNameMatchBusy?: boolean;
+  canApproveNameMatch?: boolean;
 }) {
   const bank = row.disbursement;
   const hasBank = Boolean(bank?.accountNumber?.trim() || bank?.ifscCode?.trim());
   const attempts = row.pennyDropVerification;
   const latestNameScore = row.bankAccountAttempts?.[0]?.nameMatchScore ?? null;
-  const nameReviewPending = row.statusCode.toUpperCase() === 'UNDER_REVIEW';
+  const nameReviewPending = Boolean(row.nameMatchPendingReview) || row.statusCode.toUpperCase() === 'UNDER_REVIEW';
   const showGrant = row.canGrantPennyDropAttempt || canGrantPennyDropAttemptFromRow(row);
   const bankFailed = isBankDetailFailed(row);
   const pending = hasBank && !bank?.disbursedAt;
@@ -622,7 +630,7 @@ export function ReviewBankPanel({
       }
       title="Disbursement account"
       right={
-        row.statusCode.toUpperCase() === 'UNDER_REVIEW' ? (
+        row.nameMatchPendingReview || row.statusCode.toUpperCase() === 'UNDER_REVIEW' ? (
           <ReviewPill tone="warn">Name match review</ReviewPill>
         ) : !hasBank ? (
           bankFailed || showGrant ? (
@@ -643,6 +651,18 @@ export function ReviewBankPanel({
         authToken={authToken}
         onSuccess={onRefresh}
       />
+      {canApproveNameMatch && onApproveNameMatch ? (
+        <div style={{ marginBottom: 12 }}>
+          <button
+            type="button"
+            onClick={onApproveNameMatch}
+            disabled={approveNameMatchBusy}
+            className="min-h-[38px] rounded-[8px] border border-[rgba(16,185,129,0.35)] bg-[#ecfdf5] px-4 text-[0.82rem] font-bold text-[#047857] hover:bg-[#d1fae5] disabled:cursor-not-allowed disabled:opacity-55"
+          >
+            {approveNameMatchBusy ? 'Approving…' : 'Approve'}
+          </button>
+        </div>
+      ) : null}
       {attempts ? (
         <div className="fgrid" style={{ marginBottom: 12 }}>
           <ReviewField
@@ -708,17 +728,19 @@ function ComparedField({
   value,
   verdict,
   score,
+  scoreTitle,
 }: {
   label: string;
   value: ReactNode;
   verdict: KycMatchVerdict;
   score?: number;
+  scoreTitle?: string;
 }) {
   return (
     <ReviewField
       label={label}
       value={value}
-      badge={<ReviewMatchBadge verdict={verdict} score={score} />}
+      badge={<ReviewMatchBadge verdict={verdict} score={score} title={scoreTitle} />}
       badgeInValue
     />
   );
@@ -844,6 +866,7 @@ function IdentityMatrix({
     cibil: ReactNode;
     verdict: KycMatchVerdict;
     score?: number;
+    scoreTitle?: string;
   }>;
 }) {
   return (
@@ -866,7 +889,7 @@ function IdentityMatrix({
               <td>{row.aadhaar}</td>
               <td>{row.cibil}</td>
               <td>
-                <ReviewMatchBadge verdict={row.verdict} score={row.score} />
+                <ReviewMatchBadge verdict={row.verdict} score={row.score} title={row.scoreTitle} />
               </td>
             </tr>
           ))}
@@ -912,16 +935,15 @@ export function ReviewPersonalPanel({
   const salaryFlag =
     occupationKey === 'SALARIED' && monthlyIncome != null && monthlyIncome < MIN_MONTHLY_INCOME_SALARIED;
 
+  const hasAadhaarName = Boolean(profile.fullName?.trim() && aadhaar?.fullName?.trim());
+  const hasCibilName = Boolean(profile.fullName?.trim() && cibilReport?.consumerName?.trim());
   const nameScore = computeNameMatchScore(profile.fullName, aadhaar?.fullName);
-  const nameVerdict = nameMatchVerdict(nameScore, Boolean(profile.fullName && aadhaar?.fullName));
+  const nameVerdict = nameMatchVerdict(nameScore, hasAadhaarName);
   const dobVerdict = compareIsoDates(profile.dateOfBirth, aadhaar?.dateOfBirth);
   const genderVerdict = compareGenders(profile.gender, aadhaar?.gender);
   const panVerdict = comparePan(pan, bureauPan);
   const cibilNameScore = computeNameMatchScore(profile.fullName, cibilReport?.consumerName);
-  const cibilNameVerdict = nameMatchVerdict(
-    cibilNameScore,
-    Boolean(profile.fullName && cibilReport?.consumerName?.trim()),
-  );
+  const cibilNameVerdict = nameMatchVerdict(cibilNameScore, hasCibilName);
   const cibilDobVerdict = compareIsoDates(profile.dateOfBirth, cibilReport?.dateOfBirth);
   const matrixNameVerdict = combineMatchVerdicts(
     nameVerdict,
@@ -931,6 +953,12 @@ export function ReviewPersonalPanel({
     dobVerdict,
     cibilReport ? cibilDobVerdict : 'missing',
   );
+  const nameScoreParts = [
+    { label: 'Aadhaar', hasBoth: hasAadhaarName, score: nameScore },
+    { label: 'CIBIL', hasBoth: hasCibilName, score: cibilNameScore },
+  ];
+  const matrixNameScore = combinedNameMatchScore(nameScoreParts);
+  const matrixNameScoreTitle = nameMatchScoreDetail(nameScoreParts);
 
   const hasAadhaar = Boolean(
     aadhaar?.fullName?.trim() ||
@@ -961,7 +989,8 @@ export function ReviewPersonalPanel({
       aadhaar: hasAadhaar ? formatPersonName(aadhaar?.fullName) : <span className="im-muted">—</span>,
       cibil: cibilReport ? formatPersonName(cibilReport.consumerName) : <span className="im-muted">—</span>,
       verdict: matrixNameVerdict,
-      score: nameScore,
+      score: matrixNameScore,
+      scoreTitle: matrixNameScoreTitle,
     },
     {
       field: 'Date of birth',
@@ -1001,7 +1030,13 @@ export function ReviewPersonalPanel({
           }
         >
           <div className="fgrid">
-            <ComparedField label="Full name" value={formatPersonName(profile.fullName)} verdict={matrixNameVerdict} score={nameScore} />
+            <ComparedField
+              label="Full name"
+              value={formatPersonName(profile.fullName)}
+              verdict={matrixNameVerdict}
+              score={matrixNameScore}
+              scoreTitle={matrixNameScoreTitle}
+            />
             <ComparedField label="Date of birth" value={formatDobWithAge(profile.dateOfBirth)} verdict={matrixDobVerdict} />
             <ComparedField label="Gender" value={profile.gender ?? '—'} verdict={genderVerdict} />
             <ReviewField

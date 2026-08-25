@@ -47,7 +47,11 @@ export function ApplicationReviewDashboard({
   onRefresh: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<ReviewTab>(
-    row.statusCode.toUpperCase() === 'UNDER_REVIEW' ? 'bank' : row.details?.loanAmount ? 'loan' : 'personal',
+    row.nameMatchPendingReview || row.statusCode.toUpperCase() === 'UNDER_REVIEW'
+      ? 'bank'
+      : row.details?.loanAmount
+        ? 'loan'
+        : 'personal',
   );
   const [bureauPan, setBureauPan] = useState<string | null>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -76,7 +80,8 @@ export function ApplicationReviewDashboard({
     journeySteps.every((step) => step.state === 'done');
   const canApprove =
     canDecide && journeyComplete && statusCode !== 'APPROVED' && statusCode !== 'DISBURSED';
-  const canApproveNameMatch = canDecide && statusCode === 'UNDER_REVIEW';
+  const canApproveNameMatch =
+    canDecide && (Boolean(row.nameMatchPendingReview) || statusCode === 'UNDER_REVIEW');
   const canDisburse = canDecide && statusCode === 'APPROVED' && !row.loanAccount;
   const canReject = canDecide && canRejectApplicationStatus(row.statusCode);
 
@@ -103,7 +108,7 @@ export function ApplicationReviewDashboard({
     const confirmed = window.confirm(
       `Approve bank name match for ${row.applicationNumber}?` +
         (score != null ? ` Current fuzzing score is ${score}%.` : '') +
-        `\n\nThe customer will be able to continue to references.`,
+        `\n\nThe customer can continue to the next step. When all steps are done, the application stays In Review.`,
     );
     if (!confirmed) return;
     setApproveNameMatchBusy(true);
@@ -267,6 +272,9 @@ export function ApplicationReviewDashboard({
               applicationUuid={applicationUuid}
               authToken={authToken}
               onRefresh={onRefresh}
+              onApproveNameMatch={canApproveNameMatch ? () => void handleApproveNameMatch() : undefined}
+              approveNameMatchBusy={approveNameMatchBusy}
+              canApproveNameMatch={canApproveNameMatch}
             />
           </div>
           <div className={`panel${activeTab === 'refs' ? ' on' : ''}`}>

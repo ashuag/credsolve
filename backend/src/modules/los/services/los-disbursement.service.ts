@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import {
   APPLICATION_STATUS,
 } from '../../../common/constants/application.constants';
+import { isBankNameMatchReviewPending } from '../../../common/constants/bank.constants';
 import {
   LOAN_COMMERCIAL_TERMS_PDF_FILENAME,
   LOAN_DOCUMENT_PDF_FILES,
@@ -79,14 +80,22 @@ export class LosDisbursementService {
     if (statusName === APPLICATION_STATUS.DISBURSED) {
       throw new ConflictException('This application is already disbursed.');
     }
+    const nameReviewPending = isBankNameMatchReviewPending({
+      statusName,
+      statusNote: application.applicationStatusNote,
+    });
     if (
       statusName === APPLICATION_STATUS.REJECTED ||
       statusName === APPLICATION_STATUS.CANCELLED ||
       statusName === APPLICATION_STATUS.KYC_FAILED ||
       statusName === APPLICATION_STATUS.PENNYDROP_FAILED ||
-      statusName === APPLICATION_STATUS.UNDER_REVIEW
+      nameReviewPending
     ) {
-      throw new ConflictException(`Cannot approve an application in ${statusName} status.`);
+      throw new ConflictException(
+        nameReviewPending
+          ? 'Bank name match is still pending credit review. Approve the name match first.'
+          : `Cannot approve an application in ${statusName} status.`,
+      );
     }
 
     if (!this.isJourneyComplete(application)) {
@@ -461,6 +470,7 @@ export class LosDisbursementService {
         customerId: true,
         leadId: true,
         applicationStatus: { select: { name: true } },
+        applicationStatusNote: true,
         loanAccount: { select: { id: true } },
         details: {
           select: {

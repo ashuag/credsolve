@@ -25,9 +25,7 @@ export function KycFieldMatchBadge({
   detail?: string;
 }) {
   const label =
-    verdict === 'partial' && score != null
-      ? `${LABELS[verdict]} (${score}%)`
-      : LABELS[verdict];
+    verdict !== 'missing' && score != null ? `${LABELS[verdict]} ${score}%` : LABELS[verdict];
 
   return (
     <span

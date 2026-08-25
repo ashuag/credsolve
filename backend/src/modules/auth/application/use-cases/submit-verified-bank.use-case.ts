@@ -2,7 +2,11 @@ import { BadRequestException, Injectable, Logger, NotFoundException, Unauthorize
 import { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
-import { BANK_NAME_REVIEW_NOTE, PENNY_DROP_FAILED_NOTE } from '../../../../common/constants/bank.constants';
+import {
+  BANK_NAME_REVIEW_NOTE,
+  isBankNameMatchReviewPending,
+  PENNY_DROP_FAILED_NOTE,
+} from '../../../../common/constants/bank.constants';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { REJECTION_REASON } from '../../../../common/constants/rejection-reason.constants';
 import { SmsService } from '../../../../common/sms/sms.service';
@@ -97,6 +101,7 @@ export class SubmitVerifiedBankUseCase {
       select: {
         id: true,
         applicationStatus: { select: { name: true } },
+        applicationStatusNote: true,
         details: { select: { pennyDropAttempts: true } },
       },
     });
@@ -104,11 +109,16 @@ export class SubmitVerifiedBankUseCase {
       throw new BadRequestException('Create application details before bank details.');
     }
 
-    if (applicationRow.applicationStatus.name === APPLICATION_STATUS.UNDER_REVIEW) {
+    if (
+      isBankNameMatchReviewPending({
+        statusName: applicationRow.applicationStatus.name,
+        statusNote: applicationRow.applicationStatusNote,
+      })
+    ) {
       return {
         success: true,
         pennyDropOk: true,
-        applicationStatus: APPLICATION_STATUS.UNDER_REVIEW,
+        applicationStatus: APPLICATION_STATUS.IN_REVIEW,
         message:
           'Your bank account is under credit review. You can continue once credit approves the name match.',
         vendor: null,
@@ -219,76 +229,23 @@ export class SubmitVerifiedBankUseCase {
       vendor,
     });
     const autoPass =
-      nameMatch.matched ||
-      (nameMatch.score != null &&
-        nameMatch.score >= nameMatchMinScore &&
-        !(nameMatch.matched === false && nameMatch.reason === 'vendor_name_mismatch'));
+      nameMatch.matched || (nameMatch.score != null && nameMatch.score >= nameMatchMinScore);
 
     if (!autoPass) {
-      if (nameMatch.bankName) {
-        return this.persistUnderReviewNameMismatch({
-          leadId: lead.id,
-          applicationId: applicationRow.id,
-          customerMobile: customer.mobileNumber,
-          accountNumber,
-          ifsc,
-          verifiedBankName,
-          holderName,
-          vendor,
-          nameMatchScore: nameMatch.score,
-          bankNameAtVendor: nameMatch.bankName,
-          attemptsUsed,
-          attemptsAllowed,
-        });
-      }
-
-      const nextAttemptsUsed = attemptsUsed + 1;
-      await this.prisma.client.$transaction(async (tx: Prisma.TransactionClient) => {
-        await tx.applicationDetail.update({
-          where: { applicationId: applicationRow.id },
-          data: {
-            pennyDropAttempts: nextAttemptsUsed,
-            pennyDropVendorJson:
-              vendor === null ? Prisma.JsonNull : (vendor as Prisma.InputJsonValue),
-          },
-        });
-        await this.recordBankAccountAttempt(tx, {
-          applicationId: applicationRow.id,
-          accountNumber,
-          ifsc,
-          bankName: verifiedBankName,
-          accountHolderName: holderName,
-          nameAtBank: nameMatch.bankName,
-          nameMatchScore: nameMatch.score,
-          matched: false,
-          vendor,
-        });
-      });
-      const retryLimitReached = nextAttemptsUsed >= attemptsAllowed;
-      this.logger.warn(
-        `[penny-drop] Name mismatch lead=${lead.id.toString()} reason=${nameMatch.matched ? 'matched' : nameMatch.reason} ` +
-          `bankName=${nameMatch.bankName ? '[present]' : '[missing]'} score=${nameMatch.score ?? 'n/a'}`,
-      );
-      const applicationStatus = retryLimitReached
-        ? await this.markPennyDropFailed({
-            applicationId: applicationRow.id,
-            leadId: lead.id,
-            customerMobile: customer.mobileNumber,
-          })
-        : null;
-      return {
-        success: false,
-        pennyDropOk: false,
-        applicationStatus,
-        message: retryLimitReached
-          ? undefined
-          : 'Bank verification failed: account holder name does not match.',
+      return this.persistUnderReviewNameMismatch({
+        leadId: lead.id,
+        applicationId: applicationRow.id,
+        customerMobile: customer.mobileNumber,
+        accountNumber,
+        ifsc,
+        verifiedBankName,
+        holderName,
         vendor,
-        attemptsUsed: nextAttemptsUsed,
-        attemptsAllowed,
-        retryLimitReached,
         nameMatchScore: nameMatch.score,
-      };
+        bankNameAtVendor: nameMatch.bankName,
+        attemptsUsed,
+        attemptsAllowed,
+      });
     }
 
     const appStatuses = await this.prisma.client.applicationStatus.findMany({
@@ -371,16 +328,16 @@ export class SubmitVerifiedBankUseCase {
     holderName: string;
     vendor: unknown;
     nameMatchScore: number | null;
-    bankNameAtVendor: string;
+    bankNameAtVendor: string | null;
     attemptsUsed: number;
     attemptsAllowed: number;
   }): Promise<SubmitVerifiedBankResult> {
-    const underReview = await this.prisma.client.applicationStatus.findFirst({
-      where: { name: APPLICATION_STATUS.UNDER_REVIEW, isActive: true },
+    const inReview = await this.prisma.client.applicationStatus.findFirst({
+      where: { name: APPLICATION_STATUS.IN_REVIEW, isActive: true },
       select: { id: true },
     });
-    if (!underReview) {
-      throw new BadRequestException('Application status UNDER_REVIEW is not configured.');
+    if (!inReview) {
+      throw new BadRequestException('Application status IN_REVIEW is not configured.');
     }
 
     this.logger.warn(
@@ -415,7 +372,7 @@ export class SubmitVerifiedBankUseCase {
       await tx.application.update({
         where: { id: params.applicationId },
         data: {
-          applicationStatusId: underReview.id,
+          applicationStatusId: inReview.id,
           applicationStatusNote: BANK_NAME_REVIEW_NOTE,
         },
       });
@@ -428,7 +385,7 @@ export class SubmitVerifiedBankUseCase {
     return {
       success: true,
       pennyDropOk: true,
-      applicationStatus: APPLICATION_STATUS.UNDER_REVIEW,
+      applicationStatus: APPLICATION_STATUS.IN_REVIEW,
       message:
         'Your bank account was verified, but the account name needs a credit review before you can continue.',
       vendor: params.vendor,

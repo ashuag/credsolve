@@ -24,7 +24,7 @@ import {
   mapLosLoanDetailsFromStaging,
 } from '../../../common/loan/loan-disbursement-view.util';
 import { APPLICATION_KYC_STATUS, APPLICATION_STATUS } from '../../../common/constants/application.constants';
-import { BANK_DETAIL_FAILED_NOTE, PENNY_DROP_FAILED_NOTE } from '../../../common/constants/bank.constants';
+import { BANK_DETAIL_FAILED_NOTE, isBankNameMatchReviewPending, PENNY_DROP_FAILED_NOTE } from '../../../common/constants/bank.constants';
 import { SettingKey } from '../../../common/constants/setting.constants';
 import { LEAD_STATUS } from '../../../common/constants/lead.constants';
 import { REJECTION_REASON, toRejectionReasonDto } from '../../../common/constants/rejection-reason.constants';
@@ -250,6 +250,7 @@ function dumpApplicationStageLabel(input: {
   leadStatusNote?: string | null;
   panVerified: number;
   bureauFetched: number;
+  nameMatchPendingReview?: boolean;
 }): string {
   const leadRejected = input.leadStatusCode.toUpperCase() === 'REJECTED';
   const appRejected = input.statusCode.toUpperCase().includes('REJECT');
@@ -279,7 +280,7 @@ function dumpApplicationStageLabel(input: {
     email: Boolean(input.emailVerifiedAt),
     letter: Boolean(input.loanDocumentsReviewedAt ?? input.loanDocumentsAcceptedAt),
     kyc: input.kycStatus === 1 && input.kycCompletedAt != null,
-    bank: Boolean(input.bankAccountNumber || input.disbursedAt),
+    bank: Boolean(input.bankAccountNumber || input.disbursedAt) && !input.nameMatchPendingReview,
     refs: input.referencesCount >= 2,
     esign: Boolean(input.loanDocumentsAcceptedAt),
   } as const;
@@ -469,6 +470,10 @@ export class LosApplicationService {
         ),
         statusCode: application.applicationStatus.name,
         statusLabel: displayName(application.applicationStatus.name, application.applicationStatus.displayName),
+        nameMatchPendingReview: isBankNameMatchReviewPending({
+          statusName: application.applicationStatus.name,
+          statusNote: application.applicationStatusNote,
+        }),
         leadStatusCode: application.lead.leadStatus.name,
         leadStatusLabel: displayName(application.lead.leadStatus.name, application.lead.leadStatus.displayName),
         leadRejectionReason: mapLeadRejectionReason(
@@ -660,6 +665,10 @@ export class LosApplicationService {
       emailVerifiedAt: application.details?.emailVerifiedAt?.toISOString() ?? null,
       statusCode: application.applicationStatus.name,
       statusLabel: displayName(application.applicationStatus.name, application.applicationStatus.displayName),
+      nameMatchPendingReview: isBankNameMatchReviewPending({
+        statusName: application.applicationStatus.name,
+        statusNote: application.applicationStatusNote,
+      }),
       kycStatus: application.kyc?.kycStatus ?? 0,
       kycStatusLabel: applicationKycStatusLabel(application.kyc?.kycStatus ?? 0),
       kycCompletedAt: application.kyc?.kycCompletedAt?.toISOString() ?? null,
@@ -1353,7 +1362,8 @@ export class LosApplicationService {
 
   /**
    * Credit override: bank name did not auto-match, but the account is accepted.
-   * Moves UNDER_REVIEW → IN_REVIEW so the customer can continue to references.
+   * Clears the bank-details hold so the customer can continue. Stays IN_REVIEW
+   * (including when the rest of the journey is already complete).
    */
   async approveBankNameMatch(applicationUuid: string): Promise<{
     success: true;
@@ -1366,6 +1376,7 @@ export class LosApplicationService {
         id: true,
         uuid: true,
         applicationStatus: { select: { name: true } },
+        applicationStatusNote: true,
         details: { select: { bankAccountNumber: true, ifscCode: true } },
         bankAccountDetails: {
           orderBy: { createdAt: 'desc' },
@@ -1377,7 +1388,12 @@ export class LosApplicationService {
     if (!application) {
       throw new NotFoundException('Application not found');
     }
-    if (application.applicationStatus.name !== APPLICATION_STATUS.UNDER_REVIEW) {
+    if (
+      !isBankNameMatchReviewPending({
+        statusName: application.applicationStatus.name,
+        statusNote: application.applicationStatusNote,
+      })
+    ) {
       throw new ConflictException('This application is not waiting for a bank name review.');
     }
     if (!application.details?.bankAccountNumber?.trim() || !application.details?.ifscCode?.trim()) {

@@ -136,7 +136,7 @@ export class ApplicationsController {
   @RateLimitByRoute('bank-submit-verified')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Penny-drop verify account + IFSC (Tenacio). Name mismatch goes to UNDER_REVIEW for credit.',
+    summary: 'Penny-drop verify account + IFSC (Tenacio). Name mismatch below the max fuzzing score stays In Review at Bank details for credit.',
   })
   @ApiOkResponse({ description: 'success + pennyDropOk + applicationStatus when saved' })
   submitVerifiedBankRoute(@Req() req: Request, @Body() body: SubmitVerifiedBankDto) {

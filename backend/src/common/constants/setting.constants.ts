@@ -129,7 +129,7 @@ export const SettingKey = {
         key: 'PENNY_DROP_NAME_MATCH_MIN_SCORE',
         default: '100',
         description:
-            'Minimum 0–100 fuzzing score between customer name and penny-drop bank account name to auto-pass. Below this, the application goes to UNDER_REVIEW for credit.',
+            'Max fuzzing score (0–100%) required to auto-pass bank account name vs customer name. Below this the application stays In Review at Bank details until credit approves.',
     },
     PENAL_RATE_PERCENT: {
         key: 'PENAL_RATE_PERCENT',

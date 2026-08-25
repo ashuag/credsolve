@@ -158,6 +158,7 @@ function applicationStageLabel(app: LosApplication): string {
     leadStatusNote: app.leadStatusNote,
     panVerified: app.panVerified,
     bureauFetched: app.bureauFetched,
+    nameMatchPendingReview: app.nameMatchPendingReview,
   });
 }
 

@@ -3,6 +3,7 @@ import { LeadSourceType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { isoDateOnlyUtc, parseIsoDateUtc } from '../../../common/loan/repayment-due-date.util';
 import { ELIGIBILITY_CRITERIA } from '../../../common/constants/eligibility-criteria.constants';
+import { SettingKey } from '../../../common/constants/setting.constants';
 import type { UpdateLeadSourceMasterDto } from '../dto/update-lead-source-master.dto';
 import type { UpdateBankMasterDto } from '../dto/update-bank-master.dto';
 import type { UpdateNamedMasterDto } from '../dto/update-named-master.dto';
@@ -1046,6 +1047,14 @@ export class LosMasterService {
       const trimmed = dto.value!.trim();
       if (!trimmed) {
         throw new BadRequestException('Value cannot be empty.');
+      }
+      if (existing.key === SettingKey.PENNY_DROP_NAME_MATCH_MIN_SCORE.key) {
+        const n = Number.parseInt(trimmed, 10);
+        if (!Number.isFinite(n) || n < 0 || n > 100 || String(n) !== trimmed) {
+          throw new BadRequestException(
+            'Bank name max fuzzing score must be a whole number from 0 to 100.',
+          );
+        }
       }
       data.value = trimmed;
     }

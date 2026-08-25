@@ -204,7 +204,7 @@ export class LosDataController {
   @UseGuards(LosDenyAgentGuard)
   @ApiOperation({
     summary:
-      'Credit: accept a penny-drop bank account whose name did not auto-match (UNDER_REVIEW → IN_REVIEW so the customer can continue)',
+      'Credit: accept a penny-drop bank account whose name did not auto-pass the fuzzing score. Application stays In Review; the customer can continue to the next step.',
   })
   approveBankNameMatch(@Param('applicationUuid') applicationUuid: string) {
     return this.losApplication.approveBankNameMatch(applicationUuid);

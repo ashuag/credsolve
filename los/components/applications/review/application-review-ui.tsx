@@ -97,20 +97,27 @@ export function ReviewSectionLabel({ children, first }: { children: ReactNode; f
 export function ReviewMatchBadge({
   verdict,
   score,
+  title,
 }: {
   verdict: KycMatchVerdict;
   score?: number;
+  title?: string;
 }) {
-  const label =
-    verdict === 'partial' && score != null
-      ? `Partial (${score}%)`
+  const base =
+    verdict === 'partial'
+      ? 'Partial'
       : verdict === 'match'
         ? 'Match'
         : verdict === 'mismatch'
           ? 'Mismatch'
           : 'N/A';
+  const label = verdict !== 'missing' && score != null ? `${base} ${score}%` : base;
 
-  return <span className={`match-badge ${verdict}`}>{label}</span>;
+  return (
+    <span className={`match-badge ${verdict}`} title={title}>
+      {label}
+    </span>
+  );
 }
 
 export function MaskedSecret({
@@ -228,7 +235,7 @@ export function ApplicationReviewToolbar({
           disabled={approveNameMatchBusy}
           className="min-h-[38px] rounded-[8px] border border-[rgba(245,158,11,0.45)] bg-[#fffbeb] px-4 text-[0.82rem] font-bold text-[#92400e] hover:bg-[#fef3c7] disabled:cursor-not-allowed disabled:opacity-55"
         >
-          {approveNameMatchBusy ? 'Approving…' : 'Approve name match'}
+          {approveNameMatchBusy ? 'Approving…' : 'Approve'}
         </button>
       ) : null}
       {onApprove ? (

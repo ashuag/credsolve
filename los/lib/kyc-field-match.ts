@@ -1,3 +1,5 @@
+import { computePersonNameFuzzScore } from './person-name-fuzz';
+
 export type KycMatchVerdict = 'match' | 'partial' | 'mismatch' | 'missing';
 
 export function normalizeComparablePersonName(raw: string): string {
@@ -23,18 +25,28 @@ export function normalizeProfileGender(raw: string | null | undefined): string |
   return raw.trim();
 }
 
-export function computeNameMatchScore(left: string | null | undefined, right: string | null | undefined): number {
-  const a = normalizeComparablePersonName(left ?? '');
-  const b = normalizeComparablePersonName(right ?? '');
-  if (!a || !b) return 0;
-  if (a === b) return 100;
+/** Same penny-drop fuzzing score (0–100) used in Developer Tools. */
+export function computeNameMatchScore(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): number {
+  return computePersonNameFuzzScore(left, right);
+}
 
-  const tokensA = a.split(' ').filter(Boolean);
-  const tokensB = new Set(b.split(' ').filter(Boolean));
-  const intersection = tokensA.filter((token) => tokensB.has(token)).length;
-  const union = new Set([...tokensA, ...tokensB]).size;
-  if (union === 0) return 0;
-  return Math.round((intersection / union) * 100);
+/** Worst available name score when comparing against Aadhaar and/or CIBIL. */
+export function combinedNameMatchScore(
+  parts: Array<{ hasBoth: boolean; score: number }>,
+): number | undefined {
+  const present = parts.filter((part) => part.hasBoth);
+  if (present.length === 0) return undefined;
+  return Math.min(...present.map((part) => part.score));
+}
+
+export function nameMatchScoreDetail(
+  parts: Array<{ label: string; hasBoth: boolean; score: number }>,
+): string | undefined {
+  const bits = parts.filter((part) => part.hasBoth).map((part) => `${part.label} ${part.score}%`);
+  return bits.length ? bits.join(' · ') : undefined;
 }
 
 export function nameMatchVerdict(score: number, hasBoth: boolean): KycMatchVerdict {

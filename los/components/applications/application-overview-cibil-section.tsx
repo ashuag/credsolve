@@ -919,7 +919,9 @@ function BankDetailsPanel({
                   {
                     label: 'Name match score',
                     value: `${row.bankAccountAttempts[0].nameMatchScore}%${
-                      row.statusCode.toUpperCase() === 'UNDER_REVIEW' ? ' (under review)' : ''
+                      row.nameMatchPendingReview || row.statusCode.toUpperCase() === 'UNDER_REVIEW'
+                        ? ' (under review)'
+                        : ''
                     }`,
                   },
                 ]

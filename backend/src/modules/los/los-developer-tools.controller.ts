@@ -21,12 +21,14 @@ import { CibilVendorFetchCheckDto } from './dto/cibil-vendor-fetch-check.dto';
 import { FaceLivenessCheckDto } from './dto/face-liveness-check.dto';
 import { KycFaceMatchCheckDto } from './dto/kyc-face-match-check.dto';
 import { ListVendorApiLogsQueryDto } from './dto/list-vendor-api-logs-query.dto';
+import { NameMatchFuzzScoreDto } from './dto/name-match-fuzz-score.dto';
 import { NsdlPanVerificationDto } from './dto/nsdl-pan-verification.dto';
 import { TenacioFaceLivenessCheckDto } from './dto/tenacio-face-liveness-check.dto';
 import { TenacioFaceMatchCheckDto } from './dto/tenacio-face-match-check.dto';
 import { LosCibilDevToolsService } from './services/los-cibil-dev-tools.service';
 import { LosFaceLivenessDevToolsService } from './services/los-face-liveness-dev-tools.service';
 import { LosKycDevToolsService } from './services/los-kyc-dev-tools.service';
+import { LosNameMatchDevToolsService } from './services/los-name-match-dev-tools.service';
 import { LosPanDevToolsService } from './services/los-pan-dev-tools.service';
 import { LosTenacioFaceDevToolsService } from './services/los-tenacio-face-dev-tools.service';
 import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
@@ -42,6 +44,7 @@ export class LosDeveloperToolsController {
     private readonly kycDevTools: LosKycDevToolsService,
     private readonly faceLivenessDevTools: LosFaceLivenessDevToolsService,
     private readonly panDevTools: LosPanDevToolsService,
+    private readonly nameMatchDevTools: LosNameMatchDevToolsService,
     private readonly tenacioFaceDevTools: LosTenacioFaceDevToolsService,
     private readonly vendorApiLogs: LosVendorApiLogService,
   ) {}
@@ -80,6 +83,17 @@ export class LosDeveloperToolsController {
   })
   async cibilSurepassFetch(@Body() body: CibilVendorFetchCheckDto) {
     return this.cibilDevTools.runSurepassFetch(body);
+  }
+
+  @Post('name-match-fuzz-score')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Dry-run penny-drop name-match fuzzing score',
+    description:
+      'Computes the same 0–100 fuzzing score used after penny-drop (honorifics stripped, token order ignored). Compares against PENNY_DROP_NAME_MATCH_MIN_SCORE. Does not call a vendor or update any records.',
+  })
+  async nameMatchFuzzScore(@Body() body: NameMatchFuzzScoreDto) {
+    return this.nameMatchDevTools.runFuzzScore(body);
   }
 
   @Post('nsdl-pan-verification')

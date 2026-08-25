@@ -225,6 +225,7 @@ const BREADCRUMBS: Record<string, string> = {
   '/developer-tools/cibil-tenacio-fetch': 'Tenacio CIBIL Fetch',
   '/developer-tools/cibil-surepass-fetch': 'Surepass CIBIL Fetch',
   '/developer-tools/nsdl-pan-verification': 'NSDL PAN Verification',
+  '/developer-tools/name-match-fuzz-score': 'Name Match Fuzzing Score',
   '/developer-tools/post-bre-rules': 'Post BRE Rules',
   '/developer-tools/kyc-face-match-check': 'KYC Face Match Check',
   '/developer-tools/face-liveness-check': 'Surepass Face Liveness',

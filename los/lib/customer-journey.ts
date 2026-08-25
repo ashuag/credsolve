@@ -114,7 +114,7 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
   const rejected = appRejected || leadRejected;
   const kycFailed = row.statusCode.toUpperCase() === 'KYC_FAILED' || row.kycStatus === 2;
   const pennyFailed = row.statusCode.toUpperCase() === 'PENNYDROP_FAILED';
-  const nameReviewPending = row.statusCode.toUpperCase() === 'UNDER_REVIEW';
+  const nameReviewPending = Boolean(row.nameMatchPendingReview) || row.statusCode.toUpperCase() === 'UNDER_REVIEW';
   const bankFailed = isBankDetailFailed(row) || pennyFailed;
 
   const profileDone = Boolean(profile?.fullName?.trim());
@@ -223,6 +223,7 @@ export type ApplicationListStageInput = {
   leadStatusNote?: string | null;
   panVerified: number;
   bureauFetched: number;
+  nameMatchPendingReview?: boolean;
 };
 
 /** Active journey stage for application list rows (matches application review hero). */
@@ -257,7 +258,7 @@ export function resolveApplicationStageLabel(input: ApplicationListStageInput): 
   const letterReviewed = Boolean(input.loanDocumentsReviewedAt ?? input.loanDocumentsAcceptedAt);
   const letterAccepted = Boolean(input.loanDocumentsAcceptedAt);
   const kycDone = input.kycStatus === KYC_COMPLETED && input.kycCompletedAt != null;
-  const bankDone = Boolean(input.bankAccountNumber || input.disbursedAt);
+  const bankDone = Boolean(input.bankAccountNumber || input.disbursedAt) && !input.nameMatchPendingReview;
   const refsDone = input.referencesCount >= 2;
 
   const doneById = {

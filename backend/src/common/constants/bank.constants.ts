@@ -6,3 +6,13 @@ export const PENNY_DROP_FAILED_NOTE = 'Penny drop failed';
 
 /** Written to `application.application_status_note` while credit reviews a bank name mismatch. */
 export const BANK_NAME_REVIEW_NOTE = 'Bank name mismatch pending credit review';
+
+/** Credit is holding the case at bank details for a name-match decision. */
+export function isBankNameMatchReviewPending(input: {
+  statusName?: string | null;
+  statusNote?: string | null;
+}): boolean {
+  const status = (input.statusName ?? '').trim().toUpperCase();
+  const note = (input.statusNote ?? '').trim();
+  return status === 'UNDER_REVIEW' || note === BANK_NAME_REVIEW_NOTE;
+}

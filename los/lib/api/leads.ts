@@ -49,6 +49,7 @@ export type LosApplication = {
   bankDetails: string | null;
   statusCode: string;
   statusLabel: string;
+  nameMatchPendingReview?: boolean;
   leadStatusCode: string;
   leadStatusLabel: string;
   leadRejectionReason: { code: string; label: string } | null;
@@ -225,6 +226,7 @@ export type LosApplicationDetails = {
   emailVerifiedAt: string | null;
   statusCode: string;
   statusLabel: string;
+  nameMatchPendingReview?: boolean;
   kycStatus: number;
   kycStatusLabel: string;
   kycCompletedAt: string | null;

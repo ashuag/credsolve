@@ -17,6 +17,12 @@ import {
   SummaryCards,
 } from '@/components/eligibility/eligibility-ui';
 
+const BANK_NAME_FUZZ_SCORE_KEY = 'PENNY_DROP_NAME_MATCH_MIN_SCORE';
+
+function isPercentScoreSetting(key: string): boolean {
+  return key === BANK_NAME_FUZZ_SCORE_KEY;
+}
+
 function SettingModal({
   item,
   onClose,
@@ -31,6 +37,7 @@ function SettingModal({
   const [isActive, setIsActive] = useState(item.isActive);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const percentSetting = isPercentScoreSetting(item.key);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -63,14 +70,33 @@ function SettingModal({
         </label>
 
         <label className="grid gap-1.5">
-          <span className="text-[0.9rem] font-bold">Value</span>
-          <input
-            className="los-input"
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            maxLength={255}
-            required
-          />
+          <span className="text-[0.9rem] font-bold">{percentSetting ? 'Max fuzzing score' : 'Value'}</span>
+          {percentSetting ? (
+            <span className="flex items-center gap-2">
+              <input
+                className="los-input"
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={value}
+                onChange={(event) => setValue(event.target.value)}
+                required
+              />
+              <span className="text-[0.88rem] font-bold text-brand-muted">%</span>
+            </span>
+          ) : (
+            <input
+              className="los-input"
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              maxLength={255}
+              required
+            />
+          )}
+          {percentSetting ? (
+            <span className="text-[0.78rem] text-brand-muted">Allowed range is 0–100%. Bank name scores below this stay In Review at Bank details.</span>
+          ) : null}
         </label>
 
         <label className="grid gap-1.5">
@@ -193,7 +219,8 @@ export function SettingsPanel() {
       getSortValue: (item) => item.value.toLowerCase(),
       filter: { type: 'text', placeholder: 'Search value…' },
       cellClassName: 'font-mono text-[0.82rem]',
-      render: (item) => item.value,
+      render: (item) =>
+        isPercentScoreSetting(item.key) ? `${item.value}%` : item.value,
     },
     {
       key: 'description',

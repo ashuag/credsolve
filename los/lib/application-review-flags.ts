@@ -26,7 +26,7 @@ export function buildReviewFlags(row: LosApplicationDetails, bureauPan?: string 
       title: applicationRejectionHeadline(row),
       detail: buildApplicationWorkspaceAlertText(row) ?? 'This application has been rejected and cannot proceed.',
     });
-  } else if (row.statusCode.toUpperCase() === 'UNDER_REVIEW') {
+  } else if (row.nameMatchPendingReview || row.statusCode.toUpperCase() === 'UNDER_REVIEW') {
     const score = row.bankAccountAttempts?.[0]?.nameMatchScore;
     flags.push({
       icon: '◎',
@@ -73,7 +73,7 @@ export function buildReviewFlags(row: LosApplicationDetails, bureauPan?: string 
       flags.push({
         icon: '◎',
         title: 'Aadhaar name mismatch',
-        detail: 'Profile name does not match the DigiLocker Aadhaar record.',
+        detail: `Profile name does not match the DigiLocker Aadhaar record (fuzzing score ${nameScore}%).`,
       });
     }
     if (compareIsoDates(profile.dateOfBirth, aadhaar.dateOfBirth) === 'mismatch') {
