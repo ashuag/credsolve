@@ -607,6 +607,8 @@ export function ReviewBankPanel({
   const bank = row.disbursement;
   const hasBank = Boolean(bank?.accountNumber?.trim() || bank?.ifscCode?.trim());
   const attempts = row.pennyDropVerification;
+  const latestNameScore = row.bankAccountAttempts?.[0]?.nameMatchScore ?? null;
+  const nameReviewPending = row.statusCode.toUpperCase() === 'UNDER_REVIEW';
   const showGrant = row.canGrantPennyDropAttempt || canGrantPennyDropAttemptFromRow(row);
   const bankFailed = isBankDetailFailed(row);
   const pending = hasBank && !bank?.disbursedAt;
@@ -620,7 +622,9 @@ export function ReviewBankPanel({
       }
       title="Disbursement account"
       right={
-        !hasBank ? (
+        row.statusCode.toUpperCase() === 'UNDER_REVIEW' ? (
+          <ReviewPill tone="warn">Name match review</ReviewPill>
+        ) : !hasBank ? (
           bankFailed || showGrant ? (
             <ReviewPill tone="warn">{BANK_DETAIL_FAILED_LABEL}</ReviewPill>
           ) : (
@@ -646,6 +650,13 @@ export function ReviewBankPanel({
             value={`${attempts.attemptsUsed} / ${attempts.attemptsAllowed}`}
             tone={attempts.retryLimitReached && !attempts.bankVerified ? 'flag' : undefined}
           />
+          {latestNameScore != null ? (
+            <ReviewField
+              label="Name match score"
+              value={`${latestNameScore}%`}
+              tone={nameReviewPending || latestNameScore < 100 ? 'flag' : 'accent'}
+            />
+          ) : null}
         </div>
       ) : null}
       <PennyDropAttemptHistory attempts={row.bankAccountAttempts} variant="review" />

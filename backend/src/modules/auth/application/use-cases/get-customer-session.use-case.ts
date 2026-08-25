@@ -9,6 +9,7 @@ import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { getRejectedUntilIso } from '../../../../common/lead/lead-reapply-policy.util';
 import {
   APPLICATION_KYC_STATUS,
+  APPLICATION_STATUS,
 } from '../../../../common/constants/application.constants';
 import { isDigilockerAadhaarCaptureComplete } from '../../../../common/kyc/aadhaar-vendor-parse.util';
 import {
@@ -84,6 +85,7 @@ export class GetCustomerSessionUseCase {
         kycCompleted: false,
         referencesCompleted: false,
         bankDetailsCompleted: false,
+        bankNameReviewPending: false,
       },
       preApprovedAmountInr: null,
       loanSelection: null,
@@ -191,6 +193,7 @@ export class GetCustomerSessionUseCase {
             select: {
               updatedAt: true,
               preApprovedLoanAmount: true,
+              applicationStatus: { select: { name: true } },
               details: {
                 select: {
                   pennyDropAttempts: true,
@@ -324,8 +327,10 @@ export class GetCustomerSessionUseCase {
     }));
     const referencesCompleted = leadReferences.length >= 2;
 
+    const applicationStatusName = applicationExtras?.applicationStatus.name ?? null;
+    const bankNameReviewPending = applicationStatusName === APPLICATION_STATUS.UNDER_REVIEW;
     const bankDetailsCompleted = Boolean(
-      appDetails?.bankAccountNumber?.trim() && appDetails?.ifscCode?.trim(),
+      appDetails?.bankAccountNumber?.trim() && appDetails?.ifscCode?.trim() && !bankNameReviewPending,
     );
 
     const loanSelection =
@@ -429,6 +434,7 @@ export class GetCustomerSessionUseCase {
         kycCompleted,
         referencesCompleted,
         bankDetailsCompleted,
+        bankNameReviewPending,
       },
       preApprovedAmountInr:
         preApprovedAmountInr != null && preApprovedAmountInr > 0 ? preApprovedAmountInr : null,

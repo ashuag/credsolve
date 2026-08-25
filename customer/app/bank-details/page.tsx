@@ -133,6 +133,8 @@ export default function BankDetailsPage() {
   const attemptsRemaining = verificationProgress
     ? Math.max(0, verificationProgress.attemptsAllowed - verificationProgress.attemptsUsed)
     : null;
+  const nameReviewPending =
+    session?.authenticated === true && session.journey.bankNameReviewPending === true;
 
   const normalizedIfsc = ifscCode.trim().toUpperCase();
   const ifscValidationError = getIfscValidationError(ifscCode, {
@@ -263,6 +265,9 @@ export default function BankDetailsPage() {
       }
       setConfirmOpen(false);
       await refresh();
+      if (res.nameMatchPendingReview || res.applicationStatus === 'UNDER_REVIEW') {
+        return;
+      }
       router.replace('/references');
     } catch (e) {
       setConfirmOpen(false);
@@ -272,7 +277,30 @@ export default function BankDetailsPage() {
     }
   }
 
-  const journeyPanel = (
+  const journeyPanel = nameReviewPending ? (
+    <div className="h-full flex flex-col justify-center">
+      <div className="mb-6">
+        <h1 className="text-2xl md:text-[2.2rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">
+          Bank name under review
+        </h1>
+        <p className="m-0 text-[0.95rem] leading-relaxed text-slate-600">
+          We verified your account, but the name on the bank account does not closely match the name on your
+          application. Our credit team is reviewing it.
+        </p>
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-semibold text-amber-950 leading-relaxed">
+          You can continue to the next step once credit approves the name match. Please check back shortly, or we
+          will notify you.
+        </div>
+        <button
+          type="button"
+          className="mt-6 mc-btn-primary py-3 px-6"
+          onClick={() => void refresh()}
+        >
+          Check status
+        </button>
+      </div>
+    </div>
+  ) : (
     <div className="h-full flex flex-col justify-center">
       <div className="mb-6">
         <h1 className="text-2xl md:text-[2.2rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">

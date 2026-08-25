@@ -347,7 +347,11 @@ export class LosDashboardService {
         .reduce((a: number, b: DashboardStatusCount) => a + b.count, 0);
 
     const freshLeads = countByLeadCode([LEAD_STATUS.NEW, LEAD_STATUS.IN_PROGRESS]);
-    const applicationInProgress = countByAppCode([APPLICATION_STATUS.DRAFT, APPLICATION_STATUS.IN_REVIEW]);
+    const applicationInProgress = countByAppCode([
+      APPLICATION_STATUS.DRAFT,
+      APPLICATION_STATUS.IN_REVIEW,
+      APPLICATION_STATUS.UNDER_REVIEW,
+    ]);
     const approvedCount = countByAppCode([APPLICATION_STATUS.APPROVED]);
     const disbursedCount = countByAppCode([APPLICATION_STATUS.DISBURSED]);
     const rejectedAppCount = countByAppCode([APPLICATION_STATUS.REJECTED]);
@@ -366,7 +370,9 @@ export class LosDashboardService {
             ? 'Loan sanctioned'
             : app.kyc?.kycStatus === 1
               ? 'KYC cleared'
-              : app.applicationStatus.name === APPLICATION_STATUS.IN_REVIEW
+              : app.applicationStatus.name === APPLICATION_STATUS.UNDER_REVIEW
+                ? 'Bank name under review'
+                : app.applicationStatus.name === APPLICATION_STATUS.IN_REVIEW
                 ? 'Credit review queue'
                 : 'Application updated';
 

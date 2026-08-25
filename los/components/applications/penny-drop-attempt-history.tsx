@@ -6,16 +6,44 @@ import type { LosApplicationDetails } from '@/lib/api';
 
 type PennyDropAttemptRow = NonNullable<LosApplicationDetails['bankAccountAttempts']>[number];
 
-const COLUMNS = ['#', 'Status', 'When', 'Account', 'IFSC', 'Bank', 'Name on application', 'Name at bank'] as const;
+const COLUMNS = ['#', 'Status', 'When', 'Account', 'IFSC', 'Bank', 'Name on application', 'Name at bank', 'Name match'] as const;
 
-function AttemptStatusCell({ passed }: { passed: boolean }) {
-  return passed ? (
-    <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[0.7rem] font-extrabold uppercase tracking-[0.06em] text-emerald-800">
-      Passed
-    </span>
-  ) : (
+function AttemptStatusCell({ passed, underReview }: { passed: boolean; underReview: boolean }) {
+  if (passed) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[0.7rem] font-extrabold uppercase tracking-[0.06em] text-emerald-800">
+        Passed
+      </span>
+    );
+  }
+  if (underReview) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[0.7rem] font-extrabold uppercase tracking-[0.06em] text-amber-900">
+        Review
+      </span>
+    );
+  }
+  return (
     <span className="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[0.7rem] font-extrabold uppercase tracking-[0.06em] text-rose-800">
       Failed
+    </span>
+  );
+}
+
+function NameMatchScoreCell({ score }: { score: number | null }) {
+  if (score == null) return <span className="text-brand-muted">—</span>;
+  const tone =
+    score >= 100
+      ? { background: 'rgba(16,185,129,0.1)', color: '#047857' }
+      : score >= 70
+        ? { background: 'rgba(245,158,11,0.12)', color: '#b45309' }
+        : { background: 'rgba(239,68,68,0.1)', color: '#b91c1c' };
+  return (
+    <span
+      className="inline-flex min-w-[46px] items-center justify-center rounded-[7px] px-2 py-0.5 text-[0.8rem] font-extrabold"
+      style={tone}
+    >
+      {score}%
     </span>
   );
 }
@@ -39,16 +67,17 @@ function AttemptHistoryTable({ attempts }: { attempts: PennyDropAttemptRow[] }) 
         <tbody>
           {attempts.map((attempt, index) => {
             const passed = attempt.status === true;
+            const underReview = !passed && attempt.nameMatchScore != null;
             return (
               <tr
                 key={attempt.id}
-                className={passed ? 'bg-emerald-50/80' : 'bg-rose-50/80'}
+                className={passed ? 'bg-emerald-50/80' : underReview ? 'bg-amber-50/80' : 'bg-rose-50/80'}
               >
                 <td className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2.5 font-extrabold text-brand-navy whitespace-nowrap">
                   {attempts.length - index}
                 </td>
                 <td className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2.5 whitespace-nowrap">
-                  <AttemptStatusCell passed={passed} />
+                  <AttemptStatusCell passed={passed} underReview={underReview} />
                 </td>
                 <td className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2.5 font-semibold text-brand-text whitespace-nowrap">
                   {formatReviewDateTime(attempt.createdAt)}
@@ -67,6 +96,9 @@ function AttemptHistoryTable({ attempts }: { attempts: PennyDropAttemptRow[] }) 
                 </td>
                 <td className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2.5 font-semibold text-brand-text">
                   {attempt.nameAtBank || '—'}
+                </td>
+                <td className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2.5 whitespace-nowrap">
+                  <NameMatchScoreCell score={attempt.nameMatchScore ?? null} />
                 </td>
               </tr>
             );

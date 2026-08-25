@@ -26,6 +26,16 @@ export function buildReviewFlags(row: LosApplicationDetails, bureauPan?: string 
       title: applicationRejectionHeadline(row),
       detail: buildApplicationWorkspaceAlertText(row) ?? 'This application has been rejected and cannot proceed.',
     });
+  } else if (row.statusCode.toUpperCase() === 'UNDER_REVIEW') {
+    const score = row.bankAccountAttempts?.[0]?.nameMatchScore;
+    flags.push({
+      icon: '◎',
+      title: 'Bank name match under review',
+      detail:
+        score != null
+          ? `Customer name vs bank account name scored ${score}%. Credit must approve before the customer can continue.`
+          : 'Customer name does not match the penny-drop bank account name. Credit must approve before the customer can continue.',
+    });
   } else if (isBankDetailFailed(row)) {
     flags.push({
       icon: '✕',

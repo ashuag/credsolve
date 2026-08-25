@@ -43,6 +43,8 @@ export type CustomerPortalJourneySnapshot = {
   referencesCompleted: boolean;
   /** Customer has provided bank details on `application_detail`. */
   bankDetailsCompleted: boolean;
+  /** Penny-drop succeeded but bank vs customer name is waiting for credit approval. */
+  bankNameReviewPending: boolean;
 };
 
 /** DigiLocker Aadhaar + selfie/liveness progress for the active application. */

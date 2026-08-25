@@ -114,6 +114,7 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
   const rejected = appRejected || leadRejected;
   const kycFailed = row.statusCode.toUpperCase() === 'KYC_FAILED' || row.kycStatus === 2;
   const pennyFailed = row.statusCode.toUpperCase() === 'PENNYDROP_FAILED';
+  const nameReviewPending = row.statusCode.toUpperCase() === 'UNDER_REVIEW';
   const bankFailed = isBankDetailFailed(row) || pennyFailed;
 
   const profileDone = Boolean(profile?.fullName?.trim());
@@ -127,7 +128,7 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
   /** Mobile OTP after references. */
   const letterAccepted = Boolean(row.loanDocuments.acceptedAt);
   const kycDone = isKycAndLivenessDone(row);
-  const bankDone = Boolean(row.disbursement?.accountNumber || row.disbursement?.disbursedAt);
+  const bankDone = Boolean(row.disbursement?.accountNumber || row.disbursement?.disbursedAt) && !nameReviewPending;
 
   const rejectionDetail =
     row.lead.rejectionReason?.label ??
@@ -161,7 +162,11 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
     loan: row.details?.loanAmount ? `₹${row.details.loanAmount}` : undefined,
     letter: letterAccepted ? 'Accepted' : letterReviewed ? 'Reviewed' : undefined,
     kyc: kycJourneyDetail(row, kycDone),
-    bank: bankFailed ? BANK_DETAIL_FAILED_LABEL : undefined,
+    bank: nameReviewPending
+      ? 'Name match review'
+      : bankFailed
+        ? BANK_DETAIL_FAILED_LABEL
+        : undefined,
     refs: refsDone ? `${row.referencesCount} saved` : undefined,
     esign: letterAccepted ? 'Verified' : undefined,
   };

@@ -127,8 +127,10 @@ model ApplicationBankAccountDetail {
   accountHolderName   String?  @map("account_holder_name") @db.VarChar(100)
   /// Account-holder name returned by the penny-drop vendor, when present.
   nameAtBank          String?  @map("name_at_bank") @db.VarChar(150)
-  /// True when penny-drop and name match succeeded.
+  /// True when penny-drop and name match succeeded (or credit approved a name mismatch).
   status              Boolean
+  /// 0–100 fuzzing score between accountHolderName and nameAtBank. Null when a name was missing.
+  nameMatchScore      Int?     @map("name_match_score") @db.SmallInt
   pennyDropVendorJson Json?    @map("penny_drop_vendor_json")
   createdAt           DateTime @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt           DateTime @updatedAt @map("updated_at") @db.DateTime(3)

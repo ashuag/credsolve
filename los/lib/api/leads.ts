@@ -266,6 +266,7 @@ export type LosApplicationDetails = {
     accountHolderName: string | null;
     nameAtBank: string | null;
     status: boolean;
+    nameMatchScore?: number | null;
     createdAt: string;
   }>;
   /** True when LOS ops may re-enable KYC selfie (DigiLocker Aadhaar is kept if already captured). */

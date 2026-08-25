@@ -188,6 +188,8 @@ export function ApplicationReviewToolbar({
   onRefresh,
   onReject,
   rejectDisabled = false,
+  onApproveNameMatch,
+  approveNameMatchBusy = false,
   onApprove,
   approveDisabled = false,
   approveBusy = false,
@@ -198,6 +200,8 @@ export function ApplicationReviewToolbar({
   onRefresh: () => void;
   onReject?: () => void;
   rejectDisabled?: boolean;
+  onApproveNameMatch?: () => void;
+  approveNameMatchBusy?: boolean;
   onApprove?: () => void;
   approveDisabled?: boolean;
   approveBusy?: boolean;
@@ -215,6 +219,16 @@ export function ApplicationReviewToolbar({
           className="min-h-[38px] rounded-[8px] border border-[rgba(239,68,68,0.35)] bg-white px-4 text-[0.82rem] font-bold text-[#dc2626] hover:bg-[rgba(254,242,242,0.9)] disabled:cursor-not-allowed disabled:opacity-55"
         >
           Reject application
+        </button>
+      ) : null}
+      {onApproveNameMatch ? (
+        <button
+          type="button"
+          onClick={onApproveNameMatch}
+          disabled={approveNameMatchBusy}
+          className="min-h-[38px] rounded-[8px] border border-[rgba(245,158,11,0.45)] bg-[#fffbeb] px-4 text-[0.82rem] font-bold text-[#92400e] hover:bg-[#fef3c7] disabled:cursor-not-allowed disabled:opacity-55"
+        >
+          {approveNameMatchBusy ? 'Approving…' : 'Approve name match'}
         </button>
       ) : null}
       {onApprove ? (

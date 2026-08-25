@@ -259,6 +259,8 @@ export type SubmitVerifiedBankResponse = {
   attemptsUsed: number;
   attemptsAllowed: number;
   retryLimitReached: boolean;
+  nameMatchScore?: number | null;
+  nameMatchPendingReview?: boolean;
 };
 
 export async function submitVerifiedBankDetails(payload: {

@@ -125,6 +125,12 @@ export const SettingKey = {
         default: '2',
         description: 'Maximum penny-drop bank verification attempts per application before further tries are blocked',
     },
+    PENNY_DROP_NAME_MATCH_MIN_SCORE: {
+        key: 'PENNY_DROP_NAME_MATCH_MIN_SCORE',
+        default: '100',
+        description:
+            'Minimum 0–100 fuzzing score between customer name and penny-drop bank account name to auto-pass. Below this, the application goes to UNDER_REVIEW for credit.',
+    },
     PENAL_RATE_PERCENT: {
         key: 'PENAL_RATE_PERCENT',
         default: '10',

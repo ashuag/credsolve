@@ -914,6 +914,16 @@ function BankDetailsPanel({
                 attempts.retryLimitReached && !attempts.bankVerified ? ' (exhausted)' : ''
               }`,
             },
+            ...(row.bankAccountAttempts?.[0]?.nameMatchScore != null
+              ? [
+                  {
+                    label: 'Name match score',
+                    value: `${row.bankAccountAttempts[0].nameMatchScore}%${
+                      row.statusCode.toUpperCase() === 'UNDER_REVIEW' ? ' (under review)' : ''
+                    }`,
+                  },
+                ]
+              : []),
           ]}
         />
       ) : null}

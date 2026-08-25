@@ -17,7 +17,7 @@ function statusAccentColor(code: string): string {
   if (c.includes('REJECT') || c.includes('FAIL') || c.includes('DECLIN')) return '#ef4444';
   if (c === 'CONVERTED' || c.includes('APPROV') || c.includes('DISBURS')) return '#10b981';
   if (c === 'NEW' || c === 'IN_PROGRESS' || c === 'DRAFT') return '#1496f3';
-  if (c === 'INTERNAL_ERROR' || c === 'IN_REVIEW') return '#f59e0b';
+  if (c === 'INTERNAL_ERROR' || c === 'IN_REVIEW' || c === 'UNDER_REVIEW') return '#f59e0b';
   return '#6366f1';
 }
 

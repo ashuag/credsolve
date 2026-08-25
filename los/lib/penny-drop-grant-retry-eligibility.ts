@@ -5,6 +5,7 @@ const GRANT_BLOCKED_APPLICATION_STATUSES = new Set([
   'DISBURSED',
   'CANCELLED',
   'ACTIVE',
+  'UNDER_REVIEW',
 ]);
 
 /** LOS copy when penny-drop attempts are exhausted and bank details were never saved. */

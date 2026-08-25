@@ -501,6 +501,17 @@ export class SettingsRepository implements OnModuleInit {
       : Number.parseInt(SettingKey.PENNY_DROP_RETRY_COUNT.default, 10);
   }
 
+  /** Minimum 0–100 name fuzzing score to auto-pass penny-drop (default 100). */
+  async loadPennyDropNameMatchMinScore(): Promise<number> {
+    const row = await this.prisma.client.setting.findFirst({
+      where: { key: SettingKey.PENNY_DROP_NAME_MATCH_MIN_SCORE.key, isActive: true },
+      select: { value: true },
+    });
+    const n = row ? Number.parseInt(row.value.trim(), 10) : NaN;
+    if (Number.isFinite(n) && n >= 0 && n <= 100) return n;
+    return Number.parseInt(SettingKey.PENNY_DROP_NAME_MATCH_MIN_SCORE.default, 10);
+  }
+
   /**
    * Inclusive days from disbursement for actual-day early-repay interest.
    * After this window, repayment charges full contracted tenure interest.

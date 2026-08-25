@@ -39,6 +39,18 @@ export async function approveApplication(
   );
 }
 
+export async function approveBankNameMatch(
+  token: string,
+  applicationUuid: string,
+): Promise<{ success: true; applicationUuid: string; statusCode: string }> {
+  return authorizedLosRequest(
+    token,
+    `/applications/${encodeURIComponent(applicationUuid)}/bank/approve-name-match`,
+    { method: 'POST' },
+    'Failed to approve bank name match.',
+  );
+}
+
 export async function disburseApplication(
   token: string,
   applicationUuid: string,

@@ -91,6 +91,8 @@ export type CustomerSessionResponse =
         kycCompleted: boolean;
         referencesCompleted: boolean;
         bankDetailsCompleted: boolean;
+        /** Penny-drop succeeded but name match is waiting for credit approval. */
+        bankNameReviewPending?: boolean;
       };
       /** Post-BRE pre-approved ceiling; set after bureau pass. */
       preApprovedAmountInr: number | null;

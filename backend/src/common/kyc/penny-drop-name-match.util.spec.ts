@@ -34,6 +34,7 @@ describe('penny-drop-name-match.util', () => {
       vendor: { status: 'success', data: { nameAtBank: 'AGARWAL SAURABH' } },
     });
     expect(result.matched).toBe(true);
+    expect(result.score).toBe(100);
   });
 
   it('matches when the bank name includes an honorific title', () => {
@@ -45,12 +46,13 @@ describe('penny-drop-name-match.util', () => {
     expect(result.bankName).toBe('Mr. Saurabh Agarwal');
   });
 
-  it('rejects name mismatch', () => {
+  it('rejects name mismatch but still returns a fuzzing score', () => {
     const result = compareJourneyNameToPennyDrop({
       journeyFullName: 'Saurabh Agarwal',
       vendor: { status: 'success', data: { name_at_bank: 'Someone Else' } },
     });
     expect(result).toMatchObject({ matched: false, reason: 'name_mismatch' });
+    expect(result.score).toEqual(expect.any(Number));
   });
 
   it('honors vendor nameMatch=false', () => {

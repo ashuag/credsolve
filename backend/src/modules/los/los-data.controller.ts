@@ -200,6 +200,16 @@ export class LosDataController {
     return this.losApplication.markInternalTesting(applicationUuid);
   }
 
+  @Post('applications/:applicationUuid/bank/approve-name-match')
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({
+    summary:
+      'Credit: accept a penny-drop bank account whose name did not auto-match (UNDER_REVIEW → IN_REVIEW so the customer can continue)',
+  })
+  approveBankNameMatch(@Param('applicationUuid') applicationUuid: string) {
+    return this.losApplication.approveBankNameMatch(applicationUuid);
+  }
+
   @Post('applications/:applicationUuid/approve')
   @UseGuards(LosDenyAgentGuard)
   @ApiOperation({

@@ -27,7 +27,7 @@ export function losStatusPillStyles(code: string): { bg: string; text: string; r
   if (c.includes('REJECT') || c.includes('DECLIN') || c.includes('CANCEL') || c === 'KYC_FAILED' || c === 'PENNYDROP_FAILED') {
     return { bg: 'rgba(231,95,95,0.14)', text: '#8d3434', ring: 'rgba(231,95,95,0.28)' };
   }
-  if (c === 'IN_REVIEW' || c === 'INTERNAL_ERROR') {
+  if (c === 'IN_REVIEW' || c === 'UNDER_REVIEW' || c === 'INTERNAL_ERROR') {
     return { bg: 'rgba(255,197,25,0.18)', text: '#6b4e00', ring: 'rgba(245,158,11,0.35)' };
   }
   return { bg: 'rgba(23,44,113,0.08)', text: '#172c71', ring: 'rgba(23,44,113,0.16)' };

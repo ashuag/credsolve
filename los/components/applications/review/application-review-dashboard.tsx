@@ -25,6 +25,7 @@ import { extractCibilPan } from '@/lib/kyc-field-match';
 import { formatPersonName } from '@/lib/format-person-name';
 import {
   approveApplication,
+  approveBankNameMatch,
   disburseApplication,
   getApplicationCibilReport,
   type LosApplicationDetails,
@@ -45,11 +46,14 @@ export function ApplicationReviewDashboard({
   authToken: string | null;
   onRefresh: () => void;
 }) {
-  const [activeTab, setActiveTab] = useState<ReviewTab>(row.details?.loanAmount ? 'loan' : 'personal');
+  const [activeTab, setActiveTab] = useState<ReviewTab>(
+    row.statusCode.toUpperCase() === 'UNDER_REVIEW' ? 'bank' : row.details?.loanAmount ? 'loan' : 'personal',
+  );
   const [bureauPan, setBureauPan] = useState<string | null>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [approveBusy, setApproveBusy] = useState(false);
+  const [approveNameMatchBusy, setApproveNameMatchBusy] = useState(false);
   const [disburseBusy, setDisburseBusy] = useState(false);
   const [canDecide] = useState(() => {
     const user = getLosStoredUser();
@@ -72,6 +76,7 @@ export function ApplicationReviewDashboard({
     journeySteps.every((step) => step.state === 'done');
   const canApprove =
     canDecide && journeyComplete && statusCode !== 'APPROVED' && statusCode !== 'DISBURSED';
+  const canApproveNameMatch = canDecide && statusCode === 'UNDER_REVIEW';
   const canDisburse = canDecide && statusCode === 'APPROVED' && !row.loanAccount;
   const canReject = canDecide && canRejectApplicationStatus(row.statusCode);
 
@@ -91,6 +96,27 @@ export function ApplicationReviewDashboard({
   useEffect(() => {
     void loadBureauPan();
   }, [loadBureauPan]);
+
+  const handleApproveNameMatch = useCallback(async () => {
+    if (!authToken || approveNameMatchBusy) return;
+    const score = row.bankAccountAttempts?.[0]?.nameMatchScore;
+    const confirmed = window.confirm(
+      `Approve bank name match for ${row.applicationNumber}?` +
+        (score != null ? ` Current fuzzing score is ${score}%.` : '') +
+        `\n\nThe customer will be able to continue to references.`,
+    );
+    if (!confirmed) return;
+    setApproveNameMatchBusy(true);
+    setActionError(null);
+    try {
+      await approveBankNameMatch(authToken, applicationUuid);
+      onRefresh();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Failed to approve bank name match.');
+    } finally {
+      setApproveNameMatchBusy(false);
+    }
+  }, [applicationUuid, approveNameMatchBusy, authToken, onRefresh, row.applicationNumber, row.bankAccountAttempts]);
 
   const handleApprove = useCallback(async () => {
     if (!authToken || approveBusy) return;
@@ -211,6 +237,8 @@ export function ApplicationReviewDashboard({
             onRefresh={onRefresh}
             onReject={canReject ? () => setRejectOpen(true) : undefined}
             rejectDisabled={!canReject}
+            onApproveNameMatch={canApproveNameMatch ? () => void handleApproveNameMatch() : undefined}
+            approveNameMatchBusy={approveNameMatchBusy}
             onApprove={canApprove ? () => void handleApprove() : undefined}
             approveBusy={approveBusy}
             onDisburse={canDisburse ? () => void handleDisburse() : undefined}

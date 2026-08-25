@@ -15,6 +15,7 @@ const GRANT_BLOCKED_APPLICATION_STATUSES = new Set<ApplicationStatus>([
   APPLICATION_STATUS.DISBURSED,
   APPLICATION_STATUS.CANCELLED,
   APPLICATION_STATUS.ACTIVE,
+  APPLICATION_STATUS.UNDER_REVIEW,
 ]);
 
 /** True when LOS ops may grant one more customer penny-drop (bank verification) attempt. */

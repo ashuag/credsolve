@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { BureauReportPdfService } from '../../../common/cibil/bureau-report-pdf.service';
@@ -51,6 +51,7 @@ function mapLeadRejectionReason(
 const OPEN_APPLICATION_QUEUE_STATUSES: readonly string[] = [
   APPLICATION_STATUS.DRAFT,
   APPLICATION_STATUS.IN_REVIEW,
+  APPLICATION_STATUS.UNDER_REVIEW,
   APPLICATION_STATUS.APPROVED,
   APPLICATION_STATUS.KYC_FAILED,
   APPLICATION_STATUS.PENNYDROP_FAILED,
@@ -581,6 +582,7 @@ export class LosApplicationService {
             accountHolderName: true,
             nameAtBank: true,
             status: true,
+            nameMatchScore: true,
             createdAt: true,
           },
         },
@@ -715,6 +717,7 @@ export class LosApplicationService {
         accountHolderName: attempt.accountHolderName,
         nameAtBank: attempt.nameAtBank,
         status: attempt.status,
+        nameMatchScore: attempt.nameMatchScore,
         createdAt: attempt.createdAt.toISOString(),
       })),
       canEnableReKyc: canEnableReKyc({
@@ -1345,6 +1348,72 @@ export class LosApplicationService {
       digilockerPreserved: digilockerDone,
       leadRecovered: leadWasInternalError || leadWasRejected,
       applicationRecovered: appWasInternalError || appWasKycFailed,
+    };
+  }
+
+  /**
+   * Credit override: bank name did not auto-match, but the account is accepted.
+   * Moves UNDER_REVIEW → IN_REVIEW so the customer can continue to references.
+   */
+  async approveBankNameMatch(applicationUuid: string): Promise<{
+    success: true;
+    applicationUuid: string;
+    statusCode: string;
+  }> {
+    const application = await this.prisma.client.application.findUnique({
+      where: { uuid: applicationUuid },
+      select: {
+        id: true,
+        uuid: true,
+        applicationStatus: { select: { name: true } },
+        details: { select: { bankAccountNumber: true, ifscCode: true } },
+        bankAccountDetails: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { id: true },
+        },
+      },
+    });
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+    if (application.applicationStatus.name !== APPLICATION_STATUS.UNDER_REVIEW) {
+      throw new ConflictException('This application is not waiting for a bank name review.');
+    }
+    if (!application.details?.bankAccountNumber?.trim() || !application.details?.ifscCode?.trim()) {
+      throw new BadRequestException('Bank account details are missing; cannot approve the name match.');
+    }
+
+    const inReview = await this.prisma.client.applicationStatus.findFirst({
+      where: { name: APPLICATION_STATUS.IN_REVIEW, isActive: true },
+      select: { id: true },
+    });
+    if (!inReview) {
+      throw new NotFoundException('IN_REVIEW application status is not configured.');
+    }
+
+    const latestAttemptId = application.bankAccountDetails[0]?.id;
+
+    await this.prisma.client.$transaction(async (tx) => {
+      await tx.application.update({
+        where: { id: application.id },
+        data: {
+          applicationStatusId: inReview.id,
+          applicationStatusNote: null,
+        },
+      });
+      if (latestAttemptId) {
+        await tx.applicationBankAccountDetail.update({
+          where: { id: latestAttemptId },
+          data: { status: true },
+        });
+      }
+    });
+
+    return {
+      success: true,
+      applicationUuid: application.uuid,
+      statusCode: APPLICATION_STATUS.IN_REVIEW,
     };
   }
 

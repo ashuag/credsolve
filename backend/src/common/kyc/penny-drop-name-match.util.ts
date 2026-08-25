@@ -1,21 +1,7 @@
 import { personNamesMatch } from './aadhaar-lead-identity-match.util';
+import { computePersonNameFuzzScore, stripPersonNameHonorifics } from './person-name-fuzz.util';
 
-/** Leading honorifics banks often prefix on account-holder names (longest first so Miss ≠ Ms). */
-const HONORIFIC_PREFIX = /^(?:miss|mrs|ms|mr)\b\.?\s*/i;
-
-/**
- * Strip titles such as Mr / Ms / Miss / Mrs (with or without ".") and collapse extra spaces
- * so penny-drop names can be compared to the customer journey name.
- */
-export function stripPersonNameHonorifics(raw: string): string {
-  let name = raw.trim().replace(/\s+/g, ' ');
-  for (;;) {
-    const next = name.replace(HONORIFIC_PREFIX, '').trim();
-    if (next === name) break;
-    name = next;
-  }
-  return name.replace(/\s+/g, ' ');
-}
+export { stripPersonNameHonorifics } from './person-name-fuzz.util';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -107,12 +93,13 @@ export function extractPennyDropNameMatchFlag(vendor: unknown): boolean | null {
 }
 
 export type PennyDropNameMatchResult =
-  | { matched: true; bankName: string | null }
+  | { matched: true; bankName: string | null; score: number | null }
   | {
       matched: false;
       reason: 'missing_journey_name' | 'missing_bank_name' | 'vendor_name_mismatch' | 'name_mismatch';
       message: string;
       bankName: string | null;
+      score: number | null;
     };
 
 /**
@@ -129,11 +116,13 @@ export function compareJourneyNameToPennyDrop(input: {
       reason: 'missing_journey_name',
       message: 'Complete your full name in personal details before submitting bank information.',
       bankName: null,
+      score: null,
     };
   }
 
   const vendorFlag = extractPennyDropNameMatchFlag(input.vendor);
   const bankName = extractPennyDropBankName(input.vendor);
+  const score = bankName ? computePersonNameFuzzScore(journeyName, bankName) : null;
 
   if (vendorFlag === false) {
     return {
@@ -142,13 +131,14 @@ export function compareJourneyNameToPennyDrop(input: {
       message:
         'The name on your bank account does not match the name on your loan application. Please use an account in your name.',
       bankName,
+      score,
     };
   }
 
   if (!bankName) {
     // Vendor already affirmed nameMatch — allow when name string is absent.
     if (vendorFlag === true) {
-      return { matched: true, bankName: null };
+      return { matched: true, bankName: null, score: null };
     }
     return {
       matched: false,
@@ -156,6 +146,7 @@ export function compareJourneyNameToPennyDrop(input: {
       message:
         'Bank verification did not return the account holder name. Please try again or contact support.',
       bankName: null,
+      score: null,
     };
   }
 
@@ -166,8 +157,9 @@ export function compareJourneyNameToPennyDrop(input: {
       message:
         'The name on your bank account does not match the name on your loan application. Please use an account in your name.',
       bankName,
+      score,
     };
   }
 
-  return { matched: true, bankName };
+  return { matched: true, bankName, score };
 }

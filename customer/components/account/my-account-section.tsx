@@ -49,7 +49,7 @@ function statusBadgeClass(status: string): string {
   }
   // Application journey statuses
   if (s === 'DISBURSED') return 'bg-indigo-100 text-indigo-900 border-indigo-200';
-  if (s === 'IN_REVIEW') return 'bg-amber-100 text-amber-900 border-amber-200';
+  if (s === 'IN_REVIEW' || s === 'UNDER_REVIEW') return 'bg-amber-100 text-amber-900 border-amber-200';
   if (s === 'APPROVED') return 'bg-sky-100 text-sky-900 border-sky-200';
   if (s === 'REJECTED' || s === 'KYC_FAILED' || s === 'PENNYDROP_FAILED' || s === 'CANCELLED') {
     return 'bg-rose-100 text-rose-900 border-rose-200';

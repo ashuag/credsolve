@@ -1,6 +1,8 @@
 export const APPLICATION_STATUS = {
   DRAFT: 'DRAFT',
   IN_REVIEW: 'IN_REVIEW',
+  /** Penny-drop succeeded but customer vs bank name did not auto-match — credit must decide. */
+  UNDER_REVIEW: 'UNDER_REVIEW',
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
   KYC_FAILED: 'KYC_FAILED',

@@ -3,6 +3,7 @@ import type { LosApplicationDetails } from '@/lib/api';
 const RE_KYC_BLOCKED_APPLICATION_STATUSES = new Set([
   'REJECTED',
   'PENNYDROP_FAILED',
+  'UNDER_REVIEW',
   'DISBURSED',
   'CANCELLED',
   'ACTIVE',

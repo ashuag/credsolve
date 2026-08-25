@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException, Unauthorize
 import { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
-import { PENNY_DROP_FAILED_NOTE } from '../../../../common/constants/bank.constants';
+import { BANK_NAME_REVIEW_NOTE, PENNY_DROP_FAILED_NOTE } from '../../../../common/constants/bank.constants';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { REJECTION_REASON } from '../../../../common/constants/rejection-reason.constants';
 import { SmsService } from '../../../../common/sms/sms.service';
@@ -30,6 +30,8 @@ export type SubmitVerifiedBankResult = {
   attemptsUsed: number;
   attemptsAllowed: number;
   retryLimitReached: boolean;
+  nameMatchScore?: number | null;
+  nameMatchPendingReview?: boolean;
 };
 
 @Injectable()
@@ -88,13 +90,33 @@ export class SubmitVerifiedBankUseCase {
     const verifiedBankName = dto.verifiedBankName?.trim() ?? '';
 
     const attemptsAllowed = await this.settings.loadPennyDropRetryCount();
+    const nameMatchMinScore = await this.settings.loadPennyDropNameMatchMinScore();
     const applicationRow = await this.prisma.client.application.findFirst({
       where: { leadId: lead.id },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, details: { select: { pennyDropAttempts: true } } },
+      select: {
+        id: true,
+        applicationStatus: { select: { name: true } },
+        details: { select: { pennyDropAttempts: true } },
+      },
     });
     if (!applicationRow) {
       throw new BadRequestException('Create application details before bank details.');
+    }
+
+    if (applicationRow.applicationStatus.name === APPLICATION_STATUS.UNDER_REVIEW) {
+      return {
+        success: true,
+        pennyDropOk: true,
+        applicationStatus: APPLICATION_STATUS.UNDER_REVIEW,
+        message:
+          'Your bank account is under credit review. You can continue once credit approves the name match.',
+        vendor: null,
+        attemptsUsed: applicationRow.details?.pennyDropAttempts ?? 0,
+        attemptsAllowed,
+        retryLimitReached: false,
+        nameMatchPendingReview: true,
+      };
     }
 
     const attemptsUsed = applicationRow.details?.pennyDropAttempts ?? 0;
@@ -162,6 +184,7 @@ export class SubmitVerifiedBankUseCase {
           bankName: verifiedBankName,
           accountHolderName: holderName,
           nameAtBank: extractPennyDropBankName(vendor),
+          nameMatchScore: null,
           matched: false,
           vendor,
         });
@@ -195,7 +218,30 @@ export class SubmitVerifiedBankUseCase {
       journeyFullName: holderName,
       vendor,
     });
-    if (!nameMatch.matched) {
+    const autoPass =
+      nameMatch.matched ||
+      (nameMatch.score != null &&
+        nameMatch.score >= nameMatchMinScore &&
+        !(nameMatch.matched === false && nameMatch.reason === 'vendor_name_mismatch'));
+
+    if (!autoPass) {
+      if (nameMatch.bankName) {
+        return this.persistUnderReviewNameMismatch({
+          leadId: lead.id,
+          applicationId: applicationRow.id,
+          customerMobile: customer.mobileNumber,
+          accountNumber,
+          ifsc,
+          verifiedBankName,
+          holderName,
+          vendor,
+          nameMatchScore: nameMatch.score,
+          bankNameAtVendor: nameMatch.bankName,
+          attemptsUsed,
+          attemptsAllowed,
+        });
+      }
+
       const nextAttemptsUsed = attemptsUsed + 1;
       await this.prisma.client.$transaction(async (tx: Prisma.TransactionClient) => {
         await tx.applicationDetail.update({
@@ -213,14 +259,15 @@ export class SubmitVerifiedBankUseCase {
           bankName: verifiedBankName,
           accountHolderName: holderName,
           nameAtBank: nameMatch.bankName,
+          nameMatchScore: nameMatch.score,
           matched: false,
           vendor,
         });
       });
       const retryLimitReached = nextAttemptsUsed >= attemptsAllowed;
       this.logger.warn(
-        `[penny-drop] Name mismatch lead=${lead.id.toString()} reason=${nameMatch.reason} ` +
-          `bankName=${nameMatch.bankName ? '[present]' : '[missing]'}`,
+        `[penny-drop] Name mismatch lead=${lead.id.toString()} reason=${nameMatch.matched ? 'matched' : nameMatch.reason} ` +
+          `bankName=${nameMatch.bankName ? '[present]' : '[missing]'} score=${nameMatch.score ?? 'n/a'}`,
       );
       const applicationStatus = retryLimitReached
         ? await this.markPennyDropFailed({
@@ -240,6 +287,7 @@ export class SubmitVerifiedBankUseCase {
         attemptsUsed: nextAttemptsUsed,
         attemptsAllowed,
         retryLimitReached,
+        nameMatchScore: nameMatch.score,
       };
     }
 
@@ -285,6 +333,7 @@ export class SubmitVerifiedBankUseCase {
         bankName: verifiedBankName,
         accountHolderName: holderName,
         nameAtBank: nameMatch.bankName,
+        nameMatchScore: nameMatch.score,
         matched: true,
         vendor,
       });
@@ -307,6 +356,87 @@ export class SubmitVerifiedBankUseCase {
       attemptsUsed,
       attemptsAllowed,
       retryLimitReached: false,
+      nameMatchScore: nameMatch.score,
+      nameMatchPendingReview: false,
+    };
+  }
+
+  private async persistUnderReviewNameMismatch(params: {
+    leadId: bigint;
+    applicationId: bigint;
+    customerMobile: string;
+    accountNumber: string;
+    ifsc: string;
+    verifiedBankName: string;
+    holderName: string;
+    vendor: unknown;
+    nameMatchScore: number | null;
+    bankNameAtVendor: string;
+    attemptsUsed: number;
+    attemptsAllowed: number;
+  }): Promise<SubmitVerifiedBankResult> {
+    const underReview = await this.prisma.client.applicationStatus.findFirst({
+      where: { name: APPLICATION_STATUS.UNDER_REVIEW, isActive: true },
+      select: { id: true },
+    });
+    if (!underReview) {
+      throw new BadRequestException('Application status UNDER_REVIEW is not configured.');
+    }
+
+    this.logger.warn(
+      `[penny-drop] Name mismatch sent to credit review lead=${params.leadId.toString()} ` +
+        `score=${params.nameMatchScore ?? 'n/a'}`,
+    );
+
+    await this.prisma.client.$transaction(async (tx: Prisma.TransactionClient) => {
+      await tx.applicationDetail.updateMany({
+        where: { applicationId: params.applicationId },
+        data: {
+          bankAccountNumber: params.accountNumber,
+          ifscCode: params.ifsc,
+          bankName: params.verifiedBankName.length > 0 ? params.verifiedBankName : null,
+          pennyDropVendorJson:
+            params.vendor === null ? Prisma.JsonNull : (params.vendor as Prisma.InputJsonValue),
+        },
+      });
+
+      await this.recordBankAccountAttempt(tx, {
+        applicationId: params.applicationId,
+        accountNumber: params.accountNumber,
+        ifsc: params.ifsc,
+        bankName: params.verifiedBankName,
+        accountHolderName: params.holderName,
+        nameAtBank: params.bankNameAtVendor,
+        nameMatchScore: params.nameMatchScore,
+        matched: false,
+        vendor: params.vendor,
+      });
+
+      await tx.application.update({
+        where: { id: params.applicationId },
+        data: {
+          applicationStatusId: underReview.id,
+          applicationStatusNote: BANK_NAME_REVIEW_NOTE,
+        },
+      });
+    });
+
+    void this.sms.sendUnderReviewSms(params.customerMobile, params.leadId).catch((err) => {
+      this.logger.error('Failed to send under-review SMS', err instanceof Error ? err.stack : err);
+    });
+
+    return {
+      success: true,
+      pennyDropOk: true,
+      applicationStatus: APPLICATION_STATUS.UNDER_REVIEW,
+      message:
+        'Your bank account was verified, but the account name needs a credit review before you can continue.',
+      vendor: params.vendor,
+      attemptsUsed: params.attemptsUsed,
+      attemptsAllowed: params.attemptsAllowed,
+      retryLimitReached: false,
+      nameMatchScore: params.nameMatchScore,
+      nameMatchPendingReview: true,
     };
   }
 
@@ -381,6 +511,7 @@ export class SubmitVerifiedBankUseCase {
       const canSetAppStatus =
         currentStatus === APPLICATION_STATUS.DRAFT ||
         currentStatus === APPLICATION_STATUS.IN_REVIEW ||
+        currentStatus === APPLICATION_STATUS.UNDER_REVIEW ||
         currentStatus === APPLICATION_STATUS.PENNYDROP_FAILED;
       if (pennyFailedAppStatus && canSetAppStatus) {
         await tx.application.update({
@@ -415,6 +546,7 @@ export class SubmitVerifiedBankUseCase {
       bankName: string;
       accountHolderName: string;
       nameAtBank: string | null;
+      nameMatchScore: number | null;
       matched: boolean;
       vendor: unknown;
     },
@@ -431,6 +563,7 @@ export class SubmitVerifiedBankUseCase {
         bankName: bankName.length > 0 ? bankName : null,
         accountHolderName: accountHolderName.length > 0 ? accountHolderName : null,
         nameAtBank: nameAtBank.length > 0 ? nameAtBank : null,
+        nameMatchScore: params.nameMatchScore,
         status: params.matched,
         pennyDropVendorJson:
           params.vendor === null ? Prisma.JsonNull : (params.vendor as Prisma.InputJsonValue),
