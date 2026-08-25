@@ -25,6 +25,12 @@ import {
 } from '../../../../common/loan/bounce-charge.util';
 import { BounceChargeTierResolverService } from '../../../../common/loan/bounce-charge-tier.resolver';
 import { canDeactivateConvertedLeadForReapply } from '../../../../common/loan/customer-open-loan.util';
+import {
+  remainingDueInr,
+  resolveRequestedPayAmount,
+  shouldCloseLoanAfterPayment,
+  sumSuccessfulRepaymentsInr,
+} from '../../../../common/loan/loan-repayment-outstanding.util';
 import { RedisService } from '../../../../common/redis/redis.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
@@ -61,6 +67,7 @@ export class InitiateCustomerRepaymentUseCase {
   async execute(
     req: Request,
     applicationUuid: string,
+    requestedAmountInr?: number,
   ): Promise<{
     success: true;
     applicationUuid: string;
@@ -92,13 +99,17 @@ export class InitiateCustomerRepaymentUseCase {
     }
 
     try {
-      return await this.initiateLocked(customer.id, applicationUuid);
+      return await this.initiateLocked(customer.id, applicationUuid, requestedAmountInr);
     } finally {
       await this.releaseLock(lockKey, lockToken);
     }
   }
 
-  private async initiateLocked(customerId: bigint, applicationUuid: string) {
+  private async initiateLocked(
+    customerId: bigint,
+    applicationUuid: string,
+    requestedAmountInr?: number,
+  ) {
     const application = await this.prisma.client.application.findFirst({
       where: { uuid: applicationUuid, customerId },
       select: {
@@ -168,7 +179,21 @@ export class InitiateCustomerRepaymentUseCase {
       principal,
       overdueDays,
     );
-    const totalDue = Math.round((due.amountDue + bounceFeeInr) * 100) / 100;
+    const billDueNow = Math.round((due.amountDue + bounceFeeInr) * 100) / 100;
+    const totalPaid = await sumSuccessfulRepaymentsInr(this.prisma.client, loan.id);
+    const remaining = remainingDueInr(billDueNow, totalPaid);
+    const minPayAmountInr = await this.settings.loadMinPayAmountInr();
+    const resolved = resolveRequestedPayAmount({
+      requestedAmountInr,
+      remainingInr: remaining,
+      minPayAmountInr,
+    });
+    if ('error' in resolved) {
+      throw new BadRequestException(resolved.error);
+    }
+
+    const totalDue = resolved.amountInr;
+    const isFullPayoff = resolved.isFullPayoff;
 
     const amountInr = totalDue.toFixed(2);
     const bounceFeeInrStr = bounceFeeInr.toFixed(2);
@@ -181,8 +206,8 @@ export class InitiateCustomerRepaymentUseCase {
 
     if (this.easebuzzWire.isPayInitiateSkipped()) {
       this.logger.warn(
-        `[repay] EASEBUZZ_PAY_SKIP — settling loan=${loan.loanNumber} amount=${amountInr} ` +
-          `penal=${bounceFeeInrStr} (${overdueDays}d overdue) without vendor call`,
+        `[repay] EASEBUZZ_PAY_SKIP — ${isFullPayoff ? 'settling' : 'partial'} loan=${loan.loanNumber} amount=${amountInr} ` +
+          `remaining=${remaining.toFixed(2)} penal=${bounceFeeInrStr} (${overdueDays}d overdue) without vendor call`,
       );
     } else {
       const payeeName = application.lead.leadDetail?.fullName?.trim();
@@ -200,7 +225,7 @@ export class InitiateCustomerRepaymentUseCase {
         const created = await this.easebuzzWire.initiatePaymentLink({
           txnid,
           amountInr: totalDue,
-          productinfo: `Loan repay ${loan.loanNumber}`.slice(0, 45),
+          productinfo: `${isFullPayoff ? 'Loan repay' : 'Partial repay'} ${loan.loanNumber}`.slice(0, 45),
           firstname: payeeName,
           email: payeeEmail,
           phone: payeePhone.slice(-10),
@@ -248,7 +273,8 @@ export class InitiateCustomerRepaymentUseCase {
       // Hosted Easebuzz payment URL — customer must complete payment; do not close the loan yet.
       if (paymentUrl) {
         this.logger.log(
-          `[repay] Pay initiateLink created loan=${loan.loanNumber} txnid=${txnid} amount=${amountInr} — awaiting customer payment`,
+          `[repay] Pay initiateLink created loan=${loan.loanNumber} txnid=${txnid} amount=${amountInr} ` +
+            `${isFullPayoff ? 'full' : 'partial'} — awaiting customer payment`,
         );
         return {
           success: true as const,
@@ -266,11 +292,16 @@ export class InitiateCustomerRepaymentUseCase {
       }
     }
 
-    const closedStatus = await this.prisma.client.loanStatus.findFirst({
-      where: { name: LOAN_STATUS.CLOSED, isActive: true },
-      select: { id: true },
-    });
-    if (!closedStatus) {
+    const remainingAfter = remainingDueInr(billDueNow, totalPaid + totalDue);
+    const closesLoan = shouldCloseLoanAfterPayment(remainingAfter);
+
+    const closedStatus = closesLoan
+      ? await this.prisma.client.loanStatus.findFirst({
+          where: { name: LOAN_STATUS.CLOSED, isActive: true },
+          select: { id: true },
+        })
+      : null;
+    if (closesLoan && !closedStatus) {
       throw new NotFoundException('CLOSED loan status is not configured.');
     }
 
@@ -316,31 +347,34 @@ export class InitiateCustomerRepaymentUseCase {
         )
       `;
 
-      await tx.loanAccount.update({
-        where: { id: loan.id },
-        data: {
-          loanStatusId: closedStatus.id,
-          closedAt: paidAt,
-          interestAmount: due.interestAmount.toFixed(2),
-          totalRepaymentAmount: amountInr,
-        },
-      });
+      if (closesLoan && closedStatus) {
+        const collected = Math.round((totalPaid + totalDue) * 100) / 100;
+        await tx.loanAccount.update({
+          where: { id: loan.id },
+          data: {
+            loanStatusId: closedStatus.id,
+            closedAt: paidAt,
+            interestAmount: due.interestAmount.toFixed(2),
+            totalRepaymentAmount: collected.toFixed(2),
+          },
+        });
 
-      // Free the customer to start a fresh application (do not keep journey locked on /thank-you).
-      const lead = await tx.lead.findUnique({
-        where: { id: application.leadId },
-        select: { id: true, leadStatus: { select: { name: true } } },
-      });
-      if (lead?.leadStatus.name === LEAD_STATUS.CONVERTED) {
-        const mayReapply = await canDeactivateConvertedLeadForReapply(tx, lead.id);
-        if (mayReapply) {
-          await this.leads.deactivate(lead.id, tx);
+        const lead = await tx.lead.findUnique({
+          where: { id: application.leadId },
+          select: { id: true, leadStatus: { select: { name: true } } },
+        });
+        if (lead?.leadStatus.name === LEAD_STATUS.CONVERTED) {
+          const mayReapply = await canDeactivateConvertedLeadForReapply(tx, lead.id);
+          if (mayReapply) {
+            await this.leads.deactivate(lead.id, tx);
+          }
         }
       }
     });
 
     this.logger.log(
-      `[repay] Success loan=${loan.loanNumber} amount=${amountInr} vendor=${vendor} repayment=${repaymentUuid}`,
+      `[repay] Success loan=${loan.loanNumber} amount=${amountInr} vendor=${vendor} ` +
+        `repayment=${repaymentUuid} ${closesLoan ? 'closed' : 'partial'}`,
     );
 
     return {
@@ -351,7 +385,7 @@ export class InitiateCustomerRepaymentUseCase {
       amountInr,
       bounceFeeInr: bounceFeeInrStr,
       repaymentUuid,
-      loanStatus: LOAN_STATUS.CLOSED,
+      loanStatus: closesLoan ? LOAN_STATUS.CLOSED : loan.loanStatus.name,
       redirectPath: '/my-account',
       paymentUrl: null,
       vendor,

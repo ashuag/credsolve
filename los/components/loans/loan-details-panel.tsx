@@ -723,6 +723,7 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
                 : row.usedFullTenureInterest
                   ? 'Principal + full tenure interest'
                   : 'Principal + interest till today'}
+              {Number(row.totalPaidAmount) > 0 ? ' · before payments' : ''}
             </p>
           </div>
           <div className="rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[#fbfcff] px-4 py-3.5">

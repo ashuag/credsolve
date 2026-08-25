@@ -15,8 +15,9 @@ import { VerifyPanDto } from '../application/dto/verify-pan.dto';
 import { GetCustomerSessionUseCase } from '../application/use-cases/get-customer-session.use-case';
 import { GetCustomerLoansDashboardUseCase } from '../application/use-cases/get-customer-loans-dashboard.use-case';
 import { GetCustomerPaymentHistoryUseCase } from '../application/use-cases/get-customer-payment-history.use-case';
-import { HandleEasebuzzRepaymentCallbackUseCase } from '../application/use-cases/handle-easebuzz-repayment-callback.use-case';
+import { InitiateRepaymentDto } from '../application/dto/initiate-repayment.dto';
 import { InitiateCustomerRepaymentUseCase } from '../application/use-cases/initiate-customer-repayment.use-case';
+import { HandleEasebuzzRepaymentCallbackUseCase } from '../application/use-cases/handle-easebuzz-repayment-callback.use-case';
 import { LogoutUseCase } from '../application/use-cases/logout.use-case';
 import { SendOtpUseCase } from '../application/use-cases/send-otp.use-case';
 import { SaveLeadDetailsUseCase } from '../application/use-cases/save-lead-details.use-case';
@@ -241,15 +242,20 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Collect loan repayment via Easebuzz Payment Gateway initiateLink (principal + interest till today). Returns a hosted payment URL; loan closes after Easebuzz redirects to surl.',
+      'Collect loan repayment via Easebuzz (full remaining or a partial amount). Each attempt uses a new txnid stored on loan_repayment.vendor_ref. Loan closes only when remaining is zero.',
   })
-  repayLoan(@Req() req: Request, @Param('applicationUuid') applicationUuid: string) {
-    return this.initiateCustomerRepayment.execute(req, applicationUuid);
+  repayLoan(
+    @Req() req: Request,
+    @Param('applicationUuid') applicationUuid: string,
+    @Body() body: InitiateRepaymentDto,
+  ) {
+    return this.initiateCustomerRepayment.execute(req, applicationUuid, body?.amountInr);
   }
 
   @All('repayments/easebuzz/success')
   @ApiOperation({
-    summary: 'Easebuzz repayment success URL (surl) — verifies hash, closes loan, redirects to customer portal',
+    summary:
+      'Easebuzz repayment success URL (surl) — verifies hash, records the payment, closes the loan only when remaining is zero, redirects to customer portal',
   })
   async easebuzzRepaySuccess(@Req() req: Request, @Res() res: Response): Promise<void> {
     const payload = {

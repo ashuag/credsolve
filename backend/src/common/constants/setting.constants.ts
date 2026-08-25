@@ -146,4 +146,10 @@ export const SettingKey = {
         description:
             'Inclusive days from disbursement during which early repayment charges interest only for days used; after this, full contracted tenure interest applies',
     },
+    MIN_PAY_AMOUNT: {
+        key: 'MIN_PAY_AMOUNT',
+        default: '100',
+        description:
+            'Minimum online partial repayment amount in INR. If outstanding is below this, the customer must pay the remaining balance in full.',
+    },
 } as const;

@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
+import { LOAN_REPAYMENT_STATUS } from '../../../../common/constants/loan-repayment.constants';
 import { LOAN_STATUS } from '../../../../common/constants/loan.constants';
 import {
   computeAmountDueNowInr,
@@ -16,6 +17,10 @@ import {
   overdueDaysFromMaturity,
   type PenalChargeConfig,
 } from '../../../../common/loan/bounce-charge.util';
+import {
+  remainingDueInr,
+  sumRepaymentAmounts,
+} from '../../../../common/loan/loan-repayment-outstanding.util';
 import { BounceChargeTierResolverService } from '../../../../common/loan/bounce-charge-tier.resolver';
 import { computeFeeAmountsFromLoanDetail } from '../../../../common/loan/loan-disbursement-view.util';
 import type {
@@ -93,6 +98,7 @@ function mapRow(
       closedAt: Date | null;
       bankAccountNumber: string | null;
       loanStatus: { name: string };
+      repayments: Array<{ amount: Prisma.Decimal; status: string }>;
     } | null;
   },
   penal: PenalChargeConfig,
@@ -139,6 +145,7 @@ function mapRow(
   let amountDueToday: number | null = null;
   let bounceFeeInr: number | null = null;
   let usedFullTenureInterest = false;
+  const totalPaid = sumRepaymentAmounts(loanAccount?.repayments ?? []);
 
   if (loanAccount && loanAccount.closedAt == null && principal != null && dailyRate != null) {
     const due = computeAmountDueNowInr(principal, dailyRate, loanAccount.disbursedAt, {
@@ -155,13 +162,13 @@ function mapRow(
       ? Math.max(overdueDaysFromMaturity(loanAccount.loanMaturityDate), 1)
       : 0;
     bounceFeeInr = computePenalChargeInr(principal, overdueDays, penal);
-    amountDueToday = Math.round((due.amountDue + bounceFeeInr) * 100) / 100;
+    const billDueNow = Math.round((due.amountDue + bounceFeeInr) * 100) / 100;
+    amountDueToday = remainingDueInr(billDueNow, totalPaid);
   } else if (loanAccount?.closedAt != null) {
     // Inclusive days from disbursement through repayment (disbursement day = day 1).
     daysOutstanding = calendarDaysBetween(loanAccount.disbursedAt, loanAccount.closedAt) + 1;
     interestTillToday = decimalToNumber(loanAccount.interestAmount);
-    amountDueToday = decimalToNumber(loanAccount.totalRepaymentAmount);
-    amountDueAtMaturity = amountDueToday ?? amountDueAtMaturity;
+    amountDueToday = 0;
     bounceFeeInr = null;
   }
 
@@ -193,9 +200,16 @@ function mapRow(
     amountDueToday: amountDueTodayStr,
     usedFullTenureInterest,
     bounceFeeInr: bounceFeeStr,
+    totalPaidInr: loanAccount != null ? totalPaid.toFixed(2) : null,
+    outstandingInr: amountDueTodayStr,
     processingFeeAmount: fees.processingFeeAmount != null ? fees.processingFeeAmount.toFixed(2) : null,
     gstAmount: fees.gstAmount != null ? fees.gstAmount.toFixed(2) : null,
-    totalRepayment: amountDueTodayStr ?? amountDueAtMaturityStr,
+    totalRepayment:
+      loanAccount?.closedAt != null
+        ? totalPaid > 0.009
+          ? totalPaid.toFixed(2)
+          : (decimalToNumber(loanAccount.totalRepaymentAmount)?.toFixed(2) ?? amountDueAtMaturityStr)
+        : (amountDueTodayStr ?? amountDueAtMaturityStr),
     maturityDate: loanAccount
       ? isoDateOnly(loanAccount.loanMaturityDate)
       : isoDateOnly(loanDetail?.expectedRepaymentDate ?? null),
@@ -259,6 +273,10 @@ export class GetCustomerLoansDashboardUseCase {
             closedAt: true,
             bankAccountNumber: true,
             loanStatus: { select: { name: true } },
+            repayments: {
+              where: { status: LOAN_REPAYMENT_STATUS.SUCCESS },
+              select: { amount: true, status: true },
+            },
           },
         },
       },
@@ -266,6 +284,7 @@ export class GetCustomerLoansDashboardUseCase {
 
     const penal = await this.bounceChargeTiers.loadPenalConfig();
     const coolingPeriodDays = await this.settings.loadRepayCoolingPeriodDays();
+    const minPayAmountInr = await this.settings.loadMinPayAmountInr();
     const todayStart = startOfTodayUtc();
     const cards = rows.map((row) => mapRow(row, penal, coolingPeriodDays));
 
@@ -328,8 +347,8 @@ export class GetCustomerLoansDashboardUseCase {
         const suffix = activeLoans.length > 1 ? ` · ${card.loanNumber ?? card.applicationUuid.slice(0, 8)}…` : '';
         repaymentSchedule.push({
           dueDate: isoDateOnly(maturity) ?? '',
-          label: `Full repayment (principal + interest)${suffix}`,
-          amount: total,
+          label: `${card.totalPaidInr != null && Number(card.totalPaidInr) > 0 ? 'Remaining repayment' : 'Full repayment'} (principal + interest)${suffix}`,
+          amount: card.amountDueToday ?? total,
           status: lineStatus,
         });
       }
@@ -340,6 +359,7 @@ export class GetCustomerLoansDashboardUseCase {
       pastLoans,
       inProgress,
       repaymentSchedule,
+      minPayAmountInr: minPayAmountInr.toFixed(2),
     };
   }
 }

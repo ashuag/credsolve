@@ -325,9 +325,10 @@ export class LosLoanService {
     }
 
     const bookedTotal = amountDueAtMaturity ?? decimalToNumber(loan.totalRepaymentAmount) ?? 0;
-    // Includes penal charge so this reflects the full collectable amount.
+    const liveBill =
+      amountDueToday != null ? Number.parseFloat(amountDueToday) : bookedTotal + penalAmount;
     const outstanding =
-      loan.closedAt != null ? 0 : Math.max(bookedTotal + penalAmount - totalPaid, 0);
+      loan.closedAt != null ? 0 : Math.max(Math.round((liveBill - totalPaid) * 100) / 100, 0);
 
     return {
       uuid: loan.uuid,

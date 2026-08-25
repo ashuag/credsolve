@@ -21,6 +21,16 @@ import {
   computeTenureDays,
   decimalToNumber,
 } from '../../../../common/loan/loan-calculation.util';
+import {
+  remainingDueInr,
+  shouldCloseLoanAfterPayment,
+  sumSuccessfulRepaymentsInr,
+} from '../../../../common/loan/loan-repayment-outstanding.util';
+import {
+  isRepaymentPastDue,
+  overdueDaysFromMaturity,
+} from '../../../../common/loan/bounce-charge.util';
+import { BounceChargeTierResolverService } from '../../../../common/loan/bounce-charge-tier.resolver';
 import { canDeactivateConvertedLeadForReapply } from '../../../../common/loan/customer-open-loan.util';
 import { RedisService } from '../../../../common/redis/redis.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
@@ -70,6 +80,7 @@ export class HandleEasebuzzRepaymentCallbackUseCase {
     private readonly redis: RedisService,
     private readonly config: ConfigService,
     private readonly settings: SettingsRepository,
+    private readonly bounceChargeTiers: BounceChargeTierResolverService,
   ) {}
 
   /**
@@ -261,15 +272,24 @@ export class HandleEasebuzzRepaymentCallbackUseCase {
           })
         : null;
     const amountInr = intent.amountInr;
+    const paidThis = Number.parseFloat(amountInr);
+
+    const pastDue =
+      loan.loanStatus.name === LOAN_STATUS.OVERDUE || isRepaymentPastDue(loan.loanMaturityDate);
+    const overdueDays = pastDue
+      ? Math.max(overdueDaysFromMaturity(loan.loanMaturityDate), 1)
+      : 0;
+    const bounceFeeInr =
+      principal != null
+        ? await this.bounceChargeTiers.resolveChargeForAmount(principal, overdueDays)
+        : 0;
+    const billDueNow =
+      due != null ? Math.round((due.amountDue + bounceFeeInr) * 100) / 100 : paidThis;
 
     const closedStatus = await this.prisma.client.loanStatus.findFirst({
       where: { name: LOAN_STATUS.CLOSED, isActive: true },
       select: { id: true },
     });
-    if (!closedStatus) {
-      this.logger.error('[repay-callback] CLOSED loan status missing');
-      return redirect('error', 'status_missing');
-    }
 
     // --- 6. Settle under lock ---
     const lockKey = `customer:repay-settle:${txnid}`;
@@ -324,6 +344,13 @@ export class HandleEasebuzzRepaymentCallbackUseCase {
           return;
         }
 
+        const paidBefore = await sumSuccessfulRepaymentsInr(tx, loan.id);
+        const remainingAfter = remainingDueInr(
+          billDueNow,
+          paidBefore + (Number.isFinite(paidThis) ? paidThis : 0),
+        );
+        const closesLoan = shouldCloseLoanAfterPayment(remainingAfter);
+
         await tx.$executeRaw`
           INSERT INTO loan_repayment (
             uuid,
@@ -350,24 +377,31 @@ export class HandleEasebuzzRepaymentCallbackUseCase {
           )
         `;
 
-        await tx.loanAccount.update({
-          where: { id: loan.id },
-          data: {
-            loanStatusId: closedStatus.id,
-            closedAt: paidAt,
-            interestAmount: due ? due.interestAmount.toFixed(2) : undefined,
-            totalRepaymentAmount: amountInr,
-          },
-        });
+        if (closesLoan) {
+          if (!closedStatus) {
+            this.logger.error('[repay-callback] CLOSED loan status missing');
+            throw new Error('status_missing');
+          }
+          const collected = Math.round((paidBefore + (Number.isFinite(paidThis) ? paidThis : 0)) * 100) / 100;
+          await tx.loanAccount.update({
+            where: { id: loan.id },
+            data: {
+              loanStatusId: closedStatus.id,
+              closedAt: paidAt,
+              interestAmount: due ? due.interestAmount.toFixed(2) : undefined,
+              totalRepaymentAmount: collected.toFixed(2),
+            },
+          });
 
-        const lead = await tx.lead.findUnique({
-          where: { id: loan.application.leadId },
-          select: { id: true, leadStatus: { select: { name: true } } },
-        });
-        if (lead?.leadStatus.name === LEAD_STATUS.CONVERTED) {
-          const mayReapply = await canDeactivateConvertedLeadForReapply(tx, lead.id);
-          if (mayReapply) {
-            await this.leads.deactivate(lead.id, tx);
+          const lead = await tx.lead.findUnique({
+            where: { id: loan.application.leadId },
+            select: { id: true, leadStatus: { select: { name: true } } },
+          });
+          if (lead?.leadStatus.name === LEAD_STATUS.CONVERTED) {
+            const mayReapply = await canDeactivateConvertedLeadForReapply(tx, lead.id);
+            if (mayReapply) {
+              await this.leads.deactivate(lead.id, tx);
+            }
           }
         }
       });
@@ -384,7 +418,7 @@ export class HandleEasebuzzRepaymentCallbackUseCase {
 
     await clearPendingRepayIntent(this.redis, txnid);
     this.logger.log(
-      `[repay-callback] SUCCESS loan=${loan.loanNumber} txnid=${txnid} repayment=${repaymentUuid} closed`,
+      `[repay-callback] SUCCESS loan=${loan.loanNumber} txnid=${txnid} repayment=${repaymentUuid}`,
     );
     return redirect('success');
   }

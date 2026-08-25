@@ -235,6 +235,8 @@ function ResumeJourneyCard({
 
 function LoanSummaryCard({ loan, emphasize }: { loan: CustomerLoanCard; emphasize?: boolean }) {
   const isPaidFully = loan.status.toUpperCase() === 'CLOSED';
+  const paidN = Number.parseFloat(loan.totalPaidInr ?? '');
+  const hasPaid = Number.isFinite(paidN) && paidN > 0.009;
   const repaymentDays = isPaidFully
     ? (loan.daysOutstanding ?? loan.tenureDays)
     : loan.tenureDays;
@@ -267,7 +269,9 @@ function LoanSummaryCard({ loan, emphasize }: { loan: CustomerLoanCard; emphasiz
           <dd className="text-lg font-extrabold text-brand-navy">{formatInr(loan.loanAmount)}</dd>
         </div>
         <div>
-          <dt className="text-[0.7rem] font-bold uppercase tracking-wider text-slate-400">Total repayment</dt>
+          <dt className="text-[0.7rem] font-bold uppercase tracking-wider text-slate-400">
+            {isPaidFully ? 'Repaid' : hasPaid ? 'Remaining today' : 'Due today'}
+          </dt>
           <dd className="text-lg font-extrabold text-brand-navy">{formatInr(loan.totalRepayment)}</dd>
         </div>
         <div>
@@ -395,6 +399,7 @@ export function CustomerDashboard() {
           pastLoans: [],
           inProgress: [],
           repaymentSchedule: [],
+          minPayAmountInr: '100.00',
         }
       );
     } catch (e) {
@@ -446,7 +451,7 @@ export function CustomerDashboard() {
     );
   }
 
-  const dash = data ?? { activeLoans: [], pastLoans: [], inProgress: [], repaymentSchedule: [] };
+  const dash = data ?? { activeLoans: [], pastLoans: [], inProgress: [], repaymentSchedule: [], minPayAmountInr: '100.00' };
   const hasResumeable = dash.inProgress.length > 0 && dash.activeLoans.length === 0;
   const greetingName =
     session && session.authenticated ? session.profile?.fullName?.trim().split(/\s+/)[0] ?? null : null;
@@ -548,8 +553,7 @@ export function CustomerDashboard() {
               ))}
             </ul>
             <p className="border-t border-[rgba(18,36,79,0.06)] bg-slate-50/80 px-5 py-3 text-[0.8rem] text-brand-muted leading-relaxed">
-              Short-term loans are structured as a single repayment on the maturity date. Complete payment through your
-              registered bank mandate or the instructions sent by MoneyCash.
+              You can pay the remaining balance in full or make a partial payment. The loan stays open until the remaining amount is cleared.
             </p>
           </div>
         )}

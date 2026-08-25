@@ -20,6 +20,8 @@ export type CustomerLoanCard = {
   amountDueToday: string | null;
   usedFullTenureInterest?: boolean;
   bounceFeeInr: string | null;
+  totalPaidInr: string | null;
+  outstandingInr: string | null;
   processingFeeAmount: string | null;
   gstAmount: string | null;
   totalRepayment: string | null;
@@ -34,6 +36,7 @@ export type CustomerLoansDashboard = {
   pastLoans: CustomerLoanCard[];
   inProgress: CustomerLoanCard[];
   repaymentSchedule: CustomerLoanRepaymentLine[];
+  minPayAmountInr: string;
 };
 
 export type InitiateRepaymentResult = {
@@ -73,10 +76,11 @@ export async function fetchCustomerLoansDashboard(): Promise<CustomerLoansDashbo
 
 export async function initiateCustomerRepayment(
   applicationUuid: string,
+  amountInr?: number,
 ): Promise<InitiateRepaymentResult | null> {
   return apiPost<InitiateRepaymentResult>(
     `/auth/my-loans/${encodeURIComponent(applicationUuid)}/repay`,
-    {},
+    amountInr != null ? { amountInr } : {},
     'Unable to start repayment right now.',
   );
 }

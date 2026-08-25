@@ -8,6 +8,7 @@ import {
 } from '../../../../common/constants/bureau-fetch-settings.util';
 import {SettingKey} from '../../../../common/constants/setting.constants';
 import {loadRepayCoolingPeriodDays as readRepayCoolingPeriodDays} from '../../../../common/loan/repay-cooling-period.util';
+import {loadMinPayAmountInr as readMinPayAmountInr} from '../../../../common/loan/min-pay-amount.util';
 import {RedisService} from '../../../../common/redis/redis.service';
 import {PrismaService} from '../../../../prisma/prisma.service';
 import {
@@ -506,5 +507,10 @@ export class SettingsRepository implements OnModuleInit {
    */
   async loadRepayCoolingPeriodDays(): Promise<number> {
     return readRepayCoolingPeriodDays(this.prisma.client);
+  }
+
+  /** Minimum online partial repayment in INR (`MIN_PAY_AMOUNT`). */
+  async loadMinPayAmountInr(): Promise<number> {
+    return readMinPayAmountInr(this.prisma.client);
   }
 }

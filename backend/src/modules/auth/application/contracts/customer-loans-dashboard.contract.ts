@@ -32,6 +32,10 @@ export type CustomerLoanCard = {
   usedFullTenureInterest: boolean;
   /** Penal charge included in amountDueToday when repayment is past maturity (else `0.00` / null). */
   bounceFeeInr: string | null;
+  /** Sum of successful `loan_repayment` rows. */
+  totalPaidInr: string | null;
+  /** Remaining to close today (`amountDueToday` after subtracting payments). */
+  outstandingInr: string | null;
   processingFeeAmount: string | null;
   gstAmount: string | null;
   /**
@@ -53,4 +57,6 @@ export type CustomerLoansDashboardResult = {
   pastLoans: CustomerLoanCard[];
   inProgress: CustomerLoanCard[];
   repaymentSchedule: CustomerLoanRepaymentLine[];
+  /** `MIN_PAY_AMOUNT` setting — prefill for partial pay. */
+  minPayAmountInr: string;
 };

@@ -311,35 +311,47 @@ function CompleteJourneyCard({
 
 function ActiveLoanCard({
   loan,
+  minPayAmountInr,
   onPaid,
 }: {
   loan: CustomerLoanCard;
+  minPayAmountInr: string;
   onPaid?: () => void;
 }) {
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
+  const [payMode, setPayMode] = useState<'full' | 'partial' | null>(null);
   const router = useRouter();
   const { refresh } = useCustomerSession();
-  const amountDueToday = loan.amountDueToday ?? loan.totalRepayment;
+  const remaining = loan.outstandingInr ?? loan.amountDueToday ?? loan.totalRepayment;
   const amountAtMaturity = loan.amountDueAtMaturity ?? loan.totalRepayment;
-  const todayN = parseAmount(amountDueToday);
+  const remainingN = parseAmount(remaining);
   const maturityN = parseAmount(amountAtMaturity);
+  const paidN = parseAmount(loan.totalPaidInr);
+  const minPayN = parseAmount(minPayAmountInr) ?? 100;
   const bounceN = parseAmount(loan.bounceFeeInr);
   const showBounce = bounceN != null && bounceN > 0;
   const savings =
-    todayN != null && maturityN != null ? Math.round((maturityN - todayN) * 100) / 100 : null;
+    remainingN != null && maturityN != null && (paidN == null || paidN <= 0)
+      ? Math.round((maturityN - remainingN) * 100) / 100
+      : null;
   const showSavings = loan.usedFullTenureInterest !== true && savings != null && savings > 0.009;
   const daysUntilDue = calendarDaysFromToday(loan.maturityDate);
   const isOverdue = loan.status.toUpperCase() === 'OVERDUE' || (daysUntilDue != null && daysUntilDue < 0);
   const timing = dueTiming(daysUntilDue, isOverdue, loan.maturityDate);
   const daysUsed = loan.daysOutstanding;
+  const hasPaid = paidN != null && paidN > 0.009;
+  const remainingBelowMin = remainingN != null && remainingN <= minPayN + 0.009;
+  const partialPrefill =
+    remainingN != null ? Math.min(minPayN, remainingN).toFixed(2) : minPayN.toFixed(2);
+  const [partialAmount, setPartialAmount] = useState(partialPrefill);
 
-  const onPayNow = async () => {
+  const startPay = async (amountInr: number) => {
     if (paying) return;
     setPaying(true);
     setPayError(null);
     try {
-      const result = await initiateCustomerRepayment(loan.applicationUuid);
+      const result = await initiateCustomerRepayment(loan.applicationUuid, amountInr);
       if (!result?.success) {
         setPayError('Payment was unsuccessful. Please try again.');
         return;
@@ -356,6 +368,35 @@ function ActiveLoanCard({
     } finally {
       setPaying(false);
     }
+  };
+
+  const onPayFull = () => {
+    if (remainingN == null) {
+      setPayError('Unable to calculate the remaining amount.');
+      return;
+    }
+    void startPay(remainingN);
+  };
+
+  const onPayPartial = () => {
+    const typed = Number.parseFloat(partialAmount);
+    if (!Number.isFinite(typed) || typed <= 0) {
+      setPayError('Enter an amount to pay.');
+      return;
+    }
+    if (remainingN != null && typed > remainingN + 0.009) {
+      setPayError(`Amount cannot exceed the remaining balance of ${formatInr(remaining)}.`);
+      return;
+    }
+    if (remainingN != null && Math.abs(typed - remainingN) <= 0.009) {
+      void startPay(remainingN);
+      return;
+    }
+    if (typed + 0.009 < minPayN) {
+      setPayError(`Minimum partial payment is ${formatInr(minPayN.toFixed(2))}.`);
+      return;
+    }
+    void startPay(Math.round(typed * 100) / 100);
   };
 
   const timingChipClass =
@@ -407,25 +448,121 @@ function ActiveLoanCard({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[0.68rem] font-black uppercase tracking-[0.14em] text-slate-400">
-              Pay today
+              {hasPaid ? 'Remaining today' : 'Pay today'}
             </p>
             <p className="mt-1 text-[clamp(2rem,5vw,2.55rem)] font-black leading-none tracking-tight text-brand-navy">
-              {amountDueToday ? formatInr(amountDueToday) : '—'}
+              {remaining ? formatInr(remaining) : '—'}
             </p>
             <p className="mt-2 text-[0.8rem] font-medium text-slate-500">
               Principal + interest
               {showBounce ? ' + penal charge' : ''}
+              {hasPaid ? ' − paid so far' : ''}
             </p>
+            {hasPaid ? (
+              <p className="mt-1 text-[0.78rem] font-semibold text-emerald-800">
+                Paid so far {formatInr(loan.totalPaidInr)}
+              </p>
+            ) : null}
           </div>
-          <button
-            type="button"
-            onClick={() => void onPayNow()}
-            disabled={paying}
-            className="inline-flex w-full min-w-[11.5rem] items-center justify-center rounded-2xl bg-[#ffc519] px-5 py-3.5 text-[1rem] font-extrabold text-[#12244f] shadow-[0_10px_24px_rgba(255,197,25,0.32)] transition hover:brightness-105 disabled:cursor-wait disabled:opacity-70 sm:w-auto"
-          >
-            {paying ? 'Preparing payment…' : 'Pay now'}
-          </button>
         </div>
+
+        {payMode == null ? (
+          <div className={cn('mt-4 grid gap-2', remainingBelowMin ? 'sm:grid-cols-1' : 'sm:grid-cols-2')}>
+            <button
+              type="button"
+              onClick={() => {
+                setPayError(null);
+                setPayMode('full');
+              }}
+              disabled={paying || remainingN == null || remainingN <= 0}
+              className="inline-flex w-full items-center justify-center rounded-2xl bg-[#ffc519] px-5 py-3.5 text-[0.95rem] font-extrabold text-[#12244f] shadow-[0_10px_24px_rgba(255,197,25,0.32)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              Pay full amount
+            </button>
+            {remainingBelowMin ? null : (
+              <button
+                type="button"
+                onClick={() => {
+                  setPayError(null);
+                  setPartialAmount(partialPrefill);
+                  setPayMode('partial');
+                }}
+                disabled={paying || remainingN == null || remainingN <= 0}
+                className="inline-flex w-full items-center justify-center rounded-2xl border border-[rgba(18,36,79,0.12)] bg-white px-5 py-3.5 text-[0.95rem] font-extrabold text-brand-navy transition hover:bg-[#f8fafd] disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                Pay partially
+              </button>
+            )}
+          </div>
+        ) : payMode === 'full' ? (
+          <div className="mt-4 rounded-2xl bg-[#f8fafd] p-4 ring-1 ring-[rgba(18,36,79,0.08)]">
+            <p className="text-[0.8rem] font-semibold text-slate-600">
+              You will pay the remaining {remaining ? formatInr(remaining) : '—'}
+              {showBounce ? ', including the penal charge' : ''}
+              {hasPaid ? ' after earlier payments' : ''}.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void onPayFull()}
+                disabled={paying}
+                className="inline-flex min-w-[11.5rem] items-center justify-center rounded-2xl bg-[#ffc519] px-5 py-3 text-[0.95rem] font-extrabold text-[#12244f] shadow-[0_10px_24px_rgba(255,197,25,0.32)] transition hover:brightness-105 disabled:cursor-wait disabled:opacity-70"
+              >
+                {paying ? 'Preparing payment…' : `Pay ${remaining ? formatInr(remaining) : ''}`}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPayMode(null);
+                  setPayError(null);
+                }}
+                disabled={paying}
+                className="inline-flex items-center justify-center rounded-2xl px-4 py-3 text-[0.9rem] font-bold text-slate-600 hover:bg-white"
+              >
+                Back
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 rounded-2xl bg-[#f8fafd] p-4 ring-1 ring-[rgba(18,36,79,0.08)]">
+            <label className="block text-[0.72rem] font-black uppercase tracking-[0.12em] text-slate-400">
+              Amount to pay
+            </label>
+            <input
+              type="number"
+              min={minPayN}
+              max={remainingN ?? undefined}
+              step="1"
+              value={partialAmount}
+              onChange={(e) => setPartialAmount(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-[rgba(18,36,79,0.12)] bg-white px-4 py-3 text-[1.05rem] font-extrabold text-brand-navy outline-none focus:border-[#1496f3] focus:ring-2 focus:ring-[rgba(20,150,243,0.18)]"
+            />
+            <p className="mt-2 text-[0.75rem] font-medium text-slate-500">
+              Minimum {formatInr(minPayN.toFixed(2))}. Remaining {remaining ? formatInr(remaining) : '—'}.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void onPayPartial()}
+                disabled={paying}
+                className="inline-flex min-w-[11.5rem] items-center justify-center rounded-2xl bg-[#ffc519] px-5 py-3 text-[0.95rem] font-extrabold text-[#12244f] shadow-[0_10px_24px_rgba(255,197,25,0.32)] transition hover:brightness-105 disabled:cursor-wait disabled:opacity-70"
+              >
+                {paying ? 'Preparing payment…' : 'Pay this amount'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPayMode(null);
+                  setPayError(null);
+                }}
+                disabled={paying}
+                className="inline-flex items-center justify-center rounded-2xl px-4 py-3 text-[0.9rem] font-bold text-slate-600 hover:bg-white"
+              >
+                Back
+              </button>
+            </div>
+          </div>
+        )}
 
         {payError ? (
           <p className="mt-3 text-[0.8rem] font-semibold text-rose-700" role="alert">
@@ -789,6 +926,7 @@ export function MyAccountSection({
           pastLoans: [],
           inProgress: [],
           repaymentSchedule: [],
+          minPayAmountInr: '100.00',
         },
       );
     } catch (e) {
@@ -824,7 +962,7 @@ export function MyAccountSection({
     session && isCustomerPortalSignedIn(session)
       ? getCustomerJourneyResumePath(session)
       : COMPLETE_JOURNEY_HREF;
-  const dash = data ?? { activeLoans: [], pastLoans: [], inProgress: [], repaymentSchedule: [] };
+  const dash = data ?? { activeLoans: [], pastLoans: [], inProgress: [], repaymentSchedule: [], minPayAmountInr: '100.00' };
   const hasOpenLoan =
     hasOpenCustomerLoan(session) || dash.activeLoans.length > 0;
   const hasDisbursedLoan =
@@ -893,7 +1031,7 @@ export function MyAccountSection({
           <FlashBanner tone="success">Payment successful. Your loan has been closed.</FlashBanner>
         ) : null}
         {repayFlash === 'failed' ? (
-          <FlashBanner tone="failed">Payment was unsuccessful. You can try Pay now again.</FlashBanner>
+          <FlashBanner tone="failed">Payment was unsuccessful. You can try paying again.</FlashBanner>
         ) : null}
         {repayFlash === 'error' ? (
           <FlashBanner tone="error">
@@ -961,6 +1099,7 @@ export function MyAccountSection({
                     <ActiveLoanCard
                       key={loan.applicationUuid}
                       loan={loan}
+                      minPayAmountInr={dash.minPayAmountInr}
                       onPaid={() => void loadLoans()}
                     />
                   ))}
