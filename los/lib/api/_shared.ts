@@ -13,11 +13,26 @@ import { LOS_COOKIE_NAME, LOS_STORAGE_KEY } from '../auth';
 export const SERVER_REVALIDATE_SECONDS = 30;
 export const CLIENT_READ_CACHE_TTL_MS = 30_000;
 const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
+/** Workbook downloads parse stored CIBIL JSON and can exceed the default read timeout. */
+export const WORKBOOK_DOWNLOAD_TIMEOUT_MS = 120_000;
 
 /** Bounded wait so hung API calls do not leave UI pending forever. */
-export function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  const signal = init?.signal ?? AbortSignal.timeout(DEFAULT_FETCH_TIMEOUT_MS);
+export function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  timeoutMs: number = DEFAULT_FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const signal = init?.signal ?? AbortSignal.timeout(timeoutMs);
   return fetch(input, { ...init, signal });
+}
+
+export function isFetchTimeoutError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  return (
+    err.name === 'TimeoutError' ||
+    err.name === 'AbortError' ||
+    /aborted|timeout/i.test(err.message)
+  );
 }
 
 export function clientApiUrl() {

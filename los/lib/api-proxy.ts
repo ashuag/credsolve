@@ -20,6 +20,21 @@ const HOP_BY_HOP = new Set([
 const RESPONSE_STRIP_HEADERS = new Set(['content-encoding', 'content-length']);
 
 const PROXY_TIMEOUT_MS = 60_000;
+/** Credit-assessment workbook + on-demand CIBIL PDF can exceed the default API budget. */
+const LONG_DOWNLOAD_PROXY_TIMEOUT_MS = 120_000;
+
+function proxyTimeoutMs(upstreamUrl: string): number {
+  if (
+    /\/bureau-reports\/export(?:\?|$)/i.test(upstreamUrl) ||
+    /\/lead-reports\/export(?:\?|$)/i.test(upstreamUrl) ||
+    /\/transaction-reports\/export(?:\?|$)/i.test(upstreamUrl) ||
+    /\/cibil-report\/pdf(?:\?|$)/i.test(upstreamUrl) ||
+    /\/cibil-report-download(?:\?|$)/i.test(upstreamUrl)
+  ) {
+    return LONG_DOWNLOAD_PROXY_TIMEOUT_MS;
+  }
+  return PROXY_TIMEOUT_MS;
+}
 
 function buildUpstreamUrl(pathSegments: string[], search: string): string {
   const base = getLosServerApiBase().replace(/\/$/, '');
@@ -83,7 +98,7 @@ export async function proxyLosApiRequest(
     method,
     headers: forwardRequestHeaders(request),
     redirect: 'manual',
-    signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
+    signal: AbortSignal.timeout(proxyTimeoutMs(upstreamUrl)),
   };
 
   if (method !== 'GET' && method !== 'HEAD') {

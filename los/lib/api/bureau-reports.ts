@@ -1,4 +1,4 @@
-import { cachedAuthorizedLosGet, fetchWithTimeout, messageFromBody, parseJsonResponse, resolveLosClientApiUrl } from './_shared';
+import { cachedAuthorizedLosGet, fetchWithTimeout, isFetchTimeoutError, messageFromBody, parseJsonResponse, resolveLosClientApiUrl, WORKBOOK_DOWNLOAD_TIMEOUT_MS } from './_shared';
 
 export type LosBureauReportListItem = {
   uuid: string;
@@ -45,9 +45,19 @@ function filenameFromContentDisposition(header: string | null): string | null {
 
 /** Authenticated workbook download — uses the Bearer header, not a query token. */
 export async function downloadBureauReportsExport(token: string): Promise<void> {
-  const response = await fetchWithTimeout(resolveLosClientApiUrl('/bureau-reports/export'), {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(
+      resolveLosClientApiUrl('/bureau-reports/export'),
+      { headers: { Authorization: `Bearer ${token}` } },
+      WORKBOOK_DOWNLOAD_TIMEOUT_MS,
+    );
+  } catch (err) {
+    if (isFetchTimeoutError(err)) {
+      throw new Error('Download timed out while building the CIBIL workbook. Please try again.');
+    }
+    throw err;
+  }
 
   if (!response.ok) {
     const body = await parseJsonResponse(response);

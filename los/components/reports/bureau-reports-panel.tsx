@@ -82,6 +82,7 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
 export function BureauReportsPanel() {
   const [reports, setReports] = useState<LosBureauReportListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -268,19 +269,24 @@ export function BureauReportsPanel() {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              disabled={downloading}
               onClick={() => {
                 const token = getLosToken();
                 if (!token) {
                   setFetchError('Session expired — please log in again.');
                   return;
                 }
-                void downloadBureauReportsExport(token).catch((err) => {
-                  setFetchError(err instanceof Error ? err.message : 'Failed to download bureau reports');
-                });
+                setDownloading(true);
+                setFetchError(null);
+                void downloadBureauReportsExport(token)
+                  .catch((err) => {
+                    setFetchError(err instanceof Error ? err.message : 'Failed to download bureau reports');
+                  })
+                  .finally(() => setDownloading(false));
               }}
-              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-wait disabled:opacity-60"
             >
-              ⬇ Download
+              {downloading ? 'Downloading…' : '⬇ Download'}
             </button>
             <button
               type="button"

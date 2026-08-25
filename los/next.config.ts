@@ -86,20 +86,22 @@ const nextConfig: NextConfig = {
     return [{ source: '/:path*', headers: securityHeaders }];
   },
   /**
-   * `beforeFiles` runs before the App Router. That mirrors how customer reliably reaches Nest
-   * via same-origin `/api/*`, and avoids stale Turbopack / `.next` volume 404s on `/api/los/*`.
-   * Destination must be absolute so the LOS container can reach the `backend` service.
+   * App Router `app/api/[[...path]]` proxies `/api/los/*` with an explicit timeout
+   * (workbook / CIBIL PDF downloads need more than the ~30s Next rewrite default).
+   * `fallback` is only for a stale `.next` manifest that never registered the catch-all
+   * (the original Turbopack volume 404). Destination must be absolute so the LOS
+   * container can reach the `backend` service.
    */
   async rewrites() {
     return {
-      beforeFiles: [
+      beforeFiles: [],
+      afterFiles: [],
+      fallback: [
         {
           source: '/api/los/:path*',
           destination: `${losApiProxyBase}/:path*`,
         },
       ],
-      afterFiles: [],
-      fallback: [],
     };
   },
 };

@@ -1,14 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
 import {
   buildCibilAssessmentExportRow,
   CIBIL_ASSESSMENT_EXPORT_HEADERS,
 } from '../../../common/cibil/cibil-assessment-export';
-import { buildSimpleXlsxWorkbook } from '../../../common/xlsx/simple-xlsx';
+import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
+
+const EXPORT_BATCH_SIZE = 25;
 
 @Injectable()
 export class LosBureauReportService {
+  private readonly logger = new Logger(LosBureauReportService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async listBureauReports() {
@@ -57,22 +61,46 @@ export class LosBureauReportService {
 
   /** Builds the "Credit Assessment data" workbook (raw per-report feature columns) for LOS Reports → Bureau Report. */
   async exportBureauReportsWorkbook(): Promise<Buffer> {
-    const reports = await this.prisma.read.bureauReport.findMany({
-      orderBy: { createdAt: 'desc' },
-      select: {
-        rawPayload: true,
-        cibilScore: true,
-        lead: { select: { leadNumber: true } },
-      },
-    });
+    const rows: SimpleXlsxCell[][] = [['Lead ID', ...CIBIL_ASSESSMENT_EXPORT_HEADERS]];
+    let cursorId: bigint | undefined;
+    let index = 0;
 
-    const rows = [
-      ['Lead ID', ...CIBIL_ASSESSMENT_EXPORT_HEADERS],
-      ...reports.map((report, index) => [
-        report.lead.leadNumber,
-        ...buildCibilAssessmentExportRow(report.rawPayload, index + 1, report.cibilScore),
-      ]),
-    ];
+    // Batch so we never load every `raw_payload` CIBIL JSON into memory at once
+    // (that query stalls, OOMs, and 500s the Next proxy after ~30s).
+    for (;;) {
+      const batch = await this.prisma.read.bureauReport.findMany({
+        take: EXPORT_BATCH_SIZE,
+        ...(cursorId != null ? { skip: 1, cursor: { id: cursorId } } : {}),
+        orderBy: { id: 'desc' },
+        select: {
+          id: true,
+          rawPayload: true,
+          cibilScore: true,
+          lead: { select: { leadNumber: true } },
+        },
+      });
+      if (batch.length === 0) break;
+
+      for (const report of batch) {
+        index += 1;
+        let featureCells: SimpleXlsxCell[];
+        try {
+          featureCells = buildCibilAssessmentExportRow(report.rawPayload, index, report.cibilScore);
+        } catch (err) {
+          this.logger.warn(
+            `Skipping malformed bureau payload in export (lead=${report.lead.leadNumber}): ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+          featureCells = CIBIL_ASSESSMENT_EXPORT_HEADERS.map(() => null);
+        }
+        rows.push([report.lead.leadNumber, ...featureCells]);
+      }
+
+      cursorId = batch[batch.length - 1]!.id;
+      if (batch.length < EXPORT_BATCH_SIZE) break;
+    }
+
     return buildSimpleXlsxWorkbook(rows, 'Sheet1');
   }
 }

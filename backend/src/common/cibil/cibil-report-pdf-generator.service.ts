@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { loadLoanAmountBounds } from '../bre/bre-settings.loader';
 import { buildCibilStyleReportPdf } from './cibil-report-pdf-builder';
 import {
@@ -12,7 +12,6 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class CibilReportPdfGeneratorService {
-  private readonly logger = new Logger(CibilReportPdfGeneratorService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly creditLimitTiers: CreditLimitTierResolverService,
@@ -28,9 +27,6 @@ export class CibilReportPdfGeneratorService {
 
   async generatePdf(vendorBody: unknown): Promise<Uint8Array> {
     const enriched = await this.buildEnrichedReportData(vendorBody);
-    this.logger.log("--------------");
-    this.logger.log(enriched.accounts);
-    this.logger.log("--------------");
     return buildCibilStyleReportPdf(enriched);
   }
 

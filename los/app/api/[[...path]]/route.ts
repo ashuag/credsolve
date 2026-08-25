@@ -3,6 +3,8 @@ import { proxyLosApiRequest } from '@/lib/api-proxy';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+/** Workbook / CIBIL PDF downloads may run past the platform default (often 30s). */
+export const maxDuration = 120;
 
 type RouteContext = {
   params: Promise<{ path?: string[] }>;
