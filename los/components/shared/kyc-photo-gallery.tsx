@@ -114,10 +114,13 @@ export function KycLivenessVideoPlayer({
   );
 }
 
+export type KycPhotoGalleryPart = 'aadhaar' | 'selfie' | 'liveness';
+
 export function KycPhotoGallery({
   row,
   authToken,
   photoVersion,
+  include,
 }: {
   row: {
     kycPhotos: {
@@ -129,24 +132,33 @@ export function KycPhotoGallery({
   };
   authToken: string | null;
   photoVersion?: string | number | null;
+  include?: KycPhotoGalleryPart[];
 }) {
   const version = photoVersion ?? row.updatedAt;
-  const selfieSrc = authToken
-    ? resolveLosKycPhotoSrc(row.kycPhotos.selfieUrl, authToken, version)
-    : null;
-  const aadhaarSrc = authToken
-    ? resolveLosKycPhotoSrc(row.kycPhotos.aadhaarPhotoUrl, authToken, version)
-    : null;
-  const livenessVideoSrc = authToken
-    ? resolveLosKycPhotoSrc(row.kycPhotos.livenessVideoUrl ?? null, authToken, version)
-    : null;
+  const show = (part: KycPhotoGalleryPart) => !include || include.includes(part);
+  const selfieSrc =
+    show('selfie') && authToken
+      ? resolveLosKycPhotoSrc(row.kycPhotos.selfieUrl, authToken, version)
+      : null;
+  const aadhaarSrc =
+    show('aadhaar') && authToken
+      ? resolveLosKycPhotoSrc(row.kycPhotos.aadhaarPhotoUrl, authToken, version)
+      : null;
+  const livenessVideoSrc =
+    show('liveness') && authToken
+      ? resolveLosKycPhotoSrc(row.kycPhotos.livenessVideoUrl ?? null, authToken, version)
+      : null;
 
   const [lightbox, setLightbox] = useState<LightboxState | null>(null);
 
   if (!selfieSrc && !aadhaarSrc && !livenessVideoSrc) {
-    return (
-      <p className="m-0 text-[0.84rem] text-brand-muted">No KYC photos or liveness video captured yet.</p>
-    );
+    const emptyLabel =
+      include?.length === 1 && include[0] === 'aadhaar'
+        ? 'No Aadhaar photo captured yet.'
+        : include && !include.includes('aadhaar')
+          ? 'No selfie or liveness video captured yet.'
+          : 'No KYC photos or liveness video captured yet.';
+    return <p className="m-0 text-[0.84rem] text-brand-muted">{emptyLabel}</p>;
   }
 
   return (

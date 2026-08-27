@@ -15,9 +15,6 @@ import {
   nameMatchVerdict,
   normalizeAadhaarGender,
 } from '@/lib/kyc-field-match';
-import {
-  explainKycNotDone,
-} from '@/lib/kyc-selfie-validation-display';
 import { formatPersonName } from '@/lib/format-person-name';
 import { isLosAadhaarKycComplete } from '@/lib/customer-journey';
 import {
@@ -707,69 +704,115 @@ function KycDetailPanel({
   authToken: string | null;
   onRefresh?: () => void;
 }) {
-  const kycNotDoneReason = explainKycNotDone(row);
+  const aadhaarComplete = isLosAadhaarKycComplete(row);
+  const aadhaar = row.aadhaarDetail;
+  const kycDone = row.kycStatus === 1;
+  const livenessDone = row.livenessPassed === true || kycDone;
   const showEnableReKyc = row.canEnableReKyc || canEnableReKycFromRow(row);
   return (
     <div className="grid gap-4">
-      {kycNotDoneReason ? (
-        <p className="m-0 rounded-[10px] border border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.9)] px-3 py-2.5 text-[0.84rem] leading-[1.45] text-[#92400e]">
-          {kycNotDoneReason}
-        </p>
-      ) : null}
-      {showEnableReKyc ? (
-        <div className="grid gap-2.5">
-          <KycEnableReKycButton
-            row={row}
-            applicationUuid={applicationUuid}
-            authToken={authToken}
-            onSuccess={onRefresh}
+      <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)]">
+        <div className="flex items-center justify-between gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
+          <span className="text-[0.82rem] font-extrabold text-brand-navy">DigiLocker Aadhaar KYC</span>
+          <span className="text-[0.72rem] font-bold text-brand-muted">
+            {aadhaarComplete ? 'Complete' : 'Pending'}
+          </span>
+        </div>
+        <div className="grid gap-3 px-3 py-2.5">
+          {!aadhaarComplete ? (
+            <p className="m-0 rounded-[10px] border border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.9)] px-3 py-2.5 text-[0.84rem] leading-[1.45] text-[#92400e]">
+              DigiLocker Aadhaar has not been captured yet.
+            </p>
+          ) : null}
+          <div>
+            <ProfileSubheading>Aadhaar photo</ProfileSubheading>
+            <div className="mt-2">
+              <KycPhotoGallery row={row} authToken={authToken} include={['aadhaar']} />
+            </div>
+          </div>
+          <DetailGrid
+            columns={2}
+            rows={[
+              { label: 'Aadhaar KYC', value: aadhaarComplete ? 'Complete' : 'Not complete' },
+              {
+                label: 'DigiLocker Aadhaar',
+                value: formatAadhaarNumberDisplay(aadhaar?.maskedAadhaar, aadhaarComplete),
+              },
+              { label: 'Aadhaar name', value: aadhaarComplete ? formatPersonName(aadhaar?.fullName) : '—' },
+              { label: 'Aadhaar DOB', value: aadhaarComplete ? formatDobWithAge(aadhaar?.dateOfBirth) : '—' },
+              {
+                label: 'Aadhaar gender',
+                value: aadhaarComplete ? (normalizeAadhaarGender(aadhaar?.gender) ?? '—') : '—',
+              },
+              { label: 'Aadhaar address', value: aadhaarComplete ? (aadhaar?.address ?? '—') : '—' },
+              { label: 'DigiLocker PAN', value: row.digilockerPan?.panCardNumber ?? '—' },
+              {
+                label: 'DigiLocker PAN verified at',
+                value: formatDateTime(row.digilockerPan?.panCardVerifiedAt ?? null),
+              },
+            ]}
           />
         </div>
-      ) : null}
-      <div>
-        <p className="m-0 mb-2 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
-          KYC photos &amp; video
-        </p>
-        <KycPhotoGallery row={row} authToken={authToken} />
       </div>
-      <KycPipelineSteps row={row} variant="overview" />
-      <DetailGrid
-        rows={[
-          { label: 'KYC status', value: `${row.kycStatusLabel} (${row.kycStatus})` },
-          { label: 'KYC completed at', value: formatDateTime(row.kycCompletedAt) },
-          {
-            label: 'KYC pipeline passed',
-            value: row.livenessPassed ? 'Yes' : 'No',
-          },
-          {
-            label: 'DigiLocker PAN',
-            value: row.digilockerPan?.panCardNumber ?? '—',
-          },
-          {
-            label: 'DigiLocker PAN verified at',
-            value: formatDateTime(row.digilockerPan?.panCardVerifiedAt ?? null),
-          },
-          {
-            label: 'Aadhaar KYC',
-            value: isLosAadhaarKycComplete(row) ? 'Complete' : 'Not complete',
-          },
-          {
-            label: 'DigiLocker Aadhaar',
-            value: formatAadhaarNumberDisplay(row.aadhaarDetail?.maskedAadhaar, isLosAadhaarKycComplete(row)),
-          },
-          { label: 'Selfie quality checked at', value: formatDateTime(row.selfieFaceValidation?.checkedAt ?? null) },
-          { label: 'Liveness checked at', value: formatDateTime(row.livenessCheckedAt) },
-          {
-            label: 'Face match checked at',
-            value: formatDateTime(
-              row.moneyCashFaceMatch?.reason?.startsWith('Pending') ||
-                row.moneyCashFaceMatch?.reason?.startsWith('Skipped')
-                ? null
-                : row.moneyCashFaceMatch?.checkedAt,
-            ),
-          },
-        ]}
-      />
+
+      <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)]">
+        <div className="flex items-center justify-between gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
+          <span className="text-[0.82rem] font-extrabold text-brand-navy">Liveness check</span>
+          <span className="text-[0.72rem] font-bold text-brand-muted">
+            {livenessDone ? 'Passed' : 'Pending'}
+          </span>
+        </div>
+        <div className="grid gap-3 px-3 py-2.5">
+          {!aadhaarComplete ? (
+            <p className="m-0 rounded-[10px] border border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.9)] px-3 py-2.5 text-[0.84rem] leading-[1.45] text-[#92400e]">
+              Liveness check starts after DigiLocker Aadhaar KYC.
+            </p>
+          ) : !livenessDone ? (
+            <p className="m-0 rounded-[10px] border border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.9)] px-3 py-2.5 text-[0.84rem] leading-[1.45] text-[#92400e]">
+              Aadhaar KYC is complete. Liveness check is still pending.
+            </p>
+          ) : null}
+          {showEnableReKyc ? (
+            <KycEnableReKycButton
+              row={row}
+              applicationUuid={applicationUuid}
+              authToken={authToken}
+              onSuccess={onRefresh}
+            />
+          ) : null}
+          <div>
+            <ProfileSubheading>Selfie &amp; liveness video</ProfileSubheading>
+            <div className="mt-2">
+              <KycPhotoGallery row={row} authToken={authToken} include={['selfie', 'liveness']} />
+            </div>
+          </div>
+          <div>
+            <ProfileSubheading>Liveness pipeline</ProfileSubheading>
+            <div className="mt-2">
+              <KycPipelineSteps row={row} variant="overview" />
+            </div>
+          </div>
+          <DetailGrid
+            columns={2}
+            rows={[
+              { label: 'KYC status', value: `${row.kycStatusLabel} (${row.kycStatus})` },
+              { label: 'Liveness check passed', value: row.livenessPassed ? 'Yes' : 'No' },
+              { label: 'KYC completed at', value: formatDateTime(row.kycCompletedAt) },
+              { label: 'Selfie quality checked at', value: formatDateTime(row.selfieFaceValidation?.checkedAt ?? null) },
+              { label: 'Liveness checked at', value: formatDateTime(row.livenessCheckedAt) },
+              {
+                label: 'Face match checked at',
+                value: formatDateTime(
+                  row.moneyCashFaceMatch?.reason?.startsWith('Pending') ||
+                    row.moneyCashFaceMatch?.reason?.startsWith('Skipped')
+                    ? null
+                    : row.moneyCashFaceMatch?.checkedAt,
+                ),
+              },
+            ]}
+          />
+        </div>
+      </div>
 
       {row.agreement ? (
         <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)]">

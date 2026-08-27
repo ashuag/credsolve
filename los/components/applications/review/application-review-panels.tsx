@@ -442,6 +442,34 @@ export function ReviewLoanPanel({
   );
 }
 
+function KycNotice({ children }: { children: ReactNode }) {
+  return (
+    <p
+      style={{
+        margin: '0 0 14px',
+        padding: '10px 12px',
+        borderRadius: 10,
+        border: '1px solid rgba(245, 158, 11, 0.35)',
+        background: 'rgba(255, 251, 235, 0.9)',
+        fontSize: '12px',
+        lineHeight: 1.45,
+        color: '#92400e',
+      }}
+    >
+      {children}
+    </p>
+  );
+}
+
+function LivenessCheckIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+      <circle cx="12" cy="13" r="4" />
+    </svg>
+  );
+}
+
 export function ReviewKycPanel({
   row,
   applicationUuid,
@@ -454,49 +482,98 @@ export function ReviewKycPanel({
   onRefresh?: () => void;
 }) {
   const kycDone = row.kycStatus === 1;
+  const kycFailed = row.statusCode.toUpperCase() === 'KYC_FAILED' || row.kycStatus === 2;
   const aadhaarComplete = isLosAadhaarKycComplete(row);
-  const isCurrentStep =
-    isApplicationJourneyStepActive(row, 'digilockerKyc') || isApplicationJourneyStepActive(row, 'livenessKyc');
-  const kycNotDoneReason = explainKycNotDone(row);
+  const aadhaar = row.aadhaarDetail;
+  const digilockerCurrent = isApplicationJourneyStepActive(row, 'digilockerKyc');
+  const livenessCurrent = isApplicationJourneyStepActive(row, 'livenessKyc');
+  const livenessDone = row.livenessPassed === true || kycDone;
+  const livenessFailed =
+    (kycFailed && aadhaarComplete && (Boolean(row.kycPhotos.selfiePath?.trim()) || row.livenessAttempts > 0)) ||
+    (!row.livenessPassed && row.livenessAttempts >= 3);
   const showEnableReKyc = row.canEnableReKyc || canEnableReKycFromRow(row);
+
   return (
     <>
       <ReviewCard
-        icon={
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            <path d="m9 12 2 2 4-4" />
-          </svg>
-        }
-        title="KYC"
-        iconTone={kycDone ? 'ok' : aadhaarComplete ? 'ok' : 'default'}
+        icon={<IdCardIcon />}
+        title="DigiLocker Aadhaar KYC"
+        iconTone={aadhaarComplete ? 'ok' : kycFailed && !aadhaarComplete ? 'warn' : 'default'}
         right={
-          kycDone ? (
-            <ReviewPill tone="ok">Completed</ReviewPill>
-          ) : aadhaarComplete ? (
-            <ReviewPill tone="ok">Aadhaar complete</ReviewPill>
-          ) : isCurrentStep ? (
+          aadhaarComplete ? (
+            <ReviewPill tone="ok">Complete</ReviewPill>
+          ) : kycFailed && !aadhaarComplete ? (
+            <ReviewPill tone="warn">Failed</ReviewPill>
+          ) : digilockerCurrent ? (
             <ReviewPill tone="warn">Current step</ReviewPill>
           ) : (
             <ReviewPill tone="warn">Pending</ReviewPill>
           )
         }
       >
-        {kycNotDoneReason ? (
-          <p
-            style={{
-              margin: '0 0 14px',
-              padding: '10px 12px',
-              borderRadius: 10,
-              border: '1px solid rgba(245, 158, 11, 0.35)',
-              background: 'rgba(255, 251, 235, 0.9)',
-              fontSize: '12px',
-              lineHeight: 1.45,
-              color: '#92400e',
-            }}
-          >
-            {kycNotDoneReason}
-          </p>
+        {!aadhaarComplete ? (
+          <KycNotice>DigiLocker Aadhaar has not been captured yet.</KycNotice>
+        ) : null}
+        <div style={{ marginBottom: 16 }}>
+          <ReviewSectionLabel>Aadhaar photo</ReviewSectionLabel>
+          <div style={{ marginTop: 8 }}>
+            <KycPhotoGallery row={row} authToken={authToken} include={['aadhaar']} />
+          </div>
+        </div>
+        <div className="fgrid">
+          <ReviewField
+            label="Aadhaar KYC"
+            value={aadhaarComplete ? 'Complete' : 'Not complete'}
+            tone={aadhaarComplete ? 'accent' : undefined}
+          />
+          <ReviewField
+            label="DigiLocker Aadhaar"
+            value={formatAadhaarNumberDisplay(aadhaar?.maskedAadhaar, aadhaarComplete)}
+            tone={aadhaarComplete ? 'accent' : undefined}
+          />
+          <ReviewField label="Aadhaar name" value={aadhaarComplete ? formatPersonName(aadhaar?.fullName) : '—'} />
+          <ReviewField label="Aadhaar DOB" value={aadhaarComplete ? formatDobWithAge(aadhaar?.dateOfBirth) : '—'} />
+          <ReviewField
+            label="Aadhaar gender"
+            value={aadhaarComplete ? (normalizeAadhaarGender(aadhaar?.gender) ?? '—') : '—'}
+          />
+          <ReviewField label="Aadhaar address" value={aadhaarComplete ? (aadhaar?.address ?? '—') : '—'} />
+          <ReviewField
+            label="DigiLocker PAN"
+            value={row.digilockerPan?.panCardNumber ?? '—'}
+            tone={row.digilockerPan?.panCardNumber ? 'accent' : undefined}
+          />
+          <ReviewField
+            label="DigiLocker PAN verified at"
+            value={formatReviewDateTime(row.digilockerPan?.panCardVerifiedAt ?? null)}
+          />
+        </div>
+      </ReviewCard>
+
+      <ReviewCard
+        icon={<LivenessCheckIcon />}
+        title="Liveness check"
+        iconTone={livenessDone ? 'ok' : livenessFailed ? 'warn' : 'default'}
+        right={
+          livenessDone ? (
+            <ReviewPill tone="ok">Passed</ReviewPill>
+          ) : livenessFailed ? (
+            <ReviewPill tone="warn">Failed</ReviewPill>
+          ) : livenessCurrent ? (
+            <ReviewPill tone="warn">Current step</ReviewPill>
+          ) : (
+            <ReviewPill tone="warn">Pending</ReviewPill>
+          )
+        }
+      >
+        {!aadhaarComplete ? (
+          <KycNotice>Liveness check starts after DigiLocker Aadhaar KYC.</KycNotice>
+        ) : !livenessDone && !livenessFailed ? (
+          <KycNotice>Aadhaar KYC is complete. Liveness check is still pending.</KycNotice>
+        ) : livenessFailed && !livenessDone ? (
+          <KycNotice>
+            {explainKycNotDone(row) ?? 'Liveness check did not pass.'}
+          </KycNotice>
         ) : null}
         {showEnableReKyc ? (
           <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -509,13 +586,13 @@ export function ReviewKycPanel({
           </div>
         ) : null}
         <div style={{ marginBottom: 16 }}>
-          <ReviewSectionLabel>KYC photos &amp; video</ReviewSectionLabel>
+          <ReviewSectionLabel>Selfie &amp; liveness video</ReviewSectionLabel>
           <div style={{ marginTop: 8 }}>
-            <KycPhotoGallery row={row} authToken={authToken} />
+            <KycPhotoGallery row={row} authToken={authToken} include={['selfie', 'liveness']} />
           </div>
         </div>
         <div style={{ marginBottom: 16 }}>
-          <ReviewSectionLabel>KYC pipeline</ReviewSectionLabel>
+          <ReviewSectionLabel>Liveness pipeline</ReviewSectionLabel>
           <div style={{ marginTop: 10 }}>
             <KycPipelineSteps row={row} variant="review" />
           </div>
@@ -523,40 +600,17 @@ export function ReviewKycPanel({
         <div className="fgrid">
           <ReviewField label="KYC status" value={`${row.kycStatusLabel} (${row.kycStatus})`} tone={kycDone ? 'accent' : undefined} />
           <ReviewField
-            label="KYC pipeline passed"
+            label="Liveness check passed"
             value={row.livenessPassed ? 'Yes' : 'No'}
             tone={row.livenessPassed ? 'accent' : row.livenessCheckedAt || row.livenessSummary?.checkedAt ? 'flag' : undefined}
           />
           <ReviewField label="KYC completed at" value={formatReviewDateTime(row.kycCompletedAt)} />
-          <ReviewField
-            label="DigiLocker PAN"
-            value={row.digilockerPan?.panCardNumber ?? '—'}
-            tone={row.digilockerPan?.panCardNumber ? 'accent' : undefined}
-          />
-          <ReviewField
-            label="DigiLocker PAN verified at"
-            value={formatReviewDateTime(row.digilockerPan?.panCardVerifiedAt ?? null)}
-          />
-          <ReviewField
-            label="Aadhaar KYC"
-            value={aadhaarComplete ? 'Complete' : 'Not complete'}
-            tone={aadhaarComplete ? 'accent' : undefined}
-          />
-          <ReviewField
-            label="DigiLocker Aadhaar"
-            value={formatAadhaarNumberDisplay(row.aadhaarDetail?.maskedAadhaar, aadhaarComplete)}
-            tone={aadhaarComplete ? 'accent' : undefined}
-          />
           <ReviewField label="Selfie quality checked at" value={formatReviewDateTime(row.selfieFaceValidation?.checkedAt ?? null)} />
           <ReviewField label="Liveness checked at" value={formatReviewDateTime(row.livenessCheckedAt)} />
           <ReviewField
             label="Liveness attempts used"
             value={`${row.livenessAttempts} / 3`}
-            tone={
-              !row.livenessPassed && row.livenessAttempts >= 3
-                ? 'flag'
-                : undefined
-            }
+            tone={!row.livenessPassed && row.livenessAttempts >= 3 ? 'flag' : undefined}
           />
           <ReviewField
             label="Face match checked at"
