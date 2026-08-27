@@ -172,6 +172,7 @@ type KycIncompleteInput = {
   selfieFaceValidation: LosSelfieFaceValidation | null;
   moneyCashFaceMatch: LosMoneyCashFaceMatch | null;
   livenessSummary: LosLivenessSummary | null;
+  aadhaarKycCompleted?: boolean;
   kycPhotos: {
     selfiePath: string | null;
     aadhaarPhotoPath: string | null;
@@ -193,9 +194,13 @@ export function explainKycNotDone(row: KycIncompleteInput): string | null {
     return row.kycStatusLabel?.trim() || 'KYC is incomplete due to a technical issue.';
   }
 
-  const hasAadhaarPhoto = Boolean(row.kycPhotos.aadhaarPhotoPath?.trim());
-  if (!hasAadhaarPhoto) {
+  const aadhaarComplete = Boolean(row.aadhaarKycCompleted || row.kycPhotos.aadhaarPhotoPath?.trim());
+  if (!aadhaarComplete) {
     return 'KYC is not done because DigiLocker Aadhaar has not been captured yet.';
+  }
+
+  if (!row.livenessPassed) {
+    return 'Aadhaar KYC is complete. Selfie / liveness KYC is still pending.';
   }
 
   return row.kycStatusLabel?.trim()

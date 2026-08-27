@@ -4,7 +4,7 @@ import { Prisma } from '@prisma/client';
 import { BureauReportPdfService } from '../../../common/cibil/bureau-report-pdf.service';
 import { CibilCreditAssessmentService } from '../../../common/cibil/cibil-credit-assessment.service';
 import { isDigilockerAadhaarCaptureComplete } from '../../../common/kyc/aadhaar-vendor-parse.util';
-import { extractProfileFromDigilockerFormJson } from '../../../common/kyc/digilocker-form-profile.util';
+import { extractProfileFromDigilockerFormJson, pickDigilockerAadhaarString } from '../../../common/kyc/digilocker-form-profile.util';
 import { appendPhotoCacheBuster } from '../../../common/kyc/kyc-photo-url.util';
 import { buildLivenessVendorSummary } from '../../../common/kyc/kyc-liveness-summary.util';
 import { extractLocalFaceMatchFromVendorJson } from '../../../common/kyc/kyc-face-match-inspection-persist.util';
@@ -107,12 +107,8 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
-function pickAadhaarString(obj: Record<string, unknown>, keys: string[]): string | null {
-  for (const key of keys) {
-    const value = obj[key];
-    if (typeof value === 'string' && value.trim()) return value.trim();
-  }
-  return null;
+function pickAadhaarString(formJson: unknown, keys: string[]): string | null {
+  return pickDigilockerAadhaarString(formJson, keys);
 }
 
 function formatAadhaarDob(d: Date | null): string | null {
@@ -225,7 +221,8 @@ const APPLICATION_DUMP_STAGE_ORDER = [
   { id: 'loan', label: 'Loan offer' },
   { id: 'email', label: 'Email OTP' },
   { id: 'letter', label: 'Sanction letter' },
-  { id: 'kyc', label: 'KYC' },
+  { id: 'digilockerKyc', label: 'DigiLocker KYC' },
+  { id: 'livenessKyc', label: 'Liveness KYC' },
   { id: 'bank', label: 'Bank details' },
   { id: 'refs', label: 'References' },
   { id: 'esign', label: 'eSign' },
@@ -240,6 +237,9 @@ function dumpApplicationStageLabel(input: {
   emailVerifiedAt: string | null;
   loanDocumentsReviewedAt: string | null;
   loanDocumentsAcceptedAt: string | null;
+  livenessPassed?: boolean;
+  aadhaarKycCompleted?: boolean;
+  selfieCaptured?: boolean;
   selectedLoanAmount: string | null;
   referencesCount: number;
   bankAccountNumber: string | null;
@@ -273,13 +273,19 @@ function dumpApplicationStageLabel(input: {
     return BANK_DETAIL_FAILED_NOTE;
   }
 
+  const aadhaarDone = Boolean(input.aadhaarKycCompleted);
+  const selfieDone = Boolean(input.selfieCaptured);
+  const digilockerDone = aadhaarDone && (selfieDone || input.kycStatus === 1);
+  const livenessDone = input.livenessPassed === true || (input.kycStatus === 1 && input.kycCompletedAt != null);
+
   const doneById = {
     profile: Boolean(input.fullName?.trim()),
     credit: input.panVerified === PAN_VERIFIED.VERIFIED && input.bureauFetched === BUREAU_FETCHED.SUCCESS,
     loan: Boolean(input.selectedLoanAmount),
     email: Boolean(input.emailVerifiedAt),
     letter: Boolean(input.loanDocumentsReviewedAt ?? input.loanDocumentsAcceptedAt),
-    kyc: input.kycStatus === 1 && input.kycCompletedAt != null,
+    digilockerKyc: digilockerDone,
+    livenessKyc: livenessDone,
     bank: Boolean(input.bankAccountNumber || input.disbursedAt) && !input.nameMatchPendingReview,
     refs: input.referencesCount >= 2,
     esign: Boolean(input.loanDocumentsAcceptedAt),
@@ -376,7 +382,17 @@ export class LosApplicationService {
       },
       orderBy: { createdAt: 'desc' },
       include: {
-        customer: { select: { uuid: true, mobileNumber: true } },
+        customer: {
+          select: {
+            uuid: true,
+            mobileNumber: true,
+            customerKycs: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: { aadhaarVerifiedAt: true, aadhaarPhotoPath: true },
+            },
+          },
+        },
         lead: {
           select: {
             uuid: true,
@@ -416,7 +432,14 @@ export class LosApplicationService {
             loanDocumentsAcceptedAt: true,
           },
         },
-        kyc: { select: { kycStatus: true, kycCompletedAt: true, livenessPassed: true } },
+        kyc: {
+          select: {
+            kycStatus: true,
+            kycCompletedAt: true,
+            livenessPassed: true,
+            livenessSelfiePath: true,
+          },
+        },
         _count: { select: { references: true } },
         loanAccount: {
           select: {
@@ -489,6 +512,11 @@ export class LosApplicationService {
         loanDocumentsReviewedAt: appDetails?.loanDocumentsReviewedAt?.toISOString() ?? null,
         loanDocumentsAcceptedAt: appDetails?.loanDocumentsAcceptedAt?.toISOString() ?? null,
         livenessPassed: application.kyc?.livenessPassed ?? false,
+        aadhaarKycCompleted: Boolean(
+          application.customer.customerKycs[0]?.aadhaarVerifiedAt ||
+            application.customer.customerKycs[0]?.aadhaarPhotoPath?.trim(),
+        ),
+        selfieCaptured: Boolean(application.kyc?.livenessSelfiePath?.trim()),
         referencesCount: application._count.references,
         bankAccountNumber: appDetails?.bankAccountNumber ?? null,
         disbursedAt: loanAccount?.disbursedAt?.toISOString() ?? null,
@@ -629,6 +657,7 @@ export class LosApplicationService {
       select: {
         aadhaarData: true,
         aadhaarPhotoPath: true,
+        aadhaarVerifiedAt: true,
         panCardNumber: true,
         panCardVerifiedAt: true,
       },
@@ -653,6 +682,7 @@ export class LosApplicationService {
     ]);
     const bust = (url: string | null) =>
       url && /^https?:\/\//i.test(url) ? appendPhotoCacheBuster(url, photoVersion) : url;
+    const aadhaarDetail = buildLosAadhaarDetail(customerKyc?.aadhaarData);
 
     return {
       uuid: application.uuid,
@@ -791,7 +821,17 @@ export class LosApplicationService {
         mobileNumber: ref.mobileNumber,
         relation: ref.relation.name,
       })),
-      aadhaarDetail: buildLosAadhaarDetail(customerKyc?.aadhaarData),
+      aadhaarDetail,
+      aadhaarKycCompleted: Boolean(
+        customerKyc?.aadhaarVerifiedAt ||
+          customerKyc?.aadhaarPhotoPath?.trim() ||
+          aadhaarDetail?.fullName?.trim() ||
+          aadhaarDetail?.dateOfBirth ||
+          aadhaarDetail?.maskedAadhaar?.trim() ||
+          aadhaarDetail?.gender?.trim() ||
+          aadhaarDetail?.address?.trim(),
+      ),
+      aadhaarKycCompletedAt: customerKyc?.aadhaarVerifiedAt?.toISOString() ?? null,
       digilockerPan: customerKyc?.panCardNumber
         ? {
             panCardNumber: customerKyc.panCardNumber,

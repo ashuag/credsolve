@@ -19,6 +19,7 @@ export type JourneyStep = {
 const PAN_VERIFIED = { NOT_CHECKED: 0, VERIFIED: 1, NOT_VERIFIED: 2 } as const;
 const BUREAU_FETCHED = { NOT_FETCHED: 0, SUCCESS: 1, FAILED: 2 } as const;
 const KYC_COMPLETED = 1;
+const KYC_FAILED_STATUS = 2;
 
 function step(
   id: string,
@@ -96,14 +97,64 @@ export function buildLeadIntakeJourney(lead: LosLeadDetails): JourneyStep[] {
   return markActiveStep(steps);
 }
 
-/** KYC step is done when DigiLocker / docs KYC status is completed (selfie/liveness removed pending rewrite). */
-function isKycAndLivenessDone(row: LosApplicationDetails): boolean {
-  return row.kycStatus === KYC_COMPLETED && row.kycCompletedAt != null;
+export function isLosAadhaarKycComplete(row: {
+  aadhaarKycCompleted?: boolean;
+  aadhaarDetail?: {
+    fullName: string | null;
+    dateOfBirth: string | null;
+    gender: string | null;
+    address: string | null;
+    maskedAadhaar: string | null;
+  } | null;
+  kycPhotos?: { aadhaarPhotoPath: string | null };
+}): boolean {
+  if (row.aadhaarKycCompleted) return true;
+  const aadhaar = row.aadhaarDetail;
+  if (
+    aadhaar &&
+    (aadhaar.fullName?.trim() ||
+      aadhaar.dateOfBirth ||
+      aadhaar.gender?.trim() ||
+      aadhaar.maskedAadhaar?.trim() ||
+      aadhaar.address?.trim())
+  ) {
+    return true;
+  }
+  return Boolean(row.kycPhotos?.aadhaarPhotoPath?.trim());
 }
 
-function kycJourneyDetail(row: LosApplicationDetails, kycDone: boolean): string | undefined {
-  if (kycDone) return 'Completed';
-  return row.kycStatusLabel && row.kycStatusLabel !== 'Not started' ? row.kycStatusLabel : undefined;
+function isSelfieCaptured(row: { selfieCaptured?: boolean; kycPhotos?: { selfiePath: string | null } }): boolean {
+  if (row.selfieCaptured) return true;
+  return Boolean(row.kycPhotos?.selfiePath?.trim());
+}
+
+function isDigilockerKycDone(
+  row: Pick<LosApplicationDetails, 'kycStatus'>,
+  aadhaarDone: boolean,
+  selfieDone: boolean,
+  kycFailed: boolean,
+): boolean {
+  if (!aadhaarDone) return false;
+  return selfieDone || kycFailed || row.kycStatus === KYC_COMPLETED;
+}
+
+function isLivenessKycDone(row: LosApplicationDetails): boolean {
+  return row.livenessPassed === true || (row.kycStatus === KYC_COMPLETED && row.kycCompletedAt != null);
+}
+
+function digilockerKycDetail(aadhaarDone: boolean, selfieDone: boolean): string | undefined {
+  if (aadhaarDone && selfieDone) return 'Aadhaar + selfie';
+  if (aadhaarDone) return 'Aadhaar complete';
+  if (selfieDone) return 'Selfie';
+  return undefined;
+}
+
+function livenessKycDetail(row: LosApplicationDetails, livenessDone: boolean): string | undefined {
+  if (livenessDone) return 'Passed';
+  if (row.livenessAttempts > 0 || row.livenessCheckedAt || row.livenessSummary?.checkedAt) {
+    return row.livenessPassed ? 'Passed' : 'Failed';
+  }
+  return undefined;
 }
 
 /** Full customer journey on an application workspace (matches customer portal order). */
@@ -112,7 +163,7 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
   const leadRejected = row.lead.statusCode.toUpperCase() === 'REJECTED';
   const appRejected = row.statusCode.toUpperCase().includes('REJECT');
   const rejected = appRejected || leadRejected;
-  const kycFailed = row.statusCode.toUpperCase() === 'KYC_FAILED' || row.kycStatus === 2;
+  const kycFailed = row.statusCode.toUpperCase() === 'KYC_FAILED' || row.kycStatus === KYC_FAILED_STATUS;
   const pennyFailed = row.statusCode.toUpperCase() === 'PENNYDROP_FAILED';
   const nameReviewPending = Boolean(row.nameMatchPendingReview) || row.statusCode.toUpperCase() === 'UNDER_REVIEW';
   const bankFailed = isBankDetailFailed(row) || pennyFailed;
@@ -127,7 +178,10 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
   const letterReviewed = Boolean(row.loanDocuments.reviewedAt ?? row.loanDocuments.acceptedAt);
   /** Mobile OTP after references. */
   const letterAccepted = Boolean(row.loanDocuments.acceptedAt);
-  const kycDone = isKycAndLivenessDone(row);
+  const aadhaarDone = isLosAadhaarKycComplete(row);
+  const selfieDone = isSelfieCaptured(row);
+  const digilockerDone = isDigilockerKycDone(row, aadhaarDone, selfieDone, kycFailed);
+  const livenessDone = isLivenessKycDone(row);
   const bankDone = Boolean(row.disbursement?.accountNumber || row.disbursement?.disbursedAt) && !nameReviewPending;
 
   const rejectionDetail =
@@ -141,7 +195,8 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
     loan: loanDone,
     email: emailDone,
     letter: letterReviewed,
-    kyc: kycDone,
+    digilockerKyc: digilockerDone,
+    livenessKyc: livenessDone,
     bank: bankDone,
     refs: refsDone,
     esign: letterAccepted,
@@ -152,7 +207,8 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
     loan: false,
     email: false,
     letter: false,
-    kyc: kycFailed,
+    digilockerKyc: kycFailed && !aadhaarDone,
+    livenessKyc: kycFailed && aadhaarDone && (selfieDone || row.livenessAttempts > 0),
     bank: bankFailed,
     refs: false,
     esign: false,
@@ -161,7 +217,8 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
     credit: row.bureauReport?.cibilScore != null ? `CIBIL ${row.bureauReport.cibilScore}` : undefined,
     loan: row.details?.loanAmount ? `₹${row.details.loanAmount}` : undefined,
     letter: letterAccepted ? 'Accepted' : letterReviewed ? 'Reviewed' : undefined,
-    kyc: kycJourneyDetail(row, kycDone),
+    digilockerKyc: digilockerKycDetail(aadhaarDone, selfieDone),
+    livenessKyc: livenessKycDetail(row, livenessDone),
     bank: nameReviewPending
       ? 'Name match review'
       : bankFailed
@@ -211,8 +268,10 @@ export type ApplicationListStageInput = {
   emailVerifiedAt: string | null;
   loanDocumentsReviewedAt: string | null;
   loanDocumentsAcceptedAt: string | null;
-  /** Kept for API compat; KYC stage no longer requires liveness. */
   livenessPassed: boolean;
+  livenessAttempts?: number;
+  aadhaarKycCompleted?: boolean;
+  selfieCaptured?: boolean;
   selectedLoanAmount: string | null;
   referencesCount: number;
   bankAccountNumber: string | null;
@@ -257,7 +316,12 @@ export function resolveApplicationStageLabel(input: ApplicationListStageInput): 
   const emailDone = Boolean(input.emailVerifiedAt);
   const letterReviewed = Boolean(input.loanDocumentsReviewedAt ?? input.loanDocumentsAcceptedAt);
   const letterAccepted = Boolean(input.loanDocumentsAcceptedAt);
-  const kycDone = input.kycStatus === KYC_COMPLETED && input.kycCompletedAt != null;
+  const aadhaarDone = Boolean(input.aadhaarKycCompleted);
+  const selfieDone = Boolean(input.selfieCaptured);
+  const digilockerDone =
+    aadhaarDone && (selfieDone || kycFailed || input.kycStatus === KYC_COMPLETED);
+  const livenessDone =
+    input.livenessPassed === true || (input.kycStatus === KYC_COMPLETED && input.kycCompletedAt != null);
   const bankDone = Boolean(input.bankAccountNumber || input.disbursedAt) && !input.nameMatchPendingReview;
   const refsDone = input.referencesCount >= 2;
 
@@ -267,7 +331,8 @@ export function resolveApplicationStageLabel(input: ApplicationListStageInput): 
     loan: loanDone,
     email: emailDone,
     letter: letterReviewed,
-    kyc: kycDone,
+    digilockerKyc: digilockerDone,
+    livenessKyc: livenessDone,
     bank: bankDone,
     refs: refsDone,
     esign: letterAccepted,

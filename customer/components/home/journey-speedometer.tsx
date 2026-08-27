@@ -23,8 +23,9 @@ function getStepIndexFromPathname(pathname: string): number {
   if (p.includes('/thank-you-interest') || p.includes('/thank-you') || p.includes('/active-loan')) {
     return last;
   }
-  if (p.includes('/references')) return 7;
-  if (p.includes('/bank-details')) return 6;
+  if (p.includes('/references')) return 8;
+  if (p.includes('/bank-details')) return 7;
+  if (p.includes('/kyc/selfie')) return 6;
   if (p.includes('/kyc')) return 5;
   if (p.includes('/loan-documents')) return 4;
   if (p.includes('/email-verify')) return 3;

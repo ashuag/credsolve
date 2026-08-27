@@ -148,6 +148,8 @@ function applicationStageLabel(app: LosApplication): string {
     loanDocumentsReviewedAt: app.loanDocumentsReviewedAt,
     loanDocumentsAcceptedAt: app.loanDocumentsAcceptedAt,
     livenessPassed: app.livenessPassed,
+    aadhaarKycCompleted: app.aadhaarKycCompleted,
+    selfieCaptured: app.selfieCaptured,
     selectedLoanAmount: app.selectedLoanAmount,
     referencesCount: app.referencesCount,
     bankAccountNumber: app.bankAccountNumber,

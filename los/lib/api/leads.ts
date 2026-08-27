@@ -62,6 +62,9 @@ export type LosApplication = {
   loanDocumentsReviewedAt: string | null;
   loanDocumentsAcceptedAt: string | null;
   livenessPassed: boolean;
+  /** True when DigiLocker Aadhaar was captured, even if later KYC (selfie / liveness) failed. */
+  aadhaarKycCompleted?: boolean;
+  selfieCaptured?: boolean;
   referencesCount: number;
   bankAccountNumber: string | null;
   disbursedAt: string | null;
@@ -230,6 +233,9 @@ export type LosApplicationDetails = {
   kycStatus: number;
   kycStatusLabel: string;
   kycCompletedAt: string | null;
+  /** True when DigiLocker Aadhaar was captured, even if later KYC (selfie / liveness) failed. */
+  aadhaarKycCompleted?: boolean;
+  aadhaarKycCompletedAt?: string | null;
   livenessPassed: boolean;
   livenessCheckCompleted: boolean;
   livenessAttempts: number;

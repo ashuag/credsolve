@@ -19,6 +19,7 @@ import {
   explainKycNotDone,
 } from '@/lib/kyc-selfie-validation-display';
 import { formatPersonName } from '@/lib/format-person-name';
+import { isLosAadhaarKycComplete } from '@/lib/customer-journey';
 import {
   fetchApplicationLoanDocumentBlob,
   generateApplicationLoanDocuments,
@@ -295,13 +296,7 @@ function CustomerProfilePanel({
     return <p className="m-0 text-[0.88rem] text-brand-muted">No lead profile is linked to this application yet.</p>;
   }
 
-  const hasAadhaar =
-    aadhaar &&
-    (aadhaar.fullName?.trim() ||
-      aadhaar.dateOfBirth ||
-      aadhaar.gender?.trim() ||
-      aadhaar.maskedAadhaar?.trim() ||
-      aadhaar.address?.trim());
+  const hasAadhaar = isLosAadhaarKycComplete(row);
 
   const bureauPan = cibilReport ? extractCibilPan(cibilReport.identifiers) : null;
   const profileNameScore = computeNameMatchScore(profile.fullName, aadhaar?.fullName);
@@ -755,8 +750,12 @@ function KycDetailPanel({
             value: formatDateTime(row.digilockerPan?.panCardVerifiedAt ?? null),
           },
           {
+            label: 'Aadhaar KYC',
+            value: isLosAadhaarKycComplete(row) ? 'Complete' : 'Not complete',
+          },
+          {
             label: 'DigiLocker Aadhaar',
-            value: row.aadhaarDetail?.maskedAadhaar ?? '—',
+            value: formatAadhaarNumberDisplay(row.aadhaarDetail?.maskedAadhaar, isLosAadhaarKycComplete(row)),
           },
           { label: 'Selfie quality checked at', value: formatDateTime(row.selfieFaceValidation?.checkedAt ?? null) },
           { label: 'Liveness checked at', value: formatDateTime(row.livenessCheckedAt) },

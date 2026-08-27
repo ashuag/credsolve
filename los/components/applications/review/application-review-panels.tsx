@@ -24,7 +24,7 @@ import {
   formatCibilScoreLabel,
   truncateUuid,
 } from '@/lib/application-review-format';
-import { isApplicationJourneyStepActive } from '@/lib/customer-journey';
+import { isApplicationJourneyStepActive, isLosAadhaarKycComplete } from '@/lib/customer-journey';
 import { usesMonthlyIncomeMetric, resolveOccupationKey } from '@/lib/customer-details';
 import {
   combineMatchVerdicts,
@@ -454,7 +454,9 @@ export function ReviewKycPanel({
   onRefresh?: () => void;
 }) {
   const kycDone = row.kycStatus === 1;
-  const isCurrentStep = isApplicationJourneyStepActive(row, 'kyc');
+  const aadhaarComplete = isLosAadhaarKycComplete(row);
+  const isCurrentStep =
+    isApplicationJourneyStepActive(row, 'digilockerKyc') || isApplicationJourneyStepActive(row, 'livenessKyc');
   const kycNotDoneReason = explainKycNotDone(row);
   const showEnableReKyc = row.canEnableReKyc || canEnableReKycFromRow(row);
   return (
@@ -467,10 +469,12 @@ export function ReviewKycPanel({
           </svg>
         }
         title="KYC"
-        iconTone={kycDone ? 'ok' : 'default'}
+        iconTone={kycDone ? 'ok' : aadhaarComplete ? 'ok' : 'default'}
         right={
           kycDone ? (
             <ReviewPill tone="ok">Completed</ReviewPill>
+          ) : aadhaarComplete ? (
+            <ReviewPill tone="ok">Aadhaar complete</ReviewPill>
           ) : isCurrentStep ? (
             <ReviewPill tone="warn">Current step</ReviewPill>
           ) : (
@@ -534,8 +538,14 @@ export function ReviewKycPanel({
             value={formatReviewDateTime(row.digilockerPan?.panCardVerifiedAt ?? null)}
           />
           <ReviewField
+            label="Aadhaar KYC"
+            value={aadhaarComplete ? 'Complete' : 'Not complete'}
+            tone={aadhaarComplete ? 'accent' : undefined}
+          />
+          <ReviewField
             label="DigiLocker Aadhaar"
-            value={row.aadhaarDetail?.maskedAadhaar ?? '—'}
+            value={formatAadhaarNumberDisplay(row.aadhaarDetail?.maskedAadhaar, aadhaarComplete)}
+            tone={aadhaarComplete ? 'accent' : undefined}
           />
           <ReviewField label="Selfie quality checked at" value={formatReviewDateTime(row.selfieFaceValidation?.checkedAt ?? null)} />
           <ReviewField label="Liveness checked at" value={formatReviewDateTime(row.livenessCheckedAt)} />
@@ -960,13 +970,7 @@ export function ReviewPersonalPanel({
   const matrixNameScore = combinedNameMatchScore(nameScoreParts);
   const matrixNameScoreTitle = nameMatchScoreDetail(nameScoreParts);
 
-  const hasAadhaar = Boolean(
-    aadhaar?.fullName?.trim() ||
-      aadhaar?.dateOfBirth ||
-      aadhaar?.gender?.trim() ||
-      aadhaar?.maskedAadhaar?.trim() ||
-      aadhaar?.address?.trim(),
-  );
+  const hasAadhaar = isLosAadhaarKycComplete(row);
 
   const allMatch =
     hasAadhaar &&
@@ -1057,7 +1061,11 @@ export function ReviewPersonalPanel({
           </div>
         </ReviewCard>
 
-        <ReviewCard icon={<IdCardIcon />} title="Aadhaar (DigiLocker)">
+        <ReviewCard
+          icon={<IdCardIcon />}
+          title="Aadhaar (DigiLocker)"
+          right={hasAadhaar ? <ReviewPill tone="ok">Aadhaar complete</ReviewPill> : undefined}
+        >
           {hasAadhaar ? (
             <div className="fgrid">
               <ReviewField label="Aadhaar name" value={formatPersonName(aadhaar?.fullName)} />

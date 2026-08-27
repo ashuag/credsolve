@@ -12,7 +12,7 @@ import {
   buildApplicationWorkspaceAlertText,
   isApplicationRecordRejected,
 } from '@/lib/application-workspace-status';
-import type { JourneyStep } from '@/lib/customer-journey';
+import { isLosAadhaarKycComplete, type JourneyStep } from '@/lib/customer-journey';
 import type { LosApplicationDetails } from '@/lib/api';
 import { LosStatusPill } from '@/components/shared/los-status-pill';
 
@@ -39,7 +39,7 @@ export function ApplicationReviewHero({
   const identityVerified = isApplicationIdentityVerified({
     kycStatus: row.kycStatus,
     panVerified: row.lead.panVerified ?? 0,
-    hasAadhaar: Boolean(row.aadhaarDetail?.maskedAadhaar),
+    hasAadhaar: isLosAadhaarKycComplete(row),
   });
 
   return (

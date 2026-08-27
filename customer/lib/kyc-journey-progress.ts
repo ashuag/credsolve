@@ -10,7 +10,7 @@ export const KYC_JOURNEY_STEPS = CUSTOMER_JOURNEY_PROGRESS_STEPS.map((s) =>
   s.shortLabel.toUpperCase(),
 );
 
-const KYC_STEP_INDEX = CUSTOMER_JOURNEY_PROGRESS_STEPS.findIndex((s) => s.key === 'kyc');
+const KYC_STEP_INDEX = CUSTOMER_JOURNEY_PROGRESS_STEPS.findIndex((s) => s.key === 'digilockerKyc');
 
 /** Thin wrapper so KYC hub pages stay in sync with Overview %. */
 export function kycJourneyProgressFromSession(session: CustomerSessionResponse | null | undefined): {

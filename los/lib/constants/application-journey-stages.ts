@@ -1,6 +1,6 @@
 /**
  * Canonical customer-journey stages for an application.
- * Order matches customer portal: letter review → KYC → bank → refs → sanction OTP.
+ * Order matches customer portal: letter review → DigiLocker KYC (selfie) → liveness → bank → refs → sanction OTP.
  */
 export const APPLICATION_JOURNEY_STAGES = [
   { id: 'profile', label: 'Profile' },
@@ -8,7 +8,8 @@ export const APPLICATION_JOURNEY_STAGES = [
   { id: 'loan', label: 'Loan offer' },
   { id: 'email', label: 'Email OTP' },
   { id: 'letter', label: 'Sanction letter' },
-  { id: 'kyc', label: 'KYC' },
+  { id: 'digilockerKyc', label: 'DigiLocker KYC' },
+  { id: 'livenessKyc', label: 'Liveness KYC' },
   { id: 'bank', label: 'Bank details' },
   { id: 'refs', label: 'References' },
   { id: 'esign', label: 'eSign' },

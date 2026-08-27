@@ -15,7 +15,8 @@ export const CUSTOMER_JOURNEY_PROGRESS_STEPS = [
   { key: 'loan', label: 'Loan selection', shortLabel: 'Loan' },
   { key: 'email', label: 'Email verification', shortLabel: 'Email' },
   { key: 'letter', label: 'Sanction letter review', shortLabel: 'Letter' },
-  { key: 'kyc', label: 'KYC', shortLabel: 'KYC' },
+  { key: 'digilockerKyc', label: 'DigiLocker KYC', shortLabel: 'Aadhaar' },
+  { key: 'livenessKyc', label: 'Liveness KYC', shortLabel: 'Liveness' },
   { key: 'bank', label: 'Bank details', shortLabel: 'Bank' },
   { key: 'references', label: 'References', shortLabel: 'Refs' },
   { key: 'esign', label: 'eSign', shortLabel: 'eSign' },
@@ -42,8 +43,31 @@ export type CustomerJourneyProgress = {
 };
 
 /**
- * KYC progress-dot is done when the session marks KYC complete
- * (DigiLocker Aadhaar + selfie/liveness when required).
+ * DigiLocker Aadhaar (and selfie when already captured) for the customer progress-dot.
+ */
+export function isCustomerDigilockerKycStepDone(
+  session: CustomerSessionResponse | null | undefined,
+): boolean {
+  if (!session || session.authenticated !== true) return false;
+  if (session.journey.kycCompleted === true) return true;
+  return Boolean(session.kycFaceProgress?.digilockerAadhaarCaptured);
+}
+
+/**
+ * Liveness KYC progress-dot is done when the face pipeline has passed
+ * (selfie quality + Aadhaar match + active liveness).
+ */
+export function isCustomerLivenessKycStepDone(
+  session: CustomerSessionResponse | null | undefined,
+): boolean {
+  if (!session || session.authenticated !== true) return false;
+  if (session.journey.kycCompleted === true) return true;
+  const kyc = session.kycFaceProgress;
+  return Boolean(kyc?.livenessPassed && kyc.selfieCaptured);
+}
+
+/**
+ * Full KYC is done when both DigiLocker + selfie/liveness are complete.
  */
 export function isCustomerKycJourneyStepDone(
   session: CustomerSessionResponse | null | undefined,
@@ -67,7 +91,8 @@ function completionFlags(
     loan: Boolean(j?.loanSelectionCompleted),
     email: emailVerified,
     letter: isLoanDocumentsJourneyComplete(session),
-    kyc: isCustomerKycJourneyStepDone(session),
+    digilockerKyc: isCustomerDigilockerKycStepDone(session),
+    livenessKyc: isCustomerLivenessKycStepDone(session),
     bank: Boolean(j?.bankDetailsCompleted),
     references: Boolean(j?.referencesCompleted),
     esign: Boolean(j?.loanDocumentsAccepted),

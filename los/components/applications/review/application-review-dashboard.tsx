@@ -20,7 +20,7 @@ import { canRejectApplicationStatus, RejectRecordModal } from '@/components/shar
 import { canDecideLosApplication } from '@/lib/access';
 import { buildReviewFlags } from '@/lib/application-review-flags';
 import { isApplicationRecordRejected } from '@/lib/application-workspace-status';
-import { buildApplicationJourney, journeyProgressPercent } from '@/lib/customer-journey';
+import { buildApplicationJourney, isLosAadhaarKycComplete, journeyProgressPercent } from '@/lib/customer-journey';
 import { extractCibilPan } from '@/lib/kyc-field-match';
 import { formatPersonName } from '@/lib/format-person-name';
 import {
@@ -166,7 +166,12 @@ export function ApplicationReviewDashboard({
     {
       id: 'kyc',
       label: 'KYC detail',
-      badge: row.kycStatus === 1 ? <span className="cnt ok">✓</span> : null,
+      badge:
+        row.kycStatus === 1 ? (
+          <span className="cnt ok">✓</span>
+        ) : isLosAadhaarKycComplete(row) ? (
+          <span className="cnt ok">Aadhaar</span>
+        ) : null,
     },
     {
       id: 'bank',
