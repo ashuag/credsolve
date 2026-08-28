@@ -417,8 +417,8 @@ export function downloadDigilockerAadhaarForCallback(
     }
     if (current?.status === 'in_flight' && Date.now() - current.at < AADHAAR_DOWNLOAD_IN_FLIGHT_MS) {
       const waited = await waitForPersistentAadhaarDownloadGate();
-      if (waited === 'success' || settledAadhaarDownload?.ok) {
-        return settledAadhaarDownload ?? SUCCESS_WITHOUT_VENDOR;
+      if (waited === 'success') {
+        return SUCCESS_WITHOUT_VENDOR;
       }
       if (waited === 'in_flight') {
         return SKIPPED_IN_FLIGHT;
