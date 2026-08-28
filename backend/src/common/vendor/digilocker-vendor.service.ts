@@ -206,20 +206,6 @@ export class DigilockerVendorService {
       headers: params.headers,
       body: params.body,
       leadId: params.leadId,
-      redactRequest: (b) => {
-        const input = b?.input as Record<string, unknown> | undefined;
-        const st = input?.sessionToken;
-        if (typeof st !== 'string') {
-          return b;
-        }
-        return {
-          ...b,
-          input: {
-            ...input,
-            sessionToken: `${st.slice(0, 6)}…${st.slice(-4)}`,
-          },
-        };
-      },
     });
 
     const vendorBody =

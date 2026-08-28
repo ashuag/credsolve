@@ -12,7 +12,7 @@ import { Spinner } from '@/components/ui/spinner';
 import {
   clearDigilockerExpectSelfie,
   clearDigilockerSessionTokenFromStorage,
-  downloadDigilockerAadhaar,
+  downloadDigilockerAadhaarForCallback,
   fetchPendingDigilockerSession,
   markDigilockerExpectSelfie,
   persistDigilockerSessionTokenForCallback,
@@ -77,6 +77,9 @@ function downloadErrorMessage(out: DownloadAadhaarDigilockerResponse): string {
   }
   if (!out.configured) {
     return out.skipReason ?? 'Aadhaar download is not configured on the server.';
+  }
+  if (out.skippedDuplicate) {
+    return 'Aadhaar download did not complete. You can try again.';
   }
   const vendorMsg = pickDigilockerDownloadErrorMessage(out.vendor);
   return vendorMsg ?? `Aadhaar download failed (HTTP ${out.httpStatus ?? 'n/a'}).`;
@@ -229,7 +232,7 @@ function DigilockerCallbackContent() {
     const token = sessionTokenRef.current.trim();
 
     try {
-      const out = await downloadDigilockerAadhaar(
+      const out = await downloadDigilockerAadhaarForCallback(
         token ? { sessionToken: token, consent: true } : { consent: true },
       );
       const { used, allowed } = applyAttemptCounts(
@@ -250,6 +253,23 @@ function DigilockerCallbackContent() {
 
       if (!out.ok) {
         clearDigilockerExpectSelfie();
+        if (out.skippedDuplicate) {
+          const next = await refresh();
+          if (next.authenticated === true && next.kycFaceProgress?.digilockerAadhaarCaptured) {
+            clearDigilockerSessionTokenFromStorage();
+            markDigilockerExpectSelfie();
+            const href =
+              next.lead != null ? getPostDigilockerAadhaarContinuePath(next) : '/kyc/selfie';
+            setContinueHref(href);
+            setMessage('Aadhaar verified. Opening selfie…');
+            router.replace(href);
+            return;
+          }
+          if (next.authenticated === true && next.lead && isLeadRejectedAndLocked(next.lead)) {
+            router.replace('/thank-you-interest');
+            return;
+          }
+        }
         if (out.identityMismatch) {
           const redirected = await handleTerminalFailure(out);
           if (redirected) return;
@@ -310,9 +330,10 @@ function DigilockerCallbackContent() {
   useEffect(() => {
     if (!searchParams?.toString()) return;
     if (pathname !== '/kyc/digilocker-callback') return;
+    // Strip OAuth query without Next.js navigation — `router.replace` remounts this
+    // page (useSearchParams) and would start a second Aadhaar download.
     window.history.replaceState(null, '', '/kyc/digilocker-callback');
-    void router.replace('/kyc/digilocker-callback', { scroll: false });
-  }, [pathname, router, searchParams]);
+  }, [pathname, searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -373,8 +394,9 @@ function DigilockerCallbackContent() {
     return () => {
       cancelled = true;
     };
-    // Run once on mount; callbacks are read from refs so session updates don't cancel the flow.
-  }, [router]);
+    // Mount once. `router` identity changes must not start another Aadhaar download.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const attemptsRemaining = Math.max(0, attemptsAllowed - attemptsUsed);
   const canRetry =

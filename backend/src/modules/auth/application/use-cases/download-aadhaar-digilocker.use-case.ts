@@ -9,6 +9,7 @@ import {
   decodeAadhaarPhoto,
   extractAadhaarPhotoString,
   isDigilockerAadhaarCaptureComplete,
+  isDigilockerSessionNotReadyError,
   isTenacioVendorBusinessSuccess,
 } from '../../../../common/kyc/aadhaar-vendor-parse.util';
 import { compareAadhaarToLeadProfile } from '../../../../common/kyc/aadhaar-lead-identity-match.util';
@@ -17,6 +18,7 @@ import { DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS } from '../../../../common/con
 import { KycDigilockerDownloadFailureService } from '../../../../common/kyc/kyc-digilocker-download-failure.service';
 import { KycIdentityRejectionService } from '../../../../common/kyc/kyc-identity-rejection.service';
 import { KycCompletionService } from '../../../../common/kyc/kyc-completion.service';
+import { APPLICATION_KYC_STATUS } from '../../../../common/constants/application.constants';
 import { assertApplicationKycNotCompleted } from '../../../../common/kyc/application-kyc-guard.util';
 import { assertActiveApplicationLoanDocumentsAccepted } from '../../../../common/loan-documents/application-loan-documents-guard.util';
 import { PrismaService } from '../../../../prisma/prisma.service';
@@ -24,6 +26,29 @@ import { CustomerRepository } from '../../infrastructure/repositories/customer.r
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { ApplicationRepository } from '../../infrastructure/repositories/application.repository';
 import type { DownloadAadhaarDigilockerDto } from '../dto/download-aadhaar-digilocker.dto';
+
+const PEER_DOWNLOAD_WAIT_MS = 50_000;
+const PEER_DOWNLOAD_POLL_MS = 400;
+const SESSION_NOT_READY_RETRY_DELAY_MS = 2_500;
+
+const AADHAAR_DOWNLOAD_SERVICE_NAMES = ['aadhaar-download', 'digilocker-download-aadhaar'] as const;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+function unwrapVendorAuditPayload(payload: unknown): unknown {
+  if (!isRecord(payload)) return payload;
+  if (payload.parsed != null) return payload.parsed;
+  if (payload._truncated === true && payload.parsed != null) return payload.parsed;
+  return payload;
+}
 
 export type DownloadAadhaarDigilockerResult = {
   configured: boolean;
@@ -46,11 +71,17 @@ export type DownloadAadhaarDigilockerResult = {
   /** When Surepass also returned DigiLocker PAN. */
   panFetched?: boolean;
   panCardNumber?: string | null;
+  /**
+   * Another download is already in flight for this application. The vendor was not
+   * called again; retry only after that attempt finishes (including failure).
+   */
+  skippedDuplicate?: boolean;
 };
 
 @Injectable()
 export class DownloadAadhaarDigilockerUseCase {
   private readonly logger = new Logger(DownloadAadhaarDigilockerUseCase.name);
+  private readonly inFlightByApplication = new Map<string, Promise<DownloadAadhaarDigilockerResult>>();
 
   constructor(
     private readonly customers: CustomerRepository,
@@ -121,13 +152,244 @@ export class DownloadAadhaarDigilockerUseCase {
       );
     }
 
-    const out = await this.digilockerFetch.downloadAadhaar(
-      sessionToken,
-      lead.id,
-      storedSession?.vendor,
-    );
+    const already = await this.snapshotDownloadOutcome(applicationRow.id, customer.id);
+    if (already) {
+      return already;
+    }
 
-    const vendor = out.vendorBody ?? null;
+    const existing = this.inFlightByApplication.get(applicationRow.uuid);
+    if (existing) {
+      return existing;
+    }
+
+    const run = this.runExclusiveDownload({
+      sessionToken,
+      vendorKind: storedSession?.vendor,
+      leadId: lead.id,
+      customerId: customer.id,
+      customerUuid: customer.uuid,
+      customerMobile: customer.mobileNumber,
+      applicationId: applicationRow.id,
+      applicationUuid: applicationRow.uuid,
+    }).finally(() => {
+      if (this.inFlightByApplication.get(applicationRow.uuid) === run) {
+        this.inFlightByApplication.delete(applicationRow.uuid);
+      }
+    });
+    this.inFlightByApplication.set(applicationRow.uuid, run);
+    return run;
+  }
+
+  private async runExclusiveDownload(params: {
+    sessionToken: string;
+    vendorKind: 'surepass' | 'tenacio' | null | undefined;
+    leadId: bigint;
+    customerId: bigint;
+    customerUuid: string;
+    customerMobile?: string | null;
+    applicationId: bigint;
+    applicationUuid: string;
+  }): Promise<DownloadAadhaarDigilockerResult> {
+    const cached = await this.findSuccessfulAadhaarDownload(params.leadId);
+    if (cached) {
+      this.logger.log(
+        `Reusing successful aadhaar-download log (leadId=${params.leadId.toString()}) without a second vendor call.`,
+      );
+      return this.completeFromVendorPayload({
+        ...params,
+        vendor: cached.vendor,
+        httpStatus: cached.httpStatus,
+        vendorKind: cached.vendorKind ?? params.vendorKind,
+      });
+    }
+
+    const lock = await this.digilockerSession.tryAcquireDownloadLock(params.applicationUuid);
+    if (!lock.acquired) {
+      this.logger.log(
+        `DigiLocker Aadhaar download already in flight (application=${params.applicationUuid}); waiting without a second vendor call.`,
+      );
+      return this.waitForPeerDownload(params);
+    }
+
+    try {
+      const again = await this.findSuccessfulAadhaarDownload(params.leadId);
+      if (again) {
+        return this.completeFromVendorPayload({
+          ...params,
+          vendor: again.vendor,
+          httpStatus: again.httpStatus,
+          vendorKind: again.vendorKind ?? params.vendorKind,
+        });
+      }
+      return await this.downloadFromVendor(params);
+    } finally {
+      await this.digilockerSession.releaseDownloadLock(params.applicationUuid, lock.token);
+    }
+  }
+
+  private async snapshotDownloadOutcome(
+    applicationId: bigint,
+    customerId: bigint,
+  ): Promise<DownloadAadhaarDigilockerResult | null> {
+    const customerKyc = await this.prisma.client.customerKyc.findFirst({
+      where: { customerId },
+      orderBy: { createdAt: 'desc' },
+      select: { aadhaarData: true },
+    });
+    if (isDigilockerAadhaarCaptureComplete(customerKyc?.aadhaarData)) {
+      return {
+        configured: true,
+        ok: true,
+        httpStatus: 200,
+        vendor: null,
+        persisted: true,
+      };
+    }
+
+    const appKyc = await this.prisma.client.applicationKyc.findUnique({
+      where: { applicationId },
+      select: { kycStatus: true },
+    });
+    if (appKyc?.kycStatus === APPLICATION_KYC_STATUS.FAILED) {
+      return {
+        configured: true,
+        ok: false,
+        httpStatus: 200,
+        vendor: null,
+        identityMismatch: true,
+        identityMismatchMessage:
+          'Name or date of birth on Aadhaar does not match your loan application. This application cannot proceed.',
+        leadRejected: true,
+      };
+    }
+
+    return null;
+  }
+
+  private async waitForPeerDownload(params: {
+    sessionToken: string;
+    vendorKind: 'surepass' | 'tenacio' | null | undefined;
+    leadId: bigint;
+    customerId: bigint;
+    customerUuid: string;
+    customerMobile?: string | null;
+    applicationId: bigint;
+    applicationUuid: string;
+  }): Promise<DownloadAadhaarDigilockerResult> {
+    const deadline = Date.now() + PEER_DOWNLOAD_WAIT_MS;
+    while (Date.now() < deadline) {
+      const snapshot = await this.snapshotDownloadOutcome(params.applicationId, params.customerId);
+      if (snapshot) return snapshot;
+
+      const locked = await this.digilockerSession.isDownloadLocked(params.applicationUuid);
+      if (!locked) {
+        const after = await this.snapshotDownloadOutcome(params.applicationId, params.customerId);
+        if (after) return after;
+        const cached = await this.findSuccessfulAadhaarDownload(params.leadId);
+        if (cached) {
+          return this.completeFromVendorPayload({
+            ...params,
+            vendor: cached.vendor,
+            httpStatus: cached.httpStatus,
+            vendorKind: cached.vendorKind ?? params.vendorKind,
+          });
+        }
+        return {
+          configured: true,
+          ok: false,
+          httpStatus: null,
+          vendor: null,
+          skippedDuplicate: true,
+          canRetry: true,
+        };
+      }
+
+      await sleep(PEER_DOWNLOAD_POLL_MS);
+    }
+
+    const last = await this.snapshotDownloadOutcome(params.applicationId, params.customerId);
+    if (last) return last;
+    const cached = await this.findSuccessfulAadhaarDownload(params.leadId);
+    if (cached) {
+      return this.completeFromVendorPayload({
+        ...params,
+        vendor: cached.vendor,
+        httpStatus: cached.httpStatus,
+        vendorKind: cached.vendorKind ?? params.vendorKind,
+      });
+    }
+    return {
+      configured: true,
+      ok: false,
+      httpStatus: null,
+      vendor: null,
+      skippedDuplicate: true,
+      canRetry: true,
+    };
+  }
+
+  private async findSuccessfulAadhaarDownload(leadId: bigint): Promise<{
+    vendor: unknown;
+    httpStatus: number;
+    vendorKind: 'surepass' | 'tenacio' | null;
+  } | null> {
+    const rows = await this.prisma.client.vendorApiLog.findMany({
+      where: {
+        leadId,
+        httpStatus: 200,
+        serviceName: { in: [...AADHAAR_DOWNLOAD_SERVICE_NAMES] },
+      },
+      orderBy: { respondedAt: 'desc' },
+      take: 8,
+      select: { responsePayload: true, httpStatus: true, providerName: true },
+    });
+
+    for (const row of rows) {
+      const vendor = unwrapVendorAuditPayload(row.responsePayload);
+      if (!isTenacioVendorBusinessSuccess(vendor)) continue;
+      const provider = (row.providerName ?? '').trim().toLowerCase();
+      return {
+        vendor,
+        httpStatus: row.httpStatus ?? 200,
+        vendorKind: provider.includes('surepass') ? 'surepass' : 'tenacio',
+      };
+    }
+    return null;
+  }
+
+  private async downloadFromVendor(params: {
+    sessionToken: string;
+    vendorKind: 'surepass' | 'tenacio' | null | undefined;
+    leadId: bigint;
+    customerId: bigint;
+    customerUuid: string;
+    customerMobile?: string | null;
+    applicationId: bigint;
+    applicationUuid: string;
+  }): Promise<DownloadAadhaarDigilockerResult> {
+    let out = await this.digilockerFetch.downloadAadhaar(
+      params.sessionToken,
+      params.leadId,
+      params.vendorKind,
+    );
+    let vendor = out.vendorBody ?? null;
+
+    if (
+      out.configured &&
+      out.ok &&
+      isDigilockerSessionNotReadyError(vendor)
+    ) {
+      this.logger.warn(
+        `DigiLocker Aadhaar session not ready (leadId=${params.leadId.toString()}); retrying once.`,
+      );
+      await sleep(SESSION_NOT_READY_RETRY_DELAY_MS);
+      out = await this.digilockerFetch.downloadAadhaar(
+        params.sessionToken,
+        params.leadId,
+        params.vendorKind,
+      );
+      vendor = out.vendorBody ?? null;
+    }
 
     if (!out.configured) {
       return {
@@ -140,11 +402,15 @@ export class DownloadAadhaarDigilockerUseCase {
     }
 
     if (!out.ok || !isTenacioVendorBusinessSuccess(vendor)) {
-      await this.persistVendorAttempt(applicationRow, out.httpStatus, vendor);
+      await this.persistVendorAttempt(
+        { id: params.applicationId, customerId: params.customerId },
+        out.httpStatus,
+        vendor,
+      );
       const escalation = await this.kycDigilockerDownloadFailure.recordFailureAndEscalate({
-        leadId: lead.id,
-        applicationId: applicationRow.id,
-        customerMobile: customer.mobileNumber,
+        leadId: params.leadId,
+        applicationId: params.applicationId,
+        customerMobile: params.customerMobile ?? undefined,
       });
       return {
         configured: true,
@@ -156,10 +422,32 @@ export class DownloadAadhaarDigilockerUseCase {
       };
     }
 
-    const businessSuccess = true;
+    return this.completeFromVendorPayload({
+      ...params,
+      vendor,
+      httpStatus: out.httpStatus,
+      vendorKind: out.vendorKind ?? params.vendorKind,
+    });
+  }
+
+  private async completeFromVendorPayload(params: {
+    sessionToken: string;
+    vendorKind: 'surepass' | 'tenacio' | null | undefined;
+    leadId: bigint;
+    customerId: bigint;
+    customerUuid: string;
+    customerMobile?: string | null;
+    applicationId: bigint;
+    applicationUuid: string;
+    vendor: unknown;
+    httpStatus: number | null;
+  }): Promise<DownloadAadhaarDigilockerResult> {
+    const vendor = params.vendor;
+    const already = await this.snapshotDownloadOutcome(params.applicationId, params.customerId);
+    if (already) return already;
 
     const leadProfile = await this.prisma.client.leadDetail.findUnique({
-      where: { leadId: lead.id },
+      where: { leadId: params.leadId },
       select: { fullName: true, dateOfBirth: true },
     });
 
@@ -171,18 +459,18 @@ export class DownloadAadhaarDigilockerUseCase {
 
     if (!identityMatch.matched) {
       await this.kycIdentityRejection.rejectForAadhaarProfileMismatch({
-        leadId: lead.id,
-        applicationId: applicationRow.id,
-        customerMobile: customer.mobileNumber,
+        leadId: params.leadId,
+        applicationId: params.applicationId,
+        customerMobile: params.customerMobile ?? undefined,
       });
-      await this.digilockerSession.clear(applicationRow.uuid);
+      await this.digilockerSession.clear(params.applicationUuid);
       this.logger.warn(
-        `Aadhaar identity mismatch (leadId=${lead.id.toString()}, reason=${identityMatch.reason}): ${identityMatch.message}`,
+        `Aadhaar identity mismatch (leadId=${params.leadId.toString()}, reason=${identityMatch.reason}): ${identityMatch.message}`,
       );
       return {
         configured: true,
         ok: false,
-        httpStatus: out.httpStatus,
+        httpStatus: params.httpStatus,
         vendor,
         businessSuccess: true,
         identityMismatch: true,
@@ -192,20 +480,20 @@ export class DownloadAadhaarDigilockerUseCase {
 
     let panCardNumber: string | null = null;
     let panFetched = false;
-    if (out.vendorKind === 'surepass') {
+    if (params.vendorKind === 'surepass') {
       try {
-        const panOut = await this.digilockerFetch.downloadPan(sessionToken, lead.id);
+        const panOut = await this.digilockerFetch.downloadPan(params.sessionToken, params.leadId);
         if (panOut.ok && panOut.panFields?.panNumber) {
           panCardNumber = panOut.panFields.panNumber;
           panFetched = true;
         } else {
           this.logger.warn(
-            `Surepass DigiLocker PAN download did not return a PAN (leadId=${lead.id.toString()}, http=${panOut.httpStatus ?? 'n/a'}).`,
+            `Surepass DigiLocker PAN download did not return a PAN (leadId=${params.leadId.toString()}, http=${panOut.httpStatus ?? 'n/a'}).`,
           );
         }
       } catch (err) {
         this.logger.warn(
-          `Surepass DigiLocker PAN download failed (leadId=${lead.id.toString()}): ${
+          `Surepass DigiLocker PAN download failed (leadId=${params.leadId.toString()}): ${
             err instanceof Error ? err.message : String(err)
           }`,
         );
@@ -214,16 +502,14 @@ export class DownloadAadhaarDigilockerUseCase {
 
     let persisted = false;
     try {
-      const application = applicationRow;
-
       const photoRaw = extractAadhaarPhotoString(vendor);
       let photoRel: string | null = null;
       if (photoRaw) {
         const decoded = decodeAadhaarPhoto(photoRaw);
         if (decoded?.buffer.length) {
           photoRel = this.kycFiles.aadhaarPhotoRelativePath(
-            customer.uuid,
-            application.uuid,
+            params.customerUuid,
+            params.applicationUuid,
             decoded.ext,
           );
           await this.kycFiles.writeBytes(photoRel, decoded.buffer);
@@ -232,17 +518,16 @@ export class DownloadAadhaarDigilockerUseCase {
 
       const formJson = buildDigilockerAadhaarFormJson(vendor, photoRel) ?? { _note: 'digilocker_vendor_unparsed' };
       await this.applications.updateDigilockerAadhaarArtifacts({
-        applicationId: application.id,
-        customerId: customer.id,
+        applicationId: params.applicationId,
+        customerId: params.customerId,
         digilockerAadhaarFormJson: formJson as Prisma.InputJsonValue,
         aadhaarPhotoRelativePath: photoRel,
       });
       persisted = true;
-      await this.digilockerSession.clear(application.uuid);
-      // Persist DigiLocker identity; do not mark application KYC COMPLETED (more KYC steps may follow).
+      await this.digilockerSession.clear(params.applicationUuid);
       await this.kycCompletion.completeFromDigilockerAadhaar({
-        applicationId: application.id,
-        customerId: customer.id,
+        applicationId: params.applicationId,
+        customerId: params.customerId,
         digilockerAadhaarFormJson: formJson as Prisma.JsonValue,
         aadhaarPhotoRelativePath: photoRel,
         verifiedAt: new Date(),
@@ -258,9 +543,9 @@ export class DownloadAadhaarDigilockerUseCase {
     return {
       configured: true,
       ok: true,
-      httpStatus: out.httpStatus,
+      httpStatus: params.httpStatus,
       vendor,
-      businessSuccess,
+      businessSuccess: true,
       persisted,
       panFetched,
       panCardNumber,

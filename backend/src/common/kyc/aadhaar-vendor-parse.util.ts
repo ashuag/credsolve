@@ -31,6 +31,23 @@ export function isTenacioVendorBusinessSuccess(vendor: unknown): boolean {
   return true;
 }
 
+/**
+ * DigiLocker callback can hit Tenacio before the session is usable
+ * (`status: "error"`, `serviceError.message: "Invalid Input"`, HTTP 200 envelope).
+ */
+export function isDigilockerSessionNotReadyError(vendor: unknown): boolean {
+  if (!isRecord(vendor)) return false;
+  if (isTenacioVendorBusinessSuccess(vendor)) return false;
+  const code = vendor.serviceStatusCode;
+  if (code === 400 || code === '400') return true;
+  const err = vendor.serviceError;
+  if (isRecord(err) && typeof err.message === 'string') {
+    const message = err.message.trim().toLowerCase();
+    if (message === 'invalid input' || message.includes('invalid input')) return true;
+  }
+  return false;
+}
+
 /** Best-effort user-facing line from Tenacio error envelopes (`error.message`, string `error`, nested `data`, etc.). */
 export function pickTenacioVendorErrorMessage(vendor: unknown, depth = 0): string | undefined {
   if (depth > 6 || !isRecord(vendor)) return undefined;

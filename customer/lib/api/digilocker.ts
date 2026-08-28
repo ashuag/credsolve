@@ -154,6 +154,8 @@ export type DownloadAadhaarDigilockerResponse = {
   canRetry?: boolean;
   leadRejected?: boolean;
   terminalFailure?: boolean;
+  /** Duplicate in-flight request did not call the vendor; refresh session or retry after the first call finishes. */
+  skippedDuplicate?: boolean;
 };
 
 function findDigilockerRedirectUrl(vendor: unknown, depth = 0): string | null {
@@ -180,6 +182,7 @@ export type StartDigilockerLoginResult = { ok: true } | { ok: false; message: st
 export async function startDigilockerLoginFlow(
   redirectPath = '/kyc/digilocker-callback',
 ): Promise<StartDigilockerLoginResult> {
+  resetDigilockerAadhaarDownloadGate();
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const out = await initDigilockerSession(
     origin ? { redirectUrl: `${origin}${redirectPath}` } : {},
@@ -256,6 +259,104 @@ export async function initDigilockerSession(
 
 /** Tenacio Aadhaar download can be slow; allow more time than default POST timeout. */
 const DIGILOCKER_DOWNLOAD_TIMEOUT_MS = 45_000;
+const AADHAAR_DOWNLOAD_GATE_KEY = 'moneycash:digilocker:aadhaar-download-gate';
+const AADHAAR_DOWNLOAD_IN_FLIGHT_MS = 55_000;
+
+type PersistentAadhaarDownloadGate = {
+  status: 'in_flight' | 'success' | 'failed';
+  at: number;
+};
+
+const SUCCESS_WITHOUT_VENDOR: DownloadAadhaarDigilockerResponse = {
+  configured: true,
+  ok: true,
+  httpStatus: 200,
+  vendor: null,
+  persisted: true,
+};
+
+const SKIPPED_IN_FLIGHT: DownloadAadhaarDigilockerResponse = {
+  configured: true,
+  ok: false,
+  httpStatus: null,
+  vendor: null,
+  skippedDuplicate: true,
+  canRetry: true,
+};
+
+/**
+ * Callback remounts (query strip / Strict Mode / full reload) must join one in-flight
+ * download. Success is cached so a remount cannot hit Tenacio again. A retryable
+ * failure is not cached, so the next call is a new API request.
+ */
+let inFlightAadhaarDownload: Promise<DownloadAadhaarDigilockerResponse> | null = null;
+let settledAadhaarDownload: DownloadAadhaarDigilockerResponse | null = null;
+
+function readPersistentAadhaarDownloadGate(): PersistentAadhaarDownloadGate | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(AADHAAR_DOWNLOAD_GATE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PersistentAadhaarDownloadGate>;
+    if (parsed.status !== 'in_flight' && parsed.status !== 'success' && parsed.status !== 'failed') {
+      return null;
+    }
+    if (typeof parsed.at !== 'number') return null;
+    return { status: parsed.status, at: parsed.at };
+  } catch {
+    return null;
+  }
+}
+
+function writePersistentAadhaarDownloadGate(gate: PersistentAadhaarDownloadGate): void {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(AADHAAR_DOWNLOAD_GATE_KEY, JSON.stringify(gate));
+  } catch {
+    /* storage disabled / quota */
+  }
+}
+
+function clearPersistentAadhaarDownloadGate(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.removeItem(AADHAAR_DOWNLOAD_GATE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function resetDigilockerAadhaarDownloadGate(): void {
+  inFlightAadhaarDownload = null;
+  settledAadhaarDownload = null;
+  clearPersistentAadhaarDownloadGate();
+}
+
+function shouldCacheAadhaarDownloadResult(out: DownloadAadhaarDigilockerResponse): boolean {
+  if (out.ok) return true;
+  if (out.identityMismatch) return true;
+  if (out.terminalFailure || out.leadRejected) return true;
+  if (!out.configured) return true;
+  return false;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function waitForPersistentAadhaarDownloadGate(): Promise<PersistentAadhaarDownloadGate['status']> {
+  const deadline = Date.now() + AADHAAR_DOWNLOAD_IN_FLIGHT_MS;
+  while (Date.now() < deadline) {
+    const gate = readPersistentAadhaarDownloadGate();
+    if (!gate || gate.status !== 'in_flight') {
+      return gate?.status ?? 'failed';
+    }
+    await sleep(300);
+  }
+  return 'in_flight';
+}
 
 export async function downloadDigilockerAadhaar(
   payload: DownloadAadhaarDigilockerPayload = {},
@@ -274,4 +375,60 @@ export async function downloadDigilockerAadhaar(
     throw new Error('Empty response from Aadhaar download.');
   }
   return res;
+}
+
+async function executeCallbackAadhaarDownload(
+  payload: DownloadAadhaarDigilockerPayload,
+): Promise<DownloadAadhaarDigilockerResponse> {
+  writePersistentAadhaarDownloadGate({ status: 'in_flight', at: Date.now() });
+  try {
+    const out = await downloadDigilockerAadhaar(payload);
+    if (shouldCacheAadhaarDownloadResult(out)) {
+      settledAadhaarDownload = out;
+      writePersistentAadhaarDownloadGate({ status: 'success', at: Date.now() });
+    } else {
+      writePersistentAadhaarDownloadGate({ status: 'failed', at: Date.now() });
+    }
+    return out;
+  } catch (error) {
+    writePersistentAadhaarDownloadGate({ status: 'failed', at: Date.now() });
+    throw error;
+  }
+}
+
+/** Use from the DigiLocker callback page so remounts cannot start a second download. */
+export function downloadDigilockerAadhaarForCallback(
+  payload: DownloadAadhaarDigilockerPayload = {},
+): Promise<DownloadAadhaarDigilockerResponse> {
+  if (settledAadhaarDownload) return Promise.resolve(settledAadhaarDownload);
+  if (inFlightAadhaarDownload) return inFlightAadhaarDownload;
+
+  const gate = readPersistentAadhaarDownloadGate();
+  if (gate?.status === 'success') {
+    settledAadhaarDownload = SUCCESS_WITHOUT_VENDOR;
+    return Promise.resolve(SUCCESS_WITHOUT_VENDOR);
+  }
+
+  inFlightAadhaarDownload = (async () => {
+    const current = readPersistentAadhaarDownloadGate();
+    if (current?.status === 'success') {
+      settledAadhaarDownload = SUCCESS_WITHOUT_VENDOR;
+      return SUCCESS_WITHOUT_VENDOR;
+    }
+    if (current?.status === 'in_flight' && Date.now() - current.at < AADHAAR_DOWNLOAD_IN_FLIGHT_MS) {
+      const waited = await waitForPersistentAadhaarDownloadGate();
+      if (waited === 'success' || settledAadhaarDownload?.ok) {
+        return settledAadhaarDownload ?? SUCCESS_WITHOUT_VENDOR;
+      }
+      if (waited === 'in_flight') {
+        return SKIPPED_IN_FLIGHT;
+      }
+      // First attempt failed — this call is the allowed new API request.
+    }
+    return executeCallbackAadhaarDownload(payload);
+  })().finally(() => {
+    inFlightAadhaarDownload = null;
+  });
+
+  return inFlightAadhaarDownload;
 }
