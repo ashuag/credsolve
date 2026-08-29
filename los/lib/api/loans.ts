@@ -37,6 +37,8 @@ export type LosLoan = {
   applicationStatusCode: string;
   applicationStatusLabel: string;
   closedAt: string | null;
+  /** Pay Now link was initiated and is not yet recorded as a SUCCESS repayment. */
+  unsettledPaymentLink: boolean;
 };
 
 export type LosLoanDisbursementTransfer = {
@@ -111,5 +113,37 @@ export async function getLoanDetails(token: string, loanUuid: string): Promise<L
     `/loans/${encodeURIComponent(loanUuid)}`,
     { method: 'GET' },
     'Failed to fetch loan details.',
+  );
+}
+
+export type LosRefreshPaymentResult = {
+  outcome:
+    | 'already_closed'
+    | 'no_payment_link'
+    | 'updated'
+    | 'pending'
+    | 'not_paid'
+    | 'retrieve_failed';
+  message: string;
+  loanClosed: boolean;
+  closedAt: string | null;
+  loanStatusCode: string;
+  loanStatusLabel: string;
+  unsettledPaymentLink: boolean;
+};
+
+export async function refreshLoanPayment(
+  token: string,
+  loanUuid: string,
+): Promise<LosRefreshPaymentResult> {
+  return authorizedLosRequest<LosRefreshPaymentResult>(
+    token,
+    `/loans/${encodeURIComponent(loanUuid)}/refresh-payment`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    },
+    'Failed to refresh payment status.',
+    90_000,
   );
 }

@@ -10,7 +10,10 @@ import {
 import { randomUUID } from 'node:crypto';
 import type { Request } from 'express';
 import { EasebuzzWireService } from '../../../../common/easebuzz/easebuzz-wire.service';
-import { savePendingRepayIntent } from '../../../../common/easebuzz/repay-intent.util';
+import {
+  rememberLoanRepayTxnid,
+  savePendingRepayIntent,
+} from '../../../../common/easebuzz/repay-intent.util';
 import { LOAN_REPAYMENT_STATUS } from '../../../../common/constants/loan-repayment.constants';
 import { LOAN_STATUS } from '../../../../common/constants/loan.constants';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
@@ -250,6 +253,7 @@ export class InitiateCustomerRepaymentUseCase {
           bounceFeeInr: bounceFeeInrStr,
           createdAt: new Date().toISOString(),
         });
+        await rememberLoanRepayTxnid(this.redis, loan.uuid, created.txnid);
       } catch (error) {
         const message =
           error instanceof Error

@@ -1,8 +1,9 @@
 'use client';
 
-import { getLoanDetails, markApplicationInternalTesting, type LosLoanDetails } from '@/lib/api';
+import { getLoanDetails, markApplicationInternalTesting, refreshLoanPayment, type LosLoanDetails } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
+import { RefreshPaymentButton } from '@/components/loans/refresh-payment-button';
 import { LosStatusPill, losStatusPillStyles } from '@/components/shared/los-status-pill';
 import { MarkInternalTestingButton } from '@/components/shared/mark-internal-testing-button';
 import Link from 'next/link';
@@ -458,6 +459,8 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [markingInternal, setMarkingInternal] = useState(false);
+  const [refreshingPayment, setRefreshingPayment] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ tone: 'ok' | 'warn' | 'err'; text: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -499,6 +502,47 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
       setMarkingInternal(false);
     }
   }, [row, router]);
+
+  const refreshPayment = useCallback(async () => {
+    if (!row) return;
+    const token = getToken();
+    if (!token) {
+      setError('Session expired — please log in again.');
+      return;
+    }
+    setRefreshingPayment(true);
+    setStatusMessage(null);
+    try {
+      const result = await refreshLoanPayment(token, loanUuid);
+      if (result.outcome === 'updated') {
+        setStatusMessage({ tone: 'ok', text: result.message });
+        setRow(await getLoanDetails(token, loanUuid));
+        return;
+      }
+      setStatusMessage({
+        tone: result.outcome === 'retrieve_failed' ? 'err' : 'warn',
+        text: result.message,
+      });
+      setRow((prev) =>
+        prev
+          ? {
+              ...prev,
+              unsettledPaymentLink: result.unsettledPaymentLink,
+              closedAt: result.closedAt,
+              loanStatusCode: result.loanStatusCode,
+              loanStatusLabel: result.loanStatusLabel,
+            }
+          : prev,
+      );
+    } catch (e) {
+      setStatusMessage({
+        tone: 'err',
+        text: e instanceof Error ? e.message : 'Failed to refresh payment status',
+      });
+    } finally {
+      setRefreshingPayment(false);
+    }
+  }, [row, loanUuid]);
 
   const name = useMemo(
     () => (row ? formatPersonName(row.fullName, 'Borrower (name pending)') : ''),
@@ -545,6 +589,20 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
 
   return (
     <div className="flex flex-col gap-4">
+      {statusMessage ? (
+        <p
+          className="m-0 rounded-[10px] border px-3 py-2 text-[0.84rem] font-bold"
+          style={
+            statusMessage.tone === 'ok'
+              ? { background: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.28)', color: '#047857' }
+              : statusMessage.tone === 'err'
+                ? { background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.24)', color: '#b91c1c' }
+                : { background: 'rgba(245,158,11,0.1)', borderColor: 'rgba(245,158,11,0.28)', color: '#b45309' }
+          }
+        >
+          {statusMessage.text}
+        </p>
+      ) : null}
       {/* Hero */}
       <header className="overflow-hidden rounded-[18px] border border-[rgba(23,44,113,0.1)] bg-gradient-to-br from-white via-[#f7fbff] to-[#eef6ff] shadow-[0_10px_32px_rgba(23,44,113,0.05)]">
         <div
@@ -642,6 +700,12 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
                   Open application
                 </ActionBtn>
                 <ActionBtn onClick={() => void load()}>Refresh</ActionBtn>
+                {!row.closedAt && row.unsettledPaymentLink ? (
+                  <RefreshPaymentButton
+                    busy={refreshingPayment}
+                    onClick={() => void refreshPayment()}
+                  />
+                ) : null}
                 <MarkInternalTestingButton
                   busy={markingInternal}
                   onConfirm={() => void markAsInternalTesting()}

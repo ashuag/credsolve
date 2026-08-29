@@ -496,6 +496,13 @@ export function ReviewKycPanel({
   return (
     <>
       <ReviewCard
+        icon={<LivenessCheckIcon />}
+        title="Aadhaar photo, selfie &amp; liveness video"
+      >
+        <KycPhotoGallery row={row} authToken={authToken} />
+      </ReviewCard>
+
+      <ReviewCard
         icon={<IdCardIcon />}
         title="DigiLocker Aadhaar KYC"
         iconTone={aadhaarComplete ? 'ok' : kycFailed && !aadhaarComplete ? 'warn' : 'default'}
@@ -514,12 +521,6 @@ export function ReviewKycPanel({
         {!aadhaarComplete ? (
           <KycNotice>DigiLocker Aadhaar has not been captured yet.</KycNotice>
         ) : null}
-        <div style={{ marginBottom: 16 }}>
-          <ReviewSectionLabel>Aadhaar photo</ReviewSectionLabel>
-          <div style={{ marginTop: 8 }}>
-            <KycPhotoGallery row={row} authToken={authToken} include={['aadhaar']} />
-          </div>
-        </div>
         <div className="fgrid">
           <ReviewField
             label="Aadhaar KYC"
@@ -585,12 +586,6 @@ export function ReviewKycPanel({
             />
           </div>
         ) : null}
-        <div style={{ marginBottom: 16 }}>
-          <ReviewSectionLabel>Selfie &amp; liveness video</ReviewSectionLabel>
-          <div style={{ marginTop: 8 }}>
-            <KycPhotoGallery row={row} authToken={authToken} include={['selfie', 'liveness']} />
-          </div>
-        </div>
         <div style={{ marginBottom: 16 }}>
           <ReviewSectionLabel>Liveness pipeline</ReviewSectionLabel>
           <div style={{ marginTop: 10 }}>

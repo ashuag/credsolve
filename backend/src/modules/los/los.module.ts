@@ -29,10 +29,12 @@ import { LosTeamService } from './los-team.service';
 import { LosRejectionService } from './services/los-rejection.service';
 import { LosDisbursementService } from './services/los-disbursement.service';
 import { LosLoanService } from './services/los-loan.service';
+import { LosLoanRepaymentSyncService } from './services/los-loan-repayment-sync.service';
 import { LosBureauReportService } from './services/los-bureau-report.service';
 import { LosLeadReportService } from './services/los-lead-report.service';
 import { LosTransactionReportService } from './services/los-transaction-report.service';
 import { LosCibilDevToolsService } from './services/los-cibil-dev-tools.service';
+import { LosEasebuzzDevToolsService } from './services/los-easebuzz-dev-tools.service';
 import { LosFaceLivenessDevToolsService } from './services/los-face-liveness-dev-tools.service';
 import { LosKycDevToolsService } from './services/los-kyc-dev-tools.service';
 import { LosNameMatchDevToolsService } from './services/los-name-match-dev-tools.service';
@@ -69,10 +71,12 @@ import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
     LosRejectionService,
     LosDisbursementService,
     LosLoanService,
+    LosLoanRepaymentSyncService,
     LosBureauReportService,
     LosLeadReportService,
     LosTransactionReportService,
     LosCibilDevToolsService,
+    LosEasebuzzDevToolsService,
     LosFaceLivenessDevToolsService,
     LosKycDevToolsService,
     LosNameMatchDevToolsService,

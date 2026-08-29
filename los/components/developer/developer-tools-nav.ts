@@ -13,6 +13,7 @@ export const DEVELOPER_TOOL_LINKS = [
   { href: '/developer-tools/face-liveness-check', label: 'Surepass Face Liveness' },
   { href: '/developer-tools/tenacio-face-liveness-check', label: 'Tenacio Face Liveness' },
   { href: '/developer-tools/tenacio-face-match-check', label: 'Tenacio Face Match' },
+  { href: '/developer-tools/get-payment-status', label: 'Get Payment Status' },
   { href: '/developer-tools/vendor-api-logs', label: 'Vendor API Logs' },
 ] as const;
 

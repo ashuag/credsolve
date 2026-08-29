@@ -20,6 +20,7 @@ import { resolveEffectiveLoanStatus } from '../../../common/loan/effective-loan-
 import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbursement-view.util';
 import { formatLosPersonName } from '../format-los-person-name';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { LosLoanRepaymentSyncService } from './los-loan-repayment-sync.service';
 
 function displayName(name: string, displayNameValue: string | null | undefined): string {
   return displayNameValue?.trim() || name;
@@ -37,6 +38,7 @@ export class LosLoanService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly bounceChargeTiers: BounceChargeTierResolverService,
+    private readonly repaymentSync: LosLoanRepaymentSyncService,
   ) {}
 
   async listLoans() {
@@ -69,6 +71,7 @@ export class LosLoanService {
             },
             lead: {
               select: {
+                id: true,
                 uuid: true,
                 leadDetail: { select: { fullName: true } },
               },
@@ -79,6 +82,7 @@ export class LosLoanService {
     });
 
     const penal = await this.bounceChargeTiers.loadPenalConfig();
+    const unsettledByLoanId = await this.repaymentSync.unsettledFlagsByLoanId(loans);
 
     return loans.map((loan) => {
       const details = loan.application.details;
@@ -153,6 +157,7 @@ export class LosLoanService {
           loan.application.applicationStatus.displayName,
         ),
         closedAt: loan.closedAt?.toISOString() ?? null,
+        unsettledPaymentLink: unsettledByLoanId.get(loan.id.toString()) === true,
       };
     });
   }
@@ -187,6 +192,7 @@ export class LosLoanService {
             },
             lead: {
               select: {
+                id: true,
                 uuid: true,
                 leadDetail: {
                   select: {
@@ -394,6 +400,13 @@ export class LosLoanService {
       usedFullTenureInterest,
       bounceFeeInr,
       isDisbursedApplication: loan.application.applicationStatus.name === APPLICATION_STATUS.DISBURSED,
+      unsettledPaymentLink: await this.repaymentSync.hasUnsettledPaymentLink({
+        loanId: loan.id,
+        loanUuid: loan.uuid,
+        loanNumber,
+        leadId: loan.application.lead.id,
+        closedAt: loan.closedAt,
+      }),
       repayments: repaymentRows.map((row) => ({
         uuid: row.uuid,
         amount: Number(row.amount).toFixed(2),

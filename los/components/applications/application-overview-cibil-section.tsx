@@ -713,6 +713,15 @@ function KycDetailPanel({
     <div className="grid gap-4">
       <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)]">
         <div className="flex items-center justify-between gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
+          <span className="text-[0.82rem] font-extrabold text-brand-navy">Aadhaar photo, selfie &amp; liveness video</span>
+        </div>
+        <div className="px-3 py-2.5">
+          <KycPhotoGallery row={row} authToken={authToken} />
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)]">
+        <div className="flex items-center justify-between gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
           <span className="text-[0.82rem] font-extrabold text-brand-navy">DigiLocker Aadhaar KYC</span>
           <span className="text-[0.72rem] font-bold text-brand-muted">
             {aadhaarComplete ? 'Complete' : 'Pending'}
@@ -724,12 +733,6 @@ function KycDetailPanel({
               DigiLocker Aadhaar has not been captured yet.
             </p>
           ) : null}
-          <div>
-            <ProfileSubheading>Aadhaar photo</ProfileSubheading>
-            <div className="mt-2">
-              <KycPhotoGallery row={row} authToken={authToken} include={['aadhaar']} />
-            </div>
-          </div>
           <DetailGrid
             columns={2}
             rows={[
@@ -780,12 +783,6 @@ function KycDetailPanel({
               onSuccess={onRefresh}
             />
           ) : null}
-          <div>
-            <ProfileSubheading>Selfie &amp; liveness video</ProfileSubheading>
-            <div className="mt-2">
-              <KycPhotoGallery row={row} authToken={authToken} include={['selfie', 'liveness']} />
-            </div>
-          </div>
           <div>
             <ProfileSubheading>Liveness pipeline</ProfileSubheading>
             <div className="mt-2">

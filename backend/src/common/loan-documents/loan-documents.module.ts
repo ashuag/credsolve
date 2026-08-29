@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { LoanDocumentApplicationService } from '../../modules/auth/application/services/loan-document-application.service';
+import { SettleEasebuzzRepaymentService } from '../easebuzz/settle-easebuzz-repayment.service';
 import { BounceChargeTierResolverService } from '../loan/bounce-charge-tier.resolver';
 import { StorageModule } from '../storage/storage.module';
 import { LoanDocumentDigitalSignerService } from './loan-document-digital-signer.service';
@@ -10,6 +11,7 @@ import { LoanDocumentHtmlPdfGeneratorService } from './loan-document-html-pdf-ge
   imports: [StorageModule],
   providers: [
     BounceChargeTierResolverService,
+    SettleEasebuzzRepaymentService,
     LoanDocumentHtmlPdfGeneratorService,
     LoanDocumentDigitalSignerService,
     LoanDocumentGeneratorService,
@@ -17,6 +19,7 @@ import { LoanDocumentHtmlPdfGeneratorService } from './loan-document-html-pdf-ge
   ],
   exports: [
     BounceChargeTierResolverService,
+    SettleEasebuzzRepaymentService,
     LoanDocumentGeneratorService,
     LoanDocumentApplicationService,
   ],

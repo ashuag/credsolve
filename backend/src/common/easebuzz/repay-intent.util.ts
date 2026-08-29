@@ -12,8 +12,14 @@ export type PendingRepayIntent = {
   createdAt: string;
 };
 
+const LOAN_TXNIDS_TTL_SEC = 30 * 24 * 60 * 60; // 30d — longer than intent so LOS can still find txnids
+
 export function repayIntentRedisKey(txnid: string): string {
   return `customer:repay-intent:${txnid.trim()}`;
+}
+
+export function repayIntentLoanRedisKey(loanAccountUuid: string): string {
+  return `customer:repay-intents-by-loan:${loanAccountUuid.trim()}`;
 }
 
 export async function savePendingRepayIntent(
@@ -55,6 +61,47 @@ export async function loadPendingRepayIntent(
 export async function clearPendingRepayIntent(redis: RedisService, txnid: string): Promise<void> {
   try {
     await redis.client.del(repayIntentRedisKey(txnid));
+  } catch {
+    // best-effort
+  }
+}
+
+/** Index initiated txnids by loan so LOS can reconcile after a missed callback. */
+export async function rememberLoanRepayTxnid(
+  redis: RedisService,
+  loanAccountUuid: string,
+  txnid: string,
+): Promise<void> {
+  const key = repayIntentLoanRedisKey(loanAccountUuid);
+  const id = txnid.trim();
+  if (!loanAccountUuid.trim() || !id) return;
+  try {
+    await redis.client.sadd(key, id);
+    await redis.client.expire(key, LOAN_TXNIDS_TTL_SEC);
+  } catch {
+    // best-effort
+  }
+}
+
+export async function listLoanRepayTxnids(
+  redis: RedisService,
+  loanAccountUuid: string,
+): Promise<string[]> {
+  try {
+    const members = await redis.client.smembers(repayIntentLoanRedisKey(loanAccountUuid));
+    return members.map((item) => item.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+export async function forgetLoanRepayTxnid(
+  redis: RedisService,
+  loanAccountUuid: string,
+  txnid: string,
+): Promise<void> {
+  try {
+    await redis.client.srem(repayIntentLoanRedisKey(loanAccountUuid), txnid.trim());
   } catch {
     // best-effort
   }

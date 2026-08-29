@@ -161,16 +161,14 @@ export function KycPhotoGallery({
     return <p className="m-0 text-[0.84rem] text-brand-muted">{emptyLabel}</p>;
   }
 
+  const mediaCount = [aadhaarSrc, selfieSrc, livenessVideoSrc].filter(Boolean).length;
+
   return (
     <>
       <div
         className={cx(
           'grid gap-3',
-          livenessVideoSrc && (aadhaarSrc || selfieSrc)
-            ? 'grid-cols-1 md:grid-cols-3'
-            : aadhaarSrc && selfieSrc
-              ? 'grid-cols-1 sm:grid-cols-2'
-              : 'grid-cols-1',
+          mediaCount >= 3 ? 'grid-cols-3' : mediaCount === 2 ? 'grid-cols-2' : 'grid-cols-1',
         )}
       >
         {aadhaarSrc ? (

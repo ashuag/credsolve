@@ -111,6 +111,127 @@ export function mapEasebuzzTransferLog(body: unknown): EasebuzzDisbursementTrans
   };
 }
 
+const QUICK_TRANSFER_ACCEPTED_STATUSES = new Set([
+  'success',
+  'successful',
+  'accepted',
+  'pending',
+  'queued',
+  'initiated',
+  'in_process',
+  'in-process',
+  'processing',
+]);
+
+const QUICK_TRANSFER_FAILED_STATUSES = new Set([
+  'failure',
+  'failed',
+  'rejected',
+  'declined',
+  'cancelled',
+  'canceled',
+  'reversed',
+  'bounced',
+]);
+
+export type EasebuzzQuickTransferParse = {
+  accepted: boolean;
+  transferId: string | null;
+  vendorStatus: string | null;
+  message: string | null;
+};
+
+/**
+ * Easebuzz Wire `POST /quick_transfers/initiate/` returns `{ success: true }` when the
+ * HTTP call was accepted — even if `data.transfer_request.status` is `failure`
+ * (e.g. virtual account has no cleared balance). Only a non-failed transfer status
+ * means money moved or is in flight; those cases must not create a loan.
+ */
+export function parseEasebuzzQuickTransferInitiate(body: unknown): EasebuzzQuickTransferParse {
+  const root = asRecord(body);
+  if (!root) {
+    return { accepted: false, transferId: null, vendorStatus: null, message: 'Empty Easebuzz response.' };
+  }
+
+  const data = asRecord(root.data) ?? asRecord(root.result) ?? root;
+  const transferRequest = asRecord(data.transfer_request) ?? asRecord(root.transfer_request);
+
+  const vendorStatus = pickString(
+    transferRequest?.status,
+    root.transfer_status,
+    data.transfer_status,
+    data.state,
+    // Envelope `status` is only a fallback when there is no transfer_request.
+    transferRequest ? null : root.status,
+    transferRequest ? null : data.status,
+  )?.toLowerCase() ?? null;
+
+  const failureReason = pickString(
+    transferRequest?.failure_reason,
+    data.failure_reason,
+    data.message,
+    data.error,
+    root.message,
+    root.error,
+  );
+
+  const transferId = pickString(
+    transferRequest?.unique_transaction_reference,
+    transferRequest?.utr,
+    data.unique_transaction_reference,
+    data.utr,
+    data.bank_reference_number,
+    data.transaction_id,
+    transferRequest?.id,
+    data.id,
+    data.transfer_id,
+    root.id,
+    root.transfer_id,
+    root.utr,
+  );
+
+  if (vendorStatus && QUICK_TRANSFER_FAILED_STATUSES.has(vendorStatus)) {
+    return {
+      accepted: false,
+      transferId,
+      vendorStatus,
+      message: failureReason ?? 'Easebuzz transfer failed. Loan was not disbursed.',
+    };
+  }
+
+  if (failureReason && !vendorStatus) {
+    return {
+      accepted: false,
+      transferId,
+      vendorStatus,
+      message: failureReason,
+    };
+  }
+
+  if (vendorStatus && QUICK_TRANSFER_ACCEPTED_STATUSES.has(vendorStatus)) {
+    return { accepted: true, transferId, vendorStatus, message: null };
+  }
+
+  const successFlag = root.success;
+  const acceptedByFlag =
+    successFlag === true ||
+    successFlag === 1 ||
+    successFlag === 'true' ||
+    successFlag === '1';
+
+  // Envelope success without a transfer status: treat as accepted (older payload shapes).
+  if (acceptedByFlag && !vendorStatus) {
+    return { accepted: true, transferId, vendorStatus, message: null };
+  }
+
+  return {
+    accepted: false,
+    transferId,
+    vendorStatus,
+    message: failureReason ?? 'Easebuzz did not accept the disbursement transfer. Loan was not disbursed.',
+  };
+}
+
 /** Payload persisted on loan_account — store transfer_request when present, else full body. */
 export function buildGatewayTransferJsonForPersist(rawBody: unknown): unknown {
   const tr = extractEasebuzzTransferRequest(rawBody);

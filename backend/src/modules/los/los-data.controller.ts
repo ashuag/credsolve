@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Res, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { LosAuthGuard } from './auth/los-auth.guard';
@@ -13,6 +13,7 @@ import { LosMasterService } from './services/los-master.service';
 import { LosRejectionService } from './services/los-rejection.service';
 import { LosDisbursementService } from './services/los-disbursement.service';
 import { LosLoanService } from './services/los-loan.service';
+import { LosLoanRepaymentSyncService } from './services/los-loan-repayment-sync.service';
 import { LosBureauReportService } from './services/los-bureau-report.service';
 import { LosLeadReportService } from './services/los-lead-report.service';
 import { LosTransactionReportService } from './services/los-transaction-report.service';
@@ -30,6 +31,7 @@ export class LosDataController {
     private readonly losRejection: LosRejectionService,
     private readonly losDisbursement: LosDisbursementService,
     private readonly losLoan: LosLoanService,
+    private readonly losLoanRepaymentSync: LosLoanRepaymentSyncService,
     private readonly losBureauReport: LosBureauReportService,
     private readonly losLeadReport: LosLeadReportService,
     private readonly losTransactionReport: LosTransactionReportService,
@@ -166,6 +168,18 @@ export class LosDataController {
   @ApiOperation({ summary: 'Get loan details by loan uuid' })
   loanByUuid(@Param('loanUuid') loanUuid: string) {
     return this.losLoan.getLoanDetails(loanUuid);
+  }
+
+  @Post('loans/:loanUuid/refresh-payment')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({
+    summary: 'Refresh Easebuzz repayment status for a loan with an initiated payment link',
+    description:
+      'When a Pay Now link was started but the callback did not update the loan, retrieves Transaction V2.1 status and records a successful repayment (closes the loan when remaining is zero).',
+  })
+  refreshLoanPayment(@Param('loanUuid') loanUuid: string) {
+    return this.losLoanRepaymentSync.refreshPayment(loanUuid);
   }
 
   @Get('applications/:applicationUuid')

@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { BadGatewayException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { VendorApiService } from '../vendor/vendor-api.service';
+import { parseEasebuzzQuickTransferInitiate } from './easebuzz-transfer-log.util';
 
 export type EasebuzzQuickTransferInput = {
   beneficiaryName: string;
@@ -603,10 +604,14 @@ export class EasebuzzWireService {
   }
 
   /**
-   * Server-side confirmation via Easebuzz Transaction V2 retrieve.
+   * Server-side confirmation via Easebuzz Transaction V2.1 retrieve.
    * Hash = SHA-512(key|txnid|salt). Required before closing a loan on callback.
+   * Pass `forceLive: true` from LOS developer tools so EASEBUZZ_PAY_SKIP_TXN_VERIFY is ignored.
    */
-  async retrievePayTransaction(txnid: string): Promise<{
+  async retrievePayTransaction(
+    txnid: string,
+    options?: { forceLive?: boolean },
+  ): Promise<{
     ok: boolean;
     status: string | null;
     amount: string | null;
@@ -614,8 +619,10 @@ export class EasebuzzWireService {
     bankRef: string | null;
     rawBody: unknown;
     message: string | null;
+    retrieveUrl: string;
   }> {
     const cfg = this.assertPayInitiateConfiguredOrThrow();
+    const retrieveUrl = cfg.txnRetrieveUrl;
     const id = txnid.trim().slice(0, 40);
     if (!id) {
       return {
@@ -626,11 +633,15 @@ export class EasebuzzWireService {
         bankRef: null,
         rawBody: null,
         message: 'txnid required',
+        retrieveUrl,
       };
     }
 
     const skipVerify = envTrim(this.config, 'EASEBUZZ_PAY_SKIP_TXN_VERIFY').toLowerCase();
-    if (skipVerify === '1' || skipVerify === 'true' || skipVerify === 'yes') {
+    if (
+      !options?.forceLive &&
+      (skipVerify === '1' || skipVerify === 'true' || skipVerify === 'yes')
+    ) {
       this.logger.warn(`[easebuzz] EASEBUZZ_PAY_SKIP_TXN_VERIFY — skipping transaction retrieve for ${id}`);
       return {
         ok: true,
@@ -640,6 +651,7 @@ export class EasebuzzWireService {
         bankRef: null,
         rawBody: { skipped: true },
         message: null,
+        retrieveUrl,
       };
     }
 
@@ -679,10 +691,11 @@ export class EasebuzzWireService {
         bankRef: null,
         rawBody: result.body,
         message: 'Transaction retrieve failed',
+        retrieveUrl,
       };
     }
 
-    return this.parseTxnRetrieveSuccess(result.body, id);
+    return { ...this.parseTxnRetrieveSuccess(result.body, id), retrieveUrl };
   }
 
   /** Default success/failure redirect targets for initiateLink. */
@@ -728,20 +741,20 @@ export class EasebuzzWireService {
     if (explicit) return explicit;
     const envHint = envTrim(this.config, 'EASEBUZZ_PAY_ENV').toLowerCase();
     if (envHint === 'test' || envHint === 'sandbox') {
-      return 'https://testdashboard.easebuzz.in/transaction/v2/retrieve';
+      return 'https://testdashboard.easebuzz.in/transaction/v2.1/retrieve';
     }
     if (envHint === 'prod' || envHint === 'production') {
-      return 'https://dashboard.easebuzz.in/transaction/v2/retrieve';
+      return 'https://dashboard.easebuzz.in/transaction/v2.1/retrieve';
     }
     try {
       const host = new URL(initiateUrl).hostname.toLowerCase();
       if (host.includes('testpay') || host.includes('testdashboard')) {
-        return 'https://testdashboard.easebuzz.in/transaction/v2/retrieve';
+        return 'https://testdashboard.easebuzz.in/transaction/v2.1/retrieve';
       }
     } catch {
       // fall through
     }
-    return 'https://dashboard.easebuzz.in/transaction/v2/retrieve';
+    return 'https://dashboard.easebuzz.in/transaction/v2.1/retrieve';
   }
 
   private parseTxnRetrieveSuccess(
@@ -902,11 +915,12 @@ export class EasebuzzWireService {
     const parsed = this.parseSuccess(result.body);
     if (!parsed.accepted) {
       this.logger.error(
-        `[easebuzz] Transfer rejected unique=${input.uniqueRequestNumber} status=${parsed.vendorStatus ?? 'n/a'}`,
+        `[easebuzz] Transfer rejected unique=${input.uniqueRequestNumber} status=${parsed.vendorStatus ?? 'n/a'} ` +
+          `reason=${parsed.message ?? 'n/a'}`,
       );
       throw new BadGatewayException(
         parsed.message ??
-          'Easebuzz did not accept the disbursement transfer. Loan account was not created.',
+          'Easebuzz transfer failed. Loan was not disbursed.',
       );
     }
 
@@ -1360,75 +1374,7 @@ export class EasebuzzWireService {
     return { accepted, collectId, merchantTxn, paymentUrl, vendorStatus, message };
   }
 
-  private parseSuccess(body: unknown): {
-    accepted: boolean;
-    transferId: string | null;
-    vendorStatus: string | null;
-    message: string | null;
-  } {
-    const root = asRecord(body);
-    if (!root) {
-      return { accepted: false, transferId: null, vendorStatus: null, message: 'Empty Easebuzz response.' };
-    }
-
-    const data = asRecord(root.data) ?? asRecord(root.result) ?? root;
-    const transferRequest = asRecord(data.transfer_request) ?? asRecord(root.transfer_request);
-
-    const vendorStatus = pickString(
-      transferRequest?.status,
-      root.status,
-      root.transfer_status,
-      data.status,
-      data.transfer_status,
-      data.state,
-    )?.toLowerCase() ?? null;
-
-    const successFlag = root.success;
-    const acceptedByFlag =
-      successFlag === true ||
-      successFlag === 1 ||
-      successFlag === 'true' ||
-      successFlag === '1' ||
-      String(root.status ?? '').toLowerCase() === 'success';
-
-    const acceptedStatuses = new Set([
-      'success',
-      'successful',
-      'accepted',
-      'pending',
-      'queued',
-      'initiated',
-      'in_process',
-      'in-process',
-      'processing',
-    ]);
-    const acceptedByStatus = vendorStatus != null && acceptedStatuses.has(vendorStatus);
-    const accepted = acceptedByFlag || acceptedByStatus;
-
-    // Prefer bank UTR / unique_transaction_reference over vendor transfer id (trc…).
-    const transferId = pickString(
-      transferRequest?.unique_transaction_reference,
-      transferRequest?.utr,
-      data.unique_transaction_reference,
-      data.utr,
-      data.bank_reference_number,
-      data.transaction_id,
-      transferRequest?.id,
-      data.id,
-      data.transfer_id,
-      root.id,
-      root.transfer_id,
-      root.utr,
-    );
-
-    const message = pickString(
-      root.message,
-      root.error,
-      data.message,
-      data.error,
-      transferRequest?.failure_reason,
-    );
-
-    return { accepted, transferId, vendorStatus, message };
+  private parseSuccess(body: unknown) {
+    return parseEasebuzzQuickTransferInitiate(body);
   }
 }

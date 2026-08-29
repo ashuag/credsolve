@@ -140,15 +140,20 @@ export async function authorizedLosRequest<T>(
   path: string,
   init: RequestInit,
   fallbackMessage: string,
+  timeoutMs?: number,
 ): Promise<T> {
   const method = (init.method ?? 'GET').toUpperCase();
-  const response = await fetchWithTimeout(resolveLosClientApiUrl(path), {
-    ...init,
-    headers: {
-      ...(init.headers ?? {}),
-      Authorization: `Bearer ${token}`,
+  const response = await fetchWithTimeout(
+    resolveLosClientApiUrl(path),
+    {
+      ...init,
+      headers: {
+        ...(init.headers ?? {}),
+        Authorization: `Bearer ${token}`,
+      },
     },
-  });
+    timeoutMs,
+  );
   const body = await parseJsonResponse(response);
 
   if (!response.ok) {

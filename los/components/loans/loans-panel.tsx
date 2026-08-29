@@ -7,9 +7,10 @@ import {
   LOS_LISTING_PAGE_SIZE_OPTIONS,
   type DataTableColumn,
 } from '@/components/ui/data-table';
-import { getLoans, markApplicationInternalTesting, type LosLoan } from '@/lib/api';
+import { getLoans, markApplicationInternalTesting, refreshLoanPayment, type LosLoan } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
+import { RefreshPaymentButton, useCanRefreshLoanPayment } from '@/components/loans/refresh-payment-button';
 import { MarkInternalTestingButton, useCanMarkInternalTesting } from '@/components/shared/mark-internal-testing-button';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -128,7 +129,9 @@ export function LoansPanel() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [busyUuid, setBusyUuid] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ tone: 'ok' | 'warn' | 'err'; text: string } | null>(null);
   const canMarkTesting = useCanMarkInternalTesting();
+  const canRefreshPayment = useCanRefreshLoanPayment();
 
   const loadLoans = useCallback(async () => {
     setLoading(true);
@@ -165,6 +168,46 @@ export function LoansPanel() {
       setLoans((prev) => prev.filter((row) => row.uuid !== loan.uuid));
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Failed to mark loan as internal testing');
+    } finally {
+      setBusyUuid(null);
+    }
+  }, []);
+
+  const refreshPayment = useCallback(async (loan: LosLoan) => {
+    const token = getToken();
+    if (!token) {
+      setFetchError('Session expired — please log in again.');
+      return;
+    }
+    setBusyUuid(loan.uuid);
+    setFetchError(null);
+    setActionMessage(null);
+    try {
+      const result = await refreshLoanPayment(token, loan.uuid);
+      if (result.outcome === 'updated') {
+        setActionMessage({ tone: 'ok', text: result.message });
+        setLoans(await getLoans(token));
+        return;
+      }
+      setActionMessage({
+        tone: result.outcome === 'retrieve_failed' ? 'err' : 'warn',
+        text: result.message,
+      });
+      setLoans((prev) =>
+        prev.map((row) =>
+          row.uuid === loan.uuid
+            ? {
+                ...row,
+                unsettledPaymentLink: result.unsettledPaymentLink,
+                closedAt: result.closedAt,
+                loanStatusCode: result.loanStatusCode,
+                loanStatusLabel: result.loanStatusLabel,
+              }
+            : row,
+        ),
+      );
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : 'Failed to refresh payment status');
     } finally {
       setBusyUuid(null);
     }
@@ -327,15 +370,23 @@ export function LoansPanel() {
       sortable: false,
       filter: false,
       render: (loan) => (
-        <MarkInternalTestingButton
-          busy={busyUuid === loan.uuid}
-          onConfirm={() => void markAsInternalTesting(loan)}
-        />
+        <div className="flex flex-wrap items-center gap-1.5">
+          {!loan.closedAt && loan.unsettledPaymentLink ? (
+            <RefreshPaymentButton
+              busy={busyUuid === loan.uuid}
+              onClick={() => void refreshPayment(loan)}
+            />
+          ) : null}
+          <MarkInternalTestingButton
+            busy={busyUuid === loan.uuid}
+            onConfirm={() => void markAsInternalTesting(loan)}
+          />
+        </div>
       ),
     },
-  ], [busyUuid, markAsInternalTesting]);
+  ], [busyUuid, markAsInternalTesting, refreshPayment]);
 
-  const columns = canMarkTesting
+  const columns = canMarkTesting || canRefreshPayment
     ? allColumns
     : allColumns.filter((column) => column.key !== 'actions');
 
@@ -357,6 +408,21 @@ export function LoansPanel() {
             sub="all time"
           />
         </div>
+      ) : null}
+
+      {actionMessage ? (
+        <p
+          className="m-0 rounded-[10px] border px-3 py-2 text-[0.84rem] font-bold"
+          style={
+            actionMessage.tone === 'ok'
+              ? { background: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.28)', color: '#047857' }
+              : actionMessage.tone === 'err'
+                ? { background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.24)', color: '#b91c1c' }
+                : { background: 'rgba(245,158,11,0.1)', borderColor: 'rgba(245,158,11,0.28)', color: '#b45309' }
+          }
+        >
+          {actionMessage.text}
+        </p>
       ) : null}
 
       <DataTable

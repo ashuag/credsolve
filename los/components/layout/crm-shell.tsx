@@ -231,6 +231,7 @@ const BREADCRUMBS: Record<string, string> = {
   '/developer-tools/face-liveness-check': 'Surepass Face Liveness',
   '/developer-tools/tenacio-face-liveness-check': 'Tenacio Face Liveness',
   '/developer-tools/tenacio-face-match-check': 'Tenacio Face Match',
+  '/developer-tools/get-payment-status': 'Get Payment Status',
   '/developer-tools/vendor-api-logs': 'Vendor API Logs',
   ...Object.fromEntries(ELIGIBILITY_SECTION_DEFINITIONS.map((item) => [item.href, item.label])),
   '/eligibility-criteria/credit-limit-eligibility-check': 'Credit Limit Tier',

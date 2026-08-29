@@ -19,6 +19,7 @@ import { LosAuthGuard } from './auth/los-auth.guard';
 import { LosDenyAgentGuard } from './auth/los-deny-agent.guard';
 import { CibilVendorFetchCheckDto } from './dto/cibil-vendor-fetch-check.dto';
 import { FaceLivenessCheckDto } from './dto/face-liveness-check.dto';
+import { GetPaymentStatusDto } from './dto/get-payment-status.dto';
 import { KycFaceMatchCheckDto } from './dto/kyc-face-match-check.dto';
 import { ListVendorApiLogsQueryDto } from './dto/list-vendor-api-logs-query.dto';
 import { NameMatchFuzzScoreDto } from './dto/name-match-fuzz-score.dto';
@@ -26,6 +27,7 @@ import { NsdlPanVerificationDto } from './dto/nsdl-pan-verification.dto';
 import { TenacioFaceLivenessCheckDto } from './dto/tenacio-face-liveness-check.dto';
 import { TenacioFaceMatchCheckDto } from './dto/tenacio-face-match-check.dto';
 import { LosCibilDevToolsService } from './services/los-cibil-dev-tools.service';
+import { LosEasebuzzDevToolsService } from './services/los-easebuzz-dev-tools.service';
 import { LosFaceLivenessDevToolsService } from './services/los-face-liveness-dev-tools.service';
 import { LosKycDevToolsService } from './services/los-kyc-dev-tools.service';
 import { LosNameMatchDevToolsService } from './services/los-name-match-dev-tools.service';
@@ -46,6 +48,7 @@ export class LosDeveloperToolsController {
     private readonly panDevTools: LosPanDevToolsService,
     private readonly nameMatchDevTools: LosNameMatchDevToolsService,
     private readonly tenacioFaceDevTools: LosTenacioFaceDevToolsService,
+    private readonly easebuzzDevTools: LosEasebuzzDevToolsService,
     private readonly vendorApiLogs: LosVendorApiLogService,
   ) {}
 
@@ -94,6 +97,17 @@ export class LosDeveloperToolsController {
   })
   async nameMatchFuzzScore(@Body() body: NameMatchFuzzScoreDto) {
     return this.nameMatchDevTools.runFuzzScore(body);
+  }
+
+  @Post('get-payment-status')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Live Easebuzz Transaction V2.1 retrieve (get payment status)',
+    description:
+      'Calls Easebuzz POST /transaction/v2.1/retrieve with SHA-512(key|txnid|salt). The call is live and audited in vendor_api_log; no loan or repayment record is created or updated. Ignores EASEBUZZ_PAY_SKIP_TXN_VERIFY.',
+  })
+  async getPaymentStatus(@Body() body: GetPaymentStatusDto) {
+    return this.easebuzzDevTools.runGetPaymentStatus(body);
   }
 
   @Post('nsdl-pan-verification')
