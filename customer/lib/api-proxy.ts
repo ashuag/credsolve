@@ -73,17 +73,21 @@ function forwardResponseHeaders(upstream: Response): Headers {
 
 export async function proxyCustomerApiRequest(
   request: NextRequest,
-  pathSegments: string[]
+  pathSegments: string[],
+  options?: { timeoutMs?: number },
 ): Promise<NextResponse> {
   const upstreamUrl = buildUpstreamUrl(pathSegments, request.nextUrl.search);
   const method = request.method.toUpperCase();
 
   const isLoanDocumentPdf = /\/loan-documents\/[^/]+\/pdf(?:\?|$)/i.test(upstreamUrl);
+  const timeoutMs =
+    options?.timeoutMs ??
+    (isLoanDocumentPdf ? LOAN_DOCUMENT_PDF_PROXY_TIMEOUT_MS : PROXY_TIMEOUT_MS);
   const init: RequestInit = {
     method,
     headers: forwardRequestHeaders(request),
     redirect: 'manual',
-    signal: AbortSignal.timeout(isLoanDocumentPdf ? LOAN_DOCUMENT_PDF_PROXY_TIMEOUT_MS : PROXY_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   };
 
   if (method !== 'GET' && method !== 'HEAD') {

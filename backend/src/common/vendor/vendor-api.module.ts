@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+import { EasebuzzRepaymentNotificationService } from '../easebuzz/easebuzz-repayment-notification.service';
 import { EasebuzzWireService } from '../easebuzz/easebuzz-wire.service';
 import { BureauFetchService } from './bureau-fetch.service';
 import { BankTenacioVendorService } from './bank-tenacio-vendor.service';
@@ -38,6 +39,7 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
     LivenessVendorService,
     KycTenacioVendorService,
     EasebuzzWireService,
+    EasebuzzRepaymentNotificationService,
   ],
   exports: [
     VendorApiService,
@@ -51,6 +53,7 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
     LivenessVendorService,
     KycTenacioVendorService,
     EasebuzzWireService,
+    EasebuzzRepaymentNotificationService,
     SurepassCibilModule,
     SurepassDigilockerModule,
     SurepassFaceLivenessModule,

@@ -1,6 +1,11 @@
 import { NextRequest } from 'next/server';
 import { proxyCustomerApiRequest } from '@/lib/api-proxy';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+/** Easebuzz webhook / repay callbacks retrieve Transaction V2.1 before responding. */
+export const maxDuration = 120;
+
 type RouteContext = {
   params: Promise<{ path?: string[] }>;
 };

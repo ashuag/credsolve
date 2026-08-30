@@ -8,6 +8,9 @@ import { Spinner } from '@/components/ui/spinner';
 import {
   fetchCustomerLoansDashboard,
   initiateCustomerRepayment,
+  markRepaymentPending,
+  refreshCustomerRepayment,
+  takeRepaymentPendingApplication,
   type CustomerLoanCard,
   type CustomerLoansDashboard,
 } from '@/lib/api/customer-loans';
@@ -357,6 +360,7 @@ function ActiveLoanCard({
         return;
       }
       if (result.paymentUrl) {
+        markRepaymentPending(loan.applicationUuid);
         window.location.assign(result.paymentUrl);
         return;
       }
@@ -954,7 +958,20 @@ export function MyAccountSection({
       router.replace('/my-account?mode=login');
       return;
     }
-    void loadLoans();
+    void (async () => {
+      const pendingApp = takeRepaymentPendingApplication();
+      if (pendingApp) {
+        try {
+          const refreshed = await refreshCustomerRepayment(pendingApp);
+          if (refreshed?.outcome === 'updated' || refreshed?.loanClosed) {
+            setRepayFlash('success');
+          }
+        } catch {
+          // Dashboard still loads; cron / webhook will settle if needed.
+        }
+      }
+      await loadLoans();
+    })();
   }, [sessionLoading, signedIn, router, loadLoans]);
 
   const journeySteps = useMemo(() => buildCustomerJourneyProgress(session), [session]);

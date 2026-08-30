@@ -15,8 +15,10 @@ import { GetCustomerLeadStatusUseCase } from './application/use-cases/get-custom
 import { GetCustomerSessionUseCase } from './application/use-cases/get-customer-session.use-case';
 import { GetCustomerLoansDashboardUseCase } from './application/use-cases/get-customer-loans-dashboard.use-case';
 import { GetCustomerPaymentHistoryUseCase } from './application/use-cases/get-customer-payment-history.use-case';
+import { LosModule } from '../los/los.module';
 import { InitiateCustomerRepaymentUseCase } from './application/use-cases/initiate-customer-repayment.use-case';
 import { HandleEasebuzzRepaymentCallbackUseCase } from './application/use-cases/handle-easebuzz-repayment-callback.use-case';
+import { RefreshCustomerRepaymentUseCase } from './application/use-cases/refresh-customer-repayment.use-case';
 import { LogoutUseCase } from './application/use-cases/logout.use-case';
 import { SendOtpUseCase } from './application/use-cases/send-otp.use-case';
 import { SaveLeadDetailsUseCase } from './application/use-cases/save-lead-details.use-case';
@@ -61,6 +63,7 @@ import { OtpTypeRepository } from './infrastructure/repositories/otp-type.reposi
 import { SettingsRepository } from './infrastructure/repositories/settings.repository';
 import { CustomerSessionService } from './infrastructure/session/customer-session.service';
 import { AuthController } from './presentation/auth.controller';
+import { EasebuzzRepaymentWebhookController } from './presentation/easebuzz-repayment-webhook.controller';
 import { CustomerLeadsController } from './presentation/customer-leads.controller';
 import { ApplicationsController } from './presentation/applications.controller';
 import { LoansController } from './presentation/loans.controller';
@@ -69,13 +72,22 @@ import { OptionalCustomerSessionGuard } from './presentation/guards/optional-cus
 import { RequiredCustomerSessionGuard } from './presentation/guards/required-customer-session.guard';
 
 @Module({
-  imports: [BreModule, CibilModule, EmailModule, LoanDocumentsModule, PrismaModule, VendorApiModule],
+  imports: [
+    BreModule,
+    CibilModule,
+    EmailModule,
+    LoanDocumentsModule,
+    PrismaModule,
+    VendorApiModule,
+    LosModule,
+  ],
   controllers: [
     AuthController,
     ApplicationsController,
     CustomerLeadsController,
     LoansController,
     LookupController,
+    EasebuzzRepaymentWebhookController,
   ],
   providers: [
     RedisIpRateLimitGuard,
@@ -134,6 +146,7 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     GetCustomerPaymentHistoryUseCase,
     InitiateCustomerRepaymentUseCase,
     HandleEasebuzzRepaymentCallbackUseCase,
+    RefreshCustomerRepaymentUseCase,
     LogoutUseCase,
   ],
   exports: [CustomerSessionService, BureauReportRepository],

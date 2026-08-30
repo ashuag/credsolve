@@ -13,6 +13,8 @@ export type PendingRepayIntent = {
 };
 
 const LOAN_TXNIDS_TTL_SEC = 30 * 24 * 60 * 60; // 30d — longer than intent so LOS can still find txnids
+const PENDING_LOANS_KEY = 'customer:repay-pending-loans';
+const PENDING_LOAN_KEY_PREFIX = 'customer:repay-intents-by-loan:';
 
 export function repayIntentRedisKey(txnid: string): string {
   return `customer:repay-intent:${txnid.trim()}`;
@@ -78,6 +80,7 @@ export async function rememberLoanRepayTxnid(
   try {
     await redis.client.sadd(key, id);
     await redis.client.expire(key, LOAN_TXNIDS_TTL_SEC);
+    await redis.client.sadd(PENDING_LOANS_KEY, loanAccountUuid.trim());
   } catch {
     // best-effort
   }
@@ -101,10 +104,47 @@ export async function forgetLoanRepayTxnid(
   txnid: string,
 ): Promise<void> {
   try {
-    await redis.client.srem(repayIntentLoanRedisKey(loanAccountUuid), txnid.trim());
+    const key = repayIntentLoanRedisKey(loanAccountUuid);
+    await redis.client.srem(key, txnid.trim());
+    const remaining = await redis.client.scard(key);
+    if (remaining === 0) {
+      await redis.client.srem(PENDING_LOANS_KEY, loanAccountUuid.trim());
+    }
   } catch {
     // best-effort
   }
+}
+
+/** Loan UUIDs that still have an initiated Pay Now txnid waiting for a final status. */
+export async function listPendingRepayLoanUuids(redis: RedisService): Promise<string[]> {
+  const out = new Set<string>();
+  try {
+    for (const id of await redis.client.smembers(PENDING_LOANS_KEY)) {
+      if (id.trim()) out.add(id.trim());
+    }
+  } catch {
+    // best-effort
+  }
+  try {
+    let cursor = '0';
+    do {
+      const [next, keys] = await redis.client.scan(
+        cursor,
+        'MATCH',
+        `${PENDING_LOAN_KEY_PREFIX}*`,
+        'COUNT',
+        100,
+      );
+      cursor = String(next);
+      for (const key of keys) {
+        const uuid = key.slice(PENDING_LOAN_KEY_PREFIX.length).trim();
+        if (uuid) out.add(uuid);
+      }
+    } while (cursor !== '0');
+  } catch {
+    // best-effort
+  }
+  return [...out];
 }
 
 /** Compare INR amounts as paise (allows string "10.00" vs "10.0"). */

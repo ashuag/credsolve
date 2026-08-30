@@ -84,6 +84,6 @@ import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
     LosTenacioFaceDevToolsService,
     LosVendorApiLogService,
   ],
-  exports: [LosSessionService],
+  exports: [LosSessionService, LosLoanRepaymentSyncService],
 })
 export class LosModule {}

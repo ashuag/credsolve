@@ -592,8 +592,8 @@ export class EasebuzzWireService {
       envTrim(this.config, 'EASEBUZZ_PAY_SURL') || this.defaultPayCallbackUrl('success');
     const furl =
       envTrim(this.config, 'EASEBUZZ_PAY_FURL') || this.defaultPayCallbackUrl('failure');
-    if (!surl) missing.push('EASEBUZZ_PAY_SURL (or BACKEND_PUBLIC_BASE_URL)');
-    if (!furl) missing.push('EASEBUZZ_PAY_FURL (or BACKEND_PUBLIC_BASE_URL)');
+    if (!surl) missing.push('EASEBUZZ_PAY_SURL (or CUSTOMER_PORTAL_BASE_URL)');
+    if (!furl) missing.push('EASEBUZZ_PAY_FURL (or CUSTOMER_PORTAL_BASE_URL)');
 
     if (missing.length > 0) {
       throw new ServiceUnavailableException(
@@ -746,9 +746,13 @@ export class EasebuzzWireService {
   }
 
   private defaultPayCallbackUrl(kind: 'success' | 'failure'): string {
+    // Prefer the public customer origin (moneycash.in). api.moneycash.in is not
+    // internet-reachable; customer Next forwards the same payload to Nest.
+    const portalBase = envTrim(this.config, 'CUSTOMER_PORTAL_BASE_URL').replace(/\/+$/, '');
     const backendBase = envTrim(this.config, 'BACKEND_PUBLIC_BASE_URL').replace(/\/+$/, '');
-    if (!backendBase) return '';
-    return `${backendBase}/api/auth/repayments/easebuzz/${kind}`;
+    const publicBase = portalBase || backendBase;
+    if (!publicBase) return '';
+    return `${publicBase}/api/auth/repayments/easebuzz/${kind}`;
   }
 
   private resolvePayPageBaseUrl(initiateUrl: string): string {

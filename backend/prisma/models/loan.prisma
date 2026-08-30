@@ -32,10 +32,11 @@ model LoanAccount {
   createdAt            DateTime  @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt            DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
 
-  application Application     @relation(fields: [applicationId], references: [id])
-  customer    Customer        @relation(fields: [customerId], references: [id])
-  loanStatus  LoanStatus      @relation(fields: [loanStatusId], references: [id])
-  repayments  LoanRepayment[]
+  application               Application                       @relation(fields: [applicationId], references: [id])
+  customer                  Customer                          @relation(fields: [customerId], references: [id])
+  loanStatus                LoanStatus                        @relation(fields: [loanStatusId], references: [id])
+  repayments                LoanRepayment[]
+  easebuzzNotifications     EasebuzzRepaymentNotification[]
 
   @@index([customerId, loanStatusId])
   @@index([disbursedAt])
@@ -61,4 +62,34 @@ model LoanRepayment {
   @@index([loanAccountId, paidAt])
   @@index([loanAccountId, status])
   @@map("loan_repayment")
+}
+
+/// Inbound Easebuzz Pay webhook / surl / furl payload plus Transaction V2.1 confirm.
+/// Use this table to inspect what Easebuzz sent and whether we confirmed it.
+model EasebuzzRepaymentNotification {
+  id             BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid           String    @unique @default(uuid()) @db.Char(36)
+  /// webhook | surl | furl
+  source         String    @db.VarChar(20)
+  txnid          String    @default("") @db.VarChar(64)
+  easepayid      String?   @db.VarChar(64)
+  status         String?   @db.VarChar(40)
+  amount         String?   @db.VarChar(20)
+  loanAccountId  BigInt?   @map("loan_account_id") @db.UnsignedBigInt
+  /// Exact inbound query+body from Easebuzz (same data they posted).
+  payload        Json
+  /// Transaction V2.1 retrieve used to confirm the payment.
+  confirmPayload Json?     @map("confirm_payload")
+  processResult  String?   @map("process_result") @db.VarChar(20)
+  processCode    String?   @map("process_code") @db.VarChar(64)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  loanAccount LoanAccount? @relation(fields: [loanAccountId], references: [id], onDelete: SetNull)
+
+  @@index([txnid, createdAt])
+  @@index([source, createdAt])
+  @@index([processResult, createdAt])
+  @@index([loanAccountId, createdAt])
+  @@map("easebuzz_repayment_notification")
 }

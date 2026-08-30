@@ -18,6 +18,7 @@ import { GetCustomerPaymentHistoryUseCase } from '../application/use-cases/get-c
 import { InitiateRepaymentDto } from '../application/dto/initiate-repayment.dto';
 import { InitiateCustomerRepaymentUseCase } from '../application/use-cases/initiate-customer-repayment.use-case';
 import { HandleEasebuzzRepaymentCallbackUseCase } from '../application/use-cases/handle-easebuzz-repayment-callback.use-case';
+import { RefreshCustomerRepaymentUseCase } from '../application/use-cases/refresh-customer-repayment.use-case';
 import { LogoutUseCase } from '../application/use-cases/logout.use-case';
 import { SendOtpUseCase } from '../application/use-cases/send-otp.use-case';
 import { SaveLeadDetailsUseCase } from '../application/use-cases/save-lead-details.use-case';
@@ -59,6 +60,7 @@ export class AuthController {
     private readonly customerLoansDashboard: GetCustomerLoansDashboardUseCase,
     private readonly customerPaymentHistory: GetCustomerPaymentHistoryUseCase,
     private readonly initiateCustomerRepayment: InitiateCustomerRepaymentUseCase,
+    private readonly refreshCustomerRepayment: RefreshCustomerRepaymentUseCase,
     private readonly handleEasebuzzRepaymentCallback: HandleEasebuzzRepaymentCallbackUseCase,
     private readonly logoutFlow: LogoutUseCase,
     private readonly customerGoogleOauth: CustomerGoogleOauthService,
@@ -252,10 +254,21 @@ export class AuthController {
     return this.initiateCustomerRepayment.execute(req, applicationUuid, body?.amountInr);
   }
 
+  @Post('my-loans/:applicationUuid/refresh-payment')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Reconcile a Pay Now attempt when the customer never reached surl/furl — retrieve Easebuzz status and record the repayment if paid',
+  })
+  refreshLoanPayment(@Req() req: Request, @Param('applicationUuid') applicationUuid: string) {
+    return this.refreshCustomerRepayment.execute(req, applicationUuid);
+  }
+
   @All('repayments/easebuzz/success')
   @ApiOperation({
     summary:
-      'Easebuzz repayment success URL (surl) — verifies hash, records the payment, closes the loan only when remaining is zero, redirects to customer portal',
+      'Easebuzz repayment confirm (surl). Public URL is https://moneycash.in/api/auth/repayments/easebuzz/success — customer Next forwards the same payload here.',
   })
   async easebuzzRepaySuccess(@Req() req: Request, @Res() res: Response): Promise<void> {
     const payload = {
@@ -268,7 +281,8 @@ export class AuthController {
 
   @All('repayments/easebuzz/failure')
   @ApiOperation({
-    summary: 'Easebuzz repayment failure URL (furl) — verifies hash, records failure, redirects to customer portal',
+    summary:
+      'Easebuzz repayment confirm (furl). Public URL is https://moneycash.in/api/auth/repayments/easebuzz/failure — customer Next forwards the same payload here.',
   })
   async easebuzzRepayFailure(@Req() req: Request, @Res() res: Response): Promise<void> {
     const payload = {

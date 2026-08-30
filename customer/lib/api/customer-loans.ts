@@ -88,3 +88,40 @@ export async function initiateCustomerRepayment(
 export async function fetchCustomerPaymentHistory(): Promise<CustomerPaymentHistory | null> {
   return apiGet<CustomerPaymentHistory>('/auth/my-payments', 'Unable to load payment history.');
 }
+
+export type CustomerRefreshPaymentResult = {
+  outcome:
+    | 'already_closed'
+    | 'no_payment_link'
+    | 'updated'
+    | 'pending'
+    | 'not_paid'
+    | 'retrieve_failed';
+  message: string;
+  loanClosed: boolean;
+};
+
+const REPAY_PENDING_APP_KEY = 'mc_repay_pending_app';
+
+export function markRepaymentPending(applicationUuid: string): void {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.setItem(REPAY_PENDING_APP_KEY, applicationUuid);
+}
+
+export function takeRepaymentPendingApplication(): string | null {
+  if (typeof window === 'undefined') return null;
+  const value = window.sessionStorage.getItem(REPAY_PENDING_APP_KEY)?.trim() || null;
+  if (value) window.sessionStorage.removeItem(REPAY_PENDING_APP_KEY);
+  return value;
+}
+
+export async function refreshCustomerRepayment(
+  applicationUuid: string,
+): Promise<CustomerRefreshPaymentResult | null> {
+  return apiPost<CustomerRefreshPaymentResult>(
+    `/auth/my-loans/${encodeURIComponent(applicationUuid)}/refresh-payment`,
+    {},
+    'Unable to refresh payment status.',
+    { timeoutMs: 60_000 },
+  );
+}
