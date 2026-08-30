@@ -11,7 +11,8 @@ import { randomUUID } from 'node:crypto';
 import type { Request } from 'express';
 import { EasebuzzWireService } from '../../../../common/easebuzz/easebuzz-wire.service';
 import {
-  rememberLoanRepayTxnid,
+  findReusableRepayIntent,
+  replaceLoanPendingTxnids,
   savePendingRepayIntent,
 } from '../../../../common/easebuzz/repay-intent.util';
 import { LOAN_REPAYMENT_STATUS } from '../../../../common/constants/loan-repayment.constants';
@@ -200,8 +201,32 @@ export class InitiateCustomerRepaymentUseCase {
 
     const amountInr = totalDue.toFixed(2);
     const bounceFeeInrStr = bounceFeeInr.toFixed(2);
-    const txnid = buildPayTxnId(loan.loanNumber);
     const paidAt = new Date();
+
+    if (!this.easebuzzWire.isPayInitiateSkipped()) {
+      const reusable = await findReusableRepayIntent(this.redis, loan.uuid, amountInr);
+      if (reusable?.intent.paymentUrl) {
+        await replaceLoanPendingTxnids(this.redis, loan.uuid, reusable.txnid);
+        this.logger.log(
+          `[repay] Reusing open Pay Now loan=${loan.loanNumber} txnid=${reusable.txnid} amount=${amountInr}`,
+        );
+        return {
+          success: true as const,
+          applicationUuid: application.uuid,
+          loanAccountUuid: loan.uuid,
+          loanNumber: loan.loanNumber,
+          amountInr,
+          bounceFeeInr: bounceFeeInrStr,
+          repaymentUuid: null,
+          loanStatus: loan.loanStatus.name,
+          redirectPath: '/my-account',
+          paymentUrl: reusable.intent.paymentUrl,
+          vendor: 'easebuzz' as const,
+        };
+      }
+    }
+
+    const txnid = buildPayTxnId(loan.loanNumber);
 
     let vendor: 'easebuzz' | 'skipped' = 'skipped';
     let vendorRef: string | null = txnid;
@@ -252,8 +277,9 @@ export class InitiateCustomerRepaymentUseCase {
           amountInr,
           bounceFeeInr: bounceFeeInrStr,
           createdAt: new Date().toISOString(),
+          paymentUrl: created.paymentUrl,
         });
-        await rememberLoanRepayTxnid(this.redis, loan.uuid, created.txnid);
+        await replaceLoanPendingTxnids(this.redis, loan.uuid, created.txnid);
       } catch (error) {
         const message =
           error instanceof Error

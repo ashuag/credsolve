@@ -37,6 +37,6 @@ export class RefreshCustomerRepaymentUseCase {
       throw new ForbiddenException('No loan account exists for this application.');
     }
 
-    return this.repaymentSync.refreshPayment(application.loanAccount.uuid);
+    return this.repaymentSync.refreshPayment(application.loanAccount.uuid, { scope: 'pending' });
   }
 }

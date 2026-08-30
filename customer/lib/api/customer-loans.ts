@@ -37,6 +37,8 @@ export type CustomerLoansDashboard = {
   inProgress: CustomerLoanCard[];
   repaymentSchedule: CustomerLoanRepaymentLine[];
   minPayAmountInr: string;
+  reconciledPayment?: boolean;
+  reconciledClosedLoan?: boolean;
 };
 
 export type InitiateRepaymentResult = {

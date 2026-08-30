@@ -4,6 +4,9 @@ import { LOAN_STATUS } from '../../../common/constants/loan.constants';
 import { EasebuzzWireService } from '../../../common/easebuzz/easebuzz-wire.service';
 import {
   amountsMatchInr,
+  clearPendingRepayIntent,
+  forgetLoanRepayTxnid,
+  keepLatestPendingLoanTxnid,
   listLoanRepayTxnids,
   loadPendingRepayIntent,
 } from '../../../common/easebuzz/repay-intent.util';
@@ -13,6 +16,20 @@ import { RedisService } from '../../../common/redis/redis.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 
 const MAX_STATUS_TXNIDS = 8;
+const PENDING_STATUSES = new Set(['pending', 'initiated', 'inprogress', 'in_progress', 'queued']);
+const TERMINAL_UNPAID_STATUSES = new Set([
+  'failure',
+  'failed',
+  'usercancelled',
+  'user_cancelled',
+  'cancelled',
+  'canceled',
+  'bounced',
+  'dropped',
+  'expired',
+]);
+
+export type RefreshPaymentScope = 'pending' | 'all';
 
 export type LosRefreshPaymentAttempt = {
   txnid: string;
@@ -167,11 +184,18 @@ export class LosLoanRepaymentSyncService {
     closedAt: Date | null;
   }): Promise<boolean> {
     if (input.closedAt != null) return false;
-    const candidates = await this.collectCandidateTxnids(input);
+    const candidates = await this.collectCandidateTxnids(input, 'pending');
     return candidates.length > 0;
   }
 
-  async refreshPayment(loanUuid: string): Promise<LosRefreshPaymentResult> {
+  async refreshPayment(
+    loanUuid: string,
+    options?: { scope?: RefreshPaymentScope },
+  ): Promise<LosRefreshPaymentResult> {
+    const scope: RefreshPaymentScope = options?.scope ?? 'all';
+    if (scope === 'pending') {
+      await keepLatestPendingLoanTxnid(this.redis, loanUuid);
+    }
     const loan = await this.prisma.client.loanAccount.findUnique({
       where: { uuid: loanUuid },
       select: {
@@ -214,12 +238,15 @@ export class LosLoanRepaymentSyncService {
       };
     }
 
-    const candidates = await this.collectCandidateTxnids({
-      loanId: loan.id,
-      loanUuid: loan.uuid,
-      loanNumber: loan.loanNumber,
-      leadId: loan.application.leadId,
-    });
+    const candidates = await this.collectCandidateTxnids(
+      {
+        loanId: loan.id,
+        loanUuid: loan.uuid,
+        loanNumber: loan.loanNumber,
+        leadId: loan.application.leadId,
+      },
+      scope,
+    );
 
     if (candidates.length === 0) {
       const status = statusOf(null, loan.loanStatus.name, loan.loanStatus.displayName);
@@ -241,7 +268,8 @@ export class LosLoanRepaymentSyncService {
     let retrieveFailed = false;
     let loanClosed = false;
 
-    for (const candidate of candidates.slice(0, MAX_STATUS_TXNIDS)) {
+    const retrieveLimit = scope === 'pending' ? 1 : MAX_STATUS_TXNIDS;
+    for (const candidate of candidates.slice(0, retrieveLimit)) {
       if (await this.settleRepayment.findSuccessByVendorRef(candidate.txnid)) {
         attempts.push({
           txnid: candidate.txnid,
@@ -251,6 +279,7 @@ export class LosLoanRepaymentSyncService {
           alreadySettled: true,
           message: 'Already recorded',
         });
+        await this.dropPendingTxnid(loan.uuid, candidate.txnid);
         continue;
       }
 
@@ -267,7 +296,11 @@ export class LosLoanRepaymentSyncService {
       });
 
       if (!txn.ok) {
-        if (!txn.status) retrieveFailed = true;
+        if (this.shouldDropUnpaid(txn.status, txn.message)) {
+          await this.dropPendingTxnid(loan.uuid, candidate.txnid);
+        } else if (!txn.status) {
+          retrieveFailed = true;
+        }
         continue;
       }
 
@@ -330,12 +363,15 @@ export class LosLoanRepaymentSyncService {
 
     const remaining = loanClosed
       ? []
-      : await this.collectCandidateTxnids({
-          loanId: loan.id,
-          loanUuid: loan.uuid,
-          loanNumber: loan.loanNumber,
-          leadId: loan.application.leadId,
-        });
+      : await this.collectCandidateTxnids(
+          {
+            loanId: loan.id,
+            loanUuid: loan.uuid,
+            loanNumber: loan.loanNumber,
+            leadId: loan.application.leadId,
+          },
+          scope,
+        );
 
     if (settled.length > 0) {
       return {
@@ -353,10 +389,7 @@ export class LosLoanRepaymentSyncService {
       };
     }
 
-    const anyPending = attempts.some((row) => {
-      const status = (row.status ?? '').toLowerCase();
-      return status === 'pending' || status === 'initiated' || status === 'inprogress';
-    });
+    const anyPending = attempts.some((row) => PENDING_STATUSES.has((row.status ?? '').toLowerCase()));
     if (anyPending) {
       return {
         outcome: 'pending',
@@ -398,12 +431,39 @@ export class LosLoanRepaymentSyncService {
     };
   }
 
-  private async collectCandidateTxnids(input: {
-    loanId: bigint;
-    loanUuid: string;
-    loanNumber: string;
-    leadId: bigint;
-  }): Promise<CandidateTxnid[]> {
+  private shouldDropUnpaid(status: string | null, message: string | null): boolean {
+    const s = (status ?? '').toLowerCase();
+    if (PENDING_STATUSES.has(s)) return false;
+    const msg = (message ?? '').toLowerCase();
+    if (
+      msg.includes('retrieve failed') ||
+      msg.includes('empty transaction') ||
+      msg.includes('txnid mismatch')
+    ) {
+      return false;
+    }
+    if (TERMINAL_UNPAID_STATUSES.has(s)) return true;
+    if (msg.includes('not found') || msg.includes('no transaction') || msg.includes('invalid txn')) {
+      return true;
+    }
+    // Unpaid initiate (Easebuzz 200, not success) — stop polling; webhook/surl still settle.
+    return Boolean(s) || Boolean(msg);
+  }
+
+  private async dropPendingTxnid(loanUuid: string, txnid: string): Promise<void> {
+    await clearPendingRepayIntent(this.redis, txnid);
+    await forgetLoanRepayTxnid(this.redis, loanUuid, txnid);
+  }
+
+  private async collectCandidateTxnids(
+    input: {
+      loanId: bigint;
+      loanUuid: string;
+      loanNumber: string;
+      leadId: bigint;
+    },
+    scope: RefreshPaymentScope = 'all',
+  ): Promise<CandidateTxnid[]> {
     const compact = input.loanNumber.replace(/[^a-zA-Z0-9_|\/-]/g, '');
     const seen = new Map<string, string | null>();
 
@@ -415,19 +475,25 @@ export class LosLoanRepaymentSyncService {
       if (!seen.has(id) || (!seen.get(id) && amount)) seen.set(id, amount);
     };
 
-    const logs = await this.prisma.read.vendorApiLog.findMany({
-      where: { leadId: input.leadId, serviceName: 'pay-initiate-link' },
-      orderBy: { requestedAt: 'asc' },
-      take: 40,
-      select: { requestPayload: true },
-    });
-    for (const log of logs) {
-      const parsed = txnidFromPayInitiatePayload(log.requestPayload);
-      if (parsed) add(parsed.txnid, parsed.amount, parsed.udf1);
-    }
+    if (scope === 'pending') {
+      for (const txnid of await listLoanRepayTxnids(this.redis, input.loanUuid)) {
+        add(txnid, null);
+      }
+    } else {
+      const logs = await this.prisma.read.vendorApiLog.findMany({
+        where: { leadId: input.leadId, serviceName: 'pay-initiate-link' },
+        orderBy: { requestedAt: 'asc' },
+        take: 40,
+        select: { requestPayload: true },
+      });
+      for (const log of logs) {
+        const parsed = txnidFromPayInitiatePayload(log.requestPayload);
+        if (parsed) add(parsed.txnid, parsed.amount, parsed.udf1);
+      }
 
-    for (const txnid of await listLoanRepayTxnids(this.redis, input.loanUuid)) {
-      add(txnid, null);
+      for (const txnid of await listLoanRepayTxnids(this.redis, input.loanUuid)) {
+        add(txnid, null);
+      }
     }
 
     const repaymentRefs = await this.prisma.read.$queryRaw<
@@ -451,6 +517,7 @@ export class LosLoanRepaymentSyncService {
 
     return [...seen.entries()]
       .filter(([txnid]) => !successRefs.has(txnid))
-      .map(([txnid, amount]) => ({ txnid, amount }));
+      .map(([txnid, amount]) => ({ txnid, amount }))
+      .reverse();
   }
 }

@@ -59,4 +59,8 @@ export type CustomerLoansDashboardResult = {
   repaymentSchedule: CustomerLoanRepaymentLine[];
   /** `MIN_PAY_AMOUNT` setting — prefill for partial pay. */
   minPayAmountInr: string;
+  /** True when a closed-window Pay Now was confirmed on this load. */
+  reconciledPayment?: boolean;
+  /** True when that reconcile closed the loan. */
+  reconciledClosedLoan?: boolean;
 };

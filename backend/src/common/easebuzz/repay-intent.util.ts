@@ -10,11 +10,13 @@ export type PendingRepayIntent = {
   amountInr: string;
   bounceFeeInr: string;
   createdAt: string;
+  paymentUrl?: string;
 };
 
+/** Reuse the same Easebuzz checkout if the customer taps Pay Now again. */
+const REUSE_PENDING_MS = 30 * 60 * 1000;
+
 const LOAN_TXNIDS_TTL_SEC = 30 * 24 * 60 * 60; // 30d — longer than intent so LOS can still find txnids
-const PENDING_LOANS_KEY = 'customer:repay-pending-loans';
-const PENDING_LOAN_KEY_PREFIX = 'customer:repay-intents-by-loan:';
 
 export function repayIntentRedisKey(txnid: string): string {
   return `customer:repay-intent:${txnid.trim()}`;
@@ -54,6 +56,9 @@ export async function loadPendingRepayIntent(
     ) {
       return null;
     }
+    if (typeof parsed.paymentUrl === 'string') {
+      parsed.paymentUrl = parsed.paymentUrl.trim() || undefined;
+    }
     return parsed;
   } catch {
     return null;
@@ -80,7 +85,6 @@ export async function rememberLoanRepayTxnid(
   try {
     await redis.client.sadd(key, id);
     await redis.client.expire(key, LOAN_TXNIDS_TTL_SEC);
-    await redis.client.sadd(PENDING_LOANS_KEY, loanAccountUuid.trim());
   } catch {
     // best-effort
   }
@@ -98,6 +102,61 @@ export async function listLoanRepayTxnids(
   }
 }
 
+/** One live Pay Now per loan — drop older txnids so cron does not retrieve them all. */
+export async function replaceLoanPendingTxnids(
+  redis: RedisService,
+  loanAccountUuid: string,
+  keepTxnid: string,
+): Promise<void> {
+  const keep = keepTxnid.trim();
+  const uuid = loanAccountUuid.trim();
+  if (!uuid || !keep) return;
+  for (const existing of await listLoanRepayTxnids(redis, uuid)) {
+    if (existing === keep) continue;
+    await clearPendingRepayIntent(redis, existing);
+    await forgetLoanRepayTxnid(redis, uuid, existing);
+  }
+  await rememberLoanRepayTxnid(redis, uuid, keep);
+}
+
+export async function findReusableRepayIntent(
+  redis: RedisService,
+  loanAccountUuid: string,
+  amountInr: string,
+): Promise<{ txnid: string; intent: PendingRepayIntent } | null> {
+  let best: { txnid: string; intent: PendingRepayIntent; at: number } | null = null;
+  for (const txnid of await listLoanRepayTxnids(redis, loanAccountUuid)) {
+    const intent = await loadPendingRepayIntent(redis, txnid);
+    if (!intent?.paymentUrl) continue;
+    if (!amountsMatchInr(intent.amountInr, amountInr)) continue;
+    const at = Date.parse(intent.createdAt);
+    if (!Number.isFinite(at) || Date.now() - at > REUSE_PENDING_MS) continue;
+    if (!best || at > best.at) best = { txnid, intent, at };
+  }
+  return best ? { txnid: best.txnid, intent: best.intent } : null;
+}
+
+/** Newest Redis txnid that still has a live intent. Older members are forgotten. */
+export async function keepLatestPendingLoanTxnid(
+  redis: RedisService,
+  loanAccountUuid: string,
+): Promise<string | null> {
+  const uuid = loanAccountUuid.trim();
+  const ids = await listLoanRepayTxnids(redis, uuid);
+  if (ids.length === 0) return null;
+
+  let latest: { txnid: string; at: number } | null = null;
+  for (const txnid of ids) {
+    const intent = await loadPendingRepayIntent(redis, txnid);
+    const at = intent ? Date.parse(intent.createdAt) : Number.NaN;
+    const score = Number.isFinite(at) ? at : 0;
+    if (!latest || score > latest.at) latest = { txnid, at: score };
+  }
+  if (!latest) return null;
+  await replaceLoanPendingTxnids(redis, uuid, latest.txnid);
+  return latest.txnid;
+}
+
 export async function forgetLoanRepayTxnid(
   redis: RedisService,
   loanAccountUuid: string,
@@ -106,45 +165,9 @@ export async function forgetLoanRepayTxnid(
   try {
     const key = repayIntentLoanRedisKey(loanAccountUuid);
     await redis.client.srem(key, txnid.trim());
-    const remaining = await redis.client.scard(key);
-    if (remaining === 0) {
-      await redis.client.srem(PENDING_LOANS_KEY, loanAccountUuid.trim());
-    }
   } catch {
     // best-effort
   }
-}
-
-/** Loan UUIDs that still have an initiated Pay Now txnid waiting for a final status. */
-export async function listPendingRepayLoanUuids(redis: RedisService): Promise<string[]> {
-  const out = new Set<string>();
-  try {
-    for (const id of await redis.client.smembers(PENDING_LOANS_KEY)) {
-      if (id.trim()) out.add(id.trim());
-    }
-  } catch {
-    // best-effort
-  }
-  try {
-    let cursor = '0';
-    do {
-      const [next, keys] = await redis.client.scan(
-        cursor,
-        'MATCH',
-        `${PENDING_LOAN_KEY_PREFIX}*`,
-        'COUNT',
-        100,
-      );
-      cursor = String(next);
-      for (const key of keys) {
-        const uuid = key.slice(PENDING_LOAN_KEY_PREFIX.length).trim();
-        if (uuid) out.add(uuid);
-      }
-    } while (cursor !== '0');
-  } catch {
-    // best-effort
-  }
-  return [...out];
 }
 
 /** Compare INR amounts as paise (allows string "10.00" vs "10.0"). */

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
@@ -21,7 +21,10 @@ import {
   remainingDueInr,
   sumRepaymentAmounts,
 } from '../../../../common/loan/loan-repayment-outstanding.util';
+import { listLoanRepayTxnids } from '../../../../common/easebuzz/repay-intent.util';
 import { BounceChargeTierResolverService } from '../../../../common/loan/bounce-charge-tier.resolver';
+import { RedisService } from '../../../../common/redis/redis.service';
+import { LosLoanRepaymentSyncService } from '../../../los/services/los-loan-repayment-sync.service';
 import { computeFeeAmountsFromLoanDetail } from '../../../../common/loan/loan-disbursement-view.util';
 import type {
   CustomerLoanCard,
@@ -222,13 +225,54 @@ function mapRow(
   };
 }
 
+const APPLICATION_DASHBOARD_SELECT = {
+  uuid: true,
+  applicationStatus: { select: { name: true } },
+  details: {
+    select: {
+      selectedLoanAmount: true,
+      expectedRepaymentDays: true,
+      expectedRepaymentDate: true,
+      bankAccountNumber: true,
+      ifscCode: true,
+      bankName: true,
+      interestRate: true,
+      processingFeePercentage: true,
+      gstPercentage: true,
+    },
+  },
+  loanAccount: {
+    select: {
+      uuid: true,
+      loanNumber: true,
+      principalAmount: true,
+      interestRate: true,
+      interestAmount: true,
+      totalRepaymentAmount: true,
+      loanMaturityDate: true,
+      disbursedAt: true,
+      closedAt: true,
+      bankAccountNumber: true,
+      loanStatus: { select: { name: true } },
+      repayments: {
+        where: { status: LOAN_REPAYMENT_STATUS.SUCCESS },
+        select: { amount: true, status: true },
+      },
+    },
+  },
+} as const;
+
 @Injectable()
 export class GetCustomerLoansDashboardUseCase {
+  private readonly logger = new Logger(GetCustomerLoansDashboardUseCase.name);
+
   constructor(
     private readonly customers: CustomerRepository,
     private readonly prisma: PrismaService,
     private readonly bounceChargeTiers: BounceChargeTierResolverService,
     private readonly settings: SettingsRepository,
+    private readonly redis: RedisService,
+    private readonly repaymentSync: LosLoanRepaymentSyncService,
   ) {}
 
   async execute(req: Request): Promise<CustomerLoansDashboardResult> {
@@ -242,45 +286,40 @@ export class GetCustomerLoansDashboardUseCase {
       throw new UnauthorizedException('Customer not found.');
     }
 
-    const rows = await this.prisma.client.application.findMany({
+    let rows = await this.prisma.client.application.findMany({
       where: { customerId: customer.id },
       orderBy: { createdAt: 'desc' },
-      select: {
-        uuid: true,
-        applicationStatus: { select: { name: true } },
-        details: {
-          select: {
-            selectedLoanAmount: true,
-            expectedRepaymentDays: true,
-            expectedRepaymentDate: true,
-            bankAccountNumber: true,
-            ifscCode: true,
-            bankName: true,
-            interestRate: true,
-            processingFeePercentage: true,
-            gstPercentage: true,
-          },
-        },
-        loanAccount: {
-          select: {
-            loanNumber: true,
-            principalAmount: true,
-            interestRate: true,
-            interestAmount: true,
-            totalRepaymentAmount: true,
-            loanMaturityDate: true,
-            disbursedAt: true,
-            closedAt: true,
-            bankAccountNumber: true,
-            loanStatus: { select: { name: true } },
-            repayments: {
-              where: { status: LOAN_REPAYMENT_STATUS.SUCCESS },
-              select: { amount: true, status: true },
-            },
-          },
-        },
-      },
+      select: APPLICATION_DASHBOARD_SELECT,
     });
+
+    let reconciledPayment = false;
+    let reconciledClosedLoan = false;
+    for (const row of rows) {
+      const loan = row.loanAccount;
+      if (!loan || loan.closedAt != null) continue;
+      const pending = await listLoanRepayTxnids(this.redis, loan.uuid);
+      if (pending.length === 0) continue;
+      try {
+        const result = await this.repaymentSync.refreshPayment(loan.uuid, { scope: 'pending' });
+        if (result.outcome === 'updated' || result.settled.length > 0) {
+          reconciledPayment = true;
+          if (result.loanClosed) reconciledClosedLoan = true;
+        }
+      } catch (error) {
+        this.logger.warn(
+          `[my-loans] Pending repay sync failed loan=${loan.uuid}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+    if (reconciledPayment) {
+      rows = await this.prisma.client.application.findMany({
+        where: { customerId: customer.id },
+        orderBy: { createdAt: 'desc' },
+        select: APPLICATION_DASHBOARD_SELECT,
+      });
+    }
 
     const penal = await this.bounceChargeTiers.loadPenalConfig();
     const coolingPeriodDays = await this.settings.loadRepayCoolingPeriodDays();
@@ -360,6 +399,8 @@ export class GetCustomerLoansDashboardUseCase {
       inProgress,
       repaymentSchedule,
       minPayAmountInr: minPayAmountInr.toFixed(2),
+      reconciledPayment,
+      reconciledClosedLoan,
     };
   }
 }

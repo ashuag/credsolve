@@ -924,6 +924,9 @@ export function MyAccountSection({
     setLoadError(null);
     try {
       const res = await fetchCustomerLoansDashboard();
+      if (res?.reconciledPayment) {
+        setRepayFlash((current) => current ?? 'success');
+      }
       setData(
         res ?? {
           activeLoans: [],
@@ -967,7 +970,7 @@ export function MyAccountSection({
             setRepayFlash('success');
           }
         } catch {
-          // Dashboard still loads; cron / webhook will settle if needed.
+          // GET /my-loans still reconciles a closed-window QR payment.
         }
       }
       await loadLoans();
@@ -1045,7 +1048,11 @@ export function MyAccountSection({
     <div className="mx-auto w-full max-w-3xl animate-fade-in-up px-4 py-6 sm:px-6 sm:py-8">
       <div className="grid gap-5">
         {repayFlash === 'success' ? (
-          <FlashBanner tone="success">Payment successful. Your loan has been closed.</FlashBanner>
+          <FlashBanner tone="success">
+            {data?.reconciledClosedLoan
+              ? 'Payment successful. Your loan has been closed.'
+              : 'Payment received. Your remaining amount due has been updated.'}
+          </FlashBanner>
         ) : null}
         {repayFlash === 'failed' ? (
           <FlashBanner tone="failed">Payment was unsuccessful. You can try paying again.</FlashBanner>
