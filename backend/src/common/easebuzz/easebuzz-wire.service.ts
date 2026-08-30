@@ -12,7 +12,6 @@ import { ConfigService } from '@nestjs/config';
 import { VendorApiService } from '../vendor/vendor-api.service';
 import {
   isEasebuzzDuplicateUniqueRequestNumber,
-  isEasebuzzFailedVendorStatus,
   parseEasebuzzQuickTransferInitiate,
   parseEasebuzzQuickTransferRetrieve,
 } from './easebuzz-transfer-log.util';
@@ -980,9 +979,9 @@ export class EasebuzzWireService {
   }
 
   /**
-   * When Easebuzz already has this URN, retrieve it instead of treating the
-   * duplicate as a new failure. Returns null when the existing transfer failed
-   * or is not yet visible.
+   * Reuse an existing Easebuzz transfer when retrieve shows it is live.
+   * `failed` = status/success false, Invalid key, not found — no payout to reuse.
+   * `unknown` = retrieve timed out, so a second payout must not be started.
    */
   async adoptExistingQuickTransfer(
     uniqueRequestNumber: string,
@@ -1008,17 +1007,19 @@ export class EasebuzzWireService {
       };
     }
     const message = existingParsed.message ?? existing.message ?? null;
-    if (isEasebuzzFailedVendorStatus(existingParsed.vendorStatus ?? existing.status)) {
+    const timedOut = existing.httpStatus == null && existing.rawBody == null;
+    if (timedOut) {
       this.logger.warn(
-        `[easebuzz] Existing transfer unique=${uniqueRequestNumber} failed: ${message ?? 'n/a'}`,
+        `[easebuzz] Existing transfer unique=${uniqueRequestNumber} retrieve timed out: ${message ?? 'n/a'}`,
       );
-      return { status: 'failed', message };
+      return { status: 'unknown', message };
     }
+    // status:false / success:false / Invalid key / not found — no payout to reuse.
     this.logger.warn(
-      `[easebuzz] Existing transfer unique=${uniqueRequestNumber} is not reusable ` +
+      `[easebuzz] Existing transfer unique=${uniqueRequestNumber} is not a live payment ` +
         `status=${existingParsed.vendorStatus ?? existing.status ?? 'n/a'} reason=${message ?? 'n/a'}`,
     );
-    return { status: 'unknown', message };
+    return { status: 'failed', message };
   }
 
   /**
@@ -1053,12 +1054,17 @@ export class EasebuzzWireService {
       [cfg.key]: '',
     };
 
-    const result = await this.vendorApi.request<unknown, undefined>({
+    const result = await this.vendorApi.request<unknown, Record<string, unknown>>({
       providerName: 'Easebuzz',
       serviceName: 'quick-transfer-retrieve',
       method: 'GET',
       absoluteUrl: retrieveUrl,
       headers,
+      // GET is sent without a body; this is stored on vendor_api_log.request_payload.
+      body: {
+        key: cfg.key,
+        unique_request_number: urn,
+      },
       leadId: options?.leadId ?? null,
       timeoutMs: cfg.timeoutMs,
       sensitiveHeaderNames: [cfg.key],

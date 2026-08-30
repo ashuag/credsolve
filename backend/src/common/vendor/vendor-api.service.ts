@@ -223,7 +223,9 @@ export class VendorApiService {
       );
     }
 
-    const requestForAudit = opts.redactRequest ? opts.redactRequest(opts.body) : (opts.body ?? null);
+    const requestForAudit = opts.redactRequest
+      ? opts.redactRequest(opts.body)
+      : (opts.body ?? queryParamsFromUrl(url));
     const responseForAudit = buildResponseAuditPayload(rawText, parsedResponse, httpStatus);
 
     await this.persistAuditRow({
@@ -353,6 +355,16 @@ export class VendorApiService {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.warn(`Failed to persist vendor_api_log row (${row.providerName}/${row.serviceName}): ${message}`);
     }
+  }
+}
+
+function queryParamsFromUrl(url: string): Record<string, string> | null {
+  try {
+    const parsed = new URL(url);
+    if ([...parsed.searchParams.keys()].length === 0) return null;
+    return Object.fromEntries(parsed.searchParams.entries());
+  } catch {
+    return null;
   }
 }
 

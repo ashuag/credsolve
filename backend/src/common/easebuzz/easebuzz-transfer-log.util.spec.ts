@@ -2,6 +2,7 @@ import {
   buildDisbursementUniqueRequestNumber,
   isEasebuzzDuplicateUniqueRequestNumber,
   isEasebuzzFailedVendorStatus,
+  isEasebuzzRejectedEnvelope,
   parseEasebuzzQuickTransferInitiate,
   uniqueRequestNumberFromVendorPayload,
 } from './easebuzz-transfer-log.util';
@@ -63,6 +64,22 @@ describe('parseEasebuzzQuickTransferInitiate', () => {
     });
     expect(parsed.accepted).toBe(false);
     expect(isEasebuzzDuplicateUniqueRequestNumber(parsed.message)).toBe(true);
+  });
+
+  it('treats status:false Invalid key as a rejected call with no payout', () => {
+    const body = {
+      status: false,
+      message: 'Invalid key.',
+      success: false,
+      wire_allowed: true,
+      insta_enabled: false,
+      wire_activated: true,
+      easebuzz_allowed: true,
+    };
+    const parsed = parseEasebuzzQuickTransferInitiate(body);
+    expect(parsed.accepted).toBe(false);
+    expect(parsed.message).toBe('Invalid key.');
+    expect(isEasebuzzRejectedEnvelope(body)).toBe(true);
   });
 });
 

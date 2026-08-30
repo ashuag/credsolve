@@ -145,6 +145,17 @@ export function isEasebuzzFailedVendorStatus(status: string | null | undefined):
   return Boolean(status && QUICK_TRANSFER_FAILED_STATUSES.has(status.toLowerCase()));
 }
 
+function isRejectedFlag(value: unknown): boolean {
+  return value === false || value === 0 || value === 'false' || value === '0';
+}
+
+/** Easebuzz `{ status: false, success: false }` means the call was rejected — no payout. */
+export function isEasebuzzRejectedEnvelope(body: unknown): boolean {
+  const root = asRecord(body);
+  if (!root) return false;
+  return isRejectedFlag(root.success) || isRejectedFlag(root.status);
+}
+
 /** Legacy URN (pre-timestamp): MCASH + alphanumeric application number. Used only as a fallback. */
 export function easebuzzUniqueRequestNumberForApplication(applicationNumber: string): string {
   const compact = applicationNumber.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
