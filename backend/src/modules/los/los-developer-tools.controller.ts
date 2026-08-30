@@ -19,6 +19,7 @@ import { LosAuthGuard } from './auth/los-auth.guard';
 import { LosDenyAgentGuard } from './auth/los-deny-agent.guard';
 import { CibilVendorFetchCheckDto } from './dto/cibil-vendor-fetch-check.dto';
 import { FaceLivenessCheckDto } from './dto/face-liveness-check.dto';
+import { CheckDisbursementStatusDto } from './dto/check-disbursement-status.dto';
 import { GetPaymentStatusDto } from './dto/get-payment-status.dto';
 import { KycFaceMatchCheckDto } from './dto/kyc-face-match-check.dto';
 import { ListVendorApiLogsQueryDto } from './dto/list-vendor-api-logs-query.dto';
@@ -108,6 +109,17 @@ export class LosDeveloperToolsController {
   })
   async getPaymentStatus(@Body() body: GetPaymentStatusDto) {
     return this.easebuzzDevTools.runGetPaymentStatus(body);
+  }
+
+  @Post('check-disbursement-status')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Check stored Easebuzz quick-transfer-initiate status for unpaid disbursed loans',
+    description:
+      'Finds disbursed loans that are still open (or listed applications) and reads vendor_api_log.service_name=quick-transfer-initiate. Reports HTTP response plus transfer_request.status. Does not call Easebuzz or update loan_account.',
+  })
+  async checkDisbursementStatus(@Body() body: CheckDisbursementStatusDto) {
+    return this.easebuzzDevTools.runCheckDisbursementStatus(body);
   }
 
   @Post('nsdl-pan-verification')

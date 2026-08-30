@@ -141,6 +141,45 @@ export type EasebuzzQuickTransferParse = {
   message: string | null;
 };
 
+/** Same URN used at disbursement: MCASH + alphanumeric application number. */
+export function easebuzzUniqueRequestNumberForApplication(applicationNumber: string): string {
+  const compact = applicationNumber.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  return `MCASH${compact}`.slice(0, 40);
+}
+
+export function uniqueRequestNumberFromGatewayJson(
+  gatewayTransferJson: unknown,
+  applicationNumber: string,
+): string {
+  const tr = extractEasebuzzTransferRequest(gatewayTransferJson);
+  const stored = pickString(tr?.unique_request_number);
+  return stored || easebuzzUniqueRequestNumberForApplication(applicationNumber);
+}
+
+/**
+ * Retrieve payloads may be a single `transfer_request` or a paginated `data.results` list.
+ */
+export function parseEasebuzzQuickTransferRetrieve(body: unknown): EasebuzzQuickTransferParse {
+  const root = asRecord(body);
+  const data = asRecord(root?.data);
+  const results = data?.results;
+  if (Array.isArray(results)) {
+    if (results[0] != null) {
+      return parseEasebuzzQuickTransferInitiate({
+        success: root?.success ?? true,
+        data: { transfer_request: results[0] },
+      });
+    }
+    return {
+      accepted: false,
+      transferId: null,
+      vendorStatus: null,
+      message: 'Transfer not found at Easebuzz.',
+    };
+  }
+  return parseEasebuzzQuickTransferInitiate(body);
+}
+
 /**
  * Easebuzz Wire `POST /quick_transfers/initiate/` returns `{ success: true }` when the
  * HTTP call was accepted — even if `data.transfer_request.status` is `failure`

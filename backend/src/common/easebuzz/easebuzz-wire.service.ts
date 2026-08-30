@@ -2,7 +2,10 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { BadGatewayException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { VendorApiService } from '../vendor/vendor-api.service';
-import { parseEasebuzzQuickTransferInitiate } from './easebuzz-transfer-log.util';
+import {
+  parseEasebuzzQuickTransferInitiate,
+  parseEasebuzzQuickTransferRetrieve,
+} from './easebuzz-transfer-log.util';
 
 export type EasebuzzQuickTransferInput = {
   beneficiaryName: string;
@@ -27,6 +30,18 @@ export type EasebuzzQuickTransferResult = {
   transferId: string | null;
   uniqueRequestNumber: string;
   vendorStatus: string | null;
+  rawBody: unknown;
+};
+
+export type EasebuzzQuickTransferRetrieveResult = {
+  httpOk: boolean;
+  httpStatus: number | null;
+  retrieveUrl: string;
+  uniqueRequestNumber: string;
+  status: string | null;
+  utr: string | null;
+  failureReason: string | null;
+  message: string | null;
   rawBody: unknown;
 };
 
@@ -123,6 +138,7 @@ type EasebuzzWireTransferConfig = {
   key: string;
   salt: string;
   initiateUrl: string;
+  retrieveUrl: string;
   paymentMode: string;
   timeoutMs: number;
 };
@@ -218,6 +234,15 @@ function sanitizeEasebuzzUdf(raw: string | undefined): string {
  * `upi_handle` is empty for beneficiary_type=bank_account (note the double pipe).
  * `amount` is always 2 decimal places (e.g. 10.00).
  */
+function resolveWireTransferRetrieveUrl(initiateUrl: string): string {
+  try {
+    const parsed = new URL(initiateUrl);
+    return `${parsed.origin}/api/v1/transfers/`;
+  } catch {
+    return 'https://wire.easebuzz.in/api/v1/transfers/';
+  }
+}
+
 function buildQuickTransferAuthorization(input: {
   key: string;
   accountNumber: string;
@@ -462,6 +487,8 @@ export class EasebuzzWireService {
     const initiateUrl =
       envTrim(this.config, 'EASEBUZZ_WIRE_INITIATE_URL') ||
       'https://wire.easebuzz.in/api/v1/quick_transfers/initiate/';
+    const retrieveUrl =
+      envTrim(this.config, 'EASEBUZZ_WIRE_RETRIEVE_URL') || resolveWireTransferRetrieveUrl(initiateUrl);
 
     if (!key) missing.push('EASEBUZZ_WIRE_KEY');
     if (!salt) missing.push('EASEBUZZ_WIRE_SALT');
@@ -481,6 +508,7 @@ export class EasebuzzWireService {
       key,
       salt,
       initiateUrl,
+      retrieveUrl,
       paymentMode,
       timeoutMs,
     };
@@ -930,6 +958,65 @@ export class EasebuzzWireService {
       transferId: parsed.transferId,
       uniqueRequestNumber: input.uniqueRequestNumber,
       vendorStatus: parsed.vendorStatus,
+      rawBody: result.body,
+    };
+  }
+
+  /**
+   * Live Wire retrieve — GET /api/v1/transfers/?unique_request_number=
+   * Hash = SHA-512(key|unique_request_number|salt). Does not initiate a payout.
+   */
+  async retrieveQuickTransfer(
+    uniqueRequestNumber: string,
+    options?: { leadId?: bigint | null },
+  ): Promise<EasebuzzQuickTransferRetrieveResult> {
+    const cfg = this.assertTransferConfiguredOrThrow();
+    const urn = uniqueRequestNumber.trim().slice(0, 64);
+    if (!urn) {
+      return {
+        httpOk: false,
+        httpStatus: null,
+        retrieveUrl: cfg.retrieveUrl,
+        uniqueRequestNumber: '',
+        status: null,
+        utr: null,
+        failureReason: null,
+        message: 'unique_request_number is required.',
+        rawBody: null,
+      };
+    }
+
+    const retrieveUrl = `${cfg.retrieveUrl.replace(/\/?$/, '/')}?unique_request_number=${encodeURIComponent(urn)}`;
+    const authorization = createHash('sha512').update(`${cfg.key}|${urn}|${cfg.salt}`, 'utf8').digest('hex');
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      Authorization: authorization,
+      [cfg.key]: '',
+    };
+
+    const result = await this.vendorApi.request<unknown, undefined>({
+      providerName: 'Easebuzz',
+      serviceName: 'quick-transfer-retrieve',
+      method: 'GET',
+      absoluteUrl: retrieveUrl,
+      headers,
+      leadId: options?.leadId ?? null,
+      timeoutMs: cfg.timeoutMs,
+      sensitiveHeaderNames: [cfg.key],
+    });
+
+    const parsed = parseEasebuzzQuickTransferRetrieve(result.body);
+    const httpOk = result.ok && result.httpStatus != null && result.httpStatus >= 200 && result.httpStatus < 300;
+
+    return {
+      httpOk,
+      httpStatus: result.httpStatus,
+      retrieveUrl,
+      uniqueRequestNumber: urn,
+      status: parsed.vendorStatus,
+      utr: parsed.transferId,
+      failureReason: parsed.accepted ? null : parsed.message,
+      message: httpOk ? parsed.message : result.error?.message ?? parsed.message ?? 'Transfer retrieve failed.',
       rawBody: result.body,
     };
   }

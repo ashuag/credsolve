@@ -208,7 +208,21 @@ function ActionBtn({
   );
 }
 
-function maturityMeta(daysToMaturity: number) {
+function isClosedLoan(closedAt: string | null | undefined, statusCode: string): boolean {
+  const code = statusCode.toUpperCase();
+  return Boolean(closedAt) || code.includes('CLOSED') || code === 'WRITTEN_OFF';
+}
+
+function maturityMeta(daysToMaturity: number, closed: boolean, statusCode = '') {
+  if (closed) {
+    return {
+      label: statusCode.toUpperCase() === 'WRITTEN_OFF' ? 'Written off' : 'Paid fully',
+      tone: 'good' as const,
+      color: '#047857',
+      bg: 'rgba(16,185,129,0.08)',
+      border: 'rgba(16,185,129,0.22)',
+    };
+  }
   if (daysToMaturity < 0) {
     return {
       label: `${Math.abs(daysToMaturity)} day${Math.abs(daysToMaturity) === 1 ? '' : 's'} overdue`,
@@ -258,7 +272,7 @@ function LoanLifecycle({
   closedAt: string | null;
   statusCode: string;
 }) {
-  const closed = Boolean(closedAt) || statusCode.toUpperCase().includes('CLOSED');
+  const closed = isClosedLoan(closedAt, statusCode);
   const overdue = daysToMaturity < 0 && !closed;
   const steps = [
     {
@@ -582,7 +596,8 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
     );
   }
 
-  const maturity = maturityMeta(row.daysToMaturity);
+  const closed = isClosedLoan(row.closedAt, row.loanStatusCode);
+  const maturity = maturityMeta(row.daysToMaturity, closed, row.loanStatusCode);
   const statusStyles = losStatusPillStyles(row.loanStatusCode);
   const transfer = row.disbursementTransfer;
   const transferUtr = transfer?.uniqueTransactionReference ?? row.utr;
@@ -839,9 +854,11 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
                 label="Days to maturity"
                 value={
                   <span style={{ color: maturity.color }}>
-                    {row.daysToMaturity < 0
-                      ? `${Math.abs(row.daysToMaturity)} day(s) overdue`
-                      : `${row.daysToMaturity} day(s)`}
+                    {closed
+                      ? 'Closed'
+                      : row.daysToMaturity < 0
+                        ? `${Math.abs(row.daysToMaturity)} day(s) overdue`
+                        : `${row.daysToMaturity} day(s)`}
                   </span>
                 }
               />
@@ -869,7 +886,13 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
                     Maturity
                   </p>
                   <p className="m-0 mt-1 text-[1.05rem] font-extrabold" style={{ color: maturity.color }}>
-                    {row.daysToMaturity < 0 ? 'Overdue' : row.daysToMaturity === 0 ? 'Due today' : 'On track'}
+                    {closed
+                      ? maturity.label
+                      : row.daysToMaturity < 0
+                        ? 'Overdue'
+                        : row.daysToMaturity === 0
+                          ? 'Due today'
+                          : 'On track'}
                   </p>
                 </div>
               </div>

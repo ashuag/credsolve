@@ -37,3 +37,4 @@ export * from './nsdl-pan-verification';
 export * from './name-match-fuzz-score';
 export * from './vendor-api-logs';
 export * from './get-payment-status';
+export * from './check-disbursement-status';
