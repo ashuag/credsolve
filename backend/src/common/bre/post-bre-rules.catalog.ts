@@ -18,7 +18,8 @@ export type PostBreThresholdsSnapshot = {
   enforceNoActiveMfi: boolean | null;
   maxMissedPayments6Months: number | null;
   minUnsecuredLoanAmount: number | null;
-  rejectedCreditAssessmentGrades: string[] | null;
+  rejectedCreditAssessmentGradesNew: string[] | null;
+  rejectedCreditAssessmentGradesExisting: string[] | null;
 };
 
 export type PostBreRuleCatalogEntry = {
@@ -66,8 +67,10 @@ function isCriteriaLoaded(key: string, thresholds: PostBreThresholdsSnapshot): b
       return thresholds.maxMissedPayments6Months != null;
     case EC.MIN_UNSECURED_LOAN_AMOUNT:
       return thresholds.minUnsecuredLoanAmount != null;
-    case EC.REJECTED_CREDIT_ASSESSMENT_GRADES:
-      return thresholds.rejectedCreditAssessmentGrades != null;
+    case EC.REJECTED_CREDIT_ASSESSMENT_GRADES_NEW:
+      return thresholds.rejectedCreditAssessmentGradesNew != null;
+    case EC.REJECTED_CREDIT_ASSESSMENT_GRADES_EXISTING:
+      return thresholds.rejectedCreditAssessmentGradesExisting != null;
     case EC.NO_RESTRUCTURED_LOANS:
       return thresholds.enforceNoRestructuredLoans != null;
     case EC.NO_SMA_PWOS:
@@ -338,22 +341,42 @@ export function buildPostBreRulesCatalog(thresholds: PostBreThresholdsSnapshot):
         'Uses totalUnsecuredExposureInr (sum of every unsecured tradeline, open and closed) — the same figure the pre-approved offer/credit-limit tier lookup uses.',
     },
     {
-      id: EC.REJECTED_CREDIT_ASSESSMENT_GRADES,
-      label: 'Rejected credit assessment grades',
+      id: EC.REJECTED_CREDIT_ASSESSMENT_GRADES_NEW,
+      label: 'Rejected credit assessment grades (new customers)',
       category: 'score',
       informationalOnly: false,
       alwaysEvaluated: true,
       toggleCriteriaKey: null,
-      criteriaKeys: [EC.REJECTED_CREDIT_ASSESSMENT_GRADES],
+      criteriaKeys: [EC.REJECTED_CREDIT_ASSESSMENT_GRADES_NEW],
       rejectionReasonCode: REJECTION_REASON.CREDIT_ASSESSMENT_GRADE_FAILED,
-      condition: `Credit assessment grade is one of ${(thresholds.rejectedCreditAssessmentGrades ?? []).join(', ') || '—'}.`,
-      passCondition: `Grade is not in the rejected set (${(thresholds.rejectedCreditAssessmentGrades ?? []).join(', ') || 'none'}).`,
+      condition: `New customers: credit assessment grade is one of ${(thresholds.rejectedCreditAssessmentGradesNew ?? []).join(', ') || '—'}.`,
+      passCondition: `Grade is not in the rejected set (${(thresholds.rejectedCreditAssessmentGradesNew ?? []).join(', ') || 'none'}) for new customers.`,
       dataSources: [
         'CIBIL credit-assessment category (loan-count bands A–H)',
         'TradeLinePartition → Tradeline count',
+        'applications (disbursed) for repeat-customer flag',
       ],
       tuefReference: null,
-      notes: 'Same category as the Credit Assessment panel (A best … H worst). Default blocked grades: E, F, G, H.',
+      notes: 'Applied when the customer has no prior disbursed loan. Same category as the Credit Assessment panel (A best … H worst).',
+    },
+    {
+      id: EC.REJECTED_CREDIT_ASSESSMENT_GRADES_EXISTING,
+      label: 'Rejected credit assessment grades (recurring customers)',
+      category: 'score',
+      informationalOnly: false,
+      alwaysEvaluated: true,
+      toggleCriteriaKey: null,
+      criteriaKeys: [EC.REJECTED_CREDIT_ASSESSMENT_GRADES_EXISTING],
+      rejectionReasonCode: REJECTION_REASON.CREDIT_ASSESSMENT_GRADE_FAILED,
+      condition: `Recurring customers: credit assessment grade is one of ${(thresholds.rejectedCreditAssessmentGradesExisting ?? []).join(', ') || '—'}.`,
+      passCondition: `Grade is not in the rejected set (${(thresholds.rejectedCreditAssessmentGradesExisting ?? []).join(', ') || 'none'}) for recurring customers.`,
+      dataSources: [
+        'CIBIL credit-assessment category (loan-count bands A–H)',
+        'TradeLinePartition → Tradeline count',
+        'applications (disbursed) for repeat-customer flag',
+      ],
+      tuefReference: null,
+      notes: 'Applied when the customer has at least one application in DISBURSED status. Same category as the Credit Assessment panel (A best … H worst).',
     },
   ];
 

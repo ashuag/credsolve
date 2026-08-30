@@ -833,10 +833,10 @@ export class LosMasterService {
       if (!trimmed) {
         throw new BadRequestException('Value cannot be empty.');
       }
-      data.value =
-        existing.key === ELIGIBILITY_CRITERIA.REJECTED_CREDIT_ASSESSMENT_GRADES
-          ? normalizeRejectedCreditAssessmentGrades(trimmed)
-          : trimmed;
+      const isGradeList =
+        existing.key === ELIGIBILITY_CRITERIA.REJECTED_CREDIT_ASSESSMENT_GRADES_NEW ||
+        existing.key === ELIGIBILITY_CRITERIA.REJECTED_CREDIT_ASSESSMENT_GRADES_EXISTING;
+      data.value = isGradeList ? normalizeRejectedCreditAssessmentGrades(trimmed) : trimmed;
     }
     if (hasActive) {
       data.isActive = dto.isActive;

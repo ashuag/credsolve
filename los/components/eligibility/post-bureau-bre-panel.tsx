@@ -327,7 +327,7 @@ export function PostBureauBrePanel() {
             checked={isExistingCustomer}
             onChange={(event) => setIsExistingCustomer(event.target.checked)}
           />
-          Treat as existing customer (use cibil_min_existing threshold)
+          Treat as recurring customer (existing CIBIL floor and rejected grades)
         </label>
 
         {parseError ? (

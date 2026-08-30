@@ -322,34 +322,43 @@ export class PostBreCheckService {
       }
     }
 
-    if (thresholds.rejectedCreditAssessmentGrades != null) {
-      const rejectedGrades = thresholds.rejectedCreditAssessmentGrades;
+    const rejectedGrades = input.isExistingCustomer
+      ? thresholds.rejectedCreditAssessmentGradesExisting
+      : thresholds.rejectedCreditAssessmentGradesNew;
+    if (rejectedGrades != null) {
+      const customerLabel = input.isExistingCustomer ? 'recurring' : 'new';
+      const gradeKey = input.isExistingCustomer
+        ? EC.REJECTED_CREDIT_ASSESSMENT_GRADES_EXISTING
+        : EC.REJECTED_CREDIT_ASSESSMENT_GRADES_NEW;
       const grade = this.resolveCreditAssessmentGrade(input.rawPayload, cibilScore);
       const blocked = grade != null && rejectedGrades.includes(grade);
       const gradeList = rejectedGrades.join(', ') || 'none';
       push({
-        id: EC.REJECTED_CREDIT_ASSESSMENT_GRADES,
-        label: 'Rejected credit assessment grades',
+        id: gradeKey,
+        label: `Rejected credit assessment grades (${customerLabel} customers)`,
         passed: !blocked,
         rejectionReasonCode: blocked ? REJECTION_REASON.CREDIT_ASSESSMENT_GRADE_FAILED : null,
         detail: blocked
-          ? `Credit assessment grade ${grade} is in the rejected set (${gradeList}).`
+          ? `Credit assessment grade ${grade} is in the rejected set (${gradeList}) for ${customerLabel} customers.`
           : grade
-            ? `Credit assessment grade ${grade} is not in the rejected set (${gradeList}).`
-            : `Credit assessment grade could not be computed; rejected set is ${gradeList}.`,
+            ? `Credit assessment grade ${grade} is not in the rejected set (${gradeList}) for ${customerLabel} customers.`
+            : `Credit assessment grade could not be computed; rejected set is ${gradeList} for ${customerLabel} customers.`,
         meta: {
           creditAssessmentGrade: grade,
           rejectedGrades: gradeList,
+          customerType: customerLabel,
         },
-        criteriaKeys: [EC.REJECTED_CREDIT_ASSESSMENT_GRADES],
+        criteriaKeys: [gradeKey],
         findings: blocked
           ? [
               {
                 title: 'Rejected credit assessment grade',
-                detail: `Grade ${grade} is blocked. Blocked grades: ${gradeList}.`,
+                detail: `Grade ${grade} is blocked for ${customerLabel} customers. Blocked grades: ${gradeList}.`,
                 data: {
                   creditAssessmentGrade: grade,
                   rejectedGrades: gradeList,
+                  customerType: customerLabel,
+                  criterionKey: gradeKey,
                 },
               },
             ]
@@ -715,7 +724,7 @@ export class PostBreCheckService {
     }
 
     if (bureauRow?.rawPayload != null) {
-      const bureauRules = this.runBureauPayloadRules(bureauRow.rawPayload, thresholds);
+      const bureauRules = this.runBureauPayloadRules(bureauRow.rawPayload, thresholds, isExistingCustomer);
       if (!bureauRules.passed) {
         return { ...bureauRules, cibilScore };
       }
@@ -731,6 +740,7 @@ export class PostBreCheckService {
   private runBureauPayloadRules(
     rawPayload: unknown,
     thresholds: PostBreThresholds,
+    isExistingCustomer: boolean,
   ): Pick<PostBreCheckResult, 'passed' | 'rejectReason' | 'rejectionReasonCode'> {
     const parsedReport = parseBureauReport(rawPayload);
     const wilfulDefault = checkNoWilfulDefault(parsedReport);
@@ -849,13 +859,17 @@ export class PostBreCheckService {
       }
     }
 
-    if (thresholds.rejectedCreditAssessmentGrades != null && thresholds.rejectedCreditAssessmentGrades.length > 0) {
+    const rejectedGrades = isExistingCustomer
+      ? thresholds.rejectedCreditAssessmentGradesExisting
+      : thresholds.rejectedCreditAssessmentGradesNew;
+    if (rejectedGrades != null && rejectedGrades.length > 0) {
       const grade = this.resolveCreditAssessmentGrade(rawPayload, null);
-      if (grade != null && thresholds.rejectedCreditAssessmentGrades.includes(grade)) {
-        const gradeList = thresholds.rejectedCreditAssessmentGrades.join(', ');
+      if (grade != null && rejectedGrades.includes(grade)) {
+        const customerLabel = isExistingCustomer ? 'recurring' : 'new';
+        const gradeList = rejectedGrades.join(', ');
         return {
           passed: false,
-          rejectReason: `Credit assessment grade ${grade} is in the rejected set (${gradeList}).`,
+          rejectReason: `Credit assessment grade ${grade} is in the rejected set (${gradeList}) for ${customerLabel} customers.`,
           rejectionReasonCode: REJECTION_REASON.CREDIT_ASSESSMENT_GRADE_FAILED,
         };
       }
@@ -1043,7 +1057,8 @@ export class PostBreCheckService {
       enforceNoActiveMfi: pickBool(EC.NO_ACTIVE_MFI),
       maxMissedPayments6Months: pickInt(EC.MAX_MISSED_PAYMENTS_6_MONTHS),
       minUnsecuredLoanAmount: pickInt(EC.MIN_UNSECURED_LOAN_AMOUNT),
-      rejectedCreditAssessmentGrades: pickGradeList(EC.REJECTED_CREDIT_ASSESSMENT_GRADES),
+      rejectedCreditAssessmentGradesNew: pickGradeList(EC.REJECTED_CREDIT_ASSESSMENT_GRADES_NEW),
+      rejectedCreditAssessmentGradesExisting: pickGradeList(EC.REJECTED_CREDIT_ASSESSMENT_GRADES_EXISTING),
     };
   }
 

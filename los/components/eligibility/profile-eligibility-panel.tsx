@@ -21,7 +21,10 @@ import {
   SummaryCards,
 } from './eligibility-ui';
 
-const REJECTED_CREDIT_ASSESSMENT_GRADES_KEY = 'REJECTED_CREDIT_ASSESSMENT_GRADES';
+const REJECTED_CREDIT_ASSESSMENT_GRADE_KEYS = new Set([
+  'REJECTED_CREDIT_ASSESSMENT_GRADES_NEW',
+  'REJECTED_CREDIT_ASSESSMENT_GRADES_EXISTING',
+]);
 
 const CREDIT_ASSESSMENT_GRADES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
 
@@ -79,7 +82,7 @@ function ProfileCriterionModal({
   onClose: () => void;
   onSubmit: (value: string) => Promise<unknown>;
 }) {
-  const isGradeRule = item.key === REJECTED_CREDIT_ASSESSMENT_GRADES_KEY;
+  const isGradeRule = REJECTED_CREDIT_ASSESSMENT_GRADE_KEYS.has(item.key);
   const [value, setValue] = useState(item.value);
   const [selectedGrades, setSelectedGrades] = useState(() => parseCreditAssessmentGrades(item.value));
   const [saving, setSaving] = useState(false);
@@ -113,10 +116,10 @@ function ProfileCriterionModal({
 
   return (
     <ModalShell
-      title={isGradeRule ? 'Edit rejected credit-assessment grades' : 'Edit Profile Eligibility Rule'}
+      title={isGradeRule ? `Edit ${item.label}` : 'Edit Profile Eligibility Rule'}
       subtitle={
         isGradeRule
-          ? 'Select the CIBIL credit-assessment grades (A–H) that should fail post-BRE. The rule key stays fixed.'
+          ? 'Select the CIBIL credit-assessment grades (A–H) that should fail post-BRE for this customer type. The rule key stays fixed.'
           : 'Update the stored rule value while keeping the internal rule key and label fixed.'
       }
       onClose={onClose}
@@ -325,7 +328,7 @@ export function ProfileEligibilityPanel({
       filter: { type: 'text', placeholder: 'Search values…' },
       cellClassName: 'text-brand-muted',
       render: (item) =>
-        item.key === REJECTED_CREDIT_ASSESSMENT_GRADES_KEY ? <GradeValuePills value={item.value} /> : item.value,
+        REJECTED_CREDIT_ASSESSMENT_GRADE_KEYS.has(item.key) ? <GradeValuePills value={item.value} /> : item.value,
     },
     {
       key: 'status',
