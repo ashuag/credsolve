@@ -60,5 +60,6 @@ export async function disburseApplication(
     `/applications/${encodeURIComponent(applicationUuid)}/disburse`,
     { method: 'POST' },
     'Failed to disburse loan.',
+    90_000,
   );
 }

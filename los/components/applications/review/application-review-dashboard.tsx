@@ -144,7 +144,7 @@ export function ApplicationReviewDashboard({
   const handleDisburse = useCallback(async () => {
     if (!authToken || disburseBusy) return;
     const confirmed = window.confirm(
-      `Disburse loan for ${row.applicationNumber}?\n\nThis will create the loan account (loan number = application number), set status to DISBURSED, and email the final sanction letter. Payment gateway is skipped for now.`,
+      `Disburse loan for ${row.applicationNumber}?\n\nThis sends one IMPS payout, creates the loan account (loan number = application number), sets status to DISBURSED, and emails the final sanction letter.`,
     );
     if (!confirmed) return;
     setDisburseBusy(true);

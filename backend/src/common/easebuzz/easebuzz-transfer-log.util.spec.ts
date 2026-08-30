@@ -1,4 +1,10 @@
-import { parseEasebuzzQuickTransferInitiate } from './easebuzz-transfer-log.util';
+import {
+  buildDisbursementUniqueRequestNumber,
+  isEasebuzzDuplicateUniqueRequestNumber,
+  isEasebuzzFailedVendorStatus,
+  parseEasebuzzQuickTransferInitiate,
+  uniqueRequestNumberFromVendorPayload,
+} from './easebuzz-transfer-log.util';
 
 const insufficientFundsPayload = {
   data: {
@@ -47,5 +53,48 @@ describe('parseEasebuzzQuickTransferInitiate', () => {
     });
     expect(parsed.accepted).toBe(false);
     expect(parsed.message).toBe('Insufficient funds');
+  });
+
+  it('treats a duplicate unique request number as a rejected initiate', () => {
+    const parsed = parseEasebuzzQuickTransferInitiate({
+      success: false,
+      message: 'Request already exists with same Unique Request Number.',
+      error_code: null,
+    });
+    expect(parsed.accepted).toBe(false);
+    expect(isEasebuzzDuplicateUniqueRequestNumber(parsed.message)).toBe(true);
+  });
+});
+
+describe('buildDisbursementUniqueRequestNumber', () => {
+  it('concatenates the application number with the current timestamp', () => {
+    expect(buildDisbursementUniqueRequestNumber('APP2026TSVP8', 1756535907000)).toBe(
+      'APP2026TSVP81756535907000',
+    );
+  });
+
+  it('strips non-alphanumeric characters and stays within 40 chars', () => {
+    const urn = buildDisbursementUniqueRequestNumber('app-2026-tsvp8', 1_756_535_907_000);
+    expect(urn).toBe('APP2026TSVP81756535907000');
+    expect(urn.length).toBeLessThanOrEqual(40);
+  });
+});
+
+describe('isEasebuzzFailedVendorStatus', () => {
+  it('recognizes vendor failure statuses', () => {
+    expect(isEasebuzzFailedVendorStatus('failure')).toBe(true);
+    expect(isEasebuzzFailedVendorStatus('pending')).toBe(false);
+    expect(isEasebuzzFailedVendorStatus(null)).toBe(false);
+  });
+});
+
+describe('uniqueRequestNumberFromVendorPayload', () => {
+  it('reads unique_request_number from the vendor request body', () => {
+    expect(
+      uniqueRequestNumberFromVendorPayload({
+        unique_request_number: 'APP2026TSVP81756535907000',
+        account_number: '1234562868',
+      }),
+    ).toBe('APP2026TSVP81756535907000');
   });
 });

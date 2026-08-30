@@ -1,8 +1,18 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { BadGatewayException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadGatewayException,
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { VendorApiService } from '../vendor/vendor-api.service';
 import {
+  isEasebuzzDuplicateUniqueRequestNumber,
+  isEasebuzzFailedVendorStatus,
   parseEasebuzzQuickTransferInitiate,
   parseEasebuzzQuickTransferRetrieve,
 } from './easebuzz-transfer-log.util';
@@ -32,6 +42,11 @@ export type EasebuzzQuickTransferResult = {
   vendorStatus: string | null;
   rawBody: unknown;
 };
+
+export type AdoptExistingQuickTransferResult =
+  | { status: 'accepted'; transfer: EasebuzzQuickTransferResult }
+  | { status: 'failed'; message: string | null }
+  | { status: 'unknown'; message: string | null };
 
 export type EasebuzzQuickTransferRetrieveResult = {
   httpOk: boolean;
@@ -173,12 +188,6 @@ function envTrim(config: ConfigService, key: string): string {
     return String(fromNest).trim();
   }
   return '';
-}
-
-function maskAccount(account: string): string {
-  const digits = account.replace(/\D/g, '');
-  if (digits.length <= 4) return '****';
-  return `${'*'.repeat(Math.max(0, digits.length - 4))}${digits.slice(-4)}`;
 }
 
 function maskPhone(phone: string): string {
@@ -871,7 +880,7 @@ export class EasebuzzWireService {
     const cfg = this.assertTransferConfiguredOrThrow();
 
     if (!(input.amountInr > 0) || !Number.isFinite(input.amountInr)) {
-      throw new BadGatewayException('Disbursement amount must be a positive number.');
+      throw new BadRequestException('Disbursement amount must be a positive number.');
     }
 
     const amountStr = formatWireAmountInr(input.amountInr);
@@ -923,7 +932,6 @@ export class EasebuzzWireService {
       body,
       leadId: input.leadId,
       timeoutMs: cfg.timeoutMs,
-      redactRequest: (payload) => this.redactRequest(payload),
       sensitiveHeaderNames: [cfg.key],
     });
 
@@ -935,7 +943,7 @@ export class EasebuzzWireService {
       this.logger.error(
         `[easebuzz] Transfer failed http=${result.httpStatus ?? 'n/a'} unique=${input.uniqueRequestNumber}: ${snippet}`,
       );
-      throw new BadGatewayException(
+      throw new ServiceUnavailableException(
         'Disbursement transfer failed at Easebuzz. Loan account was not created. Check vendor_api_log and try again.',
       );
     }
@@ -946,9 +954,18 @@ export class EasebuzzWireService {
         `[easebuzz] Transfer rejected unique=${input.uniqueRequestNumber} status=${parsed.vendorStatus ?? 'n/a'} ` +
           `reason=${parsed.message ?? 'n/a'}`,
       );
-      throw new BadGatewayException(
-        parsed.message ??
-          'Easebuzz transfer failed. Loan was not disbursed.',
+      if (isEasebuzzDuplicateUniqueRequestNumber(parsed.message)) {
+        const existing = await this.adoptExistingQuickTransfer(
+          input.uniqueRequestNumber,
+          input.leadId,
+        );
+        if (existing.status === 'accepted') return existing.transfer;
+        throw new ConflictException(
+          parsed.message ?? 'A disbursement payment already exists for this request number.',
+        );
+      }
+      throw new UnprocessableEntityException(
+        parsed.message ?? 'Easebuzz transfer failed. Loan was not disbursed.',
       );
     }
 
@@ -960,6 +977,48 @@ export class EasebuzzWireService {
       vendorStatus: parsed.vendorStatus,
       rawBody: result.body,
     };
+  }
+
+  /**
+   * When Easebuzz already has this URN, retrieve it instead of treating the
+   * duplicate as a new failure. Returns null when the existing transfer failed
+   * or is not yet visible.
+   */
+  async adoptExistingQuickTransfer(
+    uniqueRequestNumber: string,
+    leadId?: bigint | null,
+  ): Promise<AdoptExistingQuickTransferResult> {
+    const existing = await this.retrieveQuickTransfer(uniqueRequestNumber, { leadId });
+    const existingParsed = parseEasebuzzQuickTransferRetrieve(existing.rawBody);
+    if (existingParsed.accepted) {
+      this.logger.log(
+        `[easebuzz] Reusing existing transfer unique=${uniqueRequestNumber} ` +
+          `status=${existingParsed.vendorStatus ?? existing.status ?? 'n/a'}`,
+      );
+      return {
+        status: 'accepted',
+        transfer: {
+          ok: true,
+          httpStatus: existing.httpStatus,
+          transferId: existingParsed.transferId ?? existing.utr,
+          uniqueRequestNumber,
+          vendorStatus: existingParsed.vendorStatus ?? existing.status,
+          rawBody: existing.rawBody,
+        },
+      };
+    }
+    const message = existingParsed.message ?? existing.message ?? null;
+    if (isEasebuzzFailedVendorStatus(existingParsed.vendorStatus ?? existing.status)) {
+      this.logger.warn(
+        `[easebuzz] Existing transfer unique=${uniqueRequestNumber} failed: ${message ?? 'n/a'}`,
+      );
+      return { status: 'failed', message };
+    }
+    this.logger.warn(
+      `[easebuzz] Existing transfer unique=${uniqueRequestNumber} is not reusable ` +
+        `status=${existingParsed.vendorStatus ?? existing.status ?? 'n/a'} reason=${message ?? 'n/a'}`,
+    );
+    return { status: 'unknown', message };
   }
 
   /**
@@ -1299,22 +1358,6 @@ export class EasebuzzWireService {
       ...created,
       uniqueRequestNumber: created.merchantTxn,
       payoutLinkId: created.collectId,
-    };
-  }
-
-  private redactRequest(body: Record<string, unknown> | undefined): unknown {
-    if (!body) return body;
-    return {
-      ...body,
-      key: typeof body.key === 'string' ? `[REDACTED:${body.key.length} chars]` : body.key,
-      account_number:
-        typeof body.account_number === 'string' ? maskAccount(body.account_number) : body.account_number,
-      email: typeof body.email === 'string' ? maskEmail(body.email) : body.email,
-      phone: typeof body.phone === 'string' ? maskPhone(body.phone) : body.phone,
-      virtual_account_number:
-        typeof body.virtual_account_number === 'string'
-          ? maskAccount(body.virtual_account_number)
-          : body.virtual_account_number,
     };
   }
 

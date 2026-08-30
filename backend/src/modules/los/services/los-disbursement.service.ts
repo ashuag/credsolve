@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import {
@@ -16,8 +17,17 @@ import {
   LOAN_DOCUMENT_TYPE,
 } from '../../../common/constants/loan-document.constants';
 import { LOAN_STATUS } from '../../../common/constants/loan.constants';
-import { EasebuzzWireService } from '../../../common/easebuzz/easebuzz-wire.service';
-import { buildGatewayTransferJsonForPersist } from '../../../common/easebuzz/easebuzz-transfer-log.util';
+import {
+  EasebuzzWireService,
+  type EasebuzzQuickTransferResult,
+} from '../../../common/easebuzz/easebuzz-wire.service';
+import {
+  buildDisbursementUniqueRequestNumber,
+  buildGatewayTransferJsonForPersist,
+  isEasebuzzDuplicateUniqueRequestNumber,
+  parseEasebuzzQuickTransferInitiate,
+  uniqueRequestNumberFromVendorPayload,
+} from '../../../common/easebuzz/easebuzz-transfer-log.util';
 import { EmailService } from '../../../common/email/email.service';
 import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import { isCustomerJourneyComplete } from '../../../common/loan/customer-journey-complete.util';
@@ -28,7 +38,8 @@ import { RedisService } from '../../../common/redis/redis.service';
 import { LoanDocumentApplicationService } from '../../auth/application/services/loan-document-application.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 
-const DISBURSE_LOCK_TTL_SEC = 120;
+const DISBURSE_LOCK_TTL_SEC = 180;
+const PENDING_URN_TTL_SEC = 24 * 60 * 60;
 
 function maskEmail(email: string): string {
   const [local, domain] = email.split('@');
@@ -41,15 +52,6 @@ function maskAccount(account: string): string {
   const digits = account.replace(/\D/g, '');
   if (digits.length <= 4) return '****';
   return `${'*'.repeat(Math.max(0, digits.length - 4))}${digits.slice(-4)}`;
-}
-
-/**
- * Easebuzz unique_request_number — stable across retries for the same application.
- * Example auth pipe: …|MCASH12346|10.00|…
- */
-function buildUniqueRequestNumber(applicationNumber: string): string {
-  const compact = applicationNumber.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-  return `MCASH${compact}`.slice(0, 40);
 }
 
 @Injectable()
@@ -214,12 +216,11 @@ export class LosDisbursementService {
     }
 
     const netAmount = fees.disburseAmount;
-    // Loan number stays application number; Easebuzz URN uses MCASH{applicationNumber}.
     const loanNumber = resolveLoanAccountNumberAtDisbursement(application.applicationNumber);
-    const uniqueRequestNumber = buildUniqueRequestNumber(application.applicationNumber);
     const skipTransfer = this.easebuzzWire.isTransferSkipped();
 
     let paymentGateway: 'easebuzz' | 'skipped' = 'skipped';
+    let uniqueRequestNumber = '';
     let transferUtr: string | null = null;
     let vendorStatus: string | null = null;
     let gatewayTransferJson: unknown = null;
@@ -230,29 +231,22 @@ export class LosDisbursementService {
       );
     } else {
       this.easebuzzWire.assertConfiguredOrThrow();
-      this.logger.log(
-        `[disburse] Easebuzz transfer app=${applicationUuid} unique=${uniqueRequestNumber} ` +
-          `amount=${netAmount.toFixed(2)} account=${maskAccount(details.bankAccountNumber)}`,
-      );
-
-      const transfer = await this.easebuzzWire.initiateQuickTransfer({
+      const transfer = await this.initiateSingleDisbursementPayment({
+        applicationUuid,
+        applicationNumber: application.applicationNumber,
+        leadId: application.leadId,
+        customerId: application.customerId,
+        loanNumber,
         beneficiaryName,
         accountNumber: details.bankAccountNumber.trim(),
         ifscCode: details.ifscCode.trim(),
-        uniqueRequestNumber,
         amountInr: netAmount,
         email,
         phone: phoneDigits.slice(-10),
-        narration: 'loan disbursed',
-        leadId: application.leadId,
-        udf1: application.applicationNumber.slice(0, 50),
-        udf2: application.uuid.slice(0, 50),
-        udf3: String(application.customerId),
-        udf4: loanNumber.slice(0, 50),
-        udf5: 'LOS_DISBURSE',
       });
 
       paymentGateway = 'easebuzz';
+      uniqueRequestNumber = transfer.uniqueRequestNumber;
       transferUtr = transfer.transferId?.slice(0, 50) ?? uniqueRequestNumber.slice(0, 50);
       vendorStatus = transfer.vendorStatus;
       gatewayTransferJson = buildGatewayTransferJsonForPersist(transfer.rawBody);
@@ -398,7 +392,10 @@ export class LosDisbursementService {
       throw error;
     }
 
-    await this.emailFinalSanctionLetter(application);
+    void this.emailFinalSanctionLetter(application);
+    if (uniqueRequestNumber) {
+      await this.clearPendingUrn(applicationUuid);
+    }
 
     return {
       success: true as const,
@@ -421,6 +418,153 @@ export class LosDisbursementService {
           }
         : null,
     };
+  }
+
+  /**
+   * At most one Easebuzz payout per application: reuse an in-flight / existing
+   * URN, and only mint applicationNumber+timestamp when no live payment exists.
+   */
+  private async initiateSingleDisbursementPayment(input: {
+    applicationUuid: string;
+    applicationNumber: string;
+    leadId: bigint;
+    customerId: bigint;
+    loanNumber: string;
+    beneficiaryName: string;
+    accountNumber: string;
+    ifscCode: string;
+    amountInr: number;
+    email: string;
+    phone: string;
+  }): Promise<EasebuzzQuickTransferResult> {
+    const existingUrn = await this.findExistingPaymentUrn({
+      applicationUuid: input.applicationUuid,
+      applicationNumber: input.applicationNumber,
+      leadId: input.leadId,
+    });
+
+    if (existingUrn) {
+      this.logger.log(
+        `[disburse] Reusing existing payment URN app=${input.applicationUuid} unique=${existingUrn}`,
+      );
+      const adopted = await this.easebuzzWire.adoptExistingQuickTransfer(existingUrn, input.leadId);
+      if (adopted.status === 'accepted') {
+        await this.rememberPendingUrn(input.applicationUuid, existingUrn);
+        return adopted.transfer;
+      }
+      if (adopted.status !== 'failed') {
+        throw new ConflictException(
+          'Disbursement payment is already in progress for this application. Please wait and try again.',
+        );
+      }
+      this.logger.warn(
+        `[disburse] Previous payment unique=${existingUrn} is not reusable; starting a new transfer.`,
+      );
+      await this.clearPendingUrn(input.applicationUuid);
+    }
+
+    const uniqueRequestNumber = buildDisbursementUniqueRequestNumber(input.applicationNumber);
+    await this.rememberPendingUrn(input.applicationUuid, uniqueRequestNumber);
+    this.logger.log(
+      `[disburse] Easebuzz transfer app=${input.applicationUuid} unique=${uniqueRequestNumber} ` +
+        `amount=${input.amountInr.toFixed(2)} account=${maskAccount(input.accountNumber)}`,
+    );
+
+    try {
+      return await this.easebuzzWire.initiateQuickTransfer({
+        beneficiaryName: input.beneficiaryName,
+        accountNumber: input.accountNumber,
+        ifscCode: input.ifscCode,
+        uniqueRequestNumber,
+        amountInr: input.amountInr,
+        email: input.email,
+        phone: input.phone,
+        narration: 'loan disbursed',
+        leadId: input.leadId,
+        udf1: input.applicationNumber.slice(0, 50),
+        udf2: input.applicationUuid.slice(0, 50),
+        udf3: String(input.customerId),
+        udf4: input.loanNumber.slice(0, 50),
+        udf5: 'LOS_DISBURSE',
+      });
+    } catch (error) {
+      if (error instanceof UnprocessableEntityException) {
+        await this.clearPendingUrn(input.applicationUuid);
+      }
+      throw error;
+    }
+  }
+
+  private pendingUrnKey(applicationUuid: string): string {
+    return `los:disburse:urn:${applicationUuid}`;
+  }
+
+  private async rememberPendingUrn(applicationUuid: string, uniqueRequestNumber: string): Promise<void> {
+    try {
+      await this.redis.client.set(
+        this.pendingUrnKey(applicationUuid),
+        uniqueRequestNumber,
+        'EX',
+        PENDING_URN_TTL_SEC,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `[disburse] Failed to persist pending URN ${uniqueRequestNumber}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  private async clearPendingUrn(applicationUuid: string): Promise<void> {
+    try {
+      await this.redis.client.del(this.pendingUrnKey(applicationUuid));
+    } catch (error) {
+      this.logger.warn(
+        `[disburse] Failed to clear pending URN for ${applicationUuid}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  private async findExistingPaymentUrn(params: {
+    applicationUuid: string;
+    applicationNumber: string;
+    leadId: bigint;
+  }): Promise<string | null> {
+    try {
+      const fromRedis = (await this.redis.client.get(this.pendingUrnKey(params.applicationUuid)))?.trim();
+      if (fromRedis) return fromRedis;
+    } catch (error) {
+      this.logger.warn(
+        `[disburse] Failed to read pending URN for ${params.applicationUuid}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    const logs = await this.prisma.client.vendorApiLog.findMany({
+      where: {
+        leadId: params.leadId,
+        providerName: 'Easebuzz',
+        serviceName: 'quick-transfer-initiate',
+      },
+      orderBy: { requestedAt: 'desc' },
+      take: 12,
+      select: { requestPayload: true, responsePayload: true },
+    });
+
+    for (const log of logs) {
+      const urn = uniqueRequestNumberFromVendorPayload(log.requestPayload);
+      if (!urn) continue;
+      const parsed = parseEasebuzzQuickTransferInitiate(log.responsePayload);
+      if (parsed.accepted || isEasebuzzDuplicateUniqueRequestNumber(parsed.message)) {
+        return urn;
+      }
+    }
+
+    return null;
   }
 
   private async releaseDisburseLock(lockKey: string, lockToken: string): Promise<void> {

@@ -141,10 +141,42 @@ export type EasebuzzQuickTransferParse = {
   message: string | null;
 };
 
-/** Same URN used at disbursement: MCASH + alphanumeric application number. */
+export function isEasebuzzFailedVendorStatus(status: string | null | undefined): boolean {
+  return Boolean(status && QUICK_TRANSFER_FAILED_STATUSES.has(status.toLowerCase()));
+}
+
+/** Legacy URN (pre-timestamp): MCASH + alphanumeric application number. Used only as a fallback. */
 export function easebuzzUniqueRequestNumberForApplication(applicationNumber: string): string {
   const compact = applicationNumber.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
   return `MCASH${compact}`.slice(0, 40);
+}
+
+/**
+ * Disbursement unique_request_number: application number + unix-ms timestamp.
+ * Example: APP2026TSVP8 + 1756535907000 → APP2026TSVP81756535907000
+ */
+export function buildDisbursementUniqueRequestNumber(
+  applicationNumber: string,
+  atMs: number = Date.now(),
+): string {
+  const compact = applicationNumber.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  const timestamp = String(Math.trunc(atMs));
+  return `${compact}${timestamp}`.slice(0, 40);
+}
+
+export function isEasebuzzDuplicateUniqueRequestNumber(
+  message: string | null | undefined,
+): boolean {
+  if (!message) return false;
+  return /already exists.*unique request number|unique request number.*already exists/i.test(
+    message,
+  );
+}
+
+export function uniqueRequestNumberFromVendorPayload(payload: unknown): string | null {
+  const root = asRecord(payload);
+  if (!root) return null;
+  return pickString(root.unique_request_number, root.uniqueRequestNumber);
 }
 
 export function uniqueRequestNumberFromGatewayJson(

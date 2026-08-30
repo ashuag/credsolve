@@ -237,7 +237,7 @@ export class LosDataController {
   @UseGuards(LosDenyAgentGuard)
   @ApiOperation({
     summary:
-      'Disburse an APPROVED application: create loan_account (loan_number = application_number), set DISBURSED, email final sanction letter (payment gateway skipped)',
+      'Disburse an APPROVED application: one Easebuzz IMPS payout (URN = application number + timestamp), create loan_account, set DISBURSED, email final sanction letter',
   })
   disburseApplication(@Param('applicationUuid') applicationUuid: string) {
     return this.losDisbursement.disburseApplication(applicationUuid);

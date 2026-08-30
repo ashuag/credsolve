@@ -29,7 +29,8 @@ function proxyTimeoutMs(upstreamUrl: string): number {
     /\/lead-reports\/export(?:\?|$)/i.test(upstreamUrl) ||
     /\/transaction-reports\/export(?:\?|$)/i.test(upstreamUrl) ||
     /\/cibil-report\/pdf(?:\?|$)/i.test(upstreamUrl) ||
-    /\/cibil-report-download(?:\?|$)/i.test(upstreamUrl)
+    /\/cibil-report-download(?:\?|$)/i.test(upstreamUrl) ||
+    /\/applications\/[^/]+\/disburse(?:\?|$)/i.test(upstreamUrl)
   ) {
     return LONG_DOWNLOAD_PROXY_TIMEOUT_MS;
   }
