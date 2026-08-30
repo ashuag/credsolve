@@ -320,7 +320,7 @@ export class LosEasebuzzDevToolsService {
         apiStatus: parsed?.vendorStatus ?? null,
         apiUtr: parsed?.transferId ?? null,
         apiFailureReason: parsed && !parsed.accepted ? parsed.message : null,
-        apiMessage: log ? parsed?.message : 'No quick-transfer-initiate log found.',
+        apiMessage: log ? parsed?.message ?? null : 'No quick-transfer-initiate log found.',
         vendorBody: log?.responsePayload ?? null,
       };
     });
