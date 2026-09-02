@@ -209,7 +209,8 @@ export function PersonalDetailsStep(
       annualProfit: p.annualProfit || prev.annualProfit,
       creditConsentAccepted: p.creditConsentAccepted || prev.creditConsentAccepted,
     }));
-    const d = parseIsoDate(locked?.dob || p.dob);
+    const dobIso = locked?.dob || p.dob;
+    const d = dobIso ? parseIsoDate(dobIso) : null;
     if (d) setDobDisplay(formatDateDisplay(d));
   }, [initialProfile]);
 
