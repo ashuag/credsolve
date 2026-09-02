@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { resolveEffectiveLoanStatus } from '../../../common/loan/effective-loan-status.util';
 import { resolveLeadReportRepaymentStatus } from '../../../common/loan/lead-report-repayment-status.util';
 import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbursement-view.util';
+import { overlayLiveRepaymentDueDateIfSelected, resolveRepaymentDueDateUtc } from '../../../common/loan/repayment-due-date.util';
 import { TENACIO_SERVICE_PAN_NAME_DOB } from '../../../common/vendor/tenacio/tenacio-client.service';
 import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -95,6 +96,7 @@ const leadReportInclude = {
       city: { select: { name: true, state: { select: { name: true, code: true } } } },
       gender: { select: { name: true } },
       occupation: { select: { name: true } },
+      bureauReport: { select: { cibilScore: true } },
     },
   },
   vendorApiLogs: {
@@ -102,11 +104,6 @@ const leadReportInclude = {
     orderBy: [{ respondedAt: 'desc' as const }, { id: 'desc' as const }],
     take: 1,
     select: { requestPayload: true, responsePayload: true },
-  },
-  bureauReports: {
-    orderBy: { createdAt: 'desc' as const },
-    take: 1,
-    select: { cibilScore: true },
   },
   applications: {
     orderBy: { createdAt: 'desc' as const },
@@ -158,11 +155,15 @@ function moneyOrNull(value: number | null | undefined): string | null {
   return (Math.round(value * 100) / 100).toFixed(2);
 }
 
-function mapLeadReport(lead: LeadReportRecord) {
+function mapLeadReport(lead: LeadReportRecord, liveRepayDate?: Date | null) {
   const profile = lead.leadDetail;
   const application = lead.applications[0] ?? null;
-  const details = application?.details ?? null;
   const loan = application?.loanAccount ?? null;
+  const details = loan
+    ? application?.details ?? null
+    : overlayLiveRepaymentDueDateIfSelected(application?.details, liveRepayDate) ??
+      application?.details ??
+      null;
   const latestRepayment = loan?.repayments[0] ?? null;
   const effectiveLoan = loan
     ? resolveEffectiveLoanStatus({
@@ -215,7 +216,7 @@ function mapLeadReport(lead: LeadReportRecord) {
     pincode: profile?.pincode ?? null,
     address: [profile?.addressLine1, profile?.addressLine2].filter(Boolean).join(', ') || null,
     netMonthlyIncome: profile?.netMonthlyIncome?.toString() ?? null,
-    cibilScore: lead.bureauReports[0]?.cibilScore ?? null,
+    cibilScore: profile?.bureauReport?.cibilScore ?? null,
     leadStatusCode: lead.leadStatus.name,
     leadStatusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
     applicationUuid: application?.uuid ?? null,
@@ -306,23 +307,29 @@ export class LosLeadReportService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listLeadReports() {
-    const leads = await this.prisma.read.lead.findMany({
-      where: { isInternalTesting: false },
-      orderBy: { createdAt: 'desc' },
-      include: leadReportInclude,
-    });
-    return leads.map(mapLeadReport);
+    const [leads, liveRepayDate] = await Promise.all([
+      this.prisma.read.lead.findMany({
+        where: { isInternalTesting: false },
+        orderBy: { createdAt: 'desc' },
+        include: leadReportInclude,
+      }),
+      resolveRepaymentDueDateUtc(this.prisma.client),
+    ]);
+    return leads.map((lead) => mapLeadReport(lead, liveRepayDate));
   }
 
   async getLeadReportDetails(leadUuid: string) {
-    const lead = await this.prisma.read.lead.findUnique({
-      where: { uuid: leadUuid },
-      include: leadReportInclude,
-    });
+    const [lead, liveRepayDate] = await Promise.all([
+      this.prisma.read.lead.findUnique({
+        where: { uuid: leadUuid },
+        include: leadReportInclude,
+      }),
+      resolveRepaymentDueDateUtc(this.prisma.client),
+    ]);
     if (!lead) {
       throw new NotFoundException('Lead not found');
     }
-    return mapLeadReport(lead);
+    return mapLeadReport(lead, liveRepayDate);
   }
 
   async exportLeadReportsWorkbook(): Promise<Buffer> {

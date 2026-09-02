@@ -969,21 +969,15 @@ export class PostBreCheckService {
     cibilScore: number | null;
     rawPayload: unknown;
   } | null> {
-    const client = this.prisma.client as unknown as {
-      bureauReport: {
-        findFirst: (args: {
-          where: { leadId: bigint };
-          orderBy: { createdAt: 'desc' };
-          select: { cibilScore: true; rawPayload: true };
-        }) => Promise<{ cibilScore: number | null; rawPayload: unknown } | null>;
-      };
-    };
-    const row = await client.bureauReport.findFirst({
+    const row = await this.prisma.client.leadDetail.findUnique({
       where: { leadId },
-      orderBy: { createdAt: 'desc' },
-      select: { cibilScore: true, rawPayload: true },
+      select: {
+        bureauReport: {
+          select: { cibilScore: true, rawPayload: true },
+        },
+      },
     });
-    return row;
+    return row?.bureauReport ?? null;
   }
 
   private async loadPostBreRows(

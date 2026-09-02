@@ -6,20 +6,24 @@
 // but at most one active KYC bundle.
 
 model Customer {
-  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid          String    @unique @default(uuid()) @db.Char(36)
-  mobileNumber  String    @unique @map("mobile_number") @db.Char(10)
-  kycVerifiedAt DateTime? @map("kyc_verified_at")
-  isBlacklisted Boolean   @default(false) @map("is_blacklisted")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  id              BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid            String    @unique @default(uuid()) @db.Char(36)
+  mobileNumber    String    @unique @map("mobile_number") @db.Char(10)
+  kycVerifiedAt   DateTime? @map("kyc_verified_at")
+  isBlacklisted   Boolean   @default(false) @map("is_blacklisted")
+  /// Set after a successful PAN+DOB NSDL cache row; null on new customers.
+  panNsdlCacheId  BigInt?   @map("pan_nsdl_cache_id") @db.UnsignedBigInt
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
+  panNsdlCache  PanNsdlCache? @relation(fields: [panNsdlCacheId], references: [id], onDelete: SetNull)
   leads         Lead[]
   applications  Application[]
   customerKycs  CustomerKyc[]
   bureauReports BureauReport[]
   loanAccounts  LoanAccount[]
 
+  @@index([panNsdlCacheId])
   @@map("customer")
 }
 

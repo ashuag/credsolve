@@ -102,6 +102,8 @@ export type CustomerSessionResponse =
       bankVerificationProgress: CustomerBankVerificationProgress | null;
       /** True when an ACTIVE/OVERDUE loan exists — customer cannot start another application. */
       hasOpenLoan: boolean;
+      /** True when empty profile fields were filled from a previous repaid (CLOSED) loan. */
+      profilePrefillFromPriorApplication?: boolean;
     }
   | { authenticated: false };
 

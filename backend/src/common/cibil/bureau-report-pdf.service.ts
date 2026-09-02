@@ -38,11 +38,15 @@ export class BureauReportPdfService {
     leadId: bigint;
     customerUuid: string;
   }): Promise<{ relativePath: string; publicUrl: string | null } | null> {
-    const row = await this.prisma.client.bureauReport.findFirst({
+    const detail = await this.prisma.client.leadDetail.findUnique({
       where: { leadId: params.leadId },
-      orderBy: { createdAt: 'desc' },
-      select: { id: true, uuid: true, rawPayload: true },
+      select: {
+        bureauReport: {
+          select: { id: true, uuid: true, rawPayload: true },
+        },
+      },
     });
+    const row = detail?.bureauReport;
     if (!row) return null;
 
     return this.ensurePdfForReport({

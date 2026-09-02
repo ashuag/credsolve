@@ -17,6 +17,7 @@ import { resolveLeadCityId } from '../../../../common/utils/resolve-lead-city-id
 import { resolveGenderOccupationIds } from '../../../../common/utils/resolve-gender-occupation-ids.util';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
+import { recurringLockedIdentityFromPriorDetail } from '../../../../common/lead/recurring-customer-identity.util';
 import type { SaveLeadDetailsDto } from '../dto/save-lead-details.dto';
 
 function parseDobUtc(dob: string): Date {
@@ -54,6 +55,10 @@ export class SaveLeadDetailsUseCase {
       throw new NotFoundException('No matching active lead was found.');
     }
 
+    const priorIdentity = recurringLockedIdentityFromPriorDetail(
+      await this.leads.findLatestPriorLeadDetailForCustomer(customer.id, leadRow.id),
+    );
+
     const { genderId, occupationId } = await resolveGenderOccupationIds(
       this.prisma.client,
       dto.gender,
@@ -81,24 +86,27 @@ export class SaveLeadDetailsUseCase {
 
     await assertPincodeMatchesCity(this.prisma.client, dto.pincode, cityId);
 
-    const dateOfBirth = parseDobUtc(dto.dob);
+    const dateOfBirth = priorIdentity?.dateOfBirth ?? parseDobUtc(dto.dob);
     const netMonthlyIncome = parseOptionalInrAmount(dto.monthlyIncome);
     const annualTurnover = parseOptionalInrAmount(dto.annualTurnover);
     const annualProfit = parseOptionalInrAmount(dto.annualProfit);
+    const lockedFullName = priorIdentity?.fullName ?? dto.fullName.trim();
+    const lockedGenderId = priorIdentity?.genderId ?? genderId;
 
     const consentAt = dto.creditConsentAccepted ? new Date() : null;
     const panUpper =
-      dto.panNumber?.trim() != null && dto.panNumber.trim().length > 0
+      priorIdentity?.panNumber ??
+      (dto.panNumber?.trim() != null && dto.panNumber.trim().length > 0
         ? dto.panNumber.trim().toUpperCase()
-        : null;
+        : null);
 
     await this.prisma.client.leadDetail.upsert({
       where: { leadId: leadRow.id },
       create: {
         leadId: leadRow.id,
-        fullName: dto.fullName.trim(),
+        fullName: lockedFullName,
         dateOfBirth,
-        genderId,
+        genderId: lockedGenderId,
         occupationId,
         cityId,
         pincode: dto.pincode,
@@ -111,9 +119,9 @@ export class SaveLeadDetailsUseCase {
         ...(panUpper ? { panNumber: panUpper } : {}),
       },
       update: {
-        fullName: dto.fullName.trim(),
+        fullName: lockedFullName,
         dateOfBirth,
-        genderId,
+        genderId: lockedGenderId,
         occupationId,
         cityId,
         pincode: dto.pincode,

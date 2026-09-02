@@ -33,7 +33,8 @@ import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import { isCustomerJourneyComplete } from '../../../common/loan/customer-journey-complete.util';
 import { resolveLoanAccountNumberAtDisbursement } from '../../../common/loan/loan-account-number.util';
 import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbursement-view.util';
-import { decimalToNumber, resolveLiveTenureDays } from '../../../common/loan/loan-calculation.util';
+import { computeTenureDays, decimalToNumber, istCalendarDateUtc } from '../../../common/loan/loan-calculation.util';
+import { resolveRepaymentDueDateUtc } from '../../../common/loan/repayment-due-date.util';
 import { RedisService } from '../../../common/redis/redis.service';
 import { LoanDocumentApplicationService } from '../../auth/application/services/loan-document-application.service';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -193,17 +194,17 @@ export class LosDisbursementService {
       throw new BadRequestException('Borrower mobile number is invalid for disbursement.');
     }
 
-    // Freeze tenure/interest from disbursement day → repay date (not selection day).
+    // Freeze tenure/interest from disbursement day → the live repay date (not the
+    // selection-day snapshot). The due date can still move until this moment.
     const disbursedAt = new Date();
-    const liveTenureDays = resolveLiveTenureDays(
-      details.expectedRepaymentDate,
-      disbursedAt,
-      details.expectedRepaymentDays,
-    );
-    if (liveTenureDays == null) {
-      throw new BadRequestException('Unable to compute tenure for disbursement.');
-    }
-    const fees = computeFeeAmountsFromLoanDetail(details, disbursedAt);
+    const liveRepayDate = await resolveRepaymentDueDateUtc(this.prisma.client, disbursedAt);
+    const liveTenureDays = computeTenureDays(istCalendarDateUtc(disbursedAt), liveRepayDate);
+    const detailsForFees = {
+      ...details,
+      expectedRepaymentDate: liveRepayDate,
+      expectedRepaymentDays: liveTenureDays,
+    };
+    const fees = computeFeeAmountsFromLoanDetail(detailsForFees, disbursedAt);
     const principal = decimalToNumber(details.selectedLoanAmount);
     const interestRate = decimalToNumber(details.interestRate);
     if (
@@ -343,7 +344,7 @@ export class LosDisbursementService {
               ${fees.interestAmount!.toFixed(2)},
               ${totalRepayment.toFixed(2)},
               ${disbursedAt},
-              ${details.expectedRepaymentDate!},
+              ${liveRepayDate},
               ${utrForDb},
               ${gatewayTransferJson == null ? null : JSON.stringify(gatewayTransferJson)},
               ${details.bankAccountNumber},
@@ -363,10 +364,14 @@ export class LosDisbursementService {
             },
           });
 
-          // Persist the disbursement-day tenure so LOS / docs match the loan account.
+          // Persist the disbursement-day tenure and the live repay date so LOS / docs
+          // match the frozen loan_account.loan_maturity_date.
           await tx.applicationDetail.update({
             where: { applicationId: application.id },
-            data: { expectedRepaymentDays: liveTenureDays },
+            data: {
+              expectedRepaymentDays: liveTenureDays,
+              expectedRepaymentDate: liveRepayDate,
+            },
           });
 
           return {
@@ -392,6 +397,10 @@ export class LosDisbursementService {
       throw error;
     }
 
+    if (application.details) {
+      application.details.expectedRepaymentDate = liveRepayDate;
+      application.details.expectedRepaymentDays = liveTenureDays;
+    }
     void this.emailFinalSanctionLetter(application);
     if (uniqueRequestNumber) {
       await this.clearPendingUrn(applicationUuid);
@@ -593,7 +602,7 @@ export class LosDisbursementService {
       fullName: detail?.fullName,
       panVerified: detail?.panVerified,
       bureauFetched: detail?.bureauFetched,
-      hasBureauReport: Boolean(application.lead.bureauReports?.[0]),
+      hasBureauReport: Boolean(detail?.bureauReportId),
       selectedLoanAmount: application.details?.selectedLoanAmount,
       emailVerifiedAt: application.details?.emailVerifiedAt,
       loanDocumentsAcceptedAt: application.details?.loanDocumentsAcceptedAt,
@@ -648,16 +657,12 @@ export class LosDisbursementService {
         customer: { select: { uuid: true, mobileNumber: true } },
         lead: {
           select: {
-            bureauReports: {
-              orderBy: { createdAt: 'desc' },
-              take: 1,
-              select: { id: true },
-            },
             leadDetail: {
               select: {
                 fullName: true,
                 panVerified: true,
                 bureauFetched: true,
+                bureauReportId: true,
                 panNumber: true,
                 addressLine1: true,
                 addressLine2: true,

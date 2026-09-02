@@ -2,9 +2,9 @@ import { cachedAuthorizedLosGet, fetchWithTimeout, isFetchTimeoutError, messageF
 
 export type LosBureauReportListItem = {
   uuid: string;
-  leadUuid: string;
+  leadUuid: string | null;
   /** Public journey ID (`lead.lead_id`); same value as application ID when an application exists. */
-  leadNumber: string;
+  leadNumber: string | null;
   customerUuid: string;
   applicationUuid: string | null;
   applicationNumber: string | null;

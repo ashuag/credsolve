@@ -208,7 +208,7 @@ export class PanVerificationService {
       }
 
       return {
-        ...this.parseVendorResponse(result.body),
+        ...this.resultFromVendorBody(result.body),
         configured: true,
         skipReason: null,
         httpStatus: result.httpStatus,
@@ -226,6 +226,25 @@ export class PanVerificationService {
         vendorBody: null,
       };
     }
+  }
+
+  /**
+   * Maps a Tenacio NSDL envelope (live or cached `nsdl_response`) onto journey
+   * status. VERIFIED still requires pan valid + dobMatch + category Individual.
+   */
+  resultFromVendorBody(body: unknown): PanVerificationResult {
+    if (!body || typeof body !== 'object') {
+      return {
+        panVerifiedStatus: PAN_VERIFIED.API_FAILURE,
+        nameMatch: false,
+        dobMatch: false,
+        panStatus: null,
+        category: null,
+        vendorRequestId: null,
+        note: 'Cached NSDL payload was empty',
+      };
+    }
+    return this.parseVendorResponse(body as TenacioNsdlResponse);
   }
 
   /**

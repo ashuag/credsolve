@@ -23,6 +23,11 @@ import {
   mapLosDisbursementApiView,
   mapLosLoanDetailsFromStaging,
 } from '../../../common/loan/loan-disbursement-view.util';
+import {
+  overlayLiveRepaymentDueDateIfSelected,
+  resolveRepaymentDueDateUtc,
+  syncExpectedRepaymentDateUntilDisbursed,
+} from '../../../common/loan/repayment-due-date.util';
 import { APPLICATION_KYC_STATUS, APPLICATION_STATUS } from '../../../common/constants/application.constants';
 import { BANK_DETAIL_FAILED_NOTE, isBankNameMatchReviewPending, PENNY_DROP_FAILED_NOTE } from '../../../common/constants/bank.constants';
 import { SettingKey } from '../../../common/constants/setting.constants';
@@ -101,6 +106,7 @@ const loanDocumentApplicationSelect = {
       },
     },
   },
+  loanAccount: { select: { id: true } },
 } as const;
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -403,15 +409,16 @@ export class LosApplicationService {
                 fullName: true,
                 panVerified: true,
                 bureauFetched: true,
+                bureauReport: {
+                  select: {
+                    cibilScore: true,
+                    cibilCreditAssessment: { select: { category: true } },
+                  },
+                },
               },
             },
             leadStatus: { select: { name: true, displayName: true } },
             rejectionReason: { select: { name: true } },
-            bureauReports: {
-              orderBy: { createdAt: 'desc' },
-              take: 1,
-              select: { cibilScore: true, cibilCreditAssessment: { select: { category: true } } },
-            },
           },
         },
         applicationStatus: { select: { name: true, displayName: true } },
@@ -453,9 +460,13 @@ export class LosApplicationService {
       },
     });
 
+    const liveRepayDate = await resolveRepaymentDueDateUtc(this.prisma.client);
+
     return applications.map((application) => {
-      const appDetails = application.details;
       const loanAccount = application.loanAccount;
+      const appDetails = loanAccount
+        ? application.details
+        : overlayLiveRepaymentDueDateIfSelected(application.details, liveRepayDate) ?? application.details;
       const fees = computeFeeAmountsFromLoanDetail(appDetails, {
         preferStoredTenure: loanAccount != null,
       });
@@ -475,8 +486,8 @@ export class LosApplicationService {
         mobileNumber: application.customer.mobileNumber,
         email: appDetails?.emailId ?? null,
         fullName: formatLosPersonName(application.lead.leadDetail?.fullName),
-        cibilScore: application.lead.bureauReports[0]?.cibilScore ?? null,
-        cibilCreditAssessmentCategory: application.lead.bureauReports[0]?.cibilCreditAssessment?.category ?? null,
+        cibilScore: application.lead.leadDetail?.bureauReport?.cibilScore ?? null,
+        cibilCreditAssessmentCategory: application.lead.leadDetail?.bureauReport?.cibilCreditAssessment?.category ?? null,
         eligibleLoanAmount,
         selectedLoanAmount: appDetails?.selectedLoanAmount?.toString() ?? null,
         repayDate: loanAccount
@@ -583,6 +594,14 @@ export class LosApplicationService {
                 city: { select: { name: true, state: { select: { name: true, code: true } } } },
                 gender: { select: { name: true, key: true } },
                 occupation: { select: { name: true, key: true } },
+                bureauReport: {
+                  select: {
+                    uuid: true,
+                    cibilScore: true,
+                    createdAt: true,
+                    cibilCreditAssessment: { select: { category: true, creditRecommendation: true } },
+                  },
+                },
               },
             },
             leadUtms: { orderBy: { createdAt: 'desc' } },
@@ -628,19 +647,30 @@ export class LosApplicationService {
       throw new NotFoundException('Application not found');
     }
 
+    if (!application.loanAccount && application.details?.expectedRepaymentDate) {
+      const synced = await syncExpectedRepaymentDateUntilDisbursed(this.prisma.client, {
+        applicationId: application.id,
+        storedDate: application.details.expectedRepaymentDate,
+        storedDays: application.details.expectedRepaymentDays,
+        disbursed: false,
+        invalidateUnsignedDocuments: !application.details.loanDocumentsAcceptedAt,
+      });
+      if (synced.expectedRepaymentDate) {
+        application.details.expectedRepaymentDate = synced.expectedRepaymentDate;
+        application.details.expectedRepaymentDays = synced.expectedRepaymentDays;
+      }
+      if (synced.changed && !application.details.loanDocumentsAcceptedAt) {
+        application.details.keyFactPdfRelativePath = null;
+        application.details.loanAgreementPdfRelativePath = null;
+        application.details.loanDocumentsReviewedAt = null;
+        application.details.keyFactEsigned = false;
+      }
+    }
+
     const lead = application.lead;
     const detail = lead.leadDetail;
 
-    const bureauReportRow = await this.prisma.read.bureauReport.findFirst({
-      where: { leadId: application.leadId },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        uuid: true,
-        cibilScore: true,
-        createdAt: true,
-        cibilCreditAssessment: { select: { category: true, creditRecommendation: true } },
-      },
-    });
+    const bureauReportRow = detail?.bureauReport ?? null;
 
     let bureauReportPdfUrl: string | null = null;
     if (bureauReportRow) {
@@ -964,6 +994,12 @@ export class LosApplicationService {
     });
     if (!application) throw new NotFoundException('Application not found.');
 
+    await this.loanDocs.applyLiveRepaymentUntilDisbursed({
+      applicationId: application.id,
+      disbursed: application.loanAccount != null,
+      details: application.details,
+    });
+
     const docCtx = toLoanDocumentContext(application);
     const existing = this.loanDocs.relativePathForType(docType, docCtx);
 
@@ -1102,6 +1138,22 @@ export class LosApplicationService {
       select: {
         leadId: true,
         customer: { select: { uuid: true } },
+        lead: {
+          select: {
+            leadDetail: {
+              select: {
+                bureauReport: {
+                  select: {
+                    id: true,
+                    uuid: true,
+                    rawPayload: true,
+                    createdAt: true,
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -1109,16 +1161,7 @@ export class LosApplicationService {
       throw new NotFoundException('Application not found');
     }
 
-    const bureauReportRow = await this.prisma.read.bureauReport.findFirst({
-      where: { leadId: application.leadId },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        uuid: true,
-        rawPayload: true,
-        createdAt: true,
-      },
-    });
+    const bureauReportRow = application.lead.leadDetail?.bureauReport;
 
     if (!bureauReportRow) {
       throw new NotFoundException('No bureau report found for this application');
@@ -1159,6 +1202,12 @@ export class LosApplicationService {
     if (!application.details?.selectedLoanAmount || !application.details?.expectedRepaymentDays) {
       throw new NotFoundException('Loan selection is incomplete — cannot generate documents.');
     }
+
+    await this.loanDocs.applyLiveRepaymentUntilDisbursed({
+      applicationId: application.id,
+      disbursed: application.loanAccount != null,
+      details: application.details,
+    });
 
     // Always compute from application_detail snapshots (PF/GST/ROI/tenure), never live settings.
     const docCtx = toLoanDocumentContext(application);

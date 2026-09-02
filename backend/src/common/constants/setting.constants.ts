@@ -90,6 +90,12 @@ export const SettingKey = {
         description:
             'Bureau after PAN: 0/false = off; 1/true = live Tenacio bureau; 2 = mock success (no HTTP, fixed payload)',
     },
+    BUREAU_FETCH_DAYS_LIMIT: {
+        key: 'BUREAU_FETCH_DAYS_LIMIT',
+        default: '7',
+        description:
+            'For recurring customers (loan repaid/CLOSED): reuse the latest bureau_report for this customer if it is younger than this many days; otherwise fetch bureau again. 0 = always fetch.',
+    },
     PAN_VERIFICATION_ENABLED: {
         key: 'PAN_VERIFICATION_ENABLED',
         default: '1',

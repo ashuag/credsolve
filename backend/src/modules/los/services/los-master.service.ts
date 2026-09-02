@@ -1056,6 +1056,14 @@ export class LosMasterService {
           );
         }
       }
+      if (existing.key === SettingKey.BUREAU_FETCH_DAYS_LIMIT.key) {
+        const n = Number.parseInt(trimmed, 10);
+        if (!Number.isFinite(n) || n < 0 || n > 365 || String(n) !== trimmed) {
+          throw new BadRequestException(
+            'Bureau fetch days limit must be a whole number from 0 to 365 (0 = always fetch).',
+          );
+        }
+      }
       data.value = trimmed;
     }
     if (hasDescription) {

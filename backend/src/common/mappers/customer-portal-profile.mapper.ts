@@ -69,6 +69,66 @@ export function isLeadEmailVerifiedForPortal(
   return Boolean(email?.trim()) && emailVerificationType != null;
 }
 
+export type FormattedPortalProfile = {
+  fullName: string | null;
+  dob: string | null;
+  panNumber: string | null;
+  gender: CustomerPortalGenderSlug | null;
+  occupation: CustomerPortalOccupationSlug | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  currentCity: string | null;
+  pincode: string | null;
+  monthlyIncome: string | null;
+  annualTurnover: string | null;
+  annualProfit: string | null;
+  creditConsentAccepted: boolean;
+  panVerified: boolean;
+  panVerifiedAt: string | null;
+};
+
+function blankToNull(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+/**
+ * Fills empty fields on the current (new) lead from a recurring customer’s
+ * last repaid loan. Never copies CIBIL consent or PAN verification.
+ */
+export function mergePortalProfileWithPriorPrefill(
+  current: FormattedPortalProfile | null,
+  prior: FormattedPortalProfile | null,
+): FormattedPortalProfile | null {
+  if (!prior) return current;
+  if (!current) {
+    return {
+      ...prior,
+      creditConsentAccepted: false,
+      panVerified: false,
+      panVerifiedAt: null,
+    };
+  }
+
+  return {
+    fullName: blankToNull(current.fullName) ?? prior.fullName,
+    dob: blankToNull(current.dob) ?? prior.dob,
+    panNumber: blankToNull(current.panNumber) ?? prior.panNumber,
+    gender: current.gender ?? prior.gender,
+    occupation: current.occupation ?? prior.occupation,
+    addressLine1: blankToNull(current.addressLine1) ?? prior.addressLine1,
+    addressLine2: blankToNull(current.addressLine2) ?? prior.addressLine2,
+    currentCity: blankToNull(current.currentCity) ?? prior.currentCity,
+    pincode: blankToNull(current.pincode) ?? prior.pincode,
+    monthlyIncome: blankToNull(current.monthlyIncome) ?? prior.monthlyIncome,
+    annualTurnover: blankToNull(current.annualTurnover) ?? prior.annualTurnover,
+    annualProfit: blankToNull(current.annualProfit) ?? prior.annualProfit,
+    creditConsentAccepted: current.creditConsentAccepted,
+    panVerified: current.panVerified,
+    panVerifiedAt: current.panVerifiedAt,
+  };
+}
+
 export function formatLeadDetailForPortal(detail: {
   fullName: string | null;
   dateOfBirth: Date | null;
@@ -85,23 +145,7 @@ export function formatLeadDetailForPortal(detail: {
   gender: { key?: string; name: string } | null;
   occupation: { key?: string; name: string } | null;
   city: { name: string; state: { code: string } } | null;
-} | null): {
-  fullName: string | null;
-  dob: string | null;
-  panNumber: string | null;
-  gender: CustomerPortalGenderSlug | null;
-  occupation: CustomerPortalOccupationSlug | null;
-  addressLine1: string | null;
-  addressLine2: string | null;
-  currentCity: string | null;
-  pincode: string | null;
-  monthlyIncome: string | null;
-  annualTurnover: string | null;
-  annualProfit: string | null;
-  creditConsentAccepted: boolean;
-  panVerified: boolean;
-  panVerifiedAt: string | null;
-} | null {
+} | null): FormattedPortalProfile | null {
   if (!detail) {
     return null;
   }

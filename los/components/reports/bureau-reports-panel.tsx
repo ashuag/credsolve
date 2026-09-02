@@ -112,17 +112,20 @@ export function BureauReportsPanel() {
       key: 'lead',
       label: 'Application ID',
       headerClassName: 'whitespace-nowrap',
-      getFilterValue: (row) => row.leadNumber,
-      getSortValue: (row) => row.leadNumber.toLowerCase(),
+      getFilterValue: (row) => row.leadNumber ?? '',
+      getSortValue: (row) => (row.leadNumber ?? '').toLowerCase(),
       filter: { type: 'text', placeholder: 'Search lead…' },
-      render: (row) => (
-        <Link
-          href={`/reports/bureau-report/${row.leadUuid}`}
-          className="font-mono text-[0.82rem] font-semibold text-brand-blue no-underline hover:underline whitespace-nowrap"
-        >
-          {row.leadNumber}
-        </Link>
-      ),
+      render: (row) =>
+        row.leadUuid && row.leadNumber ? (
+          <Link
+            href={`/reports/bureau-report/${row.leadUuid}`}
+            className="font-mono text-[0.82rem] font-semibold text-brand-blue no-underline hover:underline whitespace-nowrap"
+          >
+            {row.leadNumber}
+          </Link>
+        ) : (
+          <span className="text-brand-muted">—</span>
+        ),
     },
     {
       key: 'customer',
@@ -131,14 +134,17 @@ export function BureauReportsPanel() {
       getFilterValue: (row) => row.fullName?.trim() ?? '',
       getSortValue: (row) => (row.fullName?.trim() ?? '').toLowerCase(),
       filter: { type: 'text', placeholder: 'Search name…' },
-      render: (row) => (
-        <Link
-          href={`/reports/bureau-report/${row.leadUuid}`}
-          className="font-semibold text-brand-blue no-underline hover:underline whitespace-nowrap"
-        >
-          {formatPersonName(row.fullName)}
-        </Link>
-      ),
+      render: (row) =>
+        row.leadUuid ? (
+          <Link
+            href={`/reports/bureau-report/${row.leadUuid}`}
+            className="font-semibold text-brand-blue no-underline hover:underline whitespace-nowrap"
+          >
+            {formatPersonName(row.fullName)}
+          </Link>
+        ) : (
+          <span className="font-semibold whitespace-nowrap">{formatPersonName(row.fullName)}</span>
+        ),
     },
     {
       key: 'mobile',

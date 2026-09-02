@@ -113,19 +113,14 @@ export class CibilCreditAssessmentService {
     cibilScore: number | null;
     rawPayload: unknown;
   } | null> {
-    const client = this.prisma.client as unknown as {
-      bureauReport: {
-        findFirst: (args: {
-          where: { leadId: bigint };
-          orderBy: { createdAt: 'desc' };
-          select: { id: true; cibilScore: true; rawPayload: true };
-        }) => Promise<{ id: bigint; cibilScore: number | null; rawPayload: unknown } | null>;
-      };
-    };
-    return client.bureauReport.findFirst({
+    const row = await this.prisma.client.leadDetail.findUnique({
       where: { leadId },
-      orderBy: { createdAt: 'desc' },
-      select: { id: true, cibilScore: true, rawPayload: true },
+      select: {
+        bureauReport: {
+          select: { id: true, cibilScore: true, rawPayload: true },
+        },
+      },
     });
+    return row?.bureauReport ?? null;
   }
 }

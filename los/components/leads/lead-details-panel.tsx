@@ -380,6 +380,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
                     { label: 'PAN status', value: lead.panVerifiedLabel ?? '—' },
                     { label: 'Bureau', value: lead.bureauFetchedLabel ?? '—' },
                     { label: 'CIBIL', value: formatCibilScoreLabel(lead.bureauReport?.cibilScore) },
+                    { label: 'Bureau report ID', value: lead.bureauReport?.id ?? '—' },
                     { label: 'Gender', value: profile.gender ?? '—' },
                     { label: 'Occupation', value: profile.occupation ?? '—' },
                   ]}

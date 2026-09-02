@@ -3,6 +3,7 @@ import {registerLiveLoanFeeRatesLoader} from '../../../../common/loan/live-loan-
 import {LOOKUP_CACHE_TTL_SECONDS} from '../../../../common/constants/app.constants';
 import {ELIGIBILITY_CRITERIA as EC} from '../../../../common/constants/eligibility-criteria.constants';
 import {
+  readBureauFetchDaysLimit,
   readBureauFetchMode,
   type BureauFetchMode,
 } from '../../../../common/constants/bureau-fetch-settings.util';
@@ -198,6 +199,14 @@ export class SettingsRepository implements OnModuleInit {
   /** `0` off, `1` live Tenacio, `2` mock (no HTTP). */
   async getBureauFetchMode(): Promise<BureauFetchMode> {
     return readBureauFetchMode(this.prisma.client);
+  }
+
+  /**
+   * Recurring-customer bureau reuse window in days (`BUREAU_FETCH_DAYS_LIMIT`, default 7).
+   * `0` means always fetch from the vendor.
+   */
+  async getBureauFetchDaysLimit(): Promise<number> {
+    return readBureauFetchDaysLimit(this.prisma.client);
   }
 
   async loadCustomerLeadPolicySettings(): Promise<CustomerLeadPolicySettings> {

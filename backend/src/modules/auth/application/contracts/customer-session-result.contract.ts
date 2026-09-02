@@ -128,5 +128,10 @@ export type CustomerSessionResult =
        * Blocks starting another application until the loan is CLOSED.
        */
       hasOpenLoan: boolean;
+      /**
+       * True when empty fields were filled from a recurring customer’s last repaid loan
+       * (disbursed and CLOSED). Consent and PAN verification are never copied.
+       */
+      profilePrefillFromPriorApplication: boolean;
     }
   | { authenticated: false };

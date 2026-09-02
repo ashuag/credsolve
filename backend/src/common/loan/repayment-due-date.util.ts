@@ -1,4 +1,5 @@
-import { istCalendarDateUtc } from './loan-calculation.util';
+import type { Prisma } from '@prisma/client';
+import { computeTenureDays, istCalendarDateUtc } from './loan-calculation.util';
 
 export function isoDateOnlyUtc(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -98,4 +99,110 @@ export async function resolveRepaymentDueDateUtc(
     return dueMonthOverride;
   }
   return fallback;
+}
+
+export type ExpectedRepaymentSyncClient = Pick<
+  Prisma.TransactionClient,
+  'repaymentDueDate' | 'applicationDetail'
+>;
+
+export type LoanDetailWithExpectedRepayment = {
+  expectedRepaymentDate?: Date | null;
+  expectedRepaymentDays?: number | null;
+};
+
+/**
+ * Replace a pre-disbursement snapshot with the currently resolved due date
+ * (and live tenure from `asOf`). No-op when there is no stored selection date.
+ */
+export function overlayLiveRepaymentDueDate<T extends LoanDetailWithExpectedRepayment>(
+  loanDetail: T,
+  liveDate: Date,
+  asOf: Date = new Date(),
+): T {
+  return {
+    ...loanDetail,
+    expectedRepaymentDate: liveDate,
+    expectedRepaymentDays: computeTenureDays(istCalendarDateUtc(asOf), liveDate),
+  };
+}
+
+export function overlayLiveRepaymentDueDateIfSelected<T extends LoanDetailWithExpectedRepayment>(
+  loanDetail: T | null | undefined,
+  liveDate: Date | null | undefined,
+  asOf: Date = new Date(),
+): T | null | undefined {
+  if (!loanDetail || !liveDate || loanDetail.expectedRepaymentDate == null) {
+    return loanDetail;
+  }
+  return overlayLiveRepaymentDueDate(loanDetail, liveDate, asOf);
+}
+
+export type SyncedExpectedRepayment = {
+  expectedRepaymentDate: Date | null;
+  expectedRepaymentDays: number | null;
+  changed: boolean;
+};
+
+/**
+ * Recalculate `application_detail.expected_repayment_date` from today's rule
+ * (month-end + LOS override) until a loan account exists. After disbursement the
+ * date is frozen on `loan_account.loan_maturity_date`.
+ *
+ * When the date changes and documents are not yet accepted, unsigned KFS files
+ * and the review stamp are cleared so the customer re-reviews the new date.
+ */
+export async function syncExpectedRepaymentDateUntilDisbursed(
+  prisma: ExpectedRepaymentSyncClient,
+  params: {
+    applicationId: bigint;
+    storedDate: Date | null | undefined;
+    storedDays?: number | null;
+    disbursed: boolean;
+    invalidateUnsignedDocuments?: boolean;
+    asOf?: Date;
+  },
+): Promise<SyncedExpectedRepayment> {
+  if (params.disbursed) {
+    return {
+      expectedRepaymentDate: params.storedDate ?? null,
+      expectedRepaymentDays: params.storedDays ?? null,
+      changed: false,
+    };
+  }
+  if (params.storedDate == null) {
+    return {
+      expectedRepaymentDate: null,
+      expectedRepaymentDays: params.storedDays ?? null,
+      changed: false,
+    };
+  }
+
+  const liveDate = await resolveRepaymentDueDateUtc(prisma, params.asOf);
+  const liveDays = computeTenureDays(istCalendarDateUtc(params.asOf), liveDate);
+  const changed = isoDateOnlyUtc(params.storedDate) !== isoDateOnlyUtc(liveDate);
+  if (changed) {
+    await prisma.applicationDetail.update({
+      where: { applicationId: params.applicationId },
+      data: {
+        expectedRepaymentDate: liveDate,
+        expectedRepaymentDays: liveDays,
+        ...(params.invalidateUnsignedDocuments
+          ? {
+              keyFactPdfRelativePath: null,
+              loanAgreementPdfRelativePath: null,
+              keyFactEsigned: false,
+              loanDocumentsReviewedAt: null,
+              loanDocumentsReviewedIp: null,
+            }
+          : {}),
+      },
+    });
+  }
+
+  return {
+    expectedRepaymentDate: liveDate,
+    expectedRepaymentDays: liveDays,
+    changed,
+  };
 }

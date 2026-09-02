@@ -125,6 +125,7 @@ export type LosLeadDetails = {
     cibilConsentAt: string | null;
   } | null;
   bureauReport: {
+    id: string;
     uuid: string;
     cibilScore: number | null;
     fetchedAt: string;

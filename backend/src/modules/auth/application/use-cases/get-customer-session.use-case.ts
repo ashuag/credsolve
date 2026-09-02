@@ -14,6 +14,7 @@ import {
   formatLeadDetailForPortal,
   isLeadEmailVerifiedForPortal,
   isPanVerifiedFromDb,
+  mergePortalProfileWithPriorPrefill,
 } from '../../../../common/mappers/customer-portal-profile.mapper';
 import { PAN_VERIFIED } from '../../../../common/constants/pan-verification.constants';
 import { isCibilNewToCreditScore } from '../../../../common/vendor/tenacio-bureau-payload.mapper';
@@ -29,6 +30,7 @@ import {
 } from '../../../../common/constants/kyc.constants';
 import { VendorInternalErrorService } from '../../../../common/vendor/vendor-internal-error.service';
 import { resolveLiveTenureDays } from '../../../../common/loan/loan-calculation.util';
+import { syncExpectedRepaymentDateUntilDisbursed } from '../../../../common/loan/repayment-due-date.util';
 import {
   extractActiveLivenessBlock,
   readHeadMovementSnapshot,
@@ -91,6 +93,7 @@ export class GetCustomerSessionUseCase {
       kycFaceProgress: null,
       bankVerificationProgress: null,
       hasOpenLoan: false,
+      profilePrefillFromPriorApplication: false,
     };
 
     const hasOpenLoan = await customerHasOpenLoan(this.prisma.client, customer.id);
@@ -182,9 +185,19 @@ export class GetCustomerSessionUseCase {
       application?.emailVerificationType ?? null,
     );
 
-    let profile = formatLeadDetailForPortal(leadRow.leadDetail);
+    const currentProfile = formatLeadDetailForPortal(leadRow.leadDetail);
+    const needsPriorProfilePrefill = !(
+      currentProfile?.fullName?.trim() &&
+      currentProfile?.dob?.trim() &&
+      currentProfile?.gender &&
+      currentProfile?.occupation &&
+      currentProfile?.addressLine1?.trim() &&
+      currentProfile?.currentCity?.trim() &&
+      currentProfile?.pincode?.trim() &&
+      currentProfile?.panNumber?.trim()
+    );
 
-    const [applicationExtras, latestCustomerKyc, leadReferenceRows] = await Promise.all([
+    const [applicationExtras, latestCustomerKyc, leadReferenceRows, priorLeadDetail] = await Promise.all([
       application
         ? this.prisma.client.application.findUnique({
             where: { id: application.id },
@@ -238,20 +251,47 @@ export class GetCustomerSessionUseCase {
             },
           })
         : Promise.resolve([]),
+      needsPriorProfilePrefill
+        ? this.leads.findLatestPriorLeadDetailForCustomer(customer.id, leadRow.id)
+        : Promise.resolve(null),
     ]);
+
+    const profile = mergePortalProfileWithPriorPrefill(
+      currentProfile,
+      formatLeadDetailForPortal(priorLeadDetail),
+    );
 
     const appDetails = applicationExtras?.details ?? null;
     const loanAccount = applicationExtras?.loanAccount ?? null;
 
+    let expectedRepaymentDate = appDetails?.expectedRepaymentDate ?? null;
+    let expectedRepaymentDays = appDetails?.expectedRepaymentDays ?? null;
+    let loanDocumentsReviewedAt = application?.loanDocumentsReviewedAt ?? null;
+    if (application && expectedRepaymentDate && !loanAccount) {
+      const docsAccepted = Boolean(application.loanDocumentsAcceptedAt);
+      const synced = await syncExpectedRepaymentDateUntilDisbursed(this.prisma.client, {
+        applicationId: application.id,
+        storedDate: expectedRepaymentDate,
+        storedDays: expectedRepaymentDays,
+        disbursed: false,
+        invalidateUnsignedDocuments: !docsAccepted,
+      });
+      expectedRepaymentDate = synced.expectedRepaymentDate;
+      expectedRepaymentDays = synced.expectedRepaymentDays;
+      if (synced.changed && !docsAccepted) {
+        loanDocumentsReviewedAt = null;
+      }
+    }
+
     const profileFieldsComplete = Boolean(
-      profile?.fullName?.trim() &&
-        profile?.dob?.trim() &&
-        profile?.gender &&
-        profile?.occupation &&
-        profile?.addressLine1?.trim() &&
-        profile?.currentCity?.trim() &&
-        profile?.pincode?.trim() &&
-        profile?.creditConsentAccepted,
+      currentProfile?.fullName?.trim() &&
+        currentProfile?.dob?.trim() &&
+        currentProfile?.gender &&
+        currentProfile?.occupation &&
+        currentProfile?.addressLine1?.trim() &&
+        currentProfile?.currentCity?.trim() &&
+        currentProfile?.pincode?.trim() &&
+        currentProfile?.creditConsentAccepted,
     );
     const panChecksComplete =
       isPanVerifiedFromDb(leadRow.leadDetail?.panVerified) ||
@@ -264,7 +304,7 @@ export class GetCustomerSessionUseCase {
         appDetails?.reasonForLoanId != null,
     );
 
-    const loanDocumentsCompleted = Boolean(application?.loanDocumentsReviewedAt);
+    const loanDocumentsCompleted = Boolean(loanDocumentsReviewedAt);
     const loanDocumentsAccepted = Boolean(application?.loanDocumentsAcceptedAt);
 
     const kycDocsCount = countUploadedKycDocuments(latestCustomerKyc?.aadhaarData);
@@ -338,23 +378,23 @@ export class GetCustomerSessionUseCase {
     const loanSelection =
       appDetails &&
       (appDetails.selectedLoanAmount != null ||
-        appDetails.expectedRepaymentDays != null ||
-        appDetails.expectedRepaymentDate != null)
+        expectedRepaymentDays != null ||
+        expectedRepaymentDate != null)
         ? {
             amountInr:
               appDetails.selectedLoanAmount != null ? appDetails.selectedLoanAmount.toString() : null,
             // Before disbursement, show tenure as-of today → repay date (not selection-day freeze).
             tenureDays: loanAccount
-              ? (appDetails.expectedRepaymentDays ?? null)
+              ? (expectedRepaymentDays ?? null)
               : resolveLiveTenureDays(
-                  appDetails.expectedRepaymentDate,
+                  expectedRepaymentDate,
                   new Date(),
-                  appDetails.expectedRepaymentDays,
+                  expectedRepaymentDays,
                 ),
             maturityDate: loanAccount?.loanMaturityDate
               ? loanAccount.loanMaturityDate.toISOString().slice(0, 10)
-              : appDetails.expectedRepaymentDate
-                ? appDetails.expectedRepaymentDate.toISOString().slice(0, 10)
+              : expectedRepaymentDate
+                ? expectedRepaymentDate.toISOString().slice(0, 10)
                 : null,
           }
         : null;
@@ -445,6 +485,7 @@ export class GetCustomerSessionUseCase {
       kycFaceProgress,
       bankVerificationProgress,
       hasOpenLoan,
+      profilePrefillFromPriorApplication: Boolean(priorLeadDetail),
     };
   }
 

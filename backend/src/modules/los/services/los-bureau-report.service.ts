@@ -26,15 +26,22 @@ export class LosBureauReportService {
         dummyFetched: true,
         createdAt: true,
         customer: { select: { uuid: true, mobileNumber: true } },
-        lead: {
+        leadDetails: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
           select: {
-            uuid: true,
-            leadNumber: true,
-            leadDetail: { select: { fullName: true, panNumber: true } },
-            applications: {
-              orderBy: { createdAt: 'desc' },
-              take: 1,
-              select: { uuid: true, applicationNumber: true },
+            fullName: true,
+            panNumber: true,
+            lead: {
+              select: {
+                uuid: true,
+                leadNumber: true,
+                applications: {
+                  orderBy: { createdAt: 'desc' },
+                  take: 1,
+                  select: { uuid: true, applicationNumber: true },
+                },
+              },
             },
           },
         },
@@ -42,21 +49,25 @@ export class LosBureauReportService {
       },
     });
 
-    return reports.map((row) => ({
-      uuid: row.uuid,
-      leadUuid: row.lead.uuid,
-      leadNumber: row.lead.leadNumber,
-      customerUuid: row.customer.uuid,
-      applicationUuid: row.lead.applications[0]?.uuid ?? null,
-      applicationNumber: row.lead.applications[0]?.applicationNumber ?? null,
-      fullName: formatLosPersonName(row.lead.leadDetail?.fullName),
-      mobileNumber: row.customer.mobileNumber,
-      panNumber: row.lead.leadDetail?.panNumber?.trim().toUpperCase() || null,
-      cibilScore: row.cibilScore,
-      cibilCreditAssessmentCategory: row.cibilCreditAssessment?.category ?? null,
-      dummyFetched: Boolean(row.dummyFetched),
-      fetchedAt: row.createdAt.toISOString(),
-    }));
+    return reports.map((row) => {
+      const attached = row.leadDetails[0] ?? null;
+      const lead = attached?.lead ?? null;
+      return {
+        uuid: row.uuid,
+        leadUuid: lead?.uuid ?? null,
+        leadNumber: lead?.leadNumber ?? null,
+        customerUuid: row.customer.uuid,
+        applicationUuid: lead?.applications[0]?.uuid ?? null,
+        applicationNumber: lead?.applications[0]?.applicationNumber ?? null,
+        fullName: formatLosPersonName(attached?.fullName),
+        mobileNumber: row.customer.mobileNumber,
+        panNumber: attached?.panNumber?.trim().toUpperCase() || null,
+        cibilScore: row.cibilScore,
+        cibilCreditAssessmentCategory: row.cibilCreditAssessment?.category ?? null,
+        dummyFetched: Boolean(row.dummyFetched),
+        fetchedAt: row.createdAt.toISOString(),
+      };
+    });
   }
 
   /** Builds the "Credit Assessment data" workbook (raw per-report feature columns) for LOS Reports → Bureau Report. */
@@ -76,7 +87,12 @@ export class LosBureauReportService {
           id: true,
           rawPayload: true,
           cibilScore: true,
-          lead: { select: { leadNumber: true } },
+          customer: { select: { mobileNumber: true } },
+          leadDetails: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { lead: { select: { leadNumber: true } } },
+          },
         },
       });
       if (batch.length === 0) break;
@@ -88,13 +104,13 @@ export class LosBureauReportService {
           featureCells = buildCibilAssessmentExportRow(report.rawPayload, index, report.cibilScore);
         } catch (err) {
           this.logger.warn(
-            `Skipping malformed bureau payload in export (lead=${report.lead.leadNumber}): ${
+            `Skipping malformed bureau payload in export (lead=${report.leadDetails[0]?.lead.leadNumber ?? 'n/a'}): ${
               err instanceof Error ? err.message : String(err)
             }`,
           );
           featureCells = CIBIL_ASSESSMENT_EXPORT_HEADERS.map(() => null);
         }
-        rows.push([report.lead.leadNumber, ...featureCells]);
+        rows.push([report.leadDetails[0]?.lead.leadNumber ?? '', ...featureCells]);
       }
 
       cursorId = batch[batch.length - 1]!.id;

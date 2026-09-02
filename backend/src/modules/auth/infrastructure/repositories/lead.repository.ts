@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
+import { LOAN_STATUS } from '../../../../common/constants/loan.constants';
 import { generateLeadNumber } from '../../../../common/loan/application-number.util';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import type { DbClient } from './db.client';
@@ -171,6 +172,40 @@ export class LeadRepository {
         leadDetail: { select: { panNumber: true, fullName: true } },
       },
     });
+  }
+
+  /**
+   * Prior lead_detail for a recurring customer only: a loan was disbursed and
+   * repaid successfully (CLOSED). Written-off, rejected, or unfinished apps do not count.
+   */
+  async findLatestPriorLeadDetailForCustomer(customerId: bigint, excludeLeadId: bigint, tx?: DbClient) {
+    const include = {
+      gender: { select: { key: true, name: true } },
+      occupation: { select: { key: true, name: true } },
+      city: { select: { name: true, state: { select: { code: true } } } },
+    } as const;
+
+    const repaid = await this.db(tx).loanAccount.findFirst({
+      where: {
+        customerId,
+        closedAt: { not: null },
+        loanStatus: { name: LOAN_STATUS.CLOSED, isActive: true },
+        application: { leadId: { not: excludeLeadId } },
+      },
+      orderBy: { closedAt: 'desc' },
+      select: {
+        application: {
+          select: {
+            lead: {
+              select: { leadDetail: { include } },
+            },
+          },
+        },
+      },
+    });
+
+    const detail = repaid?.application?.lead?.leadDetail;
+    return detail?.fullName?.trim() ? detail : null;
   }
 
   findByUuidForCustomer(uuid: string, customerId: bigint, tx?: DbClient) {

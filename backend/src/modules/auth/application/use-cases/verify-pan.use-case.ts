@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { PreBreCheckService } from '../../../../common/bre/pre-bre-check.service';
 import { PostBureauOfferService } from '../services/post-bureau-offer.service';
+import { canReusePriorBureauReport } from '../../../../common/vendor/bureau-report-reuse.util';
 import { BUREAU_FETCHED } from '../../../../common/constants/bureau-fetch.constants';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { PAN_VERIFIED } from '../../../../common/constants/pan-verification.constants';
@@ -27,6 +28,7 @@ import {
   tenacioBureauFailureNote,
 } from '../../../../common/vendor/tenacio-bureau-payload.mapper';
 import { BureauFetchService } from '../../../../common/vendor/bureau-fetch.service';
+import { PanNsdlCacheService } from '../../../../common/vendor/pan-nsdl-cache.service';
 import { PanVerificationService, type PanVerificationResult } from '../../../../common/vendor/pan-verification.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { BureauReportPdfService } from '../../../../common/cibil/bureau-report-pdf.service';
@@ -34,6 +36,7 @@ import { BureauReportRepository } from '../../infrastructure/repositories/bureau
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
+import { recurringLockedIdentityFromPriorDetail } from '../../../../common/lead/recurring-customer-identity.util';
 import type { VerifyPanDto } from '../dto/verify-pan.dto';
 
 const INDIAN_MOBILE = /^[6-9]\d{9}$/;
@@ -179,6 +182,7 @@ export class VerifyPanUseCase {
     private readonly leads: LeadRepository,
     private readonly prisma: PrismaService,
     private readonly panVerification: PanVerificationService,
+    private readonly panNsdlCache: PanNsdlCacheService,
     private readonly settings: SettingsRepository,
     private readonly sms: SmsService,
   ) {}
@@ -202,7 +206,10 @@ export class VerifyPanUseCase {
       throw new NotFoundException('No matching active lead was found.');
     }
 
-    const panUpper = dto.panNumber.trim().toUpperCase();
+    const priorIdentity = recurringLockedIdentityFromPriorDetail(
+      await this.leads.findLatestPriorLeadDetailForCustomer(customer.id, leadRow.id),
+    );
+    const panUpper = priorIdentity?.panNumber ?? dto.panNumber.trim().toUpperCase();
 
     const priorLeadPan = (await this.prisma.client.leadDetail.findUnique({
       where: { leadId: leadRow.id },
@@ -210,6 +217,11 @@ export class VerifyPanUseCase {
     })) as { panNumber: string | null; panVerified: number } | null;
 
     const leadDetailPayload = await this.buildLeadInputRequest(leadRow.id, dto);
+    if (priorIdentity) {
+      leadDetailPayload.fullName = priorIdentity.fullName;
+      leadDetailPayload.dateOfBirth = priorIdentity.dateOfBirth;
+      leadDetailPayload.genderId = priorIdentity.genderId;
+    }
     const fullNameTrimmed = leadDetailPayload.fullName;
 
     const [cityRow, breSettings] = await Promise.all([
@@ -319,22 +331,31 @@ export class VerifyPanUseCase {
       };
     }
 
-    const verification: PanVerificationResult = alreadyVerifiedSamePan
-      ? VERIFIED_VENDOR_SKIPPED
-      : await this.panVerification.verifyWithVendor({
-          leadId: leadRow.id,
-          panNumber: panUpper,
-          fullName: fullNameTrimmed,
-          dobIso: dto.dob,
-        });
-
+    let verification: PanVerificationResult;
     if (alreadyVerifiedSamePan) {
+      verification = VERIFIED_VENDOR_SKIPPED;
       this.logger.debug(
         `PAN vendor call skipped (leadId=${leadRow.id.toString()}): already VERIFIED in DB for this PAN.`,
       );
+      await this.panNsdlCache.linkCustomerIfCached({
+        customerId: customer.id,
+        panNumber: panUpper,
+        fullName: fullNameTrimmed,
+        dateOfBirth: leadDetailPayload.dateOfBirth,
+      });
     } else {
+      const resolved = await this.panNsdlCache.resolveForCustomer({
+        customerId: customer.id,
+        panNsdlCacheId: customer.panNsdlCacheId,
+        isRecurring: priorIdentity != null,
+        panNumber: panUpper,
+        fullName: fullNameTrimmed,
+        dateOfBirth: leadDetailPayload.dateOfBirth,
+        leadId: leadRow.id,
+      });
+      verification = resolved;
       this.logger.debug(
-        `PAN vendor result (leadId=${leadRow.id.toString()}): status=${verification.panVerifiedStatus}, panStatus=${verification.panStatus}, nameMatch=${verification.nameMatch}, dobMatch=${verification.dobMatch}`,
+        `PAN NSDL result (leadId=${leadRow.id.toString()}): source=${resolved.source}, status=${verification.panVerifiedStatus}, panStatus=${verification.panStatus}, nameMatch=${verification.nameMatch}, dobMatch=${verification.dobMatch}`,
       );
     }
 
@@ -374,6 +395,7 @@ export class VerifyPanUseCase {
           customer.mobileNumber,
           panUpper,
           fullNameTrimmed,
+          priorIdentity != null,
         );
         if (bureauOutcome === 'ntc') {
           await this.rejectLead(
@@ -645,7 +667,9 @@ export class VerifyPanUseCase {
    * Bureau soft-pull after PAN is verified (Tenacio primary; on any Tenacio
    * error the pull automatically falls back to Surepass), when
    * `BUREAU_FETCH_ENABLED` is on, the lead is not terminal-negative, and the
-   * customer has bureau consent on `lead_detail`. Outcome is written to `lead_detail.bureau_fetched` /
+   * customer has bureau consent on `lead_detail`. Recurring customers (repaid
+   * CLOSED loan) reuse the latest `bureau_report` for this customer when it is
+   * still inside `BUREAU_FETCH_DAYS_LIMIT`. Outcome is written to `lead_detail.bureau_fetched` /
    * `bureau_fetched_at` / `bureau_fetched_note`. Returns `failed` when the vendor
    * HTTP status is not 200 (caller shows thank-you and rejects the lead).
    */
@@ -654,6 +678,7 @@ export class VerifyPanUseCase {
     customerMobile: string,
     panNumber: string,
     fullName: string,
+    isRecurring: boolean,
   ): Promise<BureauSoftPullOutcome> {
     if (!(await this.settings.isBureauFetchEnabled())) {
       this.logger.debug(`Bureau soft-pull skipped (leadId=${leadId}): BUREAU_FETCH_ENABLED is off.`);
@@ -694,6 +719,17 @@ export class VerifyPanUseCase {
     if (!INDIAN_MOBILE.test(mobile)) {
       this.logger.warn(`Bureau soft-pull skipped (leadId=${leadId}): invalid mobile format.`);
       return 'skipped';
+    }
+
+    const reused = await this.tryReuseRecurringBureauReport({
+      leadId,
+      customerId: row.customerId,
+      customerUuid: row.customer?.uuid,
+      leadUuid: row.uuid,
+      isRecurring,
+    });
+    if (reused != null) {
+      return reused;
     }
 
     const out = await this.bureauFetch.fetchBureauFromTenacio(
@@ -813,6 +849,63 @@ export class VerifyPanUseCase {
     return 'failed';
   }
 
+  /**
+   * Recurring (repaid) customers: attach the latest `bureau_report` for this
+   * `customer_id` onto the new lead when it is still inside the days limit.
+   * Does not insert a new bureau_report row.
+   * Returns null when the vendor must be called (first-time, stale, missing, or attach failed).
+   */
+  private async tryReuseRecurringBureauReport(params: {
+    leadId: bigint;
+    customerId: bigint;
+    customerUuid: string | null | undefined;
+    leadUuid: string;
+    isRecurring: boolean;
+  }): Promise<BureauSoftPullOutcome | null> {
+    if (!params.isRecurring) return null;
+
+    const daysLimit = await this.settings.getBureauFetchDaysLimit();
+    const prior = await this.bureauReports.findLatestForCustomer(params.customerId);
+    if (
+      prior == null ||
+      !canReusePriorBureauReport({
+        isRecurring: true,
+        daysLimit,
+        priorCreatedAt: prior.createdAt,
+        priorPayload: prior.rawPayload,
+      })
+    ) {
+      this.logger.debug(
+        `Bureau reuse skipped (leadId=${params.leadId.toString()}): ` +
+          `daysLimit=${daysLimit} prior=${prior?.createdAt.toISOString() ?? 'none'}`,
+      );
+      return null;
+    }
+
+    await this.leads.updateLeadDetail({
+      where: { leadId: params.leadId },
+      data: {
+        bureauReportId: prior.id,
+        bureauFetched: BUREAU_FETCHED.SUCCESS,
+        bureauFetchedAt: new Date(),
+        bureauFetchedNote: `Reused prior bureau report (${prior.createdAt.toISOString().slice(0, 10)}; ${daysLimit}d limit)`.slice(
+          0,
+          500,
+        ),
+      },
+    });
+    this.logger.debug(
+      `Bureau soft-pull reused prior report (leadId=${params.leadId.toString()} customerId=${params.customerId.toString()} reportId=${prior.id.toString()} fetchedAt=${prior.createdAt.toISOString()} daysLimit=${daysLimit})`,
+    );
+
+    const postBreRejected = await this.applyPostBureauOffer({
+      leadId: params.leadId,
+      customerId: params.customerId,
+      leadUuid: params.leadUuid,
+    });
+    return postBreRejected ? 'post_bre_failed' : 'success';
+  }
+
   private async persistBureauSnapshot(params: {
     customerId: bigint;
     customerUuid: string | null | undefined;
@@ -820,7 +913,7 @@ export class VerifyPanUseCase {
     vendorBody: unknown;
     httpStatus: number | null;
     dummyFetched: boolean;
-  }): Promise<void> {
+  }): Promise<boolean> {
     try {
       const parsed = parseTenacioBureauVendorBody(params.vendorBody);
       const created = await this.bureauReports.createFromVendorSnapshot({
@@ -832,17 +925,25 @@ export class VerifyPanUseCase {
         dummyFetched: params.dummyFetched,
       });
       if (params.customerUuid) {
-        await this.bureauReportPdf.generateAndAttachForReport({
-          bureauReportId: created.id,
-          customerUuid: params.customerUuid,
-          bureauReportUuid: created.uuid,
-          vendorBody: params.vendorBody,
-        });
+        try {
+          await this.bureauReportPdf.generateAndAttachForReport({
+            bureauReportId: created.id,
+            customerUuid: params.customerUuid,
+            bureauReportUuid: created.uuid,
+            vendorBody: params.vendorBody,
+          });
+        } catch (err) {
+          this.logger.warn(
+            `Bureau report PDF not attached (leadId=${params.leadId.toString()}): ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
       }
+      return true;
     } catch (err) {
       this.logger.warn(
         `BureauReport row not saved (leadId=${params.leadId.toString()}): ${err instanceof Error ? err.message : String(err)}`,
       );
+      return false;
     }
   }
 

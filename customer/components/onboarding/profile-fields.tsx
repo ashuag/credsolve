@@ -1,6 +1,6 @@
 import type { ChangeEvent } from 'react';
 import { DatePickerField } from '@/components/ui/date-picker-field';
-import { FormInput, FormSelect, StickyActions } from './_form-ui';
+import { FormInput, FormSelect, LockedValue, StickyActions } from './_form-ui';
 import type { Fields, FieldError, SelectOption, OnChange } from './_types';
 
 type Props = {
@@ -18,6 +18,8 @@ type Props = {
   onContinue: () => void;
   isBusy: boolean;
   busyLabel: string;
+  /** Recurring customer: name, gender, DOB, and PAN cannot be changed. */
+  lockIdentityFields?: boolean;
 };
 
 const inrField = { type: 'text' as const, inputMode: 'numeric' as const, placeholder: 'Enter amount in INR', required: true };
@@ -26,35 +28,49 @@ export function ProfileFields({
   fields, errors, genderOptions, occupationOptions, isLoadingLookups, maxDob,
   dobDisplay,
   onDobChange, onPanChange, onFieldChange, onBack, onContinue, isBusy, busyLabel,
+  lockIdentityFields = false,
 }: Props) {
+  const genderLabel = genderOptions.find((o) => o.value === fields.gender)?.label ?? fields.gender;
+
   return (
     <div className="w-full">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
-        <FormInput
-          span2 labelSentenceCase id="fullName" label="Full name as per PAN card" error={errors.fullName}
-          type="text" autoComplete="name" placeholder="XXX YYY" required
-          className="uppercase placeholder:normal-case"
-          value={fields.fullName} onChange={onFieldChange('fullName')}
-        />
+        {lockIdentityFields ? (
+          <>
+            <LockedValue span2 labelSentenceCase label="Full name as per PAN card" value={fields.fullName} />
+            <LockedValue label="Gender" value={genderLabel} />
+            <LockedValue label="Date of birth" value={dobDisplay} />
+            <LockedValue span2 label="PAN" value={fields.panNumber} />
+          </>
+        ) : (
+          <>
+            <FormInput
+              span2 labelSentenceCase id="fullName" label="Full name as per PAN card" error={errors.fullName}
+              type="text" autoComplete="name" placeholder="XXX YYY" required
+              className="uppercase placeholder:normal-case"
+              value={fields.fullName} onChange={onFieldChange('fullName')}
+            />
 
-        <FormSelect id="gender" label="Gender" error={errors.gender} value={fields.gender} onChange={onFieldChange('gender')} disabled={isLoadingLookups}>
-          <option value="">{isLoadingLookups ? 'Loading gender...' : 'Select gender'}</option>
-          {genderOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </FormSelect>
+            <FormSelect id="gender" label="Gender" error={errors.gender} value={fields.gender} onChange={onFieldChange('gender')} disabled={isLoadingLookups}>
+              <option value="">{isLoadingLookups ? 'Loading gender...' : 'Select gender'}</option>
+              {genderOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </FormSelect>
 
-        <div className="flex flex-col gap-1.5 w-full">
-          <label htmlFor="dob" className="text-[0.75rem] font-bold text-slate-500 uppercase tracking-wider pl-1">Date of birth</label>
-          <DatePickerField id="dob" name="dob" label="Date of birth" showInputLabel={false}
-            value={dobDisplay} onChange={onDobChange} maxDate={maxDob} hint=""
-            ariaInvalid={Boolean(errors.dob)} ariaDescribedBy={errors.dob ? 'dob-error' : undefined} />
-          {errors.dob && <p id="dob-error" className="text-[#b2372d] text-[0.75rem] pl-1 font-medium m-0">{errors.dob}</p>}
-        </div>
+            <div className="flex flex-col gap-1.5 w-full">
+              <label htmlFor="dob" className="text-[0.75rem] font-bold text-slate-500 uppercase tracking-wider pl-1">Date of birth</label>
+              <DatePickerField id="dob" name="dob" label="Date of birth" showInputLabel={false}
+                value={dobDisplay} onChange={onDobChange} maxDate={maxDob} hint=""
+                ariaInvalid={Boolean(errors.dob)} ariaDescribedBy={errors.dob ? 'dob-error' : undefined} />
+              {errors.dob && <p id="dob-error" className="text-[#b2372d] text-[0.75rem] pl-1 font-medium m-0">{errors.dob}</p>}
+            </div>
 
-        <FormInput
-          span2 id="panNumber" label="PAN" error={errors.panNumber}
-          type="text" autoComplete="off" placeholder="ABCDE1234F" maxLength={10} required
-          value={fields.panNumber} onChange={onPanChange}
-        />
+            <FormInput
+              span2 id="panNumber" label="PAN" error={errors.panNumber}
+              type="text" autoComplete="off" placeholder="ABCDE1234F" maxLength={10} required
+              value={fields.panNumber} onChange={onPanChange}
+            />
+          </>
+        )}
 
         <FormSelect span2 id="occupation" label="Occupation" error={errors.occupation} value={fields.occupation} onChange={onFieldChange('occupation')} disabled={isLoadingLookups}>
           <option value="">{isLoadingLookups ? 'Loading occupations...' : 'Select occupation'}</option>

@@ -54,6 +54,7 @@ type DatePickerFieldProps = {
   className?: string;
   ariaInvalid?: boolean;
   ariaDescribedBy?: string;
+  disabled?: boolean;
 };
 
 /* ── Component ───────────────────────────────────────────────────────────── */
@@ -77,6 +78,7 @@ export function DatePickerField({
   className,
   ariaInvalid,
   ariaDescribedBy,
+  disabled = false,
 }: DatePickerFieldProps) {
   const effectiveMax = maxDate ?? new Date();
   const maxYear = effectiveMax.getFullYear();
@@ -170,6 +172,7 @@ export function DatePickerField({
   }, []);
 
   function handleInputChange(e: ChangeEvent<HTMLInputElement>) {
+    if (disabled) return;
     const next = formatDobInput(e.target.value);
     onChange(next);
     const parsed = parseDobDisplay(next);
@@ -177,6 +180,7 @@ export function DatePickerField({
   }
 
   function toggleCalendar() {
+    if (disabled) return;
     if (isOpen) { setIsOpen(false); return; }
     if (selectedDate) setVisibleMonth(startOfMonth(selectedDate));
     setIsOpen(true);
@@ -322,7 +326,7 @@ export function DatePickerField({
         {showInputLabel ? <span className={LABEL_CLASS}>{label}</span> : null}
         <div className="relative" ref={inputWrapRef}>
           <input
-            className={cn(INPUT_CLASS, 'pr-[56px]')}
+            className={cn(INPUT_CLASS, 'pr-[56px]', disabled && 'cursor-not-allowed bg-slate-50 text-slate-600')}
             id={id}
             name={name}
             type="text"
@@ -332,12 +336,15 @@ export function DatePickerField({
             maxLength={10}
             value={value}
             onChange={handleInputChange}
+            readOnly={disabled}
+            disabled={disabled}
             aria-invalid={ariaInvalid}
             aria-describedby={ariaDescribedBy}
           />
           <button
             type="button"
-            className="absolute top-1/2 right-3 -translate-y-1/2 inline-flex items-center justify-center w-9 h-9 rounded-[12px] border-0 bg-[rgba(20,150,243,0.08)] text-brand-navy cursor-pointer transition-all duration-[180ms] hover:-translate-y-[calc(50%+1px)] hover:bg-[rgba(255,197,25,0.16)] hover:shadow-[0_10px_20px_rgba(23,44,113,0.08)]"
+            disabled={disabled}
+            className="absolute top-1/2 right-3 -translate-y-1/2 inline-flex items-center justify-center w-9 h-9 rounded-[12px] border-0 bg-[rgba(20,150,243,0.08)] text-brand-navy cursor-pointer transition-all duration-[180ms] hover:-translate-y-[calc(50%+1px)] hover:bg-[rgba(255,197,25,0.16)] hover:shadow-[0_10px_20px_rgba(23,44,113,0.08)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-[-50%] disabled:hover:bg-[rgba(20,150,243,0.08)] disabled:hover:shadow-none"
             aria-label={isOpen ? 'Hide calendar' : 'Show calendar'}
             aria-expanded={isOpen}
             onClick={toggleCalendar}

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { computeInterestAmountFromLoanDetail } from '../../../../common/loan/loan-calculation.util';
 import { computeFeeAmountsFromLoanDetail } from '../../../../common/loan/loan-disbursement-view.util';
+import { syncExpectedRepaymentDateUntilDisbursed } from '../../../../common/loan/repayment-due-date.util';
 import {
   LOAN_DOCUMENT_PDF_FILES,
   LOAN_DOCUMENT_TYPE,
@@ -63,6 +64,40 @@ export class LoanDocumentApplicationService {
     private readonly generator: LoanDocumentGeneratorService,
   ) {}
 
+  /**
+   * Keep expected repay date in sync with today's rule until disbursement.
+   * Unsigned KFS/agreement files are dropped so they regenerate with the new date.
+   */
+  async applyLiveRepaymentUntilDisbursed<T extends ApplicationDetailsRow>(params: {
+    applicationId: bigint;
+    disbursed: boolean;
+    details: T | null;
+  }): Promise<T | null> {
+    const details = params.details;
+    if (!details?.expectedRepaymentDate || params.disbursed) {
+      return details;
+    }
+
+    const synced = await syncExpectedRepaymentDateUntilDisbursed(this.prisma.client, {
+      applicationId: params.applicationId,
+      storedDate: details.expectedRepaymentDate,
+      storedDays: details.expectedRepaymentDays,
+      disbursed: false,
+      invalidateUnsignedDocuments: !details.loanDocumentsAcceptedAt,
+    });
+    if (synced.expectedRepaymentDate) {
+      details.expectedRepaymentDate = synced.expectedRepaymentDate;
+      details.expectedRepaymentDays = synced.expectedRepaymentDays;
+    }
+    if (synced.changed && !details.loanDocumentsAcceptedAt) {
+      details.keyFactPdfRelativePath = null;
+      details.loanAgreementPdfRelativePath = null;
+      details.loanDocumentsReviewedAt = null;
+      details.loanDocumentsReviewedIp = null;
+    }
+    return details;
+  }
+
   async loadApplicationContext(customerUuid: string, leadId: bigint) {
     const customer = await this.prisma.client.customer.findUnique({
       where: { uuid: customerUuid },
@@ -95,6 +130,7 @@ export class LoanDocumentApplicationService {
             reasonForLoan: { select: { name: true } },
           },
         },
+        loanAccount: { select: { id: true } },
       },
     });
     if (!applicationRow) throw new NotFoundException('No application found for this lead.');
@@ -121,6 +157,12 @@ export class LoanDocumentApplicationService {
           loanDocumentsReviewedIp: reviewed.loanDocumentsReviewedIp,
         }
       : null;
+
+    await this.applyLiveRepaymentUntilDisbursed({
+      applicationId: applicationRow.id,
+      disbursed: applicationRow.loanAccount != null,
+      details,
+    });
     const application: LoanDocumentApplicationContext = {
       id: applicationRow.id,
       uuid: applicationRow.uuid,

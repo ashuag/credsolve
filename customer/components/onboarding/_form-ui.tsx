@@ -36,7 +36,7 @@ export function FormInput({ id, label, error, span2, labelSentenceCase, classNam
         id={id} name={id}
         aria-invalid={hasErr}
         aria-describedby={hasErr ? `${id}-error` : undefined}
-        className={cn(inputCls(hasErr), className)}
+        className={cn(inputCls(hasErr), rest.disabled && 'bg-slate-50 text-slate-600 cursor-not-allowed', className)}
         {...rest}
       />
       {error && <p id={`${id}-error`} className="text-[#b2372d] text-[0.75rem] pl-1 font-medium m-0">{error}</p>}
@@ -59,11 +59,42 @@ export function FormSelect({ id, label, error, span2, value, onChange, disabled,
         id={id} name={id} value={value} onChange={onChange} disabled={disabled}
         aria-invalid={hasErr}
         aria-describedby={hasErr ? `${id}-error` : undefined}
-        className={inputCls(hasErr)}
+        className={cn(inputCls(hasErr), disabled && 'bg-slate-50 text-slate-600 cursor-not-allowed')}
       >
         {children}
       </select>
       {error && <p id={`${id}-error`} className="text-[#b2372d] text-[0.75rem] pl-1 font-medium m-0">{error}</p>}
+    </div>
+  );
+  return span2 ? <div className="md:col-span-2">{inner}</div> : inner;
+}
+
+/** Read-only identity display — not an input, so form/DOM value edits cannot be submitted. */
+export function LockedValue({
+  label,
+  value,
+  span2,
+  labelSentenceCase,
+}: {
+  label: string;
+  value: string;
+  span2?: boolean;
+  labelSentenceCase?: boolean;
+}) {
+  const inner = (
+    <div className="flex flex-col gap-1.5 w-full">
+      <p
+        className={
+          labelSentenceCase
+            ? 'text-[0.75rem] font-bold text-slate-600 tracking-normal pl-1 leading-snug m-0'
+            : 'text-[0.75rem] font-bold text-slate-500 uppercase tracking-wider pl-1 m-0'
+        }
+      >
+        {label}
+      </p>
+      <p className="m-0 flex min-h-[48px] items-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-[0.95rem] font-semibold text-slate-700">
+        {value || '—'}
+      </p>
     </div>
   );
   return span2 ? <div className="md:col-span-2">{inner}</div> : inner;

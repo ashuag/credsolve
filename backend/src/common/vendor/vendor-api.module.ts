@@ -7,6 +7,8 @@ import { DigilockerFetchService } from './digilocker-fetch.service';
 import { DigilockerVendorService } from './digilocker-vendor.service';
 import { KycTenacioVendorService } from './kyc-tenacio-vendor.service';
 import { LivenessVendorService } from './liveness-vendor.service';
+import { PanNsdlCacheRepository } from './pan-nsdl-cache.repository';
+import { PanNsdlCacheService } from './pan-nsdl-cache.service';
 import { PanVerificationService } from './pan-verification.service';
 import { SurepassCibilModule } from './surepass/surepass-cibil.module';
 import { SurepassDigilockerModule } from './surepass/surepass-digilocker.module';
@@ -32,6 +34,8 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
     VendorApiConfigService,
     VendorInternalErrorService,
     PanVerificationService,
+    PanNsdlCacheRepository,
+    PanNsdlCacheService,
     BureauFetchService,
     DigilockerVendorService,
     DigilockerFetchService,
@@ -46,6 +50,8 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
     VendorApiConfigService,
     VendorInternalErrorService,
     PanVerificationService,
+    PanNsdlCacheRepository,
+    PanNsdlCacheService,
     BureauFetchService,
     DigilockerVendorService,
     DigilockerFetchService,

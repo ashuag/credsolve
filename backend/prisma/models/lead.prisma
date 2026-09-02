@@ -22,7 +22,6 @@ model Lead {
   leadUtms        LeadUtm[]
   applications    Application[]
   vendorApiLogs   VendorApiLog[]
-  bureauReports   BureauReport[]
 
   @@index([customerId, createdAt])
   @@index([leadStatusId])
@@ -60,18 +59,22 @@ model LeadDetail {
   bureauFetched         Int       @default(0) @map("bureau_fetched") @db.SmallInt
   bureauFetchedAt       DateTime? @map("bureau_fetched_at")
   bureauFetchedNote     String?   @map("bureau_fetched_note") @db.VarChar(500)
+  /// Current bureau snapshot for this lead (`bureau_report.id`).
+  bureauReportId        BigInt?   @map("bureau_report_id") @db.UnsignedBigInt
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  lead       Lead        @relation(fields: [leadId], references: [id])
-  gender     Gender?     @relation(fields: [genderId], references: [id])
-  occupation Occupation? @relation(fields: [occupationId], references: [id])
-  city       City?       @relation(fields: [cityId], references: [id])
+  lead         Lead          @relation(fields: [leadId], references: [id])
+  gender       Gender?       @relation(fields: [genderId], references: [id])
+  occupation   Occupation?   @relation(fields: [occupationId], references: [id])
+  city         City?         @relation(fields: [cityId], references: [id])
+  bureauReport BureauReport? @relation("LeadDetailCurrentBureauReport", fields: [bureauReportId], references: [id], onDelete: SetNull)
 
   @@index([cityId])
   @@index([pincode])
   @@index([panVerified, panVerifiedAt])
   @@index([panNumber])
+  @@index([bureauReportId])
   @@map("lead_detail")
 }
 

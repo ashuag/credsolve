@@ -140,70 +140,86 @@ function ResumeArrow() {
 
 function CheckIcon() {
   return (
-    <svg viewBox="0 0 20 20" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
+    <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
       <path d="M5 10l3.5 3.5L15 6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
-function JourneyTracker({
-  steps,
-  completed,
-  total,
-}: {
-  steps: CustomerJourneyProgressStep[];
-  completed: number;
-  total: number;
-}) {
-  const pct = Math.max(6, Math.round((completed / total) * 100));
+const STEP_HINT: Record<CustomerJourneyProgressStep['key'], string> = {
+  mobile: 'Your mobile number is verified.',
+  details: 'Add your personal details to continue.',
+  loan: 'Pick the amount and tenure that work for you.',
+  email: 'Confirm your email so we can send updates.',
+  letter: 'Review your sanction letter before KYC.',
+  digilockerKyc: 'Complete Aadhaar KYC through DigiLocker.',
+  livenessKyc: 'Take a quick selfie to confirm it is you.',
+  bank: 'Add the account where we should send the loan.',
+  references: 'Share two people we can contact if needed.',
+  esign: 'eSign your loan documents to finish.',
+};
+
+function JourneyTracker({ steps }: { steps: CustomerJourneyProgressStep[] }) {
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between text-[0.72rem] font-bold uppercase tracking-wider">
-        <span className="text-brand-navy">Journey progress</span>
-        <span className="text-brand-blue">
-          {completed} / {total} steps
-        </span>
-      </div>
-      <div className="relative h-2 w-full overflow-hidden rounded-full bg-[rgba(18,36,79,0.08)]">
-        <div
-          className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#1496f3] to-[#38bdf8] shadow-[0_0_12px_rgba(20,150,243,0.5)] transition-[width] duration-500"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <ol className="flex items-start justify-between gap-0.5 sm:gap-1">
-        {steps.map((step) => {
-          const done = step.state === 'done';
-          const current = step.state === 'current';
-          const stepNumber =
-            CUSTOMER_JOURNEY_PROGRESS_STEPS.findIndex((s) => s.key === step.key) + 1;
-          return (
-            <li key={step.key} className="flex min-w-0 flex-1 flex-col items-center gap-1.5 text-center">
+    <ol className="m-0 list-none p-0">
+      {steps.map((step, index) => {
+        const done = step.state === 'done';
+        const current = step.state === 'current';
+        const last = index === steps.length - 1;
+        const stepNumber =
+          CUSTOMER_JOURNEY_PROGRESS_STEPS.findIndex((s) => s.key === step.key) + 1;
+        return (
+          <li key={step.key} className="relative flex gap-3">
+            <div className="flex h-full w-8 shrink-0 flex-col items-center self-stretch">
               <span
                 className={cn(
-                  'flex h-7 w-7 items-center justify-center rounded-full text-[0.62rem] font-black ring-2 transition-colors',
+                  'relative z-[1] flex h-8 w-8 items-center justify-center rounded-full text-[0.72rem] font-black',
                   done
-                    ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 text-white ring-emerald-200'
+                    ? 'bg-emerald-500 text-white shadow-[0_6px_14px_rgba(16,185,129,0.28)]'
                     : current
-                      ? 'animate-ring-pop bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-[#12244f] ring-[#ffc519]/40'
-                      : 'bg-white text-slate-400 ring-slate-200',
+                      ? 'bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-[#12244f] shadow-[0_8px_18px_rgba(246,180,0,0.38)] ring-4 ring-[#ffc519]/25'
+                      : 'bg-[#eef2f8] text-slate-400',
                 )}
                 aria-current={current ? 'step' : undefined}
               >
                 {done ? <CheckIcon /> : stepNumber}
               </span>
-              <span
+              {!last ? (
+                <span
+                  aria-hidden
+                  className={cn(
+                    'mt-1 w-px flex-1 min-h-[18px]',
+                    done ? 'bg-emerald-200' : 'bg-[rgba(18,36,79,0.1)]',
+                  )}
+                />
+              ) : null}
+            </div>
+            <div
+              className={cn(
+                'min-w-0 flex-1 pb-4',
+                last && 'pb-0',
+                current &&
+                  'mb-3 rounded-2xl bg-[#fffbeb] px-3 py-2.5 ring-1 ring-[#ffc519]/35',
+              )}
+            >
+              <p
                 className={cn(
-                  'truncate text-[0.55rem] font-bold uppercase tracking-wider sm:text-[0.62rem]',
-                  done ? 'text-emerald-700' : current ? 'text-brand-navy' : 'text-slate-400',
+                  'm-0 text-[0.92rem] font-extrabold leading-tight',
+                  done ? 'text-emerald-800' : current ? 'text-brand-navy' : 'text-slate-500',
                 )}
               >
                 {step.label}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-    </div>
+              </p>
+              {current ? (
+                <p className="mt-1 mb-0 text-[0.78rem] font-medium leading-snug text-slate-600">
+                  {STEP_HINT[step.key]}
+                </p>
+              ) : null}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -256,59 +272,57 @@ function CompleteJourneyCard({
   nextLabel: string;
   resumeHref: string;
 }) {
-  const pctDone = Math.round((completed / total) * 100);
+  const stepOrdinal = Math.min(completed + 1, total);
+  const pct = Math.round((completed / total) * 100);
+  const barWidth = Math.max(8, pct);
+
   return (
-    <div className="relative overflow-hidden rounded-[28px] border border-[rgba(20,150,243,0.22)] bg-[linear-gradient(135deg,#ffffff_0%,#f0f7ff_45%,#e8f2ff_100%)] p-6 shadow-[0_28px_70px_rgba(23,44,113,0.14)]">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[radial-gradient(circle_at_center,rgba(20,150,243,0.2),transparent_70%)]"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-[radial-gradient(circle_at_center,rgba(255,197,25,0.16),transparent_70%)]"
-      />
-
-      <div className="relative flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ffc519] to-[#f6b400] shadow-[0_10px_22px_rgba(246,180,0,0.38)]">
-            <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#12244f]" fill="currentColor" aria-hidden>
-              <path d="M13 2L3 14h7l-1 8 11-13h-8l1-7z" />
-            </svg>
-          </span>
-          <div>
-            <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-amber-700">
-              Application in progress
-            </p>
-            <p className="text-[1.15rem] font-extrabold leading-tight text-brand-navy">
-              Complete your loan journey
-            </p>
-          </div>
-        </div>
-        <span className="rounded-full bg-white/90 px-3 py-1 text-[0.68rem] font-extrabold uppercase tracking-wider text-brand-blue ring-1 ring-[rgba(20,150,243,0.2)]">
-          {pctDone}% done
-        </span>
-      </div>
-
-      <div className="relative mt-6 rounded-[18px] bg-white/90 p-4 ring-1 ring-[rgba(18,36,79,0.06)] backdrop-blur">
-        <JourneyTracker steps={steps} completed={completed} total={total} />
-      </div>
-
-      <div className="relative mt-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-[0.6rem] font-black uppercase tracking-[0.18em] text-slate-400">Up next</p>
-          <p className="text-[0.95rem] font-extrabold text-brand-navy">{nextLabel}</p>
+    <article className="overflow-hidden rounded-[24px] border border-[rgba(18,36,79,0.1)] bg-white shadow-[0_18px_44px_rgba(23,44,113,0.1)]">
+      <div className="relative overflow-hidden bg-[linear-gradient(145deg,#12244f_0%,#1c347d_58%,#1496f3_140%)] px-5 py-5 sm:px-6">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(255,197,25,0.22),transparent_68%)]"
+        />
+        <p className="relative m-0 text-[0.68rem] font-black uppercase tracking-[0.16em] text-[#ffc519]">
+          Application in progress
+        </p>
+        <h2 className="relative mt-1.5 mb-0 text-[1.35rem] font-extrabold leading-tight tracking-tight text-white sm:text-[1.5rem]">
+          Continue from {nextLabel}
+        </h2>
+        <p className="relative mt-1.5 mb-0 text-[0.86rem] font-medium text-white/75">
+          Step {stepOrdinal} of {total}
+        </p>
+        <div
+          className="relative mt-4 h-1.5 overflow-hidden rounded-full bg-white/15"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={pct}
+          aria-label="Loan journey progress"
+        >
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-[#ffc519] to-[#ffe08a] transition-[width] duration-500"
+            style={{ width: `${barWidth}%` }}
+          />
         </div>
         <Link
           href={resumeHref}
-          className="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#1c347d] via-[#12244f] to-[#0a1628] px-6 py-3.5 text-[0.95rem] font-extrabold text-[#fff8df] shadow-[0_14px_32px_rgba(23,44,113,0.35)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_42px_rgba(23,44,113,0.45)]"
+          className="group relative mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#ffc519] px-5 py-3.5 text-[0.98rem] font-extrabold text-[#12244f] shadow-[0_12px_28px_rgba(246,180,0,0.28)] transition hover:brightness-105 sm:w-auto"
         >
-          Complete your journey
+          Continue to {nextLabel}
           <span className="transition-transform duration-200 group-hover:translate-x-0.5">
             <ResumeArrow />
           </span>
         </Link>
       </div>
-    </div>
+
+      <div className="px-5 py-5 sm:px-6">
+        <p className="mb-4 text-[0.68rem] font-black uppercase tracking-[0.14em] text-slate-400">
+          Your loan journey
+        </p>
+        <JourneyTracker steps={steps} />
+      </div>
+    </article>
   );
 }
 
@@ -801,36 +815,28 @@ function HistoryIcon() {
 function AccountHero({
   greetingName,
   mobileNumber,
-  journeyPct,
-  showJourneyPct,
 }: {
   greetingName: string | null;
   mobileNumber: string | null;
-  journeyPct: number;
-  showJourneyPct: boolean;
 }) {
   const initial = greetingName?.charAt(0)?.toUpperCase() ?? 'M';
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="flex items-center gap-3">
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-lg font-black text-[#12244f] shadow-[0_8px_18px_rgba(246,180,0,0.28)]">
-          {initial}
-        </span>
-        <div>
-          <h1 className="text-[clamp(1.25rem,3vw,1.65rem)] font-extrabold tracking-tight text-brand-navy">
-            {greetingName ? `Hi, ${greetingName}` : 'Welcome back'}
-          </h1>
-          {mobileNumber ? (
-            <p className="text-[0.82rem] font-medium text-slate-500">+91 {mobileNumber}</p>
-          ) : null}
-        </div>
+    <header className="flex items-center gap-3.5 rounded-[22px] border border-[rgba(18,36,79,0.08)] bg-white/90 px-4 py-3.5 shadow-[0_8px_24px_rgba(23,44,113,0.05)] sm:px-5">
+      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-lg font-black text-[#12244f] shadow-[0_8px_18px_rgba(246,180,0,0.28)]">
+        {initial}
+      </span>
+      <div className="min-w-0">
+        <p className="m-0 text-[0.64rem] font-black uppercase tracking-[0.14em] text-slate-400">
+          My account
+        </p>
+        <h1 className="m-0 truncate text-[clamp(1.2rem,3vw,1.5rem)] font-extrabold tracking-tight text-brand-navy">
+          {greetingName ? `Hi, ${greetingName}` : 'Welcome back'}
+        </h1>
+        {mobileNumber ? (
+          <p className="m-0 mt-0.5 text-[0.82rem] font-medium text-slate-500">+91 {mobileNumber}</p>
+        ) : null}
       </div>
-      {showJourneyPct ? (
-        <span className="rounded-full bg-[#eef6ff] px-3 py-1.5 text-[0.72rem] font-extrabold text-brand-blue ring-1 ring-[rgba(20,150,243,0.16)]">
-          Journey {journeyPct}%
-        </span>
-      ) : null}
-    </div>
+    </header>
   );
 }
 
@@ -1040,13 +1046,12 @@ export function MyAccountSection({
       : null;
   const mobileNumber =
     session && session.authenticated ? session.mobileNumber.replace(/^\+?91/, '') : null;
-  const journeyPct = journeySteps.percent;
   const overviewBadge =
     (showIncompleteJourney ? 1 : 0) + dash.activeLoans.length + dash.inProgress.length;
 
   return (
-    <div className="mx-auto w-full max-w-3xl animate-fade-in-up px-4 py-6 sm:px-6 sm:py-8">
-      <div className="grid gap-5">
+    <div className="mx-auto w-full max-w-[40rem] animate-fade-in-up px-4 py-5 sm:px-6 sm:py-7">
+      <div className="grid gap-4 sm:gap-5">
         {repayFlash === 'success' ? (
           <FlashBanner tone="success">
             {data?.reconciledClosedLoan
@@ -1067,8 +1072,6 @@ export function MyAccountSection({
         <AccountHero
           greetingName={greetingName}
           mobileNumber={mobileNumber}
-          journeyPct={journeyPct}
-          showJourneyPct={showIncompleteJourney && !hasDisbursedLoan}
         />
 
         <div className="grid grid-cols-2 rounded-2xl bg-[rgba(18,36,79,0.05)] p-1">
@@ -1163,16 +1166,6 @@ export function MyAccountSection({
           </section>
         )}
 
-        {session && isCustomerPortalSignedIn(session) && showIncompleteJourney ? (
-          <p className="text-center text-[0.78rem] text-brand-muted">
-            Continue from{' '}
-            <span className="font-semibold text-brand-navy">{journeySteps.nextLabel}</span>
-            {' · '}
-            <Link href={resumeHref} className="font-bold text-brand-blue hover:underline">
-              Jump to current step
-            </Link>
-          </p>
-        ) : null}
       </div>
     </div>
   );

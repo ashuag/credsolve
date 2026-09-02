@@ -22,7 +22,7 @@ export class CustomerRepository {
   findByUuid(tx: DbClient | undefined, uuid: string) {
     return this.db(tx).customer.findUnique({
       where: { uuid },
-      select: { id: true, uuid: true, mobileNumber: true },
+      select: { id: true, uuid: true, mobileNumber: true, panNsdlCacheId: true },
     });
   }
 }

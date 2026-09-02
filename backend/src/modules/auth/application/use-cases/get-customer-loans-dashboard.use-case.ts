@@ -26,6 +26,10 @@ import { BounceChargeTierResolverService } from '../../../../common/loan/bounce-
 import { RedisService } from '../../../../common/redis/redis.service';
 import { LosLoanRepaymentSyncService } from '../../../los/services/los-loan-repayment-sync.service';
 import { computeFeeAmountsFromLoanDetail } from '../../../../common/loan/loan-disbursement-view.util';
+import {
+  overlayLiveRepaymentDueDateIfSelected,
+  resolveRepaymentDueDateUtc,
+} from '../../../../common/loan/repayment-due-date.util';
 import type {
   CustomerLoanCard,
   CustomerLoanRepaymentLine,
@@ -325,7 +329,19 @@ export class GetCustomerLoansDashboardUseCase {
     const coolingPeriodDays = await this.settings.loadRepayCoolingPeriodDays();
     const minPayAmountInr = await this.settings.loadMinPayAmountInr();
     const todayStart = startOfTodayUtc();
-    const cards = rows.map((row) => mapRow(row, penal, coolingPeriodDays));
+    const liveRepayDate = await resolveRepaymentDueDateUtc(this.prisma.client);
+    const cards = rows.map((row) =>
+      mapRow(
+        row.loanAccount
+          ? row
+          : {
+              ...row,
+              details: overlayLiveRepaymentDueDateIfSelected(row.details, liveRepayDate) ?? row.details,
+            },
+        penal,
+        coolingPeriodDays,
+      ),
+    );
 
     const maturityFor = (raw: (typeof rows)[number]) =>
       raw.loanAccount?.loanMaturityDate ?? raw.details?.expectedRepaymentDate ?? null;

@@ -156,14 +156,10 @@ export class LosLeadService {
             panVerified: true,
             occupation: { select: { name: true } },
             city: { select: { name: true, state: { select: { code: true } } } },
+            bureauReport: { select: { cibilScore: true } },
           },
         },
         leadUtms: { select: { utmSource: true, utmMedium: true, utmCampaign: true }, orderBy: { createdAt: 'desc' }, take: 1 },
-        bureauReports: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: { cibilScore: true },
-        },
         applications: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -182,7 +178,7 @@ export class LosLeadService {
       const stateCode = detail?.city?.state?.code ?? null;
       const city =
         cityName != null ? (stateCode ? `${cityName}, ${stateCode}` : cityName) : null;
-      const cibilScore = lead.bureauReports[0]?.cibilScore ?? null;
+      const cibilScore = detail?.bureauReport?.cibilScore ?? null;
 
       return {
         id: Number(lead.id),
@@ -259,6 +255,9 @@ export class LosLeadService {
             city: { select: { name: true, state: { select: { name: true, code: true } } } },
             gender: { select: { name: true } },
             occupation: { select: { name: true } },
+            bureauReport: {
+              select: { id: true, uuid: true, cibilScore: true, createdAt: true },
+            },
           },
         },
         leadUtms: { orderBy: { createdAt: 'desc' }, take: 1 },
@@ -269,15 +268,6 @@ export class LosLeadService {
             details: { select: { selectedLoanAmount: true, expectedRepaymentDays: true, emailId: true } },
           },
           orderBy: { createdAt: 'desc' },
-        },
-        bureauReports: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: {
-            uuid: true,
-            cibilScore: true,
-            createdAt: true,
-          },
         },
         vendorApiLogs: {
           where: { serviceName: { in: panNsdlServiceNames() } },
@@ -296,6 +286,7 @@ export class LosLeadService {
     const detail = lead.leadDetail;
     const noteTrimmed = lead.leadStatusNote?.trim() ?? null;
     const bureauNoteTrimmed = detail?.bureauFetchedNote?.trim() ?? null;
+    const currentBureau = detail?.bureauReport ?? null;
 
     return {
       uuid: lead.uuid,
@@ -345,11 +336,12 @@ export class LosLeadService {
             cibilConsentAt: detail.cibilConsentAt?.toISOString() ?? null,
           }
         : null,
-      bureauReport: lead.bureauReports[0]
+      bureauReport: currentBureau
         ? {
-            uuid: lead.bureauReports[0].uuid,
-            cibilScore: lead.bureauReports[0].cibilScore,
-            fetchedAt: lead.bureauReports[0].createdAt.toISOString(),
+            id: currentBureau.id.toString(),
+            uuid: currentBureau.uuid,
+            cibilScore: currentBureau.cibilScore,
+            fetchedAt: currentBureau.createdAt.toISOString(),
           }
         : null,
       applications: lead.applications.map((application) => ({
@@ -371,6 +363,18 @@ export class LosLeadService {
       select: {
         id: true,
         customer: { select: { uuid: true } },
+        leadDetail: {
+          select: {
+            bureauReport: {
+              select: {
+                id: true,
+                uuid: true,
+                rawPayload: true,
+                createdAt: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -378,16 +382,7 @@ export class LosLeadService {
       throw new NotFoundException('Lead not found');
     }
 
-    const bureauReportRow = await this.prisma.read.bureauReport.findFirst({
-      where: { leadId: lead.id },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        uuid: true,
-        rawPayload: true,
-        createdAt: true,
-      },
-    });
+    const bureauReportRow = lead.leadDetail?.bureauReport;
 
     if (!bureauReportRow) {
       throw new NotFoundException('No bureau report found for this lead');
@@ -636,6 +631,7 @@ export class LosLeadService {
             bureauFetched: BUREAU_FETCHED.NOT_FETCHED,
             bureauFetchedAt: null,
             bureauFetchedNote: null,
+            bureauReportId: null,
           },
         });
         if (detail.fullName?.trim()) copiedFields.push('name');

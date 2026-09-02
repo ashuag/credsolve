@@ -1,0 +1,28 @@
+// ============================================================
+// PAN NSDL CACHE
+// ============================================================
+//
+// Success-only cache of Tenacio NSDL PAN checks. A row exists only when
+// NSDL confirmed panStatus=valid AND dobMatch=true. Failures, timeouts,
+// and DOB/PAN mismatches are never stored. Product journey rules (e.g.
+// category Individual) still run on the cached payload.
+
+model PanNsdlCache {
+  id               BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  /// Public id for 3rd-party APIs — never send PAN/PII in its place.
+  uuid             String   @unique @default(uuid()) @db.Char(36)
+  panNumber        String   @map("pan_number") @db.Char(10)
+  /// Uppercase name as sent to NSDL.
+  fullName         String   @map("full_name") @db.VarChar(100)
+  dateOfBirth      DateTime @map("date_of_birth") @db.Date
+  nsdlResponse     Json     @map("nsdl_response")
+  nameVerified     Boolean  @map("name_verified")
+  verifiedAt       DateTime @map("verified_at")
+  vendorRequestId  String?  @map("vendor_request_id") @db.VarChar(128)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  customers Customer[]
+
+  @@unique([panNumber, dateOfBirth, fullName], name: "panNumber_dateOfBirth_fullName", map: "pan_nsdl_identity_key")
+  @@map("pan_nsdl")
+}

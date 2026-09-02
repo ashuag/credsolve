@@ -19,6 +19,7 @@ import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
+import { recurringLockedIdentityFromPriorDetail } from '../../../../common/lead/recurring-customer-identity.util';
 import type { SaveLeadProfileDto } from '../dto/save-lead-profile.dto';
 
 function parseDobUtc(dob: string): Date {
@@ -65,6 +66,10 @@ export class SaveLeadProfileUseCase {
       throw new NotFoundException('No matching active lead was found.');
     }
 
+    const priorIdentity = recurringLockedIdentityFromPriorDetail(
+      await this.leads.findLatestPriorLeadDetailForCustomer(customer.id, leadRow.id),
+    );
+
     const { genderId, occupationId } = await resolveGenderOccupationIds(
       this.prisma.client,
       dto.gender,
@@ -79,16 +84,17 @@ export class SaveLeadProfileUseCase {
       }),
     );
 
-    const dateOfBirth = parseDobUtc(dto.dob);
+    const dateOfBirth = priorIdentity?.dateOfBirth ?? parseDobUtc(dto.dob);
+    const resolvedGenderId = priorIdentity?.genderId ?? genderId;
     const netMonthlyIncome = parseOptionalInrAmount(dto.monthlyIncome);
     const annualTurnover = parseOptionalInrAmount(dto.annualTurnover);
     const annualProfit = parseOptionalInrAmount(dto.annualProfit);
-    const panUpper = dto.panNumber.trim().toUpperCase();
+    const panUpper = priorIdentity?.panNumber ?? dto.panNumber.trim().toUpperCase();
 
     const profilePayload = {
-      fullName: dto.fullName.trim(),
+      fullName: priorIdentity?.fullName ?? dto.fullName.trim(),
       dateOfBirth,
-      genderId,
+      genderId: resolvedGenderId,
       occupationId,
       netMonthlyIncome,
       annualTurnover,
@@ -110,7 +116,7 @@ export class SaveLeadProfileUseCase {
     const preBreResult = await this.preBreCheck.run(
       {
         dateOfBirth,
-        genderId,
+        genderId: resolvedGenderId,
         occupationId,
         genderDisplay: dto.gender,
         occupationDisplay: dto.occupation,

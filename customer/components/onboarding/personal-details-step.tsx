@@ -37,6 +37,8 @@ export type PersonalDetailsStepProps = {
   onSectionChange: (section: PersonalDetailsSection) => void;
   onBack: () => void;
   noticeMessage?: string | null;
+  /** Recurring customer (repaid CLOSED loan): name, gender, DOB, PAN are locked. */
+  lockIdentityFields?: boolean;
 };
 
 const DRAFT_KEY_PREFIX = 'mc:details:draft:';
@@ -112,7 +114,8 @@ export function PersonalDetailsStep(
     onSaved,
     activeSection,
     onSectionChange, onBack,
-    noticeMessage
+    noticeMessage,
+    lockIdentityFields = false,
   }: PersonalDetailsStepProps) {
   const router = useRouter();
   const [fields, setFields] = useState<Fields>(EMPTY_FIELDS);
@@ -129,6 +132,12 @@ export function PersonalDetailsStep(
 
   const setCompletion01 = useJourneyProgressOptional()?.setCompletion01;
   const lastPincodeRef = useRef<string | null>(null);
+  const lockedIdentityRef = useRef<{
+    fullName: string;
+    gender: Fields['gender'];
+    dob: string;
+    panNumber: string;
+  } | null>(null);
   const draftKey = `${DRAFT_KEY_PREFIX}${leadUuid}`;
 
   const maxDob = useMemo(() => { const d = new Date(); d.setFullYear(d.getFullYear() - 18); return d; }, []);
@@ -140,27 +149,67 @@ export function PersonalDetailsStep(
   }, [fields, dobDisplay, activeSection, setCompletion01]);
 
   useEffect(() => {
+    if (
+      lockIdentityFields &&
+      initialProfile?.fullName?.trim() &&
+      initialProfile.gender &&
+      initialProfile.dob &&
+      initialProfile.panNumber?.trim()
+    ) {
+      lockedIdentityRef.current = {
+        fullName: initialProfile.fullName.trim(),
+        gender: initialProfile.gender as Fields['gender'],
+        dob: initialProfile.dob,
+        panNumber: initialProfile.panNumber.trim().toUpperCase(),
+      };
+    }
+  }, [lockIdentityFields, initialProfile]);
+
+  useEffect(() => {
     try {
       const parsed = JSON.parse(window.localStorage.getItem(draftKey) ?? 'null') as { fields?: Fields; dobDisplay?: string } | null;
-      if (parsed?.fields) setFields((p) => ({ ...p, ...parsed.fields }));
-      if (typeof parsed?.dobDisplay === 'string') setDobDisplay(parsed.dobDisplay);
+      if (parsed?.fields) {
+        const locked = lockedIdentityRef.current;
+        setFields((p) => ({
+          ...p,
+          ...parsed.fields,
+          ...(locked
+            ? {
+                fullName: locked.fullName,
+                gender: locked.gender,
+                dob: locked.dob,
+                panNumber: locked.panNumber,
+              }
+            : {}),
+        }));
+      }
+      if (!lockedIdentityRef.current && typeof parsed?.dobDisplay === 'string') {
+        setDobDisplay(parsed.dobDisplay);
+      }
     } catch { /* ignore */ }
   }, [draftKey]);
 
   useEffect(() => {
     if (!initialProfile) return;
     const p = initialProfile;
+    const locked = lockedIdentityRef.current;
     setFields((prev) => ({
-      fullName: p.fullName ?? prev.fullName, gender: (p.gender as Fields['gender']) || prev.gender,
-      dob: p.dob ?? prev.dob, panNumber: p.panNumber ?? prev.panNumber,
+      fullName: locked?.fullName || p.fullName || prev.fullName,
+      gender: locked?.gender || (p.gender as Fields['gender']) || prev.gender,
+      dob: locked?.dob || p.dob || prev.dob,
+      panNumber: locked?.panNumber || p.panNumber || prev.panNumber,
       occupation: (p.occupation as Fields['occupation']) || prev.occupation,
-      addressLine1: p.addressLine1 ?? prev.addressLine1, addressLine2: p.addressLine2 ?? prev.addressLine2,
-      currentCity: p.currentCity ?? prev.currentCity ?? '', currentCityId: null,
-      pincode: p.pincode ?? prev.pincode, monthlyIncome: p.monthlyIncome ?? prev.monthlyIncome,
-      annualTurnover: p.annualTurnover ?? prev.annualTurnover, annualProfit: p.annualProfit ?? prev.annualProfit,
-      creditConsentAccepted: p.creditConsentAccepted ?? prev.creditConsentAccepted,
+      addressLine1: p.addressLine1 || prev.addressLine1,
+      addressLine2: p.addressLine2 || prev.addressLine2,
+      currentCity: p.currentCity || prev.currentCity || '',
+      currentCityId: null,
+      pincode: p.pincode || prev.pincode,
+      monthlyIncome: p.monthlyIncome || prev.monthlyIncome,
+      annualTurnover: p.annualTurnover || prev.annualTurnover,
+      annualProfit: p.annualProfit || prev.annualProfit,
+      creditConsentAccepted: p.creditConsentAccepted || prev.creditConsentAccepted,
     }));
-    const d = p.dob ? parseIsoDate(p.dob) : null;
+    const d = parseIsoDate(locked?.dob || p.dob);
     if (d) setDobDisplay(formatDateDisplay(d));
   }, [initialProfile]);
 
@@ -187,7 +236,6 @@ export function PersonalDetailsStep(
         } else {
           lastPincodeRef.current = fields.pincode;
           setCityFromPincode(false);
-          setFields((p) => ({ ...p, currentCity: '', currentCityId: null }));
           setErrors((p) => ({ ...p, pincode: undefined, currentCity: undefined }));
         }
       })
@@ -195,7 +243,6 @@ export function PersonalDetailsStep(
         if (active) {
           lastPincodeRef.current = fields.pincode;
           setCityFromPincode(false);
-          setFields((p) => ({ ...p, currentCity: '', currentCityId: null }));
           setErrors((p) => ({ ...p, pincode: undefined, currentCity: undefined }));
         }
       })
@@ -204,13 +251,15 @@ export function PersonalDetailsStep(
   }, [fields.pincode]);
 
   const handleDobChange = useCallback((v: string) => {
+    if (lockIdentityFields) return;
     setDobDisplay(v); const p = parseDobDisplay(v);
     setFields((f) => ({ ...f, dob: p ? formatDateIso(p) : '' }));
     setErrors((e) => ({ ...e, dob: undefined })); setSubmitError('');
-  }, []);
+  }, [lockIdentityFields]);
 
   const setField = useCallback(
     (key: Exclude<keyof Fields, 'creditConsentAccepted'>) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      if (lockIdentityFields && (key === 'fullName' || key === 'gender' || key === 'dob')) return;
       let v = e.target.value;
       if (['monthlyIncome', 'annualTurnover', 'annualProfit'].includes(key)) v = v.replace(/\D/g, '').slice(0, 12);
       else if (key === 'pincode') v = v.replace(/\D/g, '').slice(0, 6);
@@ -226,15 +275,16 @@ export function PersonalDetailsStep(
       });
       setSubmitError('');
       setErrors((prev) => ({ ...prev, [key]: undefined, ...(key === 'occupation' ? { monthlyIncome: undefined, annualTurnover: undefined, annualProfit: undefined } : {}) }));
-    }, []);
+    }, [lockIdentityFields]);
 
   const handlePanChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
+      if (lockIdentityFields) return;
       const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
       setFields((f) => ({ ...f, panNumber: v })); 
       setSubmitError(''); 
       setErrors((e) => ({ ...e, panNumber: undefined })); 
-    }, []);
+    }, [lockIdentityFields]);
 
   const handleCityChange = useCallback((next: CityInputChange) => {
     setCityFromPincode(false); lastPincodeRef.current = null;
@@ -248,14 +298,21 @@ export function PersonalDetailsStep(
   }, []);
 
   function validateProfile(): FieldError {
+    const locked = lockedIdentity();
+    const fullName = locked?.fullName ?? fields.fullName;
+    const gender = locked?.gender ?? fields.gender;
+    const dobIso = locked?.dob ?? fields.dob;
+    const pan = locked?.panNumber ?? fields.panNumber;
+    const lockedDobDate = locked?.dob ? parseIsoDate(locked.dob) : null;
+    const dobShown = lockedDobDate ? formatDateDisplay(lockedDobDate) : dobDisplay;
     const today = new Date(); const err: FieldError = {};
-    if (!isValidPersonName(fields.fullName)) err.fullName = fields.fullName.trim() ? PERSON_NAME_VALIDATION_MESSAGE : 'Please enter your full name as per your PAN card.';
-    const dob = parseDobDisplay(dobDisplay);
-    if (!dobDisplay.trim()) err.dob = 'Please enter your date of birth.';
-    else if (!dob || dob > today || !Number.isFinite(getAge(fields.dob))) err.dob = 'Please enter a valid date of birth.';
-    else if (getAge(fields.dob) < 18) err.dob = 'You must be at least 18 years old to apply.';
-    if (!fields.gender) err.gender = 'Please select your gender.';
-    if (!isValidPan(fields.panNumber.trim())) err.panNumber = 'Please enter a valid 10-character PAN.';
+    if (!isValidPersonName(fullName)) err.fullName = fullName.trim() ? PERSON_NAME_VALIDATION_MESSAGE : 'Please enter your full name as per your PAN card.';
+    const dob = parseDobDisplay(dobShown);
+    if (!dobShown.trim()) err.dob = 'Please enter your date of birth.';
+    else if (!dob || dob > today || !Number.isFinite(getAge(dobIso))) err.dob = 'Please enter a valid date of birth.';
+    else if (getAge(dobIso) < 18) err.dob = 'You must be at least 18 years old to apply.';
+    if (!gender) err.gender = 'Please select your gender.';
+    if (!isValidPan(pan.trim())) err.panNumber = 'Please enter a valid 10-character PAN.';
     if (!fields.occupation) err.occupation = 'Please select your occupation.';
     const m = fields.monthlyIncome.trim();
     if (!m || !Number.isFinite(Number(m)) || Number(m) < 0) {
@@ -275,13 +332,18 @@ export function PersonalDetailsStep(
     return err;
   }
 
+  function lockedIdentity() {
+    return lockedIdentityRef.current;
+  }
+
   function profilePayload() {
-    const pan = fields.panNumber.trim().toUpperCase();
+    const locked = lockedIdentity();
+    const pan = (locked?.panNumber ?? fields.panNumber).trim().toUpperCase();
     return {
-      leadUuid, 
-      fullName: fields.fullName.trim(), 
-      dob: fields.dob,
-      gender: fields.gender,
+      leadUuid,
+      fullName: (locked?.fullName ?? fields.fullName).trim(),
+      dob: locked?.dob ?? fields.dob,
+      gender: locked?.gender ?? fields.gender,
       occupation: fields.occupation,
       panNumber: pan,
       monthlyIncome: fields.monthlyIncome.trim(),
@@ -334,10 +396,11 @@ export function PersonalDetailsStep(
         currentCity: fields.currentCity.trim(), ...(fields.currentCityId != null ? { currentCityId: fields.currentCityId } : {}),
         pincode: fields.pincode, creditConsentAccepted: fields.creditConsentAccepted,
       });
+      const identity = profilePayload();
       const panPromise = verifyLeadPan({
-        ...(leadUuid ? { leadUuid } : {}), panNumber: fields.panNumber.trim().toUpperCase(),
-        fullName: fields.fullName.trim(), dob: fields.dob,
-        gender: fields.gender, occupation: fields.occupation,
+        ...(leadUuid ? { leadUuid } : {}), panNumber: identity.panNumber,
+        fullName: identity.fullName, dob: identity.dob,
+        gender: identity.gender, occupation: fields.occupation,
         creditConsentAccepted: fields.creditConsentAccepted,
         monthlyIncome: fields.monthlyIncome.trim(),
       });
@@ -384,7 +447,11 @@ export function PersonalDetailsStep(
               </svg>
             </div>
             <p className="text-[0.88rem] text-slate-600 leading-relaxed m-0 pt-0.5">
-              {activeSection === 'profile' ? 'Please provide your personal and financial details to complete your loan profile.' : 'Enter your residential pincode and address to finish your application.'}
+              {activeSection === 'profile'
+                ? lockIdentityFields
+                  ? 'Name, gender, date of birth, and PAN are locked from your previous repaid loan. You can update occupation and income.'
+                  : 'Please provide your personal and financial details to complete your loan profile.'
+                : 'Enter your residential pincode and address to finish your application.'}
             </p>
           </div>
         </div>
@@ -413,6 +480,7 @@ export function PersonalDetailsStep(
               onContinue={() => void handleContinue()}
               isBusy={isBusy} 
               busyLabel={busy === 'saving' ? 'Saving…' : busy === 'rejecting' ? 'Verifying…' : 'Continue'}
+              lockIdentityFields={lockIdentityFields}
             />
           ) : (
             <FinancialFields

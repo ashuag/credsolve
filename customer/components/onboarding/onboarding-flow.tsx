@@ -337,6 +337,7 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
           onSectionChange={setDetailsSection}
           onBack={() => router.push('/apply-for-loan')}
           noticeMessage={detailsNotice}
+          lockIdentityFields={portalSession.profilePrefillFromPriorApplication === true}
           onSaved={handleDetailsSaved}
         />
       )}
