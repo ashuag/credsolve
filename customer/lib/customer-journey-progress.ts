@@ -1,4 +1,4 @@
-import type { CustomerSessionResponse } from '@/lib/api/customer-session';
+import { isBankStepDoneForJourney, type CustomerSessionResponse } from '@/lib/api/customer-session';
 import { isLoanDocumentsJourneyComplete } from '@/lib/loan-documents-journey';
 
 /**
@@ -93,7 +93,7 @@ function completionFlags(
     letter: isLoanDocumentsJourneyComplete(session),
     digilockerKyc: isCustomerDigilockerKycStepDone(session),
     livenessKyc: isCustomerLivenessKycStepDone(session),
-    bank: Boolean(j?.bankDetailsCompleted),
+    bank: Boolean(j?.bankDetailsCompleted || (authed && isBankStepDoneForJourney(session))),
     references: Boolean(j?.referencesCompleted),
     esign: Boolean(j?.loanDocumentsAccepted),
   };

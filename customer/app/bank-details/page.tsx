@@ -119,8 +119,12 @@ export default function BankDetailsPage() {
       router.replace('/kyc');
       return;
     }
-    if (isBankVerificationRetryExhausted(session)) {
-      router.replace('/thank-you-interest');
+    if (
+      isBankVerificationRetryExhausted(session) &&
+      session.journey.referencesCompleted &&
+      session.journey.loanDocumentsAccepted
+    ) {
+      router.replace('/thank-you');
     }
   }, [router, session, sessionLoading]);
 
@@ -254,7 +258,7 @@ export default function BankDetailsPage() {
           res.applicationStatus === 'PENNYDROP_FAILED' || res.retryLimitReached === true;
         await refresh();
         if (terminal) {
-          router.replace('/thank-you-interest');
+          router.replace('/references');
           return;
         }
         setError(
@@ -297,6 +301,27 @@ export default function BankDetailsPage() {
           onClick={() => void refresh()}
         >
           Check status
+        </button>
+      </div>
+    </div>
+  ) : retryLimitReached ? (
+    <div className="h-full flex flex-col justify-center">
+      <div className="mb-6">
+        <h1 className="text-2xl md:text-[2.2rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">
+          Continue your application
+        </h1>
+        <p className="m-0 text-[0.95rem] leading-relaxed text-slate-600">
+          We could not verify your bank account automatically. You can still finish the remaining steps.
+        </p>
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-semibold text-amber-950 leading-relaxed">
+          After you complete references and eSign, one of our representatives will call you shortly.
+        </div>
+        <button
+          type="button"
+          className="mt-6 mc-btn-primary py-3 px-6"
+          onClick={() => router.replace('/references')}
+        >
+          Continue
         </button>
       </div>
     </div>
@@ -416,8 +441,8 @@ export default function BankDetailsPage() {
 
           {retryLimitReached ? (
             <div className="p-3 rounded-lg bg-amber-50 border border-amber-100 text-amber-900 text-[0.85rem] font-semibold leading-relaxed">
-              You have used all bank verification attempts. Please contact support — you cannot proceed until your
-              account is verified.
+              We could not verify your bank account automatically. You can still finish your application — one of
+              our representatives will call you after you complete the remaining steps.
             </div>
           ) : null}
 

@@ -7,7 +7,6 @@ import {
   isBankNameMatchReviewPending,
   PENNY_DROP_FAILED_NOTE,
 } from '../../../../common/constants/bank.constants';
-import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { REJECTION_REASON } from '../../../../common/constants/rejection-reason.constants';
 import { SmsService } from '../../../../common/sms/sms.service';
 import { BankTenacioVendorService } from '../../../../common/vendor/bank-tenacio-vendor.service';
@@ -398,8 +397,9 @@ export class SubmitVerifiedBankUseCase {
   }
 
   /**
-   * Same pattern as KYC_FAILED: reject the lead, set application PENNYDROP_FAILED,
-   * and send the rejection SMS. Customer portal then shows /thank-you-interest.
+   * Mark the application PENNYDROP_FAILED for LOS, but keep the lead active so the
+   * customer can finish references / eSign. A representative-will-call message is shown
+   * after the journey completes (no rejection / thank-you-interest).
    */
   private async markPennyDropFailed(params: {
     applicationId: bigint;
@@ -421,18 +421,11 @@ export class SubmitVerifiedBankUseCase {
     if (!application) return null;
 
     const currentStatus = application.applicationStatus.name;
-    if (
-      currentStatus === APPLICATION_STATUS.PENNYDROP_FAILED &&
-      application.lead.leadStatus.name === LEAD_STATUS.REJECTED
-    ) {
+    if (currentStatus === APPLICATION_STATUS.PENNYDROP_FAILED) {
       return APPLICATION_STATUS.PENNYDROP_FAILED;
     }
 
-    const [rejectedLeadStatus, pennyFailedAppStatus, pennyFailedReason] = await Promise.all([
-      this.prisma.client.leadStatus.findFirst({
-        where: { name: LEAD_STATUS.REJECTED, isActive: true },
-        select: { id: true },
-      }),
+    const [pennyFailedAppStatus, pennyFailedReason] = await Promise.all([
       this.prisma.client.applicationStatus.findFirst({
         where: { name: APPLICATION_STATUS.PENNYDROP_FAILED, isActive: true },
         select: { id: true },
@@ -443,25 +436,17 @@ export class SubmitVerifiedBankUseCase {
       }),
     ]);
 
-    if (!rejectedLeadStatus) {
-      this.logger.warn('LeadStatus REJECTED not found — skipping penny-drop rejection.');
-      return currentStatus;
-    }
     if (!pennyFailedAppStatus) {
       this.logger.warn(
         `ApplicationStatus ${APPLICATION_STATUS.PENNYDROP_FAILED} not found — run seed; skipping application status update.`,
       );
     }
 
-    const alreadyRejected = application.lead.leadStatus.name === LEAD_STATUS.REJECTED;
-
     await this.prisma.client.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.lead.update({
         where: { id: params.leadId },
         data: {
-          leadStatusId: rejectedLeadStatus.id,
           leadStatusNote: PENNY_DROP_FAILED_NOTE,
-          ...(pennyFailedReason ? { rejectionReasonId: pennyFailedReason.id } : {}),
         },
       });
 
@@ -480,12 +465,6 @@ export class SubmitVerifiedBankUseCase {
         });
       }
     });
-
-    if (!alreadyRejected) {
-      void this.sms.sendRejectionSms(params.customerMobile, params.leadId).catch((err) => {
-        this.logger.error('Failed to send rejection SMS', err instanceof Error ? err.stack : err);
-      });
-    }
 
     return pennyFailedAppStatus ? APPLICATION_STATUS.PENNYDROP_FAILED : currentStatus;
   }

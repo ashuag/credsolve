@@ -283,6 +283,11 @@ export default function ReferencesPage() {
             Enter the code sent to your mobile to receive your signed sanctioned letter and finish your
             application.
           </p>
+          {session?.authenticated === true && session.journey.bankVerificationFailed ? (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-950 leading-relaxed">
+              After you submit, one of our representatives will call you about bank verification.
+            </div>
+          ) : null}
         </div>
         {otpStatus ? <p className="text-sm text-emerald-700 font-medium">{otpStatus}</p> : null}
         {otpError ? <AlertBanner variant="error">{otpError}</AlertBanner> : null}
@@ -327,6 +332,12 @@ export default function ReferencesPage() {
             Add two people we can contact. Their name and mobile cannot match yours. Next you will verify one
             OTP to receive your sanctioned letter and submit your application.
           </p>
+          {session?.authenticated === true && session.journey.bankVerificationFailed ? (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-950 leading-relaxed">
+              Bank verification could not be completed automatically. Finish these steps — one of our
+              representatives will call you after you submit.
+            </div>
+          ) : null}
         </div>
 
         {submitError ? (

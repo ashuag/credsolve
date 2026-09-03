@@ -328,6 +328,21 @@ export type LosApplicationDetails = {
     aadhaarName: string | null;
     aadhaarDob: string | null;
   } | null;
+  /** `vendor_api_log` rows for DigiLocker Aadhaar download (`aadhaar-download` / Surepass equivalent). */
+  aadhaarDownloadLogs?: Array<{
+    id: string;
+    uuid: string;
+    providerName: string;
+    serviceName: string;
+    requestMethod: string;
+    requestPath: string | null;
+    httpStatus: number | null;
+    requestedAt: string;
+    respondedAt: string;
+    durationMs: number;
+    outcome: 'success' | 'failure';
+    errorMessage: string | null;
+  }>;
   /** DigiLocker PAN from Surepass (`customer_kyc.pan_card_number`). */
   digilockerPan: {
     panCardNumber: string;

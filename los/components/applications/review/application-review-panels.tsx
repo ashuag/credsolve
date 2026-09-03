@@ -55,6 +55,7 @@ import {
 import { KycPhotoGallery } from '@/components/shared/kyc-photo-gallery';
 import { KycEnableReKycButton } from '@/components/applications/kyc-enable-re-kyc-button';
 import { GrantPennyDropAttemptButton } from '@/components/applications/grant-penny-drop-attempt-button';
+import { AadhaarDownloadLogHistory } from '@/components/applications/aadhaar-download-log-history';
 import { PennyDropAttemptHistory } from '@/components/applications/penny-drop-attempt-history';
 import { canEnableReKycFromRow } from '@/lib/kyc-grant-retry-eligibility';
 import { BANK_DETAIL_FAILED_LABEL, canGrantPennyDropAttemptFromRow, isBankDetailFailed } from '@/lib/penny-drop-grant-retry-eligibility';
@@ -535,7 +536,11 @@ export function ReviewKycPanel({
             ) : null}
           </KycNotice>
         ) : !aadhaarFetched ? (
-          <KycNotice>DigiLocker Aadhaar has not been captured yet.</KycNotice>
+          <KycNotice>
+            {(row.aadhaarDownloadLogs?.length ?? 0) > 0
+              ? 'Aadhaar download was called, but DigiLocker Aadhaar was not captured. Review the logs below.'
+              : 'DigiLocker Aadhaar has not been captured yet.'}
+          </KycNotice>
         ) : null}
         <div className="fgrid">
           <ReviewField
@@ -565,6 +570,7 @@ export function ReviewKycPanel({
             value={formatReviewDateTime(row.digilockerPan?.panCardVerifiedAt ?? null)}
           />
         </div>
+        <AadhaarDownloadLogHistory logs={row.aadhaarDownloadLogs} authToken={authToken} variant="review" />
       </ReviewCard>
 
       <ReviewCard

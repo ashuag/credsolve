@@ -12,7 +12,9 @@ import {
   LOAN_DOCUMENT_PDF_FILES,
   LOAN_DOCUMENT_TYPE,
 } from '../../../../common/constants/loan-document.constants';
+import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
 import { EmailService } from '../../../../common/email/email.service';
+import { SmsService } from '../../../../common/sms/sms.service';
 import { readClientIp } from '../../../../common/http/client-ip.util';
 import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
 import { isLeadEmailVerifiedForPortal } from '../../../../common/mappers/customer-portal-profile.mapper';
@@ -44,6 +46,7 @@ export class AcceptLoanDocumentsUseCase {
     private readonly otpTypes: OtpTypeRepository,
     private readonly otpRequests: OtpRequestRepository,
     private readonly settingsRepository: SettingsRepository,
+    private readonly sms: SmsService,
   ) {}
 
   async execute(req: Request, dto: AcceptLoanDocumentsDto) {
@@ -154,8 +157,28 @@ export class AcceptLoanDocumentsUseCase {
     );
 
     await this.sendSanctionedLetterEmail(ctx, lead.id);
+    await this.notifyIfBankVerificationFailed(app.id, customer.mobileNumber, lead.id);
 
     return { success: true, acceptedAt: acceptedAt.toISOString() };
+  }
+
+  /** After eSign, penny-drop failures get the “representative will call” SMS — not a rejection. */
+  private async notifyIfBankVerificationFailed(
+    applicationId: bigint,
+    mobile: string,
+    leadId: bigint,
+  ): Promise<void> {
+    const row = await this.prisma.client.application.findUnique({
+      where: { id: applicationId },
+      select: { applicationStatus: { select: { name: true } } },
+    });
+    if (row?.applicationStatus.name !== APPLICATION_STATUS.PENNYDROP_FAILED) return;
+    void this.sms.sendUnderReviewSms(mobile, leadId).catch((err) => {
+      this.logger.error(
+        'Failed to send representative-callback SMS after penny-drop failure',
+        err instanceof Error ? err.stack : err,
+      );
+    });
   }
 
   private async sendSanctionedLetterEmail(

@@ -26,6 +26,7 @@ import {
 } from '@/lib/api';
 import { KycEnableReKycButton } from '@/components/applications/kyc-enable-re-kyc-button';
 import { GrantPennyDropAttemptButton } from '@/components/applications/grant-penny-drop-attempt-button';
+import { AadhaarDownloadLogHistory } from '@/components/applications/aadhaar-download-log-history';
 import { PennyDropAttemptHistory } from '@/components/applications/penny-drop-attempt-history';
 import { canEnableReKycFromRow } from '@/lib/kyc-grant-retry-eligibility';
 import { BANK_DETAIL_FAILED_LABEL, canGrantPennyDropAttemptFromRow, isBankDetailFailed } from '@/lib/penny-drop-grant-retry-eligibility';
@@ -746,7 +747,9 @@ function KycDetailPanel({
             </p>
           ) : !aadhaarFetched ? (
             <p className="m-0 rounded-[10px] border border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.9)] px-3 py-2.5 text-[0.84rem] leading-[1.45] text-[#92400e]">
-              DigiLocker Aadhaar has not been captured yet.
+              {(row.aadhaarDownloadLogs?.length ?? 0) > 0
+                ? 'Aadhaar download was called, but DigiLocker Aadhaar was not captured. Review the logs below.'
+                : 'DigiLocker Aadhaar has not been captured yet.'}
             </p>
           ) : null}
           <DetailGrid
@@ -774,6 +777,7 @@ function KycDetailPanel({
               },
             ]}
           />
+          <AadhaarDownloadLogHistory logs={row.aadhaarDownloadLogs} authToken={authToken} />
         </div>
       </div>
 

@@ -54,7 +54,10 @@ function statusBadgeClass(status: string): string {
   if (s === 'DISBURSED') return 'bg-indigo-50 text-indigo-700 border-indigo-200 ring-1 ring-indigo-500/20';
   if (s === 'IN_REVIEW' || s === 'UNDER_REVIEW') return 'bg-amber-50 text-amber-800 border-amber-200/80 ring-1 ring-amber-500/30';
   if (s === 'APPROVED') return 'bg-sky-50 text-sky-700 border-sky-200 ring-1 ring-sky-500/20';
-  if (s === 'REJECTED' || s === 'KYC_FAILED' || s === 'PENNYDROP_FAILED' || s === 'CANCELLED') {
+  if (s === 'PENNYDROP_FAILED') {
+    return 'bg-amber-50 text-amber-800 border-amber-200/80 ring-1 ring-amber-500/30';
+  }
+  if (s === 'REJECTED' || s === 'KYC_FAILED' || s === 'CANCELLED') {
     return 'bg-rose-50 text-rose-700 border-rose-200 ring-1 ring-rose-500/20';
   }
   if (s === 'DRAFT') return 'bg-slate-50 text-slate-700 border-slate-200';
@@ -68,6 +71,7 @@ function statusBadgeLabel(status: string): string {
   if (s === 'ACTIVE') return 'Active loan';
   if (s === 'WRITTEN_OFF') return 'Written off';
   if (s === 'IN_REVIEW' || s === 'UNDER_REVIEW') return 'In review';
+  if (s === 'PENNYDROP_FAILED') return 'We will call you';
   return status.replace(/_/g, ' ');
 }
 

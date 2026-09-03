@@ -42,14 +42,19 @@ function ThankYouContent() {
     );
   }
 
+  const bankVerificationFailed =
+    session?.authenticated === true && session.journey.bankVerificationFailed === true;
+
   const journeyPanel = (
     <div className="h-full flex flex-col justify-center">
       <div className="mb-6">
         <h1 className="text-2xl md:text-[2.5rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">
-          Application Received.
+          {bankVerificationFailed ? 'Thank you.' : 'Application Received.'}
         </h1>
         <p className="text-[1rem] text-slate-500 mb-8 leading-relaxed">
-          Your application is now being processed by our automated systems and lending partners.
+          {bankVerificationFailed
+            ? 'Thank you for completing your application. Bank verification could not be completed automatically. One of our representatives will call you shortly.'
+            : 'Your application is now being processed by our automated systems and lending partners.'}
         </p>
 
         <div className="grid gap-4 mb-10">
@@ -65,9 +70,13 @@ function ThankYouContent() {
               </svg>
             </div>
             <div>
-              <h3 className="font-bold text-brand-navy text-[1rem]">Under Review</h3>
+              <h3 className="font-bold text-brand-navy text-[1rem]">
+                {bankVerificationFailed ? 'A representative will call' : 'Under Review'}
+              </h3>
               <p className="text-[0.85rem] text-slate-500">
-                Most applications are reviewed within 1–2 business days.
+                {bankVerificationFailed
+                  ? 'One of our team members will contact you shortly to complete bank verification.'
+                  : 'Most applications are reviewed within 1–2 business days.'}
               </p>
             </div>
           </div>
@@ -105,11 +114,21 @@ function ThankYouContent() {
         showSpeedometer={!hasOpenCustomerLoan(session)}
         journeyPanel={journeyPanel}
         leftTitle={
-          <>
-            Awesome! <span className="text-green-400">Success.</span>
-          </>
+          bankVerificationFailed ? (
+            <>
+              We&apos;ll <span className="text-green-400">call you.</span>
+            </>
+          ) : (
+            <>
+              Awesome! <span className="text-green-400">Success.</span>
+            </>
+          )
         }
-        leftDescription="Your loan application journey is complete. Sit back and relax while we handle the rest."
+        leftDescription={
+          bankVerificationFailed
+            ? 'Your application is in. A MoneyCash representative will contact you shortly about bank verification.'
+            : 'Your loan application journey is complete. Sit back and relax while we handle the rest.'
+        }
         leftInfographic={
           <svg
             viewBox="0 0 400 400"

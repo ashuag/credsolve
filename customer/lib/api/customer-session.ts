@@ -93,6 +93,8 @@ export type CustomerSessionResponse =
         bankDetailsCompleted: boolean;
         /** Penny-drop succeeded but name match is waiting for credit approval. */
         bankNameReviewPending?: boolean;
+        /** Penny-drop retries exhausted — finish references / eSign; a representative will call. */
+        bankVerificationFailed?: boolean;
       };
       /** Post-BRE pre-approved ceiling; set after bureau pass. */
       preApprovedAmountInr: number | null;
@@ -112,10 +114,19 @@ export function isBankVerificationRetryExhausted(
   session: CustomerSessionResponse | null | undefined,
 ): boolean {
   if (!session?.authenticated) return false;
+  if (session.journey.bankVerificationFailed) return true;
   if (session.journey.bankDetailsCompleted) return false;
   const progress = session.bankVerificationProgress;
   if (!progress) return false;
   return progress.retryLimitReached === true;
+}
+
+/** Bank step is done for routing: verified account, or penny-drop failed and they may continue. */
+export function isBankStepDoneForJourney(
+  session: CustomerSessionResponse | null | undefined,
+): boolean {
+  if (!session?.authenticated) return false;
+  return session.journey.bankDetailsCompleted || isBankVerificationRetryExhausted(session);
 }
 
 /** Email entry + OTP during the loan journey (after loan selection). */
@@ -264,14 +275,13 @@ export function isCustomerJourneyIncomplete(
   if (session.hasOpenLoan) return false;
   if (!session.lead) return true;
   if (isLeadRejectedAndLocked(session.lead)) return false;
-  if (isBankVerificationRetryExhausted(session)) return false;
   const j = session.journey;
   return !(
     j.detailsCompleted &&
     j.loanSelectionCompleted &&
     j.loanDocumentsCompleted &&
     j.kycCompleted &&
-    j.bankDetailsCompleted &&
+    isBankStepDoneForJourney(session) &&
     j.referencesCompleted &&
     j.loanDocumentsAccepted
   );
@@ -332,8 +342,7 @@ export function getCustomerJourneyResumePath(
   }
 
   if (!journey.kycCompleted) return resolveKycStagePath(session);
-  if (isBankVerificationRetryExhausted(session)) return '/thank-you-interest';
-  if (!journey.bankDetailsCompleted) return '/bank-details';
+  if (!isBankStepDoneForJourney(session)) return '/bank-details';
   if (!journey.referencesCompleted || !journey.loanDocumentsAccepted) return '/references';
   return '/thank-you';
 }

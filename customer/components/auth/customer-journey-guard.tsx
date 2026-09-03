@@ -9,7 +9,7 @@ import {
   canResumeKycAfterInternalError,
   resolveKycStagePath,
   shouldResumeKycSelfie,
-  isBankVerificationRetryExhausted,
+  isBankStepDoneForJourney,
   CUSTOMER_EMAIL_JOURNEY_PATH,
   hasOpenCustomerLoan,
 } from '@/lib/api/customer-session';
@@ -44,7 +44,7 @@ function stageFromSession(session: ReturnType<typeof useCustomerSession>['sessio
   if (!session.lead.emailVerified) return 'email';
   if (!isLoanDocumentsJourneyComplete(session)) return 'loanDocuments';
   if (!j.kycCompleted) return 'kyc';
-  if (!j.bankDetailsCompleted) return 'bankDetails';
+  if (!isBankStepDoneForJourney(session)) return 'bankDetails';
   if (!j.referencesCompleted || !j.loanDocumentsAccepted) return 'references';
   return 'done';
 }
@@ -108,7 +108,13 @@ function isPathAllowedForStage(stage: JourneyStage, path: string): boolean {
       // keep /kyc reachable so the hub is not skipped after DigiLocker.
       return path === '/bank-details' || path === '/kyc' || path.startsWith('/kyc/');
     case 'references':
-      return path === '/references' || path === '/kyc' || path.startsWith('/kyc/');
+      // Bank stays reachable after penny-drop failure so they can go back and continue.
+      return (
+        path === '/references' ||
+        path === '/bank-details' ||
+        path === '/kyc' ||
+        path.startsWith('/kyc/')
+      );
     case 'done':
       return true;
   }
@@ -189,20 +195,6 @@ export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
       if (pathname !== '/thank-you') {
         router.replace('/thank-you');
       }
-      return;
-    }
-
-    if (isBankVerificationRetryExhausted(session)) {
-      if (
-        pathname === '/thank-you-interest' ||
-        pathname === '/my-account' ||
-        pathname === '/dashboard' ||
-        pathname === '/payments' ||
-        pathname === '/'
-      ) {
-        return;
-      }
-      router.replace('/thank-you-interest');
       return;
     }
 

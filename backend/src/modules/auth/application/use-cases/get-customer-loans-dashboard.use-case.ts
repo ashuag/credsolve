@@ -39,12 +39,15 @@ import { CustomerRepository } from '../../infrastructure/repositories/customer.r
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
 
-function isTerminalApplicationStatus(statusName: string): boolean {
-  return (
-    statusName === APPLICATION_STATUS.REJECTED ||
-    statusName === APPLICATION_STATUS.KYC_FAILED ||
-    statusName === APPLICATION_STATUS.PENNYDROP_FAILED
-  );
+function isTerminalApplicationStatus(
+  statusName: string,
+  loanDocumentsAcceptedAt?: Date | null,
+): boolean {
+  if (statusName === APPLICATION_STATUS.REJECTED || statusName === APPLICATION_STATUS.KYC_FAILED) {
+    return true;
+  }
+  // Penny-drop failure stays in-progress until the customer finishes references / eSign.
+  return statusName === APPLICATION_STATUS.PENNYDROP_FAILED && loanDocumentsAcceptedAt != null;
 }
 
 function decToAmountString(value: Prisma.Decimal | null | undefined): string | null {
@@ -240,6 +243,7 @@ const APPLICATION_DASHBOARD_SELECT = {
       bankAccountNumber: true,
       ifscCode: true,
       bankName: true,
+      loanDocumentsAcceptedAt: true,
       interestRate: true,
       processingFeePercentage: true,
       gstPercentage: true,
@@ -353,14 +357,14 @@ export class GetCustomerLoansDashboardUseCase {
 
     /** Open disbursed loan — still active even when repayment is overdue. */
     const isActiveRow = (raw: (typeof rows)[number]): boolean => {
-      if (isTerminalApplicationStatus(raw.applicationStatus.name)) return false;
+      if (isTerminalApplicationStatus(raw.applicationStatus.name, raw.details?.loanDocumentsAcceptedAt)) return false;
       if (!isOpenLoanAccount(raw)) return false;
       return isDisbursedRow(disbursedAtFor(raw), raw.applicationStatus.name);
     };
 
     /** Closed / rejected applications only — overdue open loans stay in active. */
     const isPastRow = (raw: (typeof rows)[number]): boolean => {
-      if (isTerminalApplicationStatus(raw.applicationStatus.name)) return true;
+      if (isTerminalApplicationStatus(raw.applicationStatus.name, raw.details?.loanDocumentsAcceptedAt)) return true;
       return raw.loanAccount?.closedAt != null;
     };
 

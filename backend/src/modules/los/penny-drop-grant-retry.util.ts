@@ -28,6 +28,6 @@ export function canGrantPennyDropAttempt(snapshot: PennyDropGrantSnapshot): bool
 
   const pennyFailed = snapshot.applicationStatusCode === APPLICATION_STATUS.PENNYDROP_FAILED;
   const attemptsExhausted = snapshot.attemptsUsed >= snapshot.attemptsAllowed;
-  // Lead REJECTED is expected after penny-drop failure — grant recovers the lead.
+  // Lead may still be active (customer finishes references / eSign) or historically REJECTED.
   return pennyFailed || attemptsExhausted;
 }

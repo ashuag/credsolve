@@ -45,6 +45,11 @@ export type CustomerPortalJourneySnapshot = {
   bankDetailsCompleted: boolean;
   /** Penny-drop succeeded but bank vs customer name is waiting for credit approval. */
   bankNameReviewPending: boolean;
+  /**
+   * Penny-drop retries were exhausted (application PENNYDROP_FAILED).
+   * The customer can still finish references / eSign; a representative will call.
+   */
+  bankVerificationFailed: boolean;
 };
 
 /** DigiLocker Aadhaar + selfie/liveness progress for the active application. */

@@ -7,7 +7,7 @@ import {
 } from '../../../../common/loan/customer-open-loan.util';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { getRejectedUntilIso } from '../../../../common/lead/lead-reapply-policy.util';
-import { APPLICATION_KYC_STATUS } from '../../../../common/constants/application.constants';
+import { APPLICATION_KYC_STATUS, APPLICATION_STATUS } from '../../../../common/constants/application.constants';
 import { isBankNameMatchReviewPending } from '../../../../common/constants/bank.constants';
 import { isDigilockerAadhaarCaptureComplete } from '../../../../common/kyc/aadhaar-vendor-parse.util';
 import {
@@ -86,6 +86,7 @@ export class GetCustomerSessionUseCase {
         referencesCompleted: false,
         bankDetailsCompleted: false,
         bankNameReviewPending: false,
+        bankVerificationFailed: false,
       },
       preApprovedAmountInr: null,
       loanSelection: null,
@@ -374,6 +375,14 @@ export class GetCustomerSessionUseCase {
     const bankDetailsCompleted = Boolean(
       appDetails?.bankAccountNumber?.trim() && appDetails?.ifscCode?.trim() && !bankNameReviewPending,
     );
+    const pennyDropRetryCount = await this.settings.loadPennyDropRetryCount();
+    const pennyDropAttempts = applicationExtras?.details?.pennyDropAttempts ?? 0;
+    const bankVerificationFailed =
+      applicationStatusName === APPLICATION_STATUS.PENNYDROP_FAILED ||
+      (!bankDetailsCompleted &&
+        !bankNameReviewPending &&
+        pennyDropRetryCount > 0 &&
+        pennyDropAttempts >= pennyDropRetryCount);
 
     const loanSelection =
       appDetails &&
@@ -439,10 +448,8 @@ export class GetCustomerSessionUseCase {
           }
         : null;
 
-    const pennyDropRetryCount = await this.settings.loadPennyDropRetryCount();
-    const pennyDropAttempts = applicationExtras?.details?.pennyDropAttempts ?? 0;
     const bankVerificationProgress =
-      application && kycCompleted && !bankDetailsCompleted
+      application && kycCompleted && (!bankDetailsCompleted || bankVerificationFailed)
         ? {
             attemptsUsed: pennyDropAttempts,
             attemptsAllowed: pennyDropRetryCount,
@@ -477,6 +484,7 @@ export class GetCustomerSessionUseCase {
         referencesCompleted,
         bankDetailsCompleted,
         bankNameReviewPending,
+        bankVerificationFailed,
       },
       preApprovedAmountInr:
         preApprovedAmountInr != null && preApprovedAmountInr > 0 ? preApprovedAmountInr : null,

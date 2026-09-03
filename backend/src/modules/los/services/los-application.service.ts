@@ -6,8 +6,10 @@ import { CibilCreditAssessmentService } from '../../../common/cibil/cibil-credit
 import {
   extractDigilockerIdentityMismatch,
   isDigilockerAadhaarCaptureComplete,
-  isTenacioVendorBusinessSuccess,
+  pickTenacioVendorErrorMessage,
 } from '../../../common/kyc/aadhaar-vendor-parse.util';
+import { extractVendorServiceError } from '../../../common/vendor/vendor-api-error.util';
+import { classifyVendorApiLogOutcome } from '../../../common/vendor/vendor-api-log-outcome.util';
 import {
   describeAadhaarIdentityFailure,
   type AadhaarIdentityFailureDetail,
@@ -131,6 +133,28 @@ function formatAadhaarDob(d: Date | null): string | null {
 }
 
 const AADHAAR_DOWNLOAD_SERVICE_NAMES = ['aadhaar-download', 'digilocker-download-aadhaar'] as const;
+
+function aadhaarDownloadServiceNames(): string[] {
+  const extra = process.env.TENACIO_AADHAAR_DOWNLOAD_AUDIT_SERVICE?.trim();
+  const names = new Set<string>(AADHAAR_DOWNLOAD_SERVICE_NAMES);
+  if (extra) names.add(extra);
+  return [...names];
+}
+
+type LosAadhaarDownloadLogItem = {
+  id: string;
+  uuid: string;
+  providerName: string;
+  serviceName: string;
+  requestMethod: string;
+  requestPath: string | null;
+  httpStatus: number | null;
+  requestedAt: string;
+  respondedAt: string;
+  durationMs: number;
+  outcome: 'success' | 'failure';
+  errorMessage: string | null;
+};
 
 function unwrapVendorAuditPayload(payload: unknown): unknown {
   if (!isRecord(payload)) return payload;
@@ -778,14 +802,12 @@ export class LosApplicationService {
     const bust = (url: string | null) =>
       url && /^https?:\/\//i.test(url) ? appendPhotoCacheBuster(url, photoVersion) : url;
     const storedAadhaar = customerKyc?.aadhaarData ?? null;
+    const aadhaarDownloadLogs = await this.listAadhaarDownloadVendorLogs(application.leadId);
     let aadhaarSource = storedAadhaar;
     let aadhaarDetail = buildLosAadhaarDetail(storedAadhaar);
-    if (!aadhaarDetail && !isAcceptedAadhaarCapture(storedAadhaar, customerKyc?.aadhaarVerifiedAt, customerKyc?.aadhaarPhotoPath)) {
-      const loggedVendor = await this.findSuccessfulAadhaarDownloadVendor(application.leadId);
-      if (loggedVendor) {
-        aadhaarSource = loggedVendor;
-        aadhaarDetail = buildLosAadhaarDetail(loggedVendor);
-      }
+    if (!aadhaarDetail && aadhaarDownloadLogs.firstParseableVendor) {
+      aadhaarSource = aadhaarDownloadLogs.firstParseableVendor;
+      aadhaarDetail = buildLosAadhaarDetail(aadhaarDownloadLogs.firstParseableVendor);
     }
     const kycFailed =
       application.applicationStatus.name === APPLICATION_STATUS.KYC_FAILED ||
@@ -938,6 +960,7 @@ export class LosApplicationService {
       })),
       aadhaarDetail,
       aadhaarIdentityFailure,
+      aadhaarDownloadLogs: aadhaarDownloadLogs.items,
       aadhaarKycCompleted: isAcceptedAadhaarCapture(
         storedAadhaar,
         customerKyc?.aadhaarVerifiedAt,
@@ -1155,24 +1178,54 @@ export class LosApplicationService {
     res.send(buf);
   }
 
-  private async findSuccessfulAadhaarDownloadVendor(leadId: bigint): Promise<unknown | null> {
+  private async listAadhaarDownloadVendorLogs(leadId: bigint): Promise<{
+    items: LosAadhaarDownloadLogItem[];
+    firstParseableVendor: unknown | null;
+  }> {
     const rows = await this.prisma.read.vendorApiLog.findMany({
       where: {
         leadId,
-        httpStatus: 200,
-        serviceName: { in: [...AADHAAR_DOWNLOAD_SERVICE_NAMES] },
+        serviceName: { in: aadhaarDownloadServiceNames() },
       },
       orderBy: { respondedAt: 'desc' },
-      take: 8,
-      select: { responsePayload: true },
+      take: 20,
+      select: {
+        id: true,
+        uuid: true,
+        providerName: true,
+        serviceName: true,
+        requestMethod: true,
+        requestPath: true,
+        httpStatus: true,
+        requestedAt: true,
+        respondedAt: true,
+        responsePayload: true,
+      },
     });
-    for (const row of rows) {
+
+    let firstParseableVendor: unknown | null = null;
+    const items = rows.map((row) => {
       const vendor = unwrapVendorAuditPayload(row.responsePayload);
-      if (isTenacioVendorBusinessSuccess(vendor) && buildLosAadhaarDetail(vendor)) {
-        return vendor;
+      if (!firstParseableVendor && buildLosAadhaarDetail(vendor)) {
+        firstParseableVendor = vendor;
       }
-    }
-    return null;
+      const serviceError = extractVendorServiceError(vendor);
+      return {
+        id: row.id.toString(),
+        uuid: row.uuid,
+        providerName: row.providerName,
+        serviceName: row.serviceName,
+        requestMethod: row.requestMethod,
+        requestPath: row.requestPath,
+        httpStatus: row.httpStatus,
+        requestedAt: row.requestedAt.toISOString(),
+        respondedAt: row.respondedAt.toISOString(),
+        durationMs: Math.max(0, row.respondedAt.getTime() - row.requestedAt.getTime()),
+        outcome: classifyVendorApiLogOutcome(row.httpStatus, vendor),
+        errorMessage: serviceError?.message?.trim() || pickTenacioVendorErrorMessage(vendor)?.trim() || null,
+      };
+    });
+    return { items, firstParseableVendor };
   }
 
   private async streamKycPhoto(relativePath: string, res: Response): Promise<void> {
