@@ -1,5 +1,6 @@
 import {
   compareAadhaarToLeadProfile,
+  describeAadhaarIdentityFailure,
   extractAadhaarIdentityFromVendor,
   personNamesMatch,
 } from './aadhaar-lead-identity-match.util';
@@ -54,5 +55,33 @@ describe('aadhaar-lead-identity-match', () => {
 
   it('normalizes token order in names', () => {
     expect(personNamesMatch('Agarwal Saurabh', 'SAURABH AGARWAL')).toBe(true);
+  });
+
+  it('matches DD-MM-YYYY Aadhaar DOB against a UTC lead calendar date', () => {
+    const result = compareAadhaarToLeadProfile({
+      leadFullName: 'SANTHI FRANCIS',
+      leadDateOfBirth: new Date(Date.UTC(1981, 4, 8)),
+      vendor: {
+        status: 'success',
+        data: { name: 'SANTHI FRANCIS', dob: '08-05-1981' },
+      },
+    });
+    expect(result).toEqual({ matched: true });
+  });
+
+  it('describes a name mismatch with both application and Aadhaar values', () => {
+    const failure = describeAadhaarIdentityFailure({
+      leadFullName: 'Santhi Devi',
+      leadDateOfBirth: new Date(Date.UTC(1981, 4, 8)),
+      vendor: { status: 'success', data: { name: 'SANTHI FRANCIS', dob: '08-05-1981' } },
+    });
+    expect(failure).toMatchObject({
+      reason: 'name_mismatch',
+      applicationName: 'Santhi Devi',
+      applicationDob: '1981-05-08',
+      aadhaarName: 'SANTHI FRANCIS',
+      aadhaarDob: '1981-05-08',
+    });
+    expect(failure?.message).toContain('Name on Aadhaar');
   });
 });

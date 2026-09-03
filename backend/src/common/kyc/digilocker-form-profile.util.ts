@@ -23,17 +23,33 @@ const NAME_KEYS = [
 
 const DOB_KEYS = ['dateOfBirth', 'dob', 'date_of_birth', 'dateOfbirth', 'birthDate', 'birth_date'] as const;
 
-/** Flattened DigiLocker `data` plus nested Surepass `aadhaar_xml_data`. */
+function pushRecordBag(bags: Record<string, unknown>[], value: unknown): void {
+  if (isRecord(value) && !bags.includes(value)) bags.push(value);
+}
+
+/** Flattened DigiLocker `data`, vendor-attempt wrappers, and nested address / XML bags. */
 export function collectDigilockerAadhaarFieldBags(formJson: unknown): Record<string, unknown>[] {
   if (!isRecord(formJson)) return [];
-  const bags: Record<string, unknown>[] = [formJson];
-  const data = formJson.data;
-  if (isRecord(data)) bags.push(data);
-  const xml = formJson.aadhaar_xml_data;
-  if (isRecord(xml)) bags.push(xml);
-  if (isRecord(data) && isRecord(data.aadhaar_xml_data)) {
-    bags.push(data.aadhaar_xml_data);
+  const bags: Record<string, unknown>[] = [];
+  pushRecordBag(bags, formJson);
+  pushRecordBag(bags, formJson.data);
+  pushRecordBag(bags, formJson.vendor);
+  const vendor = formJson.vendor;
+  if (isRecord(vendor)) {
+    pushRecordBag(bags, vendor.data);
+    pushRecordBag(bags, vendor.aadhaar_xml_data);
+    if (isRecord(vendor.data)) {
+      pushRecordBag(bags, vendor.data.aadhaar_xml_data);
+      pushRecordBag(bags, vendor.data.address);
+    }
+    pushRecordBag(bags, vendor.address);
   }
+  pushRecordBag(bags, formJson.aadhaar_xml_data);
+  if (isRecord(formJson.data)) {
+    pushRecordBag(bags, formJson.data.aadhaar_xml_data);
+    pushRecordBag(bags, formJson.data.address);
+  }
+  pushRecordBag(bags, formJson.address);
   return bags;
 }
 
@@ -45,18 +61,18 @@ export function pickDigilockerAadhaarString(formJson: unknown, keys: readonly st
   return null;
 }
 
-/** Parse ISO `YYYY-MM-DD` or `DD-MM-YYYY` / `DD/MM/YYYY` when unambiguous. */
+/** Parse ISO `YYYY-MM-DD` or `DD-MM-YYYY` / `DD/MM/YYYY` as a UTC calendar date. */
 function parseDob(raw: string | null): Date | null {
   if (!raw) return null;
   const s = raw.trim();
   const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
   if (iso) {
-    const d = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+    const d = new Date(Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])));
     return Number.isNaN(d.getTime()) ? null : d;
   }
   const dmy = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(s);
   if (dmy) {
-    const d = new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
+    const d = new Date(Date.UTC(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1])));
     return Number.isNaN(d.getTime()) ? null : d;
   }
   return null;

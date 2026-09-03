@@ -5,6 +5,7 @@ import { DigilockerSessionStore } from '../../../../common/kyc/digilocker-sessio
 import { DigilockerFetchService } from '../../../../common/vendor/digilocker-fetch.service';
 import {
   buildDigilockerAadhaarFormJson,
+  buildDigilockerIdentityMismatchJson,
   buildDigilockerVendorAttemptJson,
   decodeAadhaarPhoto,
   extractAadhaarPhotoString,
@@ -458,10 +459,28 @@ export class DownloadAadhaarDigilockerUseCase {
     });
 
     if (!identityMatch.matched) {
+      const photoRel = await this.persistAadhaarPhotoIfPresent({
+        vendor,
+        customerUuid: params.customerUuid,
+        applicationUuid: params.applicationUuid,
+      });
+      await this.applications.updateDigilockerAadhaarArtifacts({
+        applicationId: params.applicationId,
+        customerId: params.customerId,
+        digilockerAadhaarFormJson: buildDigilockerIdentityMismatchJson({
+          httpStatus: params.httpStatus,
+          vendor,
+          photoRelativePath: photoRel,
+          reason: identityMatch.reason,
+          message: identityMatch.message,
+        }) as Prisma.InputJsonValue,
+        aadhaarPhotoRelativePath: photoRel,
+      });
       await this.kycIdentityRejection.rejectForAadhaarProfileMismatch({
         leadId: params.leadId,
         applicationId: params.applicationId,
         customerMobile: params.customerMobile ?? undefined,
+        statusNote: identityMatch.message,
       });
       await this.digilockerSession.clear(params.applicationUuid);
       this.logger.warn(
@@ -473,6 +492,7 @@ export class DownloadAadhaarDigilockerUseCase {
         httpStatus: params.httpStatus,
         vendor,
         businessSuccess: true,
+        persisted: true,
         identityMismatch: true,
         identityMismatchMessage: identityMatch.message,
       };
@@ -502,19 +522,11 @@ export class DownloadAadhaarDigilockerUseCase {
 
     let persisted = false;
     try {
-      const photoRaw = extractAadhaarPhotoString(vendor);
-      let photoRel: string | null = null;
-      if (photoRaw) {
-        const decoded = decodeAadhaarPhoto(photoRaw);
-        if (decoded?.buffer.length) {
-          photoRel = this.kycFiles.aadhaarPhotoRelativePath(
-            params.customerUuid,
-            params.applicationUuid,
-            decoded.ext,
-          );
-          await this.kycFiles.writeBytes(photoRel, decoded.buffer);
-        }
-      }
+      const photoRel = await this.persistAadhaarPhotoIfPresent({
+        vendor,
+        customerUuid: params.customerUuid,
+        applicationUuid: params.applicationUuid,
+      });
 
       const formJson = buildDigilockerAadhaarFormJson(vendor, photoRel) ?? { _note: 'digilocker_vendor_unparsed' };
       await this.applications.updateDigilockerAadhaarArtifacts({
@@ -550,6 +562,24 @@ export class DownloadAadhaarDigilockerUseCase {
       panFetched,
       panCardNumber,
     };
+  }
+
+  private async persistAadhaarPhotoIfPresent(params: {
+    vendor: unknown;
+    customerUuid: string;
+    applicationUuid: string;
+  }): Promise<string | null> {
+    const photoRaw = extractAadhaarPhotoString(params.vendor);
+    if (!photoRaw) return null;
+    const decoded = decodeAadhaarPhoto(photoRaw);
+    if (!decoded?.buffer.length) return null;
+    const photoRel = this.kycFiles.aadhaarPhotoRelativePath(
+      params.customerUuid,
+      params.applicationUuid,
+      decoded.ext,
+    );
+    await this.kycFiles.writeBytes(photoRel, decoded.buffer);
+    return photoRel;
   }
 
   private async persistVendorAttempt(

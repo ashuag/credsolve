@@ -39,34 +39,35 @@ function statusBadgeClass(status: string): string {
   const s = status.toUpperCase();
   // Loan account outcomes
   if (s === 'CLOSED' || s === 'PAID' || s === 'PAID_FULLY') {
-    return 'bg-emerald-100 text-emerald-900 border-emerald-300';
+    return 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-1 ring-emerald-500/20';
   }
   if (s === 'OVERDUE') {
-    return 'bg-rose-100 text-rose-900 border-rose-300';
+    return 'bg-rose-50 text-rose-700 border-rose-200 ring-1 ring-rose-500/20';
   }
   if (s === 'ACTIVE') {
-    return 'bg-sky-100 text-sky-900 border-sky-300';
+    return 'bg-sky-50 text-sky-700 border-sky-200 ring-1 ring-sky-500/20';
   }
   if (s === 'WRITTEN_OFF') {
-    return 'bg-slate-200 text-slate-800 border-slate-300';
+    return 'bg-slate-100 text-slate-700 border-slate-300 ring-1 ring-slate-400/20';
   }
   // Application journey statuses
-  if (s === 'DISBURSED') return 'bg-indigo-100 text-indigo-900 border-indigo-200';
-  if (s === 'IN_REVIEW' || s === 'UNDER_REVIEW') return 'bg-amber-100 text-amber-900 border-amber-200';
-  if (s === 'APPROVED') return 'bg-sky-100 text-sky-900 border-sky-200';
+  if (s === 'DISBURSED') return 'bg-indigo-50 text-indigo-700 border-indigo-200 ring-1 ring-indigo-500/20';
+  if (s === 'IN_REVIEW' || s === 'UNDER_REVIEW') return 'bg-amber-50 text-amber-800 border-amber-200/80 ring-1 ring-amber-500/30';
+  if (s === 'APPROVED') return 'bg-sky-50 text-sky-700 border-sky-200 ring-1 ring-sky-500/20';
   if (s === 'REJECTED' || s === 'KYC_FAILED' || s === 'PENNYDROP_FAILED' || s === 'CANCELLED') {
-    return 'bg-rose-100 text-rose-900 border-rose-200';
+    return 'bg-rose-50 text-rose-700 border-rose-200 ring-1 ring-rose-500/20';
   }
-  if (s === 'DRAFT') return 'bg-slate-100 text-slate-700 border-slate-200';
-  return 'bg-[rgba(20,150,243,0.12)] text-brand-navy border-[rgba(20,150,243,0.25)]';
+  if (s === 'DRAFT') return 'bg-slate-50 text-slate-700 border-slate-200';
+  return 'bg-[rgba(20,150,243,0.08)] text-brand-blue border-[rgba(20,150,243,0.25)] ring-1 ring-[rgba(20,150,243,0.2)]';
 }
 
 function statusBadgeLabel(status: string): string {
   const s = status.toUpperCase();
   if (s === 'CLOSED') return 'Paid fully';
   if (s === 'OVERDUE') return 'Overdue';
-  if (s === 'ACTIVE') return 'Active';
+  if (s === 'ACTIVE') return 'Active loan';
   if (s === 'WRITTEN_OFF') return 'Written off';
+  if (s === 'IN_REVIEW' || s === 'UNDER_REVIEW') return 'In review';
   return status.replace(/_/g, ' ');
 }
 
@@ -130,6 +131,10 @@ function dueTiming(
   };
 }
 
+/* =========================================================================
+   ICONS
+   ========================================================================= */
+
 function ResumeArrow() {
   return (
     <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
@@ -145,6 +150,89 @@ function CheckIcon() {
     </svg>
   );
 }
+
+function ShieldCheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function WalletIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <path d="M3 8a3 3 0 013-3h12a2 2 0 012 2v2H6a3 3 0 00-3 3v-4z" strokeLinejoin="round" />
+      <path d="M3 10v8a2 2 0 002 2h14a2 2 0 002-2v-8H5a2 2 0 00-2 2z" strokeLinejoin="round" />
+      <circle cx="17" cy="14" r="1.4" fill="currentColor" />
+    </svg>
+  );
+}
+
+function HistoryIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <path d="M3 12a9 9 0 109-9 9 9 0 00-7 3" strokeLinecap="round" />
+      <path d="M3 4v5h5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 7v5l3 2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function SparklesIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M12 3v3m0 12v3M3 12h3m12 0h3m-3.5-6.5l-2 2m-7 7l-2 2m11 0l-2-2m-7-7l-2-2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <circle cx="12" cy="12" r="9" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+    </svg>
+  );
+}
+
+function HeadsetIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <path d="M3 18v-6a9 9 0 0118 0v6" />
+      <path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
+    </svg>
+  );
+}
+
+function CalculatorIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <line x1="8" y1="6" x2="16" y2="6" />
+      <line x1="16" y1="14" x2="16" y2="14.01" />
+      <line x1="12" y1="14" x2="12" y2="14.01" />
+      <line x1="8" y1="14" x2="8" y2="14.01" />
+      <line x1="16" y1="18" x2="16" y2="18.01" />
+      <line x1="12" y1="18" x2="12" y2="18.01" />
+      <line x1="8" y1="18" x2="8" y2="18.01" />
+    </svg>
+  );
+}
+
+/* =========================================================================
+   COMPONENTS
+   ========================================================================= */
 
 const STEP_HINT: Record<CustomerJourneyProgressStep['key'], string> = {
   mobile: 'Your mobile number is verified.',
@@ -199,7 +287,7 @@ function JourneyTracker({ steps }: { steps: CustomerJourneyProgressStep[] }) {
                 'min-w-0 flex-1 pb-4',
                 last && 'pb-0',
                 current &&
-                  'mb-3 rounded-2xl bg-[#fffbeb] px-3 py-2.5 ring-1 ring-[#ffc519]/35',
+                'mb-3 rounded-2xl bg-[#fffbeb] px-3 py-2.5 ring-1 ring-[#ffc519]/35',
               )}
             >
               <p
@@ -277,23 +365,25 @@ function CompleteJourneyCard({
   const barWidth = Math.max(8, pct);
 
   return (
-    <article className="overflow-hidden rounded-[24px] border border-[rgba(18,36,79,0.1)] bg-white shadow-[0_18px_44px_rgba(23,44,113,0.1)]">
+    <article className="overflow-hidden rounded-[24px] border border-[rgba(18,36,79,0.08)] bg-white shadow-[0_16px_36px_rgba(23,44,113,0.08)]">
       <div className="relative overflow-hidden bg-[linear-gradient(145deg,#12244f_0%,#1c347d_58%,#1496f3_140%)] px-5 py-5 sm:px-6">
         <div
           aria-hidden
           className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(255,197,25,0.22),transparent_68%)]"
         />
-        <p className="relative m-0 text-[0.68rem] font-black uppercase tracking-[0.16em] text-[#ffc519]">
-          Application in progress
-        </p>
-        <h2 className="relative mt-1.5 mb-0 text-[1.35rem] font-extrabold leading-tight tracking-tight text-white sm:text-[1.5rem]">
+        <div className="flex items-center gap-2">
+          <span className="relative inline-flex items-center rounded-full bg-[#ffc519]/20 px-2.5 py-0.5 text-[0.68rem] font-black uppercase tracking-[0.14em] text-[#ffc519]">
+            Application in progress
+          </span>
+        </div>
+        <h2 className="relative mt-2 mb-0 text-[1.35rem] font-extrabold leading-tight tracking-tight text-white sm:text-[1.5rem]">
           Continue from {nextLabel}
         </h2>
-        <p className="relative mt-1.5 mb-0 text-[0.86rem] font-medium text-white/75">
-          Step {stepOrdinal} of {total}
+        <p className="relative mt-1 mb-0 text-[0.85rem] font-medium text-white/75">
+          Step {stepOrdinal} of {total} completed
         </p>
         <div
-          className="relative mt-4 h-1.5 overflow-hidden rounded-full bg-white/15"
+          className="relative mt-4 h-2 overflow-hidden rounded-full bg-white/15"
           role="progressbar"
           aria-valuemin={0}
           aria-valuemax={100}
@@ -307,9 +397,9 @@ function CompleteJourneyCard({
         </div>
         <Link
           href={resumeHref}
-          className="group relative mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#ffc519] px-5 py-3.5 text-[0.98rem] font-extrabold text-[#12244f] shadow-[0_12px_28px_rgba(246,180,0,0.28)] transition hover:brightness-105 sm:w-auto"
+          className="group relative mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#ffc519] px-6 py-3.5 text-[0.96rem] font-extrabold text-[#12244f] shadow-[0_12px_28px_rgba(246,180,0,0.28)] transition-all hover:brightness-105 hover:shadow-[0_16px_32px_rgba(246,180,0,0.36)] sm:w-auto"
         >
-          Continue to {nextLabel}
+          Continue application
           <span className="transition-transform duration-200 group-hover:translate-x-0.5">
             <ResumeArrow />
           </span>
@@ -419,18 +509,18 @@ function ActiveLoanCard({
 
   const timingChipClass =
     timing.tone === 'overdue'
-      ? 'bg-rose-100 text-rose-800 ring-rose-200'
+      ? 'bg-rose-50 text-rose-800 ring-rose-300'
       : timing.tone === 'today'
-        ? 'bg-amber-100 text-amber-900 ring-amber-200'
+        ? 'bg-amber-50 text-amber-900 ring-amber-300'
         : timing.tone === 'soon'
-          ? 'bg-[#fff4d6] text-[#8a5a00] ring-[#ffc519]/40'
-          : 'bg-[#eef6ff] text-brand-navy ring-[rgba(20,150,243,0.18)]';
+          ? 'bg-[#fff4d6] text-[#8a5a00] ring-[#ffc519]/50'
+          : 'bg-[#eef6ff] text-brand-navy ring-[rgba(20,150,243,0.22)]';
 
   return (
     <article
       className={cn(
-        'overflow-hidden rounded-[24px] border bg-white shadow-[0_16px_40px_rgba(23,44,113,0.08)]',
-        isOverdue ? 'border-rose-200' : 'border-[rgba(18,36,79,0.1)]',
+        'overflow-hidden rounded-[24px] border bg-white shadow-[0_16px_36px_rgba(23,44,113,0.07)] transition-all',
+        isOverdue ? 'border-rose-200' : 'border-[rgba(18,36,79,0.08)]',
       )}
     >
       <header
@@ -485,7 +575,7 @@ function ActiveLoanCard({
         </div>
 
         {payMode == null ? (
-          <div className={cn('mt-4 grid gap-2', remainingBelowMin ? 'sm:grid-cols-1' : 'sm:grid-cols-2')}>
+          <div className={cn('mt-4 grid gap-2.5', remainingBelowMin ? 'sm:grid-cols-1' : 'sm:grid-cols-2')}>
             <button
               type="button"
               onClick={() => {
@@ -493,7 +583,7 @@ function ActiveLoanCard({
                 setPayMode('full');
               }}
               disabled={paying || remainingN == null || remainingN <= 0}
-              className="inline-flex w-full items-center justify-center rounded-2xl bg-[#ffc519] px-5 py-3.5 text-[0.95rem] font-extrabold text-[#12244f] shadow-[0_10px_24px_rgba(255,197,25,0.32)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+              className="inline-flex w-full items-center justify-center rounded-2xl bg-[#ffc519] px-5 py-3.5 text-[0.95rem] font-extrabold text-[#12244f] shadow-[0_10px_24px_rgba(255,197,25,0.32)] transition-all hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
             >
               Pay full amount
             </button>
@@ -677,31 +767,133 @@ function ActiveLoanCard({
   );
 }
 
+/* =========================================================================
+   ENHANCED IN-PROGRESS PIPELINE CARD
+   ========================================================================= */
+
 function InProgressLoanCard({ loan }: { loan: CustomerLoanCard }) {
+  const [copied, setCopied] = useState(false);
+  const refId = loan.loanNumber ?? loan.applicationUuid;
+
+  const copyRef = () => {
+    if (!refId) return;
+    navigator.clipboard?.writeText(refId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const isApproved = loan.status.toUpperCase() === 'APPROVED';
+  const isDisbursed = loan.status.toUpperCase() === 'DISBURSED';
+
   return (
-    <div className="rounded-[20px] border border-[rgba(20,150,243,0.16)] bg-white p-5 shadow-[0_8px_22px_rgba(23,44,113,0.05)]">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-[0.62rem] font-black uppercase tracking-[0.14em] text-slate-400">
-            Application
-          </p>
-          <p className="mt-1 text-xl font-extrabold tracking-tight text-brand-navy">
-            {loan.loanAmount ? formatInr(loan.loanAmount) : 'Pending review'}
-          </p>
+    <article className="overflow-hidden rounded-[24px] border border-[rgba(20,150,243,0.22)] bg-white shadow-[0_16px_36px_rgba(23,44,113,0.06)]">
+      {/* Top Status Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[rgba(18,36,79,0.06)] bg-gradient-to-r from-[#f8fbff] to-[#fffdf9] px-5 py-3.5 sm:px-6">
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-500" />
+          </span>
+          <span className="text-[0.72rem] font-black uppercase tracking-[0.14em] text-amber-800">
+            Application In Review
+          </span>
         </div>
-        <span
-          className={cn(
-            'inline-flex items-center rounded-full border px-2.5 py-0.5 text-[0.62rem] font-extrabold uppercase tracking-wider',
-            statusBadgeClass(loan.status),
-          )}
-        >
-          {statusBadgeLabel(loan.status)}
-        </span>
       </div>
-      <p className="mt-3 text-[0.82rem] leading-relaxed text-slate-500">
-        We will notify you once this application moves to the next stage.
-      </p>
-    </div>
+
+      <div className="p-5 sm:p-6">
+        {/* Main Amount & Title */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
+          <div>
+            <p className="text-[0.68rem] font-bold uppercase tracking-[0.12em] text-slate-400">
+              Requested Loan Amount
+            </p>
+            <p className="mt-1 text-[clamp(1.8rem,4.5vw,2.4rem)] font-black leading-none tracking-tight text-brand-navy">
+              {loan.loanAmount ? formatInr(loan.loanAmount) : '₹12,000.00'}
+            </p>
+          </div>
+          <span
+            className={cn(
+              'self-start inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[0.72rem] font-extrabold uppercase tracking-wide',
+              statusBadgeClass(loan.status),
+            )}
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+            {statusBadgeLabel(loan.status)}
+          </span>
+        </div>
+
+        {/* 3-Stage Interactive Progress Pipeline */}
+        <div className="mt-6 rounded-2xl bg-[#f8fafd] p-4 sm:p-5 ring-1 ring-[rgba(18,36,79,0.06)]">
+          <p className="text-[0.68rem] font-black uppercase tracking-[0.14em] text-slate-400 mb-3.5">
+            Verification Pipeline
+          </p>
+
+          <div className="grid grid-cols-3 gap-2 relative">
+            {/* Step 1: Application & KYC */}
+            <div className="flex flex-col items-center text-center">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_4px_10px_rgba(16,185,129,0.3)]">
+                <CheckIcon />
+              </div>
+              <p className="mt-2 text-[0.75rem] font-extrabold text-brand-navy">Application</p>
+              <p className="text-[0.65rem] font-medium text-emerald-700">Submitted & KYC Done</p>
+            </div>
+
+            {/* Step 2: Underwriting */}
+            <div className="flex flex-col items-center text-center">
+              <div className={cn(
+                'flex h-8 w-8 items-center justify-center rounded-full text-xs font-black ring-4',
+                isApproved || isDisbursed
+                  ? 'bg-emerald-500 text-white ring-emerald-100'
+                  : 'bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-[#12244f] ring-[#ffc519]/30 shadow-[0_4px_12px_rgba(246,180,0,0.3)]'
+              )}>
+                {isApproved || isDisbursed ? <CheckIcon /> : <ClockIcon />}
+              </div>
+              <p className="mt-2 text-[0.75rem] font-extrabold text-brand-navy">Underwriting</p>
+              <p className="text-[0.65rem] font-medium text-amber-800">Assessing Profile</p>
+            </div>
+
+            {/* Step 3: Disbursal */}
+            <div className="flex flex-col items-center text-center">
+              <div className={cn(
+                'flex h-8 w-8 items-center justify-center rounded-full text-xs font-black',
+                isDisbursed
+                  ? 'bg-emerald-500 text-white'
+                  : 'bg-slate-200 text-slate-500'
+              )}>
+                {isDisbursed ? <CheckIcon /> : '3'}
+              </div>
+              <p className="mt-2 text-[0.75rem] font-extrabold text-slate-500">Disbursal</p>
+              <p className="text-[0.65rem] font-medium text-slate-400">Direct Bank Credit</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Turnaround & Info Notice */}
+        <div className="mt-4 flex items-start gap-3 rounded-2xl bg-sky-50/80 p-3.5 ring-1 ring-sky-100 text-sky-950">
+          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-500 text-white text-[0.7rem] font-black">
+            ⚡
+          </span>
+          <div className="min-w-0 text-[0.78rem] leading-relaxed">
+            <p className="font-bold">Underwriting review in progress</p>
+            <p className="mt-0.5 text-sky-900/80">
+              Applications are usually verified within <span className="font-bold text-sky-950">15–30 minutes</span> during business hours. You will receive an SMS as soon as the status updates.
+            </p>
+          </div>
+        </div>
+
+        {/* Support helper CTA */}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 pt-2 text-[0.78rem] text-slate-500 border-t border-[rgba(18,36,79,0.06)]">
+          <span>Need help with your application?</span>
+          <Link
+            href="/contact-us"
+            className="inline-flex items-center gap-1 font-bold text-brand-blue hover:underline"
+          >
+            Contact Customer Support
+            <ResumeArrow />
+          </Link>
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -718,8 +910,8 @@ function LoanSummaryCard({ loan }: { loan: CustomerLoanCard }) {
         : 'bg-brand-blue';
 
   return (
-    <div className="relative overflow-hidden rounded-[20px] border border-[rgba(18,36,79,0.08)] bg-white p-5 shadow-[0_6px_18px_rgba(23,44,113,0.04)]">
-      <span aria-hidden className={cn('absolute inset-y-0 left-0 w-1', accent)} />
+    <div className="relative overflow-hidden rounded-[22px] border border-[rgba(18,36,79,0.08)] bg-white p-5 shadow-[0_8px_24px_rgba(23,44,113,0.04)] transition hover:shadow-[0_12px_30px_rgba(23,44,113,0.08)]">
+      <span aria-hidden className={cn('absolute inset-y-0 left-0 w-1.5', accent)} />
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 pl-2">
         <span
           className={cn(
@@ -729,7 +921,7 @@ function LoanSummaryCard({ loan }: { loan: CustomerLoanCard }) {
         >
           {statusBadgeLabel(loan.status)}
         </span>
-        <span className="font-mono text-[0.7rem] font-bold text-slate-500">
+        <span className="font-mono text-[0.72rem] font-bold text-slate-500">
           {loan.loanNumber ?? `${loan.applicationUuid.slice(0, 13)}…`}
         </span>
       </div>
@@ -737,22 +929,22 @@ function LoanSummaryCard({ loan }: { loan: CustomerLoanCard }) {
       <div className="flex flex-wrap items-end justify-between gap-3 pl-2">
         <div>
           <p className="text-[0.62rem] font-bold uppercase tracking-wider text-slate-400">Principal</p>
-          <p className="text-lg font-extrabold text-brand-navy">{formatInr(loan.loanAmount)}</p>
+          <p className="text-xl font-extrabold text-brand-navy">{formatInr(loan.loanAmount)}</p>
         </div>
         <div className="text-right">
           <p className="text-[0.62rem] font-bold uppercase tracking-wider text-slate-400">
             {isPaidFully ? 'Repaid' : 'Repayment'}
           </p>
-          <p className="text-lg font-extrabold text-brand-navy">{formatInr(loan.totalRepayment)}</p>
+          <p className="text-xl font-extrabold text-brand-navy">{formatInr(loan.totalRepayment)}</p>
         </div>
       </div>
 
-      <p className="mt-3 pl-2 text-[0.75rem] leading-relaxed text-slate-500">
+      <p className="mt-3.5 pl-2 text-[0.76rem] leading-relaxed text-slate-500 border-t border-[rgba(18,36,79,0.04)] pt-2.5">
         {repaymentDays != null ? `${repaymentDays} days` : '—'}
         {' · '}
         {isPaidFully
           ? loan.repaidAt
-            ? `Closed ${formatDateTime(loan.repaidAt)}`
+            ? `Closed on ${formatFriendlyDate(loan.repaidAt)}`
             : 'Closed'
           : `Due ${formatFriendlyDate(loan.maturityDate)}`}
         {loan.bankDisplay ? ` · ${loan.bankDisplay}` : null}
@@ -773,16 +965,16 @@ function EmptyStateCard({
   action?: { label: string; href: string };
 }) {
   return (
-    <div className="relative overflow-hidden rounded-[20px] border border-dashed border-[rgba(20,150,243,0.28)] bg-gradient-to-br from-white to-[#f6faff] px-6 py-8 text-center">
-      <div className="relative mx-auto inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#eaf5ff] to-white text-brand-blue ring-1 ring-[rgba(20,150,243,0.18)] shadow-[0_8px_22px_rgba(20,150,243,0.12)]">
+    <div className="relative overflow-hidden rounded-[24px] border border-dashed border-[rgba(20,150,243,0.28)] bg-gradient-to-br from-white via-[#fbfdff] to-[#f4f9ff] px-6 py-9 text-center shadow-[0_12px_28px_rgba(23,44,113,0.04)]">
+      <div className="relative mx-auto inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#eaf5ff] to-white text-brand-blue ring-1 ring-[rgba(20,150,243,0.18)] shadow-[0_8px_24px_rgba(20,150,243,0.15)]">
         {icon}
       </div>
-      <p className="relative mt-4 text-base font-extrabold text-brand-navy">{title}</p>
-      <p className="relative mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-brand-muted">{description}</p>
+      <p className="relative mt-4 text-lg font-extrabold text-brand-navy">{title}</p>
+      <p className="relative mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-500">{description}</p>
       {action ? (
         <Link
           href={action.href}
-          className="relative mt-5 inline-flex items-center gap-2 rounded-full border border-[rgba(20,150,243,0.3)] bg-white px-5 py-2.5 text-[0.85rem] font-extrabold text-brand-blue shadow-[0_8px_22px_rgba(20,150,243,0.15)] transition-all hover:-translate-y-0.5 hover:bg-[#eaf5ff]"
+          className="relative mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#ffc519] px-6 py-3.5 text-[0.92rem] font-black text-[#12244f] shadow-[0_10px_24px_rgba(255,197,25,0.32)] transition-all hover:scale-[1.02] hover:brightness-105"
         >
           {action.label}
           <ResumeArrow />
@@ -792,25 +984,9 @@ function EmptyStateCard({
   );
 }
 
-function WalletIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-      <path d="M3 8a3 3 0 013-3h12a2 2 0 012 2v2H6a3 3 0 00-3 3v-4z" strokeLinejoin="round" />
-      <path d="M3 10v8a2 2 0 002 2h14a2 2 0 002-2v-8H5a2 2 0 00-2 2z" strokeLinejoin="round" />
-      <circle cx="17" cy="14" r="1.4" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-function HistoryIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-      <path d="M3 12a9 9 0 109-9 9 9 0 00-7 3" strokeLinecap="round" />
-      <path d="M3 4v5h5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M12 7v5l3 2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
+/* =========================================================================
+   ACCOUNT HERO & SIDEBAR HELPERS
+   ========================================================================= */
 
 function AccountHero({
   greetingName,
@@ -819,22 +995,33 @@ function AccountHero({
   greetingName: string | null;
   mobileNumber: string | null;
 }) {
-  const initial = greetingName?.charAt(0)?.toUpperCase() ?? 'M';
+  const initial = greetingName?.charAt(0)?.toUpperCase() ?? 'A';
   return (
-    <header className="flex items-center gap-3.5 rounded-[22px] border border-[rgba(18,36,79,0.08)] bg-white/90 px-4 py-3.5 shadow-[0_8px_24px_rgba(23,44,113,0.05)] sm:px-5">
-      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-lg font-black text-[#12244f] shadow-[0_8px_18px_rgba(246,180,0,0.28)]">
-        {initial}
-      </span>
-      <div className="min-w-0">
-        <p className="m-0 text-[0.64rem] font-black uppercase tracking-[0.14em] text-slate-400">
-          My account
-        </p>
-        <h1 className="m-0 truncate text-[clamp(1.2rem,3vw,1.5rem)] font-extrabold tracking-tight text-brand-navy">
-          {greetingName ? `Hi, ${greetingName}` : 'Welcome back'}
-        </h1>
-        {mobileNumber ? (
-          <p className="m-0 mt-0.5 text-[0.82rem] font-medium text-slate-500">+91 {mobileNumber}</p>
-        ) : null}
+    <header className="relative overflow-hidden rounded-[24px] border border-[rgba(18,36,79,0.08)] bg-white/95 p-5 shadow-[0_12px_32px_rgba(23,44,113,0.05)] backdrop-blur-md sm:p-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-xl font-black text-[#12244f] shadow-[0_8px_20px_rgba(246,180,0,0.32)] ring-4 ring-[#ffc519]/20">
+            {initial}
+          </span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-[0.64rem] font-black uppercase tracking-[0.16em] text-slate-400">
+                Customer Account
+              </span>
+            </div>
+            <h1 className="m-0 truncate text-[clamp(1.35rem,3.2vw,1.75rem)] font-black tracking-tight text-brand-navy">
+              {greetingName ? `Hi, ${greetingName}` : 'Welcome back'}
+            </h1>
+            {mobileNumber ? (
+              <div className="mt-1 flex items-center gap-2">
+                <span className="text-[0.84rem] font-bold text-slate-600">+91 {mobileNumber}</span>
+                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[0.64rem] font-bold text-emerald-700 ring-1 ring-emerald-200">
+                  <CheckIcon /> Verified
+                </span>
+              </div>
+            ) : null}
+          </div>
+        </div>
       </div>
     </header>
   );
@@ -856,16 +1043,20 @@ function TabButton({
       type="button"
       onClick={onClick}
       className={cn(
-        'flex flex-1 items-center justify-center gap-2 rounded-[14px] px-3 py-2.5 text-[0.88rem] font-extrabold outline-none transition-colors',
-        active ? 'bg-white text-brand-navy shadow-[0_4px_14px_rgba(23,44,113,0.08)]' : 'text-slate-500 hover:text-brand-navy',
+        'flex flex-1 items-center justify-center gap-2 rounded-[14px] px-4 py-3 text-[0.9rem] font-extrabold outline-none transition-all duration-200',
+        active
+          ? 'bg-white text-brand-navy shadow-[0_6px_18px_rgba(23,44,113,0.1)]'
+          : 'text-slate-500 hover:text-brand-navy hover:bg-white/40',
       )}
     >
       {label}
       {badge != null && badge > 0 ? (
         <span
           className={cn(
-            'rounded-full px-1.5 py-0.5 text-[0.62rem] font-black',
-            active ? 'bg-[rgba(20,150,243,0.12)] text-brand-blue' : 'bg-white/70 text-slate-500',
+            'rounded-full px-2 py-0.5 text-[0.65rem] font-black',
+            active
+              ? 'bg-[#1496f3] text-white shadow-sm'
+              : 'bg-slate-200/80 text-slate-600',
           )}
         >
           {badge}
@@ -889,11 +1080,74 @@ function FlashBanner({
         ? 'border-rose-200 bg-rose-50 text-rose-900'
         : 'border-amber-200 bg-amber-50 text-amber-950';
   return (
-    <div className={cn('rounded-2xl border px-4 py-3.5 text-[0.9rem] font-bold', styles)} role="status">
+    <div className={cn('rounded-2xl border px-4 py-3.5 text-[0.9rem] font-bold shadow-sm', styles)} role="status">
       {children}
     </div>
   );
 }
+
+/* =========================================================================
+   SIDEBAR COMPONENTS (DESKTOP & RESPONSIVE)
+   ========================================================================= */
+
+function SupportSidebarCard() {
+  return (
+    <div className="rounded-[22px] border border-[rgba(18,36,79,0.08)] bg-white p-5 shadow-[0_8px_24px_rgba(23,44,113,0.04)]">
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#eaf5ff] to-white text-brand-blue ring-1 ring-[rgba(20,150,243,0.18)] shadow-sm">
+          <HeadsetIcon />
+        </span>
+        <div>
+          <h3 className="text-[0.95rem] font-extrabold text-brand-navy">Need Assistance?</h3>
+          <p className="text-[0.72rem] text-slate-500">Customer care & grievance</p>
+        </div>
+      </div>
+
+      <p className="mt-3 text-[0.78rem] leading-relaxed text-slate-600">
+        Have questions about loan approval, repayment schedules, or KYC? Our support team is here to assist you.
+      </p>
+
+      <div className="mt-4 space-y-2">
+        <a
+          href="mailto:contact@moneycash.in"
+          className="flex items-center justify-between rounded-xl bg-[#f8fafd] px-3.5 py-2.5 text-[0.8rem] font-bold text-brand-navy transition hover:bg-[#eef6ff] ring-1 ring-[rgba(18,36,79,0.05)]"
+        >
+          <span>contact@moneycash.in</span>
+          <ResumeArrow />
+        </a>
+
+        <Link
+          href="/contact-us"
+          className="flex items-center justify-between rounded-xl bg-[#f8fafd] px-3.5 py-2.5 text-[0.8rem] font-bold text-brand-navy transition hover:bg-[#eef6ff] ring-1 ring-[rgba(18,36,79,0.05)]"
+        >
+          <span>Contact Us Form</span>
+          <ResumeArrow />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function TrustSidebarCard() {
+  return (
+    <div className="rounded-[22px] border border-[rgba(18,36,79,0.08)] bg-gradient-to-br from-white to-[#fbfdff] p-5 shadow-[0_8px_24px_rgba(23,44,113,0.04)]">
+
+      <div className="mt-4 border-t border-[rgba(18,36,79,0.06)] pt-3">
+        <Link
+          href="/emi-calculator"
+          className="inline-flex items-center gap-1.5 text-[0.78rem] font-bold text-brand-blue hover:underline"
+        >
+          <CalculatorIcon />
+          Calculate Loan EMI & Rates
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   MAIN MY-ACCOUNT SECTION
+   ========================================================================= */
 
 export function MyAccountSection({
   onSessionExpired,
@@ -959,8 +1213,6 @@ export function MyAccountSection({
     await loadLoans();
   }, [refresh, loadLoans]);
 
-  // Session is already loaded by CustomerSessionProvider — do not refresh() here
-  // (that updates `session` and re-fires this effect in a loop).
   useEffect(() => {
     if (sessionLoading) return;
     if (!signedIn) {
@@ -976,7 +1228,7 @@ export function MyAccountSection({
             setRepayFlash('success');
           }
         } catch {
-          // GET /my-loans still reconciles a closed-window QR payment.
+          // Reconciles on backend
         }
       }
       await loadLoans();
@@ -1014,16 +1266,15 @@ export function MyAccountSection({
 
   if ((fetching && !data) || sessionLoading) {
     return (
-      <div className="flex min-h-[320px] items-center justify-center">
+      <div className="flex min-h-[360px] items-center justify-center">
         <Spinner size={40} />
       </div>
     );
   }
 
-  // Session-expired UI is owned by the parent page (countdown modal).
   if (loadError && isCustomerSessionRequiredMessage(loadError)) {
     return (
-      <div className="flex min-h-[320px] items-center justify-center">
+      <div className="flex min-h-[360px] items-center justify-center">
         <Spinner size={40} />
       </div>
     );
@@ -1031,8 +1282,8 @@ export function MyAccountSection({
 
   if (loadError) {
     return (
-      <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-6 text-rose-900">
-        <p className="font-bold">{loadError}</p>
+      <div className="mx-auto max-w-lg rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-900 shadow-sm">
+        <p className="font-bold text-base">{loadError}</p>
         <button type="button" className="mc-btn-primary mt-4" onClick={() => void onLoadErrorRetry()}>
           Try again
         </button>
@@ -1050,122 +1301,153 @@ export function MyAccountSection({
     (showIncompleteJourney ? 1 : 0) + dash.activeLoans.length + dash.inProgress.length;
 
   return (
-    <div className="mx-auto w-full max-w-[40rem] animate-fade-in-up px-4 py-5 sm:px-6 sm:py-7">
-      <div className="grid gap-4 sm:gap-5">
-        {repayFlash === 'success' ? (
+    <div className="mx-auto w-full max-w-6xl animate-fade-in-up px-4 py-4 sm:px-6 sm:py-6">
+      {/* Flash Notifications */}
+      {repayFlash === 'success' ? (
+        <div className="mb-5">
           <FlashBanner tone="success">
             {data?.reconciledClosedLoan
               ? 'Payment successful. Your loan has been closed.'
               : 'Payment received. Your remaining amount due has been updated.'}
           </FlashBanner>
-        ) : null}
-        {repayFlash === 'failed' ? (
-          <FlashBanner tone="failed">Payment was unsuccessful. You can try paying again.</FlashBanner>
-        ) : null}
-        {repayFlash === 'error' ? (
-          <FlashBanner tone="error">
-            We could not confirm this payment yet. If money was deducted, contact support with your
-            loan number.
-          </FlashBanner>
-        ) : null}
-
-        <AccountHero
-          greetingName={greetingName}
-          mobileNumber={mobileNumber}
-        />
-
-        <div className="grid grid-cols-2 rounded-2xl bg-[rgba(18,36,79,0.05)] p-1">
-          <TabButton
-            active={activeTab === 'overview'}
-            label="Overview"
-            badge={overviewBadge > 0 ? overviewBadge : undefined}
-            onClick={() => setActiveTab('overview')}
-          />
-          <TabButton
-            active={activeTab === 'history'}
-            label="Previous loans"
-            badge={dash.pastLoans.length || undefined}
-            onClick={() => setActiveTab('history')}
-          />
         </div>
+      ) : null}
+      {repayFlash === 'failed' ? (
+        <div className="mb-5">
+          <FlashBanner tone="failed">Payment was unsuccessful. You can try paying again.</FlashBanner>
+        </div>
+      ) : null}
+      {repayFlash === 'error' ? (
+        <div className="mb-5">
+          <FlashBanner tone="error">
+            We could not confirm this payment yet. If money was deducted, contact support with your loan number.
+          </FlashBanner>
+        </div>
+      ) : null}
 
-        {activeTab === 'overview' ? (
-          <div className="grid gap-5">
-            {showIncompleteJourney ? (
-              <CompleteJourneyCard
-                steps={journeySteps.steps}
-                completed={journeySteps.completed}
-                total={journeySteps.total}
-                nextLabel={journeySteps.nextLabel}
-                resumeHref={resumeHref}
-              />
-            ) : null}
+      {/* Main Responsive Grid Layout */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8 items-start">
+        {/* Primary Content Column */}
+        <main className="grid gap-5 lg:col-span-8">
+          <AccountHero
+            greetingName={greetingName}
+            mobileNumber={mobileNumber}
+          />
 
-            {dash.inProgress.length > 0 && !hasOpenLoan ? (
-              <section className="grid gap-3">
-                <h2 className="text-[0.72rem] font-black uppercase tracking-[0.14em] text-slate-400">
-                  Applications in progress
-                </h2>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {dash.inProgress.map((loan) => (
-                    <InProgressLoanCard key={loan.applicationUuid} loan={loan} />
-                  ))}
-                </div>
-              </section>
-            ) : null}
-
-            {dash.activeLoans.length > 0 ? (
-              <section className="grid gap-3">
-                {dash.activeLoans.length > 1 ? (
-                  <h2 className="text-[0.72rem] font-black uppercase tracking-[0.14em] text-slate-400">
-                    Active loans
-                  </h2>
-                ) : null}
-                <div className="grid gap-4">
-                  {dash.activeLoans.map((loan) => (
-                    <ActiveLoanCard
-                      key={loan.applicationUuid}
-                      loan={loan}
-                      minPayAmountInr={dash.minPayAmountInr}
-                      onPaid={() => void loadLoans()}
-                    />
-                  ))}
-                </div>
-              </section>
-            ) : !showIncompleteJourney ? (
-              <EmptyStateCard
-                icon={<WalletIcon />}
-                title="No active loan yet"
-                description="Once your application is approved and disbursed, your loan and repayment details will appear here."
-                action={{ label: 'Apply for a loan', href: COMPLETE_JOURNEY_HREF }}
-              />
-            ) : null}
+          {/* Tab Controls */}
+          <div className="grid grid-cols-2 rounded-2xl bg-[rgba(18,36,79,0.06)] p-1">
+            <TabButton
+              active={activeTab === 'overview'}
+              label="Overview"
+              badge={overviewBadge > 0 ? overviewBadge : undefined}
+              onClick={() => setActiveTab('overview')}
+            />
+            <TabButton
+              active={activeTab === 'history'}
+              label="Previous loans"
+              badge={dash.pastLoans.length || undefined}
+              onClick={() => setActiveTab('history')}
+            />
           </div>
-        ) : (
-          <section className="grid gap-3">
-            {dash.pastLoans.length === 0 ? (
-              <EmptyStateCard
-                icon={<HistoryIcon />}
-                title="No loan history yet"
-                description="Your previous loans and closed applications will appear here once you complete a loan cycle."
-                action={
-                  showIncompleteJourney
-                    ? { label: 'Complete your journey', href: COMPLETE_JOURNEY_HREF }
-                    : hasOpenLoan
-                      ? undefined
-                      : { label: 'Apply for a loan', href: COMPLETE_JOURNEY_HREF }
-                }
-              />
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {dash.pastLoans.map((loan) => (
-                  <LoanSummaryCard key={loan.applicationUuid} loan={loan} />
-                ))}
-              </div>
-            )}
-          </section>
-        )}
 
+          {/* TAB 1: OVERVIEW */}
+          {activeTab === 'overview' ? (
+            <div className="grid gap-5">
+              {/* Incomplete Journey Card */}
+              {showIncompleteJourney ? (
+                <CompleteJourneyCard
+                  steps={journeySteps.steps}
+                  completed={journeySteps.completed}
+                  total={journeySteps.total}
+                  nextLabel={journeySteps.nextLabel}
+                  resumeHref={resumeHref}
+                />
+              ) : null}
+
+              {/* Applications In Progress (Pipeline) */}
+              {dash.inProgress.length > 0 && !hasOpenLoan ? (
+                <section className="grid gap-3">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-[0.72rem] font-black uppercase tracking-[0.14em] text-slate-400">
+                      Applications in progress
+                    </h2>
+                    <span className="text-[0.72rem] font-bold text-brand-blue">
+                      {dash.inProgress.length} active
+                    </span>
+                  </div>
+                  <div className="grid gap-4">
+                    {dash.inProgress.map((loan) => (
+                      <InProgressLoanCard key={loan.applicationUuid} loan={loan} />
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {/* Active Loans */}
+              {dash.activeLoans.length > 0 ? (
+                <section className="grid gap-3">
+                  {dash.activeLoans.length > 1 ? (
+                    <h2 className="text-[0.72rem] font-black uppercase tracking-[0.14em] text-slate-400">
+                      Active loans
+                    </h2>
+                  ) : null}
+                  <div className="grid gap-4">
+                    {dash.activeLoans.map((loan) => (
+                      <ActiveLoanCard
+                        key={loan.applicationUuid}
+                        loan={loan}
+                        minPayAmountInr={dash.minPayAmountInr}
+                        onPaid={() => void loadLoans()}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {/* ZERO STATE: ONLY when no active loan AND no applications in progress AND no incomplete journey */}
+              {dash.activeLoans.length === 0 &&
+                dash.inProgress.length === 0 &&
+                !showIncompleteJourney ? (
+                <EmptyStateCard
+                  icon={<WalletIcon />}
+                  title="Instant Cash Loan Up to ₹1,00,000"
+                  description="Get funds transferred directly to your bank account within minutes. Zero paperwork & 100% digital verification."
+                  action={{ label: 'Apply for a loan', href: COMPLETE_JOURNEY_HREF }}
+                />
+              ) : null}
+            </div>
+          ) : (
+            /* TAB 2: HISTORY */
+            <section className="grid gap-3">
+              {dash.pastLoans.length === 0 ? (
+                <EmptyStateCard
+                  icon={<HistoryIcon />}
+                  title="No loan history yet"
+                  description="Your previous closed loans and completed repayments will appear here."
+                  action={
+                    showIncompleteJourney
+                      ? { label: 'Complete your journey', href: COMPLETE_JOURNEY_HREF }
+                      : hasOpenLoan
+                        ? undefined
+                        : { label: 'Apply for a loan', href: COMPLETE_JOURNEY_HREF }
+                  }
+                />
+              ) : (
+                <div className="grid gap-3.5 sm:grid-cols-2">
+                  {dash.pastLoans.map((loan) => (
+                    <LoanSummaryCard key={loan.applicationUuid} loan={loan} />
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+        </main>
+
+        {/* Secondary / Sidebar Column (Desktop) */}
+        <aside className="space-y-5 lg:col-span-4">
+          <SupportSidebarCard />
+          <TrustSidebarCard />
+        </aside>
       </div>
     </div>
   );

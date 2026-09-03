@@ -23,6 +23,7 @@ export class KycIdentityRejectionService {
     leadId: bigint;
     applicationId: bigint;
     customerMobile?: string;
+    statusNote?: string;
   }): Promise<void> {
     const [rejectedLeadStatus, kycFailedAppStatus, kycFailedReason, legacyKycReason] = await Promise.all([
       this.prisma.client.leadStatus.findFirst({
@@ -59,7 +60,7 @@ export class KycIdentityRejectionService {
         where: { id: params.leadId },
         data: {
           leadStatusId: rejectedLeadStatus.id,
-          leadStatusNote: KYC_FAILED_NOTE,
+          leadStatusNote: params.statusNote?.trim() || KYC_FAILED_NOTE,
           ...(rejectionReason ? { rejectionReasonId: rejectionReason.id } : {}),
         },
       });

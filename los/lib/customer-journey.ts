@@ -97,8 +97,7 @@ export function buildLeadIntakeJourney(lead: LosLeadDetails): JourneyStep[] {
   return markActiveStep(steps);
 }
 
-export function isLosAadhaarKycComplete(row: {
-  aadhaarKycCompleted?: boolean;
+export function hasLosAadhaarRecord(row: {
   aadhaarDetail?: {
     fullName: string | null;
     dateOfBirth: string | null;
@@ -108,7 +107,6 @@ export function isLosAadhaarKycComplete(row: {
   } | null;
   kycPhotos?: { aadhaarPhotoPath: string | null };
 }): boolean {
-  if (row.aadhaarKycCompleted) return true;
   const aadhaar = row.aadhaarDetail;
   if (
     aadhaar &&
@@ -121,6 +119,24 @@ export function isLosAadhaarKycComplete(row: {
     return true;
   }
   return Boolean(row.kycPhotos?.aadhaarPhotoPath?.trim());
+}
+
+export function isLosAadhaarKycComplete(row: {
+  aadhaarKycCompleted?: boolean;
+  aadhaarIdentityFailure?: { reason?: string; message?: string } | null;
+  aadhaarDetail?: {
+    fullName: string | null;
+    dateOfBirth: string | null;
+    gender: string | null;
+    address: string | null;
+    maskedAadhaar: string | null;
+  } | null;
+  kycPhotos?: { aadhaarPhotoPath: string | null };
+}): boolean {
+  if (row.aadhaarIdentityFailure) return false;
+  if (row.aadhaarKycCompleted) return true;
+  if (row.aadhaarKycCompleted === false) return false;
+  return hasLosAadhaarRecord(row);
 }
 
 function isSelfieCaptured(row: { selfieCaptured?: boolean; kycPhotos?: { selfiePath: string | null } }): boolean {

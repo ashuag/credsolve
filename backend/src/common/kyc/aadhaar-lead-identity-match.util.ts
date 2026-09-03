@@ -132,3 +132,40 @@ export function compareAadhaarToLeadProfile(input: {
 
   return { matched: true };
 }
+
+export type AadhaarIdentityFailureDetail = {
+  reason: string;
+  message: string;
+  applicationName: string | null;
+  applicationDob: string | null;
+  aadhaarName: string | null;
+  aadhaarDob: string | null;
+};
+
+/** Compare Aadhaar vs lead and return both sides so LOS can explain a KYC failure. */
+export function describeAadhaarIdentityFailure(input: {
+  leadFullName: string | null;
+  leadDateOfBirth: Date | null;
+  vendor: unknown;
+  storedReason?: string | null;
+  storedMessage?: string | null;
+}): AadhaarIdentityFailureDetail | null {
+  const aadhaar = extractAadhaarIdentityFromVendor(input.vendor);
+  const match = compareAadhaarToLeadProfile(input);
+  if (match.matched && !input.storedReason && !input.storedMessage) {
+    return null;
+  }
+  const reason = !match.matched ? match.reason : (input.storedReason?.trim() || 'identity_mismatch');
+  const message = !match.matched
+    ? match.message
+    : input.storedMessage?.trim() ||
+      'Aadhaar was fetched from DigiLocker, but this application was marked KYC failed.';
+  return {
+    reason,
+    message,
+    applicationName: input.leadFullName?.trim() || null,
+    applicationDob: input.leadDateOfBirth ? dateToUtcYmd(input.leadDateOfBirth) : null,
+    aadhaarName: aadhaar.fullName,
+    aadhaarDob: aadhaar.dateOfBirth ? dateToUtcYmd(aadhaar.dateOfBirth) : null,
+  };
+}

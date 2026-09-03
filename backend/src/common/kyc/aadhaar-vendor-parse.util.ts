@@ -4,8 +4,9 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 /** `digilocker_aadhaar_form_json` rows that only record a failed vendor attempt (not a captured Aadhaar). */
 export function isDigilockerAadhaarCaptureComplete(formJson: unknown): boolean {
-  if (formJson == null) return false;
-  return !(isRecord(formJson) && formJson._vendorAttempt === true);
+  if (formJson == null || !isRecord(formJson)) return false;
+  if (formJson._vendorAttempt === true || formJson._identityMismatch === true) return false;
+  return true;
 }
 
 export function buildDigilockerVendorAttemptJson(params: {
@@ -16,6 +17,38 @@ export function buildDigilockerVendorAttemptJson(params: {
     _vendorAttempt: true,
     httpStatus: params.httpStatus,
     vendor: params.vendor ?? null,
+    recordedAt: new Date().toISOString(),
+  };
+}
+
+export function extractDigilockerIdentityMismatch(formJson: unknown): {
+  reason: string;
+  message: string;
+} | null {
+  if (!isRecord(formJson) || formJson._identityMismatch !== true) return null;
+  const reason = typeof formJson.reason === 'string' && formJson.reason.trim() ? formJson.reason.trim() : 'identity_mismatch';
+  const message =
+    typeof formJson.message === 'string' && formJson.message.trim()
+      ? formJson.message.trim()
+      : 'Name or date of birth on Aadhaar does not match the loan application.';
+  return { reason, message };
+}
+
+/** Persist fetched Aadhaar when identity check fails so LOS can show what came back and why KYC failed. */
+export function buildDigilockerIdentityMismatchJson(params: {
+  httpStatus: number | null;
+  vendor: unknown;
+  photoRelativePath: string | null;
+  reason: string;
+  message: string;
+}): Record<string, unknown> {
+  return {
+    _vendorAttempt: true,
+    _identityMismatch: true,
+    reason: params.reason,
+    message: params.message,
+    httpStatus: params.httpStatus,
+    vendor: buildDigilockerAadhaarFormJson(params.vendor, params.photoRelativePath) ?? params.vendor ?? null,
     recordedAt: new Date().toISOString(),
   };
 }
@@ -121,14 +154,29 @@ function decodeOnePhoto(raw: string): { buffer: Buffer; ext: 'jpg' | 'png' } | n
   return null;
 }
 
-/** Depth-first search for a `photo` string field (base64 or data URL). */
+function photoStringFromValue(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const decoded = decodeOnePhoto(value);
+    return decoded ? value.trim() : null;
+  }
+  if (!isRecord(value)) return null;
+  for (const key of ['content', 'data', 'base64', 'image'] as const) {
+    const inner = value[key];
+    if (typeof inner === 'string') {
+      const decoded = decodeOnePhoto(inner);
+      if (decoded) return inner.trim();
+    }
+  }
+  return null;
+}
+
+/** Depth-first search for a `photo` string field (base64, data URL, or `{ format, content }`). */
 export function extractAadhaarPhotoString(vendor: unknown): string | null {
   const seen = new WeakSet<object>();
 
   function walk(node: unknown): string | null {
     if (typeof node === 'string') {
-      const d = decodeOnePhoto(node);
-      return d ? node.trim() : null;
+      return photoStringFromValue(node);
     }
     if (!node || typeof node !== 'object') return null;
     if (seen.has(node as object)) return null;
@@ -143,9 +191,9 @@ export function extractAadhaarPhotoString(vendor: unknown): string | null {
     const rec = node as Record<string, unknown>;
     for (const [k, v] of Object.entries(rec)) {
       const key = k.toLowerCase();
-      if ((key === 'photo' || key === 'profile_image' || key === 'profileimage') && typeof v === 'string') {
-        const d = decodeOnePhoto(v);
-        if (d) return v.trim();
+      if (key === 'photo' || key === 'profile_image' || key === 'profileimage') {
+        const fromField = photoStringFromValue(v);
+        if (fromField) return fromField;
       }
     }
     for (const v of Object.values(rec)) {
@@ -400,10 +448,10 @@ export function buildDigilockerAadhaarFormJson(
     };
   }
   const base: Record<string, unknown> = { ...data };
-  if (typeof base.photo === 'string') {
+  if (typeof base.photo === 'string' || isRecord(base.photo)) {
     base.photo = photoRelativePath ? { storedFile: photoRelativePath } : null;
   }
-  if (typeof base.profile_image === 'string') {
+  if (typeof base.profile_image === 'string' || isRecord(base.profile_image)) {
     base.profile_image = photoRelativePath ? { storedFile: photoRelativePath } : null;
   }
   return base;

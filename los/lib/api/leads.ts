@@ -319,6 +319,15 @@ export type LosApplicationDetails = {
     address: string | null;
     maskedAadhaar: string | null;
   } | null;
+  /** Present when DigiLocker returned Aadhaar but KYC failed on name / DOB (or a stored mismatch). */
+  aadhaarIdentityFailure?: {
+    reason: string;
+    message: string;
+    applicationName: string | null;
+    applicationDob: string | null;
+    aadhaarName: string | null;
+    aadhaarDob: string | null;
+  } | null;
   /** DigiLocker PAN from Surepass (`customer_kyc.pan_card_number`). */
   digilockerPan: {
     panCardNumber: string;

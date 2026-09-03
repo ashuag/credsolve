@@ -3,7 +3,15 @@ import type { Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { BureauReportPdfService } from '../../../common/cibil/bureau-report-pdf.service';
 import { CibilCreditAssessmentService } from '../../../common/cibil/cibil-credit-assessment.service';
-import { isDigilockerAadhaarCaptureComplete } from '../../../common/kyc/aadhaar-vendor-parse.util';
+import {
+  extractDigilockerIdentityMismatch,
+  isDigilockerAadhaarCaptureComplete,
+  isTenacioVendorBusinessSuccess,
+} from '../../../common/kyc/aadhaar-vendor-parse.util';
+import {
+  describeAadhaarIdentityFailure,
+  type AadhaarIdentityFailureDetail,
+} from '../../../common/kyc/aadhaar-lead-identity-match.util';
 import { extractProfileFromDigilockerFormJson, pickDigilockerAadhaarString } from '../../../common/kyc/digilocker-form-profile.util';
 import { appendPhotoCacheBuster } from '../../../common/kyc/kyc-photo-url.util';
 import { buildLivenessVendorSummary } from '../../../common/kyc/kyc-liveness-summary.util';
@@ -122,6 +130,27 @@ function formatAadhaarDob(d: Date | null): string | null {
   return d.toISOString().slice(0, 10);
 }
 
+const AADHAAR_DOWNLOAD_SERVICE_NAMES = ['aadhaar-download', 'digilocker-download-aadhaar'] as const;
+
+function unwrapVendorAuditPayload(payload: unknown): unknown {
+  if (!isRecord(payload)) return payload;
+  if (payload.parsed != null) return payload.parsed;
+  return payload;
+}
+
+/** True only when DigiLocker Aadhaar was accepted — not a vendor-attempt / identity-mismatch row. */
+function isAcceptedAadhaarCapture(
+  formJson: unknown,
+  verifiedAt?: Date | null,
+  photoPath?: string | null,
+): boolean {
+  if (extractDigilockerIdentityMismatch(formJson)) return false;
+  if (isRecord(formJson) && formJson._vendorAttempt === true) return false;
+  if (verifiedAt) return true;
+  if (isDigilockerAadhaarCaptureComplete(formJson)) return true;
+  return !formJson && Boolean(photoPath?.trim());
+}
+
 function buildLosAadhaarDetail(formJson: unknown): {
   fullName: string | null;
   dateOfBirth: string | null;
@@ -129,13 +158,14 @@ function buildLosAadhaarDetail(formJson: unknown): {
   address: string | null;
   maskedAadhaar: string | null;
 } | null {
-  if (!isDigilockerAadhaarCaptureComplete(formJson) || !isRecord(formJson)) return null;
+  if (!isRecord(formJson)) return null;
 
   const identity = extractProfileFromDigilockerFormJson(formJson);
   const gender = pickAadhaarString(formJson, ['gender', 'Gender']);
   const maskedAadhaar = pickAadhaarString(formJson, [
     'maskedAadhaar',
     'masked_aadhaar',
+    'maskedaadhaar',
     'uid',
     'aadhaarNumber',
     'aadhaar_number',
@@ -144,14 +174,24 @@ function buildLosAadhaarDetail(formJson: unknown): {
   const addressParts = [
     pickAadhaarString(formJson, ['address', 'fullAddress', 'full_address', 'residentAddress', 'resident_address']),
     pickAadhaarString(formJson, ['house', 'houseNo', 'house_no']),
-    pickAadhaarString(formJson, ['street', 'streetName', 'street_name']),
+    pickAadhaarString(formJson, ['street', 'streetName', 'street_name', 'loc']),
     pickAadhaarString(formJson, ['landmark']),
-    pickAadhaarString(formJson, ['locality', 'vtc', 'villageTownCity']),
+    pickAadhaarString(formJson, ['locality', 'vtc', 'villageTownCity', 'city']),
     pickAadhaarString(formJson, ['district', 'dist']),
     pickAadhaarString(formJson, ['state']),
     pickAadhaarString(formJson, ['pincode', 'pin', 'pinCode']),
   ].filter((part): part is string => Boolean(part));
   const address = addressParts.length > 0 ? [...new Set(addressParts)].join(', ') : null;
+
+  if (
+    !identity.fullName &&
+    !identity.dateOfBirth &&
+    !gender &&
+    !maskedAadhaar &&
+    !address
+  ) {
+    return null;
+  }
 
   return {
     fullName: formatLosPersonName(identity.fullName),
@@ -160,6 +200,30 @@ function buildLosAadhaarDetail(formJson: unknown): {
     address,
     maskedAadhaar,
   };
+}
+
+function buildLosAadhaarIdentityFailure(params: {
+  formJson: unknown;
+  vendor: unknown;
+  leadFullName: string | null;
+  leadDateOfBirth: Date | null;
+  kycFailed: boolean;
+  aadhaarFetched: boolean;
+}): AadhaarIdentityFailureDetail | null {
+  const stored = extractDigilockerIdentityMismatch(params.formJson);
+  if (!params.aadhaarFetched && !stored) return null;
+  if (!params.kycFailed && !stored) return null;
+  return describeAadhaarIdentityFailure({
+    leadFullName: params.leadFullName,
+    leadDateOfBirth: params.leadDateOfBirth,
+    vendor: params.vendor ?? params.formJson,
+    storedReason: stored?.reason ?? (params.kycFailed && params.aadhaarFetched ? 'recorded_kyc_failed' : null),
+    storedMessage:
+      stored?.message ??
+      (params.kycFailed && params.aadhaarFetched
+        ? 'Aadhaar was fetched from DigiLocker, but this application was marked KYC failed.'
+        : null),
+  });
 }
 
 function maskBankDetails(bankName: string | null | undefined, accountNumber: string | null | undefined, ifscCode: string | null | undefined): string | null {
@@ -395,7 +459,7 @@ export class LosApplicationService {
             customerKycs: {
               orderBy: { createdAt: 'desc' },
               take: 1,
-              select: { aadhaarVerifiedAt: true, aadhaarPhotoPath: true },
+              select: { aadhaarVerifiedAt: true, aadhaarPhotoPath: true, aadhaarData: true },
             },
           },
         },
@@ -523,9 +587,10 @@ export class LosApplicationService {
         loanDocumentsReviewedAt: appDetails?.loanDocumentsReviewedAt?.toISOString() ?? null,
         loanDocumentsAcceptedAt: appDetails?.loanDocumentsAcceptedAt?.toISOString() ?? null,
         livenessPassed: application.kyc?.livenessPassed ?? false,
-        aadhaarKycCompleted: Boolean(
-          application.customer.customerKycs[0]?.aadhaarVerifiedAt ||
-            application.customer.customerKycs[0]?.aadhaarPhotoPath?.trim(),
+        aadhaarKycCompleted: isAcceptedAadhaarCapture(
+          application.customer.customerKycs[0]?.aadhaarData,
+          application.customer.customerKycs[0]?.aadhaarVerifiedAt,
+          application.customer.customerKycs[0]?.aadhaarPhotoPath,
         ),
         selfieCaptured: Boolean(application.kyc?.livenessSelfiePath?.trim()),
         referencesCount: application._count.references,
@@ -712,7 +777,27 @@ export class LosApplicationService {
     ]);
     const bust = (url: string | null) =>
       url && /^https?:\/\//i.test(url) ? appendPhotoCacheBuster(url, photoVersion) : url;
-    const aadhaarDetail = buildLosAadhaarDetail(customerKyc?.aadhaarData);
+    const storedAadhaar = customerKyc?.aadhaarData ?? null;
+    let aadhaarSource = storedAadhaar;
+    let aadhaarDetail = buildLosAadhaarDetail(storedAadhaar);
+    if (!aadhaarDetail && !isAcceptedAadhaarCapture(storedAadhaar, customerKyc?.aadhaarVerifiedAt, customerKyc?.aadhaarPhotoPath)) {
+      const loggedVendor = await this.findSuccessfulAadhaarDownloadVendor(application.leadId);
+      if (loggedVendor) {
+        aadhaarSource = loggedVendor;
+        aadhaarDetail = buildLosAadhaarDetail(loggedVendor);
+      }
+    }
+    const kycFailed =
+      application.applicationStatus.name === APPLICATION_STATUS.KYC_FAILED ||
+      application.kyc?.kycStatus === APPLICATION_KYC_STATUS.FAILED;
+    const aadhaarIdentityFailure = buildLosAadhaarIdentityFailure({
+      formJson: storedAadhaar,
+      vendor: aadhaarSource,
+      leadFullName: detail?.fullName ?? null,
+      leadDateOfBirth: detail?.dateOfBirth ?? null,
+      kycFailed,
+      aadhaarFetched: Boolean(aadhaarDetail),
+    });
 
     return {
       uuid: application.uuid,
@@ -852,14 +937,11 @@ export class LosApplicationService {
         relation: ref.relation.name,
       })),
       aadhaarDetail,
-      aadhaarKycCompleted: Boolean(
-        customerKyc?.aadhaarVerifiedAt ||
-          customerKyc?.aadhaarPhotoPath?.trim() ||
-          aadhaarDetail?.fullName?.trim() ||
-          aadhaarDetail?.dateOfBirth ||
-          aadhaarDetail?.maskedAadhaar?.trim() ||
-          aadhaarDetail?.gender?.trim() ||
-          aadhaarDetail?.address?.trim(),
+      aadhaarIdentityFailure,
+      aadhaarKycCompleted: isAcceptedAadhaarCapture(
+        storedAadhaar,
+        customerKyc?.aadhaarVerifiedAt,
+        customerKyc?.aadhaarPhotoPath,
       ),
       aadhaarKycCompletedAt: customerKyc?.aadhaarVerifiedAt?.toISOString() ?? null,
       digilockerPan: customerKyc?.panCardNumber
@@ -1071,6 +1153,26 @@ export class LosApplicationService {
     res.setHeader('Content-Disposition', `inline; filename="${title}.pdf"`);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     res.send(buf);
+  }
+
+  private async findSuccessfulAadhaarDownloadVendor(leadId: bigint): Promise<unknown | null> {
+    const rows = await this.prisma.read.vendorApiLog.findMany({
+      where: {
+        leadId,
+        httpStatus: 200,
+        serviceName: { in: [...AADHAAR_DOWNLOAD_SERVICE_NAMES] },
+      },
+      orderBy: { respondedAt: 'desc' },
+      take: 8,
+      select: { responsePayload: true },
+    });
+    for (const row of rows) {
+      const vendor = unwrapVendorAuditPayload(row.responsePayload);
+      if (isTenacioVendorBusinessSuccess(vendor) && buildLosAadhaarDetail(vendor)) {
+        return vendor;
+      }
+    }
+    return null;
   }
 
   private async streamKycPhoto(relativePath: string, res: Response): Promise<void> {
@@ -1328,9 +1430,11 @@ export class LosApplicationService {
       },
     });
 
-    const digilockerDone =
-      isDigilockerAadhaarCaptureComplete(customerKyc?.aadhaarData ?? null) ||
-      Boolean(customerKyc?.aadhaarPhotoPath?.trim());
+    const digilockerDone = isAcceptedAadhaarCapture(
+      customerKyc?.aadhaarData ?? null,
+      null,
+      customerKyc?.aadhaarPhotoPath,
+    );
 
     const snapshot = {
       kycStatus: kyc.kycStatus,

@@ -16,7 +16,7 @@ import {
   normalizeAadhaarGender,
 } from '@/lib/kyc-field-match';
 import { formatPersonName } from '@/lib/format-person-name';
-import { isLosAadhaarKycComplete } from '@/lib/customer-journey';
+import { hasLosAadhaarRecord, isLosAadhaarKycComplete } from '@/lib/customer-journey';
 import {
   fetchApplicationLoanDocumentBlob,
   generateApplicationLoanDocuments,
@@ -293,7 +293,7 @@ function CustomerProfilePanel({
     return <p className="m-0 text-[0.88rem] text-brand-muted">No lead profile is linked to this application yet.</p>;
   }
 
-  const hasAadhaar = isLosAadhaarKycComplete(row);
+  const hasAadhaar = hasLosAadhaarRecord(row);
 
   const bureauPan = cibilReport ? extractCibilPan(cibilReport.identifiers) : null;
   const profileNameScore = computeNameMatchScore(profile.fullName, aadhaar?.fullName);
@@ -705,6 +705,8 @@ function KycDetailPanel({
   onRefresh?: () => void;
 }) {
   const aadhaarComplete = isLosAadhaarKycComplete(row);
+  const aadhaarFetched = hasLosAadhaarRecord(row);
+  const identityFailure = row.aadhaarIdentityFailure ?? null;
   const aadhaar = row.aadhaarDetail;
   const kycDone = row.kycStatus === 1;
   const livenessDone = row.livenessPassed === true || kycDone;
@@ -724,11 +726,25 @@ function KycDetailPanel({
         <div className="flex items-center justify-between gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
           <span className="text-[0.82rem] font-extrabold text-brand-navy">DigiLocker Aadhaar KYC</span>
           <span className="text-[0.72rem] font-bold text-brand-muted">
-            {aadhaarComplete ? 'Complete' : 'Pending'}
+            {aadhaarComplete ? 'Complete' : identityFailure ? 'Failed' : 'Pending'}
           </span>
         </div>
         <div className="grid gap-3 px-3 py-2.5">
-          {!aadhaarComplete ? (
+          {identityFailure ? (
+            <p className="m-0 rounded-[10px] border border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.9)] px-3 py-2.5 text-[0.84rem] leading-[1.45] text-[#92400e]">
+              {identityFailure.message}
+              {identityFailure.applicationName || identityFailure.aadhaarName ? (
+                <>
+                  <br />
+                  Application: {formatPersonName(identityFailure.applicationName) || '—'}
+                  {identityFailure.applicationDob ? ` · ${formatDobWithAge(identityFailure.applicationDob)}` : ''}
+                  <br />
+                  Aadhaar: {formatPersonName(identityFailure.aadhaarName) || '—'}
+                  {identityFailure.aadhaarDob ? ` · ${formatDobWithAge(identityFailure.aadhaarDob)}` : ''}
+                </>
+              ) : null}
+            </p>
+          ) : !aadhaarFetched ? (
             <p className="m-0 rounded-[10px] border border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.9)] px-3 py-2.5 text-[0.84rem] leading-[1.45] text-[#92400e]">
               DigiLocker Aadhaar has not been captured yet.
             </p>
@@ -736,18 +752,21 @@ function KycDetailPanel({
           <DetailGrid
             columns={2}
             rows={[
-              { label: 'Aadhaar KYC', value: aadhaarComplete ? 'Complete' : 'Not complete' },
+              {
+                label: 'Aadhaar KYC',
+                value: aadhaarComplete ? 'Complete' : identityFailure ? 'Fetched — identity failed' : 'Not complete',
+              },
               {
                 label: 'DigiLocker Aadhaar',
-                value: formatAadhaarNumberDisplay(aadhaar?.maskedAadhaar, aadhaarComplete),
+                value: formatAadhaarNumberDisplay(aadhaar?.maskedAadhaar, aadhaarFetched),
               },
-              { label: 'Aadhaar name', value: aadhaarComplete ? formatPersonName(aadhaar?.fullName) : '—' },
-              { label: 'Aadhaar DOB', value: aadhaarComplete ? formatDobWithAge(aadhaar?.dateOfBirth) : '—' },
+              { label: 'Aadhaar name', value: aadhaarFetched ? formatPersonName(aadhaar?.fullName) : '—' },
+              { label: 'Aadhaar DOB', value: aadhaarFetched ? formatDobWithAge(aadhaar?.dateOfBirth) : '—' },
               {
                 label: 'Aadhaar gender',
-                value: aadhaarComplete ? (normalizeAadhaarGender(aadhaar?.gender) ?? '—') : '—',
+                value: aadhaarFetched ? (normalizeAadhaarGender(aadhaar?.gender) ?? '—') : '—',
               },
-              { label: 'Aadhaar address', value: aadhaarComplete ? (aadhaar?.address ?? '—') : '—' },
+              { label: 'Aadhaar address', value: aadhaarFetched ? (aadhaar?.address ?? '—') : '—' },
               { label: 'DigiLocker PAN', value: row.digilockerPan?.panCardNumber ?? '—' },
               {
                 label: 'DigiLocker PAN verified at',

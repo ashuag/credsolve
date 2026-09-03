@@ -24,7 +24,7 @@ import {
   formatCibilScoreLabel,
   truncateUuid,
 } from '@/lib/application-review-format';
-import { isApplicationJourneyStepActive, isLosAadhaarKycComplete } from '@/lib/customer-journey';
+import { hasLosAadhaarRecord, isApplicationJourneyStepActive, isLosAadhaarKycComplete } from '@/lib/customer-journey';
 import { usesMonthlyIncomeMetric, resolveOccupationKey } from '@/lib/customer-details';
 import {
   combineMatchVerdicts,
@@ -484,7 +484,9 @@ export function ReviewKycPanel({
   const kycDone = row.kycStatus === 1;
   const kycFailed = row.statusCode.toUpperCase() === 'KYC_FAILED' || row.kycStatus === 2;
   const aadhaarComplete = isLosAadhaarKycComplete(row);
+  const aadhaarFetched = hasLosAadhaarRecord(row);
   const aadhaar = row.aadhaarDetail;
+  const identityFailure = row.aadhaarIdentityFailure ?? null;
   const digilockerCurrent = isApplicationJourneyStepActive(row, 'digilockerKyc');
   const livenessCurrent = isApplicationJourneyStepActive(row, 'livenessKyc');
   const livenessDone = row.livenessPassed === true || kycDone;
@@ -505,11 +507,11 @@ export function ReviewKycPanel({
       <ReviewCard
         icon={<IdCardIcon />}
         title="DigiLocker Aadhaar KYC"
-        iconTone={aadhaarComplete ? 'ok' : kycFailed && !aadhaarComplete ? 'warn' : 'default'}
+        iconTone={aadhaarComplete ? 'ok' : kycFailed || identityFailure ? 'warn' : 'default'}
         right={
           aadhaarComplete ? (
             <ReviewPill tone="ok">Complete</ReviewPill>
-          ) : kycFailed && !aadhaarComplete ? (
+          ) : kycFailed || identityFailure ? (
             <ReviewPill tone="warn">Failed</ReviewPill>
           ) : digilockerCurrent ? (
             <ReviewPill tone="warn">Current step</ReviewPill>
@@ -518,27 +520,41 @@ export function ReviewKycPanel({
           )
         }
       >
-        {!aadhaarComplete ? (
+        {identityFailure ? (
+          <KycNotice>
+            {identityFailure.message}
+            {identityFailure.applicationName || identityFailure.aadhaarName || identityFailure.applicationDob || identityFailure.aadhaarDob ? (
+              <>
+                <br />
+                Application: {formatPersonName(identityFailure.applicationName) || '—'}
+                {identityFailure.applicationDob ? ` · ${formatDobWithAge(identityFailure.applicationDob)}` : ''}
+                <br />
+                Aadhaar: {formatPersonName(identityFailure.aadhaarName) || '—'}
+                {identityFailure.aadhaarDob ? ` · ${formatDobWithAge(identityFailure.aadhaarDob)}` : ''}
+              </>
+            ) : null}
+          </KycNotice>
+        ) : !aadhaarFetched ? (
           <KycNotice>DigiLocker Aadhaar has not been captured yet.</KycNotice>
         ) : null}
         <div className="fgrid">
           <ReviewField
             label="Aadhaar KYC"
-            value={aadhaarComplete ? 'Complete' : 'Not complete'}
-            tone={aadhaarComplete ? 'accent' : undefined}
+            value={aadhaarComplete ? 'Complete' : identityFailure ? 'Fetched — identity failed' : 'Not complete'}
+            tone={aadhaarComplete ? 'accent' : identityFailure ? 'flag' : undefined}
           />
           <ReviewField
             label="DigiLocker Aadhaar"
-            value={formatAadhaarNumberDisplay(aadhaar?.maskedAadhaar, aadhaarComplete)}
-            tone={aadhaarComplete ? 'accent' : undefined}
+            value={formatAadhaarNumberDisplay(aadhaar?.maskedAadhaar, aadhaarFetched)}
+            tone={aadhaarFetched ? 'accent' : undefined}
           />
-          <ReviewField label="Aadhaar name" value={aadhaarComplete ? formatPersonName(aadhaar?.fullName) : '—'} />
-          <ReviewField label="Aadhaar DOB" value={aadhaarComplete ? formatDobWithAge(aadhaar?.dateOfBirth) : '—'} />
+          <ReviewField label="Aadhaar name" value={aadhaarFetched ? formatPersonName(aadhaar?.fullName) : '—'} />
+          <ReviewField label="Aadhaar DOB" value={aadhaarFetched ? formatDobWithAge(aadhaar?.dateOfBirth) : '—'} />
           <ReviewField
             label="Aadhaar gender"
-            value={aadhaarComplete ? (normalizeAadhaarGender(aadhaar?.gender) ?? '—') : '—'}
+            value={aadhaarFetched ? (normalizeAadhaarGender(aadhaar?.gender) ?? '—') : '—'}
           />
-          <ReviewField label="Aadhaar address" value={aadhaarComplete ? (aadhaar?.address ?? '—') : '—'} />
+          <ReviewField label="Aadhaar address" value={aadhaarFetched ? (aadhaar?.address ?? '—') : '—'} />
           <ReviewField
             label="DigiLocker PAN"
             value={row.digilockerPan?.panCardNumber ?? '—'}
@@ -1019,7 +1035,8 @@ export function ReviewPersonalPanel({
   const matrixNameScore = combinedNameMatchScore(nameScoreParts);
   const matrixNameScoreTitle = nameMatchScoreDetail(nameScoreParts);
 
-  const hasAadhaar = isLosAadhaarKycComplete(row);
+  const aadhaarComplete = isLosAadhaarKycComplete(row);
+  const hasAadhaar = hasLosAadhaarRecord(row);
 
   const allMatch =
     hasAadhaar &&
@@ -1113,7 +1130,13 @@ export function ReviewPersonalPanel({
         <ReviewCard
           icon={<IdCardIcon />}
           title="Aadhaar (DigiLocker)"
-          right={hasAadhaar ? <ReviewPill tone="ok">Aadhaar complete</ReviewPill> : undefined}
+          right={
+            aadhaarComplete ? (
+              <ReviewPill tone="ok">Aadhaar complete</ReviewPill>
+            ) : row.aadhaarIdentityFailure ? (
+              <ReviewPill tone="warn">Identity failed</ReviewPill>
+            ) : undefined
+          }
         >
           {hasAadhaar ? (
             <div className="fgrid">

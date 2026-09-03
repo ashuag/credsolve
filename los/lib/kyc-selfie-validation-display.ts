@@ -173,6 +173,7 @@ type KycIncompleteInput = {
   moneyCashFaceMatch: LosMoneyCashFaceMatch | null;
   livenessSummary: LosLivenessSummary | null;
   aadhaarKycCompleted?: boolean;
+  aadhaarIdentityFailure?: { message?: string } | null;
   kycPhotos: {
     selfiePath: string | null;
     aadhaarPhotoPath: string | null;
@@ -186,7 +187,8 @@ export function explainKycNotDone(row: KycIncompleteInput): string | null {
   if (row.kycStatus === 1) return null;
 
   if (row.kycStatus === 2) {
-    return row.kycStatusLabel?.trim() ||
+    return row.aadhaarIdentityFailure?.message?.trim() ||
+      row.kycStatusLabel?.trim() ||
       'KYC verification failed — name or date of birth did not match Aadhaar.';
   }
 

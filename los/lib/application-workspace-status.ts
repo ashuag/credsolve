@@ -25,11 +25,13 @@ export function applicationRejectionHeadline(row: LosApplicationDetails): string
 export function buildApplicationWorkspaceAlertText(row: LosApplicationDetails): string | null {
   if (row.lead.statusCode.toUpperCase().includes('REJECT')) {
     const reasonLabel = row.lead.rejectionReason?.label;
+    const identityMessage = row.aadhaarIdentityFailure?.message?.trim();
     return buildWorkspaceAlertText({
       statusCode: row.lead.statusCode,
       rejectionReason: reasonLabel,
       leadStatusNote:
-        reasonLabel && isPennyDropFailedNote(row.lead.leadStatusNote) ? null : row.lead.leadStatusNote,
+        identityMessage ||
+        (reasonLabel && isPennyDropFailedNote(row.lead.leadStatusNote) ? null : row.lead.leadStatusNote),
       bureauFetchedNote: row.lead.bureauFetchedNote,
       panVerified: row.lead.panVerified,
       bureauFetched: row.lead.bureauFetched,
@@ -41,7 +43,7 @@ export function buildApplicationWorkspaceAlertText(row: LosApplicationDetails): 
   }
 
   if (row.statusCode.toUpperCase() === 'KYC_FAILED') {
-    return row.kycStatusLabel || 'KYC verification failed.';
+    return row.aadhaarIdentityFailure?.message?.trim() || row.kycStatusLabel || 'KYC verification failed.';
   }
 
   if (row.statusCode.toUpperCase() === 'PENNYDROP_FAILED' || isBankDetailFailed(row)) {
