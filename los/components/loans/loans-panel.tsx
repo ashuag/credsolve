@@ -371,7 +371,7 @@ export function LoansPanel() {
       filter: false,
       render: (loan) => (
         <div className="flex flex-wrap items-center gap-1.5">
-          {!loan.closedAt && loan.unsettledPaymentLink ? (
+          {!loan.closedAt ? (
             <RefreshPaymentButton
               busy={busyUuid === loan.uuid}
               onClick={() => void refreshPayment(loan)}

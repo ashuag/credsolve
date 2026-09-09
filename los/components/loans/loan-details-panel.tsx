@@ -715,7 +715,7 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
                   Open application
                 </ActionBtn>
                 <ActionBtn onClick={() => void load()}>Refresh</ActionBtn>
-                {!row.closedAt && row.unsettledPaymentLink ? (
+                {!row.closedAt ? (
                   <RefreshPaymentButton
                     busy={refreshingPayment}
                     onClick={() => void refreshPayment()}

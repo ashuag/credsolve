@@ -8,13 +8,22 @@ import {
   timingSafeEqualUtf8,
 } from '../../../../common/easebuzz/easebuzz-wire.service';
 import {
+  checkEasyCollectLoanBinding,
+  easebuzzRepayLoanLookupKeys,
+  isEasyCollectWebhookPayload,
+  parseEasebuzzAddedOn,
+} from '../../../../common/easebuzz/easebuzz-repay-binding.util';
+import {
   amountsMatchInr,
   clearPendingRepayIntent,
   loadPendingRepayIntent,
   type PendingRepayIntent,
 } from '../../../../common/easebuzz/repay-intent.util';
 import { EasebuzzRepaymentNotificationService } from '../../../../common/easebuzz/easebuzz-repayment-notification.service';
-import { SettleEasebuzzRepaymentService } from '../../../../common/easebuzz/settle-easebuzz-repayment.service';
+import {
+  SettleEasebuzzRepaymentService,
+  type SettleEasebuzzLoanRef,
+} from '../../../../common/easebuzz/settle-easebuzz-repayment.service';
 import { LOAN_REPAYMENT_STATUS } from '../../../../common/constants/loan-repayment.constants';
 import { LOAN_STATUS } from '../../../../common/constants/loan.constants';
 import { RedisService } from '../../../../common/redis/redis.service';
@@ -65,6 +74,30 @@ const CLIENT_ERROR_CODES = new Set([
 
 const RETRY_ERROR_CODES = new Set(['settle_failed', 'settle_in_progress']);
 
+const LOAN_SELECT = {
+  id: true,
+  uuid: true,
+  loanNumber: true,
+  principalAmount: true,
+  interestRate: true,
+  disbursedAt: true,
+  loanMaturityDate: true,
+  closedAt: true,
+  loanStatus: { select: { name: true } },
+  application: {
+    select: {
+      id: true,
+      uuid: true,
+      leadId: true,
+    },
+  },
+} as const;
+
+type CallbackLoan = SettleEasebuzzLoanRef & {
+  closedAt: Date | null;
+  loanStatus: { name: string };
+};
+
 @Injectable()
 export class HandleEasebuzzRepaymentCallbackUseCase {
   private readonly logger = new Logger(HandleEasebuzzRepaymentCallbackUseCase.name);
@@ -80,35 +113,56 @@ export class HandleEasebuzzRepaymentCallbackUseCase {
 
   /**
    * Handles Easebuzz browser POST/GET to surl/furl.
+   * Pay Now keep the original settle path. EasyCollect payloads are handled alongside.
    */
   async execute(
     payload: Record<string, unknown>,
     kind: 'success' | 'failure',
   ): Promise<string> {
     const rowId = await this.notifications.begin(kind === 'success' ? 'surl' : 'furl', payload);
-    const outcome = await this.process(payload, kind, rowId);
+    const outcome = await this.route(payload, kind, rowId, false);
     await this.notifications.finish(rowId, outcome);
     return this.redirectUrl(outcome);
   }
 
   /**
-   * Server-to-server webhook. Same settle path as surl; returns JSON (no redirect).
-   * 400 = bad auth / missing txnid. 500 = retry. 200 = processed or still pending.
+   * Server-to-server webhook for in-app Pay Now:
+   *   https://moneycash.in/api/webhooks/easebuzz/repayment
+   * EasyCollect payloads posted to this same URL are accepted as well.
    */
   async executeWebhook(payload: Record<string, unknown>): Promise<{
     httpStatus: number;
     body: Record<string, unknown>;
   }> {
-    const rowId = await this.notifications.begin('webhook', payload);
+    return this.runWebhook(payload, 'webhook', false);
+  }
+
+  /**
+   * Server-to-server webhook for Easebuzz EasyCollect (dashboard / SMS payment links):
+   *   https://moneycash.in/api/webhooks/easebuzz/easycollect
+   */
+  async executeEasyCollectWebhook(payload: Record<string, unknown>): Promise<{
+    httpStatus: number;
+    body: Record<string, unknown>;
+  }> {
+    return this.runWebhook(payload, 'easycollect', true);
+  }
+
+  private async runWebhook(
+    payload: Record<string, unknown>,
+    source: 'webhook' | 'easycollect',
+    forceEasyCollect: boolean,
+  ): Promise<{ httpStatus: number; body: Record<string, unknown> }> {
+    const rowId = await this.notifications.begin(source, payload);
     const fields = asStringMap(payload);
     const status = (fields.status ?? '').trim().toLowerCase();
     const kind: 'success' | 'failure' =
       status && !isCallbackSuccessStatus(status) ? 'failure' : 'success';
-    const outcome = await this.process(payload, kind, rowId);
+    const outcome = await this.route(payload, kind, rowId, forceEasyCollect);
     await this.notifications.finish(rowId, outcome);
     const httpStatus = webhookHttpStatus(outcome);
     this.logger.log(
-      `[repay-webhook] txnid=${outcome.txnid || 'n/a'} result=${outcome.result} ` +
+      `[repay-webhook] source=${source} txnid=${outcome.txnid || 'n/a'} result=${outcome.result} ` +
         `code=${outcome.code ?? 'n/a'} http=${httpStatus}`,
     );
     return {
@@ -118,34 +172,29 @@ export class HandleEasebuzzRepaymentCallbackUseCase {
         result: outcome.result,
         code: outcome.code ?? null,
         txnid: outcome.txnid || null,
-        source: 'webhook',
+        source,
       },
     };
   }
 
-  /**
-   * Security gates before marking loan CLOSED:
-   * 1. Timing-safe reverse-hash verification (salt)
-   * 2. Merchant key match
-   * 3. Pending repay intent (txnid we created) + UDF/loan consistency
-   * 4. Amount match vs intent (and optional txn retrieve amount)
-   * 5. Server-side Transaction V2.1 retrieve must report success
-   * 6. Redis settle lock + FOR UPDATE so close is idempotent
-   */
-  private async process(
+  private async route(
     payload: Record<string, unknown>,
     kind: 'success' | 'failure',
     notificationId: bigint | null,
+    forceEasyCollect: boolean,
   ): Promise<EasebuzzRepayNotificationOutcome> {
     const fields = asStringMap(payload);
-    const txnid = fields.txnid?.trim() ?? '';
-    const status = (fields.status ?? '').trim().toLowerCase();
-
-    if (!txnid) {
-      this.logger.warn(`[repay-callback] Missing txnid kind=${kind}`);
-      return { txnid: '', result: 'error', code: 'missing_txnid' };
+    if (forceEasyCollect || isEasyCollectWebhookPayload(fields)) {
+      return this.processEasyCollect(payload, kind, notificationId);
     }
+    return this.processPayNow(payload, kind, notificationId);
+  }
 
+  private async verifyHash(
+    fields: Record<string, string>,
+    txnid: string,
+    kind: 'success' | 'failure',
+  ): Promise<EasebuzzRepayNotificationOutcome | null> {
     try {
       const creds = this.easebuzzWire.getPayCredentialsOrThrow();
       const expected = buildPayCallbackReverseHash(fields, creds.salt);
@@ -166,6 +215,35 @@ export class HandleEasebuzzRepaymentCallbackUseCase {
       );
       return { txnid, result: 'error', code: 'config' };
     }
+    return null;
+  }
+
+  /**
+   * Original in-app Pay Now path (surl/furl + /webhooks/easebuzz/repayment).
+   * Security gates before marking loan CLOSED:
+   * 1. Timing-safe reverse-hash verification (salt)
+   * 2. Merchant key match
+   * 3. Pending repay intent (txnid we created) + UDF/loan consistency
+   * 4. Amount match vs intent (and optional txn retrieve amount)
+   * 5. Server-side Transaction V2.1 retrieve must report success
+   * 6. Redis settle lock + FOR UPDATE so close is idempotent
+   */
+  private async processPayNow(
+    payload: Record<string, unknown>,
+    kind: 'success' | 'failure',
+    notificationId: bigint | null,
+  ): Promise<EasebuzzRepayNotificationOutcome> {
+    const fields = asStringMap(payload);
+    const txnid = fields.txnid?.trim() ?? '';
+    const status = (fields.status ?? '').trim().toLowerCase();
+
+    if (!txnid) {
+      this.logger.warn(`[repay-callback] Missing txnid kind=${kind}`);
+      return { txnid: '', result: 'error', code: 'missing_txnid' };
+    }
+
+    const hashError = await this.verifyHash(fields, txnid, kind);
+    if (hashError) return hashError;
 
     const priorSuccess = await this.settleRepayment.findSuccessByVendorRef(txnid);
     if (priorSuccess) {
@@ -183,24 +261,7 @@ export class HandleEasebuzzRepaymentCallbackUseCase {
 
     const loan = await this.prisma.client.loanAccount.findFirst({
       where: { uuid: loanAccountUuid },
-      select: {
-        id: true,
-        uuid: true,
-        loanNumber: true,
-        principalAmount: true,
-        interestRate: true,
-        disbursedAt: true,
-        loanMaturityDate: true,
-        closedAt: true,
-        loanStatus: { select: { name: true } },
-        application: {
-          select: {
-            id: true,
-            uuid: true,
-            leadId: true,
-          },
-        },
-      },
+      select: LOAN_SELECT,
     });
 
     if (!loan) {
@@ -210,7 +271,7 @@ export class HandleEasebuzzRepaymentCallbackUseCase {
 
     await this.notifications.attachLoan(notificationId, loan.id);
 
-    const consistencyError = this.checkLoanBinding(fields, loan, intent);
+    const consistencyError = this.checkPayNowLoanBinding(fields, loan, intent);
     if (consistencyError) {
       this.logger.warn(
         `[repay-callback] Binding failed txnid=${txnid} loan=${loan.loanNumber}: ${consistencyError}`,
@@ -258,8 +319,130 @@ export class HandleEasebuzzRepaymentCallbackUseCase {
       return { txnid, result: 'error', code: 'amount_mismatch' };
     }
 
-    const txn = await this.easebuzzWire.retrievePayTransaction(txnid);
-    await this.notifications.attachConfirm(notificationId, {
+    return this.confirmAndSettle({
+      loan,
+      txnid,
+      fields,
+      intentAmount: intent.amountInr,
+      paidAt,
+      notificationId,
+      logPrefix: 'repay-callback',
+    });
+  }
+
+  /**
+   * Easebuzz EasyCollect (dashboard / SMS payment link).
+   * txnid and udf1 are the public loan/application number (e.g. APP20262BRQJ).
+   * No Redis Pay Now intent is required; vendor retrieve still confirms success.
+   */
+  private async processEasyCollect(
+    payload: Record<string, unknown>,
+    kind: 'success' | 'failure',
+    notificationId: bigint | null,
+  ): Promise<EasebuzzRepayNotificationOutcome> {
+    const fields = asStringMap(payload);
+    const txnid = fields.txnid?.trim() ?? '';
+    const status = (fields.status ?? '').trim().toLowerCase();
+
+    if (!txnid) {
+      this.logger.warn(`[easycollect-webhook] Missing txnid kind=${kind}`);
+      return { txnid: '', result: 'error', code: 'missing_txnid' };
+    }
+
+    const hashError = await this.verifyHash(fields, txnid, kind);
+    if (hashError) return hashError;
+
+    const priorSuccess = await this.settleRepayment.findSuccessByVendorRef(txnid);
+    if (priorSuccess) {
+      this.logger.log(`[easycollect-webhook] Already settled txnid=${txnid}`);
+      return { txnid, result: 'success' };
+    }
+
+    const lookup = easebuzzRepayLoanLookupKeys(fields, null);
+    if (lookup.publicIds.length === 0 && lookup.uuids.length === 0) {
+      this.logger.warn(`[easycollect-webhook] Missing loan number txnid=${txnid}`);
+      return { txnid, result: 'error', code: 'missing_loan' };
+    }
+
+    let loan: CallbackLoan | null =
+      lookup.publicIds.length > 0
+        ? await this.prisma.client.loanAccount.findFirst({
+            where: { loanNumber: { in: lookup.publicIds } },
+            select: LOAN_SELECT,
+          })
+        : null;
+    if (!loan && lookup.uuids.length > 0) {
+      loan = await this.prisma.client.loanAccount.findFirst({
+        where: { uuid: { in: lookup.uuids } },
+        select: LOAN_SELECT,
+      });
+    }
+
+    if (!loan) {
+      this.logger.warn(
+        `[easycollect-webhook] Loan not found loanNumber=${lookup.publicIds.join(',') || 'n/a'} txnid=${txnid}`,
+      );
+      return { txnid, result: 'error', code: 'loan_not_found' };
+    }
+
+    await this.notifications.attachLoan(notificationId, loan.id);
+
+    const consistencyError = checkEasyCollectLoanBinding(fields, loan, null);
+    if (consistencyError) {
+      this.logger.warn(
+        `[easycollect-webhook] Binding failed txnid=${txnid} loan=${loan.loanNumber}: ${consistencyError}`,
+      );
+      return { txnid, result: 'error', code: consistencyError };
+    }
+
+    if (loan.closedAt != null || loan.loanStatus.name === LOAN_STATUS.CLOSED) {
+      this.logger.log(`[easycollect-webhook] Loan already closed loan=${loan.loanNumber} txnid=${txnid}`);
+      return { txnid, result: 'success' };
+    }
+
+    const paidAt = parseEasebuzzAddedOn(fields.addedon) ?? new Date();
+    const callbackLooksSuccessful = kind === 'success' && isCallbackSuccessStatus(status);
+
+    if (!callbackLooksSuccessful) {
+      const failureMessage = truncateError(
+        fields.error || fields.error_Message || fields.msg || fields.status || 'Payment failed',
+      );
+      await this.recordFailedAttempt({
+        loanAccountId: loan.id,
+        amountInr: (fields.amount || '0').slice(0, 20),
+        txnid,
+        failureMessage,
+        paidAt,
+      });
+      this.logger.warn(
+        `[easycollect-webhook] FAILED loan=${loan.loanNumber} txnid=${txnid} status=${status || kind}`,
+      );
+      return { txnid, result: 'failed', code: 'payment_failed' };
+    }
+
+    const callbackAmount = (fields.amount ?? '').trim();
+    return this.confirmAndSettle({
+      loan,
+      txnid,
+      fields,
+      intentAmount: callbackAmount,
+      paidAt,
+      notificationId,
+      logPrefix: 'easycollect-webhook',
+    });
+  }
+
+  private async confirmAndSettle(input: {
+    loan: CallbackLoan;
+    txnid: string;
+    fields: Record<string, string>;
+    intentAmount: string;
+    paidAt: Date;
+    notificationId: bigint | null;
+    logPrefix: string;
+  }): Promise<EasebuzzRepayNotificationOutcome> {
+    const txn = await this.easebuzzWire.retrievePayTransaction(input.txnid);
+    await this.notifications.attachConfirm(input.notificationId, {
       ok: txn.ok,
       status: txn.status,
       amount: txn.amount,
@@ -271,47 +454,53 @@ export class HandleEasebuzzRepaymentCallbackUseCase {
     });
     if (!txn.ok || !txn.status || !isCallbackSuccessStatus(txn.status)) {
       this.logger.warn(
-        `[repay-callback] Txn retrieve not success txnid=${txnid} status=${txn.status ?? 'n/a'} msg=${txn.message ?? ''}`,
+        `[${input.logPrefix}] Txn retrieve not success txnid=${input.txnid} status=${txn.status ?? 'n/a'} msg=${txn.message ?? ''}`,
       );
-      return { txnid, result: 'pending', code: 'txn_unconfirmed' };
+      return { txnid: input.txnid, result: 'pending', code: 'txn_unconfirmed' };
     }
-    if (txn.amount && !amountsMatchInr(txn.amount, intent.amountInr)) {
+
+    const expectedAmount = (input.intentAmount || txn.amount || '').trim();
+    if (!expectedAmount || !(Number.parseFloat(expectedAmount) > 0)) {
+      this.logger.warn(`[${input.logPrefix}] Missing payment amount txnid=${input.txnid}`);
+      return { txnid: input.txnid, result: 'error', code: 'amount_mismatch' };
+    }
+    if (txn.amount && !amountsMatchInr(txn.amount, expectedAmount)) {
       this.logger.warn(
-        `[repay-callback] Txn retrieve amount mismatch txnid=${txnid} txn=${txn.amount} intent=${intent.amountInr}`,
+        `[${input.logPrefix}] Txn retrieve amount mismatch txnid=${input.txnid} txn=${txn.amount} expected=${expectedAmount}`,
       );
-      return { txnid, result: 'error', code: 'amount_mismatch' };
+      return { txnid: input.txnid, result: 'error', code: 'amount_mismatch' };
     }
 
     const bankRef = (
       txn.bankRef ||
       txn.easepayid ||
-      fields.bank_ref_num ||
-      fields.easepayid ||
-      txnid
+      input.fields.bank_ref_num ||
+      input.fields.easepayid ||
+      input.txnid
     )
       .trim()
       .slice(0, 50);
 
     try {
       const settled = await this.settleRepayment.settleSuccessfulPayment({
-        loan,
-        txnid,
-        amountInr: intent.amountInr,
+        loan: input.loan,
+        txnid: input.txnid,
+        amountInr: expectedAmount,
         bankRef,
-        paidAt,
+        paidAt: input.paidAt,
       });
       this.logger.log(
-        `[repay-callback] SUCCESS loan=${loan.loanNumber} txnid=${txnid} ` +
+        `[${input.logPrefix}] SUCCESS loan=${input.loan.loanNumber} txnid=${input.txnid} ` +
           `repayment=${settled.repaymentUuid ?? 'existing'} closed=${settled.closedLoan}`,
       );
-      return { txnid, result: 'success' };
+      return { txnid: input.txnid, result: 'success' };
     } catch (error) {
       const code = error instanceof Error ? error.message : 'settle_failed';
       this.logger.error(
-        `[repay-callback] Settle failed loan=${loan.loanNumber} txnid=${txnid}: ${code}`,
+        `[${input.logPrefix}] Settle failed loan=${input.loan.loanNumber} txnid=${input.txnid}: ${code}`,
       );
       return {
-        txnid,
+        txnid: input.txnid,
         result: 'error',
         code: code === 'settle_in_progress' ? 'settle_in_progress' : 'settle_failed',
       };
@@ -330,7 +519,8 @@ export class HandleEasebuzzRepaymentCallbackUseCase {
     return `${portalBase}/my-account?${q.toString()}`;
   }
 
-  private checkLoanBinding(
+  /** Original Pay Now UDF binding: udf1=loan UUID, udf2=application UUID, udf3=loan number. */
+  private checkPayNowLoanBinding(
     fields: Record<string, string>,
     loan: {
       uuid: string;

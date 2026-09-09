@@ -23,15 +23,51 @@ export class EasebuzzRepaymentWebhookController {
   ) {}
 
   /**
-   * Easebuzz Pay server-to-server notify URL.
+   * Easebuzz Pay Now server-to-server notify URL (original).
    * Easebuzz calls the public customer origin (not api.moneycash.in):
    *   https://moneycash.in/api/webhooks/easebuzz/repayment
    * Customer Next forwards the same payload to Nest /api/webhooks/easebuzz/repayment.
+   * EasyCollect payloads posted here are also accepted.
    */
   @All('repayment')
   @HttpCode(200)
   @ApiOperation({ summary: 'Easebuzz Pay webhook — settle repayment without a browser redirect' })
   async handle(@Req() req: Request, @Res() res: Response): Promise<void> {
+    await this.respond(req, res, {
+      requestPath: '/api/webhooks/easebuzz/repayment',
+      serviceName: 'pay-webhook',
+      execute: (payload) => this.callback.executeWebhook(payload),
+    });
+  }
+
+  /**
+   * Easebuzz EasyCollect server-to-server notify URL (dashboard / SMS payment links).
+   *   https://moneycash.in/api/webhooks/easebuzz/easycollect
+   * Does not replace /webhooks/easebuzz/repayment — configure this separately in Easebuzz.
+   */
+  @All('easycollect')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Easebuzz EasyCollect webhook — settle collection-link repayments' })
+  async handleEasyCollect(@Req() req: Request, @Res() res: Response): Promise<void> {
+    await this.respond(req, res, {
+      requestPath: '/api/webhooks/easebuzz/easycollect',
+      serviceName: 'easycollect-webhook',
+      execute: (payload) => this.callback.executeEasyCollectWebhook(payload),
+    });
+  }
+
+  private async respond(
+    req: Request,
+    res: Response,
+    opts: {
+      requestPath: string;
+      serviceName: string;
+      execute: (payload: Record<string, unknown>) => Promise<{
+        httpStatus: number;
+        body: Record<string, unknown>;
+      }>;
+    },
+  ): Promise<void> {
     const requestedAt = new Date();
     const payload = mergeCallbackPayload(req);
     const method = (req.method ?? 'POST').toUpperCase() as VendorHttpMethod;
@@ -39,7 +75,7 @@ export class EasebuzzRepaymentWebhookController {
     let body: Record<string, unknown> = { ok: false, result: 'error', code: 'unhandled' };
 
     try {
-      const out = await this.callback.executeWebhook(payload);
+      const out = await opts.execute(payload);
       httpStatus = out.httpStatus;
       body = out.body;
     } catch (error) {
@@ -51,16 +87,18 @@ export class EasebuzzRepaymentWebhookController {
         message: error instanceof Error ? error.message : 'webhook_failed',
       };
       this.logger.error(
-        `[repay-webhook] Unhandled error: ${error instanceof Error ? error.message : String(error)}`,
+        `[repay-webhook] Unhandled error path=${opts.requestPath}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
         error instanceof Error ? error.stack : undefined,
       );
     }
 
     await this.vendorApi.auditOutboundCall({
       providerName: 'Easebuzz',
-      serviceName: 'pay-webhook',
+      serviceName: opts.serviceName,
       requestMethod: method === 'GET' || method === 'POST' ? method : 'POST',
-      requestPath: '/api/webhooks/easebuzz/repayment',
+      requestPath: opts.requestPath,
       requestPayload: payload,
       responsePayload: body,
       httpStatus,

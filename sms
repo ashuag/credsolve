@@ -1,0 +1,80 @@
+curl --location 'https://api.onexaura.com/oapi/send_sms' \
+
+--header 'apikey: LrnfWcXi' \
+
+--header 'Content-Type: application/json' \
+
+--header 'Authorization: Basic SUNJQ0lfUHJ1ZGVudGlhbF9BTUNfTGltaXRlZDoxbjRpNEFmUQ==' \
+
+--data '{
+
+"sms": [
+
+{
+
+"sender": "CREDPT",
+
+"recipient": "8882911939",
+
+"type": "SI",
+
+"messageBody": "Dear Customer, Your MoneyCash login OTP is 123456. Enter it to complete sign-in. Valid for 30 seconds. Do not share this code. Regards, MoneyCash",
+
+"unicode": 0, 
+
+"custRef1": "CustomReference1"
+
+}
+
+]
+
+}
+
+'
+
+
+https://onexaura.com
+ 
+Username: Moneycash
+password: Welcome@123#
+Sign In
+ 
+curl --location 'https://api.onexaura.com/oapi/send_sms' \
+
+--header 'apikey: XXXXX' \
+
+--header 'Content-Type: application/json' \
+
+--header 'Authorization: Basic SUNJQ0lfUHJ1ZGVudGlhbF9BTUNfTGltaXRlZDoxbjRpNEFmUQ==' \
+
+--data '{
+
+"sms": [
+
+{
+
+"sender": "sender_id",
+
+"recipient": "880044XXXX",
+
+"type": "SI",
+
+"messageBody": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+
+"unicode": 0, 
+
+"custRef1": "CustomReference1"
+
+}
+
+]
+
+}
+
+'
+ 
+1302157493670013444
+ 
+ niharika.chandra@onextel.com
+ 
+ 

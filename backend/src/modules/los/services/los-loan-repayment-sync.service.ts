@@ -73,7 +73,7 @@ function txnidFromPayInitiatePayload(
 ): { txnid: string; amount: string | null; udf1: string | null } | null {
   const row = asRecord(payload);
   if (!row) return null;
-  const txnid = pickPayloadString(row.txnid, row.txnId)?.slice(0, 40) ?? null;
+  const txnid = pickPayloadString(row.txnid, row.txnId, row.merchant_txn)?.slice(0, 40) ?? null;
   if (!txnid) return null;
   return {
     txnid,
@@ -112,7 +112,7 @@ export class LosLoanRepaymentSyncService {
 
     const leadIds = [...new Set(open.map((loan) => loan.application.lead.id))];
     const logs = await this.prisma.read.vendorApiLog.findMany({
-      where: { leadId: { in: leadIds }, serviceName: 'pay-initiate-link' },
+      where: { leadId: { in: leadIds }, serviceName: { in: ['pay-initiate-link', 'easycollect-create'] } },
       select: { leadId: true, requestPayload: true },
     });
 
@@ -151,7 +151,9 @@ export class LosLoanRepaymentSyncService {
       const initiated = logsByLead.get(loan.application.lead.id.toString()) ?? [];
       const pending = initiated.some((item) => {
         if (success.has(item.txnid)) return false;
-        if (item.udf1 && item.udf1 !== loan.uuid) return false;
+        if (item.udf1 && item.udf1 !== loan.uuid && item.udf1.toUpperCase() !== compact.toUpperCase()) {
+          return false;
+        }
         if (compact && !item.txnid.startsWith(compact)) return false;
         return true;
       });
@@ -470,7 +472,7 @@ export class LosLoanRepaymentSyncService {
     const add = (txnid: string | null | undefined, amount: string | null, udf1?: string | null) => {
       const id = txnid?.trim().slice(0, 40);
       if (!id) return;
-      if (udf1 && udf1 !== input.loanUuid) return;
+      if (udf1 && udf1 !== input.loanUuid && udf1.toUpperCase() !== input.loanNumber.toUpperCase()) return;
       if (compact && !id.startsWith(compact)) return;
       if (!seen.has(id) || (!seen.get(id) && amount)) seen.set(id, amount);
     };
@@ -481,7 +483,7 @@ export class LosLoanRepaymentSyncService {
       }
     } else {
       const logs = await this.prisma.read.vendorApiLog.findMany({
-        where: { leadId: input.leadId, serviceName: 'pay-initiate-link' },
+        where: { leadId: input.leadId, serviceName: { in: ['pay-initiate-link', 'easycollect-create'] } },
         orderBy: { requestedAt: 'asc' },
         take: 40,
         select: { requestPayload: true },
@@ -495,6 +497,9 @@ export class LosLoanRepaymentSyncService {
         add(txnid, null);
       }
     }
+
+    // EasyCollect from the Easebuzz dashboard uses merchant_txn = loan / application number.
+    add(input.loanNumber, null);
 
     const repaymentRefs = await this.prisma.read.$queryRaw<
       Array<{ vendor_ref: string | null; amount: unknown; status: string }>

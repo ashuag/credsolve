@@ -174,9 +174,9 @@ export class LosDataController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(LosDenyAgentGuard)
   @ApiOperation({
-    summary: 'Refresh Easebuzz repayment status for a loan with an initiated payment link',
+    summary: 'Refresh Easebuzz repayment status for an open loan',
     description:
-      'When a Pay Now link was started but the callback did not update the loan, retrieves Transaction V2.1 status and records a successful repayment (closes the loan when remaining is zero).',
+      'Retrieves Easebuzz Transaction V2.1 status for Pay Now and EasyCollect txnids (including the loan/application number) and records a successful repayment (closes the loan when remaining is zero).',
   })
   refreshLoanPayment(@Param('loanUuid') loanUuid: string) {
     return this.losLoanRepaymentSync.refreshPayment(loanUuid);

@@ -16,6 +16,9 @@ export const APPLICATION_NUMBER_LENGTH = 12;
 export const APPLICATION_NUMBER_MAX_LENGTH = APPLICATION_NUMBER_LENGTH;
 
 const SUFFIX_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const APPLICATION_NUMBER_PATTERN = new RegExp(
+  `^${APPLICATION_NUMBER_PREFIX}\\d{4}[A-HJ-NP-Z2-9]{${APPLICATION_NUMBER_SUFFIX_LENGTH}}$`,
+);
 
 function randomSuffix(length: number): string {
   const bytes = randomBytes(length);
@@ -41,6 +44,11 @@ export function generateApplicationNumber(now: Date = new Date()): string {
 /** Same generator as {@link generateApplicationNumber}; allocated on `lead.lead_id`. */
 export function generateLeadNumber(now: Date = new Date()): string {
   return generateApplicationNumber(now);
+}
+
+/** True when the value is a public journey ID (`APP` + year + 5 chars). */
+export function isApplicationNumber(value: string): boolean {
+  return APPLICATION_NUMBER_PATTERN.test(value.trim().toUpperCase());
 }
 
 /**

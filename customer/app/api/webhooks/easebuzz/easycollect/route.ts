@@ -6,18 +6,17 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
 /**
- * Easebuzz Pay Now webhook (public — do not use api.moneycash.in):
- *   https://moneycash.in/api/webhooks/easebuzz/repayment
- *
- * EasyCollect (dashboard / SMS links) has a separate URL:
+ * Easebuzz EasyCollect webhook (public — do not use api.moneycash.in):
  *   https://moneycash.in/api/webhooks/easebuzz/easycollect
  *
+ * Separate from Pay Now:
+ *   https://moneycash.in/api/webhooks/easebuzz/repayment
+ *
  * Forwards the same method, query, headers, and body to Nest
- * `{API_SERVER_URL}/webhooks/easebuzz/repayment` (Docker: backend:4001;
- * prod: private api.moneycash.in / backend).
+ * `{API_SERVER_URL}/webhooks/easebuzz/easycollect`.
  */
 async function handle(request: NextRequest) {
-  return proxyCustomerApiRequest(request, ['webhooks', 'easebuzz', 'repayment'], {
+  return proxyCustomerApiRequest(request, ['webhooks', 'easebuzz', 'easycollect'], {
     timeoutMs: 90_000,
   });
 }

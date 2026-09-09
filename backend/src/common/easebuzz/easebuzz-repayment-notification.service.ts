@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 
-export type EasebuzzNotificationSource = 'webhook' | 'surl' | 'furl';
+export type EasebuzzNotificationSource = 'webhook' | 'surl' | 'furl' | 'easycollect';
 
 function asField(payload: Record<string, unknown>, key: string): string {
   const value = payload[key];

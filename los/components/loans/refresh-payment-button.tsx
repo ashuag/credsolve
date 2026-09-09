@@ -33,7 +33,7 @@ export function RefreshPaymentButton({
       type="button"
       disabled={busy}
       className={BUTTON_CLASS}
-      title="Payment link was initiated. Fetch the latest status from Easebuzz and update this loan."
+      title="Fetch the latest status from Easebuzz and record the repayment if it is already paid."
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
