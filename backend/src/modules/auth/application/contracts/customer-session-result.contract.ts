@@ -43,11 +43,14 @@ export type CustomerPortalJourneySnapshot = {
   referencesCompleted: boolean;
   /** Customer has provided bank details on `application_detail`. */
   bankDetailsCompleted: boolean;
-  /** Penny-drop succeeded but bank vs customer name is waiting for credit approval. */
+  /**
+   * Penny-drop succeeded but bank vs customer name is waiting for credit approval.
+   * The customer can still finish references / eSign; thank-you stays under review.
+   */
   bankNameReviewPending: boolean;
   /**
-   * Penny-drop retries were exhausted (application PENNYDROP_FAILED).
-   * The customer can still finish references / eSign; a representative will call.
+   * Penny-drop retries were exhausted, or bank vs customer name is pending credit review.
+   * The customer can still finish references / eSign; thank-you shows a representative will call.
    */
   bankVerificationFailed: boolean;
 };

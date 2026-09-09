@@ -373,14 +373,14 @@ export class GetCustomerSessionUseCase {
       statusNote: applicationExtras?.applicationStatusNote,
     });
     const bankDetailsCompleted = Boolean(
-      appDetails?.bankAccountNumber?.trim() && appDetails?.ifscCode?.trim() && !bankNameReviewPending,
+      appDetails?.bankAccountNumber?.trim() && appDetails?.ifscCode?.trim(),
     );
     const pennyDropRetryCount = await this.settings.loadPennyDropRetryCount();
     const pennyDropAttempts = applicationExtras?.details?.pennyDropAttempts ?? 0;
     const bankVerificationFailed =
+      bankNameReviewPending ||
       applicationStatusName === APPLICATION_STATUS.PENNYDROP_FAILED ||
       (!bankDetailsCompleted &&
-        !bankNameReviewPending &&
         pennyDropRetryCount > 0 &&
         pennyDropAttempts >= pennyDropRetryCount);
 

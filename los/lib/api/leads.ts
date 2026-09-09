@@ -210,12 +210,25 @@ export type LosMoneyCashFaceMatch = {
     detectionScore: number | null;
     imageWidth: number;
     imageHeight: number;
+    childLikeness?: number | null;
+    ageBand?: string | null;
+    estimatedAge?: number | null;
+    gender?: 'male' | 'female' | null;
   } | null;
   probe: {
     faceDetected: boolean;
     detectionScore: number | null;
     imageWidth: number;
     imageHeight: number;
+    childLikeness?: number | null;
+    ageBand?: string | null;
+    estimatedAge?: number | null;
+    gender?: 'male' | 'female' | null;
+  } | null;
+  checks?: {
+    descriptor?: { passed?: boolean; strength?: string };
+    geometry?: { passed?: boolean; applied?: boolean; reason?: string };
+    ageEstimate?: { passed?: boolean; applied?: boolean; reason?: string };
   } | null;
 };
 

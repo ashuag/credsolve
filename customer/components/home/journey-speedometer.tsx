@@ -172,22 +172,26 @@ export function JourneySpeedometer({ compact = false }: { compact?: boolean }) {
       {compact ? null : (
       <div className="flex max-w-full flex-wrap items-start justify-center gap-x-3 gap-y-2 px-1 pt-0.5 sm:gap-x-3 sm:px-2">
         {JOURNEY_STEPS.map((step, i) => {
-          const done = i < stepIndex;
-          const active = i === stepIndex;
+          const stepState = journey.steps[i]?.state;
+          const failed = stepState === 'failed';
+          const done = !failed && (stepState === 'done' || i < stepIndex);
+          const active = !failed && i === stepIndex;
           return (
             <div key={step} className="flex flex-col items-center gap-1">
               <div
                 className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${
-                  done
-                    ? 'bg-green-400'
-                    : active
-                      ? 'bg-yellow-400 ring-2 ring-yellow-300/40 scale-125'
-                      : 'bg-white/20'
+                  failed
+                    ? 'bg-red-400'
+                    : done
+                      ? 'bg-green-400'
+                      : active
+                        ? 'bg-yellow-400 ring-2 ring-yellow-300/40 scale-125'
+                        : 'bg-white/20'
                 }`}
               />
               <span
                 className={`text-[0.45rem] sm:text-[0.5rem] font-[800] uppercase tracking-wide leading-[1.1] text-center max-[380px]:max-w-[52px] ${
-                  active ? 'text-yellow-300' : done ? 'text-green-300' : 'text-white/30'
+                  failed ? 'text-red-300' : active ? 'text-yellow-300' : done ? 'text-green-300' : 'text-white/30'
                 }`}
               >
                 {step}

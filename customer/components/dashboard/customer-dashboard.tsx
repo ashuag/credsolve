@@ -77,6 +77,14 @@ function CheckIcon() {
   );
 }
 
+function CrossIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
+      <path d="M6 6l8 8M14 6l-8 8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function JourneyTracker({
   steps,
   completed,
@@ -104,6 +112,7 @@ function JourneyTracker({
       <ol className="flex items-start justify-between gap-0.5 sm:gap-1">
         {steps.map((step) => {
           const done = step.state === 'done';
+          const failed = step.state === 'failed';
           const current = step.state === 'current';
           const stepNumber =
             CUSTOMER_JOURNEY_PROGRESS_STEPS.findIndex((s) => s.key === step.key) + 1;
@@ -112,20 +121,22 @@ function JourneyTracker({
               <span
                 className={cn(
                   'flex h-7 w-7 items-center justify-center rounded-full text-[0.62rem] font-black ring-2 transition-colors',
-                  done
-                    ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 text-white ring-emerald-200'
-                    : current
-                      ? 'animate-ring-pop bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-[#12244f] ring-[#ffc519]/40'
-                      : 'bg-white text-slate-400 ring-slate-200'
+                  failed
+                    ? 'bg-gradient-to-br from-red-400 to-red-600 text-white ring-red-200'
+                    : done
+                      ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 text-white ring-emerald-200'
+                      : current
+                        ? 'animate-ring-pop bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-[#12244f] ring-[#ffc519]/40'
+                        : 'bg-white text-slate-400 ring-slate-200'
                 )}
                 aria-current={current ? 'step' : undefined}
               >
-                {done ? <CheckIcon /> : stepNumber}
+                {failed ? <CrossIcon /> : done ? <CheckIcon /> : stepNumber}
               </span>
               <span
                 className={cn(
                   'truncate text-[0.55rem] font-bold uppercase tracking-wider sm:text-[0.62rem]',
-                  done ? 'text-emerald-700' : current ? 'text-brand-navy' : 'text-slate-400'
+                  failed ? 'text-red-700' : done ? 'text-emerald-700' : current ? 'text-brand-navy' : 'text-slate-400'
                 )}
               >
                 {step.shortLabel}

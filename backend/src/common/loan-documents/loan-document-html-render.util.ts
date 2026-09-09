@@ -98,13 +98,14 @@ export function loanDocumentTemplatesDir(): string {
 /**
  * `sanction-kfs` — Sanction Letter + KFS (Sections A+B), the document the customer reviews
  *   and eSigns in-app. `commercial-terms` — Loan cum Commercial Terms (Section C) alone,
- *   generated only to attach to the sanction-letter email.
+ *   generated only to attach to the post-acceptance sanction-letter email.
+ * `disbursement` — A+B (+ acceptance) + C in one PDF, emailed at disbursement.
  */
-export type LoanDocumentRenderSection = 'sanction-kfs' | 'commercial-terms';
+export type LoanDocumentRenderSection = 'sanction-kfs' | 'commercial-terms' | 'disbursement';
 
 export type LoanDocumentRenderOptions = {
   section?: LoanDocumentRenderSection;
-  /** Include the borrower eSign / NBFC DSC block. Only meaningful for `sanction-kfs`; set once acceptance has happened. */
+  /** Include the borrower eSign / NBFC DSC block. Set once acceptance has happened. */
   includeAcceptanceBlock?: boolean;
   /** Extra CSS for in-app mobile/desktop reading (not used when printing to PDF). */
   onScreenPreview?: boolean;
@@ -132,7 +133,9 @@ export async function renderLoanDocumentHtml(
     html = removeSectionById(html, 'sec-b');
     html = removeSectionById(html, 'sec-close');
   } else {
-    html = removeSectionById(html, 'sec-c');
+    if (section !== 'disbursement') {
+      html = removeSectionById(html, 'sec-c');
+    }
     if (!options.includeAcceptanceBlock) {
       html = removeSectionById(html, 'sec-close');
     }

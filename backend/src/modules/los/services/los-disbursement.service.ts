@@ -12,7 +12,6 @@ import {
 } from '../../../common/constants/application.constants';
 import { isBankNameMatchReviewPending } from '../../../common/constants/bank.constants';
 import {
-  LOAN_COMMERCIAL_TERMS_PDF_FILENAME,
   LOAN_DOCUMENT_PDF_FILES,
   LOAN_DOCUMENT_TYPE,
 } from '../../../common/constants/loan-document.constants';
@@ -712,7 +711,7 @@ export class LosDisbursementService {
         loanAgreementPdfRelativePath: application.details?.loanAgreementPdfRelativePath ?? null,
       });
 
-      // Revised sanction letter at disbursement — keep acceptance PDF untouched; never overwrite prior disbursement PDF.
+      // Revised sanction letter + commercial terms at disbursement — keep acceptance PDF untouched; never overwrite prior disbursement PDF.
       const rel = await this.loanDocs.ensurePdf(
         LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT,
         application.customer.uuid,
@@ -733,14 +732,10 @@ export class LosDisbursementService {
       }
 
       const content = await this.kycFiles.readBytes(rel);
-      const commercialTerms = await this.loanDocs.generateCommercialTermsPdf(merge);
 
       await this.emailService.sendFinalSanctionLetterEmail(
         email,
-        [
-          { filename: LOAN_DOCUMENT_PDF_FILES[LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT], content },
-          { filename: LOAN_COMMERCIAL_TERMS_PDF_FILENAME, content: commercialTerms },
-        ],
+        [{ filename: LOAN_DOCUMENT_PDF_FILES[LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT], content }],
         { leadId: application.leadId },
       );
       this.logger.log(

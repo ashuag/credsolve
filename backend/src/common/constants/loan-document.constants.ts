@@ -45,7 +45,7 @@ export const LOAN_DOCUMENT_HTML_TEMPLATE = 'MoneyCash_Loan_Document.html';
 
 export const LOAN_DOCUMENT_TYPE = {
   KEY_FACT: 'key-fact',
-  /** Revised sanction letter generated at disbursement (separate from customer acceptance copy). */
+  /** Revised sanction letter + commercial terms generated at disbursement (separate from customer acceptance copy). */
   KEY_FACT_DISBURSEMENT: 'key-fact-disbursement',
   LOAN_AGREEMENT: 'loan-agreement',
 } as const;
@@ -71,5 +71,5 @@ export const LOAN_DOCUMENT_PDF_FILES: Record<LoanDocumentType, string> = {
   [LOAN_DOCUMENT_TYPE.LOAN_AGREEMENT]: 'loan-agreement.pdf',
 };
 
-/** Loan cum Commercial Terms — emailed alongside the sanction letter, not persisted separately. */
+/** Loan cum Commercial Terms — emailed alongside the post-acceptance sanction letter only. At disbursement it is merged into the KFS PDF. */
 export const LOAN_COMMERCIAL_TERMS_PDF_FILENAME = 'loan-cum-commercial-terms.pdf';

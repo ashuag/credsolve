@@ -91,9 +91,9 @@ export type CustomerSessionResponse =
         kycCompleted: boolean;
         referencesCompleted: boolean;
         bankDetailsCompleted: boolean;
-        /** Penny-drop succeeded but name match is waiting for credit approval. */
+        /** Penny-drop succeeded but name match is waiting for credit; journey continues to references / thank-you. */
         bankNameReviewPending?: boolean;
-        /** Penny-drop retries exhausted — finish references / eSign; a representative will call. */
+        /** Penny-drop failed or bank name mismatch — finish references / eSign; a representative will call. */
         bankVerificationFailed?: boolean;
       };
       /** Post-BRE pre-approved ceiling; set after bureau pass. */
@@ -121,12 +121,16 @@ export function isBankVerificationRetryExhausted(
   return progress.retryLimitReached === true;
 }
 
-/** Bank step is done for routing: verified account, or penny-drop failed and they may continue. */
+/** Bank step is done for routing: verified account, name-match review, or penny-drop failed. */
 export function isBankStepDoneForJourney(
   session: CustomerSessionResponse | null | undefined,
 ): boolean {
   if (!session?.authenticated) return false;
-  return session.journey.bankDetailsCompleted || isBankVerificationRetryExhausted(session);
+  return (
+    session.journey.bankDetailsCompleted ||
+    session.journey.bankNameReviewPending === true ||
+    isBankVerificationRetryExhausted(session)
+  );
 }
 
 /** Email entry + OTP during the loan journey (after loan selection). */

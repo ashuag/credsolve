@@ -1,4 +1,4 @@
-import { isBankStepDoneForJourney, type CustomerSessionResponse } from '@/lib/api/customer-session';
+import { isBankVerificationRetryExhausted, type CustomerSessionResponse } from '@/lib/api/customer-session';
 import { isLoanDocumentsJourneyComplete } from '@/lib/loan-documents-journey';
 
 /**
@@ -25,7 +25,7 @@ export const CUSTOMER_JOURNEY_PROGRESS_STEPS = [
 export type CustomerJourneyProgressStepKey =
   (typeof CUSTOMER_JOURNEY_PROGRESS_STEPS)[number]['key'];
 
-export type CustomerJourneyStepState = 'done' | 'current' | 'todo';
+export type CustomerJourneyStepState = 'done' | 'current' | 'todo' | 'failed';
 
 export type CustomerJourneyProgressStep = {
   key: CustomerJourneyProgressStepKey;
@@ -93,7 +93,10 @@ function completionFlags(
     letter: isLoanDocumentsJourneyComplete(session),
     digilockerKyc: isCustomerDigilockerKycStepDone(session),
     livenessKyc: isCustomerLivenessKycStepDone(session),
-    bank: Boolean(j?.bankDetailsCompleted || (authed && isBankStepDoneForJourney(session))),
+    bank: Boolean(
+      (j?.bankDetailsCompleted && !j?.bankNameReviewPending) ||
+        (authed && isBankVerificationRetryExhausted(session)),
+    ),
     references: Boolean(j?.referencesCompleted),
     esign: Boolean(j?.loanDocumentsAccepted),
   };
@@ -105,10 +108,16 @@ export function buildCustomerJourneyProgress(
 ): CustomerJourneyProgress {
   const total = CUSTOMER_JOURNEY_PROGRESS_STEPS.length;
   const flags = completionFlags(session);
+  const nameReviewFailed = Boolean(
+    session && session.authenticated === true && session.journey.bankNameReviewPending,
+  );
 
   let foundCurrent = false;
   let completed = 0;
   const steps: CustomerJourneyProgressStep[] = CUSTOMER_JOURNEY_PROGRESS_STEPS.map((s) => {
+    if (s.key === 'bank' && nameReviewFailed) {
+      return { ...s, state: 'failed' as const };
+    }
     if (flags[s.key]) {
       completed += 1;
       return { ...s, state: 'done' as const };

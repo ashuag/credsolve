@@ -394,8 +394,8 @@ export function ReviewLoanPanel({
                 </svg>
               </span>
               <div>
-                <div className="doc-name">Sanction letter cum KFS (disbursement)</div>
-                <div className="doc-sub">Revised final copy generated at disbursement</div>
+                <div className="doc-name">Sanction letter cum KFS + commercial terms (disbursement)</div>
+                <div className="doc-sub">Revised final copy with loan cum commercial terms, generated at disbursement</div>
               </div>
               <div className="doc-actions">
                 {row.loanDocuments.keyFactDisbursementEsigned ? <span className="badge signed">✓ E-signed</span> : null}

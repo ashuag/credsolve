@@ -43,7 +43,9 @@ function ThankYouContent() {
   }
 
   const bankVerificationFailed =
-    session?.authenticated === true && session.journey.bankVerificationFailed === true;
+    session?.authenticated === true &&
+    (session.journey.bankVerificationFailed === true ||
+      session.journey.bankNameReviewPending === true);
 
   const journeyPanel = (
     <div className="h-full flex flex-col justify-center">

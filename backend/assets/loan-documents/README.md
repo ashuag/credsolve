@@ -22,6 +22,7 @@ With `SPACES_KEY_PREFIX=local`, objects live under `mcashin/local/customer/...` 
 3. `pdf-lib` rewrites the PDF with classic xref tables (required by `node-signpdf`).
 4. On **contract execution** (customer OTP acceptance), `LoanDocumentDigitalSignerService` applies the NBFC (RE) **IT Act digital signature** via PKCS#7 using `CRESAI_PFX_FILE` + password. Pre-acceptance previews are generated **without** the NBFC certificate.
 5. PDF bytes are uploaded to Spaces/local storage; `application.key_fact_esigned` is updated; the signed PDF is emailed to the borrower.
+6. At **disbursement**, a new PDF is generated that includes Sections A+B (KFS) **and** Section C (Loan cum Commercial Terms) in one file, then signed and emailed as a single attachment. The customer in-app journey still shows only the KFS (Sections A+B).
 
 ### Two kinds of “signature”
 

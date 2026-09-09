@@ -119,7 +119,7 @@ export class SubmitVerifiedBankUseCase {
         pennyDropOk: true,
         applicationStatus: APPLICATION_STATUS.IN_REVIEW,
         message:
-          'Your bank account is under credit review. You can continue once credit approves the name match.',
+          'Your bank account is under credit review. Continue with references while credit reviews the name match.',
         vendor: null,
         attemptsUsed: applicationRow.details?.pennyDropAttempts ?? 0,
         attemptsAllowed,
@@ -386,7 +386,7 @@ export class SubmitVerifiedBankUseCase {
       pennyDropOk: true,
       applicationStatus: APPLICATION_STATUS.IN_REVIEW,
       message:
-        'Your bank account was verified, but the account name needs a credit review before you can continue.',
+        'Your bank account was verified. Continue with references while credit reviews the account name.',
       vendor: params.vendor,
       attemptsUsed: params.attemptsUsed,
       attemptsAllowed: params.attemptsAllowed,

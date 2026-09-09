@@ -110,7 +110,30 @@ export function KycFaceMatchResultCard({
   );
 }
 
+function formatAgeBand(value: string | null | undefined): string {
+  if (!value) return '—';
+  return value;
+}
+
+function formatLikeness(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return '—';
+  return value.toFixed(2);
+}
+
+function formatEstimatedAge(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return '—';
+  return `~${Math.round(value)}y`;
+}
+
+function checkTone(passed: boolean | undefined, applied?: boolean): 'ok' | 'bad' | undefined {
+  if (applied === false) return undefined;
+  if (passed === true) return 'ok';
+  if (passed === false) return 'bad';
+  return undefined;
+}
+
 export function buildLocalFaceMatchExtraRows(local: KycFaceMatchLocalResult) {
+  const checks = local.checks;
   return [
     {
       label: 'Reference face detected',
@@ -172,6 +195,59 @@ export function buildLocalFaceMatchExtraRows(local: KycFaceMatchLocalResult) {
     {
       label: 'Max distance threshold',
       value: local.maxDistanceThreshold.toFixed(2),
+    },
+    {
+      label: 'Match strength',
+      value: checks?.descriptor.strength ?? '—',
+      tone:
+        checks?.descriptor.strength === 'strong'
+          ? ('ok' as const)
+          : checks?.descriptor.strength === 'fail'
+            ? ('bad' as const)
+            : undefined,
+    },
+    {
+      label: 'Descriptor check',
+      value: checks ? (checks.descriptor.passed ? 'Pass' : 'Fail') : '—',
+      tone: checkTone(checks?.descriptor.passed),
+    },
+    {
+      label: 'Proportion check',
+      value: !checks
+        ? '—'
+        : !checks.geometry.applied
+          ? 'Skipped'
+          : checks.geometry.passed
+            ? 'Pass'
+            : `Fail (${checks.geometry.reason ?? 'child vs adult'})`,
+      tone: checkTone(checks?.geometry.passed, checks?.geometry.applied),
+    },
+    {
+      label: 'Age-band check',
+      value: !checks
+        ? '—'
+        : !checks.ageEstimate.applied
+          ? 'Skipped'
+          : checks.ageEstimate.passed
+            ? 'Pass'
+            : `Fail (${checks.ageEstimate.reason ?? 'child vs adult'})`,
+      tone: checkTone(checks?.ageEstimate.passed, checks?.ageEstimate.applied),
+    },
+    {
+      label: 'Aadhaar age / band',
+      value: `${formatEstimatedAge(local.reference.estimatedAge)} · ${formatAgeBand(local.reference.ageBand)}`,
+    },
+    {
+      label: 'Selfie age / band',
+      value: `${formatEstimatedAge(local.probe.estimatedAge)} · ${formatAgeBand(local.probe.ageBand)}`,
+    },
+    {
+      label: 'Child-likeness (Aadhaar → selfie)',
+      value: `${formatLikeness(local.reference.childLikeness)} → ${formatLikeness(local.probe.childLikeness)}`,
+    },
+    {
+      label: 'Gender (advisory)',
+      value: `${local.reference.gender ?? '—'} → ${local.probe.gender ?? '—'}`,
     },
     {
       label: 'Faces match',

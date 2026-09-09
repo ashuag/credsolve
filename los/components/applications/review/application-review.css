@@ -656,6 +656,11 @@
   color: var(--ok);
 }
 
+.app-review .tab .cnt.bad {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+
 .app-review .ar-layout-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);

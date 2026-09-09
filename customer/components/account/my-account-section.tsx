@@ -155,6 +155,14 @@ function CheckIcon() {
   );
 }
 
+function CrossIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
+      <path d="M6 6l8 8M14 6l-8 8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function ShieldCheckIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -256,6 +264,7 @@ function JourneyTracker({ steps }: { steps: CustomerJourneyProgressStep[] }) {
     <ol className="m-0 list-none p-0">
       {steps.map((step, index) => {
         const done = step.state === 'done';
+        const failed = step.state === 'failed';
         const current = step.state === 'current';
         const last = index === steps.length - 1;
         const stepNumber =
@@ -266,15 +275,17 @@ function JourneyTracker({ steps }: { steps: CustomerJourneyProgressStep[] }) {
               <span
                 className={cn(
                   'relative z-[1] flex h-8 w-8 items-center justify-center rounded-full text-[0.72rem] font-black',
-                  done
-                    ? 'bg-emerald-500 text-white shadow-[0_6px_14px_rgba(16,185,129,0.28)]'
-                    : current
-                      ? 'bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-[#12244f] shadow-[0_8px_18px_rgba(246,180,0,0.38)] ring-4 ring-[#ffc519]/25'
-                      : 'bg-[#eef2f8] text-slate-400',
+                  failed
+                    ? 'bg-red-500 text-white shadow-[0_6px_14px_rgba(239,68,68,0.28)]'
+                    : done
+                      ? 'bg-emerald-500 text-white shadow-[0_6px_14px_rgba(16,185,129,0.28)]'
+                      : current
+                        ? 'bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-[#12244f] shadow-[0_8px_18px_rgba(246,180,0,0.38)] ring-4 ring-[#ffc519]/25'
+                        : 'bg-[#eef2f8] text-slate-400',
                 )}
                 aria-current={current ? 'step' : undefined}
               >
-                {done ? <CheckIcon /> : stepNumber}
+                {failed ? <CrossIcon /> : done ? <CheckIcon /> : stepNumber}
               </span>
               {!last ? (
                 <span
@@ -297,7 +308,7 @@ function JourneyTracker({ steps }: { steps: CustomerJourneyProgressStep[] }) {
               <p
                 className={cn(
                   'm-0 text-[0.92rem] font-extrabold leading-tight',
-                  done ? 'text-emerald-800' : current ? 'text-brand-navy' : 'text-slate-500',
+                  failed ? 'text-red-700' : done ? 'text-emerald-800' : current ? 'text-brand-navy' : 'text-slate-500',
                 )}
               >
                 {step.label}

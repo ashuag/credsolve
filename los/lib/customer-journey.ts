@@ -225,7 +225,7 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
     letter: false,
     digilockerKyc: kycFailed && !aadhaarDone,
     livenessKyc: kycFailed && aadhaarDone && (selfieDone || row.livenessAttempts > 0),
-    bank: bankFailed,
+    bank: bankFailed || nameReviewPending,
     refs: false,
     esign: false,
   } as const;

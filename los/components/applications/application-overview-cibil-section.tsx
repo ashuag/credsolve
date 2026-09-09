@@ -652,7 +652,7 @@ function LoanDetailsPanel({
           ) : null}
           {row.loanDocuments.keyFactDisbursementReady || row.statusCode === 'DISBURSED' || row.loanAccount ? (
             <LoanDocumentCard
-              label="Sanction letter cum KFS (disbursement)"
+              label="Sanction letter cum KFS + commercial terms (disbursement)"
               ready={row.loanDocuments.keyFactDisbursementReady}
               esigned={row.loanDocuments.keyFactDisbursementEsigned}
               docType="key-fact-disbursement"

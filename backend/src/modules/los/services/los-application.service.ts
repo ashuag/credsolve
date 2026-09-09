@@ -1418,8 +1418,8 @@ export class LosApplicationService {
         select: { id: true },
       })) != null;
 
-    // After customer acceptance (or once disbursed), mint a separate revised KFS as a NEW file —
-    // never replace the acceptance PDF or a prior disbursement PDF object.
+    // After customer acceptance (or once disbursed), mint a separate revised KFS + commercial
+    // terms pack as a NEW file — never replace the acceptance PDF or a prior disbursement PDF object.
     if (digitallySignAcceptance || isDisbursed) {
       const disbType = LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT;
       const disbExisting = this.loanDocs.relativePathForType(disbType, docCtx);

@@ -74,6 +74,7 @@ export function ApplicationReviewDashboard({
   const isRejected = isApplicationRecordRejected(row);
   const flags = useMemo(() => buildReviewFlags(row, bureauPan), [row, bureauPan]);
   const statusCode = row.statusCode.toUpperCase();
+  const nameReviewPending = Boolean(row.nameMatchPendingReview) || statusCode === 'UNDER_REVIEW';
   const journeyComplete =
     !isRejected &&
     journeySteps.length > 0 &&
@@ -176,8 +177,11 @@ export function ApplicationReviewDashboard({
     {
       id: 'bank',
       label: 'Bank details',
-      badge:
-        row.disbursement?.accountNumber?.trim() ? <span className="cnt ok">✓</span> : null,
+      badge: nameReviewPending ? (
+        <span className="cnt bad">✕</span>
+      ) : row.disbursement?.accountNumber?.trim() ? (
+        <span className="cnt ok">✓</span>
+      ) : null,
     },
     {
       id: 'refs',

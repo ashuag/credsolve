@@ -332,14 +332,14 @@ export class EmailService {
     const text = [
       'Good news — your MoneyCash loan has been disbursed.',
       '',
-      'Attached is your final Sanction letter cum Key Fact Statement for your records.',
+      'Attached is your final Sanction letter cum Key Fact Statement, including the Loan cum Commercial Terms, for your records.',
       '',
       'If you have any questions, please contact support.',
     ].join('\n');
 
     const html = `
       <p>Good news — your MoneyCash loan has been <strong>disbursed</strong>.</p>
-      <p>Attached is your final <strong>Sanction letter cum Key Fact Statement</strong> for your records.</p>
+      <p>Attached is your final <strong>Sanction letter cum Key Fact Statement</strong>, including the <strong>Loan cum Commercial Terms</strong>, for your records.</p>
       <p style="color:#555;font-size:0.85em;">If you have any questions, please contact support.</p>
     `.trim();
 
