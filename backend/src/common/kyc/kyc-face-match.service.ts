@@ -246,7 +246,9 @@ export class KycFaceMatchService implements OnModuleDestroy {
       .withFaceDescriptors();
     const detections = (this.ageGenderReady
       ? await (
-          withDescriptors as { withAgeAndGender: () => Promise<FaceApiDetectionWithDescriptor[]> }
+          withDescriptors as unknown as {
+            withAgeAndGender: () => PromiseLike<FaceApiDetectionWithDescriptor[]>;
+          }
         ).withAgeAndGender()
       : await withDescriptors) as FaceApiDetectionWithDescriptor[];
 
