@@ -3,12 +3,15 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { VendorApiService } from '../vendor-api.service';
 import {
   buildMyMoneyBazaarSoftPullBody,
-  defaultPlaceholderEmail,
+  isProviderEmail,
+  isProviderPincode,
+  joinAddressParts,
   type MyMoneyBazaarSoftPullBody,
 } from './build-mymoneybazaar-soft-pull-body';
 import { mapMyMoneyBazaarSoftPullToTenacioEnvelope } from './mymoneybazaar-cibil-to-tenacio.mapper';
 
-const DEFAULT_PLACEHOLDER_PINCODE = '560001';
+/** mymoneybazaarApi `CibilSoftPullDto` requires `address` `@MinLength(3)`. */
+const MIN_ADDRESS_LENGTH = 3;
 
 export type MyMoneyBazaarCibilInput = {
   mobileNumber: string;
@@ -24,8 +27,9 @@ export type MyMoneyBazaarCibilResult = {
   httpStatus: number | null;
   /**
    * Soft-pull response wrapped into the Tenacio bureau envelope — the keys
-   * downstream BRE rules / parsers expect. `null` only when not configured
-   * (or the lead has no DOB on file).
+   * downstream BRE rules / parsers expect. `null` only when the vendor is
+   * skipped (not configured, or the lead is missing DOB / email / pincode /
+   * address).
    */
   vendorBody: Record<string, unknown> | null;
   error?: Error;
@@ -36,16 +40,18 @@ export type MyMoneyBazaarCibilResult = {
  * merchant path), a selectable `cibil_fetch` vendor ("MyMoneyBazaar").
  *
  * Env: `MMB_CIBIL_URL` + `MMB_CIBIL_ACCESS_TOKEN` (required; sent as the
- * `x-access-token` header). Optional `MMB_CIBIL_PROVIDER`,
- * `MMB_CIBIL_PLACEHOLDER_EMAIL`, `MMB_CIBIL_PLACEHOLDER_PINCODE`.
+ * `x-access-token` header). Optional `MMB_CIBIL_PROVIDER`.
  *
  * Name / DOB / gender / email / pincode / address are read from `lead_detail`
  * (email / pincode / address are captured on the address step, which runs before
- * the PAN + bureau step); a format-valid placeholder is used only when a field
- * is still missing. Every live call is audited via {@link VendorApiService} →
- * `vendor_api_log` (raw soft-pull body stored there); the returned `vendorBody`
- * is the Tenacio-shaped wrapper so BRE rules and the CIBIL report PDF are
- * unaffected.
+ * the PAN + bureau step). The provider requires a valid email, 6-digit PIN and a
+ * non-empty address, so when any of those is missing the vendor is skipped
+ * (`configured: false`) and `BureauFetchService` falls through to the next
+ * `cibil_fetch` vendor — no placeholder data is sent to the bureau.
+ *
+ * Every live call is audited via {@link VendorApiService} → `vendor_api_log`
+ * (raw soft-pull body stored there); the returned `vendorBody` is the
+ * Tenacio-shaped wrapper so BRE rules and the CIBIL report PDF are unaffected.
  */
 @Injectable()
 export class MyMoneyBazaarCibilService {
@@ -65,17 +71,15 @@ export class MyMoneyBazaarCibilService {
     const providerName = (process.env.MMB_CIBIL_PROVIDER ?? 'MyMoneyBazaar').trim();
 
     if (!url || !token) {
-      const msg =
-        'MyMoneyBazaar CIBIL is not configured. Set MMB_CIBIL_URL (full /api/cibil/soft-pull URL) and MMB_CIBIL_ACCESS_TOKEN (x-access-token).';
-      this.logger.warn(msg);
-      return { configured: false, skipReason: msg, ok: false, httpStatus: null, vendorBody: null };
+      return this.skip(
+        'MyMoneyBazaar CIBIL is not configured. Set MMB_CIBIL_URL (full /api/cibil/soft-pull URL) and MMB_CIBIL_ACCESS_TOKEN (x-access-token).',
+      );
     }
 
     if (leadId == null) {
-      const msg =
-        'MyMoneyBazaar CIBIL requires a leadId to resolve name / DOB / email / address from lead_detail.';
-      this.logger.warn(msg);
-      return { configured: false, skipReason: msg, ok: false, httpStatus: null, vendorBody: null };
+      return this.skip(
+        'MyMoneyBazaar CIBIL requires a leadId to resolve name / DOB / email / address from lead_detail.',
+      );
     }
 
     const detail = await this.prisma.client.leadDetail.findUnique({
@@ -92,17 +96,21 @@ export class MyMoneyBazaarCibilService {
       },
     });
 
-    if (!detail?.dateOfBirth) {
-      const msg = `MyMoneyBazaar CIBIL skipped (leadId=${leadId.toString()}): no date_of_birth on lead_detail.`;
-      this.logger.warn(msg);
-      return { configured: false, skipReason: msg, ok: false, httpStatus: null, vendorBody: null };
-    }
+    const email = detail?.emailId?.trim() ?? '';
+    const pincode = detail?.pincode?.trim() ?? '';
+    const address = joinAddressParts([detail?.addressLine1, detail?.addressLine2, detail?.city?.name]);
 
-    const placeholderEmail =
-      (process.env.MMB_CIBIL_PLACEHOLDER_EMAIL ?? '').trim() ||
-      defaultPlaceholderEmail(input.mobileNumber);
-    const placeholderPincode =
-      (process.env.MMB_CIBIL_PLACEHOLDER_PINCODE ?? '').trim() || DEFAULT_PLACEHOLDER_PINCODE;
+    const missing: string[] = [];
+    if (!detail?.dateOfBirth) missing.push('date_of_birth');
+    if (!isProviderEmail(email)) missing.push('email_id');
+    if (!isProviderPincode(pincode)) missing.push('pincode');
+    if (address.length < MIN_ADDRESS_LENGTH) missing.push('address');
+
+    if (missing.length > 0 || !detail?.dateOfBirth) {
+      return this.skip(
+        `MyMoneyBazaar CIBIL skipped (leadId=${leadId.toString()}): missing/invalid ${missing.join(', ')} on lead_detail.`,
+      );
+    }
 
     const body = buildMyMoneyBazaarSoftPullBody({
       fullName: (detail.fullName ?? input.name).trim(),
@@ -110,16 +118,14 @@ export class MyMoneyBazaarCibilService {
       genderKey: detail.gender?.key ?? null,
       mobileNumber: input.mobileNumber,
       panNumber: input.panNumber,
-      email: detail.emailId,
-      pincode: detail.pincode,
-      addressParts: [detail.addressLine1, detail.addressLine2, detail.city?.name],
-      placeholderEmail,
-      placeholderPincode,
+      email,
+      pincode,
+      address,
     });
 
     this.logger.log(
       `MyMoneyBazaar CIBIL soft-pull (leadId=${leadId.toString()}) ` +
-        `email=${maskEmail(body.email)} pin=${body.pin_code} addressLen=${body.address.length}`,
+        `email=${maskEmail(body.email)} pin=${body.pin_code}`,
     );
 
     const result = await this.vendorApi.request<unknown, MyMoneyBazaarSoftPullBody>({
@@ -146,6 +152,11 @@ export class MyMoneyBazaarCibilService {
       vendorBody,
       error: result.error,
     };
+  }
+
+  private skip(skipReason: string): MyMoneyBazaarCibilResult {
+    this.logger.warn(skipReason);
+    return { configured: false, skipReason, ok: false, httpStatus: null, vendorBody: null };
   }
 }
 

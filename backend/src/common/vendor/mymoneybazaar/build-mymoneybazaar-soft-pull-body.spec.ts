@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   buildMyMoneyBazaarSoftPullBody,
-  defaultPlaceholderEmail,
   formatDobYmd,
+  isProviderEmail,
+  isProviderPincode,
+  joinAddressParts,
   mapGenderKeyToProvider,
-  resolveEmail,
   splitFullName,
 } from './build-mymoneybazaar-soft-pull-body';
 
@@ -43,68 +44,59 @@ describe('formatDobYmd', () => {
   });
 });
 
-describe('resolveEmail', () => {
-  it('keeps a real, well-formed email (lower-cased)', () => {
-    assert.equal(resolveEmail('Saurabh.Agarwal@Example.com', 'ph@moneycash.in'), 'saurabh.agarwal@example.com');
+describe('isProviderEmail', () => {
+  it('accepts a well-formed address', () => {
+    assert.equal(isProviderEmail('saurabh.agarwal@example.com'), true);
   });
-  it('falls back to the placeholder for a missing / malformed email', () => {
-    assert.equal(resolveEmail(null, 'ph@moneycash.in'), 'ph@moneycash.in');
-    assert.equal(resolveEmail('not-an-email', 'ph@moneycash.in'), 'ph@moneycash.in');
+  it('rejects blanks and malformed values', () => {
+    assert.equal(isProviderEmail(''), false);
+    assert.equal(isProviderEmail('not-an-email'), false);
   });
 });
 
-describe('defaultPlaceholderEmail', () => {
-  it('builds a valid-format synthetic email from the mobile', () => {
-    assert.equal(defaultPlaceholderEmail('8882911939'), 'noreply+8882911939@moneycash.in');
+describe('isProviderPincode', () => {
+  it('accepts a 6-digit PIN not starting with 0', () => {
+    assert.equal(isProviderPincode('122018'), true);
+  });
+  it('rejects other shapes', () => {
+    assert.equal(isProviderPincode('012345'), false);
+    assert.equal(isProviderPincode('12345'), false);
+    assert.equal(isProviderPincode(''), false);
+  });
+});
+
+describe('joinAddressParts', () => {
+  it('joins the non-empty parts with ", "', () => {
+    assert.equal(joinAddressParts(['12 MG Road', null, 'Gurgaon']), '12 MG Road, Gurgaon');
+  });
+  it('returns an empty string when nothing is present', () => {
+    assert.equal(joinAddressParts([null, undefined, '  ']), '');
   });
 });
 
 describe('buildMyMoneyBazaarSoftPullBody', () => {
-  const base = {
-    fullName: 'Saurabh Agarwal',
-    dateOfBirth: new Date('1986-08-01T00:00:00.000Z'),
-    genderKey: 'MALE',
-    mobileNumber: '8882911939',
-    panNumber: 'aqtap4652r',
-    email: 'saurabh@example.com',
-    pincode: '122018',
-    addressParts: ['12 MG Road', null, 'Gurgaon'],
-    placeholderEmail: 'noreply+8882911939@moneycash.in',
-    placeholderPincode: '560001',
-  };
-
-  it('builds the flat snake_case body from real lead_detail values', () => {
-    assert.deepEqual(buildMyMoneyBazaarSoftPullBody(base), {
-      first_name: 'Saurabh',
-      last_name: 'Agarwal',
-      dob: '1986-08-01',
-      gender: 'Male',
-      email: 'saurabh@example.com',
-      phone_number: '8882911939',
-      pan_card_number: 'AQTAP4652R',
-      address: '12 MG Road, Gurgaon',
-      pin_code: '122018',
-    });
-  });
-
-  it('falls back to placeholders when email / pincode / address are missing', () => {
+  it('builds the flat snake_case body from validated lead_detail values', () => {
     assert.deepEqual(
       buildMyMoneyBazaarSoftPullBody({
-        ...base,
-        email: null,
-        pincode: null,
-        addressParts: [null, undefined, ''],
+        fullName: 'Saurabh Agarwal',
+        dateOfBirth: new Date('1986-08-01T00:00:00.000Z'),
+        genderKey: 'MALE',
+        mobileNumber: '8882911939',
+        panNumber: 'aqtap4652r',
+        email: 'Saurabh@Example.com',
+        pincode: '122018',
+        address: '12 MG Road, Gurgaon',
       }),
       {
         first_name: 'Saurabh',
         last_name: 'Agarwal',
         dob: '1986-08-01',
         gender: 'Male',
-        email: 'noreply+8882911939@moneycash.in',
+        email: 'saurabh@example.com',
         phone_number: '8882911939',
         pan_card_number: 'AQTAP4652R',
-        address: 'Address not on file',
-        pin_code: '560001',
+        address: '12 MG Road, Gurgaon',
+        pin_code: '122018',
       },
     );
   });
