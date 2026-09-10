@@ -5,8 +5,12 @@
  *
  *   { success, request_uuid, status, http_status, data, error? }
  *
- * where `data` is the **raw** PayMe India CIBIL merchant response
- * (`{ status: true, data: { cibilData: <GetCustomerAssetsResponse/TrueLink>, html_url } }`).
+ * where `data` is the **raw** PayMe India CIBIL merchant response. In practice
+ * PayMe India returns a flat PaisaBazaar-family payload at `data.data`
+ * (`{ cibil: [...], loan_type: [...], repayment_loan_type: [...], addresses: [...] }`);
+ * `payme-india-cibil-to-truelink` re-keys that into a `TrueLinkCreditReport`.
+ * A pre-shaped TrueLink payload (`data.cibilData…`) is also accepted for
+ * forward-compat.
  *
  * All downstream consumers (post-BRE rules, tradeline exposure, the LOS report
  * PDF, score parsing) read the Tenacio / TrueLink shape:
@@ -14,11 +18,8 @@
  *   { status, serviceStatusCode, requestId,
  *     data.cibilData.GetCustomerAssetsResponse.GetCustomerAssetsSuccess
  *       .Asset.TrueLinkCreditReport.{Borrower, TradeLinePartition, …} }
- *
- * This maps the soft-pull payload into that shape so BRE rules and the report
- * renderer are untouched when the vendor is switched. Ported from
- * mymoneybazaarApi `cibil-merchant-to-tenacio.wrapper.ts`.
  */
+import { isPayMeIndiaFlatReport, payMeIndiaFlatToTrueLink } from './payme-india-cibil-to-truelink';
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   return v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -168,6 +169,36 @@ export type TenacioWrappedBureauBody = {
   serviceError?: { message: string };
 };
 
+/** Wrap a `TrueLinkCreditReport` object in the Tenacio `GetCustomerAssetsResponse` envelope. */
+function trueLinkSuccessEnvelope(
+  trueLinkCreditReport: Record<string, unknown>,
+  requestId: string | null,
+): TenacioWrappedBureauBody {
+  return {
+    status: 'success',
+    serviceStatusCode: 200,
+    requestId,
+    data: {
+      htmlUrl: null,
+      cibilData: {
+        GetCustomerAssetsResponse: {
+          ResponseStatus: 'Success',
+          GetCustomerAssetsSuccess: {
+            Asset: { Type: 'SingleCreditReport', TrueLinkCreditReport: trueLinkCreditReport },
+          },
+        },
+      },
+    },
+  };
+}
+
+/** Candidate inner payloads to inspect for the PayMe India flat report. */
+function flatReportCandidates(softPullData: unknown): unknown[] {
+  const d = asRecord(softPullData);
+  if (!d) return [softPullData];
+  return [d.data, d.result, d.payload, softPullData].filter((c) => c !== undefined);
+}
+
 /** Wrap a raw PayMe India merchant payload into the Tenacio bureau envelope. */
 function wrapCibilMerchantToTenacio(input: {
   body: unknown;
@@ -255,10 +286,12 @@ const SOFT_PULL_TRANSPORT_FAILURE_STATUS: Record<string, number> = {
  * @param softPullBody parsed JSON body from the soft-pull endpoint
  *   (`{ success, request_uuid, status, http_status, data, error? }`), or `null`.
  * @param httpStatus   HTTP status of the soft-pull call itself.
+ * @param context      optional borrower fields not echoed by the vendor (name).
  */
 export function mapMyMoneyBazaarSoftPullToTenacioEnvelope(
   softPullBody: unknown,
   httpStatus: number | null,
+  context: { fullName?: string | null } = {},
 ): TenacioWrappedBureauBody {
   const root = asRecord(softPullBody);
 
@@ -300,6 +333,22 @@ export function mapMyMoneyBazaarSoftPullToTenacioEnvelope(
   // own `http_status` (the bureau HTTP status) over the outer transport status.
   const bureauHttpStatus =
     typeof root.http_status === 'number' ? root.http_status : httpStatus;
+
+  // PayMe India returns a flat PaisaBazaar-family report (usually at data.data).
+  for (const candidate of flatReportCandidates(root.data)) {
+    if (!isPayMeIndiaFlatReport(candidate)) continue;
+    const mapped = payMeIndiaFlatToTrueLink(candidate, context);
+    if (mapped.ok && mapped.trueLinkCreditReport) {
+      return trueLinkSuccessEnvelope(mapped.trueLinkCreditReport, requestId);
+    }
+    // Recognised as PayMe India but no usable data → no-hit (NTC).
+    return {
+      status: 'error',
+      serviceStatusCode: 422,
+      requestId,
+      serviceError: { message: mapped.reason ?? 'No matching bureau record' },
+    };
+  }
 
   const wrapped = wrapCibilMerchantToTenacio({
     body: root.data ?? root,

@@ -140,10 +140,9 @@ export class MyMoneyBazaarCibilService {
       redactRequest: (b) => redactSoftPullBody(b),
     });
 
-    const vendorBody = mapMyMoneyBazaarSoftPullToTenacioEnvelope(
-      result.body,
-      result.httpStatus,
-    ) as unknown as Record<string, unknown>;
+    const vendorBody = mapMyMoneyBazaarSoftPullToTenacioEnvelope(result.body, result.httpStatus, {
+      fullName: detail.fullName ?? input.name,
+    }) as unknown as Record<string, unknown>;
 
     return {
       configured: true,
