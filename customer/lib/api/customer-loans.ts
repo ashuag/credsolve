@@ -62,7 +62,7 @@ export type CustomerPaymentHistoryItem = {
   loanNumber: string;
   amount: string;
   paymentMode: string;
-  status: 'SUCCESS' | 'FAILED';
+  status: 'SUCCESS' | 'FAILED' | 'PARTIAL';
   utr: string | null;
   failureMessage: string | null;
   paidAt: string;

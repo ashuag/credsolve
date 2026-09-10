@@ -29,6 +29,13 @@ export function FinancialFields({
   return (
     <div className="w-full">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
+        <FormInput span2 id="emailId" label="Email ID" error={errors.emailId}
+          type="email" autoComplete="email" inputMode="email" placeholder="name@example.com" required
+          value={fields.emailId} onChange={onFieldChange('emailId')} />
+        <p className="md:col-span-2 m-0 -mt-1 pl-1 text-[0.75rem] leading-snug text-slate-500">
+          Contact email only — no OTP is sent at this step. You can verify a different email after loan approval.
+        </p>
+
         <div className="md:col-span-2">
           <FormInput id="pincode" label="Pincode" error={errors.pincode}
             type="text" inputMode="numeric" autoComplete="postal-code" placeholder="400001" maxLength={6} required

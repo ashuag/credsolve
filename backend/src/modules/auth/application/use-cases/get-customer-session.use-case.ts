@@ -195,6 +195,7 @@ export class GetCustomerSessionUseCase {
       currentProfile?.addressLine1?.trim() &&
       currentProfile?.currentCity?.trim() &&
       currentProfile?.pincode?.trim() &&
+      currentProfile?.emailId?.trim() &&
       currentProfile?.panNumber?.trim()
     );
 

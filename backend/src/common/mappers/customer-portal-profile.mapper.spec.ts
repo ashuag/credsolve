@@ -9,6 +9,7 @@ function profile(overrides: Partial<FormattedPortalProfile> = {}): FormattedPort
     occupation: null,
     addressLine1: null,
     addressLine2: null,
+    emailId: null,
     currentCity: null,
     pincode: null,
     monthlyIncome: null,

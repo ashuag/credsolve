@@ -41,6 +41,8 @@ export type SettleEasebuzzLoanRef = {
 export type SettleEasebuzzPaymentResult = {
   alreadySettled: boolean;
   closedLoan: boolean;
+  remainingAfterInr: number;
+  repaymentStatus: 'SUCCESS' | 'PARTIAL';
   repaymentUuid: string | null;
 };
 
@@ -58,7 +60,7 @@ export class SettleEasebuzzRepaymentService {
     const rows = await this.prisma.client.$queryRaw<Array<{ id: bigint }>>`
       SELECT id FROM loan_repayment
       WHERE vendor_ref = ${txnid.slice(0, 50)}
-        AND status = ${LOAN_REPAYMENT_STATUS.SUCCESS}
+        AND status IN (${LOAN_REPAYMENT_STATUS.SUCCESS}, ${LOAN_REPAYMENT_STATUS.PARTIAL})
       LIMIT 1
     `;
     return Boolean(rows[0]);
@@ -71,20 +73,29 @@ export class SettleEasebuzzRepaymentService {
   async settleSuccessfulPayment(input: {
     loan: SettleEasebuzzLoanRef;
     txnid: string;
+    /** Unique Easebuzz payment id (`easepayid` when present). Defaults to txnid. */
+    vendorRef?: string;
     amountInr: string;
     bankRef: string;
     paidAt?: Date;
   }): Promise<SettleEasebuzzPaymentResult> {
     const txnid = input.txnid.trim().slice(0, 50);
+    const vendorRef = (input.vendorRef?.trim() || txnid).slice(0, 50);
     const amountInr = input.amountInr.trim();
     const paidThis = Number.parseFloat(amountInr);
-    if (!txnid || !Number.isFinite(paidThis) || paidThis <= 0) {
+    if (!txnid || !vendorRef || !Number.isFinite(paidThis) || paidThis <= 0) {
       throw new Error('invalid_settle_amount');
     }
 
-    if (await this.findSuccessByVendorRef(txnid)) {
+    if (await this.findSuccessByVendorRef(vendorRef)) {
       await this.clearIntent(input.loan.uuid, txnid);
-      return { alreadySettled: true, closedLoan: false, repaymentUuid: null };
+      return {
+        alreadySettled: true,
+        closedLoan: false,
+        remainingAfterInr: 0,
+        repaymentStatus: LOAN_REPAYMENT_STATUS.SUCCESS,
+        repaymentUuid: null,
+      };
     }
 
     const principal = decimalToNumber(input.loan.principalAmount);
@@ -104,7 +115,13 @@ export class SettleEasebuzzRepaymentService {
     });
     if (loanStatus?.closedAt != null || loanStatus?.loanStatus.name === LOAN_STATUS.CLOSED) {
       await this.clearIntent(input.loan.uuid, txnid);
-      return { alreadySettled: true, closedLoan: true, repaymentUuid: null };
+      return {
+        alreadySettled: true,
+        closedLoan: true,
+        remainingAfterInr: 0,
+        repaymentStatus: LOAN_REPAYMENT_STATUS.SUCCESS,
+        repaymentUuid: null,
+      };
     }
 
     const pastDue =
@@ -125,7 +142,7 @@ export class SettleEasebuzzRepaymentService {
       select: { id: true },
     });
 
-    const lockKey = `customer:repay-settle:${txnid}`;
+    const lockKey = `customer:repay-settle:${vendorRef}`;
     const lockToken = randomUUID();
     const acquired = await this.redis.client.set(
       lockKey,
@@ -136,9 +153,15 @@ export class SettleEasebuzzRepaymentService {
     );
     if (acquired !== 'OK') {
       await new Promise((r) => setTimeout(r, 800));
-      if (await this.findSuccessByVendorRef(txnid)) {
+      if (await this.findSuccessByVendorRef(vendorRef)) {
         await this.clearIntent(input.loan.uuid, txnid);
-        return { alreadySettled: true, closedLoan: false, repaymentUuid: null };
+        return {
+          alreadySettled: true,
+          closedLoan: false,
+          remainingAfterInr: 0,
+          repaymentStatus: LOAN_REPAYMENT_STATUS.SUCCESS,
+          repaymentUuid: null,
+        };
       }
       throw new Error('settle_in_progress');
     }
@@ -146,11 +169,19 @@ export class SettleEasebuzzRepaymentService {
     const repaymentUuid = randomUUID();
     const paidAt = input.paidAt ?? new Date();
     let closedLoan = false;
+    let remainingAfterInr = 0;
+    let repaymentStatus: 'SUCCESS' | 'PARTIAL' = LOAN_REPAYMENT_STATUS.SUCCESS;
 
     try {
-      if (await this.findSuccessByVendorRef(txnid)) {
+      if (await this.findSuccessByVendorRef(vendorRef)) {
         await this.clearIntent(input.loan.uuid, txnid);
-        return { alreadySettled: true, closedLoan: false, repaymentUuid: null };
+        return {
+          alreadySettled: true,
+          closedLoan: false,
+          remainingAfterInr: 0,
+          repaymentStatus: LOAN_REPAYMENT_STATUS.SUCCESS,
+          repaymentUuid: null,
+        };
       }
 
       await this.prisma.client.$transaction(async (tx) => {
@@ -165,13 +196,15 @@ export class SettleEasebuzzRepaymentService {
         }
         if (locked[0].closed_at != null) {
           closedLoan = true;
+          remainingAfterInr = 0;
+          repaymentStatus = LOAN_REPAYMENT_STATUS.SUCCESS;
           return;
         }
 
         const existing = await tx.$queryRaw<Array<{ id: bigint }>>`
           SELECT id FROM loan_repayment
-          WHERE vendor_ref = ${txnid}
-            AND status = ${LOAN_REPAYMENT_STATUS.SUCCESS}
+          WHERE vendor_ref = ${vendorRef}
+            AND status IN (${LOAN_REPAYMENT_STATUS.SUCCESS}, ${LOAN_REPAYMENT_STATUS.PARTIAL})
           LIMIT 1
         `;
         if (existing[0]) {
@@ -179,8 +212,11 @@ export class SettleEasebuzzRepaymentService {
         }
 
         const paidBefore = await sumSuccessfulRepaymentsInr(tx, input.loan.id);
-        const remainingAfter = remainingDueInr(billDueNow, paidBefore + paidThis);
-        const closesLoan = shouldCloseLoanAfterPayment(remainingAfter);
+        remainingAfterInr = remainingDueInr(billDueNow, paidBefore + paidThis);
+        const closesLoan = shouldCloseLoanAfterPayment(remainingAfterInr);
+        repaymentStatus = closesLoan
+          ? LOAN_REPAYMENT_STATUS.SUCCESS
+          : LOAN_REPAYMENT_STATUS.PARTIAL;
 
         await tx.$executeRaw`
           INSERT INTO loan_repayment (
@@ -199,31 +235,38 @@ export class SettleEasebuzzRepaymentService {
             ${input.loan.id},
             ${amountInr},
             ${'UPI'},
-            ${LOAN_REPAYMENT_STATUS.SUCCESS},
+            ${repaymentStatus},
             ${input.bankRef.trim().slice(0, 50)},
             ${null},
-            ${txnid},
+            ${vendorRef},
             ${paidAt},
             ${paidAt}
           )
         `;
 
+        if (closesLoan && !closedStatus) {
+          this.logger.error('[repay-settle] CLOSED loan status missing');
+          throw new Error('status_missing');
+        }
+
+        const collected = Math.round((paidBefore + paidThis) * 100) / 100;
+        await tx.loanAccount.update({
+          where: { id: input.loan.id },
+          data: {
+            totalRepaymentAmount: collected.toFixed(2),
+            ...(closesLoan && closedStatus
+              ? {
+                  loanStatusId: closedStatus.id,
+                  closedAt: paidAt,
+                  interestAmount: due ? due.interestAmount.toFixed(2) : undefined,
+                }
+              : {}),
+          },
+        });
+
         if (closesLoan) {
-          if (!closedStatus) {
-            this.logger.error('[repay-settle] CLOSED loan status missing');
-            throw new Error('status_missing');
-          }
-          const collected = Math.round((paidBefore + paidThis) * 100) / 100;
-          await tx.loanAccount.update({
-            where: { id: input.loan.id },
-            data: {
-              loanStatusId: closedStatus.id,
-              closedAt: paidAt,
-              interestAmount: due ? due.interestAmount.toFixed(2) : undefined,
-              totalRepaymentAmount: collected.toFixed(2),
-            },
-          });
           closedLoan = true;
+          remainingAfterInr = 0;
 
           const lead = await tx.lead.findUnique({
             where: { id: input.loan.application.leadId },
@@ -246,10 +289,16 @@ export class SettleEasebuzzRepaymentService {
 
     await this.clearIntent(input.loan.uuid, txnid);
     this.logger.log(
-      `[repay-settle] SUCCESS loan=${input.loan.loanNumber} txnid=${txnid} ` +
-        `repayment=${repaymentUuid} closed=${closedLoan}`,
+      `[repay-settle] ${repaymentStatus} loan=${input.loan.loanNumber} txnid=${txnid} ` +
+        `vendorRef=${vendorRef} repayment=${repaymentUuid} closed=${closedLoan} remaining=${remainingAfterInr}`,
     );
-    return { alreadySettled: false, closedLoan, repaymentUuid };
+    return {
+      alreadySettled: false,
+      closedLoan,
+      remainingAfterInr,
+      repaymentStatus,
+      repaymentUuid,
+    };
   }
 
   private async clearIntent(loanAccountUuid: string, txnid: string): Promise<void> {

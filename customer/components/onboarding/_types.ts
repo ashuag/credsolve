@@ -8,6 +8,7 @@ export type Fields = {
   occupation: string;
   addressLine1: string;
   addressLine2: string;
+  emailId: string;
   currentCity: string;
   currentCityId: number | null;
   pincode: string;

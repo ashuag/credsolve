@@ -2,7 +2,7 @@ import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
-import { LOAN_REPAYMENT_STATUS } from '../../../../common/constants/loan-repayment.constants';
+import { LOAN_REPAYMENT_STATUS, COLLECTED_REPAYMENT_STATUSES } from '../../../../common/constants/loan-repayment.constants';
 import { LOAN_STATUS } from '../../../../common/constants/loan.constants';
 import {
   computeAmountDueNowInr,
@@ -263,7 +263,7 @@ const APPLICATION_DASHBOARD_SELECT = {
       bankAccountNumber: true,
       loanStatus: { select: { name: true } },
       repayments: {
-        where: { status: LOAN_REPAYMENT_STATUS.SUCCESS },
+        where: { status: { in: COLLECTED_REPAYMENT_STATUSES } },
         select: { amount: true, status: true },
       },
     },

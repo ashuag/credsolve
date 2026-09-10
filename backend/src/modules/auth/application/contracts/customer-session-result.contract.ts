@@ -20,6 +20,7 @@ export type CustomerPortalProfileSnapshot = {
   occupation: OccupationKey | null;
   addressLine1: string | null;
   addressLine2: string | null;
+  emailId: string | null;
   currentCity: string | null;
   pincode: string | null;
   monthlyIncome: string | null;

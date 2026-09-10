@@ -1122,6 +1122,7 @@ export function ReviewPersonalPanel({
               badgeInValue
             />
             <ReviewField label="Occupation" value={profile.occupation ?? '—'} />
+            <ReviewField label="Email ID" value={profile.emailId ?? '—'} />
             {usesMonthlyIncomeMetric(occupationKey) ? (
               <ReviewField
                 label="Monthly income"

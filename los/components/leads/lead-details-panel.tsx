@@ -387,6 +387,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
                 />
                 <DetailGrid
                   rows={[
+                    { label: 'Email ID', value: profile.emailId ?? '—' },
                     { label: 'City', value: profile.city ?? '—' },
                     { label: 'State', value: profile.state ?? '—' },
                     { label: 'PIN', value: profile.pincode ?? '—' },

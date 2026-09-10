@@ -6,7 +6,7 @@ export function losStatusPillStyles(code: string): { bg: string; text: string; r
   if (c === 'CLOSED' || c === 'PAID' || c.includes('PAID_FULL') || c === 'SUCCESS') {
     return { bg: 'rgba(16,185,129,0.14)', text: '#047857', ring: 'rgba(16,185,129,0.32)' };
   }
-  if (c === 'PENDING') {
+  if (c === 'PENDING' || c === 'PARTIAL' || c === 'PARTIALLY_PAID') {
     return { bg: 'rgba(245,158,11,0.18)', text: '#6b4e00', ring: 'rgba(245,158,11,0.35)' };
   }
   if (c === 'ACTIVE') {

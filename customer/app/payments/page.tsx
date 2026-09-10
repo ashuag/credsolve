@@ -29,11 +29,12 @@ function formatPaidAt(iso: string): string {
 
 function PaymentCard({ payment }: { payment: CustomerPaymentHistoryItem }) {
   const failed = payment.status === 'FAILED';
+  const partial = payment.status === 'PARTIAL';
   return (
     <article
       className={cn(
         'rounded-[22px] border bg-white p-5 shadow-[0_12px_32px_rgba(23,44,113,0.06)]',
-        failed ? 'border-rose-200' : 'border-[rgba(18,36,79,0.1)]',
+        failed ? 'border-rose-200' : partial ? 'border-amber-200' : 'border-[rgba(18,36,79,0.1)]',
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -50,10 +51,12 @@ function PaymentCard({ payment }: { payment: CustomerPaymentHistoryItem }) {
             'inline-flex items-center rounded-full px-3 py-1 text-[0.68rem] font-extrabold uppercase tracking-wider',
             failed
               ? 'bg-rose-100 text-rose-800'
-              : 'bg-emerald-100 text-emerald-800',
+              : partial
+                ? 'bg-amber-100 text-amber-800'
+                : 'bg-emerald-100 text-emerald-800',
           )}
         >
-          {failed ? 'Unsuccessful' : 'Paid fully'}
+          {failed ? 'Unsuccessful' : partial ? 'Partially paid' : 'Paid fully'}
         </span>
       </div>
 
@@ -137,7 +140,7 @@ export default function PaymentsPage() {
     );
   }
 
-  const successful = payments.filter((p) => p.status === 'SUCCESS');
+  const successful = payments.filter((p) => p.status === 'SUCCESS' || p.status === 'PARTIAL');
   const failed = payments.filter((p) => p.status === 'FAILED');
   const latestSuccess = successful[0] ?? null;
 

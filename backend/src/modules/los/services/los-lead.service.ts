@@ -156,6 +156,7 @@ export class LosLeadService {
             panVerified: true,
             occupation: { select: { name: true } },
             city: { select: { name: true, state: { select: { code: true } } } },
+            emailId: true,
             bureauReport: { select: { cibilScore: true } },
           },
         },
@@ -189,7 +190,7 @@ export class LosLeadService {
         fullName: formatLosPersonName(detail?.fullName),
         panNumber: detail?.panNumber?.trim().toUpperCase() || null,
         mobileNumber: lead.customer.mobileNumber,
-        email: lead.applications[0]?.details?.emailId ?? null,
+        email: detail?.emailId?.trim() || lead.applications[0]?.details?.emailId || null,
         occupation: detail?.occupation?.name ?? null,
         city,
         cibilScore,
@@ -293,7 +294,7 @@ export class LosLeadService {
       leadNumber: lead.leadNumber,
       customerUuid: lead.customer.uuid,
       mobileNumber: lead.customer.mobileNumber,
-      email: lead.applications[0]?.details?.emailId ?? null,
+      email: detail?.emailId?.trim() || lead.applications[0]?.details?.emailId || null,
       statusCode: lead.leadStatus.name,
       statusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
       panVerified: detail?.panVerified ?? 0,
@@ -325,6 +326,7 @@ export class LosLeadService {
             pincode: detail.pincode,
             addressLine1: detail.addressLine1,
             addressLine2: detail.addressLine2,
+            emailId: detail.emailId?.trim() || null,
             city: detail.city?.name ?? null,
             state: detail.city?.state?.name ?? null,
             stateCode: detail.city?.state?.code ?? null,
@@ -619,6 +621,7 @@ export class LosLeadService {
             pincode: detail.pincode,
             addressLine1: detail.addressLine1,
             addressLine2: detail.addressLine2,
+            emailId: detail.emailId,
             occupationId: detail.occupationId,
             netMonthlyIncome: detail.netMonthlyIncome,
             annualTurnover: detail.annualTurnover,
@@ -638,6 +641,7 @@ export class LosLeadService {
         if (detail.dateOfBirth) copiedFields.push('date of birth');
         if (detail.genderId) copiedFields.push('gender');
         if (detail.cityId || detail.pincode || detail.addressLine1) copiedFields.push('address');
+        if (detail.emailId?.trim()) copiedFields.push('email');
         if (detail.occupationId) copiedFields.push('occupation');
         if (detail.netMonthlyIncome != null || detail.annualTurnover != null) copiedFields.push('income');
         if (detail.panNumber) copiedFields.push(keepPanVerified ? 'verified PAN' : 'PAN number');

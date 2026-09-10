@@ -1076,6 +1076,7 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
               <tbody>
                 {row.repayments.map((payment) => {
                   const failed = payment.status === 'FAILED';
+                  const partial = payment.status === 'PARTIAL';
                   return (
                     <tr
                       key={payment.uuid}
@@ -1092,10 +1093,12 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
                           style={
                             failed
                               ? { background: 'rgba(239,68,68,0.14)', color: '#b91c1c' }
-                              : { background: 'rgba(16,185,129,0.14)', color: '#047857' }
+                              : partial
+                                ? { background: 'rgba(245,158,11,0.16)', color: '#b45309' }
+                                : { background: 'rgba(16,185,129,0.14)', color: '#047857' }
                           }
                         >
-                          {failed ? 'Unsuccessful' : 'Paid fully'}
+                          {failed ? 'Unsuccessful' : partial ? 'Partially paid' : 'Paid fully'}
                         </span>
                       </td>
                       <td className="px-3 py-3 font-mono text-[0.78rem] text-brand-text">

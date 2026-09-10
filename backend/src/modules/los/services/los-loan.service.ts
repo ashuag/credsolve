@@ -17,6 +17,7 @@ import {
 } from '../../../common/loan/bounce-charge.util';
 import { BounceChargeTierResolverService } from '../../../common/loan/bounce-charge-tier.resolver';
 import { resolveEffectiveLoanStatus } from '../../../common/loan/effective-loan-status.util';
+import { isCollectedRepaymentStatus } from '../../../common/constants/loan-repayment.constants';
 import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbursement-view.util';
 import { formatLosPersonName } from '../format-los-person-name';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -275,7 +276,7 @@ export class LosLoanService {
     // IST, so this stays the exact negation of `overdueDays` on a UTC-clocked server.
     const daysToMaturity = daysToMaturityIst(loan.loanMaturityDate);
     const totalPaid = repaymentRows
-      .filter((row) => row.status === 'SUCCESS')
+      .filter((row) => isCollectedRepaymentStatus(row.status))
       .reduce((sum, row) => sum + Number(row.amount), 0);
 
     const principal = decimalToNumber(loan.principalAmount);
@@ -411,7 +412,12 @@ export class LosLoanService {
         uuid: row.uuid,
         amount: Number(row.amount).toFixed(2),
         paymentMode: row.payment_mode,
-        status: row.status === 'FAILED' ? 'FAILED' : 'SUCCESS',
+        status:
+          row.status === 'FAILED'
+            ? 'FAILED'
+            : row.status === 'PARTIAL'
+              ? 'PARTIAL'
+              : 'SUCCESS',
         utr: row.utr,
         failureMessage: row.failure_message,
         paidAt: row.paid_at.toISOString(),

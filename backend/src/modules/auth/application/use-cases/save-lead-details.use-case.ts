@@ -18,6 +18,7 @@ import { resolveGenderOccupationIds } from '../../../../common/utils/resolve-gen
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { recurringLockedIdentityFromPriorDetail } from '../../../../common/lead/recurring-customer-identity.util';
+import { isValidContactEmail, normalizeEmail } from '../../infrastructure/utils/email.util';
 import type { SaveLeadDetailsDto } from '../dto/save-lead-details.dto';
 
 function parseDobUtc(dob: string): Date {
@@ -64,6 +65,11 @@ export class SaveLeadDetailsUseCase {
       dto.gender,
       dto.occupation,
     );
+
+    const emailId = normalizeEmail(dto.emailId);
+    if (!isValidContactEmail(emailId)) {
+      throw new BadRequestException('Please enter a valid email address.');
+    }
 
     throwIfLeadIntakeInvalid(validateAddressLine1(dto.addressLine1));
     throwIfLeadIntakeInvalid(
@@ -112,6 +118,7 @@ export class SaveLeadDetailsUseCase {
         pincode: dto.pincode,
         addressLine1: dto.addressLine1.trim(),
         addressLine2: dto.addressLine2?.trim() || null,
+        emailId,
         netMonthlyIncome,
         annualTurnover,
         annualProfit,
@@ -127,6 +134,7 @@ export class SaveLeadDetailsUseCase {
         pincode: dto.pincode,
         addressLine1: dto.addressLine1.trim(),
         addressLine2: dto.addressLine2?.trim() || null,
+        emailId,
         netMonthlyIncome,
         annualTurnover,
         annualProfit,

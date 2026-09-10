@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { COLLECTED_REPAYMENT_STATUSES } from '../../../common/constants/loan-repayment.constants';
 import { BounceChargeTierResolverService } from '../../../common/loan/bounce-charge-tier.resolver';
 import { computePenalChargeInr } from '../../../common/loan/bounce-charge.util';
 import { decimalToNumber } from '../../../common/loan/loan-calculation.util';
@@ -65,7 +66,7 @@ export class LosTransactionReportService {
       include: {
         customer: { select: { uuid: true, mobileNumber: true } },
         repayments: {
-          where: { status: 'SUCCESS' },
+          where: { status: { in: COLLECTED_REPAYMENT_STATUSES } },
           orderBy: { paidAt: 'desc' },
           take: 1,
           select: { paidAt: true, utr: true },

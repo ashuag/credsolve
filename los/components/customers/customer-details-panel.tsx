@@ -278,6 +278,7 @@ export function CustomerDetailsPanel({ customerUuid }: { customerUuid: string })
                     { label: 'PAN', value: profile.panNumber ?? '—' },
                     { label: 'Gender', value: profile.gender ?? '—' },
                     { label: 'Occupation', value: profile.occupation ?? '—' },
+                    { label: 'Email ID', value: profile.emailId ?? '—' },
                     { label: 'City', value: profile.city ?? '—' },
                   ]}
                 />

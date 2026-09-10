@@ -29,6 +29,8 @@ export type SaveLeadDetailsPayload = {
   occupation: string;
   addressLine1: string;
   addressLine2?: string;
+  /** Contact email from the address step. Not OTP-verified. */
+  emailId: string;
   currentCity: string;
   /** When set, backend resolves city by id (from `GET /lookup/cities`). */
   currentCityId?: number;

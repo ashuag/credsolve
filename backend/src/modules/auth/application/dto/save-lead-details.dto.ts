@@ -2,7 +2,7 @@ import { GENDER_KEYS } from '../../../../common/constants/gender.constants';
 import { OCCUPATION_KEYS } from '../../../../common/constants/occupation.constants';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, Min } from 'class-validator';
+import { IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, Min } from 'class-validator';
 import {
   PERSON_NAME_PATTERN,
   PERSON_NAME_VALIDATION_MESSAGE,
@@ -44,6 +44,16 @@ export class SaveLeadDetailsDto {
   @IsString()
   @MaxLength(500)
   addressLine2?: string;
+
+  @ApiProperty({
+    description:
+      'Contact email collected on the address step. Not OTP-verified; may differ from the post-approval email.',
+    example: 'borrower@example.com',
+  })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @IsEmail()
+  @MaxLength(150)
+  emailId!: string;
 
   @ApiProperty({
     description: 'City name from lookup, or "City, ST" when editing an existing profile',

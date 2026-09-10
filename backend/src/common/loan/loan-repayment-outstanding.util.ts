@@ -1,5 +1,5 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
-import { LOAN_REPAYMENT_STATUS } from '../constants/loan-repayment.constants';
+import { LOAN_REPAYMENT_STATUS, isCollectedRepaymentStatus } from '../constants/loan-repayment.constants';
 
 const PAISA = 100;
 const CLOSE_TOLERANCE_INR = 0.01;
@@ -29,7 +29,7 @@ export function sumRepaymentAmounts(
 ): number {
   let total = 0;
   for (const row of rows) {
-    if (row.status != null && row.status !== LOAN_REPAYMENT_STATUS.SUCCESS) continue;
+    if (row.status != null && !isCollectedRepaymentStatus(row.status)) continue;
     const n = typeof row.amount === 'number' ? row.amount : Number(row.amount);
     if (Number.isFinite(n) && n > 0) total += n;
   }
@@ -93,7 +93,7 @@ export async function sumSuccessfulRepaymentsInr(
     SELECT COALESCE(SUM(amount), 0) AS total
     FROM loan_repayment
     WHERE loan_account_id = ${loanAccountId}
-      AND status = ${LOAN_REPAYMENT_STATUS.SUCCESS}
+      AND status IN (${LOAN_REPAYMENT_STATUS.SUCCESS}, ${LOAN_REPAYMENT_STATUS.PARTIAL})
   `;
   return roundInr2(Number(rows[0]?.total ?? 0));
 }

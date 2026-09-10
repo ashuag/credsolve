@@ -437,6 +437,7 @@ function CustomerProfilePanel({
             <DetailGrid
               columns={2}
               rows={[
+                { label: 'Email ID', value: profile.emailId ?? '—' },
                 { label: 'Address line 1', value: profile.addressLine1 ?? '—' },
                 { label: 'Address line 2', value: profile.addressLine2 ?? '—' },
                 { label: 'City', value: profile.city ?? '—' },

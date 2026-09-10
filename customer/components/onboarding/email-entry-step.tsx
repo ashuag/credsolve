@@ -22,9 +22,7 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', le
   const [email, setEmail] = useState(initialEmail);
   const [emailError, setEmailError] = useState('');
   const [optionError, setOptionError] = useState('');
-  const [selectedOption, setSelectedOption] = useState<LoginOption>(
-    initialEmail ? 'manual' : null,
-  );
+  const [selectedOption, setSelectedOption] = useState<LoginOption>(null);
   const [isSending, setIsSending] = useState(false);
   const emailInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -33,12 +31,6 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', le
       setEmail(initialEmail);
     }
   }, [email, initialEmail]);
-
-  useEffect(() => {
-    if (initialEmail) {
-      setSelectedOption('manual');
-    }
-  }, [initialEmail]);
 
   useEffect(() => {
     if (selectedOption === 'manual') {
@@ -65,6 +57,9 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', le
     setSelectedOption('manual');
     setOptionError('');
     setEmailError('');
+    if (!email.trim() && initialEmail.trim()) {
+      setEmail(initialEmail.trim());
+    }
   }
 
   async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {

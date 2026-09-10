@@ -13,6 +13,7 @@ export type CustomerPortalProfile = {
   occupation: string | null;
   addressLine1: string | null;
   addressLine2: string | null;
+  emailId: string | null;
   currentCity: string | null;
   pincode: string | null;
   monthlyIncome: string | null;
