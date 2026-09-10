@@ -6,6 +6,7 @@ import { extractVendorServiceError } from './vendor-api-error.util';
 import { isTenacioBureauSuccessPayload } from './tenacio-bureau-payload.mapper';
 import { TENACIO_BUREAU_MOCK_VENDOR_BODY } from './tenacio-bureau-mock.fixture';
 import { SurepassCibilService } from './surepass/surepass-cibil.service';
+import { MyMoneyBazaarCibilService } from './mymoneybazaar/mymoneybazaar-cibil.service';
 import { VendorApiService } from './vendor-api.service';
 import { VendorApiConfigService } from './vendor-api-config.service';
 
@@ -15,6 +16,25 @@ import { VendorApiConfigService } from './vendor-api-config.service';
  * Prefer `TENACIO_CIBIL_URL` with the full HTTPS URL if joining is error-prone.
  */
 export const TENACIO_BUREAU_SOFT_PULL_SERVICE = 'experian-soft-pull/services/experian-soft-pull';
+
+/** Bureau integrations selectable as the `cibil_fetch` vendor in `vendor_api_config`. */
+export type CibilVendorKind = 'tenacio' | 'surepass' | 'mymoneybazaar';
+
+/** Map a `vendor_api_config.vendor_name` to a bureau integration (defaults to Tenacio). */
+export function mapCibilVendorName(vendorName: string): CibilVendorKind {
+  const name = vendorName.trim().toLowerCase();
+  if (name === 'surepass') return 'surepass';
+  if (
+    name === 'mymoneybazaar' ||
+    name === 'my money bazaar' ||
+    name === 'mmb' ||
+    name === 'paymeindia' ||
+    name === 'payme india'
+  ) {
+    return 'mymoneybazaar';
+  }
+  return 'tenacio';
+}
 
 export type BureauTenacioInput = {
   mobileNumber: string;
@@ -61,6 +81,7 @@ export class BureauFetchService {
     private readonly vendorApi: VendorApiService,
     private readonly vendorApiConfig: VendorApiConfigService,
     private readonly surepassCibil: SurepassCibilService,
+    private readonly myMoneyBazaarCibil: MyMoneyBazaarCibilService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -119,7 +140,9 @@ export class BureauFetchService {
       const result =
         vendor === 'surepass'
           ? await this.fetchBureauFromSurepass(body, leadId)
-          : await this.fetchDirectFromTenacio(body, leadId);
+          : vendor === 'mymoneybazaar'
+            ? await this.fetchBureauFromMyMoneyBazaar(body, leadId)
+            : await this.fetchDirectFromTenacio(body, leadId);
 
       if (this.isBureauFetchSuccess(result)) {
         return result;
@@ -143,18 +166,18 @@ export class BureauFetchService {
   }
 
   /**
-   * ACTIVE `cibil_fetch` vendors ordered by priority, mapped to the two
-   * supported integrations. Defaults to Tenacio → Surepass when no
-   * `vendor_api_config` rows exist for `cibil_fetch`.
+   * ACTIVE `cibil_fetch` vendors ordered by priority, mapped to the supported
+   * integrations. Defaults to Tenacio → Surepass when no `vendor_api_config`
+   * rows exist for `cibil_fetch`.
    */
-  private async resolveCibilVendorChain(): Promise<Array<'tenacio' | 'surepass'>> {
+  private async resolveCibilVendorChain(): Promise<CibilVendorKind[]> {
     const hasCibilConfig = await this.vendorApiConfig.hasAnyForApi(VENDOR_API_CODE.CIBIL_FETCH);
     if (!hasCibilConfig) return ['tenacio', 'surepass'];
 
     const activeVendors = await this.vendorApiConfig.listActive(VENDOR_API_CODE.CIBIL_FETCH);
-    const chain: Array<'tenacio' | 'surepass'> = [];
+    const chain: CibilVendorKind[] = [];
     for (const row of activeVendors) {
-      const kind = row.vendorName.trim().toLowerCase() === 'surepass' ? 'surepass' : 'tenacio';
+      const kind = mapCibilVendorName(row.vendorName);
       if (!chain.includes(kind)) chain.push(kind);
     }
     return chain;
@@ -354,6 +377,72 @@ export class BureauFetchService {
     if (serviceError) {
       this.logger.warn(
         `Surepass bureau service error (leadId=${leadId?.toString() ?? 'n/a'}): ` +
+          `serviceStatusCode=${serviceError.serviceStatusCode ?? 'n/a'} ntc=${isNewToCredit} ` +
+          `message=${serviceError.message ?? 'n/a'}`,
+      );
+    }
+
+    return {
+      configured: true,
+      ok: result.ok,
+      httpStatus: result.httpStatus,
+      vendorBody: result.vendorBody,
+      error: result.error,
+      dummyPayload: false,
+      isNewToCredit,
+      serviceErrorMessage: serviceError?.message ?? null,
+    };
+  }
+
+  /**
+   * MyMoneyBazaar bureau path — mymoneybazaarApi `POST /api/cibil/soft-pull`
+   * (PayMe India merchant). `MyMoneyBazaarCibilService` reads name / DOB /
+   * gender / email / pincode / address from `lead_detail` and wraps the raw
+   * soft-pull response into the Tenacio envelope, so the New-To-Credit
+   * classification below and every downstream consumer work unchanged.
+   */
+  async fetchDirectFromMyMoneyBazaar(
+    body: BureauTenacioRequestBody,
+    leadId: bigint | null,
+  ): Promise<BureauFetchResult> {
+    return this.fetchBureauFromMyMoneyBazaar(body, leadId);
+  }
+
+  private async fetchBureauFromMyMoneyBazaar(
+    body: BureauTenacioRequestBody,
+    leadId: bigint | null,
+  ): Promise<BureauFetchResult> {
+    const result = await this.myMoneyBazaarCibil.fetchCreditReport(
+      {
+        mobileNumber: body.input.mobileNumber,
+        panNumber: body.input.panNumber,
+        name: body.input.name,
+        consent: body.input.consent,
+      },
+      leadId,
+    );
+
+    if (!result.configured) {
+      return {
+        configured: false,
+        skipReason: result.skipReason,
+        ok: false,
+        httpStatus: null,
+        vendorBody: null,
+        dummyPayload: false,
+        isNewToCredit: false,
+        serviceErrorMessage: null,
+      };
+    }
+
+    const serviceError = extractVendorServiceError(result.vendorBody);
+    const isNewToCredit =
+      serviceError != null &&
+      (serviceError.serviceStatusCode == null || serviceError.serviceStatusCode < 500);
+
+    if (serviceError) {
+      this.logger.warn(
+        `MyMoneyBazaar bureau service error (leadId=${leadId?.toString() ?? 'n/a'}): ` +
           `serviceStatusCode=${serviceError.serviceStatusCode ?? 'n/a'} ntc=${isNewToCredit} ` +
           `message=${serviceError.message ?? 'n/a'}`,
       );

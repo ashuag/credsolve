@@ -10,6 +10,7 @@ import { LivenessVendorService } from './liveness-vendor.service';
 import { PanNsdlCacheRepository } from './pan-nsdl-cache.repository';
 import { PanNsdlCacheService } from './pan-nsdl-cache.service';
 import { PanVerificationService } from './pan-verification.service';
+import { MyMoneyBazaarCibilModule } from './mymoneybazaar/mymoneybazaar-cibil.module';
 import { SurepassCibilModule } from './surepass/surepass-cibil.module';
 import { SurepassDigilockerModule } from './surepass/surepass-digilocker.module';
 import { SurepassFaceLivenessModule } from './surepass/surepass-face-liveness.module';
@@ -28,7 +29,12 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
  */
 @Global()
 @Module({
-  imports: [SurepassCibilModule, SurepassDigilockerModule, SurepassFaceLivenessModule],
+  imports: [
+    MyMoneyBazaarCibilModule,
+    SurepassCibilModule,
+    SurepassDigilockerModule,
+    SurepassFaceLivenessModule,
+  ],
   providers: [
     VendorApiService,
     VendorApiConfigService,
@@ -60,6 +66,7 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
     KycTenacioVendorService,
     EasebuzzWireService,
     EasebuzzRepaymentNotificationService,
+    MyMoneyBazaarCibilModule,
     SurepassCibilModule,
     SurepassDigilockerModule,
     SurepassFaceLivenessModule,

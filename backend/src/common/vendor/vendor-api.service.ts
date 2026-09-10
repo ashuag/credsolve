@@ -28,6 +28,7 @@ const SENSITIVE_HEADER_NAMES: ReadonlySet<string> = new Set([
   'x-api-key',
   'api-key',
   'apikey',
+  'x-access-token',
   'client-id',
   'cookie',
   'set-cookie',
