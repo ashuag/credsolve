@@ -1,16 +1,17 @@
 'use client';
 
+import { CheckCibilScorePanel } from '@/components/applications/check-cibil-score-panel';
 import { CibilReportViewer } from '@/components/applications/cibil-report-viewer';
 import { cx } from '@/components/eligibility/eligibility-ui';
 import { PostBreResultsSummary } from '@/components/eligibility/post-bureau-bre-panel';
 import {
-  createApplicationCibilReport,
   getApplicationCibilReport,
   getApplicationDetails,
   getLeadCibilReport,
   resolveLosKycPhotoSrc,
   runPostBureauBreCheck,
   type LosApplicationCibilReportPayload,
+  type LosCheckCibilResult,
   type PostBreDryRunResult,
 } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
@@ -83,93 +84,6 @@ function CibilJsonViewer({ rawPayload }: { rawPayload: unknown }) {
   );
 }
 
-function CibilReportUnavailable({
-  applicationUuid,
-  leadUuid,
-  mobileNumber,
-  fullName,
-  panNumber,
-  onCreated,
-}: {
-  applicationUuid?: string;
-  leadUuid?: string;
-  mobileNumber?: string;
-  fullName?: string | null;
-  panNumber?: string | null;
-  onCreated?: () => void;
-}) {
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleDownloadReport() {
-    const token = getToken();
-    if (!token) {
-      setError('Session expired — please log in again.');
-      return;
-    }
-
-    setCreating(true);
-    setError(null);
-
-    try {
-      let resolvedLeadUuid = leadUuid?.trim() || '';
-      let resolvedMobile = mobileNumber?.trim() || '';
-      let resolvedName = fullName?.trim() || '';
-      let resolvedPan = panNumber?.trim().toUpperCase() || '';
-
-      if (applicationUuid && (!resolvedLeadUuid || !resolvedMobile || !resolvedName || !resolvedPan)) {
-        const details = await getApplicationDetails(token, applicationUuid);
-        const profile = details.lead.profile;
-        resolvedLeadUuid = details.leadUuid;
-        resolvedMobile = details.mobileNumber;
-        resolvedName = profile?.fullName?.trim() || resolvedName;
-        resolvedPan = details.lead.panNumber?.trim().toUpperCase() || resolvedPan;
-      }
-
-      if (!resolvedLeadUuid || !resolvedName || !resolvedPan) {
-        setError('Full name and PAN are required on the lead profile before fetching a CIBIL report.');
-        return;
-      }
-
-      await createApplicationCibilReport(token, {
-        leadUuid: resolvedLeadUuid,
-        mobileNumber: resolvedMobile,
-        fullName: resolvedName,
-        panNumber: resolvedPan,
-      });
-
-      onCreated?.();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to download CIBIL report.');
-    } finally {
-      setCreating(false);
-    }
-  }
-
-  return (
-    <div className="los-card border border-dashed border-[rgba(23,44,113,0.18)] bg-[rgba(248,250,255,0.88)] p-6 md:p-8">
-      <span className="los-chip mb-3">CIBIL report</span>
-      <h3 className="m-0 text-[1.05rem] font-extrabold tracking-[-0.02em] text-brand-navy">
-        No bureau report on file
-      </h3>
-      <p className="m-0 mt-2 max-w-[52ch] text-[0.88rem] leading-relaxed text-brand-muted">
-        Pull the customer&apos;s CIBIL bureau report from Tenacio. Once downloaded, you can view the formatted report
-        and raw JSON here.
-      </p>
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          className="los-btn-primary min-h-[40px] px-4"
-          disabled={creating}
-          onClick={() => void handleDownloadReport()}
-        >
-          {creating ? 'Downloading report…' : 'Download CIBIL report'}
-        </button>
-      </div>
-      {error ? <p className="m-0 mt-4 text-[0.82rem] font-semibold text-[#8d3434]">{error}</p> : null}
-    </div>
-  );
-}
 
 function PostBreView({
   rawPayload,
@@ -225,7 +139,9 @@ function PostBreView({
       <div className="los-card flex flex-wrap items-center justify-between gap-3 p-4">
         <div>
           <h3 className="m-0 text-[0.95rem] font-extrabold text-brand-navy">Post-BRE eligibility check</h3>
-          <p className="m-0 mt-0.5 text-[0.8rem] text-brand-muted">Runs all post-bureau rules against the stored bureau payload.</p>
+          <p className="m-0 mt-0.5 text-[0.8rem] text-brand-muted">
+            Dry-run inspector against the stored bureau payload. Use Check CIBIL score to persist rejection on failure.
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <label className="grid gap-1">
@@ -273,8 +189,6 @@ export function ApplicationCibilReportTab({
   applicationUuid,
   leadUuid,
   mobileNumber,
-  fullName,
-  panNumber,
   onReportCreated,
 }: ApplicationCibilReportTabProps) {
   const [payload, setPayload] = useState<LosApplicationCibilReportPayload | null>(null);
@@ -282,6 +196,7 @@ export function ApplicationCibilReportTab({
   const [missingReport, setMissingReport] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<CibilReportView>('report');
+  const [checkResult, setCheckResult] = useState<LosCheckCibilResult | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -326,7 +241,8 @@ export function ApplicationCibilReportTab({
     void load();
   }, [load]);
 
-  function handleReportCreated() {
+  function handleCibilChecked(result: LosCheckCibilResult) {
+    setCheckResult(result);
     onReportCreated?.();
     void load();
   }
@@ -345,13 +261,12 @@ export function ApplicationCibilReportTab({
 
   if (missingReport) {
     return (
-      <CibilReportUnavailable
+      <CheckCibilScorePanel
         applicationUuid={applicationUuid}
         leadUuid={leadUuid}
-        mobileNumber={mobileNumber}
-        fullName={fullName}
-        panNumber={panNumber}
-        onCreated={handleReportCreated}
+        emptyState
+        lastResult={checkResult}
+        onCompleted={handleCibilChecked}
       />
     );
   }
@@ -393,6 +308,13 @@ export function ApplicationCibilReportTab({
 
   return (
     <div className="grid gap-4">
+      <CheckCibilScorePanel
+        applicationUuid={applicationUuid}
+        leadUuid={leadUuid}
+        compact
+        lastResult={checkResult}
+        onCompleted={handleCibilChecked}
+      />
       <nav
         className="los-card flex flex-wrap gap-1 p-1.5"
         aria-label="CIBIL report views"

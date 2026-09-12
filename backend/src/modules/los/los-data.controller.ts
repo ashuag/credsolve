@@ -17,6 +17,7 @@ import { LosLoanRepaymentSyncService } from './services/los-loan-repayment-sync.
 import { LosBureauReportService } from './services/los-bureau-report.service';
 import { LosLeadReportService } from './services/los-lead-report.service';
 import { LosTransactionReportService } from './services/los-transaction-report.service';
+import { LosCheckCibilService } from './services/los-check-cibil.service';
 
 @ApiTags('LOS Data')
 @Controller('los')
@@ -35,6 +36,7 @@ export class LosDataController {
     private readonly losBureauReport: LosBureauReportService,
     private readonly losLeadReport: LosLeadReportService,
     private readonly losTransactionReport: LosTransactionReportService,
+    private readonly losCheckCibil: LosCheckCibilService,
   ) {}
 
   @Get('dashboard/crm')
@@ -332,6 +334,38 @@ export class LosDataController {
   @ApiOperation({ summary: 'Structured CIBIL report view for a lead (from latest bureau pull)' })
   leadCibilReport(@Param('leadUuid') leadUuid: string) {
     return this.losLead.getLeadCibilReport(leadUuid);
+  }
+
+  @Get('leads/:leadUuid/cibil-hits')
+  @ApiOperation({ summary: 'CIBIL / bureau hit log for a lead (vendor pulls and stored reports)' })
+  leadCibilHits(@Param('leadUuid') leadUuid: string) {
+    return this.losCheckCibil.listHitsForLeadUuid(leadUuid);
+  }
+
+  @Post('leads/:leadUuid/check-cibil')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({
+    summary: 'Pull CIBIL, run post-BRE, and reject the lead when any post-BRE rule fails',
+  })
+  checkLeadCibil(@Param('leadUuid') leadUuid: string) {
+    return this.losCheckCibil.checkForLead(leadUuid);
+  }
+
+  @Get('applications/:applicationUuid/cibil-hits')
+  @ApiOperation({ summary: 'CIBIL / bureau hit log for an application lead' })
+  applicationCibilHits(@Param('applicationUuid') applicationUuid: string) {
+    return this.losCheckCibil.listHitsForApplication(applicationUuid);
+  }
+
+  @Post('applications/:applicationUuid/check-cibil')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({
+    summary: 'Pull CIBIL for the application lead, run post-BRE, and reject when post-BRE fails',
+  })
+  checkApplicationCibil(@Param('applicationUuid') applicationUuid: string) {
+    return this.losCheckCibil.checkForApplication(applicationUuid);
   }
 
   @Get('leads/:leadUuid')

@@ -21,6 +21,7 @@ export * from './contact';
 export * from './negative-lists';
 export * from './bre';
 export * from './cibil-report';
+export * from './check-cibil';
 export * from './bureau-reports';
 export * from './lead-reports';
 export * from './transaction-reports';
