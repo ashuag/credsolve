@@ -20,7 +20,9 @@ export type LosLoan = {
   bounceRatePerDayInr: string;
   /** Penal charge (rate % of principal, min/max capped); "0.00" unless past due. */
   penalAmount: string;
-  /** `totalRepaymentAmount` plus the penal charge. */
+  /** Interest for overdue days only; "0.00" unless past due. */
+  overdueInterestInr: string;
+  /** `totalRepaymentAmount` plus overdue-days interest and the penal charge. */
   totalRepaymentWithPenalAmount: string;
   /** IST calendar days past maturity; 0 when not overdue. */
   overdueDays: number;
@@ -82,9 +84,9 @@ export type LosLoanDetails = LosLoan & {
   gstPercentage: string | null;
   /** Inclusive days from disbursement through today (or closedAt if closed). */
   daysOutstanding: number | null;
-  /** Interest charged if paid today (actual days inside cooling; full tenure after). */
+  /** Interest charged if paid today (actual days inside cooling; full tenure + overdue days after due). */
   interestTillToday: string | null;
-  /** Principal + interest due today. */
+  /** Principal + interest due today (includes overdue interest; callers add penal). */
   amountDueToday: string | null;
   /** True when pay-now interest is the contracted full tenure (cooling period has passed). */
   usedFullTenureInterest: boolean;

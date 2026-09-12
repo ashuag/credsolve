@@ -295,9 +295,16 @@ export function LoansPanel() {
             <div className={hasPenal ? 'font-bold text-[#b91c1c]' : 'font-bold text-brand-text'}>
               {formatINR(loan.totalRepaymentWithPenalAmount)}
             </div>
-            {hasPenal ? (
+            {hasPenal || Number(loan.overdueInterestInr) > 0 ? (
               <div className="text-[0.72rem] text-brand-muted mt-0.5">
-                incl. {formatINR(loan.penalAmount)} penal charge
+                {[
+                  Number(loan.overdueInterestInr) > 0
+                    ? `${formatINR(loan.overdueInterestInr)} overdue interest`
+                    : null,
+                  hasPenal ? `${formatINR(loan.penalAmount)} penal` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </div>
             ) : null}
           </>

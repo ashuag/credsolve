@@ -164,21 +164,22 @@ export class InitiateCustomerRepaymentUseCase {
     }
 
     const coolingPeriodDays = await this.settings.loadRepayCoolingPeriodDays();
-    const due = computeAmountDueNowInr(principal, dailyRate, loan.disbursedAt, {
-      coolingPeriodDays,
-      tenureDays: computeTenureDays(loan.disbursedAt, loan.loanMaturityDate),
-    });
-    if (!(due.amountDue > 0)) {
-      throw new BadRequestException('Nothing due on this loan right now.');
-    }
-
-    // Late repayment (after maturity / OVERDUE): penal charge is rate % of principal,
-    // clamped between PENAL_MIN_INR and PENAL_MAX_INR. A loan flagged OVERDUE bills at least one day.
+    // Late repayment (after maturity / OVERDUE): full tenure interest + overdue-days
+    // interest + penal (rate % of principal, clamped between PENAL_MIN_INR and PENAL_MAX_INR).
+    // A loan flagged OVERDUE bills at least one overdue day.
     const pastDue =
       loan.loanStatus.name === LOAN_STATUS.OVERDUE || isRepaymentPastDue(loan.loanMaturityDate);
     const overdueDays = pastDue
       ? Math.max(overdueDaysFromMaturity(loan.loanMaturityDate), 1)
       : 0;
+    const due = computeAmountDueNowInr(principal, dailyRate, loan.disbursedAt, {
+      coolingPeriodDays,
+      tenureDays: computeTenureDays(loan.disbursedAt, loan.loanMaturityDate),
+      overdueDays,
+    });
+    if (!(due.amountDue > 0)) {
+      throw new BadRequestException('Nothing due on this loan right now.');
+    }
     const bounceFeeInr = await this.bounceChargeTiers.resolveChargeForAmount(
       principal,
       overdueDays,

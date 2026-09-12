@@ -113,8 +113,13 @@ export class LosLoanService {
         ? Math.max(overdueDaysFromMaturity(loan.loanMaturityDate), 1)
         : 0;
       const principal = decimalToNumber(loan.principalAmount);
+      const dailyRate = decimalToNumber(loan.interestRate);
       const penalAmount =
         principal != null ? computePenalChargeInr(principal, overdueDays, penal) : 0;
+      const overdueInterestInr =
+        principal != null && dailyRate != null && overdueDays > 0
+          ? computeInterestAmountInr(principal, dailyRate, overdueDays)
+          : 0;
       const totalRepayment = decimalToNumber(loan.totalRepaymentAmount) ?? 0;
 
       return {
@@ -137,8 +142,9 @@ export class LosLoanService {
         bounceRatePerDayInr: '0.00',
         /** Penal charge (rate % of principal, min/max capped); 0 unless past due and still open. */
         penalAmount: penalAmount.toFixed(2),
+        overdueInterestInr: overdueInterestInr.toFixed(2),
         totalRepaymentWithPenalAmount: (
-          Math.round((totalRepayment + penalAmount) * 100) / 100
+          Math.round((totalRepayment + overdueInterestInr + penalAmount) * 100) / 100
         ).toFixed(2),
         /** IST calendar days past maturity; 0 when not overdue. */
         overdueDays,
@@ -313,6 +319,7 @@ export class LosLoanService {
     let interestTillToday: string | null = null;
     let amountDueToday: string | null = null;
     let usedFullTenureInterest = false;
+    let overdueInterestInr = 0;
     const bounceFeeInr = loan.closedAt == null ? penalAmount.toFixed(2) : null;
 
     if (loan.closedAt == null && principal != null && dailyRate != null) {
@@ -320,9 +327,11 @@ export class LosLoanService {
       const due = computeAmountDueNowInr(principal, dailyRate, loan.disbursedAt, {
         coolingPeriodDays,
         tenureDays: contractedTenureDays ?? 1,
+        overdueDays,
       });
       daysOutstanding = due.daysOutstanding;
-      interestTillToday = due.interestAmount.toFixed(2);
+      interestTillToday = due.totalInterestAmount.toFixed(2);
+      overdueInterestInr = due.overdueInterestAmount;
       amountDueToday = (Math.round((due.amountDue + penalAmount) * 100) / 100).toFixed(2);
       usedFullTenureInterest = due.usedFullTenureInterest;
     } else if (loan.closedAt != null) {
@@ -365,8 +374,9 @@ export class LosLoanService {
           : loan.totalRepaymentAmount.toString(),
       bounceRatePerDayInr: '0.00',
       penalAmount: penalAmount.toFixed(2),
+      overdueInterestInr: overdueInterestInr.toFixed(2),
       totalRepaymentWithPenalAmount: (
-        Math.round((bookedTotal + penalAmount) * 100) / 100
+        Math.round((bookedTotal + overdueInterestInr + penalAmount) * 100) / 100
       ).toFixed(2),
       overdueDays,
       processingFeeAmount: fees.processingFeeAmount != null ? fees.processingFeeAmount.toFixed(2) : null,

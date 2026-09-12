@@ -101,13 +101,6 @@ export class SettleEasebuzzRepaymentService {
     const principal = decimalToNumber(input.loan.principalAmount);
     const dailyRate = decimalToNumber(input.loan.interestRate);
     const coolingPeriodDays = await loadRepayCoolingPeriodDays(this.prisma.client);
-    const due =
-      principal != null && dailyRate != null
-        ? computeAmountDueNowInr(principal, dailyRate, input.loan.disbursedAt, {
-            coolingPeriodDays,
-            tenureDays: computeTenureDays(input.loan.disbursedAt, input.loan.loanMaturityDate),
-          })
-        : null;
 
     const loanStatus = await this.prisma.client.loanAccount.findUnique({
       where: { id: input.loan.id },
@@ -130,6 +123,14 @@ export class SettleEasebuzzRepaymentService {
     const overdueDays = pastDue
       ? Math.max(overdueDaysFromMaturity(input.loan.loanMaturityDate), 1)
       : 0;
+    const due =
+      principal != null && dailyRate != null
+        ? computeAmountDueNowInr(principal, dailyRate, input.loan.disbursedAt, {
+            coolingPeriodDays,
+            tenureDays: computeTenureDays(input.loan.disbursedAt, input.loan.loanMaturityDate),
+            overdueDays,
+          })
+        : null;
     const bounceFeeInr =
       principal != null
         ? await this.bounceChargeTiers.resolveChargeForAmount(principal, overdueDays)

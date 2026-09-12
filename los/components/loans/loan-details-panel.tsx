@@ -403,6 +403,8 @@ function FeeStack({ row }: { row: LosLoanDetails }) {
   const gstPct = formatPercent(row.gstPercentage);
   const penal = Number(row.penalAmount);
   const hasPenal = Number.isFinite(penal) && penal > 0;
+  const overdueInterest = Number(row.overdueInterestInr);
+  const hasOverdueInterest = Number.isFinite(overdueInterest) && overdueInterest > 0;
   const penalLabel = 'Penal charge';
   const lines: Array<{
     label: string;
@@ -426,15 +428,31 @@ function FeeStack({ row }: { row: LosLoanDetails }) {
     { label: 'Interest', value: `+ ${formatINR(row.interestAmount)}`, muted: true },
     { label: 'Total repayable', value: formatINR(row.totalRepaymentAmount), accent: '#1c347d', strong: true },
     // Only charged once the loan is past due, so the rows stay hidden on a healthy loan.
-    ...(hasPenal
+    ...(hasOverdueInterest || hasPenal
       ? [
+          ...(hasOverdueInterest
+            ? [
+                {
+                  label:
+                    row.overdueDays > 0
+                      ? `Overdue interest (${row.overdueDays} ${row.overdueDays === 1 ? 'day' : 'days'})`
+                      : 'Overdue interest',
+                  value: `+ ${formatINRExact(row.overdueInterestInr)}`,
+                  accent: '#b91c1c',
+                },
+              ]
+            : []),
+          ...(hasPenal
+            ? [
+                {
+                  label: penalLabel,
+                  value: `+ ${formatINRExact(row.penalAmount)}`,
+                  accent: '#b91c1c',
+                },
+              ]
+            : []),
           {
-            label: penalLabel,
-            value: `+ ${formatINRExact(row.penalAmount)}`,
-            accent: '#b91c1c',
-          },
-          {
-            label: 'Total repayable + penal',
+            label: 'Total due today',
             value: formatINR(row.totalRepaymentWithPenalAmount),
             accent: '#b91c1c',
             strong: true,
@@ -757,8 +775,17 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
           hint={
             Number(row.outstandingAmount) <= 0
               ? 'Nothing due'
-              : Number(row.penalAmount) > 0
-                ? `Incl. penal ${formatINRExact(row.penalAmount)}`
+              : Number(row.penalAmount) > 0 || Number(row.overdueInterestInr) > 0
+                ? `Incl. ${[
+                    Number(row.overdueInterestInr) > 0
+                      ? `overdue ${formatINRExact(row.overdueInterestInr)}`
+                      : null,
+                    Number(row.penalAmount) > 0
+                      ? `penal ${formatINRExact(row.penalAmount)}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}`
                 : 'Still to collect'
           }
           accent={Number(row.outstandingAmount) > 0 ? '#b45309' : '#047857'}
@@ -772,9 +799,11 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
         subtitle={
           row.closedAt
             ? 'Interest charged for the days the loan was open'
-            : row.usedFullTenureInterest
-              ? 'Cooling period has passed — interest is the full contracted tenure'
-              : 'Accrued interest from disbursement through today (within cooling period)'
+            : row.overdueDays > 0
+              ? 'Past due — full tenure interest plus overdue-days interest'
+              : row.usedFullTenureInterest
+                ? 'Cooling period has passed — interest is the full contracted tenure'
+                : 'Accrued interest from disbursement through today (within cooling period)'
         }
       >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -797,11 +826,19 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
               {formatINRExact(row.amountDueToday)}
             </p>
             <p className="m-0 mt-1 text-[0.72rem] font-semibold text-brand-muted">
-              {Number(row.bounceFeeInr) > 0
-                ? `Principal + interest + penal charge (${formatINRExact(row.bounceFeeInr)})`
-                : row.usedFullTenureInterest
-                  ? 'Principal + full tenure interest'
-                  : 'Principal + interest till today'}
+              {row.overdueDays > 0
+                ? `Principal + full tenure interest + ${row.overdueDays} overdue day${
+                    row.overdueDays === 1 ? '' : 's'
+                  }${
+                    Number(row.bounceFeeInr) > 0
+                      ? ` + penal (${formatINRExact(row.bounceFeeInr)})`
+                      : ''
+                  }`
+                : Number(row.bounceFeeInr) > 0
+                  ? `Principal + interest + penal charge (${formatINRExact(row.bounceFeeInr)})`
+                  : row.usedFullTenureInterest
+                    ? 'Principal + full tenure interest'
+                    : 'Principal + interest till today'}
               {Number(row.totalPaidAmount) > 0 ? ' · before payments' : ''}
             </p>
           </div>

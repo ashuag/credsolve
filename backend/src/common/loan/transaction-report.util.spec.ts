@@ -44,8 +44,9 @@ describe('resolveTransactionReportMetrics', () => {
       coolingPeriodDays,
     });
     // Cooling is 7 days; 13 Jul → 5 Aug is past cooling, so full tenure
-    // 13 Jul → 31 Jul inclusive = 19 days; 10000 × 0.1% × 19 = 190.
-    expect(result.interestReceived).toBe(190);
+    // 13 Jul → 31 Jul inclusive = 19 days; 10000 × 0.1% × 19 = 190
+    // plus 5 overdue days; 10000 × 0.1% × 5 = 50.
+    expect(result.interestReceived).toBe(240);
     expect(result.daysExceeded).toBe(5);
   });
 

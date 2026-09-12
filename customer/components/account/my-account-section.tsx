@@ -453,6 +453,9 @@ function ActiveLoanCard({
   const minPayN = parseAmount(minPayAmountInr) ?? 100;
   const bounceN = parseAmount(loan.bounceFeeInr);
   const showBounce = bounceN != null && bounceN > 0;
+  const overdueDays = loan.overdueDays != null && loan.overdueDays > 0 ? loan.overdueDays : 0;
+  const overdueInterestN = parseAmount(loan.overdueInterestInr);
+  const showOverdueInterest = overdueDays > 0 && overdueInterestN != null && overdueInterestN > 0;
   const savings =
     remainingN != null && maturityN != null && (paidN == null || paidN <= 0)
       ? Math.round((maturityN - remainingN) * 100) / 100
@@ -578,6 +581,7 @@ function ActiveLoanCard({
             </p>
             <p className="mt-2 text-[0.8rem] font-medium text-slate-500">
               Principal + interest
+              {showOverdueInterest ? ' + overdue interest' : ''}
               {showBounce ? ' + penal charge' : ''}
               {hasPaid ? ' − paid so far' : ''}
             </p>
@@ -621,7 +625,14 @@ function ActiveLoanCard({
           <div className="mt-4 rounded-2xl bg-[#f8fafd] p-4 ring-1 ring-[rgba(18,36,79,0.08)]">
             <p className="text-[0.8rem] font-semibold text-slate-600">
               You will pay the remaining {remaining ? formatInr(remaining) : '—'}
-              {showBounce ? ', including the penal charge' : ''}
+              {showOverdueInterest || showBounce
+                ? `, including ${[
+                    showOverdueInterest ? 'overdue interest' : null,
+                    showBounce ? 'the penal charge' : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' and ')}`
+                : ''}
               {hasPaid ? ' after earlier payments' : ''}.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -710,11 +721,13 @@ function ActiveLoanCard({
               {loan.interestTillToday != null ? formatInr(loan.interestTillToday) : '—'}
             </dd>
             <p className="mt-0.5 text-[0.62rem] font-semibold text-slate-400">
-              {loan.usedFullTenureInterest
-                ? 'Full tenure'
-                : daysUsed != null
-                  ? `${daysUsed} day${daysUsed === 1 ? '' : 's'} used`
-                  : 'Till today'}
+              {showOverdueInterest
+                ? `Full tenure + ${overdueDays} overdue day${overdueDays === 1 ? '' : 's'}`
+                : loan.usedFullTenureInterest
+                  ? 'Full tenure'
+                  : daysUsed != null
+                    ? `${daysUsed} day${daysUsed === 1 ? '' : 's'} used`
+                    : 'Till today'}
             </p>
           </div>
           <div className="px-3 py-3 sm:px-4">
@@ -728,9 +741,20 @@ function ActiveLoanCard({
           </div>
         </dl>
 
-        {showBounce ? (
+        {showOverdueInterest || showBounce ? (
           <p className="mt-3 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[0.78rem] font-semibold text-rose-800 ring-1 ring-rose-100">
-            Includes a penal charge of {formatInr(loan.bounceFeeInr)} because repayment is overdue.
+            Includes{' '}
+            {[
+              showOverdueInterest
+                ? `${overdueDays} day${overdueDays === 1 ? '' : 's'} of overdue interest${
+                    overdueInterestN != null ? ` (${formatInr(loan.overdueInterestInr)})` : ''
+                  }`
+                : null,
+              showBounce ? `a penal charge of ${formatInr(loan.bounceFeeInr)}` : null,
+            ]
+              .filter(Boolean)
+              .join(' and ')}{' '}
+            because repayment is overdue.
           </p>
         ) : null}
 
@@ -738,6 +762,12 @@ function ActiveLoanCard({
           <p className="mt-3 rounded-xl bg-emerald-50 px-3.5 py-2.5 text-[0.78rem] font-semibold text-emerald-800 ring-1 ring-emerald-100">
             Paying today saves {formatInr(savings.toFixed(2))} versus waiting until{' '}
             {formatFriendlyDate(loan.maturityDate)}.
+          </p>
+        ) : showOverdueInterest ? (
+          <p className="mt-3 rounded-xl bg-[#f4f8ff] px-3.5 py-2.5 text-[0.78rem] font-medium leading-relaxed text-slate-600 ring-1 ring-[rgba(20,150,243,0.1)]">
+            Past the due date — interest is the
+            {loan.tenureDays != null ? ` full ${loan.tenureDays}-day` : ' full'} tenure plus{' '}
+            {overdueDays} overdue day{overdueDays === 1 ? '' : 's'}.
           </p>
         ) : loan.usedFullTenureInterest ? (
           <p className="mt-3 rounded-xl bg-[#f4f8ff] px-3.5 py-2.5 text-[0.78rem] font-medium leading-relaxed text-slate-600 ring-1 ring-[rgba(20,150,243,0.1)]">
