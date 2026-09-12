@@ -97,7 +97,12 @@ const leadReportInclude = {
       city: { select: { name: true, state: { select: { name: true, code: true } } } },
       gender: { select: { name: true } },
       occupation: { select: { name: true } },
-      bureauReport: { select: { cibilScore: true } },
+      bureauReport: {
+        select: {
+          cibilScore: true,
+          cibilCreditAssessment: { select: { category: true } },
+        },
+      },
     },
   },
   vendorApiLogs: {
@@ -218,6 +223,7 @@ function mapLeadReport(lead: LeadReportRecord, liveRepayDate?: Date | null) {
     address: [profile?.addressLine1, profile?.addressLine2].filter(Boolean).join(', ') || null,
     netMonthlyIncome: profile?.netMonthlyIncome?.toString() ?? null,
     cibilScore: profile?.bureauReport?.cibilScore ?? null,
+    cibilCreditAssessmentCategory: profile?.bureauReport?.cibilCreditAssessment?.category ?? null,
     leadStatusCode: lead.leadStatus.name,
     leadStatusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
     applicationUuid: application?.uuid ?? null,
@@ -272,6 +278,7 @@ const LEAD_REPORT_HEADERS = [
   'Address',
   'Monthly income',
   'CIBIL',
+  'Grade',
   'Purpose of loan',
   'Loan offer amount',
   'Loan selected amount',
@@ -353,6 +360,7 @@ export class LosLeadReportService {
         row.address,
         toExcelNumber(row.netMonthlyIncome),
         toExcelNumber(row.cibilScore),
+        row.cibilCreditAssessmentCategory,
         row.purposeOfLoan,
         toExcelNumber(row.loanOfferAmount),
         toExcelNumber(row.loanSelectedAmount),

@@ -9,6 +9,8 @@ export type LosLoan = {
   customerUuid: string;
   leadUuid: string;
   fullName: string | null;
+  /** CIBIL credit-assessment grade (A–H) from the current bureau report. */
+  cibilCreditAssessmentCategory: string | null;
   mobileNumber: string;
   email: string | null;
   principalAmount: string;

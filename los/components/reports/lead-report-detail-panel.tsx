@@ -185,6 +185,7 @@ export function LeadReportDetailPanel({ leadUuid }: { leadUuid: string }) {
                   { label: 'Monthly income', value: formatReviewInr(row.netMonthlyIncome) },
                   { label: 'Email', value: row.email ?? '—' },
                   { label: 'CIBIL', value: formatCibilScoreLabel(row.cibilScore) },
+                  { label: 'Grade', value: row.cibilCreditAssessmentCategory ?? '—' },
                 ]}
               />
             </SectionCard>

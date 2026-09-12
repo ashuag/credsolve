@@ -74,7 +74,16 @@ export class LosLoanService {
               select: {
                 id: true,
                 uuid: true,
-                leadDetail: { select: { fullName: true } },
+                leadDetail: {
+                  select: {
+                    fullName: true,
+                    bureauReport: {
+                      select: {
+                        cibilCreditAssessment: { select: { category: true } },
+                      },
+                    },
+                  },
+                },
               },
             },
           },
@@ -131,6 +140,8 @@ export class LosLoanService {
         customerUuid: loan.customer.uuid,
         leadUuid: loan.application.lead.uuid,
         fullName: formatLosPersonName(loan.application.lead.leadDetail?.fullName),
+        cibilCreditAssessmentCategory:
+          loan.application.lead.leadDetail?.bureauReport?.cibilCreditAssessment?.category ?? null,
         mobileNumber: loan.customer.mobileNumber,
         email: details?.emailId ?? null,
         principalAmount: loan.principalAmount.toString(),
@@ -209,6 +220,11 @@ export class LosLoanService {
                     addressLine2: true,
                     pincode: true,
                     city: { select: { name: true, state: { select: { name: true } } } },
+                    bureauReport: {
+                      select: {
+                        cibilCreditAssessment: { select: { category: true } },
+                      },
+                    },
                   },
                 },
               },
@@ -355,6 +371,7 @@ export class LosLoanService {
       customerUuid: loan.customer.uuid,
       leadUuid: loan.application.lead.uuid,
       fullName: formatLosPersonName(profile?.fullName),
+      cibilCreditAssessmentCategory: profile?.bureauReport?.cibilCreditAssessment?.category ?? null,
       mobileNumber: loan.customer.mobileNumber,
       email: details?.emailId ?? null,
       panNumber: profile?.panNumber ?? null,
