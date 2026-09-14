@@ -119,11 +119,13 @@ export class LosLoanService {
         closedAt: loan.closedAt,
       });
 
-      // A closed loan keeps its stored status, so exclude it explicitly before charging penalty.
-      const pastDue = loan.closedAt == null && effectiveStatus.code === LOAN_STATUS.OVERDUE;
-      const overdueDays = pastDue
-        ? Math.max(overdueDaysFromMaturity(loan.loanMaturityDate), 1)
-        : 0;
+      // Open: days past due as of today. Closed after due: days from maturity through payoff.
+      const daysPastDue = overdueDaysFromMaturity(
+        loan.loanMaturityDate,
+        loan.closedAt ?? new Date(),
+      );
+      const overdueDays = daysPastDue > 0 ? Math.max(daysPastDue, 1) : 0;
+      const pastDue = loan.closedAt == null && overdueDays > 0;
       const principal = decimalToNumber(loan.principalAmount);
       const dailyRate = decimalToNumber(loan.interestRate);
       const penalAmount =
@@ -336,11 +338,12 @@ export class LosLoanService {
           ? Math.round((principal + interestAtMaturity) * 100) / 100
           : decimalToNumber(loan.totalRepaymentAmount);
 
-    // Same overdue test as `listLoans`, so the list and this page can never disagree.
-    const pastDue = loan.closedAt == null && effectiveStatus.code === LOAN_STATUS.OVERDUE;
-    const overdueDays = pastDue
-      ? Math.max(overdueDaysFromMaturity(loan.loanMaturityDate), 1)
-      : 0;
+    // Same overdue test as `listLoans`: live days if open, days-at-payoff if closed after due.
+    const daysPastDue = overdueDaysFromMaturity(
+      loan.loanMaturityDate,
+      loan.closedAt ?? new Date(),
+    );
+    const overdueDays = daysPastDue > 0 ? Math.max(daysPastDue, 1) : 0;
     const penal = await this.bounceChargeTiers.loadPenalConfig();
     const penalAmount =
       principal != null ? computePenalChargeInr(principal, overdueDays, penal) : 0;
@@ -349,7 +352,10 @@ export class LosLoanService {
     let interestTillToday: string | null = null;
     let amountDueToday: string | null = null;
     let usedFullTenureInterest = false;
-    let overdueInterestInr = 0;
+    let overdueInterestInr =
+      principal != null && dailyRate != null && overdueDays > 0
+        ? computeInterestAmountInr(principal, dailyRate, overdueDays)
+        : 0;
     const storedWaiverInr = waivedAmountFromLoan(loan.waivedAmount);
     let appliedWaiverInr = storedWaiverInr;
     const bounceFeeInr = loan.closedAt == null ? penalAmount.toFixed(2) : null;
