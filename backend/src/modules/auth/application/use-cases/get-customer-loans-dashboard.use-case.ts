@@ -17,6 +17,7 @@ import {
   overdueDaysFromMaturity,
   type PenalChargeConfig,
 } from '../../../../common/loan/bounce-charge.util';
+import { billDueNowAfterWaiverInr, waivedAmountFromLoan } from '../../../../common/loan/loan-charge-waiver.util';
 import {
   remainingDueInr,
   sumRepaymentAmounts,
@@ -106,6 +107,7 @@ function mapRow(
       loanMaturityDate: Date;
       disbursedAt: Date;
       closedAt: Date | null;
+      waivedAmount: Prisma.Decimal;
       bankAccountNumber: string | null;
       loanStatus: { name: string };
       repayments: Array<{ amount: Prisma.Decimal; status: string }>;
@@ -157,6 +159,8 @@ function mapRow(
   let overdueDaysOut: number | null = null;
   let overdueInterestInr: number | null = null;
   let usedFullTenureInterest = false;
+  const storedWaiverInr = loanAccount != null ? waivedAmountFromLoan(loanAccount.waivedAmount) : 0;
+  let appliedWaiverInr = storedWaiverInr;
   const totalPaid = sumRepaymentAmounts(loanAccount?.repayments ?? []);
 
   if (loanAccount && loanAccount.closedAt == null && principal != null && dailyRate != null) {
@@ -177,8 +181,14 @@ function mapRow(
     overdueInterestInr = due.overdueInterestAmount;
     usedFullTenureInterest = due.usedFullTenureInterest;
     bounceFeeInr = computePenalChargeInr(principal, overdueDays, penal);
-    const billDueNow = Math.round((due.amountDue + bounceFeeInr) * 100) / 100;
-    amountDueToday = remainingDueInr(billDueNow, totalPaid);
+    const bill = billDueNowAfterWaiverInr({
+      amountDueBeforePenal: due.amountDue,
+      penalInr: bounceFeeInr,
+      overdueInterestInr: due.overdueInterestAmount,
+      waivedAmountInr: storedWaiverInr,
+    });
+    appliedWaiverInr = bill.appliedWaiverInr;
+    amountDueToday = remainingDueInr(bill.billDueNow, totalPaid);
   } else if (loanAccount?.closedAt != null) {
     // Inclusive days from disbursement through repayment (disbursement day = day 1).
     daysOutstanding = calendarDaysBetween(loanAccount.disbursedAt, loanAccount.closedAt) + 1;
@@ -197,7 +207,9 @@ function mapRow(
   const displayStatus =
     loanAccount != null
       ? loanAccount.closedAt != null
-        ? 'CLOSED'
+        ? loanAccount.loanStatus.name === LOAN_STATUS.SETTLED
+          ? LOAN_STATUS.SETTLED
+          : 'CLOSED'
         : loanAccount.loanStatus.name
       : r.applicationStatus.name;
 
@@ -217,6 +229,9 @@ function mapRow(
     usedFullTenureInterest,
     overdueDays: overdueDaysOut,
     overdueInterestInr: overdueInterestStr,
+    waivedAmountInr: (loanAccount?.closedAt != null ? storedWaiverInr : appliedWaiverInr) > 0.009
+      ? (loanAccount?.closedAt != null ? storedWaiverInr : appliedWaiverInr).toFixed(2)
+      : null,
     bounceFeeInr: bounceFeeStr,
     totalPaidInr: loanAccount != null ? totalPaid.toFixed(2) : null,
     outstandingInr: amountDueTodayStr,
@@ -268,6 +283,7 @@ const APPLICATION_DASHBOARD_SELECT = {
       loanMaturityDate: true,
       disbursedAt: true,
       closedAt: true,
+      waivedAmount: true,
       bankAccountNumber: true,
       loanStatus: { select: { name: true } },
       repayments: {

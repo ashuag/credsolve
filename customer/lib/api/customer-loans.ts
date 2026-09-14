@@ -21,6 +21,7 @@ export type CustomerLoanCard = {
   usedFullTenureInterest?: boolean;
   overdueDays?: number | null;
   overdueInterestInr?: string | null;
+  waivedAmountInr?: string | null;
   bounceFeeInr: string | null;
   totalPaidInr: string | null;
   outstandingInr: string | null;

@@ -24,7 +24,11 @@ export type LosLoan = {
   penalAmount: string;
   /** Interest for overdue days only; "0.00" unless past due. */
   overdueInterestInr: string;
-  /** `totalRepaymentAmount` plus overdue-days interest and the penal charge. */
+  /** Waiver of penal + overdue-days interest. */
+  waivedAmountInr: string;
+  waivedByName: string | null;
+  waivedAt: string | null;
+  /** `totalRepaymentAmount` plus overdue-days interest and the penal charge, minus waiver. */
   totalRepaymentWithPenalAmount: string;
   /** IST calendar days past maturity; 0 when not overdue. */
   overdueDays: number;
@@ -135,6 +139,23 @@ export type LosRefreshPaymentResult = {
   loanStatusLabel: string;
   unsettledPaymentLink: boolean;
 };
+
+export async function waiveLoanCharges(
+  token: string,
+  loanUuid: string,
+  waivedAmountInr: number,
+): Promise<LosLoanDetails> {
+  return authorizedLosRequest<LosLoanDetails>(
+    token,
+    `/loans/${encodeURIComponent(loanUuid)}/waive-charges`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ waivedAmountInr }),
+    },
+    'Failed to save the charge waiver.',
+  );
+}
 
 export async function refreshLoanPayment(
   token: string,

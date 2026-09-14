@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { LOAN_REPAYMENT_STATUS } from '../constants/loan-repayment.constants';
-import { LOAN_STATUS } from '../constants/loan.constants';
+import { closeLoanStatusName, isClosedLoanStatus, LOAN_STATUS } from '../constants/loan.constants';
 import { LEAD_STATUS } from '../constants/lead.constants';
 import { BounceChargeTierResolverService } from '../loan/bounce-charge-tier.resolver';
 import { isRepaymentPastDue, overdueDaysFromMaturity } from '../loan/bounce-charge.util';
@@ -12,6 +12,7 @@ import {
   decimalToNumber,
   type DecimalLike,
 } from '../loan/loan-calculation.util';
+import { billDueNowAfterWaiverInr, waivedAmountFromLoan } from '../loan/loan-charge-waiver.util';
 import {
   remainingDueInr,
   shouldCloseLoanAfterPayment,
@@ -104,9 +105,9 @@ export class SettleEasebuzzRepaymentService {
 
     const loanStatus = await this.prisma.client.loanAccount.findUnique({
       where: { id: input.loan.id },
-      select: { loanStatus: { select: { name: true } }, closedAt: true },
+      select: { loanStatus: { select: { name: true } }, closedAt: true, waivedAmount: true },
     });
-    if (loanStatus?.closedAt != null || loanStatus?.loanStatus.name === LOAN_STATUS.CLOSED) {
+    if (loanStatus?.closedAt != null || isClosedLoanStatus(loanStatus?.loanStatus.name)) {
       await this.clearIntent(input.loan.uuid, txnid);
       return {
         alreadySettled: true,
@@ -135,13 +136,29 @@ export class SettleEasebuzzRepaymentService {
       principal != null
         ? await this.bounceChargeTiers.resolveChargeForAmount(principal, overdueDays)
         : 0;
-    const billDueNow =
-      due != null ? Math.round((due.amountDue + bounceFeeInr) * 100) / 100 : paidThis;
+    const bill =
+      due != null
+        ? billDueNowAfterWaiverInr({
+            amountDueBeforePenal: due.amountDue,
+            penalInr: bounceFeeInr,
+            overdueInterestInr: due.overdueInterestAmount,
+            waivedAmountInr: waivedAmountFromLoan(loanStatus?.waivedAmount),
+          })
+        : null;
+    const billDueNow = bill?.billDueNow ?? paidThis;
+    const closeStatusName = closeLoanStatusName(bill?.appliedWaiverInr ?? 0);
 
-    const closedStatus = await this.prisma.client.loanStatus.findFirst({
-      where: { name: LOAN_STATUS.CLOSED, isActive: true },
-      select: { id: true },
-    });
+    const closedStatus =
+      (await this.prisma.client.loanStatus.findFirst({
+        where: { name: closeStatusName, isActive: true },
+        select: { id: true },
+      })) ??
+      (closeStatusName === LOAN_STATUS.SETTLED
+        ? await this.prisma.client.loanStatus.findFirst({
+            where: { name: LOAN_STATUS.CLOSED, isActive: true },
+            select: { id: true },
+          })
+        : null);
 
     const lockKey = `customer:repay-settle:${vendorRef}`;
     const lockToken = randomUUID();

@@ -38,6 +38,9 @@ const COMPLETE_JOURNEY_HREF = '/apply-for-loan';
 function statusBadgeClass(status: string): string {
   const s = status.toUpperCase();
   // Loan account outcomes
+  if (s === 'SETTLED') {
+    return 'bg-indigo-50 text-indigo-800 border-indigo-200 ring-1 ring-indigo-500/20';
+  }
   if (s === 'CLOSED' || s === 'PAID' || s === 'PAID_FULLY') {
     return 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-1 ring-emerald-500/20';
   }
@@ -66,6 +69,7 @@ function statusBadgeClass(status: string): string {
 
 function statusBadgeLabel(status: string): string {
   const s = status.toUpperCase();
+  if (s === 'SETTLED') return 'Settled';
   if (s === 'CLOSED') return 'Paid fully';
   if (s === 'OVERDUE') return 'Overdue';
   if (s === 'ACTIVE') return 'Active loan';
@@ -453,6 +457,8 @@ function ActiveLoanCard({
   const minPayN = parseAmount(minPayAmountInr) ?? 100;
   const bounceN = parseAmount(loan.bounceFeeInr);
   const showBounce = bounceN != null && bounceN > 0;
+  const waivedN = parseAmount(loan.waivedAmountInr);
+  const showWaiver = waivedN != null && waivedN > 0;
   const overdueDays = loan.overdueDays != null && loan.overdueDays > 0 ? loan.overdueDays : 0;
   const overdueInterestN = parseAmount(loan.overdueInterestInr);
   const showOverdueInterest = overdueDays > 0 && overdueInterestN != null && overdueInterestN > 0;
@@ -583,6 +589,7 @@ function ActiveLoanCard({
               Principal + interest
               {showOverdueInterest ? ' + overdue interest' : ''}
               {showBounce ? ' + penal charge' : ''}
+              {showWaiver ? ' − waived' : ''}
               {hasPaid ? ' − paid so far' : ''}
             </p>
             {hasPaid ? (
@@ -741,7 +748,7 @@ function ActiveLoanCard({
           </div>
         </dl>
 
-        {showOverdueInterest || showBounce ? (
+        {showOverdueInterest || showBounce || showWaiver ? (
           <p className="mt-3 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[0.78rem] font-semibold text-rose-800 ring-1 ring-rose-100">
             Includes{' '}
             {[
@@ -753,8 +760,11 @@ function ActiveLoanCard({
               showBounce ? `a penal charge of ${formatInr(loan.bounceFeeInr)}` : null,
             ]
               .filter(Boolean)
-              .join(' and ')}{' '}
-            because repayment is overdue.
+              .join(' and ')}
+            {showOverdueInterest || showBounce ? ' because repayment is overdue.' : ''}
+            {showWaiver
+              ? ` ${formatInr(loan.waivedAmountInr)} of penal + overdue interest has been waived.`
+              : ''}
           </p>
         ) : null}
 
@@ -943,7 +953,7 @@ function InProgressLoanCard({ loan }: { loan: CustomerLoanCard }) {
 }
 
 function LoanSummaryCard({ loan }: { loan: CustomerLoanCard }) {
-  const isPaidFully = loan.status.toUpperCase() === 'CLOSED';
+  const isPaidFully = ['CLOSED', 'SETTLED'].includes(loan.status.toUpperCase());
   const repaymentDays = isPaidFully
     ? (loan.daysOutstanding ?? loan.tenureDays)
     : loan.tenureDays;
@@ -993,6 +1003,9 @@ function LoanSummaryCard({ loan }: { loan: CustomerLoanCard }) {
             : 'Closed'
           : `Due ${formatFriendlyDate(loan.maturityDate)}`}
         {loan.bankDisplay ? ` · ${loan.bankDisplay}` : null}
+        {parseAmount(loan.waivedAmountInr) != null && parseAmount(loan.waivedAmountInr)! > 0
+          ? ` · Waived ${formatInr(loan.waivedAmountInr)}`
+          : null}
       </p>
     </div>
   );

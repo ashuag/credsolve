@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { COLLECTED_REPAYMENT_STATUSES, LOAN_REPAYMENT_STATUS } from '../../../common/constants/loan-repayment.constants';
-import { LOAN_STATUS } from '../../../common/constants/loan.constants';
+import { isClosedLoanStatus } from '../../../common/constants/loan.constants';
 import { EasebuzzWireService } from '../../../common/easebuzz/easebuzz-wire.service';
 import {
   amountsMatchInr,
@@ -225,7 +225,7 @@ export class LosLoanRepaymentSyncService {
         closedAt,
       });
 
-    if (loan.closedAt != null || loan.loanStatus.name === LOAN_STATUS.CLOSED) {
+    if (loan.closedAt != null || isClosedLoanStatus(loan.loanStatus.name)) {
       const status = statusOf(loan.closedAt, loan.loanStatus.name, loan.loanStatus.displayName);
       return {
         outcome: 'already_closed',

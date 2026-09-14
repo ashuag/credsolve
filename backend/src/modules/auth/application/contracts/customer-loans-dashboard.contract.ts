@@ -34,6 +34,8 @@ export type CustomerLoanCard = {
   overdueDays: number | null;
   /** Interest for overdue days only (0.00 when not past due). */
   overdueInterestInr: string | null;
+  /** LOS-negotiated waiver of penal + overdue-days interest. */
+  waivedAmountInr: string | null;
   /** Penal charge included in amountDueToday when repayment is past maturity (else `0.00` / null). */
   bounceFeeInr: string | null;
   /** Sum of successful `loan_repayment` rows. */

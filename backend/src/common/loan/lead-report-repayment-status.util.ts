@@ -44,6 +44,9 @@ export function resolveLeadReportRepaymentStatus(input: {
       label: LABELS.WRITTEN_OFF,
     };
   }
+  if (loan === LOAN_STATUS.SETTLED) {
+    return { code: LEAD_REPORT_REPAYMENT_STATUS.PAID, label: 'Settled' };
+  }
   if (loan === LOAN_STATUS.CLOSED) {
     return { code: LEAD_REPORT_REPAYMENT_STATUS.PAID, label: LABELS.PAID };
   }

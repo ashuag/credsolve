@@ -1,7 +1,8 @@
 'use client';
 
-import { getLoanDetails, markApplicationInternalTesting, refreshLoanPayment, type LosLoanDetails } from '@/lib/api';
-import { LOS_STORAGE_KEY } from '@/lib/auth';
+import { getLoanDetails, markApplicationInternalTesting, refreshLoanPayment, waiveLoanCharges, type LosLoanDetails } from '@/lib/api';
+import { canWaiveLoanCharges } from '@/lib/access';
+import { getLosStoredUser, LOS_STORAGE_KEY } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
 import { RefreshPaymentButton } from '@/components/loans/refresh-payment-button';
 import { LosStatusPill, losStatusPillStyles } from '@/components/shared/los-status-pill';
@@ -165,7 +166,7 @@ function MoneyTile({
         style={{ background: accent }}
         aria-hidden
       />
-      <p className="m-0 text-[0.62rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">{label}</p>
+      <p className="m-0 text-[0.62rem] font-extrabold uppercase leading-snug tracking-[0.08em] text-brand-muted">{label}</p>
       <p className="m-0 mt-2 text-[1.45rem] font-extrabold leading-none tracking-[-0.03em]" style={{ color: accent }}>
         {value}
       </p>
@@ -405,6 +406,8 @@ function FeeStack({ row }: { row: LosLoanDetails }) {
   const hasPenal = Number.isFinite(penal) && penal > 0;
   const overdueInterest = Number(row.overdueInterestInr);
   const hasOverdueInterest = Number.isFinite(overdueInterest) && overdueInterest > 0;
+  const waived = Number(row.waivedAmountInr);
+  const hasWaiver = Number.isFinite(waived) && waived > 0;
   const penalLabel = 'Penal charge';
   const lines: Array<{
     label: string;
@@ -428,7 +431,7 @@ function FeeStack({ row }: { row: LosLoanDetails }) {
     { label: 'Interest', value: `+ ${formatINR(row.interestAmount)}`, muted: true },
     { label: 'Total repayable', value: formatINR(row.totalRepaymentAmount), accent: '#1c347d', strong: true },
     // Only charged once the loan is past due, so the rows stay hidden on a healthy loan.
-    ...(hasOverdueInterest || hasPenal
+    ...(hasOverdueInterest || hasPenal || hasWaiver
       ? [
           ...(hasOverdueInterest
             ? [
@@ -451,10 +454,19 @@ function FeeStack({ row }: { row: LosLoanDetails }) {
                 },
               ]
             : []),
+          ...(hasWaiver
+            ? [
+                {
+                  label: 'Waived (penal + overdue interest)',
+                  value: `− ${formatINRExact(row.waivedAmountInr)}`,
+                  accent: '#3730a3',
+                },
+              ]
+            : []),
           {
             label: 'Total due today',
             value: formatINR(row.totalRepaymentWithPenalAmount),
-            accent: '#b91c1c',
+            accent: hasWaiver ? '#3730a3' : '#b91c1c',
             strong: true,
           },
         ]
@@ -482,6 +494,121 @@ function FeeStack({ row }: { row: LosLoanDetails }) {
         </div>
       ))}
     </div>
+  );
+}
+
+function WaiverCard({
+  row,
+  onSaved,
+}: {
+  row: LosLoanDetails;
+  onSaved: (next: LosLoanDetails) => void;
+}) {
+  const canWaive = canWaiveLoanCharges(getLosStoredUser()?.roleName ?? getLosStoredUser()?.role, getLosStoredUser()?.hierarchyLevel);
+  const maxWaiver = Math.max(0, Math.round((Number(row.penalAmount) + Number(row.overdueInterestInr)) * 100) / 100);
+  const [amount, setAmount] = useState(row.waivedAmountInr ?? '0.00');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAmount(row.waivedAmountInr ?? '0.00');
+  }, [row.waivedAmountInr]);
+
+  const save = async () => {
+    const token = getToken();
+    if (!token) {
+      setError('Session expired — please log in again.');
+      return;
+    }
+    const n = Number.parseFloat(amount);
+    if (!Number.isFinite(n) || n < 0) {
+      setError('Enter a waiver of ₹0 or more.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      onSaved(await waiveLoanCharges(token, row.uuid, Math.round(n * 100) / 100));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save the waiver.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (Number(row.waivedAmountInr) > 0) {
+    return (
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <MoneyTile
+          label="Waived off amount"
+          value={formatINRExact(row.waivedAmountInr)}
+          hint={
+            [row.waivedByName ? `By ${row.waivedByName}` : null, row.waivedAt ? formatDateTime(row.waivedAt) : null]
+              .filter(Boolean)
+              .join(' · ') || 'Penal + overdue-days interest'
+          }
+          accent="#3730a3"
+        />
+        <MoneyTile
+          label="Outstanding amount"
+          value={formatINR(row.outstandingAmount)}
+          hint={
+            Number(row.outstandingAmount) <= 0
+              ? row.loanStatusCode.toUpperCase() === 'SETTLED'
+                ? 'Settled'
+                : 'Nothing due'
+              : 'Still to collect'
+          }
+          accent={Number(row.outstandingAmount) > 0 ? '#b45309' : '#047857'}
+          emphasis
+        />
+      </div>
+    );
+  }
+
+  if (row.closedAt || maxWaiver <= 0) {
+    return null;
+  }
+
+  return (
+    <SectionCard
+      title="Charge waiver"
+      subtitle={`Waive any amount of penal + overdue interest (max ${formatINRExact(String(maxWaiver.toFixed(2)))}). Principal and tenure interest stay due.`}
+    >
+      {canWaive ? (
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex min-w-[10rem] flex-col gap-1">
+            <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
+              Waive amount
+            </span>
+            <input
+              type="number"
+              min={0}
+              max={maxWaiver}
+              step="0.01"
+              value={amount}
+              onChange={(event) => setAmount(event.target.value)}
+              className="h-10 rounded-[10px] border border-[rgba(23,44,113,0.14)] bg-white px-3 text-[0.9rem] font-bold text-brand-navy"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void save()}
+            className="h-10 cursor-pointer rounded-[10px] border border-[rgba(79,70,229,0.28)] bg-[rgba(79,70,229,0.08)] px-4 text-[0.8rem] font-extrabold text-[#3730a3] disabled:opacity-60"
+          >
+            {busy ? 'Saving…' : 'Save waiver'}
+          </button>
+        </div>
+      ) : (
+        <p className="m-0 text-[0.8rem] font-semibold text-brand-muted">Only Team Lead or Admin can waive charges.</p>
+      )}
+      {error ? (
+        <p className="m-0 mt-2 text-[0.78rem] font-semibold text-[#b91c1c]" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </SectionCard>
   );
 }
 
@@ -585,8 +712,13 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
     return (
       <div className="flex animate-pulse flex-col gap-4">
         <div className="h-[168px] rounded-[18px] bg-[rgba(23,44,113,0.06)]" />
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {[0, 1, 2, 3].map((i) => (
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-[96px] rounded-[16px] bg-[rgba(23,44,113,0.06)]" />
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="h-[96px] rounded-[16px] bg-[rgba(23,44,113,0.06)]" />
           ))}
         </div>
@@ -619,6 +751,10 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
   const statusStyles = losStatusPillStyles(row.loanStatusCode);
   const transfer = row.disbursementTransfer;
   const transferUtr = transfer?.uniqueTransactionReference ?? row.utr;
+  const overdueInterestInr = Number(row.overdueInterestInr) || 0;
+  const penalAmountInr = Number(row.penalAmount) || 0;
+  const totalRepayAmountInr =
+    Math.round(((Number(row.totalRepaymentAmount) || 0) + overdueInterestInr + penalAmountInr) * 100) / 100;
 
   return (
     <div className="flex flex-col gap-4">
@@ -765,109 +901,84 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
       </header>
 
       {/* Money snapshot */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <MoneyTile label="Principal" value={formatINR(row.principalAmount)} hint="Sanctioned amount" accent="#1c347d" />
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+        <MoneyTile 
+          label="Principal" 
+          value={formatINR(row.principalAmount)} 
+          hint="Sanctioned amount" 
+          accent="#1c347d" 
+        />
         <MoneyTile label="Net disbursed" value={formatINR(row.netDisbursedAmount)} hint="Credited to borrower" accent="#047857" />
-        <MoneyTile label="Total repayable" value={formatINR(row.totalRepaymentAmount)} hint={`Interest ${formatINR(row.interestAmount)}`} accent="#4338ca" />
+        
         <MoneyTile
-          label="Outstanding"
-          value={formatINR(row.outstandingAmount)}
+          label="Interest till repay date"
+          value={formatINRExact(row.interestAmount)}
           hint={
-            Number(row.outstandingAmount) <= 0
-              ? 'Nothing due'
-              : Number(row.penalAmount) > 0 || Number(row.overdueInterestInr) > 0
-                ? `Incl. ${[
-                    Number(row.overdueInterestInr) > 0
-                      ? `overdue ${formatINRExact(row.overdueInterestInr)}`
-                      : null,
-                    Number(row.penalAmount) > 0
-                      ? `penal ${formatINRExact(row.penalAmount)}`
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}`
-                : 'Still to collect'
+            row.expectedRepaymentDays != null
+              ? `Full tenure (${row.expectedRepaymentDays} days)`
+              : 'Full tenure interest'
           }
-          accent={Number(row.outstandingAmount) > 0 ? '#b45309' : '#047857'}
+          accent="#4338ca"
+        />
+        <MoneyTile
+          label="Repayable till repayment date"
+          value={formatINR(row.totalRepaymentAmount)}
+          hint="Principal + tenure interest"
+          accent="#4338ca"
+        />
+        
+        <MoneyTile
+          label="Repay date"
+          value={formatDate(row.loanMaturityDate)}
+          hint="Loan maturity"
+          accent="#1c347d"
+        />
+
+      </div>
+
+      {row.overdueDays > 0 ? (
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <MoneyTile
+          label="Overdue days"
+          value={String(row.overdueDays ?? 0)}
+          hint={row.overdueDays === 1 ? 'Day past repay date' : 'Days past repay date'}
+          accent="#b91c1c"
+        />
+        <MoneyTile
+          label="Interest of overdue days"
+          value={formatINRExact(row.overdueInterestInr)}
+          hint={`${row.overdueDays} overdue day${row.overdueDays === 1 ? '' : 's'}`}
+          accent={overdueInterestInr > 0 ? '#b91c1c' : '#64748b'}
+        />
+        <MoneyTile
+          label="Penal charges"
+          value={formatINRExact(row.penalAmount)}
+          hint="Capped penal fee"
+          accent={penalAmountInr > 0 ? '#b91c1c' : '#64748b'}
+        />
+        <MoneyTile
+          label="Total repay amount"
+          value={formatINR(String(totalRepayAmountInr.toFixed(2)))}
+          hint="Principal + interest + overdue + penal"
+          accent="#1c347d"
+        />
+        <MoneyTile
+          label="Amount paid"
+          value={formatINR(row.totalPaidAmount)}
+          hint="Recorded repayments"
+          accent="#047857"
+        />
+        <MoneyTile
+          label="Repayable after penal + overdue interest"
+          value={formatINR(String(totalRepayAmountInr.toFixed(2)))}
+          hint="Till-date repayable + overdue-days interest + penal"
+          accent="#b45309"
           emphasis
         />
       </div>
+      ) : null}
 
-      {/* Interest till today */}
-      <SectionCard
-        title="Interest till today"
-        subtitle={
-          row.closedAt
-            ? 'Interest charged for the days the loan was open'
-            : row.overdueDays > 0
-              ? 'Past due — full tenure interest plus overdue-days interest'
-              : row.usedFullTenureInterest
-                ? 'Cooling period has passed — interest is the full contracted tenure'
-                : 'Accrued interest from disbursement through today (within cooling period)'
-        }
-      >
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-[14px] border border-[rgba(67,56,202,0.16)] bg-[rgba(67,56,202,0.05)] px-4 py-3.5">
-            <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-[#4338ca]">
-              Interest till today
-            </p>
-            <p className="m-0 mt-1.5 text-[1.35rem] font-extrabold tracking-tight text-[#4338ca]">
-              {formatINRExact(row.interestTillToday)}
-            </p>
-            <p className="m-0 mt-1 text-[0.72rem] font-semibold text-brand-muted">
-              @ {row.interestRate}% / day
-            </p>
-          </div>
-          <div className="rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[#fbfcff] px-4 py-3.5">
-            <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
-              Amount due today
-            </p>
-            <p className="m-0 mt-1.5 text-[1.35rem] font-extrabold tracking-tight text-brand-navy">
-              {formatINRExact(row.amountDueToday)}
-            </p>
-            <p className="m-0 mt-1 text-[0.72rem] font-semibold text-brand-muted">
-              {row.overdueDays > 0
-                ? `Principal + full tenure interest + ${row.overdueDays} overdue day${
-                    row.overdueDays === 1 ? '' : 's'
-                  }${
-                    Number(row.bounceFeeInr) > 0
-                      ? ` + penal (${formatINRExact(row.bounceFeeInr)})`
-                      : ''
-                  }`
-                : Number(row.bounceFeeInr) > 0
-                  ? `Principal + interest + penal charge (${formatINRExact(row.bounceFeeInr)})`
-                  : row.usedFullTenureInterest
-                    ? 'Principal + full tenure interest'
-                    : 'Principal + interest till today'}
-              {Number(row.totalPaidAmount) > 0 ? ' · before payments' : ''}
-            </p>
-          </div>
-          <div className="rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[#fbfcff] px-4 py-3.5">
-            <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
-              Days outstanding
-            </p>
-            <p className="m-0 mt-1.5 text-[1.35rem] font-extrabold tracking-tight text-brand-navy">
-              {row.daysOutstanding != null ? row.daysOutstanding : '—'}
-            </p>
-            <p className="m-0 mt-1 text-[0.72rem] font-semibold text-brand-muted">
-              {row.closedAt
-                ? 'Inclusive days until closure'
-                : 'Inclusive days since disbursement'}
-            </p>
-          </div>
-          <div className="rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[#fbfcff] px-4 py-3.5">
-            <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
-              Interest at maturity
-            </p>
-            <p className="m-0 mt-1.5 text-[1.35rem] font-extrabold tracking-tight text-brand-navy">
-              {formatINRExact(row.interestAmount)}
-            </p>
-            <p className="m-0 mt-1 text-[0.72rem] font-semibold text-brand-muted">
-              Full tenure ({row.expectedRepaymentDays != null ? `${row.expectedRepaymentDays} days` : '—'})
-            </p>
-          </div>
-        </div>
-      </SectionCard>
+      <WaiverCard row={row} onSaved={setRow} />
 
       {/* Terms + Borrower */}
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">

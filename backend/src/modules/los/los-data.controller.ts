@@ -1,10 +1,12 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { LosAuthGuard } from './auth/los-auth.guard';
 import { LosDenyAgentGuard } from './auth/los-deny-agent.guard';
 import { LosAdminGuard } from './auth/los-admin.guard';
+import type { LosSessionPayload } from './auth/los-session.service';
 import { RejectWorkspaceRecordDto } from './dto/reject-workspace-record.dto';
+import { WaiveLoanChargesDto } from './dto/waive-loan-charges.dto';
 import { LosLeadService } from './services/los-lead.service';
 import { LosApplicationService } from './services/los-application.service';
 import { LosCustomerService } from './services/los-customer.service';
@@ -18,6 +20,8 @@ import { LosBureauReportService } from './services/los-bureau-report.service';
 import { LosLeadReportService } from './services/los-lead-report.service';
 import { LosTransactionReportService } from './services/los-transaction-report.service';
 import { LosCheckCibilService } from './services/los-check-cibil.service';
+
+type LosRequest = Request & { losUser: LosSessionPayload };
 
 @ApiTags('LOS Data')
 @Controller('los')
@@ -182,6 +186,22 @@ export class LosDataController {
   })
   refreshLoanPayment(@Param('loanUuid') loanUuid: string) {
     return this.losLoanRepaymentSync.refreshPayment(loanUuid);
+  }
+
+  @Post('loans/:loanUuid/waive-charges')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({
+    summary: 'Waive part or all of penal + overdue-days interest on an open loan',
+    description:
+      'Stores the waived amount, the LOS user who waived it, and the timestamp. Pay Now then collects principal + tenure interest + any remaining negotiable charges.',
+  })
+  waiveLoanCharges(
+    @Req() req: LosRequest,
+    @Param('loanUuid') loanUuid: string,
+    @Body() body: WaiveLoanChargesDto,
+  ) {
+    return this.losLoan.waiveCharges(loanUuid, body.waivedAmountInr, req.losUser.userId);
   }
 
   @Get('applications/:applicationUuid')

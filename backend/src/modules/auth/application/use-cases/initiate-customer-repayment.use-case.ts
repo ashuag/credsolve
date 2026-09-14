@@ -16,13 +16,14 @@ import {
   savePendingRepayIntent,
 } from '../../../../common/easebuzz/repay-intent.util';
 import { LOAN_REPAYMENT_STATUS } from '../../../../common/constants/loan-repayment.constants';
-import { LOAN_STATUS } from '../../../../common/constants/loan.constants';
+import { closeLoanStatusName, isClosedLoanStatus, LOAN_STATUS } from '../../../../common/constants/loan.constants';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import {
   computeAmountDueNowInr,
   computeTenureDays,
   decimalToNumber,
 } from '../../../../common/loan/loan-calculation.util';
+import { billDueNowAfterWaiverInr, waivedAmountFromLoan } from '../../../../common/loan/loan-charge-waiver.util';
 import {
   isRepaymentPastDue,
   overdueDaysFromMaturity,
@@ -133,6 +134,7 @@ export class InitiateCustomerRepaymentUseCase {
             disbursedAt: true,
             loanMaturityDate: true,
             closedAt: true,
+            waivedAmount: true,
             loanStatus: { select: { name: true } },
           },
         },
@@ -147,7 +149,7 @@ export class InitiateCustomerRepaymentUseCase {
     if (!loan) {
       throw new BadRequestException('No disbursed loan found for this application.');
     }
-    if (loan.closedAt != null || loan.loanStatus.name === LOAN_STATUS.CLOSED) {
+    if (loan.closedAt != null || isClosedLoanStatus(loan.loanStatus.name)) {
       throw new ConflictException('This loan is already closed.');
     }
     if (
@@ -184,7 +186,13 @@ export class InitiateCustomerRepaymentUseCase {
       principal,
       overdueDays,
     );
-    const billDueNow = Math.round((due.amountDue + bounceFeeInr) * 100) / 100;
+    const bill = billDueNowAfterWaiverInr({
+      amountDueBeforePenal: due.amountDue,
+      penalInr: bounceFeeInr,
+      overdueInterestInr: due.overdueInterestAmount,
+      waivedAmountInr: waivedAmountFromLoan(loan.waivedAmount),
+    });
+    const billDueNow = bill.billDueNow;
     const totalPaid = await sumSuccessfulRepaymentsInr(this.prisma.client, loan.id);
     const remaining = remainingDueInr(billDueNow, totalPaid);
     const minPayAmountInr = await this.settings.loadMinPayAmountInr();
@@ -326,14 +334,21 @@ export class InitiateCustomerRepaymentUseCase {
     const remainingAfter = remainingDueInr(billDueNow, totalPaid + totalDue);
     const closesLoan = shouldCloseLoanAfterPayment(remainingAfter);
 
+    const closeStatusName = closeLoanStatusName(bill.appliedWaiverInr);
     const closedStatus = closesLoan
-      ? await this.prisma.client.loanStatus.findFirst({
-          where: { name: LOAN_STATUS.CLOSED, isActive: true },
+      ? (await this.prisma.client.loanStatus.findFirst({
+          where: { name: closeStatusName, isActive: true },
           select: { id: true },
-        })
+        })) ??
+        (closeStatusName === LOAN_STATUS.SETTLED
+          ? await this.prisma.client.loanStatus.findFirst({
+              where: { name: LOAN_STATUS.CLOSED, isActive: true },
+              select: { id: true },
+            })
+          : null)
       : null;
     if (closesLoan && !closedStatus) {
-      throw new NotFoundException('CLOSED loan status is not configured.');
+      throw new NotFoundException(`${closeStatusName} loan status is not configured.`);
     }
 
     const repaymentUuid = randomUUID();
@@ -416,7 +431,7 @@ export class InitiateCustomerRepaymentUseCase {
       amountInr,
       bounceFeeInr: bounceFeeInrStr,
       repaymentUuid,
-      loanStatus: closesLoan ? LOAN_STATUS.CLOSED : loan.loanStatus.name,
+      loanStatus: closesLoan ? closeStatusName : loan.loanStatus.name,
       redirectPath: '/my-account',
       paymentUrl: null,
       vendor,
