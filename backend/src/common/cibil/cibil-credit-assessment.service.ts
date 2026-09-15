@@ -59,8 +59,17 @@ export class CibilCreditAssessmentService {
     bureauReportId: bigint,
     db: PrismaClient = this.prisma.client,
   ): Promise<CibilCreditAssessmentView | null> {
-    const row = await db.cibilCreditAssessment.findUnique({ where: { bureauReportId } });
+    const row = await db.cibilCreditAssessment.findUnique({
+      where: { bureauReportId },
+      include: { bureauReport: { select: { rawPayload: true, cibilScore: true } } },
+    });
     if (!row) return null;
+
+    const signals = this.hydrateSignals(
+      row.metricsSnapshot as unknown as CibilAssessmentSignals,
+      row.bureauReport.rawPayload,
+      row.bureauReport.cibilScore,
+    );
 
     return {
       category: row.category as CibilCreditAssessmentResult['category'],
@@ -70,7 +79,26 @@ export class CibilCreditAssessmentService {
       paymentProbabilityPct: row.paymentProbabilityPct.toNumber(),
       creditRecommendation: row.creditRecommendation as CibilCreditAssessmentResult['creditRecommendation'],
       recommendationRejectionReason: row.recommendationRejectionReason,
-      signals: row.metricsSnapshot as unknown as CibilAssessmentSignals,
+      signals,
+    };
+  }
+
+  /** Fills new signal fields missing from older persisted snapshots. */
+  private hydrateSignals(
+    snapshot: CibilAssessmentSignals,
+    rawPayload: unknown,
+    riskScore: number | null,
+  ): CibilAssessmentSignals {
+    if (snapshot.noOfActiveUnsecuredLoans != null || rawPayload == null) {
+      return {
+        ...snapshot,
+        noOfActiveUnsecuredLoans: snapshot.noOfActiveUnsecuredLoans ?? 0,
+      };
+    }
+    const live = computeCibilAssessmentSignals(rawPayload, riskScore ?? snapshot.riskScore);
+    return {
+      ...snapshot,
+      noOfActiveUnsecuredLoans: live.noOfActiveUnsecuredLoans,
     };
   }
 

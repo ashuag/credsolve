@@ -1476,6 +1476,8 @@ export type CibilAssessmentSignals = {
   noOfCreditCards: number;
   noOfSecuredLoans: number;
   noOfUnsecuredLoans: number;
+  /** Open unsecured tradelines only (same unsecured set as `noOfUnsecuredLoans`). */
+  noOfActiveUnsecuredLoans: number;
   noOfGoldLoans: number;
   sixMonthEnquiries: number;
   totalEnquiries: number;
@@ -1529,6 +1531,7 @@ export function computeCibilAssessmentSignals(
   let noOfCreditCards = 0;
   let noOfSecuredLoans = 0;
   let noOfUnsecuredLoans = 0;
+  let noOfActiveUnsecuredLoans = 0;
   let noOfGoldLoans = 0;
   let totalOverdueAmountInr = 0;
   let hasWilfulDefault = false;
@@ -1552,8 +1555,12 @@ export function computeCibilAssessmentSignals(
         noOfCreditCards += 1;
       }
       if (parsed.accountTypeSymbol === '07') noOfGoldLoans += 1;
-      if (parsed.isUnsecured) noOfUnsecuredLoans += 1;
-      else noOfSecuredLoans += 1;
+      if (parsed.isUnsecured) {
+        noOfUnsecuredLoans += 1;
+        if (parsed.isOpen) noOfActiveUnsecuredLoans += 1;
+      } else {
+        noOfSecuredLoans += 1;
+      }
     }
 
     const granted = asRecord(lineRec.GrantedTrade);
@@ -1620,6 +1627,7 @@ export function computeCibilAssessmentSignals(
     noOfCreditCards,
     noOfSecuredLoans,
     noOfUnsecuredLoans,
+    noOfActiveUnsecuredLoans,
     noOfGoldLoans,
     sixMonthEnquiries,
     totalEnquiries,
