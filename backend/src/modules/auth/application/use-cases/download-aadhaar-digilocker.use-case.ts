@@ -12,6 +12,7 @@ import {
   isDigilockerAadhaarCaptureComplete,
   isDigilockerSessionNotReadyError,
   isTenacioVendorBusinessSuccess,
+  withAadhaarNameMismatchReview,
 } from '../../../../common/kyc/aadhaar-vendor-parse.util';
 import { compareAadhaarToLeadProfile } from '../../../../common/kyc/aadhaar-lead-identity-match.util';
 import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
@@ -61,9 +62,11 @@ export type DownloadAadhaarDigilockerResult = {
   businessSuccess?: boolean;
   /** When Aadhaar JSON + optional photo were written to DB / disk. */
   persisted?: boolean;
-  /** Name or DOB on Aadhaar did not match lead profile — application set to KYC_FAILED. */
+  /** Name or DOB on Aadhaar did not match lead profile — application set to KYC_FAILED (DOB / missing fields). */
   identityMismatch?: boolean;
   identityMismatchMessage?: string;
+  /** Aadhaar name vs application is waiting for credit; customer continues the journey. */
+  aadhaarNameReviewPending?: boolean;
   attemptsUsed?: number;
   attemptsAllowed?: number;
   canRetry?: boolean;
@@ -458,7 +461,7 @@ export class DownloadAadhaarDigilockerUseCase {
       vendor,
     });
 
-    if (!identityMatch.matched) {
+    if (!identityMatch.matched && identityMatch.reason !== 'name_mismatch') {
       const photoRel = await this.persistAadhaarPhotoIfPresent({
         vendor,
         customerUuid: params.customerUuid,
@@ -498,6 +501,9 @@ export class DownloadAadhaarDigilockerUseCase {
       };
     }
 
+    const nameMismatchReview =
+      !identityMatch.matched && identityMatch.reason === 'name_mismatch' ? identityMatch : null;
+
     let panCardNumber: string | null = null;
     let panFetched = false;
     if (params.vendorKind === 'surepass') {
@@ -528,7 +534,14 @@ export class DownloadAadhaarDigilockerUseCase {
         applicationUuid: params.applicationUuid,
       });
 
-      const formJson = buildDigilockerAadhaarFormJson(vendor, photoRel) ?? { _note: 'digilocker_vendor_unparsed' };
+      const captured =
+        buildDigilockerAadhaarFormJson(vendor, photoRel) ?? { _note: 'digilocker_vendor_unparsed' };
+      const formJson = nameMismatchReview
+        ? withAadhaarNameMismatchReview(captured, {
+            reason: nameMismatchReview.reason,
+            message: nameMismatchReview.message,
+          })
+        : captured;
       await this.applications.updateDigilockerAadhaarArtifacts({
         applicationId: params.applicationId,
         customerId: params.customerId,
@@ -545,6 +558,11 @@ export class DownloadAadhaarDigilockerUseCase {
         verifiedAt: new Date(),
         panCardNumber,
       });
+      if (nameMismatchReview) {
+        this.logger.warn(
+          `Aadhaar name mismatch pending credit review (leadId=${params.leadId.toString()}): ${nameMismatchReview.message}`,
+        );
+      }
     } catch (err) {
       this.logger.error(
         `Failed to persist DigiLocker Aadhaar artifacts: ${err instanceof Error ? err.message : String(err)}`,
@@ -561,6 +579,7 @@ export class DownloadAadhaarDigilockerUseCase {
       persisted,
       panFetched,
       panCardNumber,
+      aadhaarNameReviewPending: Boolean(nameMismatchReview),
     };
   }
 

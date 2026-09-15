@@ -25,6 +25,7 @@ import { extractCibilPan } from '@/lib/kyc-field-match';
 import { formatPersonName } from '@/lib/format-person-name';
 import {
   approveApplication,
+  approveAadhaarNameMatch,
   approveBankNameMatch,
   disburseApplication,
   getApplicationCibilReport,
@@ -47,17 +48,20 @@ export function ApplicationReviewDashboard({
   onRefresh: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<ReviewTab>(
-    row.nameMatchPendingReview || row.statusCode.toUpperCase() === 'UNDER_REVIEW'
-      ? 'bank'
-      : row.details?.loanAmount
-        ? 'loan'
-        : 'personal',
+    row.aadhaarNameMatchPendingReview
+      ? 'kyc'
+      : row.nameMatchPendingReview || row.statusCode.toUpperCase() === 'UNDER_REVIEW'
+        ? 'bank'
+        : row.details?.loanAmount
+          ? 'loan'
+          : 'personal',
   );
-  const [bureauPan, setBureauPan] = useState<string | null>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [bureauPan, setBureauPan] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [approveBusy, setApproveBusy] = useState(false);
   const [approveNameMatchBusy, setApproveNameMatchBusy] = useState(false);
+  const [approveAadhaarNameBusy, setApproveAadhaarNameBusy] = useState(false);
   const [disburseBusy, setDisburseBusy] = useState(false);
   const [canDecide] = useState(() => {
     const user = getLosStoredUser();
@@ -80,9 +84,15 @@ export function ApplicationReviewDashboard({
     journeySteps.length > 0 &&
     journeySteps.every((step) => step.state === 'done');
   const canApprove =
-    canDecide && journeyComplete && statusCode !== 'APPROVED' && statusCode !== 'DISBURSED';
+    canDecide &&
+    journeyComplete &&
+    statusCode !== 'APPROVED' &&
+    statusCode !== 'DISBURSED' &&
+    !row.aadhaarNameMatchPendingReview &&
+    !nameReviewPending;
   const canApproveNameMatch =
     canDecide && (Boolean(row.nameMatchPendingReview) || statusCode === 'UNDER_REVIEW');
+  const canApproveAadhaarName = canDecide && Boolean(row.aadhaarNameMatchPendingReview);
   const canDisburse = canDecide && statusCode === 'APPROVED' && !row.loanAccount;
   const canReject = canDecide && canRejectApplicationStatus(row.statusCode);
 
@@ -123,6 +133,36 @@ export function ApplicationReviewDashboard({
       setApproveNameMatchBusy(false);
     }
   }, [applicationUuid, approveNameMatchBusy, authToken, onRefresh, row.applicationNumber, row.bankAccountAttempts]);
+
+  const handleApproveAadhaarName = useCallback(async () => {
+    if (!authToken || approveAadhaarNameBusy) return;
+    const confirmed = window.confirm(
+      journeyComplete
+        ? `Approve Aadhaar name match and approve application ${row.applicationNumber}? Status will change to APPROVED.`
+        : `Approve Aadhaar name match for ${row.applicationNumber}?\n\nThe customer can continue the journey. When all steps are done, you can approve the application.`,
+    );
+    if (!confirmed) return;
+    setApproveAadhaarNameBusy(true);
+    setActionError(null);
+    try {
+      await approveAadhaarNameMatch(authToken, applicationUuid);
+      if (journeyComplete) {
+        await approveApplication(authToken, applicationUuid);
+      }
+      onRefresh();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Failed to approve Aadhaar name match.');
+    } finally {
+      setApproveAadhaarNameBusy(false);
+    }
+  }, [
+    applicationUuid,
+    approveAadhaarNameBusy,
+    authToken,
+    journeyComplete,
+    onRefresh,
+    row.applicationNumber,
+  ]);
 
   const handleApprove = useCallback(async () => {
     if (!authToken || approveBusy) return;
@@ -167,12 +207,13 @@ export function ApplicationReviewDashboard({
     {
       id: 'kyc',
       label: 'KYC detail',
-      badge:
-        row.kycStatus === 1 ? (
-          <span className="cnt ok">✓</span>
-        ) : isLosAadhaarKycComplete(row) ? (
-          <span className="cnt ok">Aadhaar</span>
-        ) : null,
+      badge: row.aadhaarNameMatchPendingReview ? (
+        <span className="cnt bad">✕</span>
+      ) : row.kycStatus === 1 ? (
+        <span className="cnt ok">✓</span>
+      ) : isLosAadhaarKycComplete(row) ? (
+        <span className="cnt ok">Aadhaar</span>
+      ) : null,
     },
     {
       id: 'bank',
@@ -273,7 +314,17 @@ export function ApplicationReviewDashboard({
             <ReviewLoanPanel row={row} applicationUuid={applicationUuid} authToken={authToken} onDataChange={onRefresh} />
           </div>
           <div className={`panel${activeTab === 'kyc' ? ' on' : ''}`}>
-            <ReviewKycPanel row={row} applicationUuid={applicationUuid} authToken={authToken} onRefresh={onRefresh} />
+            <ReviewKycPanel
+              row={row}
+              applicationUuid={applicationUuid}
+              authToken={authToken}
+              onRefresh={onRefresh}
+              onApproveAadhaarName={canApproveAadhaarName ? () => void handleApproveAadhaarName() : undefined}
+              approveAadhaarNameBusy={approveAadhaarNameBusy}
+              canApproveAadhaarName={canApproveAadhaarName}
+              onReject={canReject ? () => setRejectOpen(true) : undefined}
+              canReject={canReject}
+            />
           </div>
           <div className={`panel${activeTab === 'bank' ? ' on' : ''}`}>
             <ReviewBankPanel

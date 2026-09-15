@@ -50,6 +50,7 @@ export type LosApplication = {
   statusCode: string;
   statusLabel: string;
   nameMatchPendingReview?: boolean;
+  aadhaarNameMatchPendingReview?: boolean;
   leadStatusCode: string;
   leadStatusLabel: string;
   leadRejectionReason: { code: string; label: string } | null;
@@ -245,6 +246,7 @@ export type LosApplicationDetails = {
   statusCode: string;
   statusLabel: string;
   nameMatchPendingReview?: boolean;
+  aadhaarNameMatchPendingReview?: boolean;
   kycStatus: number;
   kycStatusLabel: string;
   kycCompletedAt: string | null;

@@ -96,6 +96,8 @@ export type CustomerSessionResponse =
         bankNameReviewPending?: boolean;
         /** Penny-drop failed or bank name mismatch — finish references / eSign; a representative will call. */
         bankVerificationFailed?: boolean;
+        /** Aadhaar name vs application is waiting for credit; journey continues; thank-you uses KYC follow-up copy. */
+        aadhaarNameReviewPending?: boolean;
       };
       /** Post-BRE pre-approved ceiling; set after bureau pass. */
       preApprovedAmountInr: number | null;

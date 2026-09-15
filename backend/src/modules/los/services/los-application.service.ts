@@ -4,8 +4,11 @@ import { Prisma } from '@prisma/client';
 import { BureauReportPdfService } from '../../../common/cibil/bureau-report-pdf.service';
 import { CibilCreditAssessmentService } from '../../../common/cibil/cibil-credit-assessment.service';
 import {
+  extractAadhaarNameMismatchReview,
   extractDigilockerIdentityMismatch,
+  isAadhaarNameMismatchPendingReview,
   isDigilockerAadhaarCaptureComplete,
+  markAadhaarNameMismatchApproved,
   pickTenacioVendorErrorMessage,
 } from '../../../common/kyc/aadhaar-vendor-parse.util';
 import { extractVendorServiceError } from '../../../common/vendor/vendor-api-error.util';
@@ -235,15 +238,20 @@ function buildLosAadhaarIdentityFailure(params: {
   aadhaarFetched: boolean;
 }): AadhaarIdentityFailureDetail | null {
   const stored = extractDigilockerIdentityMismatch(params.formJson);
-  if (!params.aadhaarFetched && !stored) return null;
-  if (!params.kycFailed && !stored) return null;
+  const nameReview = extractAadhaarNameMismatchReview(params.formJson);
+  if (!params.aadhaarFetched && !stored && !nameReview) return null;
+  if (!params.kycFailed && !stored && !nameReview) return null;
   return describeAadhaarIdentityFailure({
     leadFullName: params.leadFullName,
     leadDateOfBirth: params.leadDateOfBirth,
     vendor: params.vendor ?? params.formJson,
-    storedReason: stored?.reason ?? (params.kycFailed && params.aadhaarFetched ? 'recorded_kyc_failed' : null),
+    storedReason:
+      stored?.reason ??
+      nameReview?.reason ??
+      (params.kycFailed && params.aadhaarFetched ? 'recorded_kyc_failed' : null),
     storedMessage:
       stored?.message ??
+      nameReview?.message ??
       (params.kycFailed && params.aadhaarFetched
         ? 'Aadhaar was fetched from DigiLocker, but this application was marked KYC failed.'
         : null),
@@ -596,6 +604,9 @@ export class LosApplicationService {
           statusName: application.applicationStatus.name,
           statusNote: application.applicationStatusNote,
         }),
+        aadhaarNameMatchPendingReview: isAadhaarNameMismatchPendingReview(
+          application.customer.customerKycs[0]?.aadhaarData,
+        ),
         leadStatusCode: application.lead.leadStatus.name,
         leadStatusLabel: displayName(application.lead.leadStatus.name, application.lead.leadStatus.displayName),
         leadRejectionReason: mapLeadRejectionReason(
@@ -836,6 +847,7 @@ export class LosApplicationService {
         statusName: application.applicationStatus.name,
         statusNote: application.applicationStatusNote,
       }),
+      aadhaarNameMatchPendingReview: isAadhaarNameMismatchPendingReview(storedAadhaar),
       kycStatus: application.kyc?.kycStatus ?? 0,
       kycStatusLabel: applicationKycStatusLabel(application.kyc?.kycStatus ?? 0),
       kycCompletedAt: application.kyc?.kycCompletedAt?.toISOString() ?? null,
@@ -1677,6 +1689,52 @@ export class LosApplicationService {
       success: true,
       applicationUuid: application.uuid,
       statusCode: APPLICATION_STATUS.IN_REVIEW,
+    };
+  }
+
+  /**
+   * Credit override: Aadhaar name did not match the application name, but KYC is accepted.
+   * Clears the DigiLocker name-review hold so the application can be approved after the journey.
+   */
+  async approveAadhaarNameMatch(applicationUuid: string): Promise<{
+    success: true;
+    applicationUuid: string;
+  }> {
+    const application = await this.prisma.client.application.findUnique({
+      where: { uuid: applicationUuid },
+      select: {
+        id: true,
+        uuid: true,
+        customerId: true,
+        applicationStatus: { select: { name: true } },
+      },
+    });
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+
+    const customerKyc = await this.prisma.client.customerKyc.findFirst({
+      where: { customerId: application.customerId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, aadhaarData: true },
+    });
+    if (!isAadhaarNameMismatchPendingReview(customerKyc?.aadhaarData)) {
+      throw new ConflictException('This application is not waiting for an Aadhaar name review.');
+    }
+
+    const nextJson = markAadhaarNameMismatchApproved(customerKyc?.aadhaarData);
+    if (!nextJson || !customerKyc) {
+      throw new BadRequestException('Aadhaar data is missing; cannot approve the name match.');
+    }
+
+    await this.prisma.client.customerKyc.update({
+      where: { id: customerKyc.id },
+      data: { aadhaarData: nextJson as Prisma.InputJsonValue },
+    });
+
+    return {
+      success: true,
+      applicationUuid: application.uuid,
     };
   }
 

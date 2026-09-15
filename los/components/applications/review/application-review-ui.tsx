@@ -112,10 +112,11 @@ export function ReviewMatchBadge({
           ? 'Mismatch'
           : 'N/A';
   const label = verdict !== 'missing' && score != null ? `${base} ${score}%` : base;
+  const display = verdict === 'mismatch' ? `✕ ${label}` : label;
 
   return (
     <span className={`match-badge ${verdict}`} title={title}>
-      {label}
+      {display}
     </span>
   );
 }

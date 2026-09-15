@@ -246,6 +246,16 @@ export class LosDataController {
     return this.losApplication.approveBankNameMatch(applicationUuid);
   }
 
+  @Post('applications/:applicationUuid/kyc/approve-aadhaar-name-match')
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({
+    summary:
+      'Credit: accept DigiLocker Aadhaar whose name did not match the application. Customer journey stays open; application can be approved after remaining steps.',
+  })
+  approveAadhaarNameMatch(@Param('applicationUuid') applicationUuid: string) {
+    return this.losApplication.approveAadhaarNameMatch(applicationUuid);
+  }
+
   @Post('applications/:applicationUuid/approve')
   @UseGuards(LosDenyAgentGuard)
   @ApiOperation({

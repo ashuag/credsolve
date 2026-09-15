@@ -123,6 +123,7 @@ export function hasLosAadhaarRecord(row: {
 
 export function isLosAadhaarKycComplete(row: {
   aadhaarKycCompleted?: boolean;
+  aadhaarNameMatchPendingReview?: boolean;
   aadhaarIdentityFailure?: { reason?: string; message?: string } | null;
   aadhaarDetail?: {
     fullName: string | null;
@@ -133,7 +134,7 @@ export function isLosAadhaarKycComplete(row: {
   } | null;
   kycPhotos?: { aadhaarPhotoPath: string | null };
 }): boolean {
-  if (row.aadhaarIdentityFailure) return false;
+  if (row.aadhaarIdentityFailure && !row.aadhaarNameMatchPendingReview) return false;
   if (row.aadhaarKycCompleted) return true;
   if (row.aadhaarKycCompleted === false) return false;
   return hasLosAadhaarRecord(row);
@@ -299,6 +300,7 @@ export type ApplicationListStageInput = {
   panVerified: number;
   bureauFetched: number;
   nameMatchPendingReview?: boolean;
+  aadhaarNameMatchPendingReview?: boolean;
 };
 
 /** Active journey stage for application list rows (matches application review hero). */

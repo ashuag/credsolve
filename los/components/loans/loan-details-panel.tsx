@@ -180,14 +180,18 @@ function ActionBtn({
   onClick,
   children,
   variant = 'ghost',
+  size = 'md',
 }: {
   href?: string;
   onClick?: () => void;
   children: ReactNode;
   variant?: 'ghost' | 'primary' | 'soft';
+  size?: 'md' | 'sm';
 }) {
   const base =
-    'inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] px-3.5 text-[0.8rem] font-bold no-underline transition-colors';
+    size === 'sm'
+      ? 'inline-flex h-8 items-center justify-center gap-1.5 rounded-[8px] px-3 text-[0.74rem] font-bold no-underline transition-colors'
+      : 'inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] px-3.5 text-[0.8rem] font-bold no-underline transition-colors';
   const styles =
     variant === 'primary'
       ? 'bg-[#1c347d] text-[#ffc519] hover:bg-[#152a66]'
@@ -260,6 +264,43 @@ function maturityMeta(daysToMaturity: number, closed: boolean, statusCode = '') 
   };
 }
 
+function lifecycleTone(state: 'done' | 'active' | 'pending' | 'danger') {
+  switch (state) {
+    case 'done':
+      return {
+        dot: '#059669',
+        ring: 'rgba(16,185,129,0.22)',
+        line: '#34d399',
+        text: 'text-emerald-800',
+        badge: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+      };
+    case 'active':
+      return {
+        dot: '#1496f3',
+        ring: 'rgba(20,150,243,0.22)',
+        line: 'rgba(20,150,243,0.4)',
+        text: 'text-brand-navy',
+        badge: 'border-sky-200 bg-sky-50 text-brand-navy',
+      };
+    case 'danger':
+      return {
+        dot: '#dc2626',
+        ring: 'rgba(239,68,68,0.22)',
+        line: '#fca5a5',
+        text: 'text-red-800',
+        badge: 'border-red-200 bg-red-50 text-red-800',
+      };
+    default:
+      return {
+        dot: '#cbd5e1',
+        ring: 'rgba(148,163,184,0.2)',
+        line: '#e2e8f0',
+        text: 'text-brand-muted',
+        badge: 'border-slate-200 bg-slate-50 text-brand-muted',
+      };
+  }
+}
+
 function LoanLifecycle({
   disbursedAt,
   maturityDate,
@@ -275,73 +316,125 @@ function LoanLifecycle({
 }) {
   const closed = isClosedLoan(closedAt, statusCode);
   const overdue = daysToMaturity < 0 && !closed;
-  const steps = [
+  const steps: Array<{
+    key: string;
+    label: string;
+    detail: string;
+    state: 'done' | 'active' | 'pending' | 'danger';
+  }> = [
     {
       key: 'disbursed',
       label: 'Disbursed',
       detail: formatDate(disbursedAt),
-      done: Boolean(disbursedAt),
-      active: Boolean(disbursedAt) && !closed && daysToMaturity >= 0,
+      state: disbursedAt ? 'done' : 'pending',
     },
     {
       key: 'active',
       label: overdue ? 'Overdue' : 'Collecting',
-      detail: overdue ? `${Math.abs(daysToMaturity)}d late` : 'Awaiting repayment',
-      done: closed || overdue,
-      active: !closed && Boolean(disbursedAt) && daysToMaturity >= 0,
-      danger: overdue,
+      detail: overdue ? `${Math.abs(daysToMaturity)}d late` : closed ? 'Repaid' : 'Awaiting repayment',
+      state: overdue ? 'danger' : closed ? 'done' : disbursedAt ? 'active' : 'pending',
     },
     {
       key: 'maturity',
       label: 'Maturity',
       detail: formatDate(maturityDate),
-      done: closed || daysToMaturity <= 0,
-      active: !closed && daysToMaturity <= 7 && daysToMaturity >= 0,
+      state:
+        closed || daysToMaturity < 0
+          ? 'done'
+          : !closed && daysToMaturity <= 7
+            ? 'active'
+            : 'pending',
     },
     {
       key: 'closed',
       label: closed ? 'Paid fully' : 'Closure',
       detail: closed ? formatDate(closedAt) : 'Pending',
-      done: closed,
-      active: closed,
+      state: closed ? 'done' : 'pending',
     },
   ];
 
   return (
-    <div className="rounded-[16px] border border-[rgba(23,44,113,0.08)] bg-gradient-to-br from-[#f7faff] to-white p-4">
-      <p className="m-0 mb-3 text-[0.62rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">
-        Loan lifecycle
+    <ol className="m-0 flex min-w-[520px] list-none p-0">
+      {steps.map((step, idx) => {
+        const tone = lifecycleTone(step.state);
+        const isLast = idx === steps.length - 1;
+        return (
+          <li key={step.key} className="relative flex min-w-0 flex-1 flex-col items-center px-1 text-center">
+            {!isLast ? (
+              <span
+                className="pointer-events-none absolute left-[calc(50%+14px)] top-[13px] h-[2px] w-[calc(100%-28px)]"
+                style={{ background: tone.line }}
+                aria-hidden
+              />
+            ) : null}
+            <span
+              className="relative z-[1] inline-flex h-7 w-7 items-center justify-center rounded-full text-white"
+              style={{ background: tone.dot, boxShadow: `0 0 0 4px ${tone.ring}` }}
+              aria-hidden
+            >
+              {step.state === 'done' ? (
+                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3}>
+                  <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ) : step.state === 'danger' ? (
+                <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3}>
+                  <path d="M12 8v5M12 16h.01" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <span className="text-[0.68rem] font-extrabold">{idx + 1}</span>
+              )}
+            </span>
+            <span className={`mt-2 block text-[0.7rem] font-extrabold uppercase tracking-[0.06em] ${tone.text}`}>
+              {step.label}
+            </span>
+            <span
+              className={`mt-1 inline-block max-w-[9.5rem] truncate rounded-full border px-2 py-0.5 text-[0.62rem] font-semibold ${tone.badge}`}
+            >
+              {step.detail}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function HeroStat({
+  label,
+  value,
+  hint,
+  accent,
+}: {
+  label: string;
+  value: ReactNode;
+  hint?: string;
+  accent: string;
+}) {
+  return (
+    <div
+      className="min-w-[7.25rem] rounded-[12px] border bg-white px-3.5 py-2.5 shadow-[0_1px_10px_rgba(23,44,113,0.06)]"
+      style={{ borderColor: `${accent}33`, background: `linear-gradient(180deg, #fff, ${accent}0d)` }}
+    >
+      <p className="m-0 text-[0.58rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">{label}</p>
+      <p className="m-0 mt-1 text-[1.02rem] font-extrabold leading-tight tracking-[-0.02em]" style={{ color: accent }}>
+        {value}
       </p>
-      <ol className="m-0 grid list-none grid-cols-2 gap-3 p-0 lg:grid-cols-4">
-        {steps.map((step, idx) => {
-          const color = step.danger ? '#b91c1c' : step.done || step.active ? '#1496f3' : '#94a3b8';
-          return (
-            <li key={step.key} className="relative flex items-start gap-2.5">
-              <div className="flex flex-col items-center">
-                <span
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-[0.68rem] font-extrabold text-white"
-                  style={{
-                    background: step.done || step.active ? color : '#e2e8f0',
-                    color: step.done || step.active ? '#fff' : '#64748b',
-                    boxShadow: step.active ? `0 0 0 4px ${color}22` : undefined,
-                  }}
-                >
-                  {step.done ? '✓' : idx + 1}
-                </span>
-                {idx < steps.length - 1 ? (
-                  <span className="mt-1 hidden h-full w-px bg-[rgba(23,44,113,0.08)] lg:block" aria-hidden />
-                ) : null}
-              </div>
-              <div className="min-w-0 pt-0.5">
-                <p className="m-0 text-[0.8rem] font-extrabold text-brand-navy">{step.label}</p>
-                <p className="m-0 mt-0.5 text-[0.72rem] font-semibold text-brand-muted">{step.detail}</p>
-              </div>
-            </li>
-          );
-        })}
-      </ol>
+      {hint ? <p className="m-0 mt-0.5 text-[0.68rem] font-semibold text-brand-muted">{hint}</p> : null}
     </div>
   );
+}
+
+function ContactChip({ href, children }: { href?: string; children: ReactNode }) {
+  const className =
+    'inline-flex items-center rounded-full border border-[rgba(23,44,113,0.1)] bg-white px-2.5 py-1 text-[0.74rem] font-semibold text-brand-text no-underline transition-colors hover:border-brand-blue/30 hover:text-brand-blue';
+  if (href) {
+    return (
+      <a href={href} className={className}>
+        {children}
+      </a>
+    );
+  }
+  return <span className={className}>{children}</span>;
 }
 
 function RepaymentProgress({
@@ -360,21 +453,16 @@ function RepaymentProgress({
   const fullyPaid = owed <= 0 && paid > 0;
 
   return (
-    <div className="rounded-[16px] border border-[rgba(23,44,113,0.08)] bg-white p-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="m-0 text-[0.62rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">Collection progress</p>
-          <p className="m-0 mt-1 text-[1.05rem] font-extrabold text-brand-navy">
-            {fullyPaid ? 'Fully collected' : `${pct}% collected`}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="m-0 text-[0.72rem] font-semibold text-brand-muted">
-            Paid {formatINR(totalPaid)} · Due {formatINR(outstanding)}
-          </p>
-        </div>
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 sm:w-[13.5rem] sm:shrink-0">
+        <p className="m-0 text-[0.88rem] font-extrabold text-brand-navy">
+          {fullyPaid ? 'Fully collected' : `${pct}% collected`}
+        </p>
+        <p className="m-0 text-[0.7rem] font-semibold text-brand-muted">
+          {formatINR(totalPaid)} paid · {formatINR(outstanding)} due
+        </p>
       </div>
-      <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[rgba(23,44,113,0.08)]">
+      <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[rgba(23,44,113,0.08)]">
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{
@@ -711,7 +799,7 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
   if (loading) {
     return (
       <div className="flex animate-pulse flex-col gap-4">
-        <div className="h-[168px] rounded-[18px] bg-[rgba(23,44,113,0.06)]" />
+        <div className="h-[280px] rounded-[14px] bg-[rgba(23,44,113,0.06)]" />
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
           {[0, 1, 2, 3, 4].map((i) => (
             <div key={i} className="h-[96px] rounded-[16px] bg-[rgba(23,44,113,0.06)]" />
@@ -773,117 +861,93 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
         </p>
       ) : null}
       {/* Hero */}
-      <header className="overflow-hidden rounded-[18px] border border-[rgba(23,44,113,0.1)] bg-gradient-to-br from-white via-[#f7fbff] to-[#eef6ff] shadow-[0_10px_32px_rgba(23,44,113,0.05)]">
+      <header className="overflow-hidden rounded-[14px] border border-[rgba(23,44,113,0.1)] bg-gradient-to-b from-white to-[#f4f8ff] shadow-[0_8px_28px_rgba(23,44,113,0.05)]">
         <div
-          className="h-[3px] w-full"
+          className="h-[2px] w-full"
           style={{ background: `linear-gradient(90deg, ${statusStyles.text}, ${statusStyles.text}55)` }}
           aria-hidden
         />
-        <div className="p-5 sm:p-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex min-w-0 flex-1 items-start gap-4">
+        <div className="px-4 py-4 sm:px-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
               <div
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[16px] text-[1rem] font-extrabold text-white shadow-[0_10px_24px_rgba(23,44,113,0.2)]"
-                style={{ background: `linear-gradient(145deg, ${statusStyles.text}, #1c347d)` }}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] text-[0.82rem] font-extrabold text-white"
+                style={{ background: `linear-gradient(135deg, ${statusStyles.text}, #1c347d)` }}
                 aria-hidden
               >
                 {getInitials(name)}
               </div>
 
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                  <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
                     Loan account
                   </span>
                   <LosStatusPill code={row.loanStatusCode} label={row.loanStatusLabel} />
-                  <span className="text-[0.72rem] font-semibold text-brand-muted">
-                    App · {row.applicationStatusLabel}
-                  </span>
+                  <ContactChip>App · {row.applicationStatusLabel}</ContactChip>
                 </div>
 
-                <h1 className="m-0 mt-2 text-[clamp(1.35rem,2.2vw,1.75rem)] font-extrabold tracking-[-0.03em] text-brand-navy">
+                <h1 className="m-0 mt-1 text-[1.2rem] font-extrabold leading-tight tracking-[-0.03em] text-brand-navy">
                   {name}
                 </h1>
 
-                <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                  <p className="m-0 font-mono text-[0.95rem] font-bold tracking-tight text-brand-text">
-                    {row.loanNumber}
-                  </p>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <ContactChip>
+                    <span className="font-mono text-[0.74rem] font-bold tracking-tight">{row.loanNumber}</span>
+                  </ContactChip>
                   <button
                     type="button"
                     onClick={() => copyText(row.loanNumber)}
-                    className="rounded-md border border-[rgba(23,44,113,0.1)] bg-white px-1.5 py-0.5 text-[0.58rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted transition-colors hover:border-brand-blue/30 hover:text-brand-blue"
+                    className="rounded-full border border-[rgba(23,44,113,0.1)] bg-white px-2 py-1 text-[0.62rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted transition-colors hover:border-brand-blue/30 hover:text-brand-blue"
                     title="Copy loan number"
                   >
                     Copy
                   </button>
+                  <ContactChip href={`tel:${row.mobileNumber}`}>{row.mobileNumber}</ContactChip>
+                  {row.email ? <ContactChip href={`mailto:${row.email}`}>{row.email}</ContactChip> : null}
                 </div>
-
-                <p className="mt-2.5 mb-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.82rem] font-semibold text-brand-muted">
-                  <a
-                    href={`tel:${row.mobileNumber}`}
-                    className="text-brand-text no-underline transition-colors hover:text-brand-blue"
-                  >
-                    {row.mobileNumber}
-                  </a>
-                  {row.email ? (
-                    <>
-                      <span className="text-[rgba(23,44,113,0.25)]" aria-hidden>
-                        ·
-                      </span>
-                      <a
-                        href={`mailto:${row.email}`}
-                        className="min-w-0 truncate text-brand-text no-underline transition-colors hover:text-brand-blue"
-                      >
-                        {row.email}
-                      </a>
-                    </>
-                  ) : null}
-                </p>
               </div>
             </div>
 
-            <div className="flex shrink-0 flex-col gap-3 sm:items-end">
-              <div
-                className="inline-flex min-w-[9.5rem] flex-col rounded-[14px] border px-3.5 py-2.5 sm:text-right"
-                style={{
-                  color: maturity.color,
-                  background: maturity.bg,
-                  borderColor: maturity.border,
-                }}
-              >
-                <span className="text-[0.58rem] font-extrabold uppercase tracking-[0.12em] opacity-80">
-                  Maturity
-                </span>
-                <span className="mt-0.5 text-[0.92rem] font-extrabold leading-tight">{maturity.label}</span>
-                {row.loanMaturityDate ? (
-                  <span className="mt-0.5 text-[0.7rem] font-semibold opacity-80">
-                    {formatDate(row.loanMaturityDate)}
-                  </span>
-                ) : null}
-              </div>
-
-              <div className="flex flex-wrap gap-2 sm:justify-end">
-                <ActionBtn href="/loans">← All loans</ActionBtn>
-                <ActionBtn href={`/applications/${row.applicationUuid}`} variant="soft">
-                  Open application
-                </ActionBtn>
-                <ActionBtn onClick={() => void load()}>Refresh</ActionBtn>
-                {!row.closedAt ? (
-                  <RefreshPaymentButton
-                    busy={refreshingPayment}
-                    onClick={() => void refreshPayment()}
-                  />
-                ) : null}
-                <MarkInternalTestingButton
-                  busy={markingInternal}
-                  onConfirm={() => void markAsInternalTesting()}
-                />
-              </div>
+            <div className="flex flex-wrap gap-2 xl:justify-end">
+              <HeroStat
+                label="Maturity"
+                value={maturity.label}
+                hint={row.loanMaturityDate ? formatDate(row.loanMaturityDate) : undefined}
+                accent={maturity.color}
+              />
+              <HeroStat label="Paid" value={formatINR(row.totalPaidAmount)} hint="Recorded collections" accent="#047857" />
+              <HeroStat
+                label="Outstanding"
+                value={formatINR(row.outstandingAmount)}
+                hint={closed ? 'Nothing due' : 'Balance remaining'}
+                accent={closed || Number(row.outstandingAmount) <= 0 ? '#047857' : row.daysToMaturity < 0 ? '#b91c1c' : '#1c347d'}
+              />
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 lg:grid-cols-[1.4fr_1fr]">
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-[rgba(23,44,113,0.07)] pt-3">
+            <ActionBtn href="/loans" size="sm">
+              ← All loans
+            </ActionBtn>
+            <ActionBtn href={`/applications/${row.applicationUuid}`} variant="soft" size="sm">
+              Open application
+            </ActionBtn>
+            <ActionBtn onClick={() => void load()} size="sm">
+              Refresh
+            </ActionBtn>
+            {!row.closedAt ? (
+              <RefreshPaymentButton busy={refreshingPayment} onClick={() => void refreshPayment()} />
+            ) : null}
+            <MarkInternalTestingButton busy={markingInternal} onConfirm={() => void markAsInternalTesting()} />
+          </div>
+        </div>
+
+        <div className="border-t border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.7)] px-4 py-4 sm:px-5">
+          <p className="m-0 mb-3 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
+            Loan lifecycle
+          </p>
+          <div className="overflow-x-auto">
             <LoanLifecycle
               disbursedAt={row.disbursedAt}
               maturityDate={row.loanMaturityDate}
@@ -891,6 +955,11 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
               closedAt={row.closedAt}
               statusCode={row.loanStatusCode}
             />
+          </div>
+          <div className="mt-4 border-t border-[rgba(23,44,113,0.06)] pt-3">
+            <p className="m-0 mb-2 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
+              Collection progress
+            </p>
             <RepaymentProgress
               totalRepayable={row.totalRepaymentAmount}
               totalPaid={row.totalPaidAmount}

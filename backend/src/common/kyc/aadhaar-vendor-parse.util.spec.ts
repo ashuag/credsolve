@@ -1,10 +1,14 @@
 import {
   buildDigilockerIdentityMismatchJson,
   extractAadhaarPhotoString,
+  extractAadhaarNameMismatchReview,
   extractDigilockerIdentityMismatch,
+  isAadhaarNameMismatchPendingReview,
   isDigilockerAadhaarCaptureComplete,
   isDigilockerSessionNotReadyError,
   isTenacioVendorBusinessSuccess,
+  markAadhaarNameMismatchApproved,
+  withAadhaarNameMismatchReview,
 } from './aadhaar-vendor-parse.util';
 
 describe('isDigilockerSessionNotReadyError', () => {
@@ -50,6 +54,25 @@ describe('DigiLocker identity mismatch persist', () => {
       reason: 'name_mismatch',
       message: 'Name on Aadhaar does not match the name on your loan application.',
     });
+  });
+
+  it('treats a name-mismatch review row as a completed capture', () => {
+    const stored = withAadhaarNameMismatchReview(
+      { name: 'SANTHI FRANCIS', dob: '08-05-1981' },
+      {
+        reason: 'name_mismatch',
+        message: 'Name on Aadhaar does not match the name on your loan application.',
+      },
+    );
+    expect(isDigilockerAadhaarCaptureComplete(stored)).toBe(true);
+    expect(isAadhaarNameMismatchPendingReview(stored)).toBe(true);
+    expect(extractAadhaarNameMismatchReview(stored)).toEqual({
+      reason: 'name_mismatch',
+      message: 'Name on Aadhaar does not match the name on your loan application.',
+    });
+    const approved = markAadhaarNameMismatchApproved(stored);
+    expect(isAadhaarNameMismatchPendingReview(approved)).toBe(false);
+    expect(approved?._nameMismatchApproved).toBe(true);
   });
 
   it('reads Surepass photo objects with format/content', () => {

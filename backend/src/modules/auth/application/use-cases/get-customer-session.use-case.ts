@@ -9,7 +9,7 @@ import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { getRejectedUntilIso } from '../../../../common/lead/lead-reapply-policy.util';
 import { APPLICATION_KYC_STATUS, APPLICATION_STATUS } from '../../../../common/constants/application.constants';
 import { isBankNameMatchReviewPending } from '../../../../common/constants/bank.constants';
-import { isDigilockerAadhaarCaptureComplete } from '../../../../common/kyc/aadhaar-vendor-parse.util';
+import { isDigilockerAadhaarCaptureComplete, isAadhaarNameMismatchPendingReview } from '../../../../common/kyc/aadhaar-vendor-parse.util';
 import {
   formatLeadDetailForPortal,
   isLeadEmailVerifiedForPortal,
@@ -87,6 +87,7 @@ export class GetCustomerSessionUseCase {
         bankDetailsCompleted: false,
         bankNameReviewPending: false,
         bankVerificationFailed: false,
+        aadhaarNameReviewPending: false,
       },
       preApprovedAmountInr: null,
       loanSelection: null,
@@ -313,6 +314,9 @@ export class GetCustomerSessionUseCase {
     const digilockerCaptured = isDigilockerAadhaarCaptureComplete(
       application?.digilockerAadhaarFormJson ?? null,
     );
+    const aadhaarNameReviewPending = isAadhaarNameMismatchPendingReview(
+      application?.digilockerAadhaarFormJson ?? latestCustomerKyc?.aadhaarData ?? null,
+    );
     const hasSavedSelfie = Boolean(application?.selfieRelativePath?.trim());
     const headMovement = readHeadMovementSnapshot(
       extractActiveLivenessBlock(application?.livenessVendorJson),
@@ -486,6 +490,7 @@ export class GetCustomerSessionUseCase {
         bankDetailsCompleted,
         bankNameReviewPending,
         bankVerificationFailed,
+        aadhaarNameReviewPending,
       },
       preApprovedAmountInr:
         preApprovedAmountInr != null && preApprovedAmountInr > 0 ? preApprovedAmountInr : null,

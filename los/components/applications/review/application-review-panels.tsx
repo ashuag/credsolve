@@ -476,11 +476,21 @@ export function ReviewKycPanel({
   applicationUuid,
   authToken,
   onRefresh,
+  onApproveAadhaarName,
+  approveAadhaarNameBusy,
+  canApproveAadhaarName,
+  onReject,
+  canReject,
 }: {
   row: LosApplicationDetails;
   applicationUuid: string;
   authToken: string | null;
   onRefresh?: () => void;
+  onApproveAadhaarName?: () => void;
+  approveAadhaarNameBusy?: boolean;
+  canApproveAadhaarName?: boolean;
+  onReject?: () => void;
+  canReject?: boolean;
 }) {
   const kycDone = row.kycStatus === 1;
   const kycFailed = row.statusCode.toUpperCase() === 'KYC_FAILED' || row.kycStatus === 2;
@@ -488,6 +498,14 @@ export function ReviewKycPanel({
   const aadhaarFetched = hasLosAadhaarRecord(row);
   const aadhaar = row.aadhaarDetail;
   const identityFailure = row.aadhaarIdentityFailure ?? null;
+  const nameReviewPending = Boolean(row.aadhaarNameMatchPendingReview);
+  const profileName = row.lead.profile?.fullName;
+  const aadhaarNameScore = computeNameMatchScore(profileName, aadhaar?.fullName);
+  const aadhaarNameVerdict = nameMatchVerdict(
+    aadhaarNameScore,
+    Boolean(profileName?.trim() && aadhaar?.fullName?.trim()),
+  );
+  const nameMismatch = nameReviewPending || aadhaarNameVerdict === 'mismatch';
   const digilockerCurrent = isApplicationJourneyStepActive(row, 'digilockerKyc');
   const livenessCurrent = isApplicationJourneyStepActive(row, 'livenessKyc');
   const livenessDone = row.livenessPassed === true || kycDone;
@@ -508,9 +526,11 @@ export function ReviewKycPanel({
       <ReviewCard
         icon={<IdCardIcon />}
         title="DigiLocker Aadhaar KYC"
-        iconTone={aadhaarComplete ? 'ok' : kycFailed || identityFailure ? 'warn' : 'default'}
+        iconTone={nameMismatch ? 'warn' : aadhaarComplete ? 'ok' : kycFailed || identityFailure ? 'warn' : 'default'}
         right={
-          aadhaarComplete ? (
+          nameReviewPending ? (
+            <ReviewPill tone="warn">Name match review</ReviewPill>
+          ) : aadhaarComplete ? (
             <ReviewPill tone="ok">Complete</ReviewPill>
           ) : kycFailed || identityFailure ? (
             <ReviewPill tone="warn">Failed</ReviewPill>
@@ -521,6 +541,29 @@ export function ReviewKycPanel({
           )
         }
       >
+        {nameReviewPending && (canApproveAadhaarName || canReject) ? (
+          <div style={{ marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {canReject && onReject ? (
+              <button
+                type="button"
+                onClick={onReject}
+                className="min-h-[38px] rounded-[8px] border border-[rgba(239,68,68,0.35)] bg-white px-4 text-[0.82rem] font-bold text-[#dc2626] hover:bg-[rgba(254,242,242,0.9)]"
+              >
+                Reject application
+              </button>
+            ) : null}
+            {canApproveAadhaarName && onApproveAadhaarName ? (
+              <button
+                type="button"
+                onClick={onApproveAadhaarName}
+                disabled={approveAadhaarNameBusy}
+                className="min-h-[38px] rounded-[8px] border border-[rgba(16,185,129,0.35)] bg-[#ecfdf5] px-4 text-[0.82rem] font-bold text-[#047857] hover:bg-[#d1fae5] disabled:cursor-not-allowed disabled:opacity-55"
+              >
+                {approveAadhaarNameBusy ? 'Approving…' : 'Approve application'}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         {identityFailure ? (
           <KycNotice>
             {identityFailure.message}
@@ -545,15 +588,41 @@ export function ReviewKycPanel({
         <div className="fgrid">
           <ReviewField
             label="Aadhaar KYC"
-            value={aadhaarComplete ? 'Complete' : identityFailure ? 'Fetched — identity failed' : 'Not complete'}
-            tone={aadhaarComplete ? 'accent' : identityFailure ? 'flag' : undefined}
+            value={
+              aadhaarComplete
+                ? nameReviewPending
+                  ? 'Complete — name under review'
+                  : 'Complete'
+                : identityFailure
+                  ? 'Fetched — identity failed'
+                  : 'Not complete'
+            }
+            tone={aadhaarComplete && !nameReviewPending ? 'accent' : identityFailure || nameReviewPending ? 'flag' : undefined}
           />
           <ReviewField
             label="DigiLocker Aadhaar"
             value={formatAadhaarNumberDisplay(aadhaar?.maskedAadhaar, aadhaarFetched)}
             tone={aadhaarFetched ? 'accent' : undefined}
           />
-          <ReviewField label="Aadhaar name" value={aadhaarFetched ? formatPersonName(aadhaar?.fullName) : '—'} />
+          <ReviewField
+            label="Aadhaar name"
+            value={aadhaarFetched ? formatPersonName(aadhaar?.fullName) : '—'}
+            badge={
+              aadhaarFetched && aadhaarNameVerdict !== 'missing' ? (
+                <ReviewMatchBadge
+                  verdict={aadhaarNameVerdict}
+                  score={aadhaarNameScore}
+                  title={
+                    aadhaarNameVerdict === 'mismatch'
+                      ? `Application: ${formatPersonName(profileName) || '—'} · Aadhaar: ${formatPersonName(aadhaar?.fullName) || '—'}`
+                      : undefined
+                  }
+                />
+              ) : undefined
+            }
+            badgeInValue
+            tone={nameMismatch ? 'flag' : undefined}
+          />
           <ReviewField label="Aadhaar DOB" value={aadhaarFetched ? formatDobWithAge(aadhaar?.dateOfBirth) : '—'} />
           <ReviewField
             label="Aadhaar gender"

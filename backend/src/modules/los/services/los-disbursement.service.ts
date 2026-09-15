@@ -11,6 +11,7 @@ import {
   APPLICATION_STATUS,
 } from '../../../common/constants/application.constants';
 import { isBankNameMatchReviewPending } from '../../../common/constants/bank.constants';
+import { isAadhaarNameMismatchPendingReview } from '../../../common/kyc/aadhaar-vendor-parse.util';
 import {
   LOAN_DOCUMENT_PDF_FILES,
   LOAN_DOCUMENT_TYPE,
@@ -86,17 +87,26 @@ export class LosDisbursementService {
       statusName,
       statusNote: application.applicationStatusNote,
     });
+    const customerKyc = await this.prisma.client.customerKyc.findFirst({
+      where: { customerId: application.customerId },
+      orderBy: { createdAt: 'desc' },
+      select: { aadhaarData: true },
+    });
+    const aadhaarNameReviewPending = isAadhaarNameMismatchPendingReview(customerKyc?.aadhaarData);
     if (
       statusName === APPLICATION_STATUS.REJECTED ||
       statusName === APPLICATION_STATUS.CANCELLED ||
       statusName === APPLICATION_STATUS.KYC_FAILED ||
       statusName === APPLICATION_STATUS.PENNYDROP_FAILED ||
-      nameReviewPending
+      nameReviewPending ||
+      aadhaarNameReviewPending
     ) {
       throw new ConflictException(
-        nameReviewPending
-          ? 'Bank name match is still pending credit review. Approve the name match first.'
-          : `Cannot approve an application in ${statusName} status.`,
+        aadhaarNameReviewPending
+          ? 'Aadhaar name match is still pending credit review. Approve the name match first.'
+          : nameReviewPending
+            ? 'Bank name match is still pending credit review. Approve the name match first.'
+            : `Cannot approve an application in ${statusName} status.`,
       );
     }
 
