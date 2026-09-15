@@ -18,6 +18,7 @@ export type PostBreThresholdsSnapshot = {
   enforceNoActiveMfi: boolean | null;
   maxMissedPayments6Months: number | null;
   minUnsecuredLoanAmount: number | null;
+  maxLoanTypeOverdueAmount: number | null;
   rejectedCreditAssessmentGradesNew: string[] | null;
   rejectedCreditAssessmentGradesExisting: string[] | null;
 };
@@ -67,6 +68,8 @@ function isCriteriaLoaded(key: string, thresholds: PostBreThresholdsSnapshot): b
       return thresholds.maxMissedPayments6Months != null;
     case EC.MIN_UNSECURED_LOAN_AMOUNT:
       return thresholds.minUnsecuredLoanAmount != null;
+    case EC.MAX_LOAN_TYPE_OVERDUE_AMOUNT:
+      return thresholds.maxLoanTypeOverdueAmount != null;
     case EC.REJECTED_CREDIT_ASSESSMENT_GRADES_NEW:
       return thresholds.rejectedCreditAssessmentGradesNew != null;
     case EC.REJECTED_CREDIT_ASSESSMENT_GRADES_EXISTING:
@@ -339,6 +342,24 @@ export function buildPostBreRulesCatalog(thresholds: PostBreThresholdsSnapshot):
       tuefReference: 'Appendix E unsecured account types',
       notes:
         'Uses totalUnsecuredExposureInr (sum of every unsecured tradeline, open and closed) — the same figure the pre-approved offer/credit-limit tier lookup uses.',
+    },
+    {
+      id: EC.MAX_LOAN_TYPE_OVERDUE_AMOUNT,
+      label: 'Max overdue amount per loan type',
+      category: 'tradeline',
+      informationalOnly: false,
+      alwaysEvaluated: true,
+      toggleCriteriaKey: null,
+      criteriaKeys: [EC.MAX_LOAN_TYPE_OVERDUE_AMOUNT],
+      rejectionReasonCode: REJECTION_REASON.OVERDUE_AMOUNT,
+      condition: `Any CIBIL loan/account type with overdue (amount past due) > ₹${thresholds.maxLoanTypeOverdueAmount}.`,
+      passCondition: `Every loan type has overdue ≤ ₹${thresholds.maxLoanTypeOverdueAmount}.`,
+      dataSources: [
+        'TradeLinePartition → Tradeline (grouped by TUEF account type)',
+        'GrantedTrade.amountPastDue / Tradeline.amountPastDue',
+      ],
+      tuefReference: 'Amount Past Due; Appendix A account types',
+      notes: 'Overdue is summed per loan type. Default threshold 0 rejects any positive overdue on any account type.',
     },
     {
       id: EC.REJECTED_CREDIT_ASSESSMENT_GRADES_NEW,

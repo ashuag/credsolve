@@ -10,6 +10,7 @@ import {
   auditNoRestructuredLoans,
   auditNoSmaPwosTradelines,
   auditNoWilfulDefault,
+  auditLoanTypeOverdue,
   buildPostBreBureauSummary,
   buildPostBreEnquiryInspection,
   buildPostBreTradelineInspection,
@@ -19,6 +20,7 @@ import {
   checkNoRestructuredLoans,
   checkNoSmaPwosTradelines,
   checkNoWilfulDefault,
+  checkLoanTypeOverdue,
   computeCibilAssessmentSignals,
   countBureauEnquiriesInLastDays,
   evaluateBureauDpdRulesDetailed,
@@ -594,6 +596,27 @@ export class PostBreCheckService {
       });
     }
 
+    if (thresholds.maxLoanTypeOverdueAmount != null) {
+      activeTradelineRuleIds.push(EC.MAX_LOAN_TYPE_OVERDUE_AMOUNT);
+      const overdue = auditLoanTypeOverdue(parsedReport, thresholds.maxLoanTypeOverdueAmount);
+      const maxAllowed = thresholds.maxLoanTypeOverdueAmount;
+      push({
+        id: EC.MAX_LOAN_TYPE_OVERDUE_AMOUNT,
+        label: `Max overdue amount per loan type (₹${maxAllowed})`,
+        passed: overdue.passed,
+        rejectionReasonCode: overdue.passed ? null : REJECTION_REASON.OVERDUE_AMOUNT,
+        detail: overdue.passed
+          ? `No loan type has overdue above ${maxAllowed} INR.`
+          : overdue.detail,
+        meta: {
+          maxLoanTypeOverdueAmount: maxAllowed,
+          hitCount: overdue.findings.length,
+        },
+        criteriaKeys: [EC.MAX_LOAN_TYPE_OVERDUE_AMOUNT],
+        findings: overdue.passed ? undefined : overdue.findings,
+      });
+    }
+
     const blockingChecks = checks.filter(
       (c) =>
         c.id !== 'bureau_score_present' &&
@@ -859,6 +882,19 @@ export class PostBreCheckService {
       }
     }
 
+    if (thresholds.maxLoanTypeOverdueAmount != null) {
+      const overdue = checkLoanTypeOverdue(parsedReport, thresholds.maxLoanTypeOverdueAmount);
+      if (!overdue.passed) {
+        return {
+          passed: false,
+          rejectReason:
+            overdue.detail ??
+            `Overdue amount on a bureau loan type exceeds maximum ${thresholds.maxLoanTypeOverdueAmount} INR.`,
+          rejectionReasonCode: REJECTION_REASON.OVERDUE_AMOUNT,
+        };
+      }
+    }
+
     const rejectedGrades = isExistingCustomer
       ? thresholds.rejectedCreditAssessmentGradesExisting
       : thresholds.rejectedCreditAssessmentGradesNew;
@@ -1051,6 +1087,7 @@ export class PostBreCheckService {
       enforceNoActiveMfi: pickBool(EC.NO_ACTIVE_MFI),
       maxMissedPayments6Months: pickInt(EC.MAX_MISSED_PAYMENTS_6_MONTHS),
       minUnsecuredLoanAmount: pickInt(EC.MIN_UNSECURED_LOAN_AMOUNT),
+      maxLoanTypeOverdueAmount: pickInt(EC.MAX_LOAN_TYPE_OVERDUE_AMOUNT),
       rejectedCreditAssessmentGradesNew: pickGradeList(EC.REJECTED_CREDIT_ASSESSMENT_GRADES_NEW),
       rejectedCreditAssessmentGradesExisting: pickGradeList(EC.REJECTED_CREDIT_ASSESSMENT_GRADES_EXISTING),
     };

@@ -89,6 +89,7 @@ export type PostBreDryRunResult = {
     enforceNoActiveMfi: boolean | null;
     maxMissedPayments6Months: number | null;
     minUnsecuredLoanAmount: number | null;
+    maxLoanTypeOverdueAmount: number | null;
     rejectedCreditAssessmentGradesNew: string[] | null;
     rejectedCreditAssessmentGradesExisting: string[] | null;
   };
