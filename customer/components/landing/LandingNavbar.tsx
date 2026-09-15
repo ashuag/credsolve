@@ -17,7 +17,7 @@ import { LEGAL_NAV_ITEMS } from '@/lib/legal-content';
 
 const NAV_LINKS = [
   { label: 'Home', href: '/', active: true },
-  { label: 'How It Works', href: '#how-it-works' },
+  { label: 'How It Works', href: '/#how-it-works' },
   { label: 'Loans', href: '#loans' },
   { label: 'EMI Calculator', href: '/emi-calculator' },
   { label: 'About Us', href: '/about-us' },

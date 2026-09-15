@@ -43,7 +43,7 @@ const LOAN_PRODUCTS = [
 ] as const;
 
 const COMPANY_LINKS = [
-  { label: 'How It Works', href: '#how-it-works' },
+  { label: 'How It Works', href: '/#how-it-works' },
   { label: 'About Us', href: '/about-us' },
   { label: 'Contact Us', href: '/contact-us' },
   { label: 'Privacy Policy', href: '/privacy-policy' },
@@ -174,9 +174,9 @@ export function LandingFooter() {
 
             {/* Contact cards */}
             <div className="grid gap-3 sm:grid-cols-2">
-              {/* <a
-                href="tel:1800123MONEY"
-                className="group flex items-center gap-3 rounded-2xl border border-white/6 bg-white/3 p-4 transition-all hover:border-brand-blue/25 hover:bg-brand-blue/8"
+              <a
+                href="tel:+91-9650111801"
+                className="group flex items-start gap-3 rounded-2xl border border-white/6 bg-white/3 p-4 transition-all hover:border-brand-blue/25 hover:bg-brand-blue/8 sm:col-span-2"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-blue/15 transition-colors group-hover:bg-brand-blue/25">
                   <svg viewBox="0 0 24 24" className="h-4 w-4 text-brand-blue-light" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
@@ -184,10 +184,15 @@ export function LandingFooter() {
                   </svg>
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[0.58rem] font-[800] uppercase tracking-[0.14em] text-white/25">Toll Free</div>
-                  <div className="truncate text-sm font-[800] text-white">1800-123-MONEY</div>
+                  <div className="text-[0.58rem] font-[800] uppercase tracking-[0.14em] text-white/25">Phone Support</div>
+                  <div className="mt-0.5 text-sm font-[800] text-white">+91-9650111801</div>
+                  <p className="mt-1 text-xs font-[600] leading-relaxed text-white/45">
+                    Hours: Monday–Saturday, 8:00 AM–5:00 PM
+                    <br />
+                    Excluding Public Holidays
+                  </p>
                 </div>
-              </a> */}
+              </a>
 
               <a
                 href="mailto:contact@moneycash.in"
