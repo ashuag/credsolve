@@ -23,7 +23,7 @@ export function isApplicationFaceStepComplete(application: ApplicationFaceStepSn
 export function assertApplicationKycNotFailed(kycStatus: number | null | undefined): void {
   if (kycStatus === APPLICATION_KYC_STATUS.FAILED) {
     throw new BadRequestException(
-      'KYC verification failed for this application. Name or date of birth did not match Aadhaar.',
+      'KYC verification failed for this application. Date of birth or gender did not match Aadhaar.',
     );
   }
 }
@@ -41,7 +41,7 @@ export function assertApplicationKycNotCompleted(kycStatus: number | null | unde
   }
   if (kycStatus === APPLICATION_KYC_STATUS.FAILED) {
     throw new BadRequestException(
-      'KYC verification failed for this application. Name or date of birth did not match Aadhaar.',
+      'KYC verification failed for this application. Date of birth or gender did not match Aadhaar.',
     );
   }
 }

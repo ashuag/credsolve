@@ -45,7 +45,15 @@ describe('extractPanNsdlSnapshot', () => {
     assert.equal(snapshot?.dobMatch, true);
   });
 
-  it('returns null when neither a log nor a cache row is present', () => {
-    assert.equal(extractPanNsdlSnapshot({}), null);
+  it('reads snake_case match flags from the vendor payload', () => {
+    const snapshot = extractPanNsdlSnapshot({
+      responsePayload: {
+        data: { pan_status: 'invalid', name_matched: false, dob_matched: true },
+      },
+    });
+
+    assert.equal(snapshot?.nameMatch, false);
+    assert.equal(snapshot?.dobMatch, true);
+    assert.equal(snapshot?.panStatus, 'invalid');
   });
 });

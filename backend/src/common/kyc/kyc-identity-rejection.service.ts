@@ -17,8 +17,8 @@ export class KycIdentityRejectionService {
   ) {}
 
   /**
-   * Lead rejected + application marked KYC_FAILED when Aadhaar identity does not match
-   * (DOB / missing fields). Aadhaar name mismatch is a credit review, not this path.
+   * Lead rejected + application marked KYC_FAILED when Aadhaar DOB or gender does not match
+   * (or identity fields are missing). Aadhaar name mismatch is a credit review, not this path.
    */
   async rejectForAadhaarProfileMismatch(params: {
     leadId: bigint;

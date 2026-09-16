@@ -80,14 +80,14 @@ export function buildReviewFlags(row: LosApplicationDetails, bureauPan?: string 
     }
     if (compareIsoDates(profile.dateOfBirth, aadhaar.dateOfBirth) === 'mismatch') {
       flags.push({
-        icon: '◎',
+        icon: '✕',
         title: 'Aadhaar DOB mismatch',
         detail: 'Date of birth on profile does not match Aadhaar.',
       });
     }
     if (compareGenders(profile.gender, aadhaar.gender) === 'mismatch') {
       flags.push({
-        icon: '◎',
+        icon: '✕',
         title: 'Aadhaar gender mismatch',
         detail: 'Gender on profile does not match Aadhaar.',
       });

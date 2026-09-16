@@ -294,6 +294,8 @@ export function ApplicationReviewDashboard({
             rejectDisabled={!canReject}
             onApproveNameMatch={canApproveNameMatch ? () => void handleApproveNameMatch() : undefined}
             approveNameMatchBusy={approveNameMatchBusy}
+            onApproveAadhaarName={canApproveAadhaarName ? () => void handleApproveAadhaarName() : undefined}
+            approveAadhaarNameBusy={approveAadhaarNameBusy}
             onApprove={canApprove ? () => void handleApprove() : undefined}
             approveBusy={approveBusy}
             onDisburse={canDisburse ? () => void handleDisburse() : undefined}
@@ -319,11 +321,6 @@ export function ApplicationReviewDashboard({
               applicationUuid={applicationUuid}
               authToken={authToken}
               onRefresh={onRefresh}
-              onApproveAadhaarName={canApproveAadhaarName ? () => void handleApproveAadhaarName() : undefined}
-              approveAadhaarNameBusy={approveAadhaarNameBusy}
-              canApproveAadhaarName={canApproveAadhaarName}
-              onReject={canReject ? () => setRejectOpen(true) : undefined}
-              canReject={canReject}
             />
           </div>
           <div className={`panel${activeTab === 'bank' ? ' on' : ''}`}>

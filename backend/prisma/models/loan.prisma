@@ -67,6 +67,7 @@ model LoanRepayment {
 
   @@index([loanAccountId, paidAt])
   @@index([loanAccountId, status])
+  @@index([vendorRef, status])
   @@map("loan_repayment")
 }
 

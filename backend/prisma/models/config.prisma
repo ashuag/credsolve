@@ -28,6 +28,7 @@ model EligibilityCriteria {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  @@index([breType, isActive])
   @@map("eligibility_criteria")
 }
 
@@ -69,6 +70,7 @@ model SmsTemplate {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  @@index([product, isActive])
   @@map("sms_template")
 }
 

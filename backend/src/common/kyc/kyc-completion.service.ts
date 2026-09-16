@@ -1,11 +1,38 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, type Prisma as PrismaTypes } from '@prisma/client';
 import { APPLICATION_KYC_STATUS } from '../constants/application.constants';
+import { shouldStartNewCustomerKycBundle } from './customer-aadhaar-for-application.util';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class KycCompletionService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private async resolveCustomerKycForApplication(
+    tx: PrismaTypes.TransactionClient,
+    params: { customerId: bigint; applicationId: bigint },
+  ) {
+    const application = await tx.application.findUnique({
+      where: { id: params.applicationId },
+      select: { createdAt: true, kyc: { select: { kycStatus: true } } },
+    });
+    const latest = await tx.customerKyc.findFirst({
+      where: { customerId: params.customerId },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (
+      latest &&
+      !shouldStartNewCustomerKycBundle(latest, {
+        applicationCreatedAt: application?.createdAt ?? new Date(0),
+        applicationKycStatus: application?.kyc?.kycStatus,
+      })
+    ) {
+      return latest;
+    }
+    return tx.customerKyc.create({
+      data: { customerId: params.customerId },
+    });
+  }
 
   /**
    * Persists DigiLocker Aadhaar (and optional PAN) on `customer_kyc`.
@@ -36,15 +63,10 @@ export class KycCompletionService {
         },
       });
 
-      let customerKyc = await tx.customerKyc.findFirst({
-        where: { customerId: params.customerId },
-        orderBy: { createdAt: 'desc' },
+      const customerKyc = await this.resolveCustomerKycForApplication(tx, {
+        applicationId: params.applicationId,
+        customerId: params.customerId,
       });
-      if (!customerKyc) {
-        customerKyc = await tx.customerKyc.create({
-          data: { customerId: params.customerId },
-        });
-      }
 
       const pan =
         typeof params.panCardNumber === 'string' && params.panCardNumber.trim()
@@ -98,15 +120,10 @@ export class KycCompletionService {
         data: { kycVerifiedAt: params.verifiedAt },
       });
 
-      let customerKyc = await tx.customerKyc.findFirst({
-        where: { customerId: params.customerId },
-        orderBy: { createdAt: 'desc' },
+      const customerKyc = await this.resolveCustomerKycForApplication(tx, {
+        applicationId: params.applicationId,
+        customerId: params.customerId,
       });
-      if (!customerKyc) {
-        customerKyc = await tx.customerKyc.create({
-          data: { customerId: params.customerId },
-        });
-      }
 
       await tx.customerKyc.update({
         where: { id: customerKyc.id },

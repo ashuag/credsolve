@@ -22,6 +22,7 @@ model State {
   negativeAddedBy   User? @relation("StateNegativeAddedBy", fields: [negativeAddedByUserId], references: [id])
   negativeRemovedBy User? @relation("StateNegativeRemovedBy", fields: [negativeRemovedByUserId], references: [id])
 
+  @@index([isNegative, negativeAddedAt])
   @@map("state")
 }
 
@@ -49,6 +50,7 @@ model City {
 
   @@unique([name, stateId])
   @@index([stateId])
+  @@index([isNegative, negativeAddedAt])
   @@map("city")
 }
 

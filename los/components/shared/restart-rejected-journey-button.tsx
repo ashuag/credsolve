@@ -37,10 +37,9 @@ export function RestartRejectedJourneyButton({
     if (!token || busy) return;
     const confirmed = window.confirm(
       'Start a new customer journey from this rejected case?\n\n' +
-        'Name, DOB, address, occupation, income, and PAN (when already verified) will be copied onto a new lead. ' +
-        'If a loan amount was already selected, it is copied and the repay date is recalculated from today ' +
-        '(1st–15th → end of this month; 16th onward → end of next month, or the active LOS due-date override). ' +
-        'Bureau, KYC, and bank verification will run again. The rejected record stays in history.',
+        'Name, DOB, address, occupation, income, and PAN number will be copied onto a new lead. ' +
+        'Pre-BRE runs immediately. The customer must confirm PAN so CIBIL (reuse or fresh pull) and post-BRE run again. ' +
+        'Loan selection, KYC, and bank verification are not copied. The rejected record stays in history.',
     );
     if (!confirmed) return;
 
@@ -54,7 +53,10 @@ export function RestartRejectedJourneyButton({
         result.copiedFields.length > 0
           ? ` Copied: ${result.copiedFields.join(', ')}.`
           : ' No profile fields were available to copy.';
-      window.alert(`New journey ${result.newLeadNumber} created.${copied}`);
+      const breNote = result.preBreRejected
+        ? ' Pre-BRE rejected the new lead.'
+        : '';
+      window.alert(`New journey ${result.newLeadNumber} created.${copied}${breNote}`);
       router.push(`/leads/${result.newLeadUuid}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to restart the customer journey.');

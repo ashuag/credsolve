@@ -191,6 +191,8 @@ export function ApplicationReviewToolbar({
   rejectDisabled = false,
   onApproveNameMatch,
   approveNameMatchBusy = false,
+  onApproveAadhaarName,
+  approveAadhaarNameBusy = false,
   onApprove,
   approveDisabled = false,
   approveBusy = false,
@@ -203,6 +205,8 @@ export function ApplicationReviewToolbar({
   rejectDisabled?: boolean;
   onApproveNameMatch?: () => void;
   approveNameMatchBusy?: boolean;
+  onApproveAadhaarName?: () => void;
+  approveAadhaarNameBusy?: boolean;
   onApprove?: () => void;
   approveDisabled?: boolean;
   approveBusy?: boolean;
@@ -230,6 +234,16 @@ export function ApplicationReviewToolbar({
           className="min-h-[38px] rounded-[8px] border border-[rgba(245,158,11,0.45)] bg-[#fffbeb] px-4 text-[0.82rem] font-bold text-[#92400e] hover:bg-[#fef3c7] disabled:cursor-not-allowed disabled:opacity-55"
         >
           {approveNameMatchBusy ? 'Approving…' : 'Approve'}
+        </button>
+      ) : null}
+      {onApproveAadhaarName ? (
+        <button
+          type="button"
+          onClick={onApproveAadhaarName}
+          disabled={approveAadhaarNameBusy}
+          className="min-h-[38px] rounded-[8px] border border-[rgba(16,185,129,0.35)] bg-[#ecfdf5] px-4 text-[0.82rem] font-bold text-[#047857] hover:bg-[#d1fae5] disabled:cursor-not-allowed disabled:opacity-55"
+        >
+          {approveAadhaarNameBusy ? 'Approving…' : 'Approve application'}
         </button>
       ) : null}
       {onApprove ? (

@@ -27,7 +27,15 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 function asBool(value: unknown): boolean | null {
-  return typeof value === 'boolean' ? value : null;
+  if (typeof value === 'boolean') return value;
+  if (value === 1) return true;
+  if (value === 0) return false;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true' || normalized === 'yes' || normalized === '1') return true;
+    if (normalized === 'false' || normalized === 'no' || normalized === '0') return false;
+  }
+  return null;
 }
 
 function asText(value: unknown): string | null {
@@ -82,9 +90,21 @@ function extractFromVendorPayload(
     requestInput?.panNumber,
     request?.panNumber,
   );
-  const nameMatch = asBool(responseData?.nameMatch) ?? asBool(response?.nameMatch);
-  const dobMatch = asBool(responseData?.dobMatch) ?? asBool(response?.dobMatch);
-  const panStatus = asText(responseData?.panStatus) ?? asText(response?.panStatus);
+  const nameMatch =
+    asBool(responseData?.nameMatch) ??
+    asBool(responseData?.name_match) ??
+    asBool(responseData?.name_matched) ??
+    asBool(response?.nameMatch) ??
+    asBool(response?.name_match) ??
+    asBool(response?.name_matched);
+  const dobMatch =
+    asBool(responseData?.dobMatch) ??
+    asBool(responseData?.dob_match) ??
+    asBool(responseData?.dob_matched) ??
+    asBool(response?.dobMatch) ??
+    asBool(response?.dob_match) ??
+    asBool(response?.dob_matched);
+  const panStatus = asText(responseData?.panStatus) ?? asText(responseData?.pan_status) ?? asText(response?.panStatus);
 
   if (!fullName && !panNumber && nameMatch == null && dobMatch == null && !panStatus) {
     return null;

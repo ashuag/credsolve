@@ -42,5 +42,6 @@ model User {
   @@index([managerId])
   @@index([roleId])
   @@index([isActive])
+  @@index([createdAt])
   @@map("user")
 }

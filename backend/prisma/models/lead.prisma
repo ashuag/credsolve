@@ -104,6 +104,7 @@ model VendorApiLog {
   @@index([leadId, serviceName, respondedAt])
   @@index([providerName, requestedAt])
   @@index([requestedAt])
+  @@index([respondedAt])
   @@index([httpStatus, requestedAt])
   @@map("vendor_api_log")
 }
@@ -121,7 +122,6 @@ model LeadUtm {
 
   lead Lead @relation(fields: [leadId], references: [id])
 
-  @@index([leadId])
-  @@index([createdAt])
+  @@index([leadId, createdAt])
   @@map("lead_utm")
 }
