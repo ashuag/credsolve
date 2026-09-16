@@ -11,6 +11,7 @@ import {
   auditNoSmaPwosTradelines,
   auditNoWilfulDefault,
   auditLoanTypeOverdue,
+  auditRejectedLoanTypes,
   buildPostBreBureauSummary,
   buildPostBreEnquiryInspection,
   buildPostBreTradelineInspection,
@@ -21,6 +22,7 @@ import {
   checkNoSmaPwosTradelines,
   checkNoWilfulDefault,
   checkLoanTypeOverdue,
+  checkRejectedLoanTypes,
   computeCibilAssessmentSignals,
   countBureauEnquiriesInLastDays,
   evaluateBureauDpdRulesDetailed,
@@ -617,6 +619,54 @@ export class PostBreCheckService {
       });
     }
 
+    if (thresholds.rejectOpenLoanTypes != null) {
+      activeTradelineRuleIds.push(EC.REJECT_OPEN_LOAN_TYPES);
+      const blocked = thresholds.rejectOpenLoanTypes;
+      const result = auditRejectedLoanTypes(parsedReport, blocked, { openOnly: true });
+      const typeList = blocked.join(', ') || 'none';
+      push({
+        id: EC.REJECT_OPEN_LOAN_TYPES,
+        label: 'Reject open loan type',
+        passed: result.passed,
+        rejectionReasonCode: result.passed ? null : REJECTION_REASON.REJECT_OPEN_LOAN_TYPE,
+        detail: result.passed
+          ? blocked.length
+            ? `No open tradeline matches rejected loan types (${typeList}).`
+            : 'No rejected open loan types configured.'
+          : result.detail,
+        meta: {
+          rejectOpenLoanTypes: typeList,
+          hitCount: result.findings.length,
+        },
+        criteriaKeys: [EC.REJECT_OPEN_LOAN_TYPES],
+        findings: result.passed ? undefined : result.findings,
+      });
+    }
+
+    if (thresholds.rejectLoanTypes != null) {
+      activeTradelineRuleIds.push(EC.REJECT_LOAN_TYPES);
+      const blocked = thresholds.rejectLoanTypes;
+      const result = auditRejectedLoanTypes(parsedReport, blocked, { openOnly: false });
+      const typeList = blocked.join(', ') || 'none';
+      push({
+        id: EC.REJECT_LOAN_TYPES,
+        label: 'Reject if loan type',
+        passed: result.passed,
+        rejectionReasonCode: result.passed ? null : REJECTION_REASON.REJECT_LOAN_TYPE,
+        detail: result.passed
+          ? blocked.length
+            ? `No tradeline matches rejected loan types (${typeList}).`
+            : 'No rejected loan types configured.'
+          : result.detail,
+        meta: {
+          rejectLoanTypes: typeList,
+          hitCount: result.findings.length,
+        },
+        criteriaKeys: [EC.REJECT_LOAN_TYPES],
+        findings: result.passed ? undefined : result.findings,
+      });
+    }
+
     const blockingChecks = checks.filter(
       (c) =>
         c.id !== 'bureau_score_present' &&
@@ -895,6 +945,36 @@ export class PostBreCheckService {
       }
     }
 
+    if (thresholds.rejectOpenLoanTypes != null && thresholds.rejectOpenLoanTypes.length > 0) {
+      const openLoanTypes = checkRejectedLoanTypes(parsedReport, thresholds.rejectOpenLoanTypes, {
+        openOnly: true,
+      });
+      if (!openLoanTypes.passed) {
+        return {
+          passed: false,
+          rejectReason:
+            openLoanTypes.detail ??
+            `Open tradeline matches a rejected loan type (${thresholds.rejectOpenLoanTypes.join(', ')}).`,
+          rejectionReasonCode: REJECTION_REASON.REJECT_OPEN_LOAN_TYPE,
+        };
+      }
+    }
+
+    if (thresholds.rejectLoanTypes != null && thresholds.rejectLoanTypes.length > 0) {
+      const loanTypes = checkRejectedLoanTypes(parsedReport, thresholds.rejectLoanTypes, {
+        openOnly: false,
+      });
+      if (!loanTypes.passed) {
+        return {
+          passed: false,
+          rejectReason:
+            loanTypes.detail ??
+            `Tradeline matches a rejected loan type (${thresholds.rejectLoanTypes.join(', ')}).`,
+          rejectionReasonCode: REJECTION_REASON.REJECT_LOAN_TYPE,
+        };
+      }
+    }
+
     const rejectedGrades = isExistingCustomer
       ? thresholds.rejectedCreditAssessmentGradesExisting
       : thresholds.rejectedCreditAssessmentGradesNew;
@@ -1073,6 +1153,23 @@ export class PostBreCheckService {
         .map((s) => s.trim().toUpperCase())
         .filter(Boolean);
     };
+    const pickLoanTypeList = (key: string): string[] | null => {
+      if (!map.has(key)) return null;
+      const raw = map.get(key)?.trim() ?? '';
+      const seen = new Set<string>();
+      const ids: string[] = [];
+      for (const part of raw.split(',')) {
+        const trimmed = part.trim();
+        if (!trimmed) continue;
+        const symbol = /^\d+$/.test(trimmed)
+          ? String(Number.parseInt(trimmed, 10)).padStart(2, '0')
+          : trimmed.toUpperCase();
+        if (seen.has(symbol)) continue;
+        seen.add(symbol);
+        ids.push(symbol);
+      }
+      return ids;
+    };
     return {
       cibilMinNew: pickInt(EC.CIBIL_MIN_NEW),
       cibilMinExisting: pickInt(EC.CIBIL_MIN_EXISTING),
@@ -1088,6 +1185,8 @@ export class PostBreCheckService {
       maxMissedPayments6Months: pickInt(EC.MAX_MISSED_PAYMENTS_6_MONTHS),
       minUnsecuredLoanAmount: pickInt(EC.MIN_UNSECURED_LOAN_AMOUNT),
       maxLoanTypeOverdueAmount: pickInt(EC.MAX_LOAN_TYPE_OVERDUE_AMOUNT),
+      rejectOpenLoanTypes: pickLoanTypeList(EC.REJECT_OPEN_LOAN_TYPES),
+      rejectLoanTypes: pickLoanTypeList(EC.REJECT_LOAN_TYPES),
       rejectedCreditAssessmentGradesNew: pickGradeList(EC.REJECTED_CREDIT_ASSESSMENT_GRADES_NEW),
       rejectedCreditAssessmentGradesExisting: pickGradeList(EC.REJECTED_CREDIT_ASSESSMENT_GRADES_EXISTING),
     };

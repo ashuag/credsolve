@@ -21,7 +21,7 @@ model EligibilityCriteria {
   id          Int      @id @default(autoincrement()) @db.SmallInt
   key         String   @unique @db.VarChar(100)
   label       String   @db.VarChar(200)
-  value       String   @db.VarChar(100)
+  value       String   @db.VarChar(255)
   breType     String   @default("PRE_BRE") @map("bre_type") @db.VarChar(20)
   description String?  @db.VarChar(500)
   isActive    Boolean  @default(true) @map("is_active")

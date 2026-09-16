@@ -1219,6 +1219,74 @@ export function checkLoanTypeOverdue(body: unknown, maxAllowedInr: number): Bure
 }
 
 /**
+ * Rejects when any tradeline's CIBIL account type is in `loanTypeIds`.
+ * When `openOnly` is true, closed matching tradelines are ignored.
+ */
+export function auditRejectedLoanTypes(
+  body: unknown,
+  loanTypeIds: readonly string[],
+  options: { openOnly: boolean },
+): BureauTradelineRuleCheck {
+  const blocked = new Set(
+    loanTypeIds
+      .map((id) => normalizeCibilAccountTypeSymbol(id))
+      .filter((id): id is string => Boolean(id)),
+  );
+  if (!blocked.size) {
+    return { passed: true, detail: null, findings: [] };
+  }
+
+  const findings: BureauRuleFinding[] = [];
+  walkTradelines(body, ({ lineRec, partitionSymbol, creditor }) => {
+    const isOpen = isCibilTradelineOpen(lineRec);
+    if (options.openOnly && !isOpen) return;
+
+    const accountType =
+      resolveTradelineAccountTypeSymbol(partitionSymbol, lineRec) ??
+      normalizeCibilAccountTypeSymbol(partitionSymbol);
+    if (!accountType || !blocked.has(accountType)) return;
+
+    const label = cibilAccountTypeDisplayLabel(accountType);
+    const accountNumber =
+      lineRec.accountNumber != null ? String(lineRec.accountNumber).trim() : null;
+    findings.push({
+      title: creditor,
+      detail: options.openOnly
+        ? `Open ${label} (${accountType}) tradeline is in the rejected open loan-type set.`
+        : `${label} (${accountType}) tradeline is in the rejected loan-type set${isOpen ? '' : ' (closed)'}.`,
+      data: {
+        accountType,
+        loanType: label,
+        isOpen,
+        accountNumber: accountNumber || null,
+      },
+    });
+  });
+
+  const labels = [
+    ...new Set(findings.map((f) => String(f.data?.loanType ?? f.data?.accountType ?? '')).filter(Boolean)),
+  ];
+  return {
+    passed: findings.length === 0,
+    detail: findings.length
+      ? options.openOnly
+        ? `Open rejected loan type(s) found: ${labels.join(', ')}.`
+        : `Rejected loan type(s) found: ${labels.join(', ')}.`
+      : null,
+    findings,
+  };
+}
+
+export function checkRejectedLoanTypes(
+  body: unknown,
+  loanTypeIds: readonly string[],
+  options: { openOnly: boolean },
+): BureauAdverseTradelineCheck {
+  const audit = auditRejectedLoanTypes(body, loanTypeIds, options);
+  return { passed: audit.passed, detail: audit.detail };
+}
+
+/**
  * Counts (tradeline × month) pairs where DPD > 0 in the last N months.
  * A "missed payment" is any month on any tradeline with positive DPD.
  */
@@ -1349,7 +1417,12 @@ function resolveTradelineEvaluatedRules(input: {
   const overdue = input.activeRuleIds.has(EC.MAX_LOAN_TYPE_OVERDUE_AMOUNT)
     ? [EC.MAX_LOAN_TYPE_OVERDUE_AMOUNT]
     : [];
-  return [...always, ...mfi, ...dpd, ...unsecuredMin, ...overdue];
+  const rejectOpen =
+    input.activeRuleIds.has(EC.REJECT_OPEN_LOAN_TYPES) && input.isOpen
+      ? [EC.REJECT_OPEN_LOAN_TYPES]
+      : [];
+  const rejectAny = input.activeRuleIds.has(EC.REJECT_LOAN_TYPES) ? [EC.REJECT_LOAN_TYPES] : [];
+  return [...always, ...mfi, ...dpd, ...unsecuredMin, ...overdue, ...rejectOpen, ...rejectAny];
 }
 
 /** Every tradeline on the bureau report with flags and which post-BRE rules evaluate it. */
