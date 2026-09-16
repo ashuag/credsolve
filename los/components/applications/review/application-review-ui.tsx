@@ -44,7 +44,7 @@ export function ReviewField({
   sub,
   tone,
   badge,
-  badgeInValue = false,
+  badgeInValue: _badgeInValue = false,
 }: {
   label: string;
   value: ReactNode;
@@ -57,19 +57,12 @@ export function ReviewField({
   const valueNode = isEmpty ? '—' : value;
 
   return (
-    <div className={`field${tone ? ` ${tone}` : ''}`}>
-      <div className="lab">{label}</div>
-      <div className={`val${isEmpty ? ' empty' : ''}`}>
-        {badgeInValue && badge ? (
-          <span className="val-inline">
-            {valueNode}
-            {badge}
-          </span>
-        ) : (
-          valueNode
-        )}
+    <div className={`field${tone ? ` ${tone}` : ''}${badge ? ' has-badge' : ''}`}>
+      <div className="lab">
+        <span className="lab-text">{label}</span>
+        {badge}
       </div>
-      {!badgeInValue && badge ? <div className="field-badge-row">{badge}</div> : null}
+      <div className={`val${isEmpty ? ' empty' : ''}`}>{valueNode}</div>
       {sub ? <div className="sub">{sub}</div> : null}
     </div>
   );

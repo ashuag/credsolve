@@ -321,6 +321,14 @@ export type LosApplicationDetails = {
     panVerified: number;
     profile: LosLeadDetails['profile'];
   };
+  /** Latest Tenacio NSDL PAN check for this lead, else the customer PAN NSDL cache. */
+  panNsdl?: {
+    fullName: string | null;
+    panNumber: string | null;
+    nameMatch: boolean | null;
+    dobMatch: boolean | null;
+    panStatus: string | null;
+  } | null;
   referencesCount: number;
   references: Array<{
     referenceIndex: number;

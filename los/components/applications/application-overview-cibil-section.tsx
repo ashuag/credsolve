@@ -12,6 +12,7 @@ import {
   extractCibilPan,
   formatAadhaarNumberDisplay,
   formatDobWithAge,
+  isKycMismatchHighlight,
   nameMatchVerdict,
   normalizeAadhaarGender,
 } from '@/lib/kyc-field-match';
@@ -40,15 +41,26 @@ function DetailGrid({
   rows,
   columns = 1,
 }: {
-  rows: Array<{ label: string; value: ReactNode }>;
+  rows: Array<{ label: string; value: ReactNode; highlight?: boolean }>;
   columns?: 1 | 2 | 3;
 }) {
   if (columns === 1) {
     return (
       <dl className="m-0 divide-y divide-[rgba(23,44,113,0.06)]">
         {rows.map((row, idx) => (
-          <div key={`${row.label}-${idx}`} className="flex items-baseline gap-3 py-1.5 first:pt-0 last:pb-0">
-            <dt className="w-[148px] flex-shrink-0 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-brand-muted leading-tight">
+          <div
+            key={`${row.label}-${idx}`}
+            className={cx(
+              'flex items-baseline gap-3 py-1.5 first:pt-0 last:pb-0',
+              row.highlight ? '-mx-2 rounded-[8px] border border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.95)] px-2' : '',
+            )}
+          >
+            <dt
+              className={cx(
+                'w-[148px] flex-shrink-0 text-[0.68rem] font-bold uppercase tracking-[0.08em] leading-tight',
+                row.highlight ? 'text-[#92400e]' : 'text-brand-muted',
+              )}
+            >
               {row.label}
             </dt>
             <dd className="m-0 min-w-0 flex-1 text-[0.84rem] font-semibold text-brand-text leading-snug">{row.value}</dd>
@@ -65,9 +77,21 @@ function DetailGrid({
       {rows.map((row, idx) => (
         <div
           key={`${row.label}-${idx}`}
-          className="rounded-[8px] border border-[rgba(23,44,113,0.07)] bg-[rgba(255,255,255,0.72)] px-3 py-2"
+          className={cx(
+            'rounded-[8px] border px-3 py-2',
+            row.highlight
+              ? 'border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.95)]'
+              : 'border-[rgba(23,44,113,0.07)] bg-[rgba(255,255,255,0.72)]',
+          )}
         >
-          <dt className="text-[0.62rem] font-bold uppercase tracking-[0.08em] text-brand-muted leading-tight">{row.label}</dt>
+          <dt
+            className={cx(
+              'text-[0.62rem] font-bold uppercase tracking-[0.08em] leading-tight',
+              row.highlight ? 'text-[#92400e]' : 'text-brand-muted',
+            )}
+          >
+            {row.label}
+          </dt>
           <dd className="m-0 mt-1 break-words text-[0.84rem] font-semibold text-brand-text leading-snug">{row.value}</dd>
         </div>
       ))}
@@ -318,6 +342,7 @@ function CustomerProfilePanel({
             rows={[
               {
                 label: 'Name',
+                highlight: isKycMismatchHighlight(profileNameVerdict),
                 value: (
                   <KycComparedValue
                     value={formatPersonName(profile.fullName)}
@@ -339,6 +364,7 @@ function CustomerProfilePanel({
               },
               {
                 label: 'Gender',
+                highlight: isKycMismatchHighlight(profileGenderVerdict),
                 value: (
                   <KycComparedValue
                     value={profile.gender ?? '—'}
@@ -366,9 +392,30 @@ function CustomerProfilePanel({
                 <DetailGrid
                   columns={2}
                   rows={[
-                    { label: 'Aadhaar name', value: formatPersonName(aadhaar?.fullName) },
+                    {
+                      label: 'Aadhaar name',
+                      highlight: isKycMismatchHighlight(profileNameVerdict),
+                      value: (
+                        <KycComparedValue
+                          value={formatPersonName(aadhaar?.fullName)}
+                          verdict={profileNameVerdict}
+                          score={profileNameScore}
+                          compareLabel="Profile"
+                        />
+                      ),
+                    },
                     { label: 'Aadhaar DOB', value: formatDobWithAge(aadhaar?.dateOfBirth) },
-                    { label: 'Aadhaar gender', value: normalizeAadhaarGender(aadhaar?.gender) ?? '—' },
+                    {
+                      label: 'Aadhaar gender',
+                      highlight: isKycMismatchHighlight(profileGenderVerdict),
+                      value: (
+                        <KycComparedValue
+                          value={normalizeAadhaarGender(aadhaar?.gender) ?? '—'}
+                          verdict={profileGenderVerdict}
+                          compareLabel="Profile"
+                        />
+                      ),
+                    },
                     {
                       label: 'Aadhaar number',
                       value: formatAadhaarNumberDisplay(aadhaar?.maskedAadhaar, true),
@@ -713,6 +760,13 @@ function KycDetailPanel({
   const kycDone = row.kycStatus === 1;
   const livenessDone = row.livenessPassed === true || kycDone;
   const showEnableReKyc = row.canEnableReKyc || canEnableReKycFromRow(row);
+  const profileName = row.lead.profile?.fullName;
+  const aadhaarNameScore = computeNameMatchScore(profileName, aadhaar?.fullName);
+  const aadhaarNameVerdict = nameMatchVerdict(
+    aadhaarNameScore,
+    Boolean(profileName?.trim() && aadhaar?.fullName?.trim()),
+  );
+  const aadhaarGenderVerdict = compareGenders(row.lead.profile?.gender, aadhaar?.gender);
   return (
     <div className="grid gap-4">
       <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)]">
@@ -756,19 +810,38 @@ function KycDetailPanel({
           <DetailGrid
             columns={2}
             rows={[
-              {
-                label: 'Aadhaar KYC',
-                value: aadhaarComplete ? 'Complete' : identityFailure ? 'Fetched — identity failed' : 'Not complete',
-              },
+              { label: 'Aadhaar KYC', value: aadhaarComplete ? 'Complete' : identityFailure ? 'Fetched — identity failed' : 'Not complete' },
               {
                 label: 'DigiLocker Aadhaar',
                 value: formatAadhaarNumberDisplay(aadhaar?.maskedAadhaar, aadhaarFetched),
               },
-              { label: 'Aadhaar name', value: aadhaarFetched ? formatPersonName(aadhaar?.fullName) : '—' },
+              {
+                label: 'Aadhaar name',
+                highlight: aadhaarFetched && isKycMismatchHighlight(aadhaarNameVerdict),
+                value: aadhaarFetched ? (
+                  <KycComparedValue
+                    value={formatPersonName(aadhaar?.fullName)}
+                    verdict={aadhaarNameVerdict}
+                    score={aadhaarNameScore}
+                    compareLabel="Profile"
+                  />
+                ) : (
+                  '—'
+                ),
+              },
               { label: 'Aadhaar DOB', value: aadhaarFetched ? formatDobWithAge(aadhaar?.dateOfBirth) : '—' },
               {
                 label: 'Aadhaar gender',
-                value: aadhaarFetched ? (normalizeAadhaarGender(aadhaar?.gender) ?? '—') : '—',
+                highlight: aadhaarFetched && isKycMismatchHighlight(aadhaarGenderVerdict),
+                value: aadhaarFetched ? (
+                  <KycComparedValue
+                    value={normalizeAadhaarGender(aadhaar?.gender) ?? '—'}
+                    verdict={aadhaarGenderVerdict}
+                    compareLabel="Profile"
+                  />
+                ) : (
+                  '—'
+                ),
               },
               { label: 'Aadhaar address', value: aadhaarFetched ? (aadhaar?.address ?? '—') : '—' },
               { label: 'DigiLocker PAN', value: row.digilockerPan?.panCardNumber ?? '—' },

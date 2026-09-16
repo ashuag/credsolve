@@ -48,6 +48,10 @@ import { LEAD_STATUS } from '../../../common/constants/lead.constants';
 import { REJECTION_REASON, toRejectionReasonDto } from '../../../common/constants/rejection-reason.constants';
 import { canEnableReKyc } from '../kyc-grant-retry.util';
 import { canGrantPennyDropAttempt } from '../penny-drop-grant-retry.util';
+import {
+  extractPanNsdlSnapshot,
+  panNsdlVendorServiceNames,
+} from '../../../common/vendor/pan-nsdl-snapshot.util';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -683,12 +687,31 @@ export class LosApplicationService {
       this.prisma.read.application.findUnique({
         where: { uuid: applicationUuid },
         include: {
-        customer: { select: { uuid: true, mobileNumber: true } },
+        customer: {
+          select: {
+            uuid: true,
+            mobileNumber: true,
+            panNsdlCache: {
+              select: {
+                panNumber: true,
+                fullName: true,
+                nameVerified: true,
+                nsdlResponse: true,
+              },
+            },
+          },
+        },
         lead: {
           include: {
             leadStatus: { select: { name: true, displayName: true } },
             rejectionReason: { select: { name: true } },
             source: { select: { name: true, type: true } },
+            vendorApiLogs: {
+              where: { serviceName: { in: panNsdlVendorServiceNames() } },
+              orderBy: [{ respondedAt: 'desc' }, { id: 'desc' }],
+              take: 1,
+              select: { requestPayload: true, responsePayload: true },
+            },
             leadDetail: {
               include: {
                 city: { select: { name: true, state: { select: { name: true, code: true } } } },
@@ -971,6 +994,11 @@ export class LosApplicationService {
         mobileNumber: ref.mobileNumber,
         relation: ref.relation.name,
       })),
+      panNsdl: extractPanNsdlSnapshot({
+        requestPayload: lead.vendorApiLogs[0]?.requestPayload,
+        responsePayload: lead.vendorApiLogs[0]?.responsePayload,
+        cache: application.customer.panNsdlCache,
+      }),
       aadhaarDetail,
       aadhaarIdentityFailure,
       aadhaarDownloadLogs: aadhaarDownloadLogs.items,
