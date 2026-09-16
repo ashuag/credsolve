@@ -8,6 +8,7 @@ import { TENACIO_BUREAU_MOCK_VENDOR_BODY } from './tenacio-bureau-mock.fixture';
 import { SurepassCibilService } from './surepass/surepass-cibil.service';
 import { VendorApiService } from './vendor-api.service';
 import { VendorApiConfigService } from './vendor-api-config.service';
+import { formatBureauInquiryName } from '../utils/person-name.util';
 
 /**
  * Default relative path when `VENDOR_HOST` is `…/api/v1/services` and
@@ -251,7 +252,7 @@ export class BureauFetchService {
         ...body.input,
         panNumber: body.input.panNumber.trim().toUpperCase(),
         mobileNumber: body.input.mobileNumber.trim(),
-        name: body.input.name.trim(),
+        name: formatBureauInquiryName(body.input.name),
         consent: body.input.consent,
       },
     };
@@ -327,7 +328,7 @@ export class BureauFetchService {
       {
         mobileNumber: body.input.mobileNumber,
         panNumber: body.input.panNumber,
-        name: body.input.name,
+        name: formatBureauInquiryName(body.input.name),
         gender,
       },
       leadId,
