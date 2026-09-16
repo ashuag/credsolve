@@ -195,7 +195,7 @@ export function explainKycNotDone(row: KycIncompleteInput): string | null {
   if (row.kycStatus === 2) {
     return row.aadhaarIdentityFailure?.message?.trim() ||
       row.kycStatusLabel?.trim() ||
-      'KYC verification failed — name or date of birth did not match Aadhaar.';
+      'KYC verification failed — date of birth or gender did not match Aadhaar.';
   }
 
   if (row.kycStatus === 3) {

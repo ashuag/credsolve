@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
+import { APPLICATION_KYC_STATUS } from '../common/constants/application.constants';
 
 export type ApplicationKycSnapshotRow = {
   id: bigint;
@@ -19,6 +20,8 @@ export type ApplicationKycSnapshotRow = {
   loanDocumentsAcceptedAt: Date | null;
   loanDocumentsReviewedAt: Date | null;
 };
+
+const KYC_FAILED = APPLICATION_KYC_STATUS.FAILED;
 
 export async function fetchLatestApplicationKycSnapshot(
   client: PrismaClient,
@@ -47,7 +50,20 @@ export async function fetchLatestApplicationKycSnapshot(
           FROM application a
           LEFT JOIN application_detail ad ON ad.application_id = a.id
           LEFT JOIN application_kyc ak ON ak.application_id = a.id
-          LEFT JOIN customer_kyc ck ON ck.customer_id = a.customer_id
+          LEFT JOIN customer_kyc ck ON ck.id = (
+            SELECT ck2.id
+            FROM customer_kyc ck2
+            WHERE ck2.customer_id = a.customer_id
+              AND (
+                (ck2.aadhaar_verified_at IS NOT NULL AND ck2.aadhaar_verified_at >= a.created_at)
+                OR (
+                  COALESCE(ak.kyc_status, 0) = ${KYC_FAILED}
+                  AND (ck2.aadhaar_data IS NOT NULL OR NULLIF(ck2.aadhaar_photo_path, '') IS NOT NULL)
+                )
+              )
+            ORDER BY ck2.created_at DESC, ck2.id DESC
+            LIMIT 1
+          )
           WHERE a.lead_id = ${leadId} AND a.customer_id = ${customerId}
           ORDER BY a.created_at DESC
           LIMIT 1
@@ -71,7 +87,20 @@ export async function fetchLatestApplicationKycSnapshot(
           FROM application a
           LEFT JOIN application_detail ad ON ad.application_id = a.id
           LEFT JOIN application_kyc ak ON ak.application_id = a.id
-          LEFT JOIN customer_kyc ck ON ck.customer_id = a.customer_id
+          LEFT JOIN customer_kyc ck ON ck.id = (
+            SELECT ck2.id
+            FROM customer_kyc ck2
+            WHERE ck2.customer_id = a.customer_id
+              AND (
+                (ck2.aadhaar_verified_at IS NOT NULL AND ck2.aadhaar_verified_at >= a.created_at)
+                OR (
+                  COALESCE(ak.kyc_status, 0) = ${KYC_FAILED}
+                  AND (ck2.aadhaar_data IS NOT NULL OR NULLIF(ck2.aadhaar_photo_path, '') IS NOT NULL)
+                )
+              )
+            ORDER BY ck2.created_at DESC, ck2.id DESC
+            LIMIT 1
+          )
           WHERE a.lead_id = ${leadId}
           ORDER BY a.created_at DESC
           LIMIT 1

@@ -395,7 +395,6 @@ export class VerifyPanUseCase {
           customer.mobileNumber,
           panUpper,
           fullNameTrimmed,
-          priorIdentity != null,
         );
         if (bureauOutcome === 'ntc') {
           await this.rejectLead(
@@ -667,18 +666,18 @@ export class VerifyPanUseCase {
    * Bureau soft-pull after PAN is verified (Tenacio primary; on any Tenacio
    * error the pull automatically falls back to Surepass), when
    * `BUREAU_FETCH_ENABLED` is on, the lead is not terminal-negative, and the
-   * customer has bureau consent on `lead_detail`. Recurring customers (repaid
-   * CLOSED loan) reuse the latest `bureau_report` for this customer when it is
-   * still inside `BUREAU_FETCH_DAYS_LIMIT`. Outcome is written to `lead_detail.bureau_fetched` /
-   * `bureau_fetched_at` / `bureau_fetched_note`. Returns `failed` when the vendor
-   * HTTP status is not 200 (caller shows thank-you and rejects the lead).
+   * customer has bureau consent on `lead_detail`. A prior successful `bureau_report`
+   * for this customer is reused when it is still inside `BUREAU_FETCH_DAYS_LIMIT`
+   * (repaid recurring or rejected reapply); post-BRE still runs. Outcome is written to
+   * `lead_detail.bureau_fetched` / `bureau_fetched_at` / `bureau_fetched_note`.
+   * Returns `failed` when the vendor HTTP status is not 200 (caller shows thank-you
+   * and rejects the lead).
    */
   private async runBureauSoftPull(
     leadId: bigint,
     customerMobile: string,
     panNumber: string,
     fullName: string,
-    isRecurring: boolean,
   ): Promise<BureauSoftPullOutcome> {
     if (!(await this.settings.isBureauFetchEnabled())) {
       this.logger.debug(`Bureau soft-pull skipped (leadId=${leadId}): BUREAU_FETCH_ENABLED is off.`);
@@ -721,12 +720,11 @@ export class VerifyPanUseCase {
       return 'skipped';
     }
 
-    const reused = await this.tryReuseRecurringBureauReport({
+    const reused = await this.tryReusePriorBureauReport({
       leadId,
       customerId: row.customerId,
       customerUuid: row.customer?.uuid,
       leadUuid: row.uuid,
-      isRecurring,
     });
     if (reused != null) {
       return reused;
@@ -850,26 +848,22 @@ export class VerifyPanUseCase {
   }
 
   /**
-   * Recurring (repaid) customers: attach the latest `bureau_report` for this
-   * `customer_id` onto the new lead when it is still inside the days limit.
-   * Does not insert a new bureau_report row.
+   * Attach the latest `bureau_report` for this `customer_id` onto the new lead
+   * when it is still inside the days limit (repaid recurring or rejected reapply).
+   * Does not insert a new bureau_report row. Then runs post-BRE.
    * Returns null when the vendor must be called (first-time, stale, missing, or attach failed).
    */
-  private async tryReuseRecurringBureauReport(params: {
+  private async tryReusePriorBureauReport(params: {
     leadId: bigint;
     customerId: bigint;
     customerUuid: string | null | undefined;
     leadUuid: string;
-    isRecurring: boolean;
   }): Promise<BureauSoftPullOutcome | null> {
-    if (!params.isRecurring) return null;
-
     const daysLimit = await this.settings.getBureauFetchDaysLimit();
     const prior = await this.bureauReports.findLatestForCustomer(params.customerId);
     if (
       prior == null ||
       !canReusePriorBureauReport({
-        isRecurring: true,
         daysLimit,
         priorCreatedAt: prior.createdAt,
         priorPayload: prior.rawPayload,

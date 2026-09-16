@@ -18,6 +18,7 @@ import {
   type AadhaarIdentityFailureDetail,
 } from '../../../common/kyc/aadhaar-lead-identity-match.util';
 import { extractProfileFromDigilockerFormJson, pickDigilockerAadhaarString } from '../../../common/kyc/digilocker-form-profile.util';
+import { pickCustomerAadhaarForApplication } from '../../../common/kyc/customer-aadhaar-for-application.util';
 import { appendPhotoCacheBuster } from '../../../common/kyc/kyc-photo-url.util';
 import { buildLivenessVendorSummary } from '../../../common/kyc/kyc-liveness-summary.util';
 import { extractLocalFaceMatchFromVendorJson } from '../../../common/kyc/kyc-face-match-inspection-persist.util';
@@ -48,6 +49,10 @@ import { LEAD_STATUS } from '../../../common/constants/lead.constants';
 import { REJECTION_REASON, toRejectionReasonDto } from '../../../common/constants/rejection-reason.constants';
 import { canEnableReKyc } from '../kyc-grant-retry.util';
 import { canGrantPennyDropAttempt } from '../penny-drop-grant-retry.util';
+import {
+  extractPanNsdlSnapshot,
+  panNsdlVendorServiceNames,
+} from '../../../common/vendor/pan-nsdl-snapshot.util';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -234,6 +239,7 @@ function buildLosAadhaarIdentityFailure(params: {
   vendor: unknown;
   leadFullName: string | null;
   leadDateOfBirth: Date | null;
+  leadGender: string | null;
   kycFailed: boolean;
   aadhaarFetched: boolean;
 }): AadhaarIdentityFailureDetail | null {
@@ -244,6 +250,7 @@ function buildLosAadhaarIdentityFailure(params: {
   return describeAadhaarIdentityFailure({
     leadFullName: params.leadFullName,
     leadDateOfBirth: params.leadDateOfBirth,
+    leadGender: params.leadGender,
     vendor: params.vendor ?? params.formJson,
     storedReason:
       stored?.reason ??
@@ -490,7 +497,7 @@ export class LosApplicationService {
             mobileNumber: true,
             customerKycs: {
               orderBy: { createdAt: 'desc' },
-              take: 1,
+              take: 15,
               select: { aadhaarVerifiedAt: true, aadhaarPhotoPath: true, aadhaarData: true },
             },
           },
@@ -567,6 +574,10 @@ export class LosApplicationService {
         preferStoredTenure: loanAccount != null,
       });
       const kycStatus = application.kyc?.kycStatus ?? 0;
+      const customerAadhaar = pickCustomerAadhaarForApplication(application.customer.customerKycs, {
+        applicationCreatedAt: application.createdAt,
+        applicationKycStatus: kycStatus,
+      });
       const repaymentAmount =
         loanAccount?.totalRepaymentAmount?.toString()
         ?? (fees.repaymentAmount != null ? fees.repaymentAmount.toFixed(2) : null);
@@ -604,9 +615,7 @@ export class LosApplicationService {
           statusName: application.applicationStatus.name,
           statusNote: application.applicationStatusNote,
         }),
-        aadhaarNameMatchPendingReview: isAadhaarNameMismatchPendingReview(
-          application.customer.customerKycs[0]?.aadhaarData,
-        ),
+        aadhaarNameMatchPendingReview: isAadhaarNameMismatchPendingReview(customerAadhaar?.aadhaarData),
         leadStatusCode: application.lead.leadStatus.name,
         leadStatusLabel: displayName(application.lead.leadStatus.name, application.lead.leadStatus.displayName),
         leadRejectionReason: mapLeadRejectionReason(
@@ -623,9 +632,9 @@ export class LosApplicationService {
         loanDocumentsAcceptedAt: appDetails?.loanDocumentsAcceptedAt?.toISOString() ?? null,
         livenessPassed: application.kyc?.livenessPassed ?? false,
         aadhaarKycCompleted: isAcceptedAadhaarCapture(
-          application.customer.customerKycs[0]?.aadhaarData,
-          application.customer.customerKycs[0]?.aadhaarVerifiedAt,
-          application.customer.customerKycs[0]?.aadhaarPhotoPath,
+          customerAadhaar?.aadhaarData,
+          customerAadhaar?.aadhaarVerifiedAt,
+          customerAadhaar?.aadhaarPhotoPath,
         ),
         selfieCaptured: Boolean(application.kyc?.livenessSelfiePath?.trim()),
         referencesCount: application._count.references,
@@ -683,12 +692,31 @@ export class LosApplicationService {
       this.prisma.read.application.findUnique({
         where: { uuid: applicationUuid },
         include: {
-        customer: { select: { uuid: true, mobileNumber: true } },
+        customer: {
+          select: {
+            uuid: true,
+            mobileNumber: true,
+            panNsdlCache: {
+              select: {
+                panNumber: true,
+                fullName: true,
+                nameVerified: true,
+                nsdlResponse: true,
+              },
+            },
+          },
+        },
         lead: {
           include: {
             leadStatus: { select: { name: true, displayName: true } },
             rejectionReason: { select: { name: true } },
             source: { select: { name: true, type: true } },
+            vendorApiLogs: {
+              where: { serviceName: { in: panNsdlVendorServiceNames() } },
+              orderBy: [{ respondedAt: 'desc' }, { id: 'desc' }],
+              take: 1,
+              select: { requestPayload: true, responsePayload: true },
+            },
             leadDetail: {
               include: {
                 city: { select: { name: true, state: { select: { name: true, code: true } } } },
@@ -696,6 +724,7 @@ export class LosApplicationService {
                 occupation: { select: { name: true, key: true } },
                 bureauReport: {
                   select: {
+                    id: true,
                     uuid: true,
                     cibilScore: true,
                     createdAt: true,
@@ -769,21 +798,39 @@ export class LosApplicationService {
 
     const lead = application.lead;
     const detail = lead.leadDetail;
+    const priorApplication = await this.findPriorApplicationForCustomer(
+      application.customerId,
+      application.id,
+    );
 
-    const bureauReportRow = detail?.bureauReport ?? null;
+    let bureauReportRow = detail?.bureauReport ?? null;
+    let bureauReportFromPriorApplication = false;
+    if (!bureauReportRow) {
+      const priorBureau = await this.findLatestCustomerBureauReport(application.customerId);
+      if (priorBureau) {
+        bureauReportRow = priorBureau;
+        bureauReportFromPriorApplication = true;
+      }
+    }
 
     let bureauReportPdfUrl: string | null = null;
     if (bureauReportRow) {
-      const pdfResult = await this.bureauReportPdf.ensurePdfForLead({
-        leadId: application.leadId,
-        customerUuid: application.customer.uuid,
-      });
-      bureauReportPdfUrl = this.resolveBureauReportPdfUrl(application.uuid, pdfResult, true);
+      try {
+        const pdfResult = await this.bureauReportPdf.ensurePdfForReport({
+          bureauReportId: bureauReportRow.id,
+          customerUuid: application.customer.uuid,
+          bureauReportUuid: bureauReportRow.uuid,
+        });
+        bureauReportPdfUrl = this.resolveBureauReportPdfUrl(application.uuid, pdfResult, true);
+      } catch {
+        bureauReportPdfUrl = this.resolveBureauReportPdfUrl(application.uuid, null, true);
+      }
     }
 
-    const customerKyc = await this.prisma.read.customerKyc.findFirst({
+    const customerKycRows = await this.prisma.read.customerKyc.findMany({
       where: { customerId: application.customerId },
       orderBy: { createdAt: 'desc' },
+      take: 15,
       select: {
         aadhaarData: true,
         aadhaarPhotoPath: true,
@@ -791,6 +838,10 @@ export class LosApplicationService {
         panCardNumber: true,
         panCardVerifiedAt: true,
       },
+    });
+    const customerKyc = pickCustomerAadhaarForApplication(customerKycRows, {
+      applicationCreatedAt: application.createdAt,
+      applicationKycStatus: application.kyc?.kycStatus,
     });
 
     const selfieRelativePath = application.kyc?.livenessSelfiePath?.trim() || null;
@@ -828,6 +879,7 @@ export class LosApplicationService {
       vendor: aadhaarSource,
       leadFullName: detail?.fullName ?? null,
       leadDateOfBirth: detail?.dateOfBirth ?? null,
+      leadGender: detail?.gender?.key ?? detail?.gender?.name ?? null,
       kycFailed,
       aadhaarFetched: Boolean(aadhaarDetail),
     });
@@ -835,6 +887,12 @@ export class LosApplicationService {
     return {
       uuid: application.uuid,
       applicationNumber: application.applicationNumber,
+      priorApplication: priorApplication
+        ? {
+            uuid: priorApplication.uuid,
+            applicationNumber: priorApplication.applicationNumber,
+          }
+        : null,
       customerUuid: application.customer.uuid,
       leadUuid: lead.uuid,
       leadNumber: lead.leadNumber,
@@ -971,6 +1029,11 @@ export class LosApplicationService {
         mobileNumber: ref.mobileNumber,
         relation: ref.relation.name,
       })),
+      panNsdl: extractPanNsdlSnapshot({
+        requestPayload: lead.vendorApiLogs[0]?.requestPayload,
+        responsePayload: lead.vendorApiLogs[0]?.responsePayload,
+        cache: application.customer.panNsdlCache,
+      }),
       aadhaarDetail,
       aadhaarIdentityFailure,
       aadhaarDownloadLogs: aadhaarDownloadLogs.items,
@@ -999,6 +1062,7 @@ export class LosApplicationService {
             fetchedAt: bureauReportRow.createdAt.toISOString(),
             creditAssessmentCategory: bureauReportRow.cibilCreditAssessment?.category ?? null,
             creditAssessmentRecommendation: bureauReportRow.cibilCreditAssessment?.creditRecommendation ?? null,
+            fromPriorApplication: bureauReportFromPriorApplication,
           }
         : null,
       agreement: buildLoanAgreementView(application.details),
@@ -1054,15 +1118,20 @@ export class LosApplicationService {
   async serveApplicationAadhaarPhoto(applicationUuid: string, res: Response): Promise<void> {
     const application = await this.prisma.read.application.findUnique({
       where: { uuid: applicationUuid },
-      select: { customerId: true },
+      select: { createdAt: true, customerId: true, kyc: { select: { kycStatus: true } } },
     });
     if (!application) {
       throw new NotFoundException('Application not found');
     }
-    const customerKyc = await this.prisma.read.customerKyc.findFirst({
+    const customerKycRows = await this.prisma.read.customerKyc.findMany({
       where: { customerId: application.customerId },
       orderBy: { createdAt: 'desc' },
-      select: { aadhaarPhotoPath: true },
+      take: 15,
+      select: { aadhaarPhotoPath: true, aadhaarVerifiedAt: true, aadhaarData: true },
+    });
+    const customerKyc = pickCustomerAadhaarForApplication(customerKycRows, {
+      applicationCreatedAt: application.createdAt,
+      applicationKycStatus: application.kyc?.kycStatus,
     });
     const rel = customerKyc?.aadhaarPhotoPath?.trim();
     if (!rel) {
@@ -1267,7 +1336,9 @@ export class LosApplicationService {
     const application = await this.prisma.read.application.findUnique({
       where: { uuid: applicationUuid },
       select: {
+        id: true,
         leadId: true,
+        customerId: true,
         customer: { select: { uuid: true } },
       },
     });
@@ -1276,10 +1347,21 @@ export class LosApplicationService {
       throw new NotFoundException('Application not found');
     }
 
-    const pdfResult = await this.bureauReportPdf.ensurePdfForLead({
+    let pdfResult = await this.bureauReportPdf.ensurePdfForLead({
       leadId: application.leadId,
       customerUuid: application.customer.uuid,
     });
+    if (!pdfResult?.relativePath) {
+      const priorBureau = await this.findLatestCustomerBureauReportWithPayload(application.customerId);
+      if (priorBureau) {
+        pdfResult = await this.bureauReportPdf.ensurePdfForReport({
+          bureauReportId: priorBureau.id,
+          customerUuid: application.customer.uuid,
+          bureauReportUuid: priorBureau.uuid,
+          vendorBody: priorBureau.rawPayload,
+        });
+      }
+    }
     if (!pdfResult?.relativePath) {
       throw new NotFoundException('Bureau report PDF is not available for this application.');
     }
@@ -1304,7 +1386,9 @@ export class LosApplicationService {
     const application = await this.prisma.read.application.findUnique({
       where: { uuid: applicationUuid },
       select: {
+        id: true,
         leadId: true,
+        customerId: true,
         customer: { select: { uuid: true } },
         lead: {
           select: {
@@ -1329,7 +1413,10 @@ export class LosApplicationService {
       throw new NotFoundException('Application not found');
     }
 
-    const bureauReportRow = application.lead.leadDetail?.bureauReport;
+    let bureauReportRow = application.lead.leadDetail?.bureauReport ?? null;
+    if (!bureauReportRow) {
+      bureauReportRow = await this.findLatestCustomerBureauReportWithPayload(application.customerId);
+    }
 
     if (!bureauReportRow) {
       throw new NotFoundException('No bureau report found for this application');
@@ -1339,9 +1426,11 @@ export class LosApplicationService {
       throw new NotFoundException('Bureau report has no stored JSON payload');
     }
 
-    const pdfResult = await this.bureauReportPdf.ensurePdfForLead({
-      leadId: application.leadId,
+    const pdfResult = await this.bureauReportPdf.ensurePdfForReport({
+      bureauReportId: bureauReportRow.id,
       customerUuid: application.customer.uuid,
+      bureauReportUuid: bureauReportRow.uuid,
+      vendorBody: bureauReportRow.rawPayload,
     });
 
     const report = await this.bureauReportPdf.buildReportViewData(bureauReportRow.rawPayload);
@@ -1486,19 +1575,25 @@ export class LosApplicationService {
       throw new BadRequestException('KYC record not found for this application.');
     }
 
-    const customerKyc = await this.prisma.client.customerKyc.findFirst({
+    const customerKycRows = await this.prisma.client.customerKyc.findMany({
       where: { customerId: application.customerId },
       orderBy: { createdAt: 'desc' },
+      take: 15,
       select: {
         id: true,
         aadhaarData: true,
         aadhaarPhotoPath: true,
+        aadhaarVerifiedAt: true,
       },
+    });
+    const customerKyc = pickCustomerAadhaarForApplication(customerKycRows, {
+      applicationCreatedAt: application.createdAt,
+      applicationKycStatus: kyc.kycStatus,
     });
 
     const digilockerDone = isAcceptedAadhaarCapture(
       customerKyc?.aadhaarData ?? null,
-      null,
+      customerKyc?.aadhaarVerifiedAt,
       customerKyc?.aadhaarPhotoPath,
     );
 
@@ -1891,6 +1986,41 @@ export class LosApplicationService {
     if (!hasBureauReport) return null;
     if (pdfResult?.publicUrl) return pdfResult.publicUrl;
     return `/applications/${applicationUuid}/cibil-report/pdf`;
+  }
+
+  private findPriorApplicationForCustomer(customerId: bigint, excludeApplicationId: bigint) {
+    return this.prisma.read.application.findFirst({
+      where: { customerId, id: { not: excludeApplicationId } },
+      orderBy: { createdAt: 'desc' },
+      select: { uuid: true, applicationNumber: true },
+    });
+  }
+
+  private findLatestCustomerBureauReport(customerId: bigint) {
+    return this.prisma.read.bureauReport.findFirst({
+      where: { customerId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        uuid: true,
+        cibilScore: true,
+        createdAt: true,
+        cibilCreditAssessment: { select: { category: true, creditRecommendation: true } },
+      },
+    });
+  }
+
+  private findLatestCustomerBureauReportWithPayload(customerId: bigint) {
+    return this.prisma.read.bureauReport.findFirst({
+      where: { customerId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        uuid: true,
+        rawPayload: true,
+        createdAt: true,
+      },
+    });
   }
 }
 

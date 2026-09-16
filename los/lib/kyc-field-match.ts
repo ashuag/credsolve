@@ -81,10 +81,28 @@ export function compareGenders(
   profileGender: string | null | undefined,
   aadhaarGender: string | null | undefined,
 ): KycMatchVerdict {
-  const left = normalizeProfileGender(profileGender);
+  const left = normalizeAadhaarGender(profileGender);
   const right = normalizeAadhaarGender(aadhaarGender);
   if (!left || !right) return 'missing';
   return left.toLowerCase() === right.toLowerCase() ? 'match' : 'mismatch';
+}
+
+export function isKycMismatchHighlight(verdict: KycMatchVerdict): boolean {
+  return verdict === 'mismatch' || verdict === 'partial';
+}
+
+export function booleanMatchVerdict(matched: boolean | null | undefined): KycMatchVerdict {
+  if (matched == null) return 'missing';
+  return matched ? 'match' : 'mismatch';
+}
+
+/** Score to show next to a mismatched name; omit 100% when NSDL only returned a boolean miss. */
+export function nameMismatchScoreToShow(
+  verdict: KycMatchVerdict,
+  score: number | undefined,
+): number | undefined {
+  if (!isKycMismatchHighlight(verdict) || score == null || score >= 100) return undefined;
+  return score;
 }
 
 export function normalizePan(value: string | null | undefined): string | null {

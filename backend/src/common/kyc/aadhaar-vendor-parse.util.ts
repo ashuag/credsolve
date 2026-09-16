@@ -30,7 +30,7 @@ export function extractDigilockerIdentityMismatch(formJson: unknown): {
   const message =
     typeof formJson.message === 'string' && formJson.message.trim()
       ? formJson.message.trim()
-      : 'Name or date of birth on Aadhaar does not match the loan application.';
+      : 'Date of birth or gender on Aadhaar does not match the loan application.';
   return { reason, message };
 }
 

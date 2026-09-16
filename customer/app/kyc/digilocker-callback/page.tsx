@@ -72,7 +72,7 @@ function downloadErrorMessage(out: DownloadAadhaarDigilockerResponse): string {
   if (out.identityMismatch) {
     return (
       out.identityMismatchMessage ??
-      'Name or date of birth on Aadhaar does not match your loan application. This application cannot proceed.'
+      'Date of birth or gender on Aadhaar does not match your loan application. This application cannot proceed.'
     );
   }
   if (!out.configured) {
@@ -208,11 +208,7 @@ function DigilockerCallbackContent() {
     async (out: DownloadAadhaarDigilockerResponse) => {
       applyAttemptCounts(out);
       const next = await refresh();
-      if (
-        next.authenticated === true &&
-        next.lead &&
-        (out.terminalFailure || isLeadRejectedAndLocked(next.lead))
-      ) {
+      if (out.terminalFailure || out.leadRejected || isLeadRejectedAndLocked(next.lead)) {
         router.replace('/thank-you-interest');
         return true;
       }
@@ -271,11 +267,7 @@ function DigilockerCallbackContent() {
           }
         }
         if (out.identityMismatch) {
-          const redirected = await handleTerminalFailure(out);
-          if (redirected) return;
-          setStatus('error');
-          setFailureKind('identity_mismatch');
-          setError(downloadErrorMessage(out));
+          router.replace('/thank-you-interest');
           return;
         }
 

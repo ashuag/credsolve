@@ -1,7 +1,10 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
   compareAadhaarToLeadProfile,
   describeAadhaarIdentityFailure,
   extractAadhaarIdentityFromVendor,
+  isAadhaarNameMismatchReview,
   personNamesMatch,
 } from './aadhaar-lead-identity-match.util';
 
@@ -16,8 +19,8 @@ describe('aadhaar-lead-identity-match', () => {
 
   it('extracts name and dob from Tenacio aadhaar download envelope', () => {
     const id = extractAadhaarIdentityFromVendor(vendorSample);
-    expect(id.fullName).toBe('SAURABH AGARWAL');
-    expect(id.dateOfBirth).not.toBeNull();
+    assert.equal(id.fullName, 'SAURABH AGARWAL');
+    assert.notEqual(id.dateOfBirth, null);
   });
 
   it('matches profile when name and dob align', () => {
@@ -26,19 +29,20 @@ describe('aadhaar-lead-identity-match', () => {
       leadDateOfBirth: new Date(Date.UTC(1986, 7, 1)),
       vendor: vendorSample,
     });
-    expect(result).toEqual({ matched: true });
+    assert.deepEqual(result, { matched: true });
   });
 
-  it('rejects on name mismatch', () => {
+  it('puts name mismatch into review without treating it as a hard reject', () => {
     const result = compareAadhaarToLeadProfile({
       leadFullName: 'Other Person',
       leadDateOfBirth: new Date(Date.UTC(1986, 7, 1)),
       vendor: vendorSample,
     });
-    expect(result.matched).toBe(false);
+    assert.equal(result.matched, false);
     if (!result.matched) {
-      expect(result.reason).toBe('name_mismatch');
+      assert.equal(result.reason, 'name_mismatch');
     }
+    assert.equal(isAadhaarNameMismatchReview(result), true);
   });
 
   it('rejects on dob mismatch', () => {
@@ -47,14 +51,77 @@ describe('aadhaar-lead-identity-match', () => {
       leadDateOfBirth: new Date(Date.UTC(1990, 0, 1)),
       vendor: vendorSample,
     });
-    expect(result.matched).toBe(false);
+    assert.equal(result.matched, false);
     if (!result.matched) {
-      expect(result.reason).toBe('dob_mismatch');
+      assert.equal(result.reason, 'dob_mismatch');
+    }
+    assert.equal(isAadhaarNameMismatchReview(result), false);
+  });
+
+  it('rejects on gender mismatch', () => {
+    const result = compareAadhaarToLeadProfile({
+      leadFullName: 'SAURABH AGARWAL',
+      leadDateOfBirth: new Date(Date.UTC(1986, 7, 1)),
+      leadGender: 'MALE',
+      vendor: {
+        status: 'success',
+        data: { name: 'SAURABH AGARWAL', dob: '01-08-1986', gender: 'F' },
+      },
+    });
+    assert.equal(result.matched, false);
+    if (!result.matched) {
+      assert.equal(result.reason, 'gender_mismatch');
+    }
+    assert.equal(isAadhaarNameMismatchReview(result), false);
+  });
+
+  it('rejects on dob mismatch even when the name also differs', () => {
+    const result = compareAadhaarToLeadProfile({
+      leadFullName: 'Other Person',
+      leadDateOfBirth: new Date(Date.UTC(1990, 0, 1)),
+      leadGender: 'MALE',
+      vendor: {
+        status: 'success',
+        data: { name: 'SAURABH AGARWAL', dob: '01-08-1986', gender: 'M' },
+      },
+    });
+    assert.equal(result.matched, false);
+    if (!result.matched) {
+      assert.equal(result.reason, 'dob_mismatch');
     }
   });
 
+  it('rejects on gender mismatch even when the name also differs', () => {
+    const result = compareAadhaarToLeadProfile({
+      leadFullName: 'Other Person',
+      leadDateOfBirth: new Date(Date.UTC(1986, 7, 1)),
+      leadGender: 'Male',
+      vendor: {
+        status: 'success',
+        data: { name: 'ANUSHA GUPTA', dob: '01-08-1986', gender: 'F' },
+      },
+    });
+    assert.equal(result.matched, false);
+    if (!result.matched) {
+      assert.equal(result.reason, 'gender_mismatch');
+    }
+  });
+
+  it('matches M/F Aadhaar gender against lead Male/Female', () => {
+    const result = compareAadhaarToLeadProfile({
+      leadFullName: 'SAURABH AGARWAL',
+      leadDateOfBirth: new Date(Date.UTC(1986, 7, 1)),
+      leadGender: 'Male',
+      vendor: {
+        status: 'success',
+        data: { name: 'SAURABH AGARWAL', dob: '01-08-1986', gender: 'M' },
+      },
+    });
+    assert.deepEqual(result, { matched: true });
+  });
+
   it('normalizes token order in names', () => {
-    expect(personNamesMatch('Agarwal Saurabh', 'SAURABH AGARWAL')).toBe(true);
+    assert.equal(personNamesMatch('Agarwal Saurabh', 'SAURABH AGARWAL'), true);
   });
 
   it('matches DD-MM-YYYY Aadhaar DOB against a UTC lead calendar date', () => {
@@ -66,7 +133,7 @@ describe('aadhaar-lead-identity-match', () => {
         data: { name: 'SANTHI FRANCIS', dob: '08-05-1981' },
       },
     });
-    expect(result).toEqual({ matched: true });
+    assert.deepEqual(result, { matched: true });
   });
 
   it('describes a name mismatch with both application and Aadhaar values', () => {
@@ -75,13 +142,11 @@ describe('aadhaar-lead-identity-match', () => {
       leadDateOfBirth: new Date(Date.UTC(1981, 4, 8)),
       vendor: { status: 'success', data: { name: 'SANTHI FRANCIS', dob: '08-05-1981' } },
     });
-    expect(failure).toMatchObject({
-      reason: 'name_mismatch',
-      applicationName: 'Santhi Devi',
-      applicationDob: '1981-05-08',
-      aadhaarName: 'SANTHI FRANCIS',
-      aadhaarDob: '1981-05-08',
-    });
-    expect(failure?.message).toContain('Name on Aadhaar');
+    assert.equal(failure?.reason, 'name_mismatch');
+    assert.equal(failure?.applicationName, 'Santhi Devi');
+    assert.equal(failure?.applicationDob, '1981-05-08');
+    assert.equal(failure?.aadhaarName, 'SANTHI FRANCIS');
+    assert.equal(failure?.aadhaarDob, '1981-05-08');
+    assert.match(failure?.message ?? '', /Name on Aadhaar/);
   });
 });
