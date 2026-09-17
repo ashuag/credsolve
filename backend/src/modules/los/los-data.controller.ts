@@ -190,11 +190,11 @@ export class LosDataController {
 
   @Post('loans/:loanUuid/waive-charges')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(LosDenyAgentGuard)
+  @UseGuards(LosAdminGuard)
   @ApiOperation({
     summary: 'Waive part or all of penal + overdue-days interest on an open loan',
     description:
-      'Stores the waived amount, the LOS user who waived it, and the timestamp. Pay Now then collects principal + tenure interest + any remaining negotiable charges.',
+      'Stores the waived amount, the LOS user who waived it, and the timestamp. Pay Now then collects principal + tenure interest + any remaining negotiable charges. Admin role only.',
   })
   waiveLoanCharges(
     @Req() req: LosRequest,
