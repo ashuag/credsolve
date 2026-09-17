@@ -162,6 +162,7 @@ function isNoHit(body: unknown, httpStatus: number | null, report: unknown | nul
 }
 
 export type TenacioWrappedBureauBody = {
+  sourceVendor?: string;
   status: 'success' | 'error';
   serviceStatusCode: number;
   requestId: string | null;
@@ -289,6 +290,17 @@ const SOFT_PULL_TRANSPORT_FAILURE_STATUS: Record<string, number> = {
  * @param context      optional borrower fields not echoed by the vendor (name).
  */
 export function mapMyMoneyBazaarSoftPullToTenacioEnvelope(
+  softPullBody: unknown,
+  httpStatus: number | null,
+  context: { fullName?: string | null } = {},
+): TenacioWrappedBureauBody {
+  return {
+    sourceVendor: 'MyMoneyBazaar',
+    ...buildMyMoneyBazaarTenacioEnvelope(softPullBody, httpStatus, context),
+  };
+}
+
+function buildMyMoneyBazaarTenacioEnvelope(
   softPullBody: unknown,
   httpStatus: number | null,
   context: { fullName?: string | null } = {},

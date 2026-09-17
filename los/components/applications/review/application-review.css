@@ -750,6 +750,10 @@
   grid-template-columns: 1fr 1fr 1fr 1fr;
 }
 
+.app-review .fgrid.fifths {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .app-review .field {
   border: 1px solid var(--line);
   border-radius: 11px;
@@ -1627,6 +1631,10 @@
     margin-left: 0;
     width: 100%;
   }
+
+  .app-review .fgrid.fifths {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 760px) {
@@ -1659,7 +1667,8 @@
 
   .app-review .fgrid,
   .app-review .fgrid.thirds,
-  .app-review .fgrid.fourths {
+  .app-review .fgrid.fourths,
+  .app-review .fgrid.fifths {
     grid-template-columns: 1fr;
   }
 

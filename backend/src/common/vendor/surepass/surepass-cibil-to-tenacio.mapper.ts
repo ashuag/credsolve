@@ -345,8 +345,16 @@ function mapTrueLinkCreditReport(data: Record<string, unknown>): Record<string, 
           inquiryDate,
           // TUEF enquiry purpose codes ("05" personal loan, "10" credit card, …)
           // — same code set the post-BRE enquiry rules already understand.
-          inquiryType: str(rec.enquiryPurpose),
-          subscriberName: str(rec.memberShortName),
+          inquiryType:
+            surepassAccountTypeToTuefSymbol(rec.enquiryPurpose ?? rec.enquiry_purpose) ??
+            str(rec.enquiryPurpose) ??
+            str(rec.enquiry_purpose),
+          subscriberName:
+            str(rec.memberShortName) ??
+            str(rec.member_short_name) ??
+            str(rec.memberName) ??
+            str(rec.member_name) ??
+            str(rec.member),
           amount: amountOrNull(rec.enquiryAmount),
         },
       };

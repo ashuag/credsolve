@@ -9,6 +9,10 @@ import { SurepassCibilService } from './surepass/surepass-cibil.service';
 import { MyMoneyBazaarCibilService } from './mymoneybazaar/mymoneybazaar-cibil.service';
 import { VendorApiService } from './vendor-api.service';
 import { VendorApiConfigService } from './vendor-api-config.service';
+import { type CibilVendorKind, mapCibilVendorName } from './cibil-vendor.util';
+
+export type { CibilVendorKind } from './cibil-vendor.util';
+export { mapCibilVendorName } from './cibil-vendor.util';
 
 /**
  * Default relative path when `VENDOR_HOST` is `…/api/v1/services` and
@@ -16,25 +20,6 @@ import { VendorApiConfigService } from './vendor-api-config.service';
  * Prefer `TENACIO_CIBIL_URL` with the full HTTPS URL if joining is error-prone.
  */
 export const TENACIO_BUREAU_SOFT_PULL_SERVICE = 'experian-soft-pull/services/experian-soft-pull';
-
-/** Bureau integrations selectable as the `cibil_fetch` vendor in `vendor_api_config`. */
-export type CibilVendorKind = 'tenacio' | 'surepass' | 'mymoneybazaar';
-
-/** Map a `vendor_api_config.vendor_name` to a bureau integration (defaults to Tenacio). */
-export function mapCibilVendorName(vendorName: string): CibilVendorKind {
-  const name = vendorName.trim().toLowerCase();
-  if (name === 'surepass') return 'surepass';
-  if (
-    name === 'mymoneybazaar' ||
-    name === 'my money bazaar' ||
-    name === 'mmb' ||
-    name === 'paymeindia' ||
-    name === 'payme india'
-  ) {
-    return 'mymoneybazaar';
-  }
-  return 'tenacio';
-}
 
 export type BureauTenacioInput = {
   mobileNumber: string;
@@ -66,6 +51,8 @@ export type BureauFetchResult = {
   isNewToCredit: boolean;
   /** Vendor `serviceError.message` when present (for audit notes). */
   serviceErrorMessage: string | null;
+  /** Integration that produced this result (`null` when no vendor was attempted). */
+  vendorKind: CibilVendorKind | null;
 };
 
 /**
@@ -114,6 +101,7 @@ export class BureauFetchService {
         dummyPayload: true,
         isNewToCredit: false,
         serviceErrorMessage: null,
+        vendorKind: 'tenacio',
       };
     }
 
@@ -131,18 +119,21 @@ export class BureauFetchService {
         dummyPayload: false,
         isNewToCredit: false,
         serviceErrorMessage: null,
+        vendorKind: null,
       };
     }
 
     let lastResult: BureauFetchResult | null = null;
     for (let i = 0; i < vendorChain.length; i++) {
       const vendor = vendorChain[i];
-      const result =
-        vendor === 'surepass'
+      const result = {
+        ...(vendor === 'surepass'
           ? await this.fetchBureauFromSurepass(body, leadId)
           : vendor === 'mymoneybazaar'
             ? await this.fetchBureauFromMyMoneyBazaar(body, leadId)
-            : await this.fetchDirectFromTenacio(body, leadId);
+            : await this.fetchDirectFromTenacio(body, leadId)),
+        vendorKind: vendor,
+      };
 
       if (this.isBureauFetchSuccess(result)) {
         return result;
@@ -250,6 +241,7 @@ export class BureauFetchService {
         dummyPayload: false,
         isNewToCredit: false,
         serviceErrorMessage: null,
+        vendorKind: 'tenacio',
       };
     }
 
@@ -266,6 +258,7 @@ export class BureauFetchService {
         dummyPayload: false,
         isNewToCredit: false,
         serviceErrorMessage: null,
+        vendorKind: 'tenacio',
       };
     }
 
@@ -321,6 +314,7 @@ export class BureauFetchService {
       dummyPayload: false,
       isNewToCredit,
       serviceErrorMessage: serviceError?.message ?? null,
+      vendorKind: 'tenacio',
     };
   }
 
@@ -366,6 +360,7 @@ export class BureauFetchService {
         dummyPayload: false,
         isNewToCredit: false,
         serviceErrorMessage: null,
+        vendorKind: 'surepass',
       };
     }
 
@@ -391,6 +386,7 @@ export class BureauFetchService {
       dummyPayload: false,
       isNewToCredit,
       serviceErrorMessage: serviceError?.message ?? null,
+      vendorKind: 'surepass',
     };
   }
 
@@ -432,6 +428,7 @@ export class BureauFetchService {
         dummyPayload: false,
         isNewToCredit: false,
         serviceErrorMessage: null,
+        vendorKind: 'mymoneybazaar',
       };
     }
 
@@ -457,6 +454,7 @@ export class BureauFetchService {
       dummyPayload: false,
       isNewToCredit,
       serviceErrorMessage: serviceError?.message ?? null,
+      vendorKind: 'mymoneybazaar',
     };
   }
 

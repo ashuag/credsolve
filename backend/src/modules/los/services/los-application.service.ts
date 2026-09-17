@@ -9,6 +9,7 @@ import {
   pickTenacioVendorErrorMessage,
 } from '../../../common/kyc/aadhaar-vendor-parse.util';
 import { extractVendorServiceError } from '../../../common/vendor/vendor-api-error.util';
+import { resolveCibilVendorDisplayName } from '../../../common/vendor/cibil-vendor.util';
 import { classifyVendorApiLogOutcome } from '../../../common/vendor/vendor-api-log-outcome.util';
 import {
   describeAadhaarIdentityFailure,
@@ -688,6 +689,7 @@ export class LosApplicationService {
                     uuid: true,
                     cibilScore: true,
                     createdAt: true,
+                    vendorName: true,
                     cibilCreditAssessment: { select: { category: true, creditRecommendation: true } },
                   },
                 },
@@ -985,6 +987,7 @@ export class LosApplicationService {
             cibilScore: bureauReportRow.cibilScore,
             reportPdfUrl: bureauReportPdfUrl,
             fetchedAt: bureauReportRow.createdAt.toISOString(),
+            vendorName: resolveCibilVendorDisplayName({ storedVendorName: bureauReportRow.vendorName }),
             creditAssessmentCategory: bureauReportRow.cibilCreditAssessment?.category ?? null,
             creditAssessmentRecommendation: bureauReportRow.cibilCreditAssessment?.creditRecommendation ?? null,
           }
@@ -1304,6 +1307,7 @@ export class LosApplicationService {
                     uuid: true,
                     rawPayload: true,
                     createdAt: true,
+                    vendorName: true,
                   },
                 },
               },
@@ -1341,6 +1345,10 @@ export class LosApplicationService {
     return {
       bureauReportUuid: bureauReportRow.uuid,
       fetchedAt: bureauReportRow.createdAt.toISOString(),
+      vendorName: resolveCibilVendorDisplayName({
+        storedVendorName: bureauReportRow.vendorName,
+        vendorBody: bureauReportRow.rawPayload,
+      }),
       reportPdfUrl: this.resolveBureauReportPdfUrl(applicationUuid, pdfResult, true),
       rawPayload: bureauReportRow.rawPayload,
       report,

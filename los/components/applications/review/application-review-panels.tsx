@@ -1268,7 +1268,7 @@ export function ReviewCibilPanel({
         }
         title="Credit bureau summary"
       >
-        <div className="fgrid fourths">
+        <div className="fgrid fifths">
           <ReviewField
             label="CIBIL score"
             value={formatCibilScoreLabel(score)}
@@ -1276,6 +1276,7 @@ export function ReviewCibilPanel({
             sub={cibilScoreBand(score)}
           />
           <ReviewField label="Bureau" value="TransUnion CIBIL" />
+          <ReviewField label="Vendor" value={row.bureauReport?.vendorName ?? null} />
           <ReviewField label="Pulled" value={formatReviewDateOnly(row.bureauReport?.fetchedAt)} />
           <ReviewField
             label="Credit assessment"

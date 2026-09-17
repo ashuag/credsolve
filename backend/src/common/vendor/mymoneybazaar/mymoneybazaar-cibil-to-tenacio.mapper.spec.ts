@@ -41,6 +41,7 @@ describe('mapMyMoneyBazaarSoftPullToTenacioEnvelope', () => {
     assert.deepEqual(wrapped.data?.cibilData, bureauReport);
     assert.equal(wrapped.data?.htmlUrl, 'https://x/report.html');
     assert.equal(wrapped.requestId, 'req-uuid-1');
+    assert.equal(wrapped.sourceVendor, 'MyMoneyBazaar');
   });
 
   it('maps a merchant no-hit to the Tenacio 422 error envelope', () => {
@@ -49,6 +50,7 @@ describe('mapMyMoneyBazaarSoftPullToTenacioEnvelope', () => {
       200,
     );
     assert.deepEqual(wrapped, {
+      sourceVendor: 'MyMoneyBazaar',
       status: 'error',
       serviceStatusCode: 422,
       requestId: 'req-uuid-1',

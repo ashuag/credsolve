@@ -28,6 +28,7 @@ import {
   tenacioBureauFailureNote,
 } from '../../../../common/vendor/tenacio-bureau-payload.mapper';
 import { BureauFetchService } from '../../../../common/vendor/bureau-fetch.service';
+import type { CibilVendorKind } from '../../../../common/vendor/cibil-vendor.util';
 import { PanNsdlCacheService } from '../../../../common/vendor/pan-nsdl-cache.service';
 import { PanVerificationService, type PanVerificationResult } from '../../../../common/vendor/pan-verification.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
@@ -765,6 +766,7 @@ export class VerifyPanUseCase {
           vendorBody: out.vendorBody,
           httpStatus: out.httpStatus,
           dummyFetched: out.dummyPayload,
+          vendorKind: out.vendorKind,
         });
       }
       this.logger.warn(
@@ -792,6 +794,7 @@ export class VerifyPanUseCase {
         vendorBody: out.vendorBody,
         httpStatus: out.httpStatus,
         dummyFetched: out.dummyPayload,
+        vendorKind: out.vendorKind,
       });
       try {
         const offerResult = await this.postBureauOffer.runAfterSuccessfulBureauFetch({
@@ -913,6 +916,7 @@ export class VerifyPanUseCase {
     vendorBody: unknown;
     httpStatus: number | null;
     dummyFetched: boolean;
+    vendorKind?: CibilVendorKind | null;
   }): Promise<boolean> {
     try {
       const parsed = parseTenacioBureauVendorBody(params.vendorBody);
@@ -923,6 +927,7 @@ export class VerifyPanUseCase {
         parsed,
         httpStatus: params.httpStatus,
         dummyFetched: params.dummyFetched,
+        vendorKind: params.vendorKind,
       });
       if (params.customerUuid) {
         try {

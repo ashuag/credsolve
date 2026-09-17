@@ -17,6 +17,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
 import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 import { TENACIO_SERVICE_PAN_NAME_DOB } from '../../../common/vendor/tenacio/tenacio-client.service';
+import { resolveCibilVendorDisplayName } from '../../../common/vendor/cibil-vendor.util';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -257,7 +258,7 @@ export class LosLeadService {
             gender: { select: { name: true } },
             occupation: { select: { name: true } },
             bureauReport: {
-              select: { id: true, uuid: true, cibilScore: true, createdAt: true },
+              select: { id: true, uuid: true, cibilScore: true, createdAt: true, vendorName: true },
             },
           },
         },
@@ -344,6 +345,7 @@ export class LosLeadService {
             uuid: currentBureau.uuid,
             cibilScore: currentBureau.cibilScore,
             fetchedAt: currentBureau.createdAt.toISOString(),
+            vendorName: resolveCibilVendorDisplayName({ storedVendorName: currentBureau.vendorName }),
           }
         : null,
       applications: lead.applications.map((application) => ({
@@ -373,6 +375,7 @@ export class LosLeadService {
                 uuid: true,
                 rawPayload: true,
                 createdAt: true,
+                vendorName: true,
               },
             },
           },
@@ -408,6 +411,10 @@ export class LosLeadService {
     return {
       bureauReportUuid: bureauReportRow.uuid,
       fetchedAt: bureauReportRow.createdAt.toISOString(),
+      vendorName: resolveCibilVendorDisplayName({
+        storedVendorName: bureauReportRow.vendorName,
+        vendorBody: bureauReportRow.rawPayload,
+      }),
       reportPdfUrl: this.resolveBureauReportPdfUrl(leadUuid, pdfResult, true),
       rawPayload: bureauReportRow.rawPayload,
       report,

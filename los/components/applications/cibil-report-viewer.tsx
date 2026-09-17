@@ -626,6 +626,12 @@ export function CibilReportViewer({
               </h2>
               <p className="m-0 mt-1.5 text-[0.84rem] text-brand-muted">
                 Bureau pulled {formatDateTime(payload.fetchedAt)}
+                {payload.vendorName ? (
+                  <>
+                    {' '}
+                    · via <span className="font-semibold text-brand-navy">{payload.vendorName}</span>
+                  </>
+                ) : null}
                 {report.controlNumber ? (
                   <>
                     {' '}

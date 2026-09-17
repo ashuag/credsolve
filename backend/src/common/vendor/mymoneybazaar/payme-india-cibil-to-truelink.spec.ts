@@ -86,6 +86,28 @@ describe('payMeIndiaFlatToTrueLink', () => {
     const nohit = payMeIndiaFlatToTrueLink({ cibil: [], loan_type: [] });
     assert.equal(nohit.ok, false);
   });
+
+  it('maps enquiry member name and loan purpose onto InquiryPartition', () => {
+    const result = payMeIndiaFlatToTrueLink({
+      cibil: [{ score: '742', cibil_date: '2026-09-17' }],
+      loan_type: [],
+      member_enquiries_: [
+        {
+          date: '2024-07-31',
+          member: 'HDFC BANK',
+          enquiry_purpose: 'Personal Loan',
+          amount: 10000,
+        },
+      ],
+    });
+    assert.equal(result.ok, true);
+    const partitions = result.trueLinkCreditReport!.InquiryPartition as Array<Record<string, unknown>>;
+    assert.equal(partitions.length, 1);
+    const inquiry = record(partitions[0].Inquiry);
+    assert.equal(inquiry.subscriberName, 'HDFC BANK');
+    assert.equal(inquiry.inquiryType, '05');
+    assert.equal(inquiry.amount, '10000');
+  });
 });
 
 describe('mapMyMoneyBazaarSoftPullToTenacioEnvelope (PayMe India flat)', () => {

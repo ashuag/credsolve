@@ -601,6 +601,29 @@ export type ParsedBureauInquiry = {
   amount: string | null;
 };
 
+function nonEmptyInquiryText(raw: unknown): string | null {
+  if (raw == null) return null;
+  if (typeof raw === 'object') {
+    const fromSymbol = readSymbol(raw);
+    if (fromSymbol) return fromSymbol;
+    const rec = asRecord(raw);
+    if (!rec) return null;
+    for (const key of ['description', 'Description', 'name', 'Name', 'text', 'Text']) {
+      const nested = rec[key];
+      if (typeof nested === 'string' && nested.trim()) return nested.trim();
+    }
+    return null;
+  }
+  const s = String(raw).trim();
+  return s.length > 0 ? s : null;
+}
+
+function readInquiryTypeCode(raw: unknown): string | null {
+  const s = nonEmptyInquiryText(raw);
+  if (!s) return null;
+  return /^\d+$/.test(s) ? s.padStart(2, '0') : s;
+}
+
 /**
  * Decode base64 OriginalData and return a map of enqControlNum → ParsedBureauInquiry.
  * The TUEF data uses clean YYYYMMDD dates, unlike the TrueLinkCreditReport which can
@@ -634,13 +657,12 @@ function buildOriginalDataInquiryMap(tlr: Record<string, unknown>): Map<string, 
       if (!controlNumber) continue;
       const date = parseCibilDate(inq.dateOfInquiry);
       if (!date) continue;
-      const purposeRaw = inq.inquiryPurpose != null ? String(inq.inquiryPurpose).trim().padStart(2, '0') : null;
       map.set(controlNumber, {
         date,
-        inquiryType: purposeRaw,
+        inquiryType: readInquiryTypeCode(inq.inquiryPurpose),
         controlNumber,
-        subscriberName: inq.memberShortName != null ? String(inq.memberShortName).trim() : null,
-        amount: inq.inquiryAmount != null ? String(inq.inquiryAmount).trim() : null,
+        subscriberName: nonEmptyInquiryText(inq.memberShortName),
+        amount: nonEmptyInquiryText(inq.inquiryAmount),
       });
     }
   }
@@ -674,16 +696,32 @@ export function extractBureauInquiries(body: unknown): ParsedBureauInquiry[] {
         const inquiry = partitionRec ? asRecord(partitionRec.Inquiry) : null;
         if (!inquiry) continue;
         const controlNumber = inquiry.enqControlNum != null ? String(inquiry.enqControlNum).trim() : null;
+        const fromOriginal = controlNumber ? originalDataMap.get(controlNumber) ?? null : null;
         // TrueLinkCreditReport dates can be malformed (e.g. month=20); fall back to OriginalData date
-        const date = parseCibilDate(inquiry.inquiryDate) ?? (controlNumber ? originalDataMap.get(controlNumber)?.date ?? null : null);
+        const date =
+          parseCibilDate(inquiry.inquiryDate) ??
+          fromOriginal?.date ??
+          null;
         if (!date) continue;
         push({
           date,
-          inquiryType: inquiry.inquiryType != null ? String(inquiry.inquiryType).trim() : null,
+          inquiryType:
+            readInquiryTypeCode(inquiry.inquiryType ?? inquiry.InquiryType) ??
+            fromOriginal?.inquiryType ??
+            null,
           controlNumber,
           subscriberName:
-            inquiry.subscriberName != null ? String(inquiry.subscriberName).trim() : null,
-          amount: inquiry.amount != null ? String(inquiry.amount).trim() : null,
+            nonEmptyInquiryText(
+              inquiry.subscriberName ??
+                inquiry.memberShortName ??
+                inquiry.memberName ??
+                inquiry.MemberName ??
+                inquiry.member,
+            ) ?? fromOriginal?.subscriberName ?? null,
+          amount:
+            nonEmptyInquiryText(inquiry.amount ?? inquiry.enquiryAmount) ??
+            fromOriginal?.amount ??
+            null,
         });
       }
     } else {
@@ -1205,8 +1243,13 @@ export type PostBreBureauSummary = {
 
 function enquiryPurposeLabel(code: string | null): string {
   if (!code) return 'Unknown';
-  const norm = code.trim().padStart(2, '0');
-  return ACCOUNT_TYPE_LABELS[norm] ?? `Purpose ${norm}`;
+  const trimmed = code.trim();
+  if (!trimmed) return 'Unknown';
+  if (/^\d+$/.test(trimmed)) {
+    const norm = trimmed.padStart(2, '0');
+    return ACCOUNT_TYPE_LABELS[norm] ?? `Purpose ${norm}`;
+  }
+  return ACCOUNT_TYPE_LABELS[trimmed] ?? trimmed;
 }
 
 function readBureauInquiryDate(body: unknown): string | null {

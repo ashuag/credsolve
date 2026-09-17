@@ -130,6 +130,8 @@ export type LosLeadDetails = {
     uuid: string;
     cibilScore: number | null;
     fetchedAt: string;
+    /** Integration that pulled this CIBIL report (`Tenacio`, `Surepass`, `MyMoneyBazaar`). */
+    vendorName: string | null;
   } | null;
   applications: Array<{
     uuid: string;
@@ -381,6 +383,8 @@ export type LosApplicationDetails = {
     cibilScore: number | null;
     reportPdfUrl: string | null;
     fetchedAt: string;
+    /** Integration that pulled this CIBIL report (`Tenacio`, `Surepass`, `MyMoneyBazaar`). */
+    vendorName: string | null;
     /** Rule-based CIBIL credit-assessment category (A best .. H worst); null if not yet computed. */
     creditAssessmentCategory: string | null;
     creditAssessmentRecommendation: 'Approved' | 'Rejected' | null;
