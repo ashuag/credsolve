@@ -711,7 +711,6 @@ export function CibilReportViewer({
           ) : null}
           <DetailGrid
             rows={[
-              { label: 'Score name', value: report.scoreName ?? '—' },
               { label: 'Population rank', value: report.populationRank ?? '—' },
               { label: 'On-time payments', value: report.creditSummary.onTimePaymentHistory ?? '—' },
               { label: 'Card utilization', value: report.creditSummary.creditCardUtilization ?? '—' },

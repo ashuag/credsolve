@@ -32,6 +32,7 @@ export function ApplicationReviewHero({
   journeySteps: JourneyStep[];
 }) {
   const profile = row.lead.profile;
+  const customerEmail = row.email?.trim() || profile?.emailId?.trim() || '';
   const isRejected = isApplicationRecordRejected(row);
   const activeStep = journeySteps.find((step) => step.state === 'active');
   const stageLabel = isRejected ? applicationRejectionHeadline(row) : (activeStep?.label ?? row.statusLabel);
@@ -75,12 +76,14 @@ export function ApplicationReviewHero({
             <span>{formatCityState(profile?.city, profile?.state)}</span>
             <span className="ah-sep">•</span>
             <span className="mono">{row.mobileNumber}</span>
-            {row.email?.trim() ? (
-              <>
-                <span className="ah-sep">•</span>
-                <span>{row.email.trim()}</span>
-              </>
-            ) : null}
+            <span className="ah-sep">•</span>
+            {customerEmail ? (
+              <a className="ah-email" href={`mailto:${customerEmail}`} title={customerEmail}>
+                {customerEmail}
+              </a>
+            ) : (
+              <span>—</span>
+            )}
             {identityVerified ? (
               <span className="ah-id-badge">
                 <span className="ah-id-dot" aria-hidden />

@@ -12,7 +12,7 @@ import {
   type LosCibilHitsPayload,
 } from '@/lib/api';
 import { getLosStoredUser, LOS_STORAGE_KEY } from '@/lib/auth';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -36,24 +36,111 @@ function formatHitTime(iso: string): string {
   });
 }
 
-function CibilHitLogs({ hits }: { hits: LosCibilHitLog[] }) {
-  if (hits.length < 2) return null;
+function formatJson(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function JsonViewButton({ label, value }: { label: string; value: unknown }) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  if (value == null) {
+    return <span className="text-brand-muted">—</span>;
+  }
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(formatJson(value));
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
 
   return (
-    <div className="los-card overflow-hidden border border-[rgba(245,158,11,0.28)] bg-[rgba(255,251,235,0.72)]">
-      <div className="border-b border-[rgba(245,158,11,0.18)] px-4 py-3">
-        <p className="m-0 text-[0.62rem] font-extrabold uppercase tracking-[0.14em] text-[#92400e]">
-          Multiple bureau hits
+    <>
+      <button
+        type="button"
+        className="inline-flex min-h-[30px] items-center rounded-[8px] border border-[rgba(23,44,113,0.12)] bg-white px-2.5 text-[0.72rem] font-bold text-brand-blue hover:border-[rgba(20,150,243,0.35)]"
+        onClick={() => setOpen(true)}
+      >
+        View
+      </button>
+      {open ? (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-[rgba(15,26,46,0.45)] p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={label}
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="flex max-h-[min(82vh,880px)] w-full max-w-[720px] flex-col overflow-hidden rounded-[16px] border border-[rgba(23,44,113,0.12)] bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-[rgba(23,44,113,0.08)] px-4 py-3">
+              <h3 className="m-0 text-[0.92rem] font-extrabold text-brand-navy">{label}</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="inline-flex min-h-[32px] items-center rounded-full border border-[rgba(23,44,113,0.12)] bg-white px-3 text-[0.74rem] font-bold text-brand-navy hover:border-[rgba(20,150,243,0.35)]"
+                  onClick={() => void handleCopy()}
+                >
+                  {copied ? 'Copied' : 'Copy JSON'}
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex min-h-[32px] items-center rounded-full border border-[rgba(23,44,113,0.12)] bg-white px-3 text-[0.74rem] font-bold text-brand-muted hover:text-brand-navy"
+                  onClick={() => setOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            <pre className="m-0 flex-1 overflow-auto bg-[#0f172a] p-4 text-[0.72rem] leading-relaxed text-[#e2e8f0]">
+              <code>{formatJson(value)}</code>
+            </pre>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function CibilHitLogs({ hits }: { hits: LosCibilHitLog[] }) {
+  if (hits.length === 0) {
+    return (
+      <div className="los-card border border-dashed border-[rgba(23,44,113,0.16)] bg-[rgba(248,250,255,0.88)] p-6">
+        <h3 className="m-0 text-[0.95rem] font-extrabold text-brand-navy">No CIBIL hit logs yet</h3>
+        <p className="m-0 mt-1 max-w-[52ch] text-[0.82rem] leading-relaxed text-brand-muted">
+          Bureau pulls for this lead will appear here, with the original vendor JSON and the
+          converted Tenacio response JSON.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="los-card overflow-hidden">
+      <div className="border-b border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.85)] px-4 py-3">
+        <p className="m-0 text-[0.62rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">
+          Bureau pulls
         </p>
         <h3 className="m-0 mt-0.5 text-[0.95rem] font-extrabold text-brand-navy">
-          CIBIL hit log · {hits.length} pulls
+          CIBIL hit logs · {hits.length} {hits.length === 1 ? 'pull' : 'pulls'}
         </h3>
         <p className="m-0 mt-1 text-[0.78rem] leading-relaxed text-brand-muted">
-          This lead has been pulled more than once. Each row is a bureau call or stored report snapshot.
+          Each row is a bureau call or stored report snapshot. Original JSON is the raw vendor
+          response. Tenacio JSON is that payload converted to a Tenacio-style response.
         </p>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] border-collapse text-left text-[0.78rem]">
+        <table className="w-full min-w-[780px] border-collapse text-left text-[0.78rem]">
           <thead>
             <tr className="border-b border-[rgba(23,44,113,0.08)] bg-[rgba(255,255,255,0.7)] text-[0.66rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted">
               <th className="px-4 py-2.5 font-extrabold">When</th>
@@ -61,7 +148,8 @@ function CibilHitLogs({ hits }: { hits: LosCibilHitLog[] }) {
               <th className="px-4 py-2.5 font-extrabold">Service</th>
               <th className="px-4 py-2.5 font-extrabold">HTTP</th>
               <th className="px-4 py-2.5 font-extrabold">Outcome</th>
-              <th className="px-4 py-2.5 font-extrabold">Score</th>
+              <th className="px-4 py-2.5 font-extrabold">Original JSON</th>
+              <th className="px-4 py-2.5 font-extrabold">Tenacio JSON</th>
             </tr>
           </thead>
           <tbody>
@@ -89,7 +177,15 @@ function CibilHitLogs({ hits }: { hits: LosCibilHitLog[] }) {
                     {hit.outcome === 'success' ? 'Success' : 'Failure'}
                   </span>
                 </td>
-                <td className="px-4 py-2.5 font-bold text-brand-navy">{formatCibilScoreLabel(hit.cibilScore)}</td>
+                <td className="px-4 py-2.5">
+                  <JsonViewButton label="Original vendor JSON" value={hit.originalJson} />
+                </td>
+                <td className="px-4 py-2.5">
+                  <JsonViewButton
+                    label="Converted Tenacio response JSON"
+                    value={hit.wrappedJson}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -148,6 +244,11 @@ type CheckCibilScorePanelProps = {
   emptyState?: boolean;
   lastResult?: LosCheckCibilResult | null;
   onCompleted?: (result: LosCheckCibilResult) => void;
+  buttonClassName?: string;
+  /** Hide the hit-log table (shown on the dedicated CIBIL hits tab instead). */
+  hideHitLogs?: boolean;
+  /** Render the check button in a parent toolbar instead of above the panel body. */
+  renderToolbarButton?: (button: ReactNode) => ReactNode;
 };
 
 export function CheckCibilScorePanel({
@@ -157,6 +258,9 @@ export function CheckCibilScorePanel({
   emptyState = false,
   lastResult = null,
   onCompleted,
+  buttonClassName,
+  hideHitLogs = false,
+  renderToolbarButton,
 }: CheckCibilScorePanelProps) {
   const [allowed] = useState(() => {
     const user = getLosStoredUser();
@@ -224,7 +328,7 @@ export function CheckCibilScorePanel({
   const button = allowed ? (
     <button
       type="button"
-      className="los-btn-primary min-h-[40px] px-4"
+      className={buttonClassName ?? 'los-btn-primary min-h-[40px] px-4'}
       disabled={busy}
       onClick={() => void handleCheck()}
     >
@@ -233,17 +337,31 @@ export function CheckCibilScorePanel({
   ) : null;
 
   if (compact) {
+    const body = (
+      <>
+        {error ? <p className="m-0 text-[0.82rem] font-semibold text-[#8d3434]">{error}</p> : null}
+        {result ? <CheckResultBanner result={result} /> : null}
+        {!hideHitLogs && hits ? <CibilHitLogs hits={hits.hits} /> : null}
+      </>
+    );
+
+    if (renderToolbarButton) {
+      return (
+        <div className="grid gap-3">
+          {renderToolbarButton(button)}
+          {body}
+        </div>
+      );
+    }
+
     return (
       <div className="grid gap-3">
         <div className="flex flex-wrap items-center gap-3">
           {button}
-          {hits && hits.hitCount > 1 ? (
-            <span className="text-[0.74rem] font-bold text-[#92400e]">{hits.hitCount} bureau hits on this lead</span>
-          ) : null}
         </div>
         {error ? <p className="m-0 text-[0.82rem] font-semibold text-[#8d3434]">{error}</p> : null}
         {result ? <CheckResultBanner result={result} /> : null}
-        {hits ? <CibilHitLogs hits={hits.hits} /> : null}
+        {!hideHitLogs && hits ? <CibilHitLogs hits={hits.hits} /> : null}
       </div>
     );
   }
@@ -283,4 +401,66 @@ export function CheckCibilScorePanel({
       {hits ? <CibilHitLogs hits={hits.hits} /> : null}
     </div>
   );
+}
+
+type CibilHitLogsPanelProps = {
+  applicationUuid?: string;
+  leadUuid?: string;
+  refreshKey?: string | number | null;
+};
+
+export function CibilHitLogsPanel({ applicationUuid, leadUuid, refreshKey }: CibilHitLogsPanelProps) {
+  const [hits, setHits] = useState<LosCibilHitLog[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadHits = useCallback(async () => {
+    const token = getToken();
+    if (!token || (!applicationUuid && !leadUuid)) {
+      setHits([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const data = applicationUuid
+        ? await getApplicationCibilHits(token, applicationUuid)
+        : await getLeadCibilHits(token, leadUuid!);
+      setHits(data.hits);
+    } catch (e) {
+      setHits(null);
+      setError(e instanceof Error ? e.message : 'Failed to load CIBIL hit logs.');
+    } finally {
+      setLoading(false);
+    }
+  }, [applicationUuid, leadUuid]);
+
+  useEffect(() => {
+    void loadHits();
+  }, [loadHits, refreshKey]);
+
+  if (loading) {
+    return (
+      <div className="los-card p-6">
+        <div className="animate-pulse space-y-3">
+          <div className="h-4 w-40 rounded bg-[rgba(23,44,113,0.08)]" />
+          <div className="h-24 rounded-xl bg-[rgba(23,44,113,0.05)]" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="los-card border border-[rgba(231,95,95,0.28)] bg-[rgba(255,241,241,0.88)] p-4 text-[0.86rem] text-[#8d3434]">
+        {error}
+        <button type="button" className="los-btn-primary mt-3 min-h-[34px] px-4" onClick={() => void loadHits()}>
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  return <CibilHitLogs hits={hits ?? []} />;
 }

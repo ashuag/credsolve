@@ -59,6 +59,13 @@ function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
 }
 
+function resolveCustomerEmail(
+  applicationEmail?: string | null,
+  leadEmail?: string | null,
+): string | null {
+  return applicationEmail?.trim() || leadEmail?.trim() || null;
+}
+
 function mapLeadRejectionReason(
   reason: { name: string } | null | undefined,
   applicationStatusName?: string,
@@ -513,6 +520,7 @@ export class LosApplicationService {
                 fullName: true,
                 panVerified: true,
                 bureauFetched: true,
+                emailId: true,
                 bureauReport: {
                   select: {
                     cibilScore: true,
@@ -592,7 +600,7 @@ export class LosApplicationService {
         customerUuid: application.customer.uuid,
         leadUuid: application.lead.uuid,
         mobileNumber: application.customer.mobileNumber,
-        email: appDetails?.emailId ?? null,
+        email: resolveCustomerEmail(appDetails?.emailId, application.lead.leadDetail?.emailId),
         fullName: formatLosPersonName(application.lead.leadDetail?.fullName),
         cibilScore: application.lead.leadDetail?.bureauReport?.cibilScore ?? null,
         cibilCreditAssessmentCategory: application.lead.leadDetail?.bureauReport?.cibilCreditAssessment?.category ?? null,
@@ -899,7 +907,7 @@ export class LosApplicationService {
       leadUuid: lead.uuid,
       leadNumber: lead.leadNumber,
       mobileNumber: application.customer.mobileNumber,
-      email: application.details?.emailId ?? null,
+      email: resolveCustomerEmail(application.details?.emailId, detail?.emailId),
       emailVerifiedAt: application.details?.emailVerifiedAt?.toISOString() ?? null,
       statusCode: application.applicationStatus.name,
       statusLabel: displayName(application.applicationStatus.name, application.applicationStatus.displayName),
@@ -1353,6 +1361,7 @@ export class LosApplicationService {
     let pdfResult = await this.bureauReportPdf.ensurePdfForLead({
       leadId: application.leadId,
       customerUuid: application.customer.uuid,
+      force: true,
     });
     if (!pdfResult?.relativePath) {
       const priorBureau = await this.findLatestCustomerBureauReportWithPayload(application.customerId);
@@ -1362,6 +1371,7 @@ export class LosApplicationService {
           customerUuid: application.customer.uuid,
           bureauReportUuid: priorBureau.uuid,
           vendorBody: priorBureau.rawPayload,
+          force: true,
         });
       }
     }
@@ -2013,6 +2023,7 @@ export class LosApplicationService {
         uuid: true,
         cibilScore: true,
         createdAt: true,
+        vendorName: true,
         cibilCreditAssessment: { select: { category: true, creditRecommendation: true } },
       },
     });
@@ -2027,6 +2038,7 @@ export class LosApplicationService {
         uuid: true,
         rawPayload: true,
         createdAt: true,
+        vendorName: true,
       },
     });
   }

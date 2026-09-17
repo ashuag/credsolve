@@ -17,6 +17,10 @@ import { REJECTION_REASON, toRejectionReasonDto } from '../../../common/constant
 import { generateLeadNumber } from '../../../common/loan/application-number.util';
 import { SmsService } from '../../../common/sms/sms.service';
 import { BureauFetchService } from '../../../common/vendor/bureau-fetch.service';
+import { mapCibilVendorName } from '../../../common/vendor/cibil-vendor.util';
+import { mapMyMoneyBazaarSoftPullToTenacioEnvelope } from '../../../common/vendor/mymoneybazaar/mymoneybazaar-cibil-to-tenacio.mapper';
+import { mapSurepassCibilToTenacioEnvelope } from '../../../common/vendor/surepass/surepass-cibil-to-tenacio.mapper';
+import { unwrapVendorApiLogPayload } from '../../../common/vendor/vendor-api-log-payload.util';
 import {
   isTenacioBureauClientError,
   isTenacioBureauSuccessPayload,
@@ -43,10 +47,16 @@ export type LosCibilHitLog = {
   serviceName: string | null;
   httpStatus: number | null;
   outcome: 'success' | 'failure';
-  cibilScore: number | null;
   dummyFetched: boolean;
   vendorLogUuid: string | null;
   bureauReportUuid: string | null;
+  /** Raw vendor HTTP body stored on `vendor_api_log.response_payload`. */
+  originalJson: unknown | null;
+  /**
+   * Vendor payload converted to a Tenacio-style bureau response
+   * (`status` / `serviceStatusCode` / `data.cibilData…`) — what BRE and the CIBIL report consume.
+   */
+  wrappedJson: unknown | null;
 };
 
 export type LosCibilHitsPayload = {
@@ -87,6 +97,30 @@ export function isCibilVendorServiceName(serviceName: string): boolean {
 function hitOutcomeFromHttpStatus(httpStatus: number | null): 'success' | 'failure' {
   if (httpStatus == null) return 'failure';
   return httpStatus >= 200 && httpStatus < 300 ? 'success' : 'failure';
+}
+
+/** Convert a stored vendor CIBIL body into a Tenacio-shaped bureau response JSON. */
+export function wrapCibilHitJson(params: {
+  providerName: string | null;
+  serviceName: string | null;
+  httpStatus: number | null;
+  originalJson: unknown;
+}): unknown {
+  const original = unwrapVendorApiLogPayload(params.originalJson);
+  if (original == null) return null;
+  const service = (params.serviceName ?? '').toLowerCase();
+  const kind = mapCibilVendorName(params.providerName ?? '');
+  try {
+    if (kind === 'mymoneybazaar' || service.includes('cibil-soft-pull')) {
+      return mapMyMoneyBazaarSoftPullToTenacioEnvelope(original, params.httpStatus);
+    }
+    if (kind === 'surepass' || service.includes('credit-report-cibil')) {
+      return mapSurepassCibilToTenacioEnvelope(original, params.httpStatus);
+    }
+    return original;
+  } catch {
+    return original;
+  }
 }
 
 @Injectable()
@@ -266,24 +300,34 @@ export class LosCheckCibilService {
         serviceName: true,
         httpStatus: true,
         requestedAt: true,
+        responsePayload: true,
       },
     });
 
     const vendorHits = vendorRows
       .filter((row) => isCibilVendorServiceName(row.serviceName))
-      .map((row) => ({
-        id: `vendor:${row.uuid}`,
-        kind: 'vendor' as const,
-        at: row.requestedAt.toISOString(),
-        providerName: row.providerName,
-        serviceName: row.serviceName,
-        httpStatus: row.httpStatus,
-        outcome: hitOutcomeFromHttpStatus(row.httpStatus),
-        cibilScore: null,
-        dummyFetched: false,
-        vendorLogUuid: row.uuid,
-        bureauReportUuid: null,
-      }));
+      .map((row) => {
+        const originalJson = unwrapVendorApiLogPayload(row.responsePayload ?? null);
+        return {
+          id: `vendor:${row.uuid}`,
+          kind: 'vendor' as const,
+          at: row.requestedAt.toISOString(),
+          providerName: row.providerName,
+          serviceName: row.serviceName,
+          httpStatus: row.httpStatus,
+          outcome: hitOutcomeFromHttpStatus(row.httpStatus),
+          dummyFetched: false,
+          vendorLogUuid: row.uuid,
+          bureauReportUuid: null,
+          originalJson,
+          wrappedJson: wrapCibilHitJson({
+            providerName: row.providerName,
+            serviceName: row.serviceName,
+            httpStatus: row.httpStatus,
+            originalJson,
+          }),
+        };
+      });
 
     if (vendorHits.length > 0) {
       return { hitCount: vendorHits.length, hits: vendorHits };
@@ -295,10 +339,11 @@ export class LosCheckCibilService {
       select: {
         id: true,
         uuid: true,
-        cibilScore: true,
         dummyFetched: true,
         serviceStatusCode: true,
         createdAt: true,
+        rawPayload: true,
+        vendorName: true,
       },
     });
 
@@ -306,16 +351,17 @@ export class LosCheckCibilService {
       id: `report:${row.uuid}`,
       kind: 'report' as const,
       at: row.createdAt.toISOString(),
-      providerName: row.dummyFetched ? 'mock' : null,
+      providerName: row.dummyFetched ? 'mock' : row.vendorName,
       serviceName: 'bureau-report',
       httpStatus: row.serviceStatusCode,
       outcome: (row.serviceStatusCode == null || (row.serviceStatusCode >= 200 && row.serviceStatusCode < 300)
         ? 'success'
         : 'failure') as 'success' | 'failure',
-      cibilScore: row.cibilScore,
       dummyFetched: Boolean(row.dummyFetched),
       vendorLogUuid: null,
       bureauReportUuid: row.uuid,
+      originalJson: null,
+      wrappedJson: row.rawPayload ?? null,
     }));
 
     return { hitCount: reportHits.length, hits: reportHits };

@@ -17,6 +17,7 @@ import {
   ACCOUNT_TYPE_LABELS,
   CIBIL_CREDIT_CARD_ACCOUNT_TYPE_SYMBOLS,
   CIBIL_UNSECURED_ACCOUNT_TYPE_SYMBOLS,
+  formatCibilEnquiryPurposeLabel,
 } from './cibil-tuef.constants';
 import { ELIGIBILITY_CRITERIA as EC } from '../constants/eligibility-criteria.constants';
 import {
@@ -110,13 +111,37 @@ function normalizeTuefStatusCode(raw: unknown): string | null {
   return s.toUpperCase();
 }
 
-function isCreditFacilityStatusNode(node: unknown): boolean {
+function accountConditionAbbreviation(node: unknown): string {
   const rec = asRecord(node);
-  if (!rec) return false;
-  const abbr = String(rec.abbreviation ?? rec.Abbreviation ?? '')
+  if (!rec) return '';
+  return String(rec.abbreviation ?? rec.Abbreviation ?? '')
     .trim()
-    .toLowerCase();
-  return abbr === 'creditfacilitystatus';
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function isCreditFacilityStatusNode(node: unknown): boolean {
+  return accountConditionAbbreviation(node) === 'creditfacilitystatus';
+}
+
+/** Tenacio wraps TUEF Tag 34 onto AccountCondition with abbreviation `suitFiledStatus`. */
+function isSuitFiledAccountCondition(node: unknown): boolean {
+  const abbr = accountConditionAbbreviation(node);
+  return (
+    abbr === 'suitfiledstatus' ||
+    abbr === 'suitfiledwilfuldefault' ||
+    abbr === 'suitfiledwilfuldefaultstatus'
+  );
+}
+
+/**
+ * AccountCondition is a catch-all on TrueLink. Tag 33 fall-through is only valid
+ * when the node is unlabeled (or itself a write-off / settled node). Credit
+ * Facility Status and Suit Filed / Wilful Default share numeric codes with Tag 33
+ * (`01` = restructure vs suit filed) so labeled nodes must not be read as Tag 33.
+ */
+function isNonWrittenOffSettledAccountCondition(node: unknown): boolean {
+  return isCreditFacilityStatusNode(node) || isSuitFiledAccountCondition(node);
 }
 
 /** TUEF Tag 33 — Written-off and Settled Status on TrueLink tradelines. */
@@ -132,9 +157,7 @@ function readWrittenOffSettledStatusCode(lineRec: Record<string, unknown>): stri
   const fromWrittenOffSettled = normalizeTuefStatusCode(readSymbol(lineRec.WrittenOffSettled));
   if (fromWrittenOffSettled) return fromWrittenOffSettled;
 
-  // TrueLink maps Credit Facility Status onto AccountCondition (abbreviation
-  // creditFacilityStatus). That is not TUEF Tag 33 write-off / settled status.
-  if (isCreditFacilityStatusNode(lineRec.AccountCondition)) return null;
+  if (isNonWrittenOffSettledAccountCondition(lineRec.AccountCondition)) return null;
 
   return normalizeTuefStatusCode(readSymbol(lineRec.AccountCondition));
 }
@@ -245,8 +268,13 @@ function resolveTradelineAccountTypeSymbol(
     readSymbol(granted?.AccountType) ?? readSymbol(granted?.CreditType);
   if (isMfiAccountType(fromGranted)) return normalizeCibilAccountTypeSymbol(fromGranted);
 
-  if (partitionSymbol != null) return normalizeCibilAccountTypeSymbol(partitionSymbol);
-  return fromGranted;
+  if (partitionSymbol != null && String(partitionSymbol).trim()) {
+    return normalizeCibilAccountTypeSymbol(partitionSymbol);
+  }
+  if (fromGranted) return fromGranted;
+  const description =
+    lineRec.accountTypeDescription != null ? String(lineRec.accountTypeDescription).trim() : '';
+  return description ? normalizeCibilAccountTypeSymbol(description) : null;
 }
 
 function isMicrofinanceTradeline(partitionSymbol: string | null, lineRec: Record<string, unknown>): boolean {
@@ -273,11 +301,23 @@ export function readSuitFiledWilfulDefaultCode(lineRec: Record<string, unknown>)
   if (fromDirect) return fromDirect;
 
   for (const node of [lineRec.SuitFiled, lineRec.suitFiled]) {
+    if (node == null || node === '') continue;
     const symbol = normalizeTuefStatusCode(readSymbol(node));
     if (symbol) return symbol;
     const rec = asRecord(node);
-    const fromDescription = normalizeSuitFiledWilfulDefaultText(rec?.description ?? rec?.Description);
+    if (!rec) {
+      const fromText = normalizeSuitFiledWilfulDefaultText(node);
+      if (fromText) return fromText;
+      continue;
+    }
+    const description = rec.description ?? rec.Description;
+    if (description == null || String(description).trim() === '') continue;
+    const fromDescription = normalizeSuitFiledWilfulDefaultText(description);
     if (fromDescription) return fromDescription;
+  }
+
+  if (isSuitFiledAccountCondition(lineRec.AccountCondition)) {
+    return normalizeTuefStatusCode(readSymbol(lineRec.AccountCondition));
   }
 
   return null;
@@ -1404,9 +1444,9 @@ function enquiryPurposeLabel(code: string | null): string {
   if (!trimmed) return 'Unknown';
   if (/^\d+$/.test(trimmed)) {
     const norm = trimmed.padStart(2, '0');
-    return ACCOUNT_TYPE_LABELS[norm] ?? `Purpose ${norm}`;
+    return formatCibilEnquiryPurposeLabel(ACCOUNT_TYPE_LABELS[norm] ?? `Purpose ${norm}`);
   }
-  return ACCOUNT_TYPE_LABELS[trimmed] ?? trimmed;
+  return formatCibilEnquiryPurposeLabel(ACCOUNT_TYPE_LABELS[trimmed] ?? trimmed);
 }
 
 function readBureauInquiryDate(body: unknown): string | null {

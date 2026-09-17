@@ -4,7 +4,7 @@ import { BadRequestException } from '@nestjs/common';
 import { BUREAU_FETCHED } from '../../../common/constants/bureau-fetch.constants';
 import { LEAD_STATUS } from '../../../common/constants/lead.constants';
 import { REJECTION_REASON } from '../../../common/constants/rejection-reason.constants';
-import { isCibilVendorServiceName, LosCheckCibilService } from './los-check-cibil.service';
+import { isCibilVendorServiceName, LosCheckCibilService, wrapCibilHitJson } from './los-check-cibil.service';
 
 describe('isCibilVendorServiceName', () => {
   it('matches Tenacio, Surepass, and MyMoneyBazaar CIBIL service names', () => {
@@ -18,6 +18,70 @@ describe('isCibilVendorServiceName', () => {
     assert.equal(isCibilVendorServiceName('pan-name-dob'), false);
     assert.equal(isCibilVendorServiceName('digilocker-download-aadhaar'), false);
     assert.equal(isCibilVendorServiceName('sms-rejection'), false);
+  });
+});
+
+describe('wrapCibilHitJson', () => {
+  it('wraps MyMoneyBazaar soft-pull bodies into the Tenacio envelope', () => {
+    const wrapped = wrapCibilHitJson({
+      providerName: 'MyMoneyBazaar',
+      serviceName: 'cibil-soft-pull',
+      httpStatus: 200,
+      originalJson: { success: false, status: 'VENDOR_ERROR', error: { message: 'upstream timeout' } },
+    });
+    assert.equal((wrapped as { sourceVendor?: string }).sourceVendor, 'MyMoneyBazaar');
+    assert.equal((wrapped as { status?: string }).status, 'error');
+  });
+
+  it('leaves Tenacio bodies unchanged', () => {
+    const original = { status: 'success', serviceStatusCode: 200, data: { cibilData: {} } };
+    const wrapped = wrapCibilHitJson({
+      providerName: 'Tenacio',
+      serviceName: 'experian-soft-pull',
+      httpStatus: 200,
+      originalJson: original,
+    });
+    assert.equal(wrapped, original);
+  });
+
+  it('converts a truncated MyMoneyBazaar vendor-log payload into a Tenacio success envelope', () => {
+    const wrapped = wrapCibilHitJson({
+      providerName: 'MyMoneyBazaar',
+      serviceName: 'cibil-soft-pull',
+      httpStatus: 200,
+      originalJson: {
+        parsed: {
+          success: true,
+          request_uuid: '96184dba-0daa-4a3e-b7f5-f9035cefb4c8',
+          status: 'SUCCESS',
+          http_status: 200,
+          data: {
+            data: {
+              cibil: [{ score: '742', score_name: 'CIBILTransUnionScore3', cibil_date: '2026-09-17' }],
+              loan_type: [
+                {
+                  name: 'personal_loan',
+                  original_loan_type: 'Personal Loan',
+                  member_name: 'SMICC',
+                  opened_date: '2024-12-14',
+                  overdue: 10429,
+                  current_balance: 37324,
+                  sanctioned: 190000,
+                },
+              ],
+            },
+          },
+        },
+        snippet: '{"success":true',
+        _truncated: true,
+        httpStatus: 200,
+        _originalSize: 119075,
+      },
+    });
+    const rec = wrapped as { status?: string; serviceStatusCode?: number; sourceVendor?: string };
+    assert.equal(rec.sourceVendor, 'MyMoneyBazaar');
+    assert.equal(rec.status, 'success');
+    assert.equal(rec.serviceStatusCode, 200);
   });
 });
 
@@ -224,7 +288,59 @@ describe('LosCheckCibilService', () => {
     const hits = await service.listHitsForLead(leadId, customerId, createdAt);
     assert.equal(hits.hitCount, 1);
     assert.equal(hits.hits[0]?.vendorLogUuid, 'log-1');
+    assert.deepEqual(hits.hits[0]?.originalJson, { status: 'success' });
+    assert.deepEqual(hits.hits[0]?.wrappedJson, { status: 'success' });
     assert.equal(flags.bureauFindManyCalled, false);
+  });
+
+  it('unwraps truncated vendor-log JSON and converts it to Tenacio', async () => {
+    const parsed = {
+      success: true,
+      request_uuid: 'req-1',
+      status: 'SUCCESS',
+      http_status: 200,
+      data: {
+        data: {
+          cibil: [{ score: '742', score_name: 'CIBILTransUnionScore3', cibil_date: '2026-09-17' }],
+          loan_type: [
+            {
+              name: 'personal_loan',
+              original_loan_type: 'Personal Loan',
+              member_name: 'SMICC',
+              opened_date: '2024-12-14',
+              overdue: 10429,
+              current_balance: 37324,
+              sanctioned: 190000,
+            },
+          ],
+        },
+      },
+    };
+    const { service } = buildService({
+      vendorLogs: [
+        {
+          id: 1n,
+          uuid: 'log-mmb',
+          providerName: 'MyMoneyBazaar',
+          serviceName: 'cibil-soft-pull',
+          httpStatus: 200,
+          requestedAt: new Date('2026-09-17T10:00:00.000Z'),
+          responsePayload: {
+            parsed,
+            snippet: '{"success":true',
+            _truncated: true,
+            httpStatus: 200,
+            _originalSize: 119075,
+          },
+        },
+      ],
+    });
+
+    const hits = await service.listHitsForLead(leadId, customerId, createdAt);
+    assert.deepEqual(hits.hits[0]?.originalJson, parsed);
+    const wrapped = hits.hits[0]?.wrappedJson as { status?: string; serviceStatusCode?: number };
+    assert.equal(wrapped.status, 'success');
+    assert.equal(wrapped.serviceStatusCode, 200);
   });
 
   it('falls back to stored bureau reports when the lead has no vendor CIBIL logs', async () => {

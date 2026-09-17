@@ -19,6 +19,7 @@
  *     data.cibilData.GetCustomerAssetsResponse.GetCustomerAssetsSuccess
  *       .Asset.TrueLinkCreditReport.{Borrower, TradeLinePartition, …} }
  */
+import { unwrapVendorApiLogPayload } from '../vendor-api-log-payload.util';
 import { isPayMeIndiaFlatReport, payMeIndiaFlatToTrueLink } from './payme-india-cibil-to-truelink';
 
 function asRecord(v: unknown): Record<string, unknown> | null {
@@ -296,7 +297,11 @@ export function mapMyMoneyBazaarSoftPullToTenacioEnvelope(
 ): TenacioWrappedBureauBody {
   return {
     sourceVendor: 'MyMoneyBazaar',
-    ...buildMyMoneyBazaarTenacioEnvelope(softPullBody, httpStatus, context),
+    ...buildMyMoneyBazaarTenacioEnvelope(
+      unwrapVendorApiLogPayload(softPullBody),
+      httpStatus,
+      context,
+    ),
   };
 }
 

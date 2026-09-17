@@ -442,6 +442,7 @@ export class LosLeadService {
     const pdfResult = await this.bureauReportPdf.ensurePdfForLead({
       leadId: lead.id,
       customerUuid: lead.customer.uuid,
+      force: true,
     });
     if (!pdfResult?.relativePath) {
       throw new NotFoundException('Bureau report PDF is not available for this lead.');

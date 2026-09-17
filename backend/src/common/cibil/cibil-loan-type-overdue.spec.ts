@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { auditLoanTypeOverdue } from './cibil-bureau-rules.parser';
+import {
+  auditLoanTypeOverdue,
+  auditNoRestructuredLoans,
+  formatSuitFiledWilfulDefaultLabel,
+} from './cibil-bureau-rules.parser';
 
 function bureauWithTradelines(
   partitions: Array<{ accountTypeSymbol: string; tradelines: Record<string, unknown>[] }>,
@@ -94,5 +98,107 @@ describe('auditLoanTypeOverdue', () => {
       500,
     );
     assert.equal(result.passed, true);
+  });
+});
+
+describe('auditNoRestructuredLoans vs suit-filed AccountCondition', () => {
+  it('does not treat Tenacio Tag 34 AccountCondition 01 as a restructure', () => {
+    const result = auditNoRestructuredLoans(
+      bureauWithTradelines([
+        {
+          accountTypeSymbol: '51',
+          tradelines: [
+            {
+              creditorName: 'CENTRAL BANK',
+              accountNumber: '00000003016839118',
+              AccountCondition: {
+                rank: '100000',
+                symbol: '01',
+                description: '',
+                abbreviation: 'suitFiledStatus',
+              },
+            },
+          ],
+        },
+      ]),
+    );
+    assert.equal(result.passed, true);
+    assert.equal(result.findings.length, 0);
+  });
+
+  it('still flags unlabeled AccountCondition 01 as Tag 33 restructure', () => {
+    const result = auditNoRestructuredLoans(
+      bureauWithTradelines([
+        {
+          accountTypeSymbol: '51',
+          tradelines: [
+            {
+              creditorName: 'CENTRAL BANK',
+              AccountCondition: { symbol: '01' },
+            },
+          ],
+        },
+      ]),
+    );
+    assert.equal(result.passed, false);
+    assert.match(result.findings[0]?.detail ?? '', /Restructured Loan \(Govt\. Mandated\)/);
+  });
+
+  it('reads suitFiledStatus AccountCondition as Suit filed', () => {
+    const label = formatSuitFiledWilfulDefaultLabel({
+      AccountCondition: {
+        symbol: '01',
+        abbreviation: 'suitFiledStatus',
+      },
+    });
+    assert.equal(label, 'Suit filed');
+  });
+
+  it('does not treat a missing SuitFiled node as No suit filed', () => {
+    const label = formatSuitFiledWilfulDefaultLabel({
+      SuitFiled: undefined,
+      AccountCondition: {
+        symbol: '01',
+        abbreviation: 'suitFiledStatus',
+      },
+    });
+    assert.equal(label, 'Suit filed');
+  });
+});
+
+describe('auditNoRestructuredLoans vs CreditFacilityStatus', () => {
+  it('flags COVID / moratorium CreditFacilityStatus as a regulatory restructure', () => {
+    const covid = auditNoRestructuredLoans(
+      bureauWithTradelines([
+        {
+          accountTypeSymbol: '05',
+          tradelines: [
+            {
+              creditorName: 'HOME CREDIT',
+              accountNumber: '3911701697',
+              CreditFacilityStatus: 'Restructured due to COVID-19',
+            },
+          ],
+        },
+      ]),
+    );
+    assert.equal(covid.passed, false);
+    assert.match(covid.findings[0]?.detail ?? '', /Restructured due to COVID-19/);
+
+    const moratorium = auditNoRestructuredLoans(
+      bureauWithTradelines([
+        {
+          accountTypeSymbol: '05',
+          tradelines: [
+            {
+              creditorName: 'HOME CREDIT',
+              CreditFacilityStatus: 'Moratorium (Regulatory Measure)',
+            },
+          ],
+        },
+      ]),
+    );
+    assert.equal(moratorium.passed, false);
+    assert.match(moratorium.findings[0]?.detail ?? '', /Moratorium \(Regulatory Measure\)/);
   });
 });

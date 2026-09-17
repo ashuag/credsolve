@@ -37,6 +37,7 @@ export class BureauReportPdfService {
   async ensurePdfForLead(params: {
     leadId: bigint;
     customerUuid: string;
+    force?: boolean;
   }): Promise<{ relativePath: string; publicUrl: string | null } | null> {
     const detail = await this.prisma.client.leadDetail.findUnique({
       where: { leadId: params.leadId },
@@ -54,6 +55,7 @@ export class BureauReportPdfService {
       customerUuid: params.customerUuid,
       bureauReportUuid: row.uuid,
       vendorBody: row.rawPayload ?? undefined,
+      force: params.force,
     });
   }
 
@@ -65,12 +67,13 @@ export class BureauReportPdfService {
     customerUuid: string;
     bureauReportUuid: string;
     vendorBody?: unknown;
+    force?: boolean;
   }): Promise<{ relativePath: string; publicUrl: string | null } | null> {
     const relativePath =
       (await loadBureauReportPdfRelativePath(this.prisma.client, params.bureauReportUuid)) ??
       this.bureauReportPdfRelativePath(params.customerUuid, params.bureauReportUuid);
 
-    if (await this.kycFiles.exists(relativePath)) {
+    if (!params.force && (await this.kycFiles.exists(relativePath))) {
       await this.persistPdfPathIfMissing(params.bureauReportId, relativePath);
       return { relativePath, publicUrl: await this.publicUrlForRelativePath(relativePath) };
     }

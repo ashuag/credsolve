@@ -104,4 +104,38 @@ describe('mapMyMoneyBazaarSoftPullToTenacioEnvelope', () => {
     assert.equal(wrapped.status, 'error');
     assert.equal(wrapped.serviceStatusCode, 500);
   });
+
+  it('unwraps a truncated vendor_api_log body before mapping PayMe India data', () => {
+    const wrapped = mapMyMoneyBazaarSoftPullToTenacioEnvelope(
+      {
+        parsed: softPullOk({
+          data: {
+            cibil: [{ score: '742', score_name: 'CIBILTransUnionScore3', cibil_date: '2026-09-17' }],
+            loan_type: [
+              {
+                name: 'personal_loan',
+                original_loan_type: 'Personal Loan',
+                member_name: 'SMICC',
+                opened_date: '2024-12-14',
+                overdue: 10429,
+                current_balance: 37324,
+                sanctioned: 190000,
+              },
+            ],
+          },
+        }),
+        snippet: '{"success":true',
+        _truncated: true,
+        httpStatus: 200,
+        _originalSize: 119075,
+      },
+      200,
+    );
+    assert.equal(wrapped.status, 'success');
+    assert.equal(wrapped.serviceStatusCode, 200);
+    assert.equal(wrapped.sourceVendor, 'MyMoneyBazaar');
+    const score = (wrapped.data?.cibilData as Record<string, unknown> | undefined)
+      ?.GetCustomerAssetsResponse as Record<string, unknown> | undefined;
+    assert.ok(score);
+  });
 });

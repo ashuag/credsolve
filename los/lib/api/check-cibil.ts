@@ -8,10 +8,12 @@ export type LosCibilHitLog = {
   serviceName: string | null;
   httpStatus: number | null;
   outcome: 'success' | 'failure';
-  cibilScore: number | null;
   dummyFetched: boolean;
   vendorLogUuid: string | null;
   bureauReportUuid: string | null;
+  originalJson: unknown | null;
+  /** Vendor payload converted to a Tenacio-style bureau response JSON. */
+  wrappedJson: unknown | null;
 };
 
 export type LosCibilHitsPayload = {

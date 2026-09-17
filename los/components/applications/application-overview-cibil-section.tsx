@@ -383,6 +383,8 @@ function CustomerProfilePanel({
                   />
                 ),
               },
+              { label: 'Mobile', value: row.mobileNumber || '—' },
+              { label: 'Email ID', value: row.email?.trim() || profile.emailId || '—' },
             ]}
           />
           <div className="mt-3 border-t border-[rgba(23,44,113,0.06)] pt-3">
@@ -484,7 +486,6 @@ function CustomerProfilePanel({
             <DetailGrid
               columns={2}
               rows={[
-                { label: 'Email ID', value: profile.emailId ?? '—' },
                 { label: 'Address line 1', value: profile.addressLine1 ?? '—' },
                 { label: 'Address line 2', value: profile.addressLine2 ?? '—' },
                 { label: 'City', value: profile.city ?? '—' },

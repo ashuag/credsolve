@@ -1,6 +1,7 @@
 import {
   ACCOUNT_TYPE_LABELS,
   DWELLING_LABELS,
+  formatCibilEnquiryPurposeLabel,
   PHONE_TYPE_LABELS,
 } from './cibil-tuef.constants';
 import { formatInrAmountForPdf } from '../pdf/pdf-safe-text.util';
@@ -233,7 +234,9 @@ function inquiryPurposeLabel(code: unknown): string {
   const rec = asRecord(code);
   if (rec) {
     const description = rec.description ?? rec.Description;
-    if (description != null && String(description).trim()) return String(description).trim();
+    if (description != null && String(description).trim()) {
+      return formatCibilEnquiryPurposeLabel(String(description).trim());
+    }
     const symbol = readSymbol(code);
     return symbol ? inquiryPurposeLabel(symbol) : '-';
   }
@@ -241,9 +244,9 @@ function inquiryPurposeLabel(code: unknown): string {
   if (!s) return '-';
   if (/^\d+$/.test(s)) {
     const norm = s.padStart(2, '0');
-    return ACCOUNT_TYPE_LABELS[norm] ?? `Purpose ${norm}`;
+    return formatCibilEnquiryPurposeLabel(ACCOUNT_TYPE_LABELS[norm] ?? `Purpose ${norm}`);
   }
-  return s;
+  return formatCibilEnquiryPurposeLabel(s);
 }
 
 function scoreRatingFromScore(score: number | null): string | null {
@@ -657,7 +660,9 @@ export function extractCibilReportData(vendorBody: unknown): CibilReportData {
         const payHistory = resolvePayStatusHistory(lineRec);
         const parsedLine = parseCibilTradeline(rawLine, partitionSymbol);
         const creditor = String(lineRec.creditorName ?? 'Lender').trim() || 'Lender';
-        const acctType = accountTypeLabel(partitionSymbol);
+        const description =
+          lineRec.accountTypeDescription != null ? String(lineRec.accountTypeDescription).trim() : '';
+        const acctType = accountTypeLabel(partitionSymbol || description || parsedLine?.accountTypeSymbol || null);
 
         if (parsedLine) {
           accountOverview.push({

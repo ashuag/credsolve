@@ -13,6 +13,7 @@ import {
   parseTenacioBureauVendorBody,
 } from '../tenacio-bureau-payload.mapper';
 import { extractTradelinesFromBureauVendorBody } from '../../cibil/cibil-tradeline.parser';
+import { auditNoRestructuredLoans } from '../../cibil/cibil-bureau-rules.parser';
 
 const SAMPLE = JSON.parse(
   readFileSync(join(__dirname, 'fixtures/payme-india-soft-pull-hit.sample.json'), 'utf8'),
@@ -30,6 +31,15 @@ describe('payMeAccountTypeToTuefSymbol', () => {
     assert.equal(payMeAccountTypeToTuefSymbol('Housing Loan'), '02');
     assert.equal(payMeAccountTypeToTuefSymbol('07'), '07');
     assert.equal(payMeAccountTypeToTuefSymbol('something unknown'), null);
+    assert.equal(
+      payMeAccountTypeToTuefSymbol('(BLPS-AGR) Business Loan - Priority Sector - Agriculture'),
+      '53',
+    );
+    assert.equal(payMeAccountTypeToTuefSymbol('BLPS-AGR'), '53');
+    assert.equal(
+      payMeAccountTypeToTuefSymbol('Business Loan - Priority Sector - Agriculture'),
+      '53',
+    );
   });
 });
 
@@ -129,5 +139,83 @@ describe('mapMyMoneyBazaarSoftPullToTenacioEnvelope (PayMe India flat)', () => {
     const lines = extractTradelinesFromBureauVendorBody(wrapped);
     assert.equal(lines.length, 5);
     assert.ok(lines.every((l) => l.accountTypeSymbol != null && l.isUnsecured));
+  });
+});
+
+describe('payMeIndiaFlatToTrueLink account condition', () => {
+  it('maps PayMe suitFiledStatus onto Tag 34, not Tag 33, even when the status text is the Tag 33 label', () => {
+    const result = payMeIndiaFlatToTrueLink({
+      cibil: [{ score: '746', score_name: 'CIBILTransUnionScore3', cibil_date: '2026-09-17' }],
+      loan_type: [
+        {
+          id: '2390651',
+          original_loan_type: 'Business Loan - General',
+          member_name: 'CENTRAL BANK',
+          account_number: '00000003016839118',
+          opened_date: '2008-03-12',
+          closed_date: '2022-03-30',
+          reported_date: '2022-03-31+05:30',
+          high_credit: 92500,
+          current_balance: 0,
+          account_condition_abbreviation: 'suitFiledStatus',
+          account_condition_pre_default_status: 'Restructured Loan (Govt. Mandated)',
+        },
+      ],
+    });
+    assert.equal(result.ok, true);
+    const partitions = result.trueLinkCreditReport?.TradeLinePartition as
+      | Array<Record<string, unknown>>
+      | undefined;
+    const tradeline = partitions?.[0]?.Tradeline as Record<string, unknown> | undefined;
+    assert.equal(tradeline?.suitFiledStatus, '01');
+    assert.equal(tradeline?.writtenOffSettledStatus, undefined);
+    const condition = tradeline?.AccountCondition as Record<string, unknown> | undefined;
+    assert.equal(condition?.symbol, '01');
+    assert.equal(condition?.abbreviation, 'suitFiledStatus');
+  });
+
+  it('maps PayMe creditFacilityStatus moratorium onto CreditFacilityStatus, not Tag 33', () => {
+    const result = payMeIndiaFlatToTrueLink({
+      cibil: [{ score: '746', score_name: 'CIBILTransUnionScore3', cibil_date: '2026-09-17' }],
+      loan_type: [
+        {
+          id: '30252532',
+          original_loan_type: 'Personal Loan',
+          member_name: 'HOME CREDIT',
+          account_number: '3911701697',
+          opened_date: '2019-12-17',
+          closed_date: '2023-07-13',
+          reported_date: '2023-07-31+05:30',
+          high_credit: 59332,
+          current_balance: 0,
+          account_condition_abbreviation: 'creditFacilityStatus',
+          account_condition_pre_default_status: 'Moratorium (Regulatory Measure)',
+        },
+      ],
+    });
+    assert.equal(result.ok, true);
+    const partitions = result.trueLinkCreditReport?.TradeLinePartition as
+      | Array<Record<string, unknown>>
+      | undefined;
+    const tradeline = partitions?.[0]?.Tradeline as Record<string, unknown> | undefined;
+    assert.equal(tradeline?.CreditFacilityStatus, 'Moratorium (Regulatory Measure)');
+    assert.equal(tradeline?.writtenOffSettledStatus, undefined);
+    assert.equal(tradeline?.suitFiledStatus, undefined);
+    const condition = tradeline?.AccountCondition as Record<string, unknown> | undefined;
+    assert.equal(condition?.abbreviation, 'creditFacilityStatus');
+
+    const audit = auditNoRestructuredLoans({
+      data: {
+        cibilData: {
+          GetCustomerAssetsResponse: {
+            GetCustomerAssetsSuccess: {
+              Asset: { TrueLinkCreditReport: result.trueLinkCreditReport },
+            },
+          },
+        },
+      },
+    });
+    assert.equal(audit.passed, false);
+    assert.match(audit.findings[0]?.detail ?? '', /Moratorium \(Regulatory Measure\)/);
   });
 });
