@@ -165,6 +165,7 @@ export type CibilCreditAssessmentSignals = {
   noOfCreditCards: number;
   noOfSecuredLoans: number;
   noOfUnsecuredLoans: number;
+  noOfActiveUnsecuredLoans: number;
   noOfGoldLoans: number;
   sixMonthEnquiries: number;
   totalEnquiries: number;

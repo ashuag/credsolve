@@ -3,6 +3,7 @@ const REJECTION_REASON_LABEL: Record<string, string> = {
   PENNYDROP_FAILED: 'Penny drop failed',
   BANK_NAME_MISMATCH: 'Bank account name mismatch',
   KYC_FAILED: 'KYC failed',
+  OVERDUE_AMOUNT: 'Overdue amount',
 };
 
 export function rejectionReasonDisplayLabel(name: string): string {

@@ -30,8 +30,49 @@ export function extractDigilockerIdentityMismatch(formJson: unknown): {
   const message =
     typeof formJson.message === 'string' && formJson.message.trim()
       ? formJson.message.trim()
-      : 'Name or date of birth on Aadhaar does not match the loan application.';
+      : 'Date of birth or gender on Aadhaar does not match the loan application.';
   return { reason, message };
+}
+
+/** Aadhaar was captured; name vs application is waiting for credit (customer continues KYC). */
+export function isAadhaarNameMismatchPendingReview(formJson: unknown): boolean {
+  return isRecord(formJson) && formJson._nameMismatchPendingReview === true;
+}
+
+export function extractAadhaarNameMismatchReview(formJson: unknown): {
+  reason: string;
+  message: string;
+} | null {
+  if (!isAadhaarNameMismatchPendingReview(formJson) || !isRecord(formJson)) return null;
+  const reason = typeof formJson.reason === 'string' && formJson.reason.trim() ? formJson.reason.trim() : 'name_mismatch';
+  const message =
+    typeof formJson.message === 'string' && formJson.message.trim()
+      ? formJson.message.trim()
+      : 'Name on Aadhaar does not match the name on your loan application.';
+  return { reason, message };
+}
+
+/** Attach a credit-review flag without treating the DigiLocker row as a failed capture. */
+export function withAadhaarNameMismatchReview(
+  formJson: Record<string, unknown>,
+  params: { reason: string; message: string },
+): Record<string, unknown> {
+  return {
+    ...formJson,
+    _nameMismatchPendingReview: true,
+    reason: params.reason,
+    message: params.message,
+  };
+}
+
+/** Credit accepted the DigiLocker name despite the mismatch. */
+export function markAadhaarNameMismatchApproved(formJson: unknown): Record<string, unknown> | null {
+  if (!isRecord(formJson)) return null;
+  const next = { ...formJson };
+  delete next._nameMismatchPendingReview;
+  next._nameMismatchApproved = true;
+  next.nameMismatchApprovedAt = new Date().toISOString();
+  return next;
 }
 
 /** Persist fetched Aadhaar when identity check fails so LOS can show what came back and why KYC failed. */

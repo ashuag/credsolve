@@ -185,28 +185,28 @@ export const PHONE_TYPE_LABELS: Record<string, string> = {
 };
 
 export const CIBIL_UNSECURED_ACCOUNT_TYPE_SYMBOLS = new Set([
-  '00', // Other
+ // '00', // Other
   '05', // Personal Loan
   '06', // Consumer Loan
   '08', // Education Loan
   '09', // Loan to Professional
   '10', // Credit Card
-  '12', // Overdraft
+  //'12', // Overdraft
   '16', // Fleet Card
   '37', // Loan on Credit Card
-  '38', // PMJDY Overdraft
-  '39', // Mudra Loans
-  '40', // Microfinance – Unsecured
-  '41', // Microfinance – Unsecured (Govt. Mandated)
-  '42', // Microfinance – Unsecured (Other)
-  '43', // Microfinance – Unsecured (Other, Govt. Mandated)
+  //'38', // PMJDY Overdraft
+  //'39', // Mudra Loans
+  //'40', // Microfinance – Unsecured
+  //'41', // Microfinance – Unsecured (Govt. Mandated)
+  //'42', // Microfinance – Unsecured (Other)
+  //'43', // Microfinance – Unsecured (Other, Govt. Mandated)
   '45', // P2P Personal Loan
   '46', // P2P Business Loan
   '47', // P2P Consumer Loan
-  '51', // Business Loan – Secured
-  '61', // Business Loan – Unsecured
+  //'51', // Business Loan – Secured
+  //'61', // Business Loan – Unsecured
   '69', // Short Term Personal Loan
-  '99', // Current Unsecured (portfolio group)
+  //'99', // Current Unsecured (portfolio group)
 ]);
 
 /** Credit card account types use sanctioned limit when available. */

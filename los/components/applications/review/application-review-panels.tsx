@@ -25,10 +25,9 @@ import {
   truncateUuid,
 } from '@/lib/application-review-format';
 import { hasLosAadhaarRecord, isApplicationJourneyStepActive, isLosAadhaarKycComplete } from '@/lib/customer-journey';
-import { usesMonthlyIncomeMetric, resolveOccupationKey } from '@/lib/customer-details';
 import {
+  booleanMatchVerdict,
   combineMatchVerdicts,
-  combinedNameMatchScore,
   compareGenders,
   compareIsoDates,
   comparePan,
@@ -37,11 +36,13 @@ import {
   extractCibilPan,
   formatAadhaarNumberDisplay,
   formatDobWithAge,
-  nameMatchScoreDetail,
+  isKycMismatchHighlight,
   nameMatchVerdict,
+  nameMismatchScoreToShow,
   normalizeAadhaarGender,
   type KycMatchVerdict,
 } from '@/lib/kyc-field-match';
+
 import {
   fetchApplicationLoanDocumentBlob,
   generateApplicationLoanDocuments,
@@ -63,8 +64,6 @@ import { KycPipelineSteps } from '@/components/applications/kyc-pipeline-steps';
 import { LosStatusPill } from '@/components/shared/los-status-pill';
 import { formatPersonName } from '@/lib/format-person-name';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
-
-const MIN_MONTHLY_INCOME_SALARIED = 10_000;
 
 function useCibilReport(
   row: LosApplicationDetails,
@@ -488,6 +487,19 @@ export function ReviewKycPanel({
   const aadhaarFetched = hasLosAadhaarRecord(row);
   const aadhaar = row.aadhaarDetail;
   const identityFailure = row.aadhaarIdentityFailure ?? null;
+  const nameReviewPending = Boolean(row.aadhaarNameMatchPendingReview);
+  const profileName = row.lead.profile?.fullName;
+  const aadhaarNameScore = computeNameMatchScore(profileName, aadhaar?.fullName);
+  const aadhaarNameVerdict = nameMatchVerdict(
+    aadhaarNameScore,
+    Boolean(profileName?.trim() && aadhaar?.fullName?.trim()),
+  );
+  const nameMismatch = nameReviewPending || aadhaarNameVerdict === 'mismatch' || aadhaarNameVerdict === 'partial';
+  const aadhaarGenderVerdict = compareGenders(row.lead.profile?.gender, aadhaar?.gender);
+  const genderMismatch = aadhaarGenderVerdict === 'mismatch';
+  const aadhaarDobVerdict = compareIsoDates(row.lead.profile?.dateOfBirth, aadhaar?.dateOfBirth);
+  const dobMismatch = aadhaarDobVerdict === 'mismatch';
+  const identityMismatch = nameMismatch || genderMismatch || dobMismatch;
   const digilockerCurrent = isApplicationJourneyStepActive(row, 'digilockerKyc');
   const livenessCurrent = isApplicationJourneyStepActive(row, 'livenessKyc');
   const livenessDone = row.livenessPassed === true || kycDone;
@@ -508,9 +520,11 @@ export function ReviewKycPanel({
       <ReviewCard
         icon={<IdCardIcon />}
         title="DigiLocker Aadhaar KYC"
-        iconTone={aadhaarComplete ? 'ok' : kycFailed || identityFailure ? 'warn' : 'default'}
+        iconTone={identityMismatch ? 'warn' : aadhaarComplete ? 'ok' : kycFailed || identityFailure ? 'warn' : 'default'}
         right={
-          aadhaarComplete ? (
+          nameReviewPending ? (
+            <ReviewPill tone="warn">Name match review</ReviewPill>
+          ) : aadhaarComplete ? (
             <ReviewPill tone="ok">Complete</ReviewPill>
           ) : kycFailed || identityFailure ? (
             <ReviewPill tone="warn">Failed</ReviewPill>
@@ -521,21 +535,7 @@ export function ReviewKycPanel({
           )
         }
       >
-        {identityFailure ? (
-          <KycNotice>
-            {identityFailure.message}
-            {identityFailure.applicationName || identityFailure.aadhaarName || identityFailure.applicationDob || identityFailure.aadhaarDob ? (
-              <>
-                <br />
-                Application: {formatPersonName(identityFailure.applicationName) || '—'}
-                {identityFailure.applicationDob ? ` · ${formatDobWithAge(identityFailure.applicationDob)}` : ''}
-                <br />
-                Aadhaar: {formatPersonName(identityFailure.aadhaarName) || '—'}
-                {identityFailure.aadhaarDob ? ` · ${formatDobWithAge(identityFailure.aadhaarDob)}` : ''}
-              </>
-            ) : null}
-          </KycNotice>
-        ) : !aadhaarFetched ? (
+        {!aadhaarFetched ? (
           <KycNotice>
             {(row.aadhaarDownloadLogs?.length ?? 0) > 0
               ? 'Aadhaar download was called, but DigiLocker Aadhaar was not captured. Review the logs below.'
@@ -545,19 +545,76 @@ export function ReviewKycPanel({
         <div className="fgrid">
           <ReviewField
             label="Aadhaar KYC"
-            value={aadhaarComplete ? 'Complete' : identityFailure ? 'Fetched — identity failed' : 'Not complete'}
-            tone={aadhaarComplete ? 'accent' : identityFailure ? 'flag' : undefined}
+            value={
+              aadhaarComplete
+                ? nameReviewPending
+                  ? 'Complete — name under review'
+                  : 'Complete'
+                : identityFailure
+                  ? 'Fetched — identity failed'
+                  : 'Not complete'
+            }
+            tone={aadhaarComplete && !nameReviewPending ? 'accent' : identityFailure || nameReviewPending ? 'flag' : undefined}
           />
           <ReviewField
             label="DigiLocker Aadhaar"
             value={formatAadhaarNumberDisplay(aadhaar?.maskedAadhaar, aadhaarFetched)}
             tone={aadhaarFetched ? 'accent' : undefined}
           />
-          <ReviewField label="Aadhaar name" value={aadhaarFetched ? formatPersonName(aadhaar?.fullName) : '—'} />
-          <ReviewField label="Aadhaar DOB" value={aadhaarFetched ? formatDobWithAge(aadhaar?.dateOfBirth) : '—'} />
+          <ReviewField
+            label="Aadhaar name"
+            value={aadhaarFetched ? formatPersonName(aadhaar?.fullName) : '—'}
+            badge={
+              aadhaarFetched && aadhaarNameVerdict !== 'missing' ? (
+                <ReviewMatchBadge
+                  verdict={aadhaarNameVerdict}
+                  score={aadhaarNameScore}
+                  title={
+                    aadhaarNameVerdict === 'mismatch' || aadhaarNameVerdict === 'partial'
+                      ? `Application: ${formatPersonName(profileName) || '—'} · Aadhaar: ${formatPersonName(aadhaar?.fullName) || '—'}`
+                      : undefined
+                  }
+                />
+              ) : undefined
+            }
+            badgeInValue
+            tone={nameMismatch ? 'flag' : undefined}
+          />
+          <ReviewField
+            label="Aadhaar DOB"
+            value={aadhaarFetched ? formatDobWithAge(aadhaar?.dateOfBirth) : '—'}
+            badge={
+              aadhaarFetched && aadhaarDobVerdict !== 'missing' ? (
+                <ReviewMatchBadge
+                  verdict={aadhaarDobVerdict}
+                  title={
+                    aadhaarDobVerdict === 'mismatch'
+                      ? `Application: ${formatDobWithAge(row.lead.profile?.dateOfBirth)} · Aadhaar: ${formatDobWithAge(aadhaar?.dateOfBirth)}`
+                      : undefined
+                  }
+                />
+              ) : undefined
+            }
+            badgeInValue
+            tone={dobMismatch ? 'flag' : undefined}
+          />
           <ReviewField
             label="Aadhaar gender"
             value={aadhaarFetched ? (normalizeAadhaarGender(aadhaar?.gender) ?? '—') : '—'}
+            badge={
+              aadhaarFetched && aadhaarGenderVerdict !== 'missing' ? (
+                <ReviewMatchBadge
+                  verdict={aadhaarGenderVerdict}
+                  title={
+                    aadhaarGenderVerdict === 'mismatch'
+                      ? `Application: ${row.lead.profile?.gender || '—'} · Aadhaar: ${normalizeAadhaarGender(aadhaar?.gender) ?? '—'}`
+                      : undefined
+                  }
+                />
+              ) : undefined
+            }
+            badgeInValue
+            tone={genderMismatch ? 'flag' : undefined}
           />
           <ReviewField label="Aadhaar address" value={aadhaarFetched ? (aadhaar?.address ?? '—') : '—'} />
           <ReviewField
@@ -804,29 +861,6 @@ export function ReviewBankPanel({
   );
 }
 
-function ComparedField({
-  label,
-  value,
-  verdict,
-  score,
-  scoreTitle,
-}: {
-  label: string;
-  value: ReactNode;
-  verdict: KycMatchVerdict;
-  score?: number;
-  scoreTitle?: string;
-}) {
-  return (
-    <ReviewField
-      label={label}
-      value={value}
-      badge={<ReviewMatchBadge verdict={verdict} score={score} title={scoreTitle} />}
-      badgeInValue
-    />
-  );
-}
-
 function PersonIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -937,17 +971,53 @@ function GovernmentIdsBlock({
   return <ReviewEmptyState title="No bureau pull" subtitle="Government IDs appear after the CIBIL report is fetched." />;
 }
 
+type IdentitySourceCell = {
+  value: ReactNode;
+  mismatch?: boolean;
+};
+
+function mutedIdentityValue(text = '—') {
+  return <span className="im-muted">{text}</span>;
+}
+
+function NsdlMatchFlag({ matched }: { matched: boolean | null | undefined }) {
+  if (matched == null) return mutedIdentityValue();
+  return <span className={matched ? 'im-nsdl-match' : undefined}>{matched ? 'Matched' : 'Not matched'}</span>;
+}
+
+function IdentityNameValue({
+  name,
+  verdict,
+  score,
+}: {
+  name: string | null | undefined;
+  verdict: KycMatchVerdict;
+  score?: number;
+}) {
+  if (!name?.trim()) return mutedIdentityValue();
+  const shownScore = nameMismatchScoreToShow(verdict, score);
+  return (
+    <>
+      {formatPersonName(name)}
+      {shownScore != null ? <span className="im-name-score"> ({shownScore}%)</span> : null}
+    </>
+  );
+}
+
+function IdentitySourceTd({ cell }: { cell: IdentitySourceCell }) {
+  return <td className={cell.mismatch ? 'im-mismatch' : undefined}>{cell.value}</td>;
+}
+
 function IdentityMatrix({
   rows,
 }: {
   rows: Array<{
     field: string;
-    application: ReactNode;
-    aadhaar: ReactNode;
-    cibil: ReactNode;
-    verdict: KycMatchVerdict;
-    score?: number;
-    scoreTitle?: string;
+    customer: ReactNode;
+    nsdl: IdentitySourceCell;
+    cibil: IdentitySourceCell;
+    aadhaar: IdentitySourceCell;
+    bank: IdentitySourceCell;
   }>;
 }) {
   return (
@@ -956,22 +1026,22 @@ function IdentityMatrix({
         <thead>
           <tr>
             <th>Field</th>
-            <th>Application</th>
-            <th>Aadhaar</th>
+            <th>Customer detail</th>
+            <th>PAN NSDL</th>
             <th>CIBIL</th>
-            <th>Verdict</th>
+            <th>Aadhaar</th>
+            <th>Bank</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.field}>
               <td className="im-field">{row.field}</td>
-              <td>{row.application}</td>
-              <td>{row.aadhaar}</td>
-              <td>{row.cibil}</td>
-              <td>
-                <ReviewMatchBadge verdict={row.verdict} score={row.score} title={row.scoreTitle} />
-              </td>
+              <td className="im-customer">{row.customer}</td>
+              <IdentitySourceTd cell={row.nsdl} />
+              <IdentitySourceTd cell={row.cibil} />
+              <IdentitySourceTd cell={row.aadhaar} />
+              <IdentitySourceTd cell={row.bank} />
             </tr>
           ))}
         </tbody>
@@ -1002,7 +1072,7 @@ export function ReviewPersonalPanel({
             <path d="M5.5 21a8 8 0 0 1 13 0" />
           </svg>
         }
-        title="Personal & identity"
+        title="Identity verification matrix"
       >
         <ReviewEmptyState title="Profile pending" subtitle="No lead profile is linked to this application yet." />
       </ReviewCard>
@@ -1011,45 +1081,51 @@ export function ReviewPersonalPanel({
 
   const pan = profile.panNumber?.trim() || row.lead.panNumber?.trim() || '';
   const bureauPan = cibilReport ? extractCibilPan(cibilReport.identifiers) : null;
-  const occupationKey = resolveOccupationKey(profile.occupationKey, profile.occupation);
-  const monthlyIncome = parseInrNumber(profile.netMonthlyIncome);
-  const salaryFlag =
-    occupationKey === 'SALARIED' && monthlyIncome != null && monthlyIncome < MIN_MONTHLY_INCOME_SALARIED;
 
+  const panNsdl = row.panNsdl ?? null;
+  const latestBank = row.bankAccountAttempts?.[0];
+  const bankName = latestBank?.nameAtBank?.trim() || null;
   const hasAadhaarName = Boolean(profile.fullName?.trim() && aadhaar?.fullName?.trim());
   const hasCibilName = Boolean(profile.fullName?.trim() && cibilReport?.consumerName?.trim());
-  const nameScore = computeNameMatchScore(profile.fullName, aadhaar?.fullName);
-  const nameVerdict = nameMatchVerdict(nameScore, hasAadhaarName);
-  const dobVerdict = compareIsoDates(profile.dateOfBirth, aadhaar?.dateOfBirth);
-  const genderVerdict = compareGenders(profile.gender, aadhaar?.gender);
-  const panVerdict = comparePan(pan, bureauPan);
+  const hasBankName = Boolean(profile.fullName?.trim() && bankName);
+  const aadhaarNameScore = computeNameMatchScore(profile.fullName, aadhaar?.fullName);
   const cibilNameScore = computeNameMatchScore(profile.fullName, cibilReport?.consumerName);
+  const bankNameScore = latestBank?.nameMatchScore ?? computeNameMatchScore(profile.fullName, bankName);
+  const aadhaarNameVerdict = nameMatchVerdict(aadhaarNameScore, hasAadhaarName);
   const cibilNameVerdict = nameMatchVerdict(cibilNameScore, hasCibilName);
+  const nsdlNameMatched = panNsdl?.nameMatch ?? null;
+  const nsdlDobMatched = panNsdl?.dobMatch ?? null;
+  const nsdlPanStatus = panNsdl?.panStatus?.trim().toLowerCase();
+  const nsdlPanMatched =
+    nsdlPanStatus === 'valid' ? true : nsdlPanStatus === 'invalid' ? false : null;
+  const nsdlNameVerdict = booleanMatchVerdict(nsdlNameMatched);
+  const bankNameVerdict = nameMatchVerdict(bankNameScore, hasBankName);
+  const aadhaarDobVerdict = compareIsoDates(profile.dateOfBirth, aadhaar?.dateOfBirth);
   const cibilDobVerdict = compareIsoDates(profile.dateOfBirth, cibilReport?.dateOfBirth);
+  const nsdlDobVerdict = booleanMatchVerdict(nsdlDobMatched);
+  const aadhaarGenderVerdict = compareGenders(profile.gender, aadhaar?.gender);
+  const cibilGenderVerdict = compareGenders(profile.gender, cibilReport?.gender);
+  const nsdlPanVerdict = booleanMatchVerdict(nsdlPanMatched);
+  const cibilPanVerdict = comparePan(pan, bureauPan);
   const matrixNameVerdict = combineMatchVerdicts(
-    nameVerdict,
+    aadhaarNameVerdict,
     cibilReport ? cibilNameVerdict : 'missing',
+    nsdlNameVerdict,
+    bankNameVerdict,
   );
   const matrixDobVerdict = combineMatchVerdicts(
-    dobVerdict,
+    aadhaarDobVerdict,
     cibilReport ? cibilDobVerdict : 'missing',
+    nsdlDobVerdict,
   );
-  const nameScoreParts = [
-    { label: 'Aadhaar', hasBoth: hasAadhaarName, score: nameScore },
-    { label: 'CIBIL', hasBoth: hasCibilName, score: cibilNameScore },
-  ];
-  const matrixNameScore = combinedNameMatchScore(nameScoreParts);
-  const matrixNameScoreTitle = nameMatchScoreDetail(nameScoreParts);
+  const genderVerdict = combineMatchVerdicts(aadhaarGenderVerdict, cibilReport ? cibilGenderVerdict : 'missing');
+  const panVerdict = combineMatchVerdicts(cibilPanVerdict, nsdlPanVerdict);
 
-  const aadhaarComplete = isLosAadhaarKycComplete(row);
   const hasAadhaar = hasLosAadhaarRecord(row);
-
-  const allMatch =
-    hasAadhaar &&
-    matrixNameVerdict !== 'mismatch' &&
-    matrixDobVerdict !== 'mismatch' &&
-    genderVerdict !== 'mismatch' &&
-    panVerdict !== 'mismatch';
+  const flaggedCount = [matrixNameVerdict, matrixDobVerdict, genderVerdict, panVerdict].filter(
+    isKycMismatchHighlight,
+  ).length;
+  const allMatch = hasAadhaar && flaggedCount === 0;
 
   const otherIds =
     cibilReport?.identifiers.filter((identifier) => {
@@ -1061,108 +1137,98 @@ export function ReviewPersonalPanel({
   const matrixRows = [
     {
       field: 'Name',
-      application: formatPersonName(profile.fullName),
-      aadhaar: hasAadhaar ? formatPersonName(aadhaar?.fullName) : <span className="im-muted">—</span>,
-      cibil: cibilReport ? formatPersonName(cibilReport.consumerName) : <span className="im-muted">—</span>,
-      verdict: matrixNameVerdict,
-      score: matrixNameScore,
-      scoreTitle: matrixNameScoreTitle,
+      customer: formatPersonName(profile.fullName),
+      nsdl: {
+        value: <NsdlMatchFlag matched={nsdlNameMatched} />,
+        mismatch: isKycMismatchHighlight(nsdlNameVerdict),
+      },
+      cibil: {
+        value: cibilReport ? (
+          <IdentityNameValue name={cibilReport.consumerName} verdict={cibilNameVerdict} score={cibilNameScore} />
+        ) : (
+          mutedIdentityValue()
+        ),
+        mismatch: isKycMismatchHighlight(cibilNameVerdict),
+      },
+      aadhaar: {
+        value: hasAadhaar ? (
+          <IdentityNameValue name={aadhaar?.fullName} verdict={aadhaarNameVerdict} score={aadhaarNameScore} />
+        ) : (
+          mutedIdentityValue()
+        ),
+        mismatch: hasAadhaar && isKycMismatchHighlight(aadhaarNameVerdict),
+      },
+      bank: {
+        value: hasBankName ? (
+          <IdentityNameValue name={bankName} verdict={bankNameVerdict} score={bankNameScore} />
+        ) : (
+          mutedIdentityValue()
+        ),
+        mismatch: isKycMismatchHighlight(bankNameVerdict),
+      },
     },
     {
       field: 'Date of birth',
-      application: formatDobWithAge(profile.dateOfBirth),
-      aadhaar: hasAadhaar ? formatDobWithAge(aadhaar?.dateOfBirth) : <span className="im-muted">—</span>,
-      cibil: cibilReport ? formatDobWithAge(cibilReport.dateOfBirth) : <span className="im-muted">—</span>,
-      verdict: matrixDobVerdict,
+      customer: formatDobWithAge(profile.dateOfBirth),
+      nsdl: {
+        value: <NsdlMatchFlag matched={nsdlDobMatched} />,
+        mismatch: isKycMismatchHighlight(nsdlDobVerdict),
+      },
+      cibil: {
+        value: cibilReport ? formatDobWithAge(cibilReport.dateOfBirth) : mutedIdentityValue(),
+        mismatch: isKycMismatchHighlight(cibilDobVerdict),
+      },
+      aadhaar: {
+        value: hasAadhaar ? formatDobWithAge(aadhaar?.dateOfBirth) : mutedIdentityValue(),
+        mismatch: hasAadhaar && isKycMismatchHighlight(aadhaarDobVerdict),
+      },
+      bank: { value: mutedIdentityValue('Not on bank') },
     },
     {
       field: 'Gender',
-      application: profile.gender ?? '—',
-      aadhaar: hasAadhaar ? (normalizeAadhaarGender(aadhaar?.gender) ?? '—') : <span className="im-muted">—</span>,
-      cibil: cibilReport?.gender ? cibilReport.gender : <span className="im-muted">—</span>,
-      verdict: genderVerdict,
+      customer: profile.gender ?? '—',
+      nsdl: { value: mutedIdentityValue() },
+      cibil: {
+        value: cibilReport?.gender ? cibilReport.gender : mutedIdentityValue(),
+        mismatch: isKycMismatchHighlight(cibilGenderVerdict),
+      },
+      aadhaar: {
+        value: hasAadhaar ? (normalizeAadhaarGender(aadhaar?.gender) ?? '—') : mutedIdentityValue(),
+        mismatch: hasAadhaar && isKycMismatchHighlight(aadhaarGenderVerdict),
+      },
+      bank: { value: mutedIdentityValue('Not on bank') },
     },
     {
       field: 'PAN',
-      application: pan ? <MaskedSecret value={pan} mask={maskPan(pan)} /> : '—',
-      aadhaar: <span className="im-muted">Not on Aadhaar</span>,
-      cibil: bureauPan ? <span className="mono">{maskPan(bureauPan)}</span> : <span className="im-muted">—</span>,
-      verdict: panVerdict,
+      customer: pan ? <MaskedSecret value={pan} mask={maskPan(pan)} /> : '—',
+      nsdl: {
+        value: <NsdlMatchFlag matched={nsdlPanMatched} />,
+        mismatch: isKycMismatchHighlight(nsdlPanVerdict),
+      },
+      cibil: {
+        value: bureauPan ? <span className="mono">{maskPan(bureauPan)}</span> : mutedIdentityValue(),
+        mismatch: isKycMismatchHighlight(cibilPanVerdict),
+      },
+      aadhaar: { value: mutedIdentityValue('Not on Aadhaar') },
+      bank: { value: mutedIdentityValue('Not on bank') },
     },
   ];
 
   return (
     <div className="ar-personal-stack">
-      <div className="ar-personal-top">
-        <ReviewCard
-          icon={<PersonIcon />}
-          title="Personal & identity"
-          right={
-            allMatch ? (
-              <ReviewPill tone="ok">All sources match</ReviewPill>
-            ) : (
-              <ReviewPill tone="warn">Review matches</ReviewPill>
-            )
-          }
-        >
-          <div className="fgrid">
-            <ComparedField
-              label="Full name"
-              value={formatPersonName(profile.fullName)}
-              verdict={matrixNameVerdict}
-              score={matrixNameScore}
-              scoreTitle={matrixNameScoreTitle}
-            />
-            <ComparedField label="Date of birth" value={formatDobWithAge(profile.dateOfBirth)} verdict={matrixDobVerdict} />
-            <ComparedField label="Gender" value={profile.gender ?? '—'} verdict={genderVerdict} />
-            <ReviewField
-              label="PAN"
-              value={pan ? <MaskedSecret value={pan} mask={maskPan(pan)} /> : '—'}
-              badge={<ReviewMatchBadge verdict={panVerdict} />}
-              badgeInValue
-            />
-            <ReviewField label="Occupation" value={profile.occupation ?? '—'} />
-            <ReviewField label="Email ID" value={profile.emailId ?? '—'} />
-            {usesMonthlyIncomeMetric(occupationKey) ? (
-              <ReviewField
-                label="Monthly income"
-                value={<span className="mono">{formatReviewInr(profile.netMonthlyIncome)}</span>}
-                tone={salaryFlag ? 'flag' : undefined}
-                sub={salaryFlag ? 'Below threshold' : undefined}
-              />
-            ) : null}
-          </div>
-        </ReviewCard>
-
-        <ReviewCard
-          icon={<IdCardIcon />}
-          title="Aadhaar (DigiLocker)"
-          right={
-            aadhaarComplete ? (
-              <ReviewPill tone="ok">Aadhaar complete</ReviewPill>
-            ) : row.aadhaarIdentityFailure ? (
-              <ReviewPill tone="warn">Identity failed</ReviewPill>
-            ) : undefined
-          }
-        >
-          {hasAadhaar ? (
-            <div className="fgrid">
-              <ReviewField label="Aadhaar name" value={formatPersonName(aadhaar?.fullName)} />
-              <ReviewField label="Aadhaar DOB" value={formatDobWithAge(aadhaar?.dateOfBirth)} />
-              <ReviewField label="Aadhaar gender" value={normalizeAadhaarGender(aadhaar?.gender) ?? '—'} />
-              <ReviewField label="Aadhaar number" value={formatAadhaarNumberDisplay(aadhaar?.maskedAadhaar, true)} />
-              <ReviewField label="Aadhaar address" value={aadhaar?.address ?? '—'} />
-            </div>
-          ) : (
-            <ReviewEmptyState title="Aadhaar not fetched" subtitle="DigiLocker Aadhaar data is not available for this application yet." />
-          )}
-        </ReviewCard>
-      </div>
-
       <ReviewCard
         icon={<PersonIcon />}
         title="Identity verification matrix"
-        right={<ReviewPill tone="info">Profile · Aadhaar · CIBIL</ReviewPill>}
+        iconTone={flaggedCount > 0 ? 'warn' : allMatch ? 'ok' : 'default'}
+        right={
+          allMatch ? (
+            <ReviewPill tone="ok">All sources match</ReviewPill>
+          ) : flaggedCount > 0 ? (
+            <ReviewPill tone="warn">Review matches</ReviewPill>
+          ) : (
+            <ReviewPill tone="info">Customer · PAN NSDL · CIBIL · Aadhaar · Bank</ReviewPill>
+          )
+        }
       >
         <IdentityMatrix rows={matrixRows} />
       </ReviewCard>
@@ -1291,6 +1357,19 @@ export function ReviewCibilPanel({
             sub={row.bureauReport?.creditAssessmentRecommendation ? `Recommendation: ${row.bureauReport.creditAssessmentRecommendation}` : undefined}
           />
         </div>
+        {row.bureauReport?.fromPriorApplication && row.priorApplication ? (
+          <p className="ar-prior-cibil-note">
+            CIBIL was not pulled again for this application. Showing the report from{' '}
+            <a
+              href={`/applications/${row.priorApplication.uuid}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {row.priorApplication.applicationNumber.trim().toUpperCase()}
+            </a>
+            .
+          </p>
+        ) : null}
       </ReviewCard>
       <div style={{ borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid var(--line)' }}>
         <ApplicationCibilReportTab applicationUuid={applicationUuid} onReportCreated={onReportCreated} />

@@ -10,6 +10,7 @@ import { MyMoneyBazaarCibilService } from './mymoneybazaar/mymoneybazaar-cibil.s
 import { VendorApiService } from './vendor-api.service';
 import { VendorApiConfigService } from './vendor-api-config.service';
 import { type CibilVendorKind, mapCibilVendorName } from './cibil-vendor.util';
+import { formatBureauInquiryName } from '../utils/person-name.util';
 
 export type { CibilVendorKind } from './cibil-vendor.util';
 export { mapCibilVendorName } from './cibil-vendor.util';
@@ -267,7 +268,7 @@ export class BureauFetchService {
         ...body.input,
         panNumber: body.input.panNumber.trim().toUpperCase(),
         mobileNumber: body.input.mobileNumber.trim(),
-        name: body.input.name.trim(),
+        name: formatBureauInquiryName(body.input.name),
         consent: body.input.consent,
       },
     };
@@ -344,7 +345,7 @@ export class BureauFetchService {
       {
         mobileNumber: body.input.mobileNumber,
         panNumber: body.input.panNumber,
-        name: body.input.name,
+        name: formatBureauInquiryName(body.input.name),
         gender,
       },
       leadId,

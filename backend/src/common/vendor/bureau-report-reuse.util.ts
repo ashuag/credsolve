@@ -15,18 +15,17 @@ export function isBureauReportWithinDaysLimit(
 }
 
 /**
- * Recurring (repaid/CLOSED) customers reuse the latest `bureau_report` for this
- * customer when that snapshot is a successful payload still inside the days limit.
+ * Reuse the customer's latest `bureau_report` when that snapshot is a successful
+ * payload still inside the days limit (repaid recurring *or* rejected reapply).
  * Reuse attaches `lead_detail.bureau_report_id` to the existing row (no clone).
+ * Post-BRE still runs against the attached payload.
  */
 export function canReusePriorBureauReport(params: {
-  isRecurring: boolean;
   daysLimit: number;
   priorCreatedAt: Date | null | undefined;
   priorPayload: unknown;
   now?: Date;
 }): boolean {
-  if (!params.isRecurring) return false;
   if (params.priorCreatedAt == null || params.priorPayload == null) return false;
   if (!isTenacioBureauSuccessPayload(params.priorPayload)) return false;
   return isBureauReportWithinDaysLimit(params.priorCreatedAt, params.daysLimit, params.now);

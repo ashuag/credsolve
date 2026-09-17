@@ -12,8 +12,10 @@ import {
   isDigilockerAadhaarCaptureComplete,
   isDigilockerSessionNotReadyError,
   isTenacioVendorBusinessSuccess,
+  withAadhaarNameMismatchReview,
 } from '../../../../common/kyc/aadhaar-vendor-parse.util';
-import { compareAadhaarToLeadProfile } from '../../../../common/kyc/aadhaar-lead-identity-match.util';
+import { compareAadhaarToLeadProfile, isAadhaarNameMismatchReview } from '../../../../common/kyc/aadhaar-lead-identity-match.util';
+import { customerAadhaarAppliesToApplication } from '../../../../common/kyc/customer-aadhaar-for-application.util';
 import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
 import { DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS } from '../../../../common/constants/kyc.constants';
 import { KycDigilockerDownloadFailureService } from '../../../../common/kyc/kyc-digilocker-download-failure.service';
@@ -61,9 +63,11 @@ export type DownloadAadhaarDigilockerResult = {
   businessSuccess?: boolean;
   /** When Aadhaar JSON + optional photo were written to DB / disk. */
   persisted?: boolean;
-  /** Name or DOB on Aadhaar did not match lead profile — application set to KYC_FAILED. */
+  /** DOB or gender on Aadhaar did not match lead profile — application set to KYC_FAILED. */
   identityMismatch?: boolean;
   identityMismatchMessage?: string;
+  /** Aadhaar name vs application is waiting for credit; customer continues the journey. */
+  aadhaarNameReviewPending?: boolean;
   attemptsUsed?: number;
   attemptsAllowed?: number;
   canRetry?: boolean;
@@ -232,12 +236,21 @@ export class DownloadAadhaarDigilockerUseCase {
     applicationId: bigint,
     customerId: bigint,
   ): Promise<DownloadAadhaarDigilockerResult | null> {
+    const application = await this.prisma.client.application.findUnique({
+      where: { id: applicationId },
+      select: { createdAt: true, kyc: { select: { kycStatus: true } } },
+    });
     const customerKyc = await this.prisma.client.customerKyc.findFirst({
       where: { customerId },
       orderBy: { createdAt: 'desc' },
-      select: { aadhaarData: true },
+      select: { aadhaarData: true, aadhaarVerifiedAt: true, aadhaarPhotoPath: true },
     });
-    if (isDigilockerAadhaarCaptureComplete(customerKyc?.aadhaarData)) {
+    const kycStatus = application?.kyc?.kycStatus;
+    const aadhaarApplies = customerAadhaarAppliesToApplication(customerKyc, {
+      applicationCreatedAt: application?.createdAt ?? new Date(0),
+      applicationKycStatus: kycStatus,
+    });
+    if (aadhaarApplies && isDigilockerAadhaarCaptureComplete(customerKyc?.aadhaarData)) {
       return {
         configured: true,
         ok: true,
@@ -247,11 +260,7 @@ export class DownloadAadhaarDigilockerUseCase {
       };
     }
 
-    const appKyc = await this.prisma.client.applicationKyc.findUnique({
-      where: { applicationId },
-      select: { kycStatus: true },
-    });
-    if (appKyc?.kycStatus === APPLICATION_KYC_STATUS.FAILED) {
+    if (kycStatus === APPLICATION_KYC_STATUS.FAILED) {
       return {
         configured: true,
         ok: false,
@@ -259,8 +268,9 @@ export class DownloadAadhaarDigilockerUseCase {
         vendor: null,
         identityMismatch: true,
         identityMismatchMessage:
-          'Name or date of birth on Aadhaar does not match your loan application. This application cannot proceed.',
+          'Date of birth or gender on Aadhaar does not match your loan application. This application cannot proceed.',
         leadRejected: true,
+        terminalFailure: true,
       };
     }
 
@@ -449,16 +459,17 @@ export class DownloadAadhaarDigilockerUseCase {
 
     const leadProfile = await this.prisma.client.leadDetail.findUnique({
       where: { leadId: params.leadId },
-      select: { fullName: true, dateOfBirth: true },
+      select: { fullName: true, dateOfBirth: true, gender: { select: { key: true, name: true } } },
     });
 
     const identityMatch = compareAadhaarToLeadProfile({
       leadFullName: leadProfile?.fullName ?? null,
       leadDateOfBirth: leadProfile?.dateOfBirth ?? null,
+      leadGender: leadProfile?.gender?.key ?? leadProfile?.gender?.name ?? null,
       vendor,
     });
 
-    if (!identityMatch.matched) {
+    if (!identityMatch.matched && !isAadhaarNameMismatchReview(identityMatch)) {
       const photoRel = await this.persistAadhaarPhotoIfPresent({
         vendor,
         customerUuid: params.customerUuid,
@@ -495,8 +506,12 @@ export class DownloadAadhaarDigilockerUseCase {
         persisted: true,
         identityMismatch: true,
         identityMismatchMessage: identityMatch.message,
+        leadRejected: true,
+        terminalFailure: true,
       };
     }
+
+    const nameMismatchReview = isAadhaarNameMismatchReview(identityMatch) ? identityMatch : null;
 
     let panCardNumber: string | null = null;
     let panFetched = false;
@@ -528,7 +543,14 @@ export class DownloadAadhaarDigilockerUseCase {
         applicationUuid: params.applicationUuid,
       });
 
-      const formJson = buildDigilockerAadhaarFormJson(vendor, photoRel) ?? { _note: 'digilocker_vendor_unparsed' };
+      const captured =
+        buildDigilockerAadhaarFormJson(vendor, photoRel) ?? { _note: 'digilocker_vendor_unparsed' };
+      const formJson = nameMismatchReview
+        ? withAadhaarNameMismatchReview(captured, {
+            reason: nameMismatchReview.reason,
+            message: nameMismatchReview.message,
+          })
+        : captured;
       await this.applications.updateDigilockerAadhaarArtifacts({
         applicationId: params.applicationId,
         customerId: params.customerId,
@@ -545,6 +567,11 @@ export class DownloadAadhaarDigilockerUseCase {
         verifiedAt: new Date(),
         panCardNumber,
       });
+      if (nameMismatchReview) {
+        this.logger.warn(
+          `Aadhaar name mismatch pending credit review (leadId=${params.leadId.toString()}): ${nameMismatchReview.message}`,
+        );
+      }
     } catch (err) {
       this.logger.error(
         `Failed to persist DigiLocker Aadhaar artifacts: ${err instanceof Error ? err.message : String(err)}`,
@@ -561,6 +588,7 @@ export class DownloadAadhaarDigilockerUseCase {
       persisted,
       panFetched,
       panCardNumber,
+      aadhaarNameReviewPending: Boolean(nameMismatchReview),
     };
   }
 
@@ -587,12 +615,22 @@ export class DownloadAadhaarDigilockerUseCase {
     httpStatus: number | null,
     vendor: unknown,
   ): Promise<void> {
+    const applicationRow = await this.prisma.client.application.findUnique({
+      where: { id: application.id },
+      select: { createdAt: true, kyc: { select: { kycStatus: true } } },
+    });
     const customerKyc = await this.prisma.client.customerKyc.findFirst({
       where: { customerId: application.customerId },
       orderBy: { createdAt: 'desc' },
-      select: { aadhaarData: true },
+      select: { aadhaarData: true, aadhaarVerifiedAt: true, aadhaarPhotoPath: true },
     });
-    if (isDigilockerAadhaarCaptureComplete(customerKyc?.aadhaarData)) {
+    if (
+      customerAadhaarAppliesToApplication(customerKyc, {
+        applicationCreatedAt: applicationRow?.createdAt ?? new Date(0),
+        applicationKycStatus: applicationRow?.kyc?.kycStatus,
+      }) &&
+      isDigilockerAadhaarCaptureComplete(customerKyc?.aadhaarData)
+    ) {
       return;
     }
     try {

@@ -3,6 +3,9 @@ export function losStatusPillStyles(code: string): { bg: string; text: string; r
   if (c === 'OVERDUE' || c === 'FAILED') {
     return { bg: 'rgba(239,68,68,0.14)', text: '#b91c1c', ring: 'rgba(239,68,68,0.3)' };
   }
+  if (c === 'SETTLED') {
+    return { bg: 'rgba(79,70,229,0.14)', text: '#3730a3', ring: 'rgba(79,70,229,0.3)' };
+  }
   if (c === 'CLOSED' || c === 'PAID' || c.includes('PAID_FULL') || c === 'SUCCESS') {
     return { bg: 'rgba(16,185,129,0.14)', text: '#047857', ring: 'rgba(16,185,129,0.32)' };
   }
@@ -37,11 +40,13 @@ export function LosStatusPill({ code, label }: { code: string; label: string }) 
   const s = losStatusPillStyles(code);
   const c = code.toUpperCase();
   const display =
-    c === 'CLOSED' || c === 'PAID'
-      ? 'Paid fully'
-      : c === 'OVERDUE'
-        ? 'Overdue'
-        : label;
+    c === 'SETTLED'
+      ? 'Settled'
+      : c === 'CLOSED' || c === 'PAID'
+        ? 'Paid fully'
+        : c === 'OVERDUE'
+          ? 'Overdue'
+          : label;
   return (
     <span
       className="inline-flex max-w-full items-center rounded-full px-3 py-1 text-[0.72rem] font-extrabold uppercase tracking-[0.07em] ring-1 ring-inset"

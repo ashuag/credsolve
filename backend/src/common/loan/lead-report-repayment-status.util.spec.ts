@@ -11,6 +11,16 @@ describe('resolveLeadReportRepaymentStatus', () => {
     ).toEqual({ code: 'NOT_APPLICABLE', label: '—' });
   });
 
+  it('maps a settled loan to paid with a settled label', () => {
+    expect(
+      resolveLeadReportRepaymentStatus({
+        hasLoan: true,
+        loanStatusCode: 'SETTLED',
+        latestRepaymentStatus: 'SUCCESS',
+      }),
+    ).toEqual({ code: 'PAID', label: 'Settled' });
+  });
+
   it('maps a closed loan to paid', () => {
     expect(
       resolveLeadReportRepaymentStatus({

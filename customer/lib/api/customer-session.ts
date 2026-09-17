@@ -96,6 +96,8 @@ export type CustomerSessionResponse =
         bankNameReviewPending?: boolean;
         /** Penny-drop failed or bank name mismatch — finish references / eSign; a representative will call. */
         bankVerificationFailed?: boolean;
+        /** Aadhaar name vs application is waiting for credit; journey continues; thank-you uses KYC follow-up copy. */
+        aadhaarNameReviewPending?: boolean;
       };
       /** Post-BRE pre-approved ceiling; set after bureau pass. */
       preApprovedAmountInr: number | null;
@@ -270,6 +272,14 @@ export function canResumeKycAfterInternalError(
 export function isLeadRejectedAndLocked(lead: CustomerPortalLead | null | undefined): boolean {
   if (!lead) return false;
   return lead.status === 'REJECTED' || lead.status === 'BLACKLISTED';
+}
+
+/** Safe on the session union — `{ authenticated: false }` has no `lead`. */
+export function isSessionLeadRejectedAndLocked(
+  session: CustomerSessionResponse | null | undefined,
+): boolean {
+  if (!session || session.authenticated !== true) return false;
+  return isLeadRejectedAndLocked(session.lead);
 }
 
 /** True when the customer still has loan-application steps left (hub should show "Complete your journey"). */

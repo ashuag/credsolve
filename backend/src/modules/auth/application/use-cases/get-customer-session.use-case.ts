@@ -8,8 +8,9 @@ import {
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { getRejectedUntilIso } from '../../../../common/lead/lead-reapply-policy.util';
 import { APPLICATION_KYC_STATUS, APPLICATION_STATUS } from '../../../../common/constants/application.constants';
+import { BUREAU_FETCHED } from '../../../../common/constants/bureau-fetch.constants';
 import { isBankNameMatchReviewPending } from '../../../../common/constants/bank.constants';
-import { isDigilockerAadhaarCaptureComplete } from '../../../../common/kyc/aadhaar-vendor-parse.util';
+import { isDigilockerAadhaarCaptureComplete, isAadhaarNameMismatchPendingReview } from '../../../../common/kyc/aadhaar-vendor-parse.util';
 import {
   formatLeadDetailForPortal,
   isLeadEmailVerifiedForPortal,
@@ -87,6 +88,7 @@ export class GetCustomerSessionUseCase {
         bankDetailsCompleted: false,
         bankNameReviewPending: false,
         bankVerificationFailed: false,
+        aadhaarNameReviewPending: false,
       },
       preApprovedAmountInr: null,
       loanSelection: null,
@@ -199,7 +201,7 @@ export class GetCustomerSessionUseCase {
       currentProfile?.panNumber?.trim()
     );
 
-    const [applicationExtras, latestCustomerKyc, leadReferenceRows, priorLeadDetail] = await Promise.all([
+    const [applicationExtras, leadReferenceRows, priorLeadDetail] = await Promise.all([
       application
         ? this.prisma.client.application.findUnique({
             where: { id: application.id },
@@ -230,13 +232,6 @@ export class GetCustomerSessionUseCase {
             },
           })
         : Promise.resolve(null),
-      this.prisma.client.customerKyc.findFirst({
-        where: { customerId: customer.id },
-        orderBy: { createdAt: 'desc' },
-        select: {
-          aadhaarData: true,
-        },
-      }),
       application
         ? this.prisma.client.applicationReference.findMany({
             where: {
@@ -298,10 +293,19 @@ export class GetCustomerSessionUseCase {
     const panChecksComplete =
       isPanVerifiedFromDb(leadRow.leadDetail?.panVerified) ||
       leadRow.leadDetail?.panVerified === PAN_VERIFIED.API_DISABLED;
-    const detailsCompleted = profileFieldsComplete && panChecksComplete;
+    const bureauFetchEnabled = await this.settings.isBureauFetchEnabled();
+    const bureauChecksComplete =
+      !bureauFetchEnabled ||
+      (leadRow.leadDetail?.bureauFetched ?? 0) === BUREAU_FETCHED.SUCCESS;
+    const detailsCompleted = profileFieldsComplete && panChecksComplete && bureauChecksComplete;
 
+    const postBreOfferReady =
+      applicationExtras?.preApprovedLoanAmount != null &&
+      Number.isFinite(Number(applicationExtras.preApprovedLoanAmount)) &&
+      Number(applicationExtras.preApprovedLoanAmount) > 0;
     const loanSelectionCompleted = Boolean(
-      appDetails?.selectedLoanAmount != null &&
+      postBreOfferReady &&
+        appDetails?.selectedLoanAmount != null &&
         appDetails?.expectedRepaymentDays != null &&
         appDetails?.reasonForLoanId != null,
     );
@@ -309,8 +313,11 @@ export class GetCustomerSessionUseCase {
     const loanDocumentsCompleted = Boolean(loanDocumentsReviewedAt);
     const loanDocumentsAccepted = Boolean(application?.loanDocumentsAcceptedAt);
 
-    const kycDocsCount = countUploadedKycDocuments(latestCustomerKyc?.aadhaarData);
+    const kycDocsCount = countUploadedKycDocuments(application?.digilockerAadhaarFormJson);
     const digilockerCaptured = isDigilockerAadhaarCaptureComplete(
+      application?.digilockerAadhaarFormJson ?? null,
+    );
+    const aadhaarNameReviewPending = isAadhaarNameMismatchPendingReview(
       application?.digilockerAadhaarFormJson ?? null,
     );
     const hasSavedSelfie = Boolean(application?.selfieRelativePath?.trim());
@@ -357,7 +364,7 @@ export class GetCustomerSessionUseCase {
           hasSavedSelfie &&
           livenessPassed &&
           headMovementSatisfied) ||
-        (latestCustomerKyc && kycDocsCount >= 3 && livenessPassed && headMovementSatisfied),
+        (kycDocsCount >= 3 && livenessPassed && headMovementSatisfied && digilockerCaptured),
     );
 
     const leadReferences = leadReferenceRows.map((row) => ({
@@ -486,6 +493,7 @@ export class GetCustomerSessionUseCase {
         bankDetailsCompleted,
         bankNameReviewPending,
         bankVerificationFailed,
+        aadhaarNameReviewPending,
       },
       preApprovedAmountInr:
         preApprovedAmountInr != null && preApprovedAmountInr > 0 ? preApprovedAmountInr : null,

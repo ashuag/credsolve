@@ -27,7 +27,7 @@ import {
   type SettleEasebuzzLoanRef,
 } from '../../../../common/easebuzz/settle-easebuzz-repayment.service';
 import { LOAN_REPAYMENT_STATUS } from '../../../../common/constants/loan-repayment.constants';
-import { LOAN_STATUS } from '../../../../common/constants/loan.constants';
+import { isClosedLoanStatus } from '../../../../common/constants/loan.constants';
 import { RedisService } from '../../../../common/redis/redis.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
 
@@ -284,7 +284,7 @@ export class HandleEasebuzzRepaymentCallbackUseCase {
       return { txnid, result: 'error', code: consistencyError };
     }
 
-    if (loan.closedAt != null || loan.loanStatus.name === LOAN_STATUS.CLOSED) {
+    if (loan.closedAt != null || isClosedLoanStatus(loan.loanStatus.name)) {
       this.logger.log(`[repay-callback] Loan already closed loan=${loan.loanNumber} txnid=${txnid}`);
       await clearPendingRepayIntent(this.redis, txnid);
       return { txnid, result: 'success' };
@@ -405,7 +405,7 @@ export class HandleEasebuzzRepaymentCallbackUseCase {
       return { txnid, result: 'error', code: consistencyError };
     }
 
-    if (loan.closedAt != null || loan.loanStatus.name === LOAN_STATUS.CLOSED) {
+    if (loan.closedAt != null || isClosedLoanStatus(loan.loanStatus.name)) {
       this.logger.log(`[easycollect-webhook] Loan already closed loan=${loan.loanNumber} txnid=${txnid}`);
       return { txnid, result: 'success' };
     }

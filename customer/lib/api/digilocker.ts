@@ -149,6 +149,7 @@ export type DownloadAadhaarDigilockerResponse = {
   persisted?: boolean;
   identityMismatch?: boolean;
   identityMismatchMessage?: string;
+  aadhaarNameReviewPending?: boolean;
   attemptsUsed?: number;
   attemptsAllowed?: number;
   canRetry?: boolean;

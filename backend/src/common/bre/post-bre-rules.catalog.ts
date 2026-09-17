@@ -18,6 +18,9 @@ export type PostBreThresholdsSnapshot = {
   enforceNoActiveMfi: boolean | null;
   maxMissedPayments6Months: number | null;
   minUnsecuredLoanAmount: number | null;
+  maxLoanTypeOverdueAmount: number | null;
+  rejectOpenLoanTypes: string[] | null;
+  rejectLoanTypes: string[] | null;
   rejectedCreditAssessmentGradesNew: string[] | null;
   rejectedCreditAssessmentGradesExisting: string[] | null;
 };
@@ -67,6 +70,12 @@ function isCriteriaLoaded(key: string, thresholds: PostBreThresholdsSnapshot): b
       return thresholds.maxMissedPayments6Months != null;
     case EC.MIN_UNSECURED_LOAN_AMOUNT:
       return thresholds.minUnsecuredLoanAmount != null;
+    case EC.MAX_LOAN_TYPE_OVERDUE_AMOUNT:
+      return thresholds.maxLoanTypeOverdueAmount != null;
+    case EC.REJECT_OPEN_LOAN_TYPES:
+      return thresholds.rejectOpenLoanTypes != null;
+    case EC.REJECT_LOAN_TYPES:
+      return thresholds.rejectLoanTypes != null;
     case EC.REJECTED_CREDIT_ASSESSMENT_GRADES_NEW:
       return thresholds.rejectedCreditAssessmentGradesNew != null;
     case EC.REJECTED_CREDIT_ASSESSMENT_GRADES_EXISTING:
@@ -339,6 +348,57 @@ export function buildPostBreRulesCatalog(thresholds: PostBreThresholdsSnapshot):
       tuefReference: 'Appendix E unsecured account types',
       notes:
         'Uses totalUnsecuredExposureInr (sum of every unsecured tradeline, open and closed) — the same figure the pre-approved offer/credit-limit tier lookup uses.',
+    },
+    {
+      id: EC.MAX_LOAN_TYPE_OVERDUE_AMOUNT,
+      label: 'Max overdue amount per loan type',
+      category: 'tradeline',
+      informationalOnly: false,
+      alwaysEvaluated: true,
+      toggleCriteriaKey: null,
+      criteriaKeys: [EC.MAX_LOAN_TYPE_OVERDUE_AMOUNT],
+      rejectionReasonCode: REJECTION_REASON.OVERDUE_AMOUNT,
+      condition: `Any CIBIL loan/account type with overdue (amount past due) > ₹${thresholds.maxLoanTypeOverdueAmount}.`,
+      passCondition: `Every loan type has overdue ≤ ₹${thresholds.maxLoanTypeOverdueAmount}.`,
+      dataSources: [
+        'TradeLinePartition → Tradeline (grouped by TUEF account type)',
+        'GrantedTrade.amountPastDue / Tradeline.amountPastDue',
+      ],
+      tuefReference: 'Amount Past Due; Appendix A account types',
+      notes: 'Overdue is summed per loan type. Default threshold 0 rejects any positive overdue on any account type.',
+    },
+    {
+      id: EC.REJECT_OPEN_LOAN_TYPES,
+      label: 'Reject open loan type',
+      category: 'tradeline',
+      informationalOnly: false,
+      alwaysEvaluated: true,
+      toggleCriteriaKey: null,
+      criteriaKeys: [EC.REJECT_OPEN_LOAN_TYPES],
+      rejectionReasonCode: REJECTION_REASON.REJECT_OPEN_LOAN_TYPE,
+      condition: `Any open CIBIL tradeline whose account type is one of ${(thresholds.rejectOpenLoanTypes ?? []).join(', ') || '—'}.`,
+      passCondition: `No open tradeline matches the rejected open loan-type set (${(thresholds.rejectOpenLoanTypes ?? []).join(', ') || 'none'}).`,
+      dataSources: [
+        'TradeLinePartition → Tradeline (TUEF account type)',
+        'Tradeline.dateClosed / OpenClosed',
+      ],
+      tuefReference: 'Appendix A account types; open vs closed tradeline',
+      notes: 'Comma-separated loan type IDs in eligibility_criteria. Closed matching tradelines do not fail this rule.',
+    },
+    {
+      id: EC.REJECT_LOAN_TYPES,
+      label: 'Reject if loan type',
+      category: 'tradeline',
+      informationalOnly: false,
+      alwaysEvaluated: true,
+      toggleCriteriaKey: null,
+      criteriaKeys: [EC.REJECT_LOAN_TYPES],
+      rejectionReasonCode: REJECTION_REASON.REJECT_LOAN_TYPE,
+      condition: `Any CIBIL tradeline (open or closed) whose account type is one of ${(thresholds.rejectLoanTypes ?? []).join(', ') || '—'}.`,
+      passCondition: `No tradeline matches the rejected loan-type set (${(thresholds.rejectLoanTypes ?? []).join(', ') || 'none'}).`,
+      dataSources: ['TradeLinePartition → Tradeline (TUEF account type)'],
+      tuefReference: 'Appendix A account types',
+      notes: 'Comma-separated loan type IDs in eligibility_criteria. Presence of the type is enough; open/closed does not matter.',
     },
     {
       id: EC.REJECTED_CREDIT_ASSESSMENT_GRADES_NEW,

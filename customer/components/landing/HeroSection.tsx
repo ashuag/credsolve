@@ -116,7 +116,7 @@ export function HeroSection() {
                 </span>
               </Link>
               <Link
-                href="#how-it-works"
+                href="/#how-it-works"
                 className="inline-flex items-center justify-center gap-1 text-[0.92rem] font-[800] text-[#1496f3] transition-colors hover:text-[#2388e5] hover:underline"
               >
                 Read borrower stories

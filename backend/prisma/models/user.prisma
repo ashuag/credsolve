@@ -37,9 +37,11 @@ model User {
   statesNegativeRemoved   State[]     @relation("StateNegativeRemovedBy")
   sourceUtmsCreated       SourceUtm[] @relation("SourceUtmCreatedBy")
   sourceUtmsUpdated       SourceUtm[] @relation("SourceUtmUpdatedBy")
+  loanChargeWaivers       LoanAccount[] @relation("LoanChargeWaivedBy")
 
   @@index([managerId])
   @@index([roleId])
   @@index([isActive])
+  @@index([createdAt])
   @@map("user")
 }

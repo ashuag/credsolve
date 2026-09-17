@@ -51,6 +51,18 @@ export async function approveBankNameMatch(
   );
 }
 
+export async function approveAadhaarNameMatch(
+  token: string,
+  applicationUuid: string,
+): Promise<{ success: true; applicationUuid: string }> {
+  return authorizedLosRequest(
+    token,
+    `/applications/${encodeURIComponent(applicationUuid)}/kyc/approve-aadhaar-name-match`,
+    { method: 'POST' },
+    'Failed to approve Aadhaar name match.',
+  );
+}
+
 export async function disburseApplication(
   token: string,
   applicationUuid: string,

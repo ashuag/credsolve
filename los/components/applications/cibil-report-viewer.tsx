@@ -274,6 +274,11 @@ function CibilCreditAssessmentSection({ assessment }: { assessment: CibilCreditA
           { label: 'Total tradelines', value: formatInsightCount(assessment.signals.noOfLoans) },
           { label: 'Credit cards', value: formatInsightCount(assessment.signals.noOfCreditCards) },
           { label: 'Unsecured loans', value: formatInsightCount(assessment.signals.noOfUnsecuredLoans) },
+          {
+            label: 'Active unsecured loans',
+            hint: 'Open unsecured tradelines only',
+            value: formatInsightCount(assessment.signals.noOfActiveUnsecuredLoans),
+          },
           { label: 'Secured loans', value: formatInsightCount(assessment.signals.noOfSecuredLoans) },
           { label: 'Gold loans', value: formatInsightCount(assessment.signals.noOfGoldLoans) },
           { label: 'Enquiries (6 months)', value: formatInsightCount(assessment.signals.sixMonthEnquiries) },

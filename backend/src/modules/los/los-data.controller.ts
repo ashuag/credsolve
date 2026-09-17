@@ -1,10 +1,12 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { LosAuthGuard } from './auth/los-auth.guard';
 import { LosDenyAgentGuard } from './auth/los-deny-agent.guard';
 import { LosAdminGuard } from './auth/los-admin.guard';
+import type { LosSessionPayload } from './auth/los-session.service';
 import { RejectWorkspaceRecordDto } from './dto/reject-workspace-record.dto';
+import { WaiveLoanChargesDto } from './dto/waive-loan-charges.dto';
 import { LosLeadService } from './services/los-lead.service';
 import { LosApplicationService } from './services/los-application.service';
 import { LosCustomerService } from './services/los-customer.service';
@@ -17,6 +19,9 @@ import { LosLoanRepaymentSyncService } from './services/los-loan-repayment-sync.
 import { LosBureauReportService } from './services/los-bureau-report.service';
 import { LosLeadReportService } from './services/los-lead-report.service';
 import { LosTransactionReportService } from './services/los-transaction-report.service';
+import { LosCheckCibilService } from './services/los-check-cibil.service';
+
+type LosRequest = Request & { losUser: LosSessionPayload };
 
 @ApiTags('LOS Data')
 @Controller('los')
@@ -35,6 +40,7 @@ export class LosDataController {
     private readonly losBureauReport: LosBureauReportService,
     private readonly losLeadReport: LosLeadReportService,
     private readonly losTransactionReport: LosTransactionReportService,
+    private readonly losCheckCibil: LosCheckCibilService,
   ) {}
 
   @Get('dashboard/crm')
@@ -182,6 +188,22 @@ export class LosDataController {
     return this.losLoanRepaymentSync.refreshPayment(loanUuid);
   }
 
+  @Post('loans/:loanUuid/waive-charges')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({
+    summary: 'Waive part or all of penal + overdue-days interest on an open loan',
+    description:
+      'Stores the waived amount, the LOS user who waived it, and the timestamp. Pay Now then collects principal + tenure interest + any remaining negotiable charges.',
+  })
+  waiveLoanCharges(
+    @Req() req: LosRequest,
+    @Param('loanUuid') loanUuid: string,
+    @Body() body: WaiveLoanChargesDto,
+  ) {
+    return this.losLoan.waiveCharges(loanUuid, body.waivedAmountInr, req.losUser.userId);
+  }
+
   @Get('applications/:applicationUuid')
   @ApiOperation({ summary: 'Get application details by application uuid' })
   applicationByUuid(@Param('applicationUuid') applicationUuid: string) {
@@ -222,6 +244,16 @@ export class LosDataController {
   })
   approveBankNameMatch(@Param('applicationUuid') applicationUuid: string) {
     return this.losApplication.approveBankNameMatch(applicationUuid);
+  }
+
+  @Post('applications/:applicationUuid/kyc/approve-aadhaar-name-match')
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({
+    summary:
+      'Credit: accept DigiLocker Aadhaar whose name did not match the application. Customer journey stays open; application can be approved after remaining steps.',
+  })
+  approveAadhaarNameMatch(@Param('applicationUuid') applicationUuid: string) {
+    return this.losApplication.approveAadhaarNameMatch(applicationUuid);
   }
 
   @Post('applications/:applicationUuid/approve')
@@ -332,6 +364,38 @@ export class LosDataController {
   @ApiOperation({ summary: 'Structured CIBIL report view for a lead (from latest bureau pull)' })
   leadCibilReport(@Param('leadUuid') leadUuid: string) {
     return this.losLead.getLeadCibilReport(leadUuid);
+  }
+
+  @Get('leads/:leadUuid/cibil-hits')
+  @ApiOperation({ summary: 'CIBIL / bureau hit log for a lead (vendor pulls and stored reports)' })
+  leadCibilHits(@Param('leadUuid') leadUuid: string) {
+    return this.losCheckCibil.listHitsForLeadUuid(leadUuid);
+  }
+
+  @Post('leads/:leadUuid/check-cibil')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({
+    summary: 'Pull CIBIL, run post-BRE, and reject the lead when any post-BRE rule fails',
+  })
+  checkLeadCibil(@Param('leadUuid') leadUuid: string) {
+    return this.losCheckCibil.checkForLead(leadUuid);
+  }
+
+  @Get('applications/:applicationUuid/cibil-hits')
+  @ApiOperation({ summary: 'CIBIL / bureau hit log for an application lead' })
+  applicationCibilHits(@Param('applicationUuid') applicationUuid: string) {
+    return this.losCheckCibil.listHitsForApplication(applicationUuid);
+  }
+
+  @Post('applications/:applicationUuid/check-cibil')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({
+    summary: 'Pull CIBIL for the application lead, run post-BRE, and reject when post-BRE fails',
+  })
+  checkApplicationCibil(@Param('applicationUuid') applicationUuid: string) {
+    return this.losCheckCibil.checkForApplication(applicationUuid);
   }
 
   @Get('leads/:leadUuid')

@@ -70,7 +70,7 @@ function istCalendarYmd(asOf: Date): string {
 function isLoanPastDue(loan: LosLoan, asOf: Date = new Date()): boolean {
   if (loan.closedAt) return false;
   const code = loan.loanStatusCode.toUpperCase();
-  if (code === 'CLOSED' || code.includes('WRITE')) return false;
+  if (code === 'CLOSED' || code === 'SETTLED' || code.includes('WRITE')) return false;
   if (code === 'OVERDUE') return true;
   const maturityYmd = loan.loanMaturityDate?.slice(0, 10);
   if (!maturityYmd || !/^\d{4}-\d{2}-\d{2}$/.test(maturityYmd)) return false;
@@ -82,24 +82,50 @@ function effectiveStatusCode(loan: LosLoan): string {
   return loan.loanStatusCode;
 }
 
+const GRADE_TONE: Record<string, { background: string; color: string }> = {
+  A: { background: 'rgba(16,185,129,0.1)', color: '#10b981' },
+  B: { background: 'rgba(16,185,129,0.1)', color: '#10b981' },
+  C: { background: 'rgba(16,185,129,0.1)', color: '#10b981' },
+  D: { background: 'rgba(245,158,11,0.1)', color: '#f59e0b' },
+  E: { background: 'rgba(245,158,11,0.1)', color: '#f59e0b' },
+  F: { background: 'rgba(245,158,11,0.1)', color: '#f59e0b' },
+  G: { background: 'rgba(239,68,68,0.1)', color: '#ef4444' },
+  H: { background: 'rgba(239,68,68,0.1)', color: '#ef4444' },
+};
+
+function GradeBadge({ category }: { category: string | null | undefined }) {
+  if (!category) return <span className="text-brand-muted">—</span>;
+  const style = GRADE_TONE[category] ?? { background: 'rgba(99,102,241,0.12)', color: '#4f46e5' };
+  return (
+    <span className="inline-flex items-center justify-center min-w-[32px] h-7 px-2 rounded-[7px] text-[0.8rem] font-extrabold" style={style}>
+      {category}
+    </span>
+  );
+}
+
 function StatusPill({ label, code }: { label: string; code?: string }) {
   const s = (code ?? label).toUpperCase();
+  const isSettled = s === 'SETTLED';
   const isClosed = s.includes('CLOSED') || s.includes('WRITE') || s === 'PAID';
   const isOverdue = s.includes('OVERDUE');
   const isActive = s === 'ACTIVE' || s.includes('DISBURS');
   const style = isOverdue
     ? { background: 'rgba(239,68,68,0.14)', color: '#b91c1c', border: '1px solid rgba(239,68,68,0.28)' }
-    : isClosed
-      ? { background: 'rgba(16,185,129,0.14)', color: '#047857', border: '1px solid rgba(16,185,129,0.3)' }
-      : isActive
-        ? { background: 'rgba(14,165,233,0.14)', color: '#0369a1', border: '1px solid rgba(14,165,233,0.28)' }
-        : { background: 'rgba(99,102,241,0.12)', color: '#4338ca', border: '1px solid rgba(99,102,241,0.22)' };
+    : isSettled
+      ? { background: 'rgba(79,70,229,0.14)', color: '#3730a3', border: '1px solid rgba(79,70,229,0.28)' }
+      : isClosed
+        ? { background: 'rgba(16,185,129,0.14)', color: '#047857', border: '1px solid rgba(16,185,129,0.3)' }
+        : isActive
+          ? { background: 'rgba(14,165,233,0.14)', color: '#0369a1', border: '1px solid rgba(14,165,233,0.28)' }
+          : { background: 'rgba(99,102,241,0.12)', color: '#4338ca', border: '1px solid rgba(99,102,241,0.22)' };
   const display =
-    isClosed && !s.includes('WRITE')
-      ? 'Paid fully'
-      : isOverdue
-        ? 'Overdue'
-        : label;
+    isSettled
+      ? 'Settled'
+      : isClosed && !s.includes('WRITE')
+        ? 'Paid fully'
+        : isOverdue
+          ? 'Overdue'
+          : label;
   return (
     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[0.7rem] font-bold whitespace-nowrap" style={style}>
       {display}
@@ -251,6 +277,19 @@ export function LoansPanel() {
       },
     },
     {
+      key: 'grade',
+      label: 'Grade',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.cibilCreditAssessmentCategory ?? '',
+      getSortValue: (row) => row.cibilCreditAssessmentCategory ?? '',
+      filter: {
+        type: 'select',
+        options: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((g) => ({ value: g, label: g })),
+        matches: (row, value) => row.cibilCreditAssessmentCategory === value,
+      },
+      render: (loan) => <GradeBadge category={loan.cibilCreditAssessmentCategory} />,
+    },
+    {
       key: 'principal',
       label: 'Principal',
       headerClassName: 'whitespace-nowrap',
@@ -295,9 +334,19 @@ export function LoansPanel() {
             <div className={hasPenal ? 'font-bold text-[#b91c1c]' : 'font-bold text-brand-text'}>
               {formatINR(loan.totalRepaymentWithPenalAmount)}
             </div>
-            {hasPenal ? (
+            {hasPenal || Number(loan.overdueInterestInr) > 0 || Number(loan.waivedAmountInr) > 0 ? (
               <div className="text-[0.72rem] text-brand-muted mt-0.5">
-                incl. {formatINR(loan.penalAmount)} penal charge
+                {[
+                  Number(loan.overdueInterestInr) > 0
+                    ? `${formatINR(loan.overdueInterestInr)} overdue interest`
+                    : null,
+                  hasPenal ? `${formatINR(loan.penalAmount)} penal` : null,
+                  Number(loan.waivedAmountInr) > 0
+                    ? `${formatINR(loan.waivedAmountInr)} waived`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </div>
             ) : null}
           </>
@@ -320,6 +369,24 @@ export function LoansPanel() {
           </span>
         );
       },
+    },
+    {
+      key: 'waived',
+      label: 'Waived',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.waivedAmountInr ?? '',
+      getSortValue: (row) => {
+        const n = Number(row.waivedAmountInr);
+        return Number.isFinite(n) ? n : 0;
+      },
+      filter: false,
+      cellClassName: 'whitespace-nowrap',
+      render: (loan) =>
+        Number(loan.waivedAmountInr) > 0 ? (
+          <span className="font-bold text-[#3730a3]">{formatINR(loan.waivedAmountInr)}</span>
+        ) : (
+          <span className="text-brand-muted">—</span>
+        ),
     },
     {
       key: 'overdueDays',

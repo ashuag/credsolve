@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { APPLICATION_STATUS } from '../../../common/constants/application.constants';
-import { LOAN_STATUS } from '../../../common/constants/loan.constants';
+import { isClosedLoanStatus, LOAN_STATUS } from '../../../common/constants/loan.constants';
 import { mapEasebuzzTransferLog } from '../../../common/easebuzz/easebuzz-transfer-log.util';
 import {
   calendarDaysBetween,
@@ -16,7 +16,9 @@ import {
   overdueDaysFromMaturity,
 } from '../../../common/loan/bounce-charge.util';
 import { BounceChargeTierResolverService } from '../../../common/loan/bounce-charge-tier.resolver';
+import { billDueNowAfterWaiverInr, waivedAmountFromLoan } from '../../../common/loan/loan-charge-waiver.util';
 import { resolveEffectiveLoanStatus } from '../../../common/loan/effective-loan-status.util';
+import { roundInr2 } from '../../../common/loan/loan-repayment-outstanding.util';
 import { isCollectedRepaymentStatus } from '../../../common/constants/loan-repayment.constants';
 import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbursement-view.util';
 import { formatLosPersonName } from '../format-los-person-name';
@@ -51,6 +53,7 @@ export class LosLoanService {
       take: 500,
       include: {
         loanStatus: { select: { name: true, displayName: true } },
+        waivedByUser: { select: { fullName: true } },
         customer: { select: { uuid: true, mobileNumber: true } },
         application: {
           select: {
@@ -74,7 +77,16 @@ export class LosLoanService {
               select: {
                 id: true,
                 uuid: true,
-                leadDetail: { select: { fullName: true } },
+                leadDetail: {
+                  select: {
+                    fullName: true,
+                    bureauReport: {
+                      select: {
+                        cibilCreditAssessment: { select: { category: true } },
+                      },
+                    },
+                  },
+                },
               },
             },
           },
@@ -107,14 +119,28 @@ export class LosLoanService {
         closedAt: loan.closedAt,
       });
 
-      // A closed loan keeps its stored status, so exclude it explicitly before charging penalty.
-      const pastDue = loan.closedAt == null && effectiveStatus.code === LOAN_STATUS.OVERDUE;
-      const overdueDays = pastDue
-        ? Math.max(overdueDaysFromMaturity(loan.loanMaturityDate), 1)
-        : 0;
+      // Open: days past due as of today. Closed after due: days from maturity through payoff.
+      const daysPastDue = overdueDaysFromMaturity(
+        loan.loanMaturityDate,
+        loan.closedAt ?? new Date(),
+      );
+      const overdueDays = daysPastDue > 0 ? Math.max(daysPastDue, 1) : 0;
+      const pastDue = loan.closedAt == null && overdueDays > 0;
       const principal = decimalToNumber(loan.principalAmount);
+      const dailyRate = decimalToNumber(loan.interestRate);
       const penalAmount =
         principal != null ? computePenalChargeInr(principal, overdueDays, penal) : 0;
+      const overdueInterestInr =
+        principal != null && dailyRate != null && overdueDays > 0
+          ? computeInterestAmountInr(principal, dailyRate, overdueDays)
+          : 0;
+      const storedWaiverInr = waivedAmountFromLoan(loan.waivedAmount);
+      const bill = billDueNowAfterWaiverInr({
+        amountDueBeforePenal: (decimalToNumber(loan.totalRepaymentAmount) ?? 0) + overdueInterestInr,
+        penalInr: penalAmount,
+        overdueInterestInr,
+        waivedAmountInr: storedWaiverInr,
+      });
       const totalRepayment = decimalToNumber(loan.totalRepaymentAmount) ?? 0;
 
       return {
@@ -126,6 +152,8 @@ export class LosLoanService {
         customerUuid: loan.customer.uuid,
         leadUuid: loan.application.lead.uuid,
         fullName: formatLosPersonName(loan.application.lead.leadDetail?.fullName),
+        cibilCreditAssessmentCategory:
+          loan.application.lead.leadDetail?.bureauReport?.cibilCreditAssessment?.category ?? null,
         mobileNumber: loan.customer.mobileNumber,
         email: details?.emailId ?? null,
         principalAmount: loan.principalAmount.toString(),
@@ -137,8 +165,12 @@ export class LosLoanService {
         bounceRatePerDayInr: '0.00',
         /** Penal charge (rate % of principal, min/max capped); 0 unless past due and still open. */
         penalAmount: penalAmount.toFixed(2),
+        overdueInterestInr: overdueInterestInr.toFixed(2),
+        waivedAmountInr: (pastDue ? bill.appliedWaiverInr : storedWaiverInr).toFixed(2),
+        waivedByName: loan.waivedByUser?.fullName ?? null,
+        waivedAt: loan.waivedAt?.toISOString() ?? null,
         totalRepaymentWithPenalAmount: (
-          Math.round((totalRepayment + penalAmount) * 100) / 100
+          Math.round((totalRepayment + overdueInterestInr + penalAmount - (pastDue ? bill.appliedWaiverInr : 0)) * 100) / 100
         ).toFixed(2),
         /** IST calendar days past maturity; 0 when not overdue. */
         overdueDays,
@@ -168,6 +200,7 @@ export class LosLoanService {
       where: { uuid: loanUuid },
       include: {
         loanStatus: { select: { name: true, displayName: true } },
+        waivedByUser: { select: { fullName: true } },
         customer: { select: { uuid: true, mobileNumber: true } },
         application: {
           select: {
@@ -203,6 +236,11 @@ export class LosLoanService {
                     addressLine2: true,
                     pincode: true,
                     city: { select: { name: true, state: { select: { name: true } } } },
+                    bureauReport: {
+                      select: {
+                        cibilCreditAssessment: { select: { category: true } },
+                      },
+                    },
                   },
                 },
               },
@@ -300,11 +338,12 @@ export class LosLoanService {
           ? Math.round((principal + interestAtMaturity) * 100) / 100
           : decimalToNumber(loan.totalRepaymentAmount);
 
-    // Same overdue test as `listLoans`, so the list and this page can never disagree.
-    const pastDue = loan.closedAt == null && effectiveStatus.code === LOAN_STATUS.OVERDUE;
-    const overdueDays = pastDue
-      ? Math.max(overdueDaysFromMaturity(loan.loanMaturityDate), 1)
-      : 0;
+    // Same overdue test as `listLoans`: live days if open, days-at-payoff if closed after due.
+    const daysPastDue = overdueDaysFromMaturity(
+      loan.loanMaturityDate,
+      loan.closedAt ?? new Date(),
+    );
+    const overdueDays = daysPastDue > 0 ? Math.max(daysPastDue, 1) : 0;
     const penal = await this.bounceChargeTiers.loadPenalConfig();
     const penalAmount =
       principal != null ? computePenalChargeInr(principal, overdueDays, penal) : 0;
@@ -313,6 +352,12 @@ export class LosLoanService {
     let interestTillToday: string | null = null;
     let amountDueToday: string | null = null;
     let usedFullTenureInterest = false;
+    let overdueInterestInr =
+      principal != null && dailyRate != null && overdueDays > 0
+        ? computeInterestAmountInr(principal, dailyRate, overdueDays)
+        : 0;
+    const storedWaiverInr = waivedAmountFromLoan(loan.waivedAmount);
+    let appliedWaiverInr = storedWaiverInr;
     const bounceFeeInr = loan.closedAt == null ? penalAmount.toFixed(2) : null;
 
     if (loan.closedAt == null && principal != null && dailyRate != null) {
@@ -320,10 +365,19 @@ export class LosLoanService {
       const due = computeAmountDueNowInr(principal, dailyRate, loan.disbursedAt, {
         coolingPeriodDays,
         tenureDays: contractedTenureDays ?? 1,
+        overdueDays,
       });
       daysOutstanding = due.daysOutstanding;
-      interestTillToday = due.interestAmount.toFixed(2);
-      amountDueToday = (Math.round((due.amountDue + penalAmount) * 100) / 100).toFixed(2);
+      interestTillToday = due.totalInterestAmount.toFixed(2);
+      overdueInterestInr = due.overdueInterestAmount;
+      const bill = billDueNowAfterWaiverInr({
+        amountDueBeforePenal: due.amountDue,
+        penalInr: penalAmount,
+        overdueInterestInr: due.overdueInterestAmount,
+        waivedAmountInr: storedWaiverInr,
+      });
+      appliedWaiverInr = bill.appliedWaiverInr;
+      amountDueToday = bill.billDueNow.toFixed(2);
       usedFullTenureInterest = due.usedFullTenureInterest;
     } else if (loan.closedAt != null) {
       daysOutstanding = calendarDaysBetween(loan.disbursedAt, loan.closedAt) + 1;
@@ -346,6 +400,7 @@ export class LosLoanService {
       customerUuid: loan.customer.uuid,
       leadUuid: loan.application.lead.uuid,
       fullName: formatLosPersonName(profile?.fullName),
+      cibilCreditAssessmentCategory: profile?.bureauReport?.cibilCreditAssessment?.category ?? null,
       mobileNumber: loan.customer.mobileNumber,
       email: details?.emailId ?? null,
       panNumber: profile?.panNumber ?? null,
@@ -365,8 +420,12 @@ export class LosLoanService {
           : loan.totalRepaymentAmount.toString(),
       bounceRatePerDayInr: '0.00',
       penalAmount: penalAmount.toFixed(2),
+      overdueInterestInr: overdueInterestInr.toFixed(2),
+      waivedAmountInr: (loan.closedAt != null ? storedWaiverInr : appliedWaiverInr).toFixed(2),
+      waivedByName: loan.waivedByUser?.fullName ?? null,
+      waivedAt: loan.waivedAt?.toISOString() ?? null,
       totalRepaymentWithPenalAmount: (
-        Math.round((bookedTotal + penalAmount) * 100) / 100
+        Math.round((bookedTotal + overdueInterestInr + penalAmount - (loan.closedAt != null ? 0 : appliedWaiverInr)) * 100) / 100
       ).toFixed(2),
       overdueDays,
       processingFeeAmount: fees.processingFeeAmount != null ? fees.processingFeeAmount.toFixed(2) : null,
@@ -424,6 +483,85 @@ export class LosLoanService {
         createdAt: row.created_at.toISOString(),
       })),
     };
+  }
+
+  async waiveCharges(loanUuid: string, waivedAmountInr: number, userId: string) {
+    const waived = roundInr2(waivedAmountInr);
+    if (!Number.isFinite(waived) || waived < 0) {
+      throw new BadRequestException('Enter a waiver amount of ₹0 or more.');
+    }
+
+    const loan = await this.prisma.client.loanAccount.findUnique({
+      where: { uuid: loanUuid },
+      select: {
+        id: true,
+        uuid: true,
+        closedAt: true,
+        principalAmount: true,
+        interestRate: true,
+        disbursedAt: true,
+        loanMaturityDate: true,
+        loanStatus: { select: { name: true, displayName: true } },
+      },
+    });
+    if (!loan) {
+      throw new NotFoundException('Loan not found.');
+    }
+    if (loan.closedAt != null || isClosedLoanStatus(loan.loanStatus.name)) {
+      throw new BadRequestException('This loan is already closed.');
+    }
+
+    const effectiveStatus = resolveEffectiveLoanStatus({
+      statusName: loan.loanStatus.name,
+      statusDisplayName: loan.loanStatus.displayName,
+      loanMaturityDate: loan.loanMaturityDate,
+      closedAt: loan.closedAt,
+    });
+    const pastDue = effectiveStatus.code === LOAN_STATUS.OVERDUE;
+    const overdueDays = pastDue
+      ? Math.max(overdueDaysFromMaturity(loan.loanMaturityDate), 1)
+      : 0;
+    const principal = decimalToNumber(loan.principalAmount);
+    const dailyRate = decimalToNumber(loan.interestRate);
+    if (principal == null || dailyRate == null) {
+      throw new BadRequestException('Unable to compute overdue charges for this loan.');
+    }
+    const penal = await this.bounceChargeTiers.loadPenalConfig();
+    const penalAmount = computePenalChargeInr(principal, overdueDays, penal);
+    const overdueInterestInr =
+      overdueDays > 0 ? computeInterestAmountInr(principal, dailyRate, overdueDays) : 0;
+    const maxWaiver = roundInr2(penalAmount + overdueInterestInr);
+    if (waived > maxWaiver + 0.009) {
+      throw new BadRequestException(
+        `Waiver cannot exceed penal + overdue interest (₹${maxWaiver.toFixed(2)}).`,
+      );
+    }
+
+    let waivedByUserId: bigint | null = null;
+    try {
+      waivedByUserId = waived > 0.009 ? BigInt(userId) : null;
+    } catch {
+      throw new BadRequestException('Signed-in LOS user is invalid.');
+    }
+
+    const now = new Date();
+    await this.prisma.client.loanAccount.update({
+      where: { id: loan.id },
+      data:
+        waived > 0.009
+          ? {
+              waivedAmount: waived.toFixed(2),
+              waivedByUserId,
+              waivedAt: now,
+            }
+          : {
+              waivedAmount: '0.00',
+              waivedByUserId: null,
+              waivedAt: null,
+            },
+    });
+
+    return this.getLoanDetails(loan.uuid);
   }
 
   private resolveLoanNumber(loan: { loanAccountNumber: string } & Record<string, unknown>): string {

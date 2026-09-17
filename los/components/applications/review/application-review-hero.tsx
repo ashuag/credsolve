@@ -55,6 +55,20 @@ export function ApplicationReviewHero({
           </div>
           <div className="ah-meta">
             <span className="mono">{formatApplicationDisplayId(row.applicationNumber)}</span>
+            {row.priorApplication?.uuid && row.priorApplication.applicationNumber ? (
+              <>
+                <span className="ah-sep">•</span>
+                <a
+                  className="ah-prior-app mono"
+                  href={`/applications/${row.priorApplication.uuid}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={`Open previous application ${row.priorApplication.applicationNumber}`}
+                >
+                  Prev {formatApplicationDisplayId(row.priorApplication.applicationNumber)}
+                </a>
+              </>
+            ) : null}
             <span className="ah-sep">•</span>
             <span>{profile?.occupation ?? '—'}</span>
             <span className="ah-sep">•</span>

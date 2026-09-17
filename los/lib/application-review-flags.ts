@@ -71,21 +71,23 @@ export function buildReviewFlags(row: LosApplicationDetails, bureauPan?: string 
     const nameScore = computeNameMatchScore(profile.fullName, aadhaar.fullName);
     if (nameMatchVerdict(nameScore, true) === 'mismatch') {
       flags.push({
-        icon: '◎',
-        title: 'Aadhaar name mismatch',
-        detail: `Profile name does not match the DigiLocker Aadhaar record (fuzzing score ${nameScore}%).`,
+        icon: row.aadhaarNameMatchPendingReview ? '✕' : '◎',
+        title: row.aadhaarNameMatchPendingReview ? 'Aadhaar name mismatch — credit review' : 'Aadhaar name mismatch',
+        detail: row.aadhaarNameMatchPendingReview
+          ? `Profile name does not match the DigiLocker Aadhaar record (fuzzing score ${nameScore}%). Approve or reject from the KYC detail tab.`
+          : `Profile name does not match the DigiLocker Aadhaar record (fuzzing score ${nameScore}%).`,
       });
     }
     if (compareIsoDates(profile.dateOfBirth, aadhaar.dateOfBirth) === 'mismatch') {
       flags.push({
-        icon: '◎',
+        icon: '✕',
         title: 'Aadhaar DOB mismatch',
         detail: 'Date of birth on profile does not match Aadhaar.',
       });
     }
     if (compareGenders(profile.gender, aadhaar.gender) === 'mismatch') {
       flags.push({
-        icon: '◎',
+        icon: '✕',
         title: 'Aadhaar gender mismatch',
         detail: 'Gender on profile does not match Aadhaar.',
       });

@@ -54,6 +54,11 @@ export type CustomerPortalJourneySnapshot = {
    * The customer can still finish references / eSign; thank-you shows a representative will call.
    */
   bankVerificationFailed: boolean;
+  /**
+   * DigiLocker Aadhaar name does not match the application name.
+   * The customer continues KYC / bank / references; thank-you uses the KYC follow-up copy.
+   */
+  aadhaarNameReviewPending: boolean;
 };
 
 /** DigiLocker Aadhaar + selfie/liveness progress for the active application. */

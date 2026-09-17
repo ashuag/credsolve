@@ -50,6 +50,7 @@ export type LosApplication = {
   statusCode: string;
   statusLabel: string;
   nameMatchPendingReview?: boolean;
+  aadhaarNameMatchPendingReview?: boolean;
   leadStatusCode: string;
   leadStatusLabel: string;
   leadRejectionReason: { code: string; label: string } | null;
@@ -238,6 +239,11 @@ export type LosMoneyCashFaceMatch = {
 export type LosApplicationDetails = {
   uuid: string;
   applicationNumber: string;
+  /** Previous application for this customer (re-apply). Open in a new tab from the header. */
+  priorApplication?: {
+    uuid: string;
+    applicationNumber: string;
+  } | null;
   customerUuid: string;
   leadUuid: string;
   leadNumber: string;
@@ -247,6 +253,7 @@ export type LosApplicationDetails = {
   statusCode: string;
   statusLabel: string;
   nameMatchPendingReview?: boolean;
+  aadhaarNameMatchPendingReview?: boolean;
   kycStatus: number;
   kycStatusLabel: string;
   kycCompletedAt: string | null;
@@ -321,6 +328,14 @@ export type LosApplicationDetails = {
     panVerified: number;
     profile: LosLeadDetails['profile'];
   };
+  /** Latest Tenacio NSDL PAN check for this lead, else the customer PAN NSDL cache. */
+  panNsdl?: {
+    fullName: string | null;
+    panNumber: string | null;
+    nameMatch: boolean | null;
+    dobMatch: boolean | null;
+    panStatus: string | null;
+  } | null;
   referencesCount: number;
   references: Array<{
     referenceIndex: number;
@@ -335,14 +350,16 @@ export type LosApplicationDetails = {
     address: string | null;
     maskedAadhaar: string | null;
   } | null;
-  /** Present when DigiLocker returned Aadhaar but KYC failed on name / DOB (or a stored mismatch). */
+  /** Present when DigiLocker returned Aadhaar but KYC failed on DOB / gender (or a stored mismatch). */
   aadhaarIdentityFailure?: {
     reason: string;
     message: string;
     applicationName: string | null;
     applicationDob: string | null;
+    applicationGender?: string | null;
     aadhaarName: string | null;
     aadhaarDob: string | null;
+    aadhaarGender?: string | null;
   } | null;
   /** `vendor_api_log` rows for DigiLocker Aadhaar download (`aadhaar-download` / Surepass equivalent). */
   aadhaarDownloadLogs?: Array<{
@@ -388,6 +405,8 @@ export type LosApplicationDetails = {
     /** Rule-based CIBIL credit-assessment category (A best .. H worst); null if not yet computed. */
     creditAssessmentCategory: string | null;
     creditAssessmentRecommendation: 'Approved' | 'Rejected' | null;
+    /** True when this report was pulled on a previous application and reused for display. */
+    fromPriorApplication?: boolean;
   } | null;
   agreement: {
     documentName: string | null;

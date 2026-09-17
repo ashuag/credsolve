@@ -161,6 +161,7 @@ function applicationStageLabel(app: LosApplication): string {
     panVerified: app.panVerified,
     bureauFetched: app.bureauFetched,
     nameMatchPendingReview: app.nameMatchPendingReview,
+    aadhaarNameMatchPendingReview: app.aadhaarNameMatchPendingReview,
   });
 }
 

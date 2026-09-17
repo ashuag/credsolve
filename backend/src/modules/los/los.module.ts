@@ -41,6 +41,8 @@ import { LosNameMatchDevToolsService } from './services/los-name-match-dev-tools
 import { LosPanDevToolsService } from './services/los-pan-dev-tools.service';
 import { LosTenacioFaceDevToolsService } from './services/los-tenacio-face-dev-tools.service';
 import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
+import { LosCheckCibilService } from './services/los-check-cibil.service';
+import { BureauReportRepository } from '../auth/infrastructure/repositories/bureau-report.repository';
 
 @Module({
   imports: [BreModule, CibilModule, StorageModule, LoanDocumentsModule, SmsModule, ContactModule, EmailModule],
@@ -83,6 +85,8 @@ import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
     LosPanDevToolsService,
     LosTenacioFaceDevToolsService,
     LosVendorApiLogService,
+    BureauReportRepository,
+    LosCheckCibilService,
   ],
   exports: [LosSessionService, LosLoanRepaymentSyncService],
 })

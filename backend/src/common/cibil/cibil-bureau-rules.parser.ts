@@ -1168,6 +1168,163 @@ export function checkNoActiveMfiLoans(body: unknown): BureauAdverseTradelineChec
 }
 
 /**
+ * Rejects when any CIBIL loan/account type has overdue (amount past due)
+ * greater than `maxAllowedInr`. Overdue is summed per TUEF account type.
+ */
+export function auditLoanTypeOverdue(
+  body: unknown,
+  maxAllowedInr: number,
+): BureauTradelineRuleCheck {
+  const byType = new Map<
+    string,
+    {
+      label: string;
+      totalInr: number;
+      lines: Array<{
+        creditor: string;
+        overdueInr: number;
+        accountNumber: string | null;
+        isOpen: boolean;
+      }>;
+    }
+  >();
+
+  walkTradelines(body, ({ lineRec, partitionSymbol, creditor }) => {
+    const granted = asRecord(lineRec.GrantedTrade);
+    const overdueInr = parseAssessmentAmountInr(granted?.amountPastDue ?? lineRec.amountPastDue);
+    const accountType =
+      resolveTradelineAccountTypeSymbol(partitionSymbol, lineRec) ??
+      normalizeCibilAccountTypeSymbol(partitionSymbol) ??
+      'UNKNOWN';
+    const label = cibilAccountTypeDisplayLabel(accountType === 'UNKNOWN' ? null : accountType);
+    const bucket = byType.get(accountType) ?? { label, totalInr: 0, lines: [] };
+    bucket.totalInr += overdueInr;
+    if (overdueInr > 0) {
+      const accountNumber =
+        lineRec.accountNumber != null ? String(lineRec.accountNumber).trim() : null;
+      bucket.lines.push({
+        creditor,
+        overdueInr,
+        accountNumber: accountNumber || null,
+        isOpen: isCibilTradelineOpen(lineRec),
+      });
+    }
+    byType.set(accountType, bucket);
+  });
+
+  const findings: BureauRuleFinding[] = [];
+  const failingSummaries: string[] = [];
+  for (const [symbol, bucket] of byType) {
+    if (bucket.totalInr <= maxAllowedInr) continue;
+    failingSummaries.push(`${bucket.label} ${bucket.totalInr} INR`);
+    findings.push({
+      title: bucket.label,
+      detail: `Loan type overdue amount ${bucket.totalInr} INR exceeds maximum ${maxAllowedInr} INR.`,
+      data: {
+        accountType: symbol,
+        loanType: bucket.label,
+        overdueAmountInr: bucket.totalInr,
+        maxAllowedInr,
+        tradelineCount: bucket.lines.length,
+      },
+    });
+    for (const line of bucket.lines) {
+      findings.push({
+        title: line.creditor,
+        detail: `${bucket.label} overdue ${line.overdueInr} INR${line.isOpen ? '' : ' (closed)'}.`,
+        data: {
+          accountType: symbol,
+          overdueAmountInr: line.overdueInr,
+          accountNumber: line.accountNumber,
+          isOpen: line.isOpen,
+        },
+      });
+    }
+  }
+
+  return {
+    passed: findings.length === 0,
+    detail: failingSummaries.length
+      ? `Overdue amount on loan type(s): ${failingSummaries.join('; ')} (max allowed ${maxAllowedInr} INR).`
+      : null,
+    findings,
+  };
+}
+
+export function checkLoanTypeOverdue(body: unknown, maxAllowedInr: number): BureauAdverseTradelineCheck {
+  const audit = auditLoanTypeOverdue(body, maxAllowedInr);
+  return { passed: audit.passed, detail: audit.detail };
+}
+
+/**
+ * Rejects when any tradeline's CIBIL account type is in `loanTypeIds`.
+ * When `openOnly` is true, closed matching tradelines are ignored.
+ */
+export function auditRejectedLoanTypes(
+  body: unknown,
+  loanTypeIds: readonly string[],
+  options: { openOnly: boolean },
+): BureauTradelineRuleCheck {
+  const blocked = new Set(
+    loanTypeIds
+      .map((id) => normalizeCibilAccountTypeSymbol(id))
+      .filter((id): id is string => Boolean(id)),
+  );
+  if (!blocked.size) {
+    return { passed: true, detail: null, findings: [] };
+  }
+
+  const findings: BureauRuleFinding[] = [];
+  walkTradelines(body, ({ lineRec, partitionSymbol, creditor }) => {
+    const isOpen = isCibilTradelineOpen(lineRec);
+    if (options.openOnly && !isOpen) return;
+
+    const accountType =
+      resolveTradelineAccountTypeSymbol(partitionSymbol, lineRec) ??
+      normalizeCibilAccountTypeSymbol(partitionSymbol);
+    if (!accountType || !blocked.has(accountType)) return;
+
+    const label = cibilAccountTypeDisplayLabel(accountType);
+    const accountNumber =
+      lineRec.accountNumber != null ? String(lineRec.accountNumber).trim() : null;
+    findings.push({
+      title: creditor,
+      detail: options.openOnly
+        ? `Open ${label} (${accountType}) tradeline is in the rejected open loan-type set.`
+        : `${label} (${accountType}) tradeline is in the rejected loan-type set${isOpen ? '' : ' (closed)'}.`,
+      data: {
+        accountType,
+        loanType: label,
+        isOpen,
+        accountNumber: accountNumber || null,
+      },
+    });
+  });
+
+  const labels = [
+    ...new Set(findings.map((f) => String(f.data?.loanType ?? f.data?.accountType ?? '')).filter(Boolean)),
+  ];
+  return {
+    passed: findings.length === 0,
+    detail: findings.length
+      ? options.openOnly
+        ? `Open rejected loan type(s) found: ${labels.join(', ')}.`
+        : `Rejected loan type(s) found: ${labels.join(', ')}.`
+      : null,
+    findings,
+  };
+}
+
+export function checkRejectedLoanTypes(
+  body: unknown,
+  loanTypeIds: readonly string[],
+  options: { openOnly: boolean },
+): BureauAdverseTradelineCheck {
+  const audit = auditRejectedLoanTypes(body, loanTypeIds, options);
+  return { passed: audit.passed, detail: audit.detail };
+}
+
+/**
  * Counts (tradeline × month) pairs where DPD > 0 in the last N months.
  * A "missed payment" is any month on any tradeline with positive DPD.
  */
@@ -1300,7 +1457,15 @@ function resolveTradelineEvaluatedRules(input: {
     input.activeRuleIds.has(EC.MIN_UNSECURED_LOAN_AMOUNT) && input.isOpen && input.isUnsecured
       ? [EC.MIN_UNSECURED_LOAN_AMOUNT]
       : [];
-  return [...always, ...mfi, ...dpd, ...unsecuredMin];
+  const overdue = input.activeRuleIds.has(EC.MAX_LOAN_TYPE_OVERDUE_AMOUNT)
+    ? [EC.MAX_LOAN_TYPE_OVERDUE_AMOUNT]
+    : [];
+  const rejectOpen =
+    input.activeRuleIds.has(EC.REJECT_OPEN_LOAN_TYPES) && input.isOpen
+      ? [EC.REJECT_OPEN_LOAN_TYPES]
+      : [];
+  const rejectAny = input.activeRuleIds.has(EC.REJECT_LOAN_TYPES) ? [EC.REJECT_LOAN_TYPES] : [];
+  return [...always, ...mfi, ...dpd, ...unsecuredMin, ...overdue, ...rejectOpen, ...rejectAny];
 }
 
 /** Every tradeline on the bureau report with flags and which post-BRE rules evaluate it. */
@@ -1427,6 +1592,8 @@ export type CibilAssessmentSignals = {
   noOfCreditCards: number;
   noOfSecuredLoans: number;
   noOfUnsecuredLoans: number;
+  /** Open unsecured tradelines only (same unsecured set as `noOfUnsecuredLoans`). */
+  noOfActiveUnsecuredLoans: number;
   noOfGoldLoans: number;
   sixMonthEnquiries: number;
   totalEnquiries: number;
@@ -1480,6 +1647,7 @@ export function computeCibilAssessmentSignals(
   let noOfCreditCards = 0;
   let noOfSecuredLoans = 0;
   let noOfUnsecuredLoans = 0;
+  let noOfActiveUnsecuredLoans = 0;
   let noOfGoldLoans = 0;
   let totalOverdueAmountInr = 0;
   let hasWilfulDefault = false;
@@ -1503,8 +1671,12 @@ export function computeCibilAssessmentSignals(
         noOfCreditCards += 1;
       }
       if (parsed.accountTypeSymbol === '07') noOfGoldLoans += 1;
-      if (parsed.isUnsecured) noOfUnsecuredLoans += 1;
-      else noOfSecuredLoans += 1;
+      if (parsed.isUnsecured) {
+        noOfUnsecuredLoans += 1;
+        if (parsed.isOpen) noOfActiveUnsecuredLoans += 1;
+      } else {
+        noOfSecuredLoans += 1;
+      }
     }
 
     const granted = asRecord(lineRec.GrantedTrade);
@@ -1571,6 +1743,7 @@ export function computeCibilAssessmentSignals(
     noOfCreditCards,
     noOfSecuredLoans,
     noOfUnsecuredLoans,
+    noOfActiveUnsecuredLoans,
     noOfGoldLoans,
     sixMonthEnquiries,
     totalEnquiries,
