@@ -274,6 +274,14 @@ export function isLeadRejectedAndLocked(lead: CustomerPortalLead | null | undefi
   return lead.status === 'REJECTED' || lead.status === 'BLACKLISTED';
 }
 
+/** Safe on the session union — `{ authenticated: false }` has no `lead`. */
+export function isSessionLeadRejectedAndLocked(
+  session: CustomerSessionResponse | null | undefined,
+): boolean {
+  if (!session || session.authenticated !== true) return false;
+  return isLeadRejectedAndLocked(session.lead);
+}
+
 /** True when the customer still has loan-application steps left (hub should show "Complete your journey"). */
 export function isCustomerJourneyIncomplete(
   session: CustomerSessionResponse | null | undefined,

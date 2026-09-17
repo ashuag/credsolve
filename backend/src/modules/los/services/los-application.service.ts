@@ -497,7 +497,7 @@ export class LosApplicationService {
             mobileNumber: true,
             customerKycs: {
               orderBy: { createdAt: 'desc' },
-              take: 15,
+              take: 5,
               select: { aadhaarVerifiedAt: true, aadhaarPhotoPath: true, aadhaarData: true },
             },
           },

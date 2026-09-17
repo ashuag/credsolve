@@ -23,7 +23,7 @@ import {
 } from '@/lib/api/digilocker';
 import {
   getPostDigilockerAadhaarContinuePath,
-  isLeadRejectedAndLocked,
+  isSessionLeadRejectedAndLocked,
 } from '@/lib/api/customer-session';
 import { kycJourneyProgressFromSession } from '@/lib/kyc-journey-progress';
 
@@ -208,7 +208,7 @@ function DigilockerCallbackContent() {
     async (out: DownloadAadhaarDigilockerResponse) => {
       applyAttemptCounts(out);
       const next = await refresh();
-      if (out.terminalFailure || out.leadRejected || isLeadRejectedAndLocked(next.lead)) {
+      if (out.terminalFailure || out.leadRejected || isSessionLeadRejectedAndLocked(next)) {
         router.replace('/thank-you-interest');
         return true;
       }
@@ -261,7 +261,7 @@ function DigilockerCallbackContent() {
             router.replace(href);
             return;
           }
-          if (next.authenticated === true && next.lead && isLeadRejectedAndLocked(next.lead)) {
+          if (isSessionLeadRejectedAndLocked(next)) {
             router.replace('/thank-you-interest');
             return;
           }
@@ -353,11 +353,7 @@ function DigilockerCallbackContent() {
         return;
       }
 
-      if (
-        currentSession.authenticated === true &&
-        currentSession.lead &&
-        isLeadRejectedAndLocked(currentSession.lead)
-      ) {
+      if (isSessionLeadRejectedAndLocked(currentSession)) {
         router.replace('/thank-you-interest');
         return;
       }
