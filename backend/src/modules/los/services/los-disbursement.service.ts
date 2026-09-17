@@ -110,7 +110,7 @@ export class LosDisbursementService {
       );
     }
 
-    if (!this.isJourneyComplete(application)) {
+    if (!(await this.isJourneyComplete(application))) {
       throw new BadRequestException(
         'Customer journey is incomplete. Approve is available only after profile, credit, loan, email, sanction letter, KYC, bank, and references are done.',
       );
@@ -603,15 +603,23 @@ export class LosDisbursementService {
     }
   }
 
-  private isJourneyComplete(
+  private async isJourneyComplete(
     application: Awaited<ReturnType<LosDisbursementService['loadApplicationForDecision']>>,
-  ): boolean {
+  ): Promise<boolean> {
     const detail = application.lead.leadDetail;
+    let hasBureauReport = Boolean(detail?.bureauReportId);
+    if (!hasBureauReport) {
+      const prior = await this.prisma.client.bureauReport.findFirst({
+        where: { customerId: application.customerId },
+        select: { id: true },
+      });
+      hasBureauReport = Boolean(prior);
+    }
     return isCustomerJourneyComplete({
       fullName: detail?.fullName,
       panVerified: detail?.panVerified,
       bureauFetched: detail?.bureauFetched,
-      hasBureauReport: Boolean(detail?.bureauReportId),
+      hasBureauReport,
       selectedLoanAmount: application.details?.selectedLoanAmount,
       emailVerifiedAt: application.details?.emailVerifiedAt,
       loanDocumentsAcceptedAt: application.details?.loanDocumentsAcceptedAt,

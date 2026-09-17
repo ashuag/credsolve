@@ -188,8 +188,7 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
   const profileDone = Boolean(profile?.fullName?.trim());
   const panDone = (row.lead.panVerified ?? 0) === PAN_VERIFIED.VERIFIED;
   const bureauDone =
-    (row.lead.bureauFetched ?? 0) === BUREAU_FETCHED.SUCCESS ||
-    (Boolean(row.bureauReport) && !row.bureauReport?.fromPriorApplication);
+    (row.lead.bureauFetched ?? 0) === BUREAU_FETCHED.SUCCESS || Boolean(row.bureauReport);
   const loanDone = Boolean(row.details?.loanAmount);
   const refsDone = (row.referencesCount ?? 0) >= 2;
   const emailDone = Boolean(row.emailVerifiedAt);
