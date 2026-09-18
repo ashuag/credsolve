@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { extractProfileFromDigilockerFormJson } from './digilocker-form-profile.util';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -168,13 +169,13 @@ export function compareAadhaarToLeadProfile(input: {
     };
   }
 
-  if (!personNamesMatch(leadName, aadhaar.fullName)) {
-    return {
-      matched: false,
-      reason: 'name_mismatch',
-      message: 'Name on Aadhaar does not match the name on your loan application.',
-    };
-  }
+  // if (!personNamesMatch(leadName, aadhaar.fullName)) {
+  //   return {
+  //     matched: false,
+  //     reason: 'name_mismatch',
+  //     message: 'Name on Aadhaar does not match the name on your loan application.',
+  //   };
+  // }
 
   return { matched: true };
 }
