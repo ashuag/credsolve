@@ -30,6 +30,9 @@ type UrlResolved = { absoluteUrl: string } | { baseUrl: string; path: string };
 
 type PickUrlOutcome = VendorCallResult | { resolved: UrlResolved };
 
+/** Penny-drop can sit behind the bank IMPS/name-enquiry hop; 30s is too tight. */
+const PENNY_DROP_TIMEOUT_MS = 60_000;
+
 /**
  * Tenacio IFSC details + penny-drop style bank verification.
  *
@@ -122,6 +125,7 @@ export class BankTenacioVendorService {
       workflowId,
       body,
       leadId,
+      timeoutMs: PENNY_DROP_TIMEOUT_MS,
       redactRequest: (b) => {
         const input = b?.input as Record<string, unknown> | undefined;
         const acct = input?.bankAccountNumber;
@@ -201,6 +205,7 @@ export class BankTenacioVendorService {
     workflowId: string;
     body: TenacioIfscLookupBody | TenacioPennyDropBody;
     leadId: bigint | null;
+    timeoutMs?: number;
     redactRequest: (body: TenacioIfscLookupBody | TenacioPennyDropBody | undefined) => unknown;
   }): Promise<VendorCallResult> {
     const auth = this.resolveAuth();
@@ -219,6 +224,7 @@ export class BankTenacioVendorService {
       headers: this.headers(auth.clientId, auth.apiKey, params.workflowId),
       body: params.body,
       leadId: params.leadId,
+      timeoutMs: params.timeoutMs,
       redactRequest: params.redactRequest,
     });
 

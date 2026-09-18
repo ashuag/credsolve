@@ -270,28 +270,30 @@ export function ApplicationCibilReportTab({
         hideHitLogs
         lastResult={checkResult}
         onCompleted={handleCibilChecked}
-        buttonClassName="los-btn-primary min-h-[38px] px-4 text-[0.82rem]"
+        buttonClassName="los-btn-primary min-h-[38px] shrink-0 whitespace-nowrap px-4 text-[0.82rem]"
         renderToolbarButton={(button) => (
           <nav
-            className="los-card flex flex-wrap items-center gap-1 p-1.5"
+            className="flex flex-wrap items-center gap-2"
             aria-label="CIBIL report views"
           >
-            {viewTabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveView(tab.id)}
-                className={cx(
-                  'min-h-[38px] flex-1 rounded-[10px] px-4 text-[0.82rem] font-extrabold transition-colors sm:flex-none',
-                  activeView === tab.id
-                    ? 'bg-brand-navy text-white shadow-sm'
-                    : 'text-brand-navy hover:bg-[rgba(23,44,113,0.06)]',
-                )}
-                aria-current={activeView === tab.id ? 'page' : undefined}
-              >
-                {tab.label}
-              </button>
-            ))}
+            <div className="los-card flex min-w-0 flex-wrap items-center gap-1 p-1.5">
+              {viewTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveView(tab.id)}
+                  className={cx(
+                    'min-h-[38px] flex-1 whitespace-nowrap rounded-[10px] px-3 text-[0.82rem] font-extrabold transition-colors sm:flex-none sm:px-4',
+                    activeView === tab.id
+                      ? 'bg-brand-navy text-white shadow-sm'
+                      : 'text-brand-navy hover:bg-[rgba(23,44,113,0.06)]',
+                  )}
+                  aria-current={activeView === tab.id ? 'page' : undefined}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
             <div className="ml-auto flex flex-wrap items-center gap-1.5">
               {button}
               {pdfDownloadUrl ? (
@@ -299,7 +301,7 @@ export function ApplicationCibilReportTab({
                   href={pdfDownloadUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex min-h-[38px] items-center rounded-[10px] border border-[rgba(23,44,113,0.12)] bg-white px-4 text-[0.82rem] font-bold text-brand-blue no-underline hover:border-[rgba(20,150,243,0.35)]"
+                  className="inline-flex min-h-[38px] shrink-0 items-center whitespace-nowrap rounded-[10px] border border-[rgba(23,44,113,0.12)] bg-white px-4 text-[0.82rem] font-bold text-brand-blue no-underline hover:border-[rgba(20,150,243,0.35)]"
                 >
                   Download CIBIL report
                 </a>
