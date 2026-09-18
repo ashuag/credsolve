@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
-  buildMyMoneyBazaarSoftPullBody,
+  buildCibil07SoftPullBody,
   formatDobYmd,
   isProviderEmail,
   isProviderPincode,
   joinAddressParts,
   mapGenderKeyToProvider,
   splitFullName,
-} from './build-mymoneybazaar-soft-pull-body';
+} from './build-cibil07-soft-pull-body';
 
 describe('splitFullName', () => {
   it('splits multi-token names', () => {
@@ -74,10 +74,10 @@ describe('joinAddressParts', () => {
   });
 });
 
-describe('buildMyMoneyBazaarSoftPullBody', () => {
+describe('buildCibil07SoftPullBody', () => {
   it('builds the flat snake_case body from validated lead_detail values', () => {
     assert.deepEqual(
-      buildMyMoneyBazaarSoftPullBody({
+      buildCibil07SoftPullBody({
         fullName: 'Saurabh Agarwal',
         dateOfBirth: new Date('1986-08-01T00:00:00.000Z'),
         genderKey: 'MALE',

@@ -2,25 +2,25 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { VendorApiService } from '../vendor-api.service';
 import {
-  buildMyMoneyBazaarSoftPullBody,
+  buildCibil07SoftPullBody,
   isProviderEmail,
   isProviderPincode,
   joinAddressParts,
-  type MyMoneyBazaarSoftPullBody,
-} from './build-mymoneybazaar-soft-pull-body';
-import { mapMyMoneyBazaarSoftPullToTenacioEnvelope } from './mymoneybazaar-cibil-to-tenacio.mapper';
+  type Cibil07SoftPullBody,
+} from './build-cibil07-soft-pull-body';
+import { mapCibil07SoftPullToTenacioEnvelope } from './cibil07-cibil-to-tenacio.mapper';
 
-/** mymoneybazaarApi `CibilSoftPullDto` requires `address` `@MinLength(3)`. */
+/** CIBIL07 API `CibilSoftPullDto` requires `address` `@MinLength(3)`. */
 const MIN_ADDRESS_LENGTH = 3;
 
-export type MyMoneyBazaarCibilInput = {
+export type Cibil07CibilInput = {
   mobileNumber: string;
   panNumber: string;
   name: string;
   consent: boolean;
 };
 
-export type MyMoneyBazaarCibilResult = {
+export type Cibil07CibilResult = {
   configured: boolean;
   skipReason?: string;
   ok: boolean;
@@ -36,11 +36,12 @@ export type MyMoneyBazaarCibilResult = {
 };
 
 /**
- * Bureau soft-pull via mymoneybazaarApi `POST /api/cibil/soft-pull` (PayMe India
- * merchant path), a selectable `cibil_fetch` vendor ("MyMoneyBazaar").
+ * Bureau soft-pull via CIBIL07 `POST /api/cibil/soft-pull` (PayMe India
+ * merchant path), a selectable `cibil_fetch` vendor ("CIBIL07").
  *
- * Env: `MMB_CIBIL_URL` + `MMB_CIBIL_ACCESS_TOKEN` (required; sent as the
- * `x-access-token` header). Optional `MMB_CIBIL_PROVIDER`.
+ * Env: `CIBIL07_CIBIL_URL` + `CIBIL07_CIBIL_ACCESS_TOKEN` (required; sent as
+ * the `x-access-token` header). Optional `CIBIL07_CIBIL_PROVIDER`.
+ * `MMB_CIBIL_*` aliases are still accepted.
  *
  * Name / DOB / gender / email / pincode / address are read from `lead_detail`
  * (email / pincode / address are captured on the address step, which runs before
@@ -54,8 +55,8 @@ export type MyMoneyBazaarCibilResult = {
  * Tenacio-shaped wrapper so BRE rules and the CIBIL report PDF are unaffected.
  */
 @Injectable()
-export class MyMoneyBazaarCibilService {
-  private readonly logger = new Logger(MyMoneyBazaarCibilService.name);
+export class Cibil07CibilService {
+  private readonly logger = new Logger(Cibil07CibilService.name);
 
   constructor(
     private readonly vendorApi: VendorApiService,
@@ -63,22 +64,22 @@ export class MyMoneyBazaarCibilService {
   ) {}
 
   async fetchCreditReport(
-    input: MyMoneyBazaarCibilInput,
+    input: Cibil07CibilInput,
     leadId: bigint | null,
-  ): Promise<MyMoneyBazaarCibilResult> {
-    const url = (process.env.MMB_CIBIL_URL ?? '').trim();
-    const token = (process.env.MMB_CIBIL_ACCESS_TOKEN ?? '').trim();
-    const providerName = (process.env.MMB_CIBIL_PROVIDER ?? 'MyMoneyBazaar').trim();
+  ): Promise<Cibil07CibilResult> {
+    const url = (process.env.CIBIL07_CIBIL_URL ?? process.env.MMB_CIBIL_URL ?? '').trim();
+    const token = (process.env.CIBIL07_CIBIL_ACCESS_TOKEN ?? process.env.MMB_CIBIL_ACCESS_TOKEN ?? '').trim();
+    const providerName = (process.env.CIBIL07_CIBIL_PROVIDER ?? process.env.MMB_CIBIL_PROVIDER ?? 'CIBIL07').trim();
 
     if (!url || !token) {
       return this.skip(
-        'MyMoneyBazaar CIBIL is not configured. Set MMB_CIBIL_URL (full /api/cibil/soft-pull URL) and MMB_CIBIL_ACCESS_TOKEN (x-access-token).',
+        'CIBIL07 is not configured. Set CIBIL07_CIBIL_URL (full /api/cibil/soft-pull URL) and CIBIL07_CIBIL_ACCESS_TOKEN (x-access-token).',
       );
     }
 
     if (leadId == null) {
       return this.skip(
-        'MyMoneyBazaar CIBIL requires a leadId to resolve name / DOB / email / address from lead_detail.',
+        'CIBIL07 requires a leadId to resolve name / DOB / email / address from lead_detail.',
       );
     }
 
@@ -108,11 +109,11 @@ export class MyMoneyBazaarCibilService {
 
     if (missing.length > 0 || !detail?.dateOfBirth) {
       return this.skip(
-        `MyMoneyBazaar CIBIL skipped (leadId=${leadId.toString()}): missing/invalid ${missing.join(', ')} on lead_detail.`,
+        `CIBIL07 skipped (leadId=${leadId.toString()}): missing/invalid ${missing.join(', ')} on lead_detail.`,
       );
     }
 
-    const body = buildMyMoneyBazaarSoftPullBody({
+    const body = buildCibil07SoftPullBody({
       fullName: (detail.fullName ?? input.name).trim(),
       dateOfBirth: detail.dateOfBirth,
       genderKey: detail.gender?.key ?? null,
@@ -124,11 +125,11 @@ export class MyMoneyBazaarCibilService {
     });
 
     this.logger.log(
-      `MyMoneyBazaar CIBIL soft-pull (leadId=${leadId.toString()}) ` +
+      `CIBIL07 soft-pull (leadId=${leadId.toString()}) ` +
         `email=${maskEmail(body.email)} pin=${body.pin_code}`,
     );
 
-    const result = await this.vendorApi.request<unknown, MyMoneyBazaarSoftPullBody>({
+    const result = await this.vendorApi.request<unknown, Cibil07SoftPullBody>({
       providerName,
       serviceName: 'cibil-soft-pull',
       method: 'POST',
@@ -140,7 +141,7 @@ export class MyMoneyBazaarCibilService {
       redactRequest: (b) => redactSoftPullBody(b),
     });
 
-    const vendorBody = mapMyMoneyBazaarSoftPullToTenacioEnvelope(result.body, result.httpStatus, {
+    const vendorBody = mapCibil07SoftPullToTenacioEnvelope(result.body, result.httpStatus, {
       fullName: detail.fullName ?? input.name,
     }) as unknown as Record<string, unknown>;
 
@@ -153,7 +154,7 @@ export class MyMoneyBazaarCibilService {
     };
   }
 
-  private skip(skipReason: string): MyMoneyBazaarCibilResult {
+  private skip(skipReason: string): Cibil07CibilResult {
     this.logger.warn(skipReason);
     return { configured: false, skipReason, ok: false, httpStatus: null, vendorBody: null };
   }
@@ -167,7 +168,7 @@ function maskEmail(email: string): string {
 }
 
 /** Mask PAN / phone / email before the request body lands in `vendor_api_log`. */
-function redactSoftPullBody(body: MyMoneyBazaarSoftPullBody | undefined): unknown {
+function redactSoftPullBody(body: Cibil07SoftPullBody | undefined): unknown {
   if (!body) return body;
   const pan = body.pan_card_number;
   const phone = body.phone_number;

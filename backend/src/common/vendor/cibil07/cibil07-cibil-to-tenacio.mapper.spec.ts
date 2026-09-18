@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { mapMyMoneyBazaarSoftPullToTenacioEnvelope } from './mymoneybazaar-cibil-to-tenacio.mapper';
+import { mapCibil07SoftPullToTenacioEnvelope } from './cibil07-cibil-to-tenacio.mapper';
 
 const bureauReport = {
   GetCustomerAssetsResponse: {
@@ -15,7 +15,7 @@ const bureauReport = {
   },
 };
 
-/** A successful soft-pull envelope from mymoneybazaarApi `/api/cibil/soft-pull`. */
+/** A successful soft-pull envelope from CIBIL07 API `/api/cibil/soft-pull`. */
 function softPullOk(data: unknown) {
   return {
     success: true,
@@ -26,9 +26,9 @@ function softPullOk(data: unknown) {
   };
 }
 
-describe('mapMyMoneyBazaarSoftPullToTenacioEnvelope', () => {
+describe('mapCibil07SoftPullToTenacioEnvelope', () => {
   it('wraps a PayMe India merchant report into the Tenacio envelope', () => {
-    const wrapped = mapMyMoneyBazaarSoftPullToTenacioEnvelope(
+    const wrapped = mapCibil07SoftPullToTenacioEnvelope(
       softPullOk({
         status: true,
         data: { cibilData: bureauReport, html_url: 'https://x/report.html' },
@@ -41,16 +41,16 @@ describe('mapMyMoneyBazaarSoftPullToTenacioEnvelope', () => {
     assert.deepEqual(wrapped.data?.cibilData, bureauReport);
     assert.equal(wrapped.data?.htmlUrl, 'https://x/report.html');
     assert.equal(wrapped.requestId, 'req-uuid-1');
-    assert.equal(wrapped.sourceVendor, 'MyMoneyBazaar');
+    assert.equal(wrapped.sourceVendor, 'CIBIL07');
   });
 
   it('maps a merchant no-hit to the Tenacio 422 error envelope', () => {
-    const wrapped = mapMyMoneyBazaarSoftPullToTenacioEnvelope(
+    const wrapped = mapCibil07SoftPullToTenacioEnvelope(
       softPullOk({ status: false, message: 'No matching bureau record' }),
       200,
     );
     assert.deepEqual(wrapped, {
-      sourceVendor: 'MyMoneyBazaar',
+      sourceVendor: 'CIBIL07',
       status: 'error',
       serviceStatusCode: 422,
       requestId: 'req-uuid-1',
@@ -59,7 +59,7 @@ describe('mapMyMoneyBazaarSoftPullToTenacioEnvelope', () => {
   });
 
   it('passes through a payload that is already a Tenacio envelope', () => {
-    const wrapped = mapMyMoneyBazaarSoftPullToTenacioEnvelope(
+    const wrapped = mapCibil07SoftPullToTenacioEnvelope(
       softPullOk({
         status: 'success',
         serviceStatusCode: 200,
@@ -74,7 +74,7 @@ describe('mapMyMoneyBazaarSoftPullToTenacioEnvelope', () => {
   });
 
   it('surfaces a soft-pull transport failure as a Tenacio error envelope', () => {
-    const wrapped = mapMyMoneyBazaarSoftPullToTenacioEnvelope(
+    const wrapped = mapCibil07SoftPullToTenacioEnvelope(
       {
         success: false,
         request_uuid: 'req-uuid-2',
@@ -91,7 +91,7 @@ describe('mapMyMoneyBazaarSoftPullToTenacioEnvelope', () => {
   });
 
   it('surfaces a timeout as serviceStatusCode 504', () => {
-    const wrapped = mapMyMoneyBazaarSoftPullToTenacioEnvelope(
+    const wrapped = mapCibil07SoftPullToTenacioEnvelope(
       { success: false, status: 'TIMEOUT', http_status: null, data: null },
       504,
     );
@@ -100,13 +100,13 @@ describe('mapMyMoneyBazaarSoftPullToTenacioEnvelope', () => {
   });
 
   it('handles a missing / non-object body', () => {
-    const wrapped = mapMyMoneyBazaarSoftPullToTenacioEnvelope(null, 500);
+    const wrapped = mapCibil07SoftPullToTenacioEnvelope(null, 500);
     assert.equal(wrapped.status, 'error');
     assert.equal(wrapped.serviceStatusCode, 500);
   });
 
   it('unwraps a truncated vendor_api_log body before mapping PayMe India data', () => {
-    const wrapped = mapMyMoneyBazaarSoftPullToTenacioEnvelope(
+    const wrapped = mapCibil07SoftPullToTenacioEnvelope(
       {
         parsed: softPullOk({
           data: {
@@ -133,7 +133,7 @@ describe('mapMyMoneyBazaarSoftPullToTenacioEnvelope', () => {
     );
     assert.equal(wrapped.status, 'success');
     assert.equal(wrapped.serviceStatusCode, 200);
-    assert.equal(wrapped.sourceVendor, 'MyMoneyBazaar');
+    assert.equal(wrapped.sourceVendor, 'CIBIL07');
     const score = (wrapped.data?.cibilData as Record<string, unknown> | undefined)
       ?.GetCustomerAssetsResponse as Record<string, unknown> | undefined;
     assert.ok(score);

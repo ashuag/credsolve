@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
-import { mapMyMoneyBazaarSoftPullToTenacioEnvelope } from './mymoneybazaar-cibil-to-tenacio.mapper';
+import { mapCibil07SoftPullToTenacioEnvelope } from './cibil07-cibil-to-tenacio.mapper';
 import {
   isPayMeIndiaFlatReport,
   payMeAccountTypeToTuefSymbol,
@@ -120,8 +120,8 @@ describe('payMeIndiaFlatToTrueLink', () => {
   });
 });
 
-describe('mapMyMoneyBazaarSoftPullToTenacioEnvelope (PayMe India flat)', () => {
-  const wrapped = mapMyMoneyBazaarSoftPullToTenacioEnvelope(SAMPLE, 200, { fullName: 'Sample Borrower' });
+describe('mapCibil07SoftPullToTenacioEnvelope (PayMe India flat)', () => {
+  const wrapped = mapCibil07SoftPullToTenacioEnvelope(SAMPLE, 200, { fullName: 'Sample Borrower' });
 
   it('returns a success envelope the pipeline accepts', () => {
     assert.equal(wrapped.status, 'success');

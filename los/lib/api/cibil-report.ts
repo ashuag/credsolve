@@ -203,7 +203,7 @@ export type CibilCreditAssessment = {
 export type LosApplicationCibilReportPayload = {
   bureauReportUuid: string;
   fetchedAt: string;
-  /** Integration that pulled this CIBIL report (`Tenacio`, `Surepass`, `MyMoneyBazaar`). */
+  /** Integration that pulled this CIBIL report (`Tenacio`, `Surepass`, `CIBIL07`). */
   vendorName: string | null;
   reportPdfUrl: string | null;
   /** Original Tenacio / TrueLink bureau JSON stored on the bureau report row. */

@@ -7,7 +7,7 @@ import { REJECTION_REASON } from '../../../common/constants/rejection-reason.con
 import { isCibilVendorServiceName, LosCheckCibilService, wrapCibilHitJson } from './los-check-cibil.service';
 
 describe('isCibilVendorServiceName', () => {
-  it('matches Tenacio, Surepass, and MyMoneyBazaar CIBIL service names', () => {
+  it('matches Tenacio, Surepass, and CIBIL07 CIBIL service names', () => {
     assert.equal(isCibilVendorServiceName('experian-soft-pull'), true);
     assert.equal(isCibilVendorServiceName('experian-soft-pull/services/experian-soft-pull'), true);
     assert.equal(isCibilVendorServiceName('credit-report-cibil'), true);
@@ -22,15 +22,25 @@ describe('isCibilVendorServiceName', () => {
 });
 
 describe('wrapCibilHitJson', () => {
-  it('wraps MyMoneyBazaar soft-pull bodies into the Tenacio envelope', () => {
+  it('wraps CIBIL07 soft-pull bodies into the Tenacio envelope', () => {
+    const wrapped = wrapCibilHitJson({
+      providerName: 'CIBIL07',
+      serviceName: 'cibil-soft-pull',
+      httpStatus: 200,
+      originalJson: { success: false, status: 'VENDOR_ERROR', error: { message: 'upstream timeout' } },
+    });
+    assert.equal((wrapped as { sourceVendor?: string }).sourceVendor, 'CIBIL07');
+    assert.equal((wrapped as { status?: string }).status, 'error');
+  });
+
+  it('still wraps historical MyMoneyBazaar vendor-log bodies as CIBIL07', () => {
     const wrapped = wrapCibilHitJson({
       providerName: 'MyMoneyBazaar',
       serviceName: 'cibil-soft-pull',
       httpStatus: 200,
       originalJson: { success: false, status: 'VENDOR_ERROR', error: { message: 'upstream timeout' } },
     });
-    assert.equal((wrapped as { sourceVendor?: string }).sourceVendor, 'MyMoneyBazaar');
-    assert.equal((wrapped as { status?: string }).status, 'error');
+    assert.equal((wrapped as { sourceVendor?: string }).sourceVendor, 'CIBIL07');
   });
 
   it('leaves Tenacio bodies unchanged', () => {
@@ -44,9 +54,9 @@ describe('wrapCibilHitJson', () => {
     assert.equal(wrapped, original);
   });
 
-  it('converts a truncated MyMoneyBazaar vendor-log payload into a Tenacio success envelope', () => {
+  it('converts a truncated CIBIL07 vendor-log payload into a Tenacio success envelope', () => {
     const wrapped = wrapCibilHitJson({
-      providerName: 'MyMoneyBazaar',
+      providerName: 'CIBIL07',
       serviceName: 'cibil-soft-pull',
       httpStatus: 200,
       originalJson: {
@@ -79,7 +89,7 @@ describe('wrapCibilHitJson', () => {
       },
     });
     const rec = wrapped as { status?: string; serviceStatusCode?: number; sourceVendor?: string };
-    assert.equal(rec.sourceVendor, 'MyMoneyBazaar');
+    assert.equal(rec.sourceVendor, 'CIBIL07');
     assert.equal(rec.status, 'success');
     assert.equal(rec.serviceStatusCode, 200);
   });
@@ -320,8 +330,8 @@ describe('LosCheckCibilService', () => {
       vendorLogs: [
         {
           id: 1n,
-          uuid: 'log-mmb',
-          providerName: 'MyMoneyBazaar',
+          uuid: 'log-cibil07',
+          providerName: 'CIBIL07',
           serviceName: 'cibil-soft-pull',
           httpStatus: 200,
           requestedAt: new Date('2026-09-17T10:00:00.000Z'),

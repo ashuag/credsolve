@@ -1,10 +1,10 @@
 /**
- * Builds the flat snake_case body for mymoneybazaarApi `POST /api/cibil/soft-pull`.
+ * Builds the flat snake_case body for CIBIL07 API `POST /api/cibil/soft-pull`.
  *
  * moneyCash captures email / pincode / address on the address step
  * (`POST /auth/lead-details`), which runs before the PAN + bureau step, so these
  * are read straight from `lead_detail`. The caller
- * ({@link MyMoneyBazaarCibilService}) validates them first and skips the vendor
+ * ({@link Cibil07CibilService}) validates them first and skips the vendor
  * (falls through to the next `cibil_fetch` vendor) when any is missing — no
  * placeholder data is ever sent to the bureau.
  */
@@ -12,17 +12,17 @@
 const PROVIDER_EMAIL_RE =
   /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i;
 
-/** mymoneybazaarApi `CibilSoftPullDto` requires `@IsEmail()`. */
+/** CIBIL07 API `CibilSoftPullDto` requires `@IsEmail()`. */
 export function isProviderEmail(value: string): boolean {
   return value.length > 0 && value.length <= 254 && PROVIDER_EMAIL_RE.test(value);
 }
 
-/** mymoneybazaarApi `CibilSoftPullDto` requires a 6-digit Indian PIN. */
+/** CIBIL07 API `CibilSoftPullDto` requires a 6-digit Indian PIN. */
 export function isProviderPincode(value: string): boolean {
   return /^[1-9]\d{5}$/.test(value);
 }
 
-export type MyMoneyBazaarSoftPullBody = {
+export type Cibil07SoftPullBody = {
   first_name: string;
   last_name: string;
   dob: string;
@@ -87,9 +87,9 @@ export function joinAddressParts(parts: Array<string | null | undefined>): strin
     .join(', ');
 }
 
-export function buildMyMoneyBazaarSoftPullBody(
+export function buildCibil07SoftPullBody(
   input: BuildSoftPullBodyInput,
-): MyMoneyBazaarSoftPullBody {
+): Cibil07SoftPullBody {
   const { firstName, lastName } = splitFullName(input.fullName);
 
   return {

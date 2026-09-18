@@ -18,7 +18,7 @@ import { generateLeadNumber } from '../../../common/loan/application-number.util
 import { SmsService } from '../../../common/sms/sms.service';
 import { BureauFetchService } from '../../../common/vendor/bureau-fetch.service';
 import { mapCibilVendorName } from '../../../common/vendor/cibil-vendor.util';
-import { mapMyMoneyBazaarSoftPullToTenacioEnvelope } from '../../../common/vendor/mymoneybazaar/mymoneybazaar-cibil-to-tenacio.mapper';
+import { mapCibil07SoftPullToTenacioEnvelope } from '../../../common/vendor/cibil07/cibil07-cibil-to-tenacio.mapper';
 import { mapSurepassCibilToTenacioEnvelope } from '../../../common/vendor/surepass/surepass-cibil-to-tenacio.mapper';
 import { unwrapVendorApiLogPayload } from '../../../common/vendor/vendor-api-log-payload.util';
 import {
@@ -111,8 +111,8 @@ export function wrapCibilHitJson(params: {
   const service = (params.serviceName ?? '').toLowerCase();
   const kind = mapCibilVendorName(params.providerName ?? '');
   try {
-    if (kind === 'mymoneybazaar' || service.includes('cibil-soft-pull')) {
-      return mapMyMoneyBazaarSoftPullToTenacioEnvelope(original, params.httpStatus);
+    if (kind === 'cibil07' || service.includes('cibil-soft-pull')) {
+      return mapCibil07SoftPullToTenacioEnvelope(original, params.httpStatus);
     }
     if (kind === 'surepass' || service.includes('credit-report-cibil')) {
       return mapSurepassCibilToTenacioEnvelope(original, params.httpStatus);

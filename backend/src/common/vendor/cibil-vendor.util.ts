@@ -1,24 +1,23 @@
 /** Bureau integrations selectable as the `cibil_fetch` vendor in `vendor_api_config`. */
-export type CibilVendorKind = 'tenacio' | 'surepass' | 'mymoneybazaar';
+export type CibilVendorKind = 'tenacio' | 'surepass' | 'cibil07';
 
 const CIBIL_VENDOR_DISPLAY: Record<CibilVendorKind, string> = {
   tenacio: 'Tenacio',
   surepass: 'Surepass',
-  mymoneybazaar: 'MyMoneyBazaar',
+  cibil07: 'CIBIL07',
 };
 
 /** Map a `vendor_api_config.vendor_name` (or payload `sourceVendor`) to a bureau integration. */
 export function mapCibilVendorName(vendorName: string): CibilVendorKind {
-  const name = vendorName.trim().toLowerCase();
+  const name = vendorName.trim().toLowerCase().replace(/[\s_-]+/g, '');
   if (name === 'surepass') return 'surepass';
   if (
+    name === 'cibil07' ||
     name === 'mymoneybazaar' ||
-    name === 'my money bazaar' ||
     name === 'mmb' ||
-    name === 'paymeindia' ||
-    name === 'payme india'
+    name === 'paymeindia'
   ) {
-    return 'mymoneybazaar';
+    return 'cibil07';
   }
   return 'tenacio';
 }
@@ -27,7 +26,7 @@ export function displayCibilVendorName(kind: CibilVendorKind | null | undefined)
   return CIBIL_VENDOR_DISPLAY[kind ?? 'tenacio'];
 }
 
-/** Read `sourceVendor` stamped on Surepass / MyMoneyBazaar envelopes; default Tenacio. */
+/** Read `sourceVendor` stamped on Surepass / CIBIL07 envelopes; default Tenacio. */
 export function inferCibilVendorFromPayload(vendorBody: unknown): CibilVendorKind {
   if (vendorBody == null || typeof vendorBody !== 'object' || Array.isArray(vendorBody)) {
     return 'tenacio';

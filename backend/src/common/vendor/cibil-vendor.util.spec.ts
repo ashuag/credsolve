@@ -9,14 +9,18 @@ import {
 describe('cibil-vendor.util', () => {
   it('maps vendor_api_config names onto supported integrations', () => {
     assert.equal(mapCibilVendorName('Surepass'), 'surepass');
-    assert.equal(mapCibilVendorName('My Money Bazaar'), 'mymoneybazaar');
-    assert.equal(mapCibilVendorName('PayMe India'), 'mymoneybazaar');
+    assert.equal(mapCibilVendorName('CIBIL07'), 'cibil07');
+    assert.equal(mapCibilVendorName('CIBIL 07'), 'cibil07');
+    assert.equal(mapCibilVendorName('MyMoneyBazaar'), 'cibil07');
+    assert.equal(mapCibilVendorName('My Money Bazaar'), 'cibil07');
+    assert.equal(mapCibilVendorName('PayMe India'), 'cibil07');
     assert.equal(mapCibilVendorName('Tenacio'), 'tenacio');
   });
 
-  it('infers Surepass / MyMoneyBazaar from stamped sourceVendor', () => {
+  it('infers Surepass / CIBIL07 from stamped sourceVendor', () => {
     assert.equal(inferCibilVendorFromPayload({ sourceVendor: 'Surepass' }), 'surepass');
-    assert.equal(inferCibilVendorFromPayload({ sourceVendor: 'MyMoneyBazaar' }), 'mymoneybazaar');
+    assert.equal(inferCibilVendorFromPayload({ sourceVendor: 'CIBIL07' }), 'cibil07');
+    assert.equal(inferCibilVendorFromPayload({ sourceVendor: 'MyMoneyBazaar' }), 'cibil07');
     assert.equal(inferCibilVendorFromPayload({ status: 'success' }), 'tenacio');
     assert.equal(inferCibilVendorFromPayload(null), 'tenacio');
   });
@@ -31,9 +35,9 @@ describe('cibil-vendor.util', () => {
     );
     assert.equal(
       resolveCibilVendorDisplayName({
-        vendorKind: 'mymoneybazaar',
+        vendorKind: 'cibil07',
       }),
-      'MyMoneyBazaar',
+      'CIBIL07',
     );
     assert.equal(
       resolveCibilVendorDisplayName({

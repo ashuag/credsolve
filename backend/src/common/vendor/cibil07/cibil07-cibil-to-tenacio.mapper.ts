@@ -1,7 +1,7 @@
 /**
- * MyMoneyBazaar CIBIL soft-pull → Tenacio bureau envelope.
+ * CIBIL07 CIBIL soft-pull → Tenacio bureau envelope.
  *
- * mymoneybazaarApi's `POST /api/cibil/soft-pull` returns an outer envelope:
+ * CIBIL07 API's `POST /api/cibil/soft-pull` returns an outer envelope:
  *
  *   { success, request_uuid, status, http_status, data, error? }
  *
@@ -282,7 +282,7 @@ const SOFT_PULL_TRANSPORT_FAILURE_STATUS: Record<string, number> = {
 };
 
 /**
- * Normalise mymoneybazaarApi's `/api/cibil/soft-pull` response into the Tenacio
+ * Normalise CIBIL07 API's `/api/cibil/soft-pull` response into the Tenacio
  * bureau envelope.
  *
  * @param softPullBody parsed JSON body from the soft-pull endpoint
@@ -290,14 +290,14 @@ const SOFT_PULL_TRANSPORT_FAILURE_STATUS: Record<string, number> = {
  * @param httpStatus   HTTP status of the soft-pull call itself.
  * @param context      optional borrower fields not echoed by the vendor (name).
  */
-export function mapMyMoneyBazaarSoftPullToTenacioEnvelope(
+export function mapCibil07SoftPullToTenacioEnvelope(
   softPullBody: unknown,
   httpStatus: number | null,
   context: { fullName?: string | null } = {},
 ): TenacioWrappedBureauBody {
   return {
-    sourceVendor: 'MyMoneyBazaar',
-    ...buildMyMoneyBazaarTenacioEnvelope(
+    sourceVendor: 'CIBIL07',
+    ...buildCibil07TenacioEnvelope(
       unwrapVendorApiLogPayload(softPullBody),
       httpStatus,
       context,
@@ -305,7 +305,7 @@ export function mapMyMoneyBazaarSoftPullToTenacioEnvelope(
   };
 }
 
-function buildMyMoneyBazaarTenacioEnvelope(
+function buildCibil07TenacioEnvelope(
   softPullBody: unknown,
   httpStatus: number | null,
   context: { fullName?: string | null } = {},
@@ -318,7 +318,7 @@ function buildMyMoneyBazaarTenacioEnvelope(
       status: 'error',
       serviceStatusCode: httpStatus != null && httpStatus >= 500 ? httpStatus : 502,
       requestId: null,
-      serviceError: { message: 'MyMoneyBazaar soft-pull returned no body' },
+      serviceError: { message: 'CIBIL07 soft-pull returned no body' },
     };
   }
 
@@ -341,7 +341,7 @@ function buildMyMoneyBazaarTenacioEnvelope(
         message:
           asNonEmptyString(err?.message) ??
           asNonEmptyString(root.message) ??
-          `MyMoneyBazaar soft-pull ${softPullStatus}`,
+          `CIBIL07 soft-pull ${softPullStatus}`,
       },
     };
   }

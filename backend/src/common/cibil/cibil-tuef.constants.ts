@@ -214,7 +214,7 @@ export const CIBIL_CREDIT_CARD_ACCOUNT_TYPE_SYMBOLS = new Set(['10']);
 
 /**
  * CIBIL / TransUnion short codes that appear as `(CODE) Label` on vendor reports
- * (MyMoneyBazaar / PayMe India `original_loan_type`).
+ * (CIBIL07 / PayMe India `original_loan_type`).
  */
 const CIBIL_ACCOUNT_TYPE_ABBREVIATIONS: Record<string, string> = {
   'BLPS-AGR': '53',

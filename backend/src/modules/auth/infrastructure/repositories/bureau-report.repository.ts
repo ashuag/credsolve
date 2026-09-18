@@ -16,7 +16,7 @@ export class BureauReportRepository {
     httpStatus: number | null;
     /** Set when bureau data came from mock mode (`BUREAU_FETCH_ENABLED=2`), not live CIBIL. */
     dummyFetched?: boolean;
-    /** Integration that produced this snapshot (`tenacio` / `surepass` / `mymoneybazaar`). */
+    /** Integration that produced this snapshot (`tenacio` / `surepass` / `cibil07`). */
     vendorKind?: CibilVendorKind | null;
   }) {
     const rawPayload =

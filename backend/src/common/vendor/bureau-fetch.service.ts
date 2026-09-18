@@ -6,7 +6,7 @@ import { extractVendorServiceError } from './vendor-api-error.util';
 import { isTenacioBureauSuccessPayload } from './tenacio-bureau-payload.mapper';
 import { TENACIO_BUREAU_MOCK_VENDOR_BODY } from './tenacio-bureau-mock.fixture';
 import { SurepassCibilService } from './surepass/surepass-cibil.service';
-import { MyMoneyBazaarCibilService } from './mymoneybazaar/mymoneybazaar-cibil.service';
+import { Cibil07CibilService } from './cibil07/cibil07-cibil.service';
 import { VendorApiService } from './vendor-api.service';
 import { VendorApiConfigService } from './vendor-api-config.service';
 import { type CibilVendorKind, mapCibilVendorName } from './cibil-vendor.util';
@@ -69,7 +69,7 @@ export class BureauFetchService {
     private readonly vendorApi: VendorApiService,
     private readonly vendorApiConfig: VendorApiConfigService,
     private readonly surepassCibil: SurepassCibilService,
-    private readonly myMoneyBazaarCibil: MyMoneyBazaarCibilService,
+    private readonly cibil07Cibil: Cibil07CibilService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -130,8 +130,8 @@ export class BureauFetchService {
       const result = {
         ...(vendor === 'surepass'
           ? await this.fetchBureauFromSurepass(body, leadId)
-          : vendor === 'mymoneybazaar'
-            ? await this.fetchBureauFromMyMoneyBazaar(body, leadId)
+          : vendor === 'cibil07'
+            ? await this.fetchBureauFromCibil07(body, leadId)
             : await this.fetchDirectFromTenacio(body, leadId)),
         vendorKind: vendor,
       };
@@ -392,24 +392,24 @@ export class BureauFetchService {
   }
 
   /**
-   * MyMoneyBazaar bureau path — mymoneybazaarApi `POST /api/cibil/soft-pull`
-   * (PayMe India merchant). `MyMoneyBazaarCibilService` reads name / DOB /
+   * CIBIL07 bureau path — CIBIL07 API `POST /api/cibil/soft-pull`
+   * (PayMe India merchant). `Cibil07CibilService` reads name / DOB /
    * gender / email / pincode / address from `lead_detail` and wraps the raw
    * soft-pull response into the Tenacio envelope, so the New-To-Credit
    * classification below and every downstream consumer work unchanged.
    */
-  async fetchDirectFromMyMoneyBazaar(
+  async fetchDirectFromCibil07(
     body: BureauTenacioRequestBody,
     leadId: bigint | null,
   ): Promise<BureauFetchResult> {
-    return this.fetchBureauFromMyMoneyBazaar(body, leadId);
+    return this.fetchBureauFromCibil07(body, leadId);
   }
 
-  private async fetchBureauFromMyMoneyBazaar(
+  private async fetchBureauFromCibil07(
     body: BureauTenacioRequestBody,
     leadId: bigint | null,
   ): Promise<BureauFetchResult> {
-    const result = await this.myMoneyBazaarCibil.fetchCreditReport(
+    const result = await this.cibil07Cibil.fetchCreditReport(
       {
         mobileNumber: body.input.mobileNumber,
         panNumber: body.input.panNumber,
@@ -429,7 +429,7 @@ export class BureauFetchService {
         dummyPayload: false,
         isNewToCredit: false,
         serviceErrorMessage: null,
-        vendorKind: 'mymoneybazaar',
+        vendorKind: 'cibil07',
       };
     }
 
@@ -440,7 +440,7 @@ export class BureauFetchService {
 
     if (serviceError) {
       this.logger.warn(
-        `MyMoneyBazaar bureau service error (leadId=${leadId?.toString() ?? 'n/a'}): ` +
+        `CIBIL07 bureau service error (leadId=${leadId?.toString() ?? 'n/a'}): ` +
           `serviceStatusCode=${serviceError.serviceStatusCode ?? 'n/a'} ntc=${isNewToCredit} ` +
           `message=${serviceError.message ?? 'n/a'}`,
       );
@@ -455,7 +455,7 @@ export class BureauFetchService {
       dummyPayload: false,
       isNewToCredit,
       serviceErrorMessage: serviceError?.message ?? null,
-      vendorKind: 'mymoneybazaar',
+      vendorKind: 'cibil07',
     };
   }
 
