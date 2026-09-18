@@ -689,7 +689,7 @@ function WaiverCard({
           </button>
         </div>
       ) : (
-        <p className="m-0 text-[0.8rem] font-semibold text-brand-muted">Only Team Lead or Admin can waive charges.</p>
+        <p className="m-0 text-[0.8rem] font-semibold text-brand-muted">Only Admin can waive charges.</p>
       )}
       {error ? (
         <p className="m-0 mt-2 text-[0.78rem] font-semibold text-[#b91c1c]" role="alert">
