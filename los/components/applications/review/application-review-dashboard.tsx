@@ -18,7 +18,7 @@ import { ApplicationReviewToolbar } from '@/components/applications/review/appli
 import { RestartRejectedJourneyButton } from '@/components/shared/restart-rejected-journey-button';
 import { canRejectApplicationStatus, RejectRecordModal } from '@/components/shared/reject-record-modal';
 import { canDecideLosApplication } from '@/lib/access';
-import { buildReviewFlags } from '@/lib/application-review-flags';
+import { buildReviewFlags, hasAadhaarKycMismatch } from '@/lib/application-review-flags';
 import { isApplicationRecordRejected } from '@/lib/application-workspace-status';
 import { buildApplicationJourney, isLosAadhaarKycComplete, journeyProgressPercent } from '@/lib/customer-journey';
 import { extractCibilPan } from '@/lib/kyc-field-match';
@@ -48,7 +48,7 @@ export function ApplicationReviewDashboard({
   onRefresh: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<ReviewTab>(
-    row.aadhaarNameMatchPendingReview
+    hasAadhaarKycMismatch(row)
       ? 'kyc'
       : row.nameMatchPendingReview || row.statusCode.toUpperCase() === 'UNDER_REVIEW'
         ? 'bank'
@@ -207,7 +207,7 @@ export function ApplicationReviewDashboard({
     {
       id: 'kyc',
       label: 'KYC detail',
-      badge: row.aadhaarNameMatchPendingReview ? (
+      badge: hasAadhaarKycMismatch(row) ? (
         <span className="cnt bad">✕</span>
       ) : row.kycStatus === 1 ? (
         <span className="cnt ok">✓</span>

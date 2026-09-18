@@ -254,6 +254,13 @@ export type LosApplicationDetails = {
   statusLabel: string;
   nameMatchPendingReview?: boolean;
   aadhaarNameMatchPendingReview?: boolean;
+  /** Live profile vs DigiLocker Aadhaar comparison. Read-only; does not reject the lead. */
+  aadhaarKycMismatch?: {
+    name: boolean;
+    dob: boolean;
+    gender: boolean;
+    messages: string[];
+  } | null;
   kycStatus: number;
   kycStatusLabel: string;
   kycCompletedAt: string | null;

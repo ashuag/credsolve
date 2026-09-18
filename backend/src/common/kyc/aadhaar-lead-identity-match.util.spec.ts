@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  compareAadhaarKycMismatchFlags,
   compareAadhaarToLeadProfile,
   describeAadhaarIdentityFailure,
   extractAadhaarIdentityFromVendor,
@@ -122,6 +123,52 @@ describe('aadhaar-lead-identity-match', () => {
 
   it('normalizes token order in names', () => {
     assert.equal(personNamesMatch('Agarwal Saurabh', 'SAURABH AGARWAL'), true);
+  });
+
+  it('flags name, DOB, and gender mismatches independently without rejecting', () => {
+    const flags = compareAadhaarKycMismatchFlags({
+      leadFullName: 'Other Person',
+      leadDateOfBirth: new Date(Date.UTC(1990, 0, 1)),
+      leadGender: 'MALE',
+      vendor: {
+        status: 'success',
+        data: { name: 'SAURABH AGARWAL', dob: '01-08-1986', gender: 'F' },
+      },
+    });
+    assert.deepEqual(flags, {
+      name: true,
+      dob: true,
+      gender: true,
+      messages: [
+        'Name on Aadhaar does not match the name on the loan application.',
+        'Date of birth on Aadhaar does not match the loan application.',
+        'Gender on Aadhaar does not match the loan application.',
+      ],
+    });
+  });
+
+  it('returns no mismatch flags when profile and Aadhaar align', () => {
+    const flags = compareAadhaarKycMismatchFlags({
+      leadFullName: 'Saurabh Agarwal',
+      leadDateOfBirth: new Date(Date.UTC(1986, 7, 1)),
+      leadGender: 'Male',
+      vendor: {
+        status: 'success',
+        data: { name: 'SAURABH AGARWAL', dob: '01-08-1986', gender: 'M' },
+      },
+    });
+    assert.deepEqual(flags, { name: false, dob: false, gender: false, messages: [] });
+  });
+
+  it('returns null mismatch flags when Aadhaar identity is missing', () => {
+    assert.equal(
+      compareAadhaarKycMismatchFlags({
+        leadFullName: 'Saurabh Agarwal',
+        leadDateOfBirth: new Date(Date.UTC(1986, 7, 1)),
+        vendor: { status: 'success', data: {} },
+      }),
+      null,
+    );
   });
 
   it('matches DD-MM-YYYY Aadhaar DOB against a UTC lead calendar date', () => {

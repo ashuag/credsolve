@@ -15,6 +15,7 @@ import { extractVendorServiceError } from '../../../common/vendor/vendor-api-err
 import { resolveCibilVendorDisplayName } from '../../../common/vendor/cibil-vendor.util';
 import { classifyVendorApiLogOutcome } from '../../../common/vendor/vendor-api-log-outcome.util';
 import {
+  compareAadhaarKycMismatchFlags,
   describeAadhaarIdentityFailure,
   type AadhaarIdentityFailureDetail,
 } from '../../../common/kyc/aadhaar-lead-identity-match.util';
@@ -893,6 +894,19 @@ export class LosApplicationService {
       kycFailed,
       aadhaarFetched: Boolean(aadhaarDetail),
     });
+    const aadhaarKycMismatch = aadhaarDetail
+      ? compareAadhaarKycMismatchFlags({
+          leadFullName: detail?.fullName ?? null,
+          leadDateOfBirth: detail?.dateOfBirth ?? null,
+          leadGender: detail?.gender?.key ?? detail?.gender?.name ?? null,
+          vendor:
+            aadhaarSource ?? {
+              name: aadhaarDetail.fullName,
+              dob: aadhaarDetail.dateOfBirth,
+              gender: aadhaarDetail.gender,
+            },
+        })
+      : null;
 
     return {
       uuid: application.uuid,
@@ -916,6 +930,7 @@ export class LosApplicationService {
         statusNote: application.applicationStatusNote,
       }),
       aadhaarNameMatchPendingReview: isAadhaarNameMismatchPendingReview(storedAadhaar),
+      aadhaarKycMismatch,
       kycStatus: application.kyc?.kycStatus ?? 0,
       kycStatusLabel: applicationKycStatusLabel(application.kyc?.kycStatus ?? 0),
       kycCompletedAt: application.kyc?.kycCompletedAt?.toISOString() ?? null,

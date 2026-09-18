@@ -1,4 +1,3 @@
-import { Logger } from '@nestjs/common';
 import { extractProfileFromDigilockerFormJson } from './digilocker-form-profile.util';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -102,6 +101,50 @@ export function isAadhaarNameMismatchReview(
   result: AadhaarLeadIdentityMatchResult,
 ): result is AadhaarNameMismatchReview {
   return !result.matched && result.reason === 'name_mismatch';
+}
+
+/** Read-time flags for LOS application details. Does not reject the lead. */
+export type AadhaarKycMismatchFlags = {
+  name: boolean;
+  dob: boolean;
+  gender: boolean;
+  messages: string[];
+};
+
+/**
+ * Independently compare lead profile vs stored Aadhaar (name, DOB, gender).
+ * Returns null when Aadhaar identity is not on the payload.
+ */
+export function compareAadhaarKycMismatchFlags(input: {
+  leadFullName: string | null;
+  leadDateOfBirth: Date | null;
+  leadGender?: string | null;
+  vendor: unknown;
+}): AadhaarKycMismatchFlags | null {
+  const aadhaar = extractAadhaarIdentityFromVendor(input.vendor);
+  if (!aadhaar.fullName && !aadhaar.dateOfBirth && !aadhaar.gender) {
+    return null;
+  }
+
+  const leadName = input.leadFullName?.trim() ?? '';
+  const name = Boolean(leadName && aadhaar.fullName && !personNamesMatch(leadName, aadhaar.fullName));
+
+  const dob = Boolean(
+    input.leadDateOfBirth &&
+      aadhaar.dateOfBirth &&
+      dateToUtcYmd(input.leadDateOfBirth) !== dateToUtcYmd(aadhaar.dateOfBirth),
+  );
+
+  const leadGender = normalizeGenderForMatch(input.leadGender);
+  const aadhaarGender = normalizeGenderForMatch(aadhaar.gender);
+  const gender = Boolean(leadGender && aadhaarGender && leadGender !== aadhaarGender);
+
+  const messages: string[] = [];
+  if (name) messages.push('Name on Aadhaar does not match the name on the loan application.');
+  if (dob) messages.push('Date of birth on Aadhaar does not match the loan application.');
+  if (gender) messages.push('Gender on Aadhaar does not match the loan application.');
+
+  return { name, dob, gender, messages };
 }
 
 /**
