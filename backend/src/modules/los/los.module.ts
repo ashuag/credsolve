@@ -43,6 +43,7 @@ import { LosTenacioFaceDevToolsService } from './services/los-tenacio-face-dev-t
 import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
 import { LosCheckCibilService } from './services/los-check-cibil.service';
 import { BureauReportRepository } from '../auth/infrastructure/repositories/bureau-report.repository';
+import { KycCompletionService } from '../../common/kyc/kyc-completion.service';
 
 @Module({
   imports: [BreModule, CibilModule, StorageModule, LoanDocumentsModule, SmsModule, ContactModule, EmailModule],
@@ -86,6 +87,7 @@ import { BureauReportRepository } from '../auth/infrastructure/repositories/bure
     LosTenacioFaceDevToolsService,
     LosVendorApiLogService,
     BureauReportRepository,
+    KycCompletionService,
     LosCheckCibilService,
   ],
   exports: [LosSessionService, LosLoanRepaymentSyncService],

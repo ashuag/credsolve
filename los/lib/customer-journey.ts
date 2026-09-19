@@ -104,6 +104,10 @@ export function hasLosAadhaarRecord(row: {
     gender: string | null;
     address: string | null;
     maskedAadhaar: string | null;
+    aadhaarKycType?: 1 | 2 | null;
+    aadhaarKycProcess?: 'DIGILOCKER' | 'OTP' | null;
+    aadhaarKycProcessLabel?: 'DigiLocker' | 'OTP based';
+    reusedFromPrior?: boolean;
   } | null;
   kycPhotos?: { aadhaarPhotoPath: string | null };
 }): boolean {
@@ -131,13 +135,16 @@ export function isLosAadhaarKycComplete(row: {
     gender: string | null;
     address: string | null;
     maskedAadhaar: string | null;
+    aadhaarKycType?: 1 | 2 | null;
+    aadhaarKycProcess?: 'DIGILOCKER' | 'OTP' | null;
+    aadhaarKycProcessLabel?: 'DigiLocker' | 'OTP based';
+    reusedFromPrior?: boolean;
   } | null;
   kycPhotos?: { aadhaarPhotoPath: string | null };
 }): boolean {
   if (row.aadhaarIdentityFailure && !row.aadhaarNameMatchPendingReview) return false;
-  if (row.aadhaarKycCompleted) return true;
-  if (row.aadhaarKycCompleted === false) return false;
-  return hasLosAadhaarRecord(row);
+  if (hasLosAadhaarRecord(row)) return true;
+  return Boolean(row.aadhaarKycCompleted);
 }
 
 function isSelfieCaptured(row: { selfieCaptured?: boolean; kycPhotos?: { selfiePath: string | null } }): boolean {

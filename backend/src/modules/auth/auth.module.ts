@@ -4,6 +4,7 @@ import { CibilModule } from '../../common/cibil/cibil.module';
 import { EmailModule } from '../../common/email/email.module';
 import { VendorApiModule } from '../../common/vendor/vendor-api.module';
 import { LoanDocumentsModule } from '../../common/loan-documents/loan-documents.module';
+import { AadhaarXmlOtpStore } from '../../common/kyc/aadhaar-xml-otp.store';
 import { DigilockerSessionStore } from '../../common/kyc/digilocker-session.store';
 import { KycCompletionService } from '../../common/kyc/kyc-completion.service';
 import { KycDigilockerDownloadFailureService } from '../../common/kyc/kyc-digilocker-download-failure.service';
@@ -33,6 +34,8 @@ import { VerifyPanUseCase } from './application/use-cases/verify-pan.use-case';
 import { RejectPanClientValidationUseCase } from './application/use-cases/reject-pan-client-validation.use-case';
 import { InitDigilockerUseCase } from './application/use-cases/init-digilocker.use-case';
 import { DownloadAadhaarDigilockerUseCase } from './application/use-cases/download-aadhaar-digilocker.use-case';
+import { GenerateAadhaarXmlOtpUseCase } from './application/use-cases/generate-aadhaar-xml-otp.use-case';
+import { DownloadAadhaarXmlUseCase } from './application/use-cases/download-aadhaar-xml.use-case';
 import { GetPendingDigilockerSessionUseCase } from './application/use-cases/get-pending-digilocker-session.use-case';
 import { ServeDigilockerAadhaarPhotoUseCase } from './application/use-cases/serve-digilocker-aadhaar-photo.use-case';
 import { ServeKycSelfiePhotoUseCase } from './application/use-cases/serve-kyc-selfie-photo.use-case';
@@ -128,8 +131,11 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     RejectPanClientValidationUseCase,
     InitDigilockerUseCase,
     DownloadAadhaarDigilockerUseCase,
+    GenerateAadhaarXmlOtpUseCase,
+    DownloadAadhaarXmlUseCase,
     GetPendingDigilockerSessionUseCase,
     DigilockerSessionStore,
+    AadhaarXmlOtpStore,
     KycIdentityRejectionService,
     KycDigilockerDownloadFailureService,
     KycCompletionService,

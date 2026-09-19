@@ -310,6 +310,8 @@ export type LosApplicationDetails = {
   }>;
   /** True when LOS ops may re-enable KYC selfie (DigiLocker Aadhaar is kept if already captured). */
   canEnableReKyc?: boolean;
+  /** True when LOS ops may reset Aadhaar OTP / DigiLocker attempts so the customer starts OTP again. */
+  canEnableAadhaarReattempt?: boolean;
   preApprovedLoanAmount: string | null;
   createdAt: string;
   updatedAt: string;
@@ -356,6 +358,10 @@ export type LosApplicationDetails = {
     gender: string | null;
     address: string | null;
     maskedAadhaar: string | null;
+    aadhaarKycType?: 1 | 2 | null;
+    aadhaarKycProcess?: 'DIGILOCKER' | 'OTP' | null;
+    aadhaarKycProcessLabel?: 'DigiLocker' | 'OTP based';
+    reusedFromPrior?: boolean;
   } | null;
   /** Present when DigiLocker returned Aadhaar but KYC failed on DOB / gender (or a stored mismatch). */
   aadhaarIdentityFailure?: {
@@ -368,7 +374,7 @@ export type LosApplicationDetails = {
     aadhaarDob: string | null;
     aadhaarGender?: string | null;
   } | null;
-  /** `vendor_api_log` rows for DigiLocker Aadhaar download (`aadhaar-download` / Surepass equivalent). */
+  /** `vendor_api_log` rows for Aadhaar KYC (DigiLocker init/download + XML OTP generate/download). */
   aadhaarDownloadLogs?: Array<{
     id: string;
     uuid: string;

@@ -208,7 +208,7 @@ function DigilockerCallbackContent() {
     async (out: DownloadAadhaarDigilockerResponse) => {
       applyAttemptCounts(out);
       const next = await refresh();
-      if (out.terminalFailure || out.leadRejected || isSessionLeadRejectedAndLocked(next)) {
+      if (out.identityMismatch || out.terminalFailure || out.leadRejected || isSessionLeadRejectedAndLocked(next)) {
         router.replace('/thank-you-interest');
         return true;
       }
@@ -271,9 +271,14 @@ function DigilockerCallbackContent() {
           return;
         }
 
-        if (out.terminalFailure || used >= allowed) {
+        if (out.terminalFailure || out.leadRejected) {
           const redirected = await handleTerminalFailure(out);
           if (redirected) return;
+        }
+
+        if (used >= allowed) {
+          router.replace('/thank-you-interest');
+          return;
         }
 
         setStatus('error');
@@ -311,6 +316,7 @@ function DigilockerCallbackContent() {
       const result = await startDigilockerLoginFlow('/kyc/digilocker-callback');
       if (!result.ok) {
         setError(result.message);
+        setStatus('error');
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to restart DigiLocker.');
@@ -359,10 +365,7 @@ function DigilockerCallbackContent() {
       }
 
       if (priorAttempts >= maxAttempts) {
-        clearDigilockerExpectSelfie();
-        setStatus('error');
-        setFailureKind('retryable');
-        setError('Maximum download attempts reached.');
+        router.replace('/thank-you-interest');
         return;
       }
 
@@ -389,7 +392,7 @@ function DigilockerCallbackContent() {
   const attemptsRemaining = Math.max(0, attemptsAllowed - attemptsUsed);
   const canRetry =
     status === 'error' &&
-    failureKind === 'retryable' &&
+    failureKind !== 'identity_mismatch' &&
     attemptsRemaining > 0 &&
     !retryBusy;
 
@@ -400,7 +403,9 @@ function DigilockerCallbackContent() {
       journeyPanel={
         <div
           className={
-            status === 'working' || status === 'error' ? 'flex min-h-[40vh] flex-col justify-center' : undefined
+            status === 'working' || status === 'error'
+              ? 'flex min-h-[40vh] flex-col justify-center'
+              : undefined
           }
         >
             {status === 'working' ? (

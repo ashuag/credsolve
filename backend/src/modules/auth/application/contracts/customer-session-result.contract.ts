@@ -80,6 +80,8 @@ export type CustomerKycFaceProgressSnapshot = {
   /** Failed DigiLocker Aadhaar download attempts for the active lead. */
   digilockerAadhaarDownloadAttempts: number;
   digilockerAadhaarDownloadMaxAttempts: number;
+  /** True after Aadhaar XML OTP attempts are exhausted — DigiLocker may start. */
+  digilockerFallbackAvailable: boolean;
   /** Failed KYC liveness / face-match runs so far. */
   livenessAttempts: number;
   /** Total allowed liveness runs before escalation to thank-you. */

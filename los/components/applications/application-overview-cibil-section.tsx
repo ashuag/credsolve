@@ -26,10 +26,15 @@ import {
   type LosApplicationDetails,
 } from '@/lib/api';
 import { KycEnableReKycButton } from '@/components/applications/kyc-enable-re-kyc-button';
+import { KycEnableAadhaarReattemptButton } from '@/components/applications/kyc-enable-aadhaar-reattempt-button';
 import { GrantPennyDropAttemptButton } from '@/components/applications/grant-penny-drop-attempt-button';
 import { AadhaarDownloadLogHistory } from '@/components/applications/aadhaar-download-log-history';
 import { PennyDropAttemptHistory } from '@/components/applications/penny-drop-attempt-history';
-import { canEnableReKycFromRow } from '@/lib/kyc-grant-retry-eligibility';
+import {
+  canEnableAadhaarReattemptFromRow,
+  canEnableReKycFromRow,
+  isLivenessFinishedForReKyc,
+} from '@/lib/kyc-grant-retry-eligibility';
 import { BANK_DETAIL_FAILED_LABEL, canGrantPennyDropAttemptFromRow, isBankDetailFailed } from '@/lib/penny-drop-grant-retry-eligibility';
 import { KycPipelineSteps } from '@/components/applications/kyc-pipeline-steps';
 import { KycPhotoGallery } from '@/components/shared/kyc-photo-gallery';
@@ -388,7 +393,15 @@ function CustomerProfilePanel({
             ]}
           />
           <div className="mt-3 border-t border-[rgba(23,44,113,0.06)] pt-3">
-            <ProfileSubheading>Aadhaar details (DigiLocker)</ProfileSubheading>
+            <ProfileSubheading>
+              Aadhaar details ({
+                aadhaar?.aadhaarKycProcessLabel
+                  ? aadhaar.aadhaarKycType
+                    ? `${aadhaar.aadhaarKycProcessLabel} (${aadhaar.aadhaarKycType})`
+                    : aadhaar.aadhaarKycProcessLabel
+                  : 'DigiLocker'
+              })
+            </ProfileSubheading>
             {hasAadhaar ? (
               <div className="mt-2">
                 <DetailGrid
@@ -760,7 +773,10 @@ function KycDetailPanel({
   const aadhaar = row.aadhaarDetail;
   const kycDone = row.kycStatus === 1;
   const livenessDone = row.livenessPassed === true || kycDone;
-  const showEnableReKyc = row.canEnableReKyc || canEnableReKycFromRow(row);
+  const showEnableReKyc =
+    (row.canEnableReKyc || canEnableReKycFromRow(row)) && isLivenessFinishedForReKyc(row);
+  const showEnableAadhaarReattempt =
+    row.canEnableAadhaarReattempt || canEnableAadhaarReattemptFromRow(row);
   const profileName = row.lead.profile?.fullName;
   const aadhaarNameScore = computeNameMatchScore(profileName, aadhaar?.fullName);
   const aadhaarNameVerdict = nameMatchVerdict(
@@ -773,6 +789,15 @@ function KycDetailPanel({
       <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)]">
         <div className="flex items-center justify-between gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
           <span className="text-[0.82rem] font-extrabold text-brand-navy">Aadhaar photo, selfie &amp; liveness video</span>
+          {showEnableAadhaarReattempt ? (
+            <KycEnableAadhaarReattemptButton
+              row={row}
+              applicationUuid={applicationUuid}
+              authToken={authToken}
+              onSuccess={onRefresh}
+              className="shrink-0"
+            />
+          ) : null}
         </div>
         <div className="px-3 py-2.5">
           <KycPhotoGallery row={row} authToken={authToken} />
@@ -781,7 +806,7 @@ function KycDetailPanel({
 
       <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)]">
         <div className="flex items-center justify-between gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
-          <span className="text-[0.82rem] font-extrabold text-brand-navy">DigiLocker Aadhaar KYC</span>
+          <span className="text-[0.82rem] font-extrabold text-brand-navy">Aadhaar KYC</span>
           <span className="text-[0.72rem] font-bold text-brand-muted">
             {aadhaarComplete ? 'Complete' : identityFailure ? 'Failed' : 'Pending'}
           </span>
@@ -804,8 +829,12 @@ function KycDetailPanel({
           ) : !aadhaarFetched ? (
             <p className="m-0 rounded-[10px] border border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.9)] px-3 py-2.5 text-[0.84rem] leading-[1.45] text-[#92400e]">
               {(row.aadhaarDownloadLogs?.length ?? 0) > 0
-                ? 'Aadhaar download was called, but DigiLocker Aadhaar was not captured. Review the logs below.'
-                : 'DigiLocker Aadhaar has not been captured yet.'}
+                ? 'Aadhaar download was called, but Aadhaar was not captured. Review the logs below.'
+                : 'Aadhaar has not been captured yet.'}
+            </p>
+          ) : aadhaar?.reusedFromPrior ? (
+            <p className="m-0 rounded-[10px] border border-[rgba(37,99,235,0.2)] bg-[rgba(239,246,255,0.9)] px-3 py-2.5 text-[0.84rem] leading-[1.45] text-[#1e3a8a]">
+              Linked from previous Aadhaar KYC for this mobile number.
             </p>
           ) : null}
           <DetailGrid
@@ -813,7 +842,17 @@ function KycDetailPanel({
             rows={[
               { label: 'Aadhaar KYC', value: aadhaarComplete ? 'Complete' : identityFailure ? 'Fetched — identity failed' : 'Not complete' },
               {
-                label: 'DigiLocker Aadhaar',
+                label: 'KYC process',
+                value: aadhaar?.aadhaarKycProcessLabel
+                  ? aadhaar.aadhaarKycType
+                    ? `${aadhaar.aadhaarKycProcessLabel} (${aadhaar.aadhaarKycType})`
+                    : aadhaar.aadhaarKycProcessLabel
+                  : aadhaarFetched
+                    ? 'DigiLocker'
+                    : '—',
+              },
+              {
+                label: 'Aadhaar number',
                 value: formatAadhaarNumberDisplay(aadhaar?.maskedAadhaar, aadhaarFetched),
               },
               {
@@ -859,27 +898,25 @@ function KycDetailPanel({
       <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)]">
         <div className="flex items-center justify-between gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
           <span className="text-[0.82rem] font-extrabold text-brand-navy">Liveness check</span>
-          <span className="text-[0.72rem] font-bold text-brand-muted">
-            {livenessDone ? 'Passed' : 'Pending'}
-          </span>
-        </div>
-        <div className="grid gap-3 px-3 py-2.5">
-          {!aadhaarComplete ? (
-            <p className="m-0 rounded-[10px] border border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.9)] px-3 py-2.5 text-[0.84rem] leading-[1.45] text-[#92400e]">
-              Liveness check starts after DigiLocker Aadhaar KYC.
-            </p>
-          ) : !livenessDone ? (
-            <p className="m-0 rounded-[10px] border border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.9)] px-3 py-2.5 text-[0.84rem] leading-[1.45] text-[#92400e]">
-              Aadhaar KYC is complete. Liveness check is still pending.
-            </p>
-          ) : null}
           {showEnableReKyc ? (
             <KycEnableReKycButton
               row={row}
               applicationUuid={applicationUuid}
               authToken={authToken}
               onSuccess={onRefresh}
+              className="shrink-0"
             />
+          ) : (
+            <span className="text-[0.72rem] font-bold text-brand-muted">
+              {livenessDone ? 'Passed' : 'Pending'}
+            </span>
+          )}
+        </div>
+        <div className="grid gap-3 px-3 py-2.5">
+          {aadhaarComplete && !livenessDone ? (
+            <p className="m-0 rounded-[10px] border border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.9)] px-3 py-2.5 text-[0.84rem] leading-[1.45] text-[#92400e]">
+              Aadhaar KYC is complete. Liveness check is still pending.
+            </p>
           ) : null}
           <div>
             <ProfileSubheading>Liveness pipeline</ProfileSubheading>

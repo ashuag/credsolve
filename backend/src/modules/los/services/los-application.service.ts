@@ -19,8 +19,20 @@ import {
   describeAadhaarIdentityFailure,
   type AadhaarIdentityFailureDetail,
 } from '../../../common/kyc/aadhaar-lead-identity-match.util';
+import {
+  AADHAAR_KYC_TYPE,
+  aadhaarKycTypeLabel,
+  parseAadhaarKycType,
+  type AadhaarKycType,
+} from '../../../common/constants/aadhaar-kyc-process.constants';
 import { extractProfileFromDigilockerFormJson, pickDigilockerAadhaarString } from '../../../common/kyc/digilocker-form-profile.util';
-import { pickCustomerAadhaarForApplication } from '../../../common/kyc/customer-aadhaar-for-application.util';
+import {
+  isAadhaarReusedFromPrior,
+  pickCustomerAadhaarForApplication,
+  pickCustomerAadhaarForLos,
+} from '../../../common/kyc/customer-aadhaar-for-application.util';
+import { KycCompletionService } from '../../../common/kyc/kyc-completion.service';
+import { maskAadhaarNumber } from '../../../common/kyc/aadhaar-xml-otp.util';
 import { appendPhotoCacheBuster } from '../../../common/kyc/kyc-photo-url.util';
 import { buildLivenessVendorSummary } from '../../../common/kyc/kyc-liveness-summary.util';
 import { extractLocalFaceMatchFromVendorJson } from '../../../common/kyc/kyc-face-match-inspection-persist.util';
@@ -49,7 +61,7 @@ import { BANK_DETAIL_FAILED_NOTE, isBankNameMatchReviewPending, PENNY_DROP_FAILE
 import { SettingKey } from '../../../common/constants/setting.constants';
 import { LEAD_STATUS } from '../../../common/constants/lead.constants';
 import { REJECTION_REASON, toRejectionReasonDto } from '../../../common/constants/rejection-reason.constants';
-import { canEnableReKyc } from '../kyc-grant-retry.util';
+import { canEnableAadhaarReattempt, canEnableReKyc } from '../kyc-grant-retry.util';
 import { canGrantPennyDropAttempt } from '../penny-drop-grant-retry.util';
 import {
   extractPanNsdlSnapshot,
@@ -149,12 +161,29 @@ function formatAadhaarDob(d: Date | null): string | null {
   return d.toISOString().slice(0, 10);
 }
 
-const AADHAAR_DOWNLOAD_SERVICE_NAMES = ['aadhaar-download', 'digilocker-download-aadhaar'] as const;
+const AADHAAR_KYC_SERVICE_NAMES = [
+  'aadhaar-download',
+  'digilocker-download-aadhaar',
+  'digilocker-generate-url',
+  'xml-generate-otp',
+  'xml-download',
+] as const;
 
-function aadhaarDownloadServiceNames(): string[] {
-  const extra = process.env.TENACIO_AADHAAR_DOWNLOAD_AUDIT_SERVICE?.trim();
-  const names = new Set<string>(AADHAAR_DOWNLOAD_SERVICE_NAMES);
-  if (extra) names.add(extra);
+function aadhaarKycServiceNames(): string[] {
+  const names = new Set<string>(AADHAAR_KYC_SERVICE_NAMES);
+  for (const envName of [
+    process.env.TENACIO_DIGILOCKER_AUDIT_SERVICE,
+    process.env.TENACIO_DIGILOCKER_SERVICE,
+    process.env.TENACIO_AADHAAR_DOWNLOAD_AUDIT_SERVICE,
+    process.env.TENACIO_AADHAAR_DOWNLOAD_SERVICE,
+    process.env.TENACIO_AADHAAR_XML_OTP_AUDIT_SERVICE,
+    process.env.TENACIO_AADHAAR_XML_OTP_SERVICE,
+    process.env.TENACIO_AADHAAR_XML_DOWNLOAD_AUDIT_SERVICE,
+    process.env.TENACIO_AADHAAR_XML_DOWNLOAD_SERVICE,
+  ]) {
+    const extra = envName?.trim();
+    if (extra) names.add(extra);
+  }
   return [...names];
 }
 
@@ -192,12 +221,34 @@ function isAcceptedAadhaarCapture(
   return !formJson && Boolean(photoPath?.trim());
 }
 
-function buildLosAadhaarDetail(formJson: unknown): {
+function resolveAadhaarKycType(
+  column: number | string | null | undefined,
+  formJson: unknown,
+): AadhaarKycType | null {
+  const fromColumn = parseAadhaarKycType(column);
+  if (fromColumn) return fromColumn;
+  if (isRecord(formJson)) {
+    const fromJson =
+      parseAadhaarKycType(formJson._aadhaarKycType) ?? parseAadhaarKycType(formJson._aadhaarKycProcess);
+    if (fromJson) return fromJson;
+  }
+  if (formJson != null) return AADHAAR_KYC_TYPE.DIGILOCKER;
+  return null;
+}
+
+function buildLosAadhaarDetail(
+  formJson: unknown,
+  storedType?: number | string | null,
+): {
   fullName: string | null;
   dateOfBirth: string | null;
   gender: string | null;
   address: string | null;
   maskedAadhaar: string | null;
+  aadhaarKycType: AadhaarKycType | null;
+  aadhaarKycProcess: 'DIGILOCKER' | 'OTP' | null;
+  aadhaarKycProcessLabel: 'DigiLocker' | 'OTP based';
+  reusedFromPrior: boolean;
 } | null {
   if (!isRecord(formJson)) return null;
 
@@ -212,15 +263,17 @@ function buildLosAadhaarDetail(formJson: unknown): {
     'aadhaar_number',
     'aadhaar',
   ]);
+  const addressBag = isRecord(formJson.address) ? formJson.address : formJson;
   const addressParts = [
-    pickAadhaarString(formJson, ['address', 'fullAddress', 'full_address', 'residentAddress', 'resident_address']),
-    pickAadhaarString(formJson, ['house', 'houseNo', 'house_no']),
-    pickAadhaarString(formJson, ['street', 'streetName', 'street_name', 'loc']),
-    pickAadhaarString(formJson, ['landmark']),
-    pickAadhaarString(formJson, ['locality', 'vtc', 'villageTownCity', 'city']),
-    pickAadhaarString(formJson, ['district', 'dist']),
-    pickAadhaarString(formJson, ['state']),
-    pickAadhaarString(formJson, ['pincode', 'pin', 'pinCode']),
+    pickAadhaarString(formJson, ['fullAddress', 'full_address', 'residentAddress', 'resident_address']),
+    typeof formJson.address === 'string' ? formJson.address.trim() : null,
+    pickAadhaarString(addressBag, ['house', 'houseNo', 'house_no']),
+    pickAadhaarString(addressBag, ['street', 'streetName', 'street_name', 'loc']),
+    pickAadhaarString(addressBag, ['landmark']),
+    pickAadhaarString(addressBag, ['locality', 'vtc', 'villageTownCity', 'city']),
+    pickAadhaarString(addressBag, ['district', 'dist']),
+    pickAadhaarString(addressBag, ['state']),
+    pickAadhaarString(addressBag, ['pincode', 'pin', 'pinCode']),
   ].filter((part): part is string => Boolean(part));
   const address = addressParts.length > 0 ? [...new Set(addressParts)].join(', ') : null;
 
@@ -234,12 +287,17 @@ function buildLosAadhaarDetail(formJson: unknown): {
     return null;
   }
 
+  const aadhaarKycType = resolveAadhaarKycType(storedType, formJson);
   return {
     fullName: formatLosPersonName(identity.fullName),
     dateOfBirth: formatAadhaarDob(identity.dateOfBirth),
     gender,
     address,
     maskedAadhaar,
+    aadhaarKycType,
+    aadhaarKycProcess: aadhaarKycType === AADHAAR_KYC_TYPE.OTP ? 'OTP' : aadhaarKycType ? 'DIGILOCKER' : null,
+    aadhaarKycProcessLabel: aadhaarKycTypeLabel(aadhaarKycType),
+    reusedFromPrior: isAadhaarReusedFromPrior(formJson),
   };
 }
 
@@ -473,6 +531,7 @@ export class LosApplicationService {
     private readonly kycFiles: KycFilesService,
     private readonly loanDocs: LoanDocumentApplicationService,
     private readonly cibilCreditAssessment: CibilCreditAssessmentService,
+    private readonly kycCompletion: KycCompletionService,
   ) {}
 
   async listApplications() {
@@ -505,8 +564,8 @@ export class LosApplicationService {
             uuid: true,
             mobileNumber: true,
             customerKycs: {
-              orderBy: { createdAt: 'desc' },
-              take: 5,
+              orderBy: [{ aadhaarVerifiedAt: 'desc' }, { createdAt: 'desc' }],
+              take: 10,
               select: { aadhaarVerifiedAt: true, aadhaarPhotoPath: true, aadhaarData: true },
             },
           },
@@ -584,7 +643,7 @@ export class LosApplicationService {
         preferStoredTenure: loanAccount != null,
       });
       const kycStatus = application.kyc?.kycStatus ?? 0;
-      const customerAadhaar = pickCustomerAadhaarForApplication(application.customer.customerKycs, {
+      const customerAadhaar = pickCustomerAadhaarForLos(application.customer.customerKycs, {
         applicationCreatedAt: application.createdAt,
         applicationKycStatus: kycStatus,
       });
@@ -838,22 +897,52 @@ export class LosApplicationService {
       }
     }
 
-    const customerKycRows = await this.prisma.read.customerKyc.findMany({
+    const customerKycSelect = {
+      aadhaarData: true,
+      aadhaarPhotoPath: true,
+      aadhaarVerifiedAt: true,
+      aadhaarKycType: true,
+      panCardNumber: true,
+      panCardVerifiedAt: true,
+    } as const;
+    let customerKycRows = await this.prisma.read.customerKyc.findMany({
       where: { customerId: application.customerId },
-      orderBy: { createdAt: 'desc' },
-      take: 15,
-      select: {
-        aadhaarData: true,
-        aadhaarPhotoPath: true,
-        aadhaarVerifiedAt: true,
-        panCardNumber: true,
-        panCardVerifiedAt: true,
-      },
+      orderBy: [{ aadhaarVerifiedAt: 'desc' }, { createdAt: 'desc' }],
+      take: 30,
+      select: customerKycSelect,
     });
-    const customerKyc = pickCustomerAadhaarForApplication(customerKycRows, {
+    let customerKyc = pickCustomerAadhaarForLos(customerKycRows, {
       applicationCreatedAt: application.createdAt,
       applicationKycStatus: application.kyc?.kycStatus,
     });
+    if (!isAcceptedAadhaarCapture(customerKyc?.aadhaarData, customerKyc?.aadhaarVerifiedAt, customerKyc?.aadhaarPhotoPath)) {
+      const linked = await this.kycCompletion.linkReusableAadhaarToApplication({
+        applicationId: application.id,
+        customerId: application.customerId,
+        mobileNumber: application.customer.mobileNumber,
+        leadFullName: detail?.fullName ?? null,
+        leadDateOfBirth: detail?.dateOfBirth ?? null,
+        leadGender: detail?.gender?.key ?? detail?.gender?.name ?? null,
+      });
+      if (linked.linked || linked.complete) {
+        customerKycRows = await this.prisma.client.customerKyc.findMany({
+          where: { customerId: application.customerId },
+          orderBy: [{ aadhaarVerifiedAt: 'desc' }, { createdAt: 'desc' }],
+          take: 30,
+          select: customerKycSelect,
+        });
+        customerKyc = pickCustomerAadhaarForLos(customerKycRows, {
+          applicationCreatedAt: application.createdAt,
+          applicationKycStatus: application.kyc?.kycStatus,
+        });
+      } else {
+        const prior = await this.kycCompletion.findLatestSuccessfulCustomerAadhaar({
+          customerId: application.customerId,
+          mobileNumber: application.customer.mobileNumber,
+        });
+        if (prior) customerKyc = prior;
+      }
+    }
 
     const selfieRelativePath = application.kyc?.livenessSelfiePath?.trim() || null;
     const aadhaarPhotoRelativePath = customerKyc?.aadhaarPhotoPath?.trim() || null;
@@ -877,10 +966,25 @@ export class LosApplicationService {
     const storedAadhaar = customerKyc?.aadhaarData ?? null;
     const aadhaarDownloadLogs = await this.listAadhaarDownloadVendorLogs(application.leadId);
     let aadhaarSource = storedAadhaar;
-    let aadhaarDetail = buildLosAadhaarDetail(storedAadhaar);
+    let aadhaarDetail = buildLosAadhaarDetail(storedAadhaar, customerKyc?.aadhaarKycType);
     if (!aadhaarDetail && aadhaarDownloadLogs.firstParseableVendor) {
       aadhaarSource = aadhaarDownloadLogs.firstParseableVendor;
-      aadhaarDetail = buildLosAadhaarDetail(aadhaarDownloadLogs.firstParseableVendor);
+      aadhaarDetail = buildLosAadhaarDetail(
+        aadhaarDownloadLogs.firstParseableVendor,
+        customerKyc?.aadhaarKycType,
+      );
+    }
+    const enteredAadhaar = application.details?.aadhaarNumber?.trim() || null;
+    if (aadhaarDetail && !aadhaarDetail.maskedAadhaar && enteredAadhaar) {
+      aadhaarDetail = { ...aadhaarDetail, maskedAadhaar: maskAadhaarNumber(enteredAadhaar) };
+    }
+    if (
+      aadhaarDetail &&
+      !aadhaarDetail.reusedFromPrior &&
+      customerKyc?.aadhaarVerifiedAt &&
+      customerKyc.aadhaarVerifiedAt.getTime() < application.createdAt.getTime()
+    ) {
+      aadhaarDetail = { ...aadhaarDetail, reusedFromPrior: true };
     }
     const kycFailed =
       application.applicationStatus.name === APPLICATION_STATUS.KYC_FAILED ||
@@ -991,6 +1095,21 @@ export class LosApplicationService {
         nameMatchScore: attempt.nameMatchScore,
         createdAt: attempt.createdAt.toISOString(),
       })),
+      canEnableAadhaarReattempt: canEnableAadhaarReattempt({
+        aadhaarCaptured: isAcceptedAadhaarCapture(
+          storedAadhaar,
+          customerKyc?.aadhaarVerifiedAt,
+          customerKyc?.aadhaarPhotoPath,
+        ),
+        otpAttempts: application.kyc?.aadhaarXmlOtpAttempts ?? 0,
+        digilockerAttempts: application.kyc?.digilockerAadhaarDownloadAttempts ?? 0,
+        digilockerFallbackEligible: application.kyc?.digilockerFallbackEligible ?? false,
+        applicationStatusCode: application.applicationStatus.name,
+        leadStatusCode: lead.leadStatus.name,
+        kycFailed:
+          application.applicationStatus.name === APPLICATION_STATUS.KYC_FAILED ||
+          application.kyc?.kycStatus === APPLICATION_KYC_STATUS.FAILED,
+      }),
       canEnableReKyc: canEnableReKyc({
         kycStatus: application.kyc?.kycStatus ?? 0,
         livenessPassed: application.kyc?.livenessPassed ?? false,
@@ -1151,14 +1270,20 @@ export class LosApplicationService {
     }
     const customerKycRows = await this.prisma.read.customerKyc.findMany({
       where: { customerId: application.customerId },
-      orderBy: { createdAt: 'desc' },
-      take: 15,
+      orderBy: [{ aadhaarVerifiedAt: 'desc' }, { createdAt: 'desc' }],
+      take: 30,
       select: { aadhaarPhotoPath: true, aadhaarVerifiedAt: true, aadhaarData: true },
     });
-    const customerKyc = pickCustomerAadhaarForApplication(customerKycRows, {
+    let customerKyc = pickCustomerAadhaarForLos(customerKycRows, {
       applicationCreatedAt: application.createdAt,
       applicationKycStatus: application.kyc?.kycStatus,
     });
+    if (!customerKyc?.aadhaarPhotoPath?.trim()) {
+      const prior = await this.kycCompletion.findLatestSuccessfulCustomerAadhaar({
+        customerId: application.customerId,
+      });
+      if (prior?.aadhaarPhotoPath?.trim()) customerKyc = prior;
+    }
     const rel = customerKyc?.aadhaarPhotoPath?.trim();
     if (!rel) {
       throw new NotFoundException('Aadhaar photo is not available yet.');
@@ -1293,10 +1418,10 @@ export class LosApplicationService {
     const rows = await this.prisma.read.vendorApiLog.findMany({
       where: {
         leadId,
-        serviceName: { in: aadhaarDownloadServiceNames() },
+        serviceName: { in: aadhaarKycServiceNames() },
       },
       orderBy: { respondedAt: 'desc' },
-      take: 20,
+      take: 50,
       select: {
         id: true,
         uuid: true,
@@ -1744,6 +1869,168 @@ export class LosApplicationService {
       digilockerPreserved: digilockerDone,
       leadRecovered: leadWasInternalError || leadWasRejected,
       applicationRecovered: appWasInternalError || appWasKycFailed,
+    };
+  }
+
+  /**
+   * Resets Aadhaar OTP / DigiLocker attempt counts so the customer can start OTP KYC again.
+   * Does not reset selfie / liveness.
+   */
+  async enableAadhaarReattempt(applicationUuid: string) {
+    const application = await this.prisma.client.application.findUnique({
+      where: { uuid: applicationUuid },
+      include: {
+        kyc: true,
+        details: {
+          select: {
+            selectedLoanAmount: true,
+            expectedRepaymentDays: true,
+          },
+        },
+        applicationStatus: { select: { name: true } },
+        lead: {
+          include: {
+            leadStatus: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+
+    const kyc = application.kyc;
+    if (!kyc) {
+      throw new BadRequestException('KYC record not found for this application.');
+    }
+
+    const customerKycRows = await this.prisma.client.customerKyc.findMany({
+      where: { customerId: application.customerId },
+      orderBy: { createdAt: 'desc' },
+      take: 15,
+      select: {
+        id: true,
+        aadhaarData: true,
+        aadhaarPhotoPath: true,
+        aadhaarVerifiedAt: true,
+      },
+    });
+    const customerKyc = pickCustomerAadhaarForApplication(customerKycRows, {
+      applicationCreatedAt: application.createdAt,
+      applicationKycStatus: kyc.kycStatus,
+    });
+
+    const aadhaarCaptured = isAcceptedAadhaarCapture(
+      customerKyc?.aadhaarData ?? null,
+      customerKyc?.aadhaarVerifiedAt,
+      customerKyc?.aadhaarPhotoPath,
+    );
+    const kycFailed =
+      application.applicationStatus.name === APPLICATION_STATUS.KYC_FAILED ||
+      kyc.kycStatus === APPLICATION_KYC_STATUS.FAILED;
+
+    if (
+      !canEnableAadhaarReattempt({
+        aadhaarCaptured,
+        otpAttempts: kyc.aadhaarXmlOtpAttempts,
+        digilockerAttempts: kyc.digilockerAadhaarDownloadAttempts,
+        digilockerFallbackEligible: kyc.digilockerFallbackEligible,
+        applicationStatusCode: application.applicationStatus.name,
+        leadStatusCode: application.lead.leadStatus.name,
+        kycFailed,
+      })
+    ) {
+      throw new BadRequestException('This application is not eligible to reattempt Aadhaar KYC.');
+    }
+
+    const loanSelectionCompleted = Boolean(
+      application.details?.selectedLoanAmount != null &&
+        application.details?.expectedRepaymentDays != null,
+    );
+
+    const [inProgressLeadStatus, convertedLeadStatus, inReviewAppStatus] = await Promise.all([
+      this.prisma.client.leadStatus.findFirst({
+        where: { name: LEAD_STATUS.IN_PROGRESS, isActive: true },
+        select: { id: true },
+      }),
+      this.prisma.client.leadStatus.findFirst({
+        where: { name: LEAD_STATUS.CONVERTED, isActive: true },
+        select: { id: true },
+      }),
+      this.prisma.client.applicationStatus.findFirst({
+        where: { name: APPLICATION_STATUS.IN_REVIEW, isActive: true },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!inProgressLeadStatus) {
+      throw new BadRequestException('Lead status IN_PROGRESS is not configured.');
+    }
+
+    const recoveryLeadStatus =
+      loanSelectionCompleted && convertedLeadStatus ? convertedLeadStatus : inProgressLeadStatus;
+    const leadWasRejected = application.lead.leadStatus.name === LEAD_STATUS.REJECTED;
+    const appWasKycFailed = application.applicationStatus.name === APPLICATION_STATUS.KYC_FAILED;
+
+    await this.prisma.client.$transaction(async (tx) => {
+      await tx.applicationKyc.update({
+        where: { applicationId: application.id },
+        data: {
+          aadhaarXmlOtpAttempts: 0,
+          digilockerAadhaarDownloadAttempts: 0,
+          digilockerFallbackEligible: false,
+          kycStatus:
+            kyc.kycStatus === APPLICATION_KYC_STATUS.FAILED
+              ? APPLICATION_KYC_STATUS.NOT_DONE
+              : kyc.kycStatus,
+        },
+      });
+      await tx.applicationDetail.updateMany({
+        where: { applicationId: application.id },
+        data: { aadhaarNumber: null },
+      });
+
+      if (customerKyc && !aadhaarCaptured) {
+        await tx.customerKyc.update({
+          where: { id: customerKyc.id },
+          data: {
+            aadhaarVerifiedAt: null,
+            aadhaarData: Prisma.JsonNull,
+            aadhaarPhotoPath: null,
+            aadhaarKycType: null,
+          },
+        });
+      }
+
+      if (leadWasRejected) {
+        await tx.lead.update({
+          where: { id: application.leadId },
+          data: {
+            leadStatusId: recoveryLeadStatus.id,
+            leadStatusNote: null,
+            rejectionReasonId: null,
+          },
+        });
+      }
+
+      if (appWasKycFailed && inReviewAppStatus) {
+        await tx.application.update({
+          where: { id: application.id },
+          data: {
+            applicationStatusId: inReviewAppStatus.id,
+            rejectionReasonId: null,
+          },
+        });
+      }
+    });
+
+    return {
+      success: true as const,
+      applicationUuid,
+      leadUuid: application.lead.uuid,
+      leadRecovered: leadWasRejected,
+      applicationRecovered: appWasKycFailed,
     };
   }
 

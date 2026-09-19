@@ -17,6 +17,7 @@ import {
 import { compareAadhaarToLeadProfile, isAadhaarNameMismatchReview } from '../../../../common/kyc/aadhaar-lead-identity-match.util';
 import { customerAadhaarAppliesToApplication } from '../../../../common/kyc/customer-aadhaar-for-application.util';
 import { KycFilesService } from '../../../../common/kyc/kyc-files.service';
+import { AADHAAR_KYC_TYPE, type AadhaarKycType } from '../../../../common/constants/aadhaar-kyc-process.constants';
 import { DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS } from '../../../../common/constants/kyc.constants';
 import { KycDigilockerDownloadFailureService } from '../../../../common/kyc/kyc-digilocker-download-failure.service';
 import { KycIdentityRejectionService } from '../../../../common/kyc/kyc-identity-rejection.service';
@@ -81,6 +82,7 @@ export type DownloadAadhaarDigilockerResult = {
    * called again; retry only after that attempt finishes (including failure).
    */
   skippedDuplicate?: boolean;
+  digilockerFallback?: boolean;
 };
 
 @Injectable()
@@ -131,6 +133,14 @@ export class DownloadAadhaarDigilockerUseCase {
     });
     assertApplicationKycNotCompleted(appKyc?.kycStatus);
 
+    const eligible = await this.kycDigilockerDownloadFailure.isDigilockerFallbackEligible(applicationRow.id);
+    const storedSession = await this.digilockerSession.readSession(applicationRow.uuid);
+    if (!eligible && !storedSession?.token && !dto.sessionToken?.trim()) {
+      throw new BadRequestException(
+        'DigiLocker KYC is available only after Aadhaar OTP download fails. Enter your Aadhaar number first.',
+      );
+    }
+
     const priorAttempts = await this.kycDigilockerDownloadFailure.readAttemptsUsed(applicationRow.id);
     if (priorAttempts >= DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS) {
       return {
@@ -145,8 +155,6 @@ export class DownloadAadhaarDigilockerUseCase {
         terminalFailure: true,
       };
     }
-
-    const storedSession = await this.digilockerSession.readSession(applicationRow.uuid);
     let sessionToken = dto.sessionToken?.trim() ?? '';
     if (!sessionToken) {
       sessionToken = storedSession?.token ?? '';
@@ -438,10 +446,11 @@ export class DownloadAadhaarDigilockerUseCase {
       vendor,
       httpStatus: out.httpStatus,
       vendorKind: out.vendorKind ?? params.vendorKind,
+      aadhaarKycType: AADHAAR_KYC_TYPE.DIGILOCKER,
     });
   }
 
-  private async completeFromVendorPayload(params: {
+  async completeFromVendorPayload(params: {
     sessionToken: string;
     vendorKind: 'surepass' | 'tenacio' | null | undefined;
     leadId: bigint;
@@ -452,6 +461,7 @@ export class DownloadAadhaarDigilockerUseCase {
     applicationUuid: string;
     vendor: unknown;
     httpStatus: number | null;
+    aadhaarKycType?: AadhaarKycType;
   }): Promise<DownloadAadhaarDigilockerResult> {
     const vendor = params.vendor;
     const already = await this.snapshotDownloadOutcome(params.applicationId, params.customerId);
@@ -469,7 +479,9 @@ export class DownloadAadhaarDigilockerUseCase {
       vendor,
     });
 
-    if (!identityMatch.matched && !isAadhaarNameMismatchReview(identityMatch)) {
+    const aadhaarKycType = params.aadhaarKycType ?? AADHAAR_KYC_TYPE.DIGILOCKER;
+
+    if (!identityMatch.matched && identityMatch.reason !== 'name_mismatch') {
       const photoRel = await this.persistAadhaarPhotoIfPresent({
         vendor,
         customerUuid: params.customerUuid,
@@ -478,14 +490,18 @@ export class DownloadAadhaarDigilockerUseCase {
       await this.applications.updateDigilockerAadhaarArtifacts({
         applicationId: params.applicationId,
         customerId: params.customerId,
-        digilockerAadhaarFormJson: buildDigilockerIdentityMismatchJson({
-          httpStatus: params.httpStatus,
-          vendor,
-          photoRelativePath: photoRel,
-          reason: identityMatch.reason,
-          message: identityMatch.message,
-        }) as Prisma.InputJsonValue,
+        digilockerAadhaarFormJson: {
+          ...buildDigilockerIdentityMismatchJson({
+            httpStatus: params.httpStatus,
+            vendor,
+            photoRelativePath: photoRel,
+            reason: identityMatch.reason,
+            message: identityMatch.message,
+          }),
+          _aadhaarKycType: aadhaarKycType,
+        } as Prisma.InputJsonValue,
         aadhaarPhotoRelativePath: photoRel,
+        aadhaarKycType,
       });
       await this.kycIdentityRejection.rejectForAadhaarProfileMismatch({
         leadId: params.leadId,
@@ -543,8 +559,10 @@ export class DownloadAadhaarDigilockerUseCase {
         applicationUuid: params.applicationUuid,
       });
 
-      const captured =
-        buildDigilockerAadhaarFormJson(vendor, photoRel) ?? { _note: 'digilocker_vendor_unparsed' };
+      const captured = {
+        ...(buildDigilockerAadhaarFormJson(vendor, photoRel) ?? { _note: 'digilocker_vendor_unparsed' }),
+        _aadhaarKycType: aadhaarKycType,
+      };
       const formJson = nameMismatchReview
         ? withAadhaarNameMismatchReview(captured, {
             reason: nameMismatchReview.reason,
@@ -556,6 +574,7 @@ export class DownloadAadhaarDigilockerUseCase {
         customerId: params.customerId,
         digilockerAadhaarFormJson: formJson as Prisma.InputJsonValue,
         aadhaarPhotoRelativePath: photoRel,
+        aadhaarKycType,
       });
       persisted = true;
       await this.digilockerSession.clear(params.applicationUuid);
@@ -566,6 +585,7 @@ export class DownloadAadhaarDigilockerUseCase {
         aadhaarPhotoRelativePath: photoRel,
         verifiedAt: new Date(),
         panCardNumber,
+        aadhaarKycType,
       });
       if (nameMismatchReview) {
         this.logger.warn(

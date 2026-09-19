@@ -64,7 +64,7 @@ function VendorLogDetailModal({
       }}
       role="dialog"
       aria-modal="true"
-      aria-label="Aadhaar download log detail"
+      aria-label="Aadhaar KYC log detail"
     >
       <div
         className="flex max-h-[90vh] w-full max-w-[920px] flex-col overflow-hidden rounded-[20px] border border-[rgba(23,44,113,0.12)] shadow-[0_28px_70px_rgba(23,44,113,0.22)]"
@@ -73,7 +73,7 @@ function VendorLogDetailModal({
         <div className="flex items-start justify-between gap-4 border-b border-[rgba(23,44,113,0.08)] px-6 py-5">
           <div>
             <span className="mb-1 block text-[0.68rem] font-extrabold uppercase tracking-[0.16em] text-brand-blue">
-              Aadhaar download log
+              Aadhaar KYC logs
             </span>
             <h2 className="m-0 text-[1.2rem] font-extrabold leading-[1.15] tracking-[-0.03em]">
               {detail ? `${detail.providerName} / ${detail.serviceName}` : 'Loading…'}
@@ -249,7 +249,7 @@ export function AadhaarDownloadLogHistory({
   if (variant === 'review') {
     return (
       <div style={{ marginTop: 16 }}>
-        <ReviewSectionLabel>Aadhaar download logs</ReviewSectionLabel>
+        <ReviewSectionLabel>Aadhaar KYC logs</ReviewSectionLabel>
         <LogHistoryTable logs={rows} authToken={authToken} />
       </div>
     );
@@ -258,7 +258,7 @@ export function AadhaarDownloadLogHistory({
   return (
     <div>
       <div className="mb-2 flex items-baseline gap-2">
-        <span className="text-[0.82rem] font-extrabold text-brand-navy">Aadhaar download logs</span>
+        <span className="text-[0.82rem] font-extrabold text-brand-navy">Aadhaar KYC logs</span>
         <span className="text-[0.76rem] font-semibold text-brand-muted">
           {rows.length} call{rows.length === 1 ? '' : 's'}
         </span>

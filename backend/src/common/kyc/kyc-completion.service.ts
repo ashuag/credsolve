@@ -1,8 +1,51 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, type Prisma as PrismaTypes } from '@prisma/client';
 import { APPLICATION_KYC_STATUS } from '../constants/application.constants';
-import { shouldStartNewCustomerKycBundle } from './customer-aadhaar-for-application.util';
+import { SettingKey } from '../constants/setting.constants';
+import { isDigilockerAadhaarCaptureComplete } from './aadhaar-vendor-parse.util';
+import {
+  customerAadhaarAppliesToApplication,
+  isAadhaarReusedFromPrior,
+  isReusableCustomerAadhaar,
+  kycValidityCutoff,
+  markAadhaarReusedFromPrior,
+  parseKycValidityDays,
+  pickLatestSuccessfulCustomerAadhaar,
+  shouldStartNewCustomerKycBundle,
+} from './customer-aadhaar-for-application.util';
 import { PrismaService } from '../../prisma/prisma.service';
+
+const REUSABLE_AADHAAR_SELECT = {
+  id: true,
+  customerId: true,
+  aadhaarData: true,
+  aadhaarPhotoPath: true,
+  aadhaarVerifiedAt: true,
+  aadhaarKycType: true,
+  panCardNumber: true,
+  panCardVerifiedAt: true,
+} as const;
+
+type ReusableCustomerAadhaarRow = {
+  id: bigint;
+  customerId: bigint;
+  aadhaarData: Prisma.JsonValue | null;
+  aadhaarPhotoPath: string | null;
+  aadhaarVerifiedAt: Date | null;
+  aadhaarKycType: number | null;
+  panCardNumber: string | null;
+  panCardVerifiedAt: Date | null;
+};
+
+function extractTwelveDigitAadhaar(formJson: unknown): string | null {
+  if (formJson == null || typeof formJson !== 'object' || Array.isArray(formJson)) return null;
+  for (const value of Object.values(formJson as Record<string, unknown>)) {
+    if (typeof value !== 'string') continue;
+    const digits = value.replace(/\D/g, '');
+    if (digits.length === 12) return digits;
+  }
+  return null;
+}
 
 @Injectable()
 export class KycCompletionService {
@@ -47,6 +90,7 @@ export class KycCompletionService {
     verifiedAt: Date;
     /** Optional DigiLocker PAN (Surepass) — stored on `customer_kyc.pan_card_number`. */
     panCardNumber?: string | null;
+    aadhaarKycType?: number | null;
   }): Promise<void> {
     await this.prisma.client.$transaction(async (tx) => {
       await tx.applicationKyc.upsert({
@@ -79,6 +123,9 @@ export class KycCompletionService {
           aadhaarVerifiedAt: params.verifiedAt,
           aadhaarData: params.digilockerAadhaarFormJson ?? Prisma.JsonNull,
           aadhaarPhotoPath: params.aadhaarPhotoRelativePath,
+          ...(params.aadhaarKycType != null
+            ? { aadhaarKycType: params.aadhaarKycType }
+            : {}),
           ...(pan
             ? {
                 panCardNumber: pan,
@@ -134,5 +181,198 @@ export class KycCompletionService {
         },
       });
     });
+  }
+
+  async findLatestSuccessfulCustomerAadhaar(params: {
+    customerId: bigint;
+    mobileNumber?: string | null;
+  }): Promise<ReusableCustomerAadhaarRow | null> {
+    const own = await this.prisma.client.customerKyc.findMany({
+      where: { customerId: params.customerId, aadhaarVerifiedAt: { not: null } },
+      orderBy: [{ aadhaarVerifiedAt: 'desc' }, { id: 'desc' }],
+      take: 30,
+      select: REUSABLE_AADHAAR_SELECT,
+    });
+    const fromOwn = pickLatestSuccessfulCustomerAadhaar(own);
+    if (fromOwn) return fromOwn;
+
+    const mobile = params.mobileNumber?.trim();
+    if (!mobile) return null;
+    const byMobile = await this.prisma.client.customerKyc.findMany({
+      where: {
+        customerId: { not: params.customerId },
+        customer: { mobileNumber: mobile },
+        aadhaarVerifiedAt: { not: null },
+      },
+      orderBy: [{ aadhaarVerifiedAt: 'desc' }, { id: 'desc' }],
+      take: 30,
+      select: REUSABLE_AADHAAR_SELECT,
+    });
+    return pickLatestSuccessfulCustomerAadhaar(byMobile);
+  }
+
+  /**
+   * When this application skipped recapture because Aadhaar is still valid,
+   * copy that prior KYC onto a customer_kyc row that applies here so LOS shows it.
+   */
+  async linkReusableAadhaarToApplication(params: {
+    applicationId: bigint;
+    customerId: bigint;
+    mobileNumber?: string | null;
+    leadFullName?: string | null;
+    leadDateOfBirth?: Date | null;
+    leadGender?: string | null;
+  }): Promise<{ linked: boolean; complete: boolean; reusedFromPrior: boolean }> {
+    const application = await this.prisma.client.application.findUnique({
+      where: { id: params.applicationId },
+      select: {
+        createdAt: true,
+        kyc: { select: { kycStatus: true } },
+        details: { select: { aadhaarNumber: true } },
+      },
+    });
+    if (!application) {
+      return { linked: false, complete: false, reusedFromPrior: false };
+    }
+
+    const ownRows = await this.prisma.client.customerKyc.findMany({
+      where: { customerId: params.customerId },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+      select: REUSABLE_AADHAAR_SELECT,
+    });
+    const applying = ownRows.find((row) =>
+      customerAadhaarAppliesToApplication(row, {
+        applicationCreatedAt: application.createdAt,
+        applicationKycStatus: application.kyc?.kycStatus,
+      }),
+    );
+    if (applying && isDigilockerAadhaarCaptureComplete(applying.aadhaarData)) {
+      return {
+        linked: false,
+        complete: true,
+        reusedFromPrior: isAadhaarReusedFromPrior(applying.aadhaarData),
+      };
+    }
+
+    const validityDays = await this.readKycValidityDays();
+    const reuseParams = {
+      validityDays,
+      leadFullName: params.leadFullName,
+      leadDateOfBirth: params.leadDateOfBirth,
+      leadGender: params.leadGender,
+    };
+    let prior =
+      ownRows.find((row) => isReusableCustomerAadhaar(row, reuseParams)) ??
+      (await this.findReusableCustomerAadhaar({
+        customerId: params.customerId,
+        mobileNumber: params.mobileNumber,
+        ...reuseParams,
+      }));
+    if (!prior || !isReusableCustomerAadhaar(prior, reuseParams)) {
+      return { linked: false, complete: false, reusedFromPrior: false };
+    }
+
+    const reusablePrior = prior;
+    const verifiedAt = new Date();
+    const linkedData = markAadhaarReusedFromPrior(reusablePrior.aadhaarData, reusablePrior.aadhaarVerifiedAt);
+    const enteredAadhaar = application.details?.aadhaarNumber?.trim() || extractTwelveDigitAadhaar(reusablePrior.aadhaarData);
+
+    await this.prisma.client.$transaction(async (tx) => {
+      const customerKyc = await this.resolveCustomerKycForApplication(tx, {
+        applicationId: params.applicationId,
+        customerId: params.customerId,
+      });
+      if (customerKyc.id === reusablePrior.id) {
+        const copy = await tx.customerKyc.create({
+          data: { customerId: params.customerId },
+        });
+        await tx.customerKyc.update({
+          where: { id: copy.id },
+          data: {
+            aadhaarVerifiedAt: verifiedAt,
+            aadhaarData: linkedData as Prisma.InputJsonValue,
+            aadhaarPhotoPath: reusablePrior.aadhaarPhotoPath,
+            aadhaarKycType: reusablePrior.aadhaarKycType,
+            ...(reusablePrior.panCardNumber
+              ? {
+                  panCardNumber: reusablePrior.panCardNumber,
+                  panCardVerifiedAt: reusablePrior.panCardVerifiedAt ?? verifiedAt,
+                }
+              : {}),
+          },
+        });
+      } else {
+        await tx.customerKyc.update({
+          where: { id: customerKyc.id },
+          data: {
+            aadhaarVerifiedAt: verifiedAt,
+            aadhaarData: linkedData as Prisma.InputJsonValue,
+            aadhaarPhotoPath: reusablePrior.aadhaarPhotoPath,
+            aadhaarKycType: reusablePrior.aadhaarKycType,
+            ...(reusablePrior.panCardNumber && !customerKyc.panCardNumber
+              ? {
+                  panCardNumber: reusablePrior.panCardNumber,
+                  panCardVerifiedAt: reusablePrior.panCardVerifiedAt ?? verifiedAt,
+                }
+              : {}),
+          },
+        });
+      }
+
+      if (enteredAadhaar && enteredAadhaar.length === 12) {
+        await tx.applicationDetail.upsert({
+          where: { applicationId: params.applicationId },
+          create: { applicationId: params.applicationId, aadhaarNumber: enteredAadhaar },
+          update: application.details?.aadhaarNumber ? {} : { aadhaarNumber: enteredAadhaar },
+        });
+      }
+    });
+
+    return { linked: true, complete: true, reusedFromPrior: true };
+  }
+
+  private async readKycValidityDays(): Promise<number> {
+    const row = await this.prisma.client.setting.findFirst({
+      where: { key: SettingKey.KYC_VALIDITY_DAYS.key, isActive: true },
+      select: { value: true },
+    });
+    return parseKycValidityDays(row?.value);
+  }
+
+  private async findReusableCustomerAadhaar(params: {
+    customerId: bigint;
+    mobileNumber?: string | null;
+    validityDays: number;
+    leadFullName?: string | null;
+    leadDateOfBirth?: Date | null;
+    leadGender?: string | null;
+  }): Promise<ReusableCustomerAadhaarRow | null> {
+    const cutoff = kycValidityCutoff(new Date(), params.validityDays);
+    const own = await this.prisma.client.customerKyc.findMany({
+      where: {
+        customerId: params.customerId,
+        aadhaarVerifiedAt: { gte: cutoff },
+      },
+      orderBy: [{ aadhaarVerifiedAt: 'desc' }, { id: 'desc' }],
+      take: 30,
+      select: REUSABLE_AADHAAR_SELECT,
+    });
+    const fromOwn = own.find((row) => isReusableCustomerAadhaar(row, params));
+    if (fromOwn) return fromOwn;
+
+    const mobile = params.mobileNumber?.trim();
+    if (!mobile) return null;
+    const byMobile = await this.prisma.client.customerKyc.findMany({
+      where: {
+        customerId: { not: params.customerId },
+        customer: { mobileNumber: mobile },
+        aadhaarVerifiedAt: { gte: cutoff },
+      },
+      orderBy: [{ aadhaarVerifiedAt: 'desc' }, { id: 'desc' }],
+      take: 30,
+      select: REUSABLE_AADHAAR_SELECT,
+    });
+    return byMobile.find((row) => isReusableCustomerAadhaar(row, params)) ?? null;
   }
 }

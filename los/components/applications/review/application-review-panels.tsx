@@ -55,10 +55,15 @@ import {
 } from '@/lib/kyc-selfie-validation-display';
 import { KycPhotoGallery } from '@/components/shared/kyc-photo-gallery';
 import { KycEnableReKycButton } from '@/components/applications/kyc-enable-re-kyc-button';
+import { KycEnableAadhaarReattemptButton } from '@/components/applications/kyc-enable-aadhaar-reattempt-button';
 import { GrantPennyDropAttemptButton } from '@/components/applications/grant-penny-drop-attempt-button';
 import { AadhaarDownloadLogHistory } from '@/components/applications/aadhaar-download-log-history';
 import { PennyDropAttemptHistory } from '@/components/applications/penny-drop-attempt-history';
-import { canEnableReKycFromRow } from '@/lib/kyc-grant-retry-eligibility';
+import {
+  canEnableAadhaarReattemptFromRow,
+  canEnableReKycFromRow,
+  isLivenessFinishedForReKyc,
+} from '@/lib/kyc-grant-retry-eligibility';
 import { BANK_DETAIL_FAILED_LABEL, canGrantPennyDropAttemptFromRow, isBankDetailFailed } from '@/lib/penny-drop-grant-retry-eligibility';
 import { KycPipelineSteps } from '@/components/applications/kyc-pipeline-steps';
 import { LosStatusPill } from '@/components/shared/los-status-pill';
@@ -506,20 +511,34 @@ export function ReviewKycPanel({
   const livenessFailed =
     (kycFailed && aadhaarComplete && (Boolean(row.kycPhotos.selfiePath?.trim()) || row.livenessAttempts > 0)) ||
     (!row.livenessPassed && row.livenessAttempts >= 3);
-  const showEnableReKyc = row.canEnableReKyc || canEnableReKycFromRow(row);
+  const showEnableReKyc =
+    (row.canEnableReKyc || canEnableReKycFromRow(row)) && isLivenessFinishedForReKyc(row);
+  const showEnableAadhaarReattempt =
+    row.canEnableAadhaarReattempt || canEnableAadhaarReattemptFromRow(row);
 
   return (
     <>
       <ReviewCard
         icon={<LivenessCheckIcon />}
         title="Aadhaar photo, selfie &amp; liveness video"
+        right={
+          showEnableAadhaarReattempt ? (
+            <KycEnableAadhaarReattemptButton
+              row={row}
+              applicationUuid={applicationUuid}
+              authToken={authToken}
+              onSuccess={onRefresh}
+              className="shrink-0"
+            />
+          ) : null
+        }
       >
         <KycPhotoGallery row={row} authToken={authToken} />
       </ReviewCard>
 
       <ReviewCard
         icon={<IdCardIcon />}
-        title="DigiLocker Aadhaar KYC"
+        title="Aadhaar KYC"
         iconTone={identityMismatch ? 'warn' : aadhaarComplete ? 'ok' : kycFailed || identityFailure ? 'warn' : 'default'}
         right={
           nameReviewPending ? (
@@ -538,8 +557,12 @@ export function ReviewKycPanel({
         {!aadhaarFetched ? (
           <KycNotice>
             {(row.aadhaarDownloadLogs?.length ?? 0) > 0
-              ? 'Aadhaar download was called, but DigiLocker Aadhaar was not captured. Review the logs below.'
-              : 'DigiLocker Aadhaar has not been captured yet.'}
+              ? 'Aadhaar download was called, but Aadhaar was not captured. Review the logs below.'
+              : 'Aadhaar has not been captured yet.'}
+          </KycNotice>
+        ) : aadhaar?.reusedFromPrior ? (
+          <KycNotice>
+            Linked from previous Aadhaar KYC for this mobile number.
           </KycNotice>
         ) : null}
         <div className="fgrid">
@@ -557,7 +580,20 @@ export function ReviewKycPanel({
             tone={aadhaarComplete && !nameReviewPending ? 'accent' : identityFailure || nameReviewPending ? 'flag' : undefined}
           />
           <ReviewField
-            label="DigiLocker Aadhaar"
+            label="KYC process"
+            value={
+              aadhaar?.aadhaarKycProcessLabel
+                ? aadhaar.aadhaarKycType
+                  ? `${aadhaar.aadhaarKycProcessLabel} (${aadhaar.aadhaarKycType})`
+                  : aadhaar.aadhaarKycProcessLabel
+                : aadhaarFetched
+                  ? 'DigiLocker'
+                  : '—'
+            }
+            tone={aadhaarFetched ? 'accent' : undefined}
+          />
+          <ReviewField
+            label="Aadhaar number"
             value={formatAadhaarNumberDisplay(aadhaar?.maskedAadhaar, aadhaarFetched)}
             tone={aadhaarFetched ? 'accent' : undefined}
           />
@@ -635,7 +671,15 @@ export function ReviewKycPanel({
         title="Liveness check"
         iconTone={livenessDone ? 'ok' : livenessFailed ? 'warn' : 'default'}
         right={
-          livenessDone ? (
+          showEnableReKyc ? (
+            <KycEnableReKycButton
+              row={row}
+              applicationUuid={applicationUuid}
+              authToken={authToken}
+              onSuccess={onRefresh}
+              className="shrink-0"
+            />
+          ) : livenessDone ? (
             <ReviewPill tone="ok">Passed</ReviewPill>
           ) : livenessFailed ? (
             <ReviewPill tone="warn">Failed</ReviewPill>
@@ -646,24 +690,14 @@ export function ReviewKycPanel({
           )
         }
       >
-        {!aadhaarComplete ? (
-          <KycNotice>Liveness check starts after DigiLocker Aadhaar KYC.</KycNotice>
-        ) : !livenessDone && !livenessFailed ? (
-          <KycNotice>Aadhaar KYC is complete. Liveness check is still pending.</KycNotice>
-        ) : livenessFailed && !livenessDone ? (
-          <KycNotice>
-            {explainKycNotDone(row) ?? 'Liveness check did not pass.'}
-          </KycNotice>
-        ) : null}
-        {showEnableReKyc ? (
-          <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <KycEnableReKycButton
-              row={row}
-              applicationUuid={applicationUuid}
-              authToken={authToken}
-              onSuccess={onRefresh}
-            />
-          </div>
+        {aadhaarComplete && !livenessDone ? (
+          livenessFailed ? (
+            <KycNotice>
+              {explainKycNotDone(row) ?? 'Liveness check did not pass.'}
+            </KycNotice>
+          ) : (
+            <KycNotice>Aadhaar KYC is complete. Liveness check is still pending.</KycNotice>
+          )
         ) : null}
         <div style={{ marginBottom: 16 }}>
           <ReviewSectionLabel>Liveness pipeline</ReviewSectionLabel>

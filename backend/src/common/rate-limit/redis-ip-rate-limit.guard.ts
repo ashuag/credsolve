@@ -25,6 +25,8 @@ const DEFAULTS: Record<RateLimitRouteId, { max: number; windowSec: number }> = {
   'verify-pan': { max: 40, windowSec: 3600 },
   'digilocker-init': { max: 20, windowSec: 3600 },
   'digilocker-aadhaar': { max: 30, windowSec: 3600 },
+  'aadhaar-xml-otp': { max: 20, windowSec: 3600 },
+  'aadhaar-xml-download': { max: 20, windowSec: 3600 },
   'fetch-bureau': { max: 30, windowSec: 3600 },
   logout: { max: 60, windowSec: 3600 },
   'sync-lead-email': { max: 30, windowSec: 3600 },

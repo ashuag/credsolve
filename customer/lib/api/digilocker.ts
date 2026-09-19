@@ -177,7 +177,9 @@ function findDigilockerRedirectUrl(vendor: unknown, depth = 0): string | null {
   return null;
 }
 
-export type StartDigilockerLoginResult = { ok: true } | { ok: false; message: string };
+export type StartDigilockerLoginResult =
+  | { ok: true }
+  | { ok: false; message: string };
 
 /** Calls `digilocker-generate-url` and redirects the browser to DigiLocker login. */
 export async function startDigilockerLoginFlow(
@@ -190,7 +192,10 @@ export async function startDigilockerLoginFlow(
   );
 
   if (!out.configured) {
-    return { ok: false, message: out.skipReason ?? 'DigiLocker is not configured on the server.' };
+    return {
+      ok: false,
+      message: out.skipReason ?? 'DigiLocker is not configured on the server.',
+    };
   }
   if (!out.ok) {
     const vendorMsg =

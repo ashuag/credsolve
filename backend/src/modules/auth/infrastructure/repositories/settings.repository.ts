@@ -498,6 +498,18 @@ export class SettingsRepository implements OnModuleInit {
     return settings.leadExpireDays;
   }
 
+  /** Days a prior successful Aadhaar KYC can be reused before recapture (default 180). */
+  async loadKycValidityDays(): Promise<number> {
+    const row = await this.prisma.client.setting.findFirst({
+      where: { key: SettingKey.KYC_VALIDITY_DAYS.key, isActive: true },
+      select: { value: true },
+    });
+    const n = row ? Number.parseInt(row.value.trim(), 10) : NaN;
+    return Number.isFinite(n) && n > 0
+      ? n
+      : Number.parseInt(SettingKey.KYC_VALIDITY_DAYS.default, 10);
+  }
+
   /** Max penny-drop verification attempts per application (default 2). */
   async loadPennyDropRetryCount(): Promise<number> {
     const row = await this.prisma.client.setting.findFirst({

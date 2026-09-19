@@ -4,6 +4,7 @@ import { EasebuzzWireService } from '../easebuzz/easebuzz-wire.service';
 import { BureauFetchService } from './bureau-fetch.service';
 import { BankTenacioVendorService } from './bank-tenacio-vendor.service';
 import { DigilockerFetchService } from './digilocker-fetch.service';
+import { AadhaarXmlOtpVendorService } from './aadhaar-xml-otp-vendor.service';
 import { DigilockerVendorService } from './digilocker-vendor.service';
 import { KycTenacioVendorService } from './kyc-tenacio-vendor.service';
 import { LivenessVendorService } from './liveness-vendor.service';
@@ -44,6 +45,7 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
     PanNsdlCacheService,
     BureauFetchService,
     DigilockerVendorService,
+    AadhaarXmlOtpVendorService,
     DigilockerFetchService,
     BankTenacioVendorService,
     LivenessVendorService,
@@ -60,6 +62,7 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
     PanNsdlCacheService,
     BureauFetchService,
     DigilockerVendorService,
+    AadhaarXmlOtpVendorService,
     DigilockerFetchService,
     BankTenacioVendorService,
     LivenessVendorService,

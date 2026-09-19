@@ -59,6 +59,7 @@ export type CustomerKycFaceProgress = {
   selfieUpdatedAt?: string | null;
   digilockerAadhaarDownloadAttempts?: number;
   digilockerAadhaarDownloadMaxAttempts?: number;
+  digilockerFallbackAvailable?: boolean;
   livenessAttempts?: number;
   livenessMaxAttempts?: number;
   /** When true, KYC stays open until a head-movement clip scores a pass. */

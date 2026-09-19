@@ -285,6 +285,16 @@ export class LosDataController {
     return this.losApplication.enableReKyc(applicationUuid);
   }
 
+  @Post('applications/:applicationUuid/kyc/enable-aadhaar-reattempt')
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({
+    summary:
+      'Reset Aadhaar OTP / DigiLocker attempts so the customer can start Aadhaar OTP KYC again',
+  })
+  enableAadhaarReattempt(@Param('applicationUuid') applicationUuid: string) {
+    return this.losApplication.enableAadhaarReattempt(applicationUuid);
+  }
+
   @Post('applications/:applicationUuid/bank/grant-penny-drop-attempt')
   @UseGuards(LosDenyAgentGuard)
   @ApiOperation({

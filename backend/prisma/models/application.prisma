@@ -65,6 +65,8 @@ model ApplicationDetail {
   loanDocumentsReviewedIp      String?                @map("loan_documents_reviewed_ip") @db.VarChar(45)
   pennyDropAttempts            Int                    @default(0) @map("penny_drop_attempts") @db.SmallInt
   pennyDropVendorJson          Json?                  @map("penny_drop_vendor_json")
+  /** 12-digit Aadhaar number entered by the customer on OTP KYC. */
+  aadhaarNumber                String?                @map("aadhaar_number") @db.Char(12)
   createdAt                    DateTime               @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt                    DateTime               @updatedAt @map("updated_at") @db.DateTime(3)
 
@@ -89,6 +91,9 @@ model ApplicationKyc {
   selfieFaceValidationJson       Json?     @map("selfie_face_validation_json")
   selfieFaceValidationPassed     Boolean   @default(false) @map("selfie_face_validation_passed")
   digilockerAadhaarDownloadAttempts Int  @default(0) @map("digilocker_aadhaar_download_attempts") @db.SmallInt
+  /** True after OTP attempts are exhausted — DigiLocker KYC may start. */
+  digilockerFallbackEligible        Boolean @default(false) @map("aadhaar_otp_fallback_eligible")
+  aadhaarXmlOtpAttempts             Int     @default(0) @map("aadhaar_xml_otp_attempts") @db.SmallInt
   livenessAttempts               Int       @default(0) @map("liveness_attempts") @db.SmallInt
   kycCompletedAt                 DateTime? @map("kyc_completed_at") @db.DateTime(3)
   createdAt                      DateTime  @default(now()) @map("created_at") @db.DateTime(3)

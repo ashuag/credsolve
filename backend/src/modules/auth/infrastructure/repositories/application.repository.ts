@@ -159,6 +159,7 @@ export class ApplicationRepository {
       customerId: bigint;
       digilockerAadhaarFormJson: Prisma.InputJsonValue;
       aadhaarPhotoRelativePath: string | null;
+      aadhaarKycType?: number | null;
     },
     tx?: DbClient,
   ) {
@@ -189,6 +190,9 @@ export class ApplicationRepository {
       data: {
         aadhaarData: params.digilockerAadhaarFormJson,
         aadhaarPhotoPath: params.aadhaarPhotoRelativePath,
+        ...(params.aadhaarKycType != null
+          ? { aadhaarKycType: params.aadhaarKycType }
+          : {}),
       },
     });
   }
