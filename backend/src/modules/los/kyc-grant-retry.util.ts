@@ -67,19 +67,32 @@ export type AadhaarReattemptSnapshot = {
 
 /** True when LOS ops may reset Aadhaar OTP/DigiLocker attempts so the customer starts OTP again. */
 export function canEnableAadhaarReattempt(snapshot: AadhaarReattemptSnapshot): boolean {
-  if (snapshot.aadhaarCaptured) return false;
-  if (RE_KYC_BLOCKED_APPLICATION_STATUSES.has(snapshot.applicationStatusCode as ApplicationStatus)) {
+  if (snapshot.leadStatusCode === LEAD_STATUS.BLACKLISTED) return false;
+
+  const recoverableKycFailure =
+    snapshot.kycFailed &&
+    (snapshot.applicationStatusCode === APPLICATION_STATUS.KYC_FAILED ||
+      snapshot.applicationStatusCode === APPLICATION_STATUS.REJECTED);
+
+  // Identity-mismatch rejects still have Aadhaar on file — ops must be able to clear it and retry.
+  if (snapshot.aadhaarCaptured && !recoverableKycFailure) return false;
+
+  if (
+    RE_KYC_BLOCKED_APPLICATION_STATUSES.has(snapshot.applicationStatusCode as ApplicationStatus) &&
+    !recoverableKycFailure
+  ) {
     return false;
   }
-  if (snapshot.leadStatusCode === LEAD_STATUS.BLACKLISTED) return false;
   if (
     snapshot.leadStatusCode === LEAD_STATUS.REJECTED &&
-    snapshot.applicationStatusCode !== APPLICATION_STATUS.KYC_FAILED
+    snapshot.applicationStatusCode !== APPLICATION_STATUS.KYC_FAILED &&
+    snapshot.applicationStatusCode !== APPLICATION_STATUS.REJECTED
   ) {
     return false;
   }
 
   return (
+    recoverableKycFailure ||
     snapshot.otpAttempts > 0 ||
     snapshot.digilockerAttempts > 0 ||
     snapshot.digilockerFallbackEligible ||

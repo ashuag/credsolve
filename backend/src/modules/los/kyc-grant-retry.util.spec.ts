@@ -61,4 +61,31 @@ describe('canEnableAadhaarReattempt', () => {
       false,
     );
   });
+
+  it('allows a captured Aadhaar to be retried after KYC identity rejection', async () => {
+    assert.equal(
+      canEnableAadhaarReattempt({
+        aadhaarCaptured: true,
+        otpAttempts: 0,
+        digilockerAttempts: 1,
+        digilockerFallbackEligible: false,
+        applicationStatusCode: APPLICATION_STATUS.REJECTED,
+        leadStatusCode: LEAD_STATUS.REJECTED,
+        kycFailed: true,
+      }),
+      true,
+    );
+    assert.equal(
+      canEnableAadhaarReattempt({
+        aadhaarCaptured: true,
+        otpAttempts: 0,
+        digilockerAttempts: 1,
+        digilockerFallbackEligible: false,
+        applicationStatusCode: APPLICATION_STATUS.KYC_FAILED,
+        leadStatusCode: LEAD_STATUS.REJECTED,
+        kycFailed: true,
+      }),
+      true,
+    );
+  });
 });

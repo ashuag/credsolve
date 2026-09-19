@@ -1971,7 +1971,9 @@ export class LosApplicationService {
     const recoveryLeadStatus =
       loanSelectionCompleted && convertedLeadStatus ? convertedLeadStatus : inProgressLeadStatus;
     const leadWasRejected = application.lead.leadStatus.name === LEAD_STATUS.REJECTED;
-    const appWasKycFailed = application.applicationStatus.name === APPLICATION_STATUS.KYC_FAILED;
+    const appWasKycFailed =
+      application.applicationStatus.name === APPLICATION_STATUS.KYC_FAILED ||
+      (kycFailed && application.applicationStatus.name === APPLICATION_STATUS.REJECTED);
 
     await this.prisma.client.$transaction(async (tx) => {
       await tx.applicationKyc.update({
@@ -1991,7 +1993,7 @@ export class LosApplicationService {
         data: { aadhaarNumber: null },
       });
 
-      if (customerKyc && !aadhaarCaptured) {
+      if (customerKyc) {
         await tx.customerKyc.update({
           where: { id: customerKyc.id },
           data: {

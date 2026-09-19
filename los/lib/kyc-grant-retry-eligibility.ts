@@ -69,13 +69,26 @@ export function canEnableAadhaarReattemptFromRow(
 ): boolean {
   if (row.canEnableAadhaarReattempt) return true;
   if (isLosAadhaarKycComplete(row)) return false;
-  if (RE_KYC_BLOCKED_APPLICATION_STATUSES.has(row.statusCode)) return false;
   if (row.lead.statusCode === 'BLACKLISTED') return false;
-  if (row.lead.statusCode === 'REJECTED' && row.statusCode !== 'KYC_FAILED') return false;
 
-  return (
+  const recoverableKycFailure =
     row.kycStatus === 2 ||
     Boolean(row.aadhaarIdentityFailure) ||
-    (row.aadhaarDownloadLogs?.length ?? 0) > 0
-  );
+    row.statusCode === 'KYC_FAILED';
+
+  if (
+    RE_KYC_BLOCKED_APPLICATION_STATUSES.has(row.statusCode) &&
+    !(recoverableKycFailure && row.statusCode === 'REJECTED')
+  ) {
+    return false;
+  }
+  if (
+    row.lead.statusCode === 'REJECTED' &&
+    row.statusCode !== 'KYC_FAILED' &&
+    row.statusCode !== 'REJECTED'
+  ) {
+    return false;
+  }
+
+  return recoverableKycFailure || (row.aadhaarDownloadLogs?.length ?? 0) > 0;
 }
