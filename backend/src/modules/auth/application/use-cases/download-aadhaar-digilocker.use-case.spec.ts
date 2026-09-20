@@ -24,6 +24,7 @@ function makeUseCase(opts: { eligible?: boolean; storedToken?: string | null }) 
       readAttemptsUsed: async () => 0,
     } as never,
     {} as never,
+    { recoverLeadIfAadhaarCaptured: async () => false } as never,
     {
       client: {
         applicationKyc: {

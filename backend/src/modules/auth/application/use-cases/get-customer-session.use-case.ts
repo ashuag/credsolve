@@ -124,10 +124,11 @@ export class GetCustomerSessionUseCase {
 
     if (statusName === LEAD_STATUS.INTERNAL_ERROR) {
       const providerName = (process.env.TENACIO_PROVIDER ?? 'Tenacio').trim();
-      const recovered = await this.vendorInternalError.recoverLeadIfVendorFailuresCleared(
-        leadRow.id,
-        providerName,
-      );
+      const recovered =
+        (await this.vendorInternalError.recoverLeadIfVendorFailuresCleared(
+          leadRow.id,
+          providerName,
+        )) || (await this.vendorInternalError.recoverLeadIfAadhaarCaptured(leadRow.id));
       if (recovered) {
         const refreshedLead = await this.leads.findActiveByCustomerId(customer.id);
         if (refreshedLead) {

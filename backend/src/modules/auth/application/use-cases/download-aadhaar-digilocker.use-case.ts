@@ -25,6 +25,7 @@ import { KycCompletionService } from '../../../../common/kyc/kyc-completion.serv
 import { APPLICATION_KYC_STATUS } from '../../../../common/constants/application.constants';
 import { assertApplicationKycNotCompleted } from '../../../../common/kyc/application-kyc-guard.util';
 import { assertActiveApplicationLoanDocumentsAccepted } from '../../../../common/loan-documents/application-loan-documents-guard.util';
+import { VendorInternalErrorService } from '../../../../common/vendor/vendor-internal-error.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
@@ -100,6 +101,7 @@ export class DownloadAadhaarDigilockerUseCase {
     private readonly kycIdentityRejection: KycIdentityRejectionService,
     private readonly kycDigilockerDownloadFailure: KycDigilockerDownloadFailureService,
     private readonly kycCompletion: KycCompletionService,
+    private readonly vendorInternalError: VendorInternalErrorService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -586,6 +588,13 @@ export class DownloadAadhaarDigilockerUseCase {
         verifiedAt: new Date(),
         panCardNumber,
         aadhaarKycType,
+      });
+      await this.vendorInternalError.recoverLeadIfAadhaarCaptured(params.leadId).catch((err) => {
+        this.logger.warn(
+          `INTERNAL_ERROR recovery after Aadhaar capture failed (leadId=${params.leadId.toString()}): ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
       });
       if (nameMismatchReview) {
         this.logger.warn(

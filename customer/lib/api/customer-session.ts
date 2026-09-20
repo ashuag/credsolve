@@ -336,7 +336,7 @@ export function getCustomerJourneyResumePath(
     if (canResumeKycAfterInternalError(session)) {
       return shouldResumeKycSelfie(session) ? '/kyc/selfie' : '/kyc';
     }
-    return '/thank-you';
+    // DigiLocker already captured (Aadhaar OTP 5xx leftover) — continue the remaining steps.
   }
 
   const journey = session.journey;
@@ -409,6 +409,9 @@ export function getCustomerPostMobileOtpRedirectPath(
   }
 
   if (isInternalErrorLead(lead, otpLeadStatus)) {
+    if (session?.authenticated && lead) {
+      return getCustomerJourneyResumePath(session);
+    }
     if (canResumeKycAfterInternalError(session)) {
       return shouldResumeKycSelfie(session) ? '/kyc/selfie' : '/kyc';
     }

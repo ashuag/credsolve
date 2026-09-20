@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
-import { hasOpenCustomerLoan } from '@/lib/api/customer-session';
+import { getCustomerJourneyResumePath, hasOpenCustomerLoan } from '@/lib/api/customer-session';
 import { Spinner } from '@/components/ui/spinner';
 
 function ThankYouContent() {
@@ -23,6 +23,11 @@ function ThankYouContent() {
     // Do not keep them on the post-application thank-you screen.
     if (!hasOpenCustomerLoan(session) && !session.lead) {
       router.replace('/my-account');
+      return;
+    }
+    const resumePath = getCustomerJourneyResumePath(session);
+    if (resumePath !== '/thank-you') {
+      router.replace(resumePath);
     }
   }, [loading, session, router]);
 
