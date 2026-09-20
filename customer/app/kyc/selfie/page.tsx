@@ -528,35 +528,41 @@ function KycSelfieContent() {
             ) : null}
 
             {photoHref || hasAadhaarDetails ? (
-              <div className="hidden gap-3 rounded-2xl border border-[rgba(18,36,79,0.12)] bg-white/90 p-3 lg:grid lg:grid-cols-2 lg:items-start">
-                <div className="min-w-0">
-                  <p className="m-0 mb-2 text-sm font-semibold text-brand-navy">Aadhaar details</p>
+              <div className="flex flex-col gap-4 rounded-2xl border border-[rgba(18,36,79,0.12)] bg-white/90 p-4 sm:flex-row sm:items-start">
+                <div className="min-w-0 flex-1">
+                  <p className="m-0 mb-3 text-sm font-semibold text-brand-navy">Aadhaar details</p>
                   {hasAadhaarDetails ? (
-                    <dl className="m-0 grid gap-2 text-sm">
-                      <div className="grid grid-cols-[7.5rem_1fr] gap-x-2 gap-y-0.5">
+                    <dl className="m-0 grid gap-2.5 text-sm">
+                      <div className="grid grid-cols-[5.25rem_minmax(0,1fr)] items-baseline gap-x-3 gap-y-2">
                         <dt className="text-brand-muted font-medium">Name</dt>
-                        <dd className="m-0 text-brand-navy break-words">{aadhaarIdentity.name ?? '—'}</dd>
+                        <dd className="m-0 font-medium text-brand-navy">{aadhaarIdentity.name ?? '—'}</dd>
                         <dt className="text-brand-muted font-medium">DOB</dt>
                         <dd className="m-0 text-brand-navy">{aadhaarIdentity.dob ?? '—'}</dd>
                         <dt className="text-brand-muted font-medium">Gender</dt>
                         <dd className="m-0 text-brand-navy">{aadhaarIdentity.gender ?? '—'}</dd>
-                        <dt className="text-brand-muted font-medium">Full Address</dt>
-                        <dd className="m-0 text-brand-navy break-words">{aadhaarIdentity.fullAddress ?? '—'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-brand-muted font-medium">Full address</dt>
+                        <dd className="m-0 mt-1 leading-relaxed text-brand-navy">
+                          {aadhaarIdentity.fullAddress ?? '—'}
+                        </dd>
                       </div>
                     </dl>
                   ) : (
                     <p className="m-0 text-sm text-brand-muted">Aadhaar details are not available yet.</p>
                   )}
                 </div>
-                <div className="min-w-0">
-                  <p className="m-0 mb-2 text-sm font-semibold text-brand-navy">Aadhaar photo</p>
+                <div className="shrink-0 sm:w-[148px]">
+                  <p className="m-0 mb-3 text-sm font-semibold text-brand-navy">Aadhaar photo</p>
                   {photoHref ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={photoHref}
-                      alt="Aadhaar reference"
-                      className="w-full max-h-56 object-contain rounded-xl bg-slate-50"
-                    />
+                    <div className="flex h-[168px] w-[136px] items-center justify-center overflow-hidden rounded-xl bg-slate-50 ring-1 ring-[rgba(18,36,79,0.08)]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={photoHref}
+                        alt="Aadhaar reference"
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    </div>
                   ) : (
                     <p className="m-0 text-sm text-brand-muted">Photo not available.</p>
                   )}
