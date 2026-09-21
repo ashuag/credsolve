@@ -50,7 +50,6 @@ export class LosLoanService {
         application: { lead: { isInternalTesting: false } },
       },
       orderBy: { disbursedAt: 'desc' },
-      take: 500,
       include: {
         loanStatus: { select: { name: true, displayName: true } },
         waivedByUser: { select: { fullName: true } },
