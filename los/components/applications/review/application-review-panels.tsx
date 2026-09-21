@@ -13,6 +13,7 @@ import {
   ReviewSectionLabel,
 } from '@/components/applications/review/application-review-ui';
 import {
+  formatApplicationDisplayId,
   formatReviewDateOnly,
   formatReviewDateTime,
   formatReviewInr,
@@ -49,6 +50,7 @@ import {
   getApplicationCibilReport,
   type CibilReportData,
   type LosApplicationDetails,
+  type LosPreviousLoan,
 } from '@/lib/api';
 import {
   explainKycNotDone,
@@ -106,6 +108,80 @@ function useCibilReport(
   return { cibilReport, loading, error, reload: load };
 }
 
+function previousLoanOverdueLabel(loan: LosPreviousLoan): { text: string; tone: 'bad' | 'ok' | 'mute' } {
+  if (loan.overdueDays > 0) {
+    const days = `${loan.overdueDays} day${loan.overdueDays === 1 ? '' : 's'}`;
+    if (loan.closedAt) return { text: `${days} (closed)`, tone: 'mute' };
+    return { text: days, tone: 'bad' };
+  }
+  return { text: 'On time', tone: 'ok' };
+}
+
+function ReviewPreviousLoansCard({ loans }: { loans: LosPreviousLoan[] }) {
+  return (
+    <ReviewCard
+      icon={
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+          <path d="M3 5h18M3 12h18M3 19h18" />
+        </svg>
+      }
+      title="Previous loans"
+      right={loans.length > 0 ? <ReviewPill>{loans.length}</ReviewPill> : undefined}
+    >
+      {loans.length === 0 ? (
+        <ReviewEmptyState
+          title="No previous loans"
+          subtitle="This customer has no earlier disbursed loans on record."
+        />
+      ) : (
+        <div className="prev-loans-wrap">
+          <table className="prev-loans">
+            <thead>
+              <tr>
+                <th>Loan ID</th>
+                <th>Loan amount</th>
+                <th>Disbursement amount</th>
+                <th>Repay amount</th>
+                <th>Disbursed date</th>
+                <th>Repayment date</th>
+                <th>Overdue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loans.map((loan) => {
+                const overdue = previousLoanOverdueLabel(loan);
+                return (
+                  <tr key={loan.uuid}>
+                    <td>
+                      <Link
+                        href={`/applications/${loan.applicationUuid}?tab=personal`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="prev-loan-id mono"
+                        title={`Open application ${formatApplicationDisplayId(loan.applicationNumber)}`}
+                      >
+                        {formatApplicationDisplayId(loan.loanNumber)}
+                      </Link>
+                    </td>
+                    <td className="mono">{formatReviewInr(loan.loanAmount)}</td>
+                    <td className="mono">{formatReviewInr(loan.disbursementAmount)}</td>
+                    <td className="mono">{formatReviewInr(loan.repayAmount)}</td>
+                    <td>{formatReviewDateOnly(loan.disbursedAt)}</td>
+                    <td>{formatReviewDateOnly(loan.repaymentDate)}</td>
+                    <td>
+                      <span className={`prev-loan-overdue ${overdue.tone}`}>{overdue.text}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </ReviewCard>
+  );
+}
+
 export function ReviewLoanPanel({
   row,
   applicationUuid,
@@ -125,16 +201,19 @@ export function ReviewLoanPanel({
 
   if (!details) {
     return (
-      <ReviewCard
-        icon={
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-          </svg>
-        }
-        title="Loan economics"
-      >
-        <ReviewEmptyState title="No loan selection" subtitle="The customer has not saved a loan offer yet." />
-      </ReviewCard>
+      <>
+        <ReviewCard
+          icon={
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+          }
+          title="Loan economics"
+        >
+          <ReviewEmptyState title="No loan selection" subtitle="The customer has not saved a loan offer yet." />
+        </ReviewCard>
+        <ReviewPreviousLoansCard loans={row.previousLoans ?? []} />
+      </>
     );
   }
 
@@ -443,6 +522,7 @@ export function ReviewLoanPanel({
           </p>
         ) : null}
       </ReviewCard>
+      <ReviewPreviousLoansCard loans={row.previousLoans ?? []} />
     </>
   );
 }

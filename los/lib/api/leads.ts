@@ -236,6 +236,23 @@ export type LosMoneyCashFaceMatch = {
   } | null;
 };
 
+export type LosPreviousLoan = {
+  uuid: string;
+  loanNumber: string;
+  applicationUuid: string;
+  applicationNumber: string;
+  loanAmount: string;
+  disbursementAmount: string;
+  repayAmount: string;
+  disbursedAt: string;
+  repaymentDate: string;
+  overdueDays: number;
+  overdue: boolean;
+  loanStatusCode: string;
+  loanStatusLabel: string;
+  closedAt: string | null;
+};
+
 export type LosApplicationDetails = {
   uuid: string;
   applicationNumber: string;
@@ -244,6 +261,8 @@ export type LosApplicationDetails = {
     uuid: string;
     applicationNumber: string;
   } | null;
+  /** Earlier disbursed loans for this customer (excludes the current application). */
+  previousLoans?: LosPreviousLoan[];
   customerUuid: string;
   leadUuid: string;
   leadNumber: string;

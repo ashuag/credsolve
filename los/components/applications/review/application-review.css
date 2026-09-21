@@ -776,6 +776,70 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.app-review .prev-loans-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fcfdff;
+}
+
+.app-review .prev-loans {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.app-review .prev-loans th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  background: linear-gradient(180deg, #f7f9fd, var(--line-2));
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.app-review .prev-loans td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line-2);
+  vertical-align: middle;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.app-review .prev-loans tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.app-review .prev-loan-id {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.app-review .prev-loan-id:hover {
+  text-decoration: underline;
+}
+
+.app-review .prev-loan-overdue.bad {
+  color: var(--bad);
+  font-weight: 700;
+}
+
+.app-review .prev-loan-overdue.ok {
+  color: var(--ok);
+  font-weight: 700;
+}
+
+.app-review .prev-loan-overdue.mute {
+  color: var(--ink-3);
+  font-weight: 600;
+}
+
 .app-review .ar-prior-cibil-note {
   margin: 12px 0 0;
   font-size: 12.5px;

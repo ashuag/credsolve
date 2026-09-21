@@ -36,6 +36,30 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type ReviewTab = 'personal' | 'cibil' | 'loan' | 'kyc' | 'bank' | 'refs' | 'utm' | 'ids' | 'timeline';
 
+const REVIEW_TABS: readonly ReviewTab[] = [
+  'personal',
+  'cibil',
+  'loan',
+  'kyc',
+  'bank',
+  'refs',
+  'utm',
+  'ids',
+  'timeline',
+];
+
+function parseReviewTab(value: string | null | undefined): ReviewTab | null {
+  const tab = value?.trim().toLowerCase();
+  return REVIEW_TABS.includes(tab as ReviewTab) ? (tab as ReviewTab) : null;
+}
+
+function defaultReviewTab(row: LosApplicationDetails): ReviewTab {
+  if (hasAadhaarKycMismatch(row)) return 'kyc';
+  if (row.nameMatchPendingReview || row.statusCode.toUpperCase() === 'UNDER_REVIEW') return 'bank';
+  if (row.details?.loanAmount) return 'loan';
+  return 'personal';
+}
+
 export function ApplicationReviewDashboard({
   row,
   applicationUuid,
@@ -47,15 +71,13 @@ export function ApplicationReviewDashboard({
   authToken: string | null;
   onRefresh: () => void;
 }) {
-  const [activeTab, setActiveTab] = useState<ReviewTab>(
-    hasAadhaarKycMismatch(row)
-      ? 'kyc'
-      : row.nameMatchPendingReview || row.statusCode.toUpperCase() === 'UNDER_REVIEW'
-        ? 'bank'
-        : row.details?.loanAmount
-          ? 'loan'
-          : 'personal',
-  );
+  const [activeTab, setActiveTab] = useState<ReviewTab>(() => {
+    if (typeof window !== 'undefined') {
+      const fromUrl = parseReviewTab(new URLSearchParams(window.location.search).get('tab'));
+      if (fromUrl) return fromUrl;
+    }
+    return defaultReviewTab(row);
+  });
   const [rejectOpen, setRejectOpen] = useState(false);
   const [bureauPan, setBureauPan] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -112,6 +134,11 @@ export function ApplicationReviewDashboard({
   useEffect(() => {
     void loadBureauPan();
   }, [loadBureauPan]);
+
+  useEffect(() => {
+    const fromUrl = parseReviewTab(new URLSearchParams(window.location.search).get('tab'));
+    if (fromUrl) setActiveTab(fromUrl);
+  }, [row.uuid]);
 
   const handleApproveNameMatch = useCallback(async () => {
     if (!authToken || approveNameMatchBusy) return;

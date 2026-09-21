@@ -56,6 +56,8 @@ import {
   resolveRepaymentDueDateUtc,
   syncExpectedRepaymentDateUntilDisbursed,
 } from '../../../common/loan/repayment-due-date.util';
+import { overdueDaysFromMaturity } from '../../../common/loan/bounce-charge.util';
+import { resolveEffectiveLoanStatus } from '../../../common/loan/effective-loan-status.util';
 import { APPLICATION_KYC_STATUS, APPLICATION_STATUS } from '../../../common/constants/application.constants';
 import { BANK_DETAIL_FAILED_NOTE, isBankNameMatchReviewPending, PENNY_DROP_FAILED_NOTE } from '../../../common/constants/bank.constants';
 import { SettingKey } from '../../../common/constants/setting.constants';
@@ -836,10 +838,10 @@ export class LosApplicationService {
 
     const lead = application.lead;
     const detail = lead.leadDetail;
-    const priorApplication = await this.findPriorApplicationForCustomer(
-      application.customerId,
-      application.id,
-    );
+    const [priorApplication, previousLoans] = await Promise.all([
+      this.findPriorApplicationForCustomer(application.customerId, application.id),
+      this.listPreviousLoansForCustomer(application.customerId, application.id),
+    ]);
 
     let bureauReportRow = detail?.bureauReport ?? null;
     let bureauReportFromPriorApplication = false;
@@ -1210,6 +1212,7 @@ export class LosApplicationService {
         reviewedAt: application.details?.loanDocumentsReviewedAt?.toISOString() ?? null,
         acceptedAt: application.details?.loanDocumentsAcceptedAt?.toISOString() ?? null,
       },
+      previousLoans,
     };
   }
 
@@ -2283,6 +2286,53 @@ export class LosApplicationService {
       where: { customerId, id: { not: excludeApplicationId } },
       orderBy: { createdAt: 'desc' },
       select: { uuid: true, applicationNumber: true },
+    });
+  }
+
+  private async listPreviousLoansForCustomer(customerId: bigint, excludeApplicationId: bigint) {
+    const loans = await this.prisma.read.loanAccount.findMany({
+      where: {
+        customerId,
+        applicationId: { not: excludeApplicationId },
+        application: { lead: { isInternalTesting: false } },
+      },
+      orderBy: { disbursedAt: 'desc' },
+      include: {
+        loanStatus: { select: { name: true, displayName: true } },
+        application: { select: { uuid: true, applicationNumber: true } },
+      },
+    });
+
+    return loans.map((loan) => {
+      const effectiveStatus = resolveEffectiveLoanStatus({
+        statusName: loan.loanStatus.name,
+        statusDisplayName: loan.loanStatus.displayName,
+        loanMaturityDate: loan.loanMaturityDate,
+        closedAt: loan.closedAt,
+      });
+      const daysPastDue = overdueDaysFromMaturity(
+        loan.loanMaturityDate,
+        loan.closedAt ?? new Date(),
+      );
+      const overdueDays = daysPastDue > 0 ? Math.max(daysPastDue, 1) : 0;
+      const loanNumber = loan.loanNumber?.trim() || loan.loanAccountNumber;
+
+      return {
+        uuid: loan.uuid,
+        loanNumber,
+        applicationUuid: loan.application.uuid,
+        applicationNumber: loan.application.applicationNumber,
+        loanAmount: loan.principalAmount.toString(),
+        disbursementAmount: loan.netDisbursedAmount.toString(),
+        repayAmount: loan.totalRepaymentAmount.toString(),
+        disbursedAt: loan.disbursedAt.toISOString(),
+        repaymentDate: loan.loanMaturityDate.toISOString().slice(0, 10),
+        overdueDays,
+        overdue: overdueDays > 0 && loan.closedAt == null,
+        loanStatusCode: effectiveStatus.code,
+        loanStatusLabel: effectiveStatus.label,
+        closedAt: loan.closedAt?.toISOString() ?? null,
+      };
     });
   }
 
