@@ -7,6 +7,7 @@ import {
   Param,
   Post,
   Query,
+  Res,
   UploadedFile,
   UploadedFiles,
   UseGuards,
@@ -14,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import type { UploadedFileLike } from '../../common/types/uploaded-file';
 import { LosAuthGuard } from './auth/los-auth.guard';
 import { LosDenyAgentGuard } from './auth/los-deny-agent.guard';
@@ -59,6 +61,27 @@ export class LosDeveloperToolsController {
   })
   listVendorApiLogs(@Query() query: ListVendorApiLogsQueryDto) {
     return this.vendorApiLogs.list(query);
+  }
+
+  @Get('vendor-api-logs/export')
+  @ApiOperation({
+    summary: 'Download filtered vendor_api_log rows as an Excel dump workbook (.xlsx)',
+    description:
+      'Requires at least one filter (provider, service, method, status, id, lead, application, path, outcome, or date range) to avoid an unbounded dump. Omits log id, lead id, request headers, and request path. ' +
+      'Query is read raw (like leads/export) so access_token can ride along without tripping the ValidationPipe whitelist.',
+  })
+  async exportVendorApiLogs(
+    @Query() query: Record<string, string>,
+    @Res() res: Response,
+  ): Promise<void> {
+    const buffer = await this.vendorApiLogs.exportWorkbook(query);
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', 'attachment; filename="Vendor API logs dump.xlsx"');
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.send(buffer);
   }
 
   @Get('vendor-api-logs/:uuid')

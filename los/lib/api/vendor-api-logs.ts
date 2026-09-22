@@ -1,4 +1,4 @@
-import { authorizedLosRequest } from './_shared';
+import { authorizedLosRequest, resolveLosClientApiUrl } from './_shared';
 
 export type VendorApiLogOutcome = 'success' | 'failure';
 
@@ -73,6 +73,22 @@ export async function listVendorApiLogs(
     { method: 'GET', cache: 'no-store' },
     'Unable to load vendor API logs.',
   );
+}
+
+/** URL for the vendor API logs dump workbook download. Caller must pass at least one filter — the backend rejects an unfiltered export. */
+export function getVendorApiLogsExportUrl(
+  token: string,
+  params: ListVendorApiLogsParams = {},
+): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value == null) continue;
+    const text = String(value).trim();
+    if (!text) continue;
+    query.set(key, text);
+  }
+  query.set('access_token', token);
+  return `${resolveLosClientApiUrl('/developer-tools/vendor-api-logs/export')}?${query.toString()}`;
 }
 
 export async function getVendorApiLog(

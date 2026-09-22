@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/data-table';
 import {
   getVendorApiLog,
+  getVendorApiLogsExportUrl,
   listVendorApiLogs,
   type LosVendorApiLogDetail,
   type LosVendorApiLogListItem,
@@ -335,6 +336,34 @@ export function VendorApiLogsPanel() {
 
   const filtersActive = hasActiveColumnFilters(columnFilters);
 
+  const downloadDump = useCallback(() => {
+    const token = getLosToken();
+    if (!token) {
+      setError('Session expired - please log in again.');
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = getVendorApiLogsExportUrl(token, {
+      sortBy: sort?.key ?? 'requestedAt',
+      sortDir: sort?.dir ?? 'desc',
+      providerName: debouncedFilters.providerName,
+      serviceName: debouncedFilters.serviceName,
+      requestMethod: debouncedFilters.requestMethod,
+      httpStatus: debouncedFilters.httpStatus,
+      id: debouncedFilters.id,
+      leadId: debouncedFilters.leadId,
+      applicationNumber: debouncedFilters.applicationNumber,
+      requestPath: debouncedFilters.requestPath,
+      outcome: debouncedFilters.outcome,
+      requestedFrom: debouncedFilters.requestedFrom,
+      requestedTo: debouncedFilters.requestedTo,
+    });
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }, [sort, debouncedFilters]);
+
   return (
     <>
       <div className="overflow-hidden rounded-[14px] border border-[rgba(23,44,113,0.1)] bg-white">
@@ -346,6 +375,15 @@ export function VendorApiLogsPanel() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={downloadDump}
+              disabled={!filtersActive}
+              title={filtersActive ? undefined : 'Apply a filter to enable the dump download'}
+              className="min-h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              ⬇ Download dump
+            </button>
             {filtersActive ? (
               <button
                 type="button"
