@@ -9,11 +9,14 @@ type VendorCallResult = {
   vendorBody: unknown | null;
 };
 
+const DEFAULT_IFSC_PATH = 'ifsc';
+
 /**
- * IFSC lookup via Credostack `GET /ifsc/{ifscCode}`.
+ * IFSC lookup via Credostack `GET /{CREDOSTACK_IFSC_PATH}/{ifscCode}`.
  *
  * Env: `CREDOSTACK_URL` (base URL, shared across every Credostack integration),
  * `CREDOSTACK_CLIENT_CODE` (`X-Client-Code`), `CREDOSTACK_API_KEY` (`X-Api-Key`) — all required.
+ * `CREDOSTACK_IFSC_PATH` (path segment, defaults to `ifsc`) — optional.
  */
 @Injectable()
 export class CredostackIfscService {
@@ -25,6 +28,7 @@ export class CredostackIfscService {
     const baseUrl = (process.env.CREDOSTACK_URL ?? '').trim();
     const clientCode = (process.env.CREDOSTACK_CLIENT_CODE ?? '').trim();
     const apiKey = (process.env.CREDOSTACK_API_KEY ?? '').trim();
+    const ifscPath = (process.env.CREDOSTACK_IFSC_PATH ?? '').trim() || DEFAULT_IFSC_PATH;
     if (!baseUrl || !clientCode || !apiKey) {
       return this.skip(
         'Credostack is not configured. Set CREDOSTACK_URL (base URL), ' +
@@ -37,7 +41,7 @@ export class CredostackIfscService {
       serviceName: 'ifsc-lookup',
       method: 'GET',
       baseUrl,
-      path: `ifsc/${encodeURIComponent(ifscCode)}`,
+      path: `${ifscPath}/${encodeURIComponent(ifscCode)}`,
       headers: { 'X-Client-Code': clientCode, 'X-Api-Key': apiKey },
       leadId,
       sensitiveHeaderNames: ['x-api-key'],
