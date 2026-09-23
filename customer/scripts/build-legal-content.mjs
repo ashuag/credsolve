@@ -102,8 +102,6 @@ const docs = [
     kind: 'privacy',
     description:
       'How MoneyCash collects, uses, stores, and protects personal information on the website and app.',
-    registeredOffice:
-      'CREDSOLVE Technologies Private Limited, Flat No. E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh — 201009',
     contactEmail: 'legal@moneycash.in',
     grievanceOfficer: {
       name: 'Mohammad Uvaid',
