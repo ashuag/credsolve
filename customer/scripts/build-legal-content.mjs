@@ -95,8 +95,7 @@ const docs = [
     kind: 'terms',
     description:
       'Terms governing use of the MoneyCash website and mobile application, including digital lending services through partner NBFCs.',
-    registeredOffice:
-      'CREDSOLVE Technologies Private Limited, Flat No. E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh — 201009',
+      '',
     contactEmail: 'legal@moneycash.in',
   }),
   buildDoc('Privacy Policy_Moneycash.txt', 'privacy-policy', {
