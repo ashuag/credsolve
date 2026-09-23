@@ -16,6 +16,12 @@ import type { CibilAssessmentSignals } from './cibil-bureau-rules.parser';
 
 export type CibilCategory = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
 
+/** Every grade, best (A) to worst (H) — the single source of truth other modules should filter/validate/list against instead of re-declaring the letters. */
+export const CIBIL_CATEGORIES: readonly CibilCategory[] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
+
+/** Same set as {@link CIBIL_CATEGORIES}, for O(1) membership checks (e.g. validating a query filter). */
+export const CIBIL_CATEGORY_SET: ReadonlySet<CibilCategory> = new Set(CIBIL_CATEGORIES);
+
 const CATEGORY_MEANING: Record<CibilCategory, string> = {
   A: 'Credit-active prime borrower — heavy credit user with long bureau history.',
   B: 'Near-prime active borrower — active borrower with wide credit footprint.',

@@ -5,12 +5,15 @@ import {
   isoDateTimestamp,
   LOS_LISTING_PAGE_SIZE,
   LOS_LISTING_PAGE_SIZE_OPTIONS,
+  useDataTableFilterState,
   type DataTableColumn,
 } from '@/components/ui/data-table';
+import { DownloadDumpButton } from '@/components/ui/download-dump-button';
 import { losStatusPillStyles } from '@/components/shared/los-status-pill';
 import { downloadLeadReportsExport, getLeadReports, type LosLeadReportListItem } from '@/lib/api';
 import { formatCibilScoreLabel, formatReviewDateOnly, formatReviewInr, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { getLosToken } from '@/lib/auth';
+import { CIBIL_GRADE_FILTER_OPTIONS } from '@/lib/constants/cibil-grades';
 import { formatPersonName } from '@/lib/format-person-name';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -137,6 +140,7 @@ export function LeadReportsPanel() {
   const [reports, setReports] = useState<LosLeadReportListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const { filteredCount, filtersActive, activeColumnFilters, onFilteredItemsChange } = useDataTableFilterState();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -326,7 +330,7 @@ export function LeadReportsPanel() {
       filter: {
         type: 'multi-select',
         placeholder: 'Grades',
-        options: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((g) => ({ value: g, label: g })),
+        options: CIBIL_GRADE_FILTER_OPTIONS,
       },
       cellClassName: 'whitespace-nowrap',
       render: (row) => <GradeBadge category={row.cibilCreditAssessmentCategory} />,
@@ -418,24 +422,19 @@ export function LeadReportsPanel() {
         pageSize={LOS_LISTING_PAGE_SIZE}
         pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         initialSort={{ key: 'created', dir: 'desc' }}
+        onFilteredItemsChange={onFilteredItemsChange}
         toolbarActions={
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                const token = getLosToken();
-                if (!token) {
-                  setFetchError('Session expired — please log in again.');
-                  return;
-                }
-                void downloadLeadReportsExport(token).catch((err) => {
-                  setFetchError(err instanceof Error ? err.message : 'Failed to download lead report');
-                });
-              }}
-              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
-            >
-              ⬇ Download
-            </button>
+            <DownloadDumpButton
+              filtersActive={filtersActive}
+              loading={loading}
+              resultCount={filteredCount}
+              onDownload={(token) => downloadLeadReportsExport(token, activeColumnFilters)}
+              onSessionExpired={() => setFetchError('Session expired — please log in again.')}
+              onError={(message) => setFetchError(message)}
+              label="⬇ Download"
+              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            />
             <button
               type="button"
               onClick={() => void load()}

@@ -6,8 +6,17 @@ import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbu
 import { overlayLiveRepaymentDueDateIfSelected, resolveRepaymentDueDateUtc } from '../../../common/loan/repayment-due-date.util';
 import { TENACIO_SERVICE_PAN_NAME_DOB } from '../../../common/vendor/tenacio/tenacio-client.service';
 import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
+import {
+  matchesExportDateFilter,
+  matchesExportDatetimeRangeFilter,
+  matchesExportMultiSelectFilter,
+  matchesExportNumberRangeFilter,
+  matchesExportTextFilter,
+  requireAtLeastOneExportFilter,
+} from '../../../common/xlsx/export-row-filter.util';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
+import type { ExportLeadReportsQueryDto } from '../los-data.controller';
 
 function displayName(name: string, custom: string | null | undefined): string {
   return (custom?.trim() || name).trim();
@@ -340,8 +349,76 @@ export class LosLeadReportService {
     return mapLeadReport(lead, liveRepayDate);
   }
 
-  async exportLeadReportsWorkbook(): Promise<Buffer> {
-    const rows = await this.listLeadReports();
+  /**
+   * Mirrors the LOS Lead Report table's own column filters (same field names as the table's
+   * column keys). Almost every column here is a derived label computed by `mapLeadReport` (loan
+   * status, repayment status, …) rather than a stored DB column, so — unlike the Loans/Leads/
+   * Applications exports — this filters the already-mapped in-memory rows with the same matcher
+   * functions the frontend `DataTable` uses, instead of building a Prisma `where`. Requires at
+   * least one filter, same as the download button staying disabled until a filter matches a row.
+   */
+  async exportLeadReportsWorkbook(query: ExportLeadReportsQueryDto): Promise<Buffer> {
+    requireAtLeastOneExportFilter(
+      Object.values(query),
+      'Apply at least one filter before downloading the lead report dump.',
+    );
+    const all = await this.listLeadReports();
+    const rows = all.filter((row) => {
+      if (query.lead && !matchesExportTextFilter(row.leadNumber, query.lead)) return false;
+      if (
+        query.customer &&
+        !matchesExportTextFilter(row.panCardName ?? row.fullName, query.customer)
+      )
+        return false;
+      if (query.mobile && !matchesExportTextFilter(row.mobileNumber, query.mobile)) return false;
+      if (query.pan && !matchesExportTextFilter(row.panNumber, query.pan)) return false;
+      if (query.dob && !matchesExportDateFilter(row.dateOfBirth, query.dob)) return false;
+      if (query.city && !matchesExportMultiSelectFilter(row.city, query.city)) return false;
+      if (query.state && !matchesExportMultiSelectFilter(row.state, query.state)) return false;
+      if (query.purpose && !matchesExportMultiSelectFilter(row.purposeOfLoan, query.purpose)) return false;
+      if (
+        query.offerAmount &&
+        !matchesExportNumberRangeFilter(row.loanOfferAmount, query.offerAmount, 'offerAmount')
+      )
+        return false;
+      if (
+        query.selectedAmount &&
+        !matchesExportNumberRangeFilter(row.loanSelectedAmount, query.selectedAmount, 'selectedAmount')
+      )
+        return false;
+      if (query.cibil && !matchesExportNumberRangeFilter(row.cibilScore, query.cibil, 'cibil')) return false;
+      if (
+        query.grade &&
+        !matchesExportMultiSelectFilter(row.cibilCreditAssessmentCategory, query.grade)
+      )
+        return false;
+      if (
+        query.leadStatus &&
+        !matchesExportMultiSelectFilter(row.leadStatusCode, query.leadStatus)
+      )
+        return false;
+      if (
+        query.applicationStatus &&
+        !matchesExportMultiSelectFilter(row.applicationStatusCode, query.applicationStatus)
+      )
+        return false;
+      if (
+        query.loanStatus &&
+        !matchesExportMultiSelectFilter(row.loanStatusCode, query.loanStatus)
+      )
+        return false;
+      if (
+        query.repaymentStatus &&
+        !matchesExportMultiSelectFilter(row.repaymentStatusCode, query.repaymentStatus)
+      )
+        return false;
+      if (
+        query.created &&
+        !matchesExportDatetimeRangeFilter(row.createdAt, query.created, 'created')
+      )
+        return false;
+      return true;
+    });
     const sheet: SimpleXlsxCell[][] = [
       [...LEAD_REPORT_HEADERS],
       ...rows.map((row) => [

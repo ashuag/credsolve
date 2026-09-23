@@ -69,6 +69,12 @@ import {
   extractPanNsdlSnapshot,
   panNsdlVendorServiceNames,
 } from '../../../common/vendor/pan-nsdl-snapshot.util';
+import { CIBIL_CATEGORY_SET, type CibilCategory } from '../../../common/cibil/cibil-credit-assessment.engine';
+import {
+  parseExportIstDayRange,
+  requireAtLeastOneExportFilter,
+} from '../../../common/xlsx/export-row-filter.util';
+import type { ExportApplicationsQueryDto } from '../los-data.controller';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -522,10 +528,12 @@ export class LosApplicationService {
     private readonly kycCompletion: KycCompletionService,
   ) {}
 
-  async listApplications() {
+  /** `extraWhere`, when given, further restricts the result (used by the filtered export dump). */
+  async listApplications(extraWhere?: Prisma.ApplicationWhereInput) {
     const applications = await this.prisma.read.application.findMany({
       where: {
         lead: { isInternalTesting: false },
+        ...(extraWhere ?? {}),
       },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -687,9 +695,33 @@ export class LosApplicationService {
     });
   }
 
-  /** Builds an applications dump workbook for LOS Application → Download dump. */
-  async exportApplicationsWorkbook(): Promise<Buffer> {
-    const applications = await this.listApplications();
+  /**
+   * Dump export for LOS Applications → Download dump. Mirrors the LOS Applications table's own
+   * column filters (same field names as the table's column keys). "Stage" and "Rejection reason"
+   * are derived labels (computed from many raw signals, not stored columns), so they're applied as
+   * a JS filter on the already-narrowed, mapped rows instead of a Prisma `where` condition. Requires
+   * at least one filter, same as the button staying disabled until a filter matches at least one row.
+   */
+  async exportApplicationsWorkbook(query: ExportApplicationsQueryDto): Promise<Buffer> {
+    const { access_token: _accessToken, ...filterFields } = query;
+    requireAtLeastOneExportFilter(
+      Object.values(filterFields),
+      'Apply at least one filter before downloading the applications dump.',
+    );
+    const where = this.buildExportWhere(query);
+    let applications = await this.listApplications(where);
+
+    const stage = query.stage?.trim();
+    if (stage) {
+      applications = applications.filter((app) => dumpApplicationStageLabel(app) === stage);
+    }
+    const reason = query.reason?.trim().toLowerCase();
+    if (reason) {
+      applications = applications.filter((app) =>
+        (app.leadRejectionReason?.label ?? '').toLowerCase().includes(reason),
+      );
+    }
+
     const rows: SimpleXlsxCell[][] = [
       [...APPLICATION_DUMP_HEADERS],
       ...applications.map((app) => [
@@ -724,6 +756,97 @@ export class LosApplicationService {
       ]),
     ];
     return buildSimpleXlsxWorkbook(rows, 'Applications');
+  }
+
+  /** Builds the export's Prisma `where` from the LOS Applications table's own filters. Throws when none are set. */
+  private buildExportWhere(query: ExportApplicationsQueryDto): Prisma.ApplicationWhereInput {
+    const and: Prisma.ApplicationWhereInput[] = [];
+
+    const appIdText = query['app-id']?.trim();
+    if (appIdText) {
+      and.push({
+        OR: [
+          { applicationNumber: { contains: appIdText } },
+          { lead: { leadNumber: { contains: appIdText } } },
+          { uuid: { contains: appIdText } },
+          { lead: { uuid: { contains: appIdText } } },
+        ],
+      });
+    }
+
+    const nameText = query.name?.trim();
+    if (nameText) {
+      and.push({ lead: { leadDetail: { fullName: { contains: nameText } } } });
+    }
+
+    const mobileText = query.mobile?.trim();
+    if (mobileText) {
+      and.push({ customer: { mobileNumber: { contains: mobileText } } });
+    }
+
+    const emailText = query.email?.trim();
+    if (emailText) {
+      and.push({
+        OR: [
+          { details: { emailId: { contains: emailText } } },
+          { lead: { leadDetail: { emailId: { contains: emailText } } } },
+        ],
+      });
+    }
+
+    const cibilText = query.cibil?.trim();
+    if (cibilText) {
+      const cibilScore = Number(cibilText);
+      if (!Number.isFinite(cibilScore)) {
+        throw new BadRequestException('cibil must be a number.');
+      }
+      and.push({ lead: { leadDetail: { bureauReport: { cibilScore } } } });
+    }
+
+    const grade = query.grade?.trim().toUpperCase();
+    if (grade) {
+      if (!CIBIL_CATEGORY_SET.has(grade as CibilCategory)) {
+        throw new BadRequestException('grade must be one of A-H.');
+      }
+      and.push({
+        lead: { leadDetail: { bureauReport: { cibilCreditAssessment: { category: grade } } } },
+      });
+    }
+
+    const loanText = query.loan?.trim();
+    if (loanText) {
+      const loanAmount = Number(loanText);
+      if (!Number.isFinite(loanAmount)) {
+        throw new BadRequestException('loan must be a number.');
+      }
+      and.push({ details: { selectedLoanAmount: loanAmount } });
+    }
+
+    const statusText = query.status?.trim();
+    if (statusText) {
+      and.push(
+        statusText.toUpperCase() === 'REJECTED'
+          ? {
+              OR: [
+                { lead: { leadStatus: { name: { contains: 'REJECT' } } } },
+                { applicationStatus: { name: { contains: 'REJECT' } } },
+              ],
+            }
+          : { applicationStatus: { name: statusText } },
+      );
+    }
+
+    const createdRange = parseExportIstDayRange(query.created, 'created');
+    if (createdRange) {
+      and.push({ createdAt: { gte: createdRange.start, lt: createdRange.end } });
+    }
+
+    const modifiedRange = parseExportIstDayRange(query.modified, 'modified');
+    if (modifiedRange) {
+      and.push({ updatedAt: { gte: modifiedRange.start, lt: modifiedRange.end } });
+    }
+
+    return and.length > 0 ? { AND: and } : {};
   }
 
   async getApplicationDetails(applicationUuid: string) {

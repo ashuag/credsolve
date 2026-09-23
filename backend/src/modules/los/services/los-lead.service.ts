@@ -18,6 +18,11 @@ import { formatLosPersonName } from '../format-los-person-name';
 import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 import { TENACIO_SERVICE_PAN_NAME_DOB } from '../../../common/vendor/tenacio/tenacio-client.service';
 import { resolveCibilVendorDisplayName } from '../../../common/vendor/cibil-vendor.util';
+import {
+  parseExportIstDayRange,
+  requireAtLeastOneExportFilter,
+} from '../../../common/xlsx/export-row-filter.util';
+import type { ExportLeadsQueryDto } from '../los-data.controller';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -137,7 +142,8 @@ export class LosLeadService {
     private readonly sms: SmsService,
   ) {}
 
-  async listLeads() {
+  /** `extraWhere`, when given, further restricts the result (used by the filtered export dump). */
+  async listLeads(extraWhere?: Prisma.LeadWhereInput) {
     const leads = await this.prisma.read.lead.findMany({
       where: {
         isActive: true,
@@ -147,6 +153,7 @@ export class LosLeadService {
           leadStatus: { name: LEAD_STATUS.CONVERTED },
           applications: { some: {} },
         },
+        ...(extraWhere ?? {}),
       },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -216,9 +223,33 @@ export class LosLeadService {
     });
   }
 
-  /** Builds a leads dump workbook for LOS Leads → Download dump. */
-  async exportLeadsWorkbook(): Promise<Buffer> {
-    const leads = await this.listLeads();
+  /**
+   * Dump export for LOS Leads → Download dump. Mirrors the LOS Leads table's own column filters
+   * (same field names as the table's column keys). "Rejection reason" is a derived label (joins
+   * the stored reason code with its display label and the free-text status note), so it's applied
+   * as a JS filter on the already-narrowed, mapped rows instead of a Prisma `where` condition.
+   * Requires at least one filter, same as the button staying disabled until a filter matches a lead.
+   */
+  async exportLeadsWorkbook(query: ExportLeadsQueryDto): Promise<Buffer> {
+    const { access_token: _accessToken, ...filterFields } = query;
+    requireAtLeastOneExportFilter(
+      Object.values(filterFields),
+      'Apply at least one filter before downloading the leads dump.',
+    );
+    const where = this.buildExportWhere(query);
+    let leads = await this.listLeads(where);
+
+    const reason = query.reason?.trim().toLowerCase();
+    if (reason) {
+      leads = leads.filter((lead) =>
+        [lead.rejectionReason?.code, lead.rejectionReason?.label, lead.leadStatusNote]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(reason),
+      );
+    }
+
     const rows: SimpleXlsxCell[][] = [
       [...LEAD_DUMP_HEADERS],
       ...leads.map((lead) => [
@@ -247,6 +278,82 @@ export class LosLeadService {
       ]),
     ];
     return buildSimpleXlsxWorkbook(rows, 'Leads');
+  }
+
+  /** Builds the export's Prisma `where` from the LOS Leads table's own filters. Throws when none are set. */
+  private buildExportWhere(query: ExportLeadsQueryDto): Prisma.LeadWhereInput {
+    const and: Prisma.LeadWhereInput[] = [];
+
+    const leadIdText = query['lead-id']?.trim();
+    if (leadIdText) {
+      and.push({ leadNumber: { contains: leadIdText } });
+    }
+
+    const customerText = query.customer?.trim();
+    if (customerText) {
+      and.push({ leadDetail: { fullName: { contains: customerText } } });
+    }
+
+    const panText = query['pan-number']?.trim();
+    if (panText) {
+      and.push({ leadDetail: { panNumber: { contains: panText } } });
+    }
+
+    const mobileText = query.mobile?.trim();
+    if (mobileText) {
+      and.push({ customer: { mobileNumber: { contains: mobileText } } });
+    }
+
+    const occupationText = query.occupation?.trim();
+    if (occupationText) {
+      and.push({ leadDetail: { occupation: { name: { contains: occupationText } } } });
+    }
+
+    const cityText = query.city?.trim();
+    if (cityText) {
+      and.push({ leadDetail: { city: { name: { contains: cityText } } } });
+    }
+
+    const cibilText = query.cibil?.trim();
+    if (cibilText) {
+      const cibilScore = Number(cibilText);
+      if (!Number.isFinite(cibilScore)) {
+        throw new BadRequestException('cibil must be a number.');
+      }
+      and.push({ leadDetail: { bureauReport: { cibilScore } } });
+    }
+
+    const panVerifiedText = query['pan-verified']?.trim();
+    if (panVerifiedText) {
+      const panVerified = Number(panVerifiedText);
+      if (!Number.isFinite(panVerified)) {
+        throw new BadRequestException('pan-verified must be a number.');
+      }
+      and.push({ leadDetail: { panVerified } });
+    }
+
+    const statusText = query.status?.trim();
+    if (statusText) {
+      and.push({ leadStatus: { name: statusText } });
+    }
+
+    const sourceText = query.source?.trim();
+    if (sourceText) {
+      and.push({
+        OR: [
+          { source: { name: { contains: sourceText } } },
+          { leadUtms: { some: { utmSource: { contains: sourceText } } } },
+          { leadUtms: { some: { utmMedium: { contains: sourceText } } } },
+        ],
+      });
+    }
+
+    const createdRange = parseExportIstDayRange(query.created, 'created');
+    if (createdRange) {
+      and.push({ createdAt: { gte: createdRange.start, lt: createdRange.end } });
+    }
+
+    return and.length > 0 ? { AND: and } : {};
   }
 
   async getLeadDetails(leadUuid: string, db: PrismaClient = this.prisma.read) {

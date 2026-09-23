@@ -1,4 +1,4 @@
-import { authorizedLosRequest, cachedAuthorizedLosGet, clientApiUrl, fetchWithTimeout, invalidateClientReadCache, messageFromBody, parseJsonResponse, resolveLosClientApiUrl } from './_shared';
+import { authorizedLosRequest, buildExportFilterParams, cachedAuthorizedLosGet, clientApiUrl, fetchWithTimeout, invalidateClientReadCache, messageFromBody, parseJsonResponse, resolveLosClientApiUrl } from './_shared';
 
 export type LosLead = {
   uuid: string;
@@ -496,9 +496,9 @@ export async function getNewLeads(token: string): Promise<LosLead[]> {
   return cachedAuthorizedLosGet<LosLead[]>(token, '/leads/new', 'Failed to fetch new leads');
 }
 
-/** URL for the leads dump workbook download (LOS Leads). */
-export function getLeadsExportUrl(token: string): string {
-  const params = new URLSearchParams();
+/** URL for the leads dump workbook download. Caller must pass the table's active column filters (same keys as the Leads table's columns) — the backend rejects an empty set. */
+export function getLeadsExportUrl(token: string, filters: Partial<Record<string, string>>): string {
+  const params = buildExportFilterParams(filters);
   params.set('access_token', token);
   return `${resolveLosClientApiUrl('/leads/export')}?${params.toString()}`;
 }
@@ -507,9 +507,9 @@ export async function getApplications(token: string): Promise<LosApplication[]> 
   return cachedAuthorizedLosGet<LosApplication[]>(token, '/applications', 'Failed to fetch applications');
 }
 
-/** URL for the applications dump workbook download (LOS Application). */
-export function getApplicationsExportUrl(token: string): string {
-  const params = new URLSearchParams();
+/** URL for the applications dump workbook download. Caller must pass the table's active column filters (same keys as the Applications table's columns) — the backend rejects an empty set. */
+export function getApplicationsExportUrl(token: string, filters: Partial<Record<string, string>>): string {
+  const params = buildExportFilterParams(filters);
   params.set('access_token', token);
   return `${resolveLosClientApiUrl('/applications/export')}?${params.toString()}`;
 }

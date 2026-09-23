@@ -165,6 +165,30 @@ export function useColumnTableState(resetDeps: unknown[] = []) {
   };
 }
 
+/**
+ * State + `onFilteredItemsChange` handler for gating a "Download dump" button (`DownloadDumpButton`)
+ * on the table's own filters: `filtersActive`/`filteredCount` feed its disabled/tooltip rule, and
+ * `activeColumnFilters` is forwarded as-is to the export URL/request (same keys as the table's
+ * column `key`s). Every LOS list/report page wires `<DataTable onFilteredItemsChange={onFilteredItemsChange} />`
+ * this way — use this instead of re-declaring the three `useState`s per page.
+ */
+export function useDataTableFilterState() {
+  const [filteredCount, setFilteredCount] = useState(0);
+  const [filtersActive, setFiltersActive] = useState(false);
+  const [activeColumnFilters, setActiveColumnFilters] = useState<ColumnFilters>({});
+
+  const onFilteredItemsChange = useCallback(
+    (items: unknown[], active: boolean, filters: ColumnFilters) => {
+      setFilteredCount(items.length);
+      setFiltersActive(active);
+      setActiveColumnFilters(filters);
+    },
+    [],
+  );
+
+  return { filteredCount, filtersActive, activeColumnFilters, onFilteredItemsChange };
+}
+
 export function DataTableColumnFilter({
   value,
   onChange,

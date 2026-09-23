@@ -14,6 +14,7 @@ import type { UpdateEligibilityCriterionDto } from '../dto/update-eligibility-cr
 import type { UpdateCreditLimitTierDto } from '../dto/update-credit-limit-tier.dto';
 import type { UpdateSmsTemplateDto } from '../dto/update-sms-template.dto';
 import type { UpdateSettingDto } from '../dto/update-setting.dto';
+import { CIBIL_CATEGORIES, CIBIL_CATEGORY_SET, type CibilCategory } from '../../../common/cibil/cibil-credit-assessment.engine';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -41,16 +42,13 @@ function slugMasterKey(name: string, maxLen: number): string {
   return slug || 'ITEM';
 }
 
-const CREDIT_ASSESSMENT_GRADES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
-const CREDIT_ASSESSMENT_GRADE_SET = new Set<string>(CREDIT_ASSESSMENT_GRADES);
-
 function normalizeRejectedCreditAssessmentGrades(value: string): string {
   const seen = new Set<string>();
   const invalid: string[] = [];
   for (const part of value.split(',')) {
     const grade = part.trim().toUpperCase();
     if (!grade) continue;
-    if (!CREDIT_ASSESSMENT_GRADE_SET.has(grade)) {
+    if (!CIBIL_CATEGORY_SET.has(grade as CibilCategory)) {
       invalid.push(part.trim());
       continue;
     }
@@ -62,7 +60,7 @@ function normalizeRejectedCreditAssessmentGrades(value: string): string {
   if (!seen.size) {
     throw new BadRequestException('Select at least one credit-assessment grade.');
   }
-  return CREDIT_ASSESSMENT_GRADES.filter((grade) => seen.has(grade)).join(',');
+  return CIBIL_CATEGORIES.filter((grade) => seen.has(grade)).join(',');
 }
 
 function normalizeRejectedLoanTypeIds(value: string): string {

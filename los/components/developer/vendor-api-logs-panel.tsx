@@ -9,6 +9,7 @@ import {
   type ColumnFilters,
   type SortState,
 } from '@/components/ui/data-table';
+import { DownloadDumpButton } from '@/components/ui/download-dump-button';
 import {
   getVendorApiLog,
   getVendorApiLogsExportUrl,
@@ -336,35 +337,26 @@ export function VendorApiLogsPanel() {
 
   const filtersActive = hasActiveColumnFilters(columnFilters);
   const filtersSettled = columnFilters === debouncedFilters;
-  const canDownloadDump = filtersActive && filtersSettled && !loading && total > 0;
 
-  const downloadDump = useCallback(() => {
-    const token = getLosToken();
-    if (!token) {
-      setError('Session expired - please log in again.');
-      return;
-    }
-    const link = document.createElement('a');
-    link.href = getVendorApiLogsExportUrl(token, {
-      sortBy: sort?.key ?? 'requestedAt',
-      sortDir: sort?.dir ?? 'desc',
-      providerName: debouncedFilters.providerName,
-      serviceName: debouncedFilters.serviceName,
-      requestMethod: debouncedFilters.requestMethod,
-      httpStatus: debouncedFilters.httpStatus,
-      id: debouncedFilters.id,
-      leadId: debouncedFilters.leadId,
-      applicationNumber: debouncedFilters.applicationNumber,
-      requestPath: debouncedFilters.requestPath,
-      outcome: debouncedFilters.outcome,
-      requestedFrom: debouncedFilters.requestedFrom,
-      requestedTo: debouncedFilters.requestedTo,
-    });
-    link.rel = 'noopener';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  }, [sort, debouncedFilters]);
+  const buildExportUrl = useCallback(
+    (token: string) =>
+      getVendorApiLogsExportUrl(token, {
+        sortBy: sort?.key ?? 'requestedAt',
+        sortDir: sort?.dir ?? 'desc',
+        providerName: debouncedFilters.providerName,
+        serviceName: debouncedFilters.serviceName,
+        requestMethod: debouncedFilters.requestMethod,
+        httpStatus: debouncedFilters.httpStatus,
+        id: debouncedFilters.id,
+        leadId: debouncedFilters.leadId,
+        applicationNumber: debouncedFilters.applicationNumber,
+        requestPath: debouncedFilters.requestPath,
+        outcome: debouncedFilters.outcome,
+        requestedFrom: debouncedFilters.requestedFrom,
+        requestedTo: debouncedFilters.requestedTo,
+      }),
+    [sort, debouncedFilters],
+  );
 
   return (
     <>
@@ -377,23 +369,14 @@ export function VendorApiLogsPanel() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={downloadDump}
-              disabled={!canDownloadDump}
-              title={
-                !filtersActive
-                  ? 'Apply a filter to enable the dump download'
-                  : !filtersSettled || loading
-                    ? undefined
-                    : total === 0
-                      ? 'No records match the current filters'
-                      : undefined
-              }
+            <DownloadDumpButton
+              filtersActive={filtersActive}
+              loading={!filtersSettled || loading}
+              resultCount={total}
+              buildUrl={buildExportUrl}
+              onSessionExpired={() => setError('Session expired - please log in again.')}
               className="min-h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-            >
-              ⬇ Download dump
-            </button>
+            />
             {filtersActive ? (
               <button
                 type="button"

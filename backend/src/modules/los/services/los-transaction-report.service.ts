@@ -7,8 +7,16 @@ import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbu
 import { loadRepayCoolingPeriodDays } from '../../../common/loan/repay-cooling-period.util';
 import { resolveTransactionReportMetrics } from '../../../common/loan/transaction-report.util';
 import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
+import {
+  matchesExportDateFilter,
+  matchesExportDatetimeRangeFilter,
+  matchesExportNumberFilter,
+  matchesExportTextFilter,
+  requireAtLeastOneExportFilter,
+} from '../../../common/xlsx/export-row-filter.util';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
+import type { ExportTransactionReportsQueryDto } from '../los-data.controller';
 
 function toExcelDate(iso: string | null | undefined): Date | null {
   if (!iso) return null;
@@ -62,7 +70,6 @@ export class LosTransactionReportService {
         application: { lead: { isInternalTesting: false } },
       },
       orderBy: { disbursedAt: 'desc' },
-      take: 2000,
       include: {
         customer: { select: { uuid: true, mobileNumber: true } },
         repayments: {
@@ -166,8 +173,70 @@ export class LosTransactionReportService {
     });
   }
 
-  async exportTransactionReportsWorkbook(): Promise<Buffer> {
-    const rows = await this.listTransactionReports();
+  /**
+   * Mirrors the LOS Transaction Report table's own column filters (same field names as the
+   * table's column keys). Like the Lead Report export, every column here is computed by
+   * `listTransactionReports`'s mapping rather than a stored DB column, so this filters the
+   * already-mapped in-memory rows with the same matcher functions the frontend `DataTable` uses.
+   * Requires at least one filter, same as the download button staying disabled until a filter
+   * matches at least one row.
+   */
+  async exportTransactionReportsWorkbook(query: ExportTransactionReportsQueryDto): Promise<Buffer> {
+    requireAtLeastOneExportFilter(
+      Object.values(query),
+      'Apply at least one filter before downloading the transaction report dump.',
+    );
+    const all = await this.listTransactionReports();
+    const rows = all.filter((row) => {
+      if (query.transaction && !matchesExportTextFilter(row.transactionId, query.transaction)) return false;
+      if (query.application && !matchesExportTextFilter(row.applicationNumber, query.application)) return false;
+      if (query.customer && !matchesExportTextFilter(row.fullName, query.customer)) return false;
+      if (query.mobile && !matchesExportTextFilter(row.mobileNumber, query.mobile)) return false;
+      if (query.email && !matchesExportTextFilter(row.email, query.email)) return false;
+      if (query.dob && !matchesExportDateFilter(row.dateOfBirth, query.dob)) return false;
+      if (query.pan && !matchesExportTextFilter(row.panNumber, query.pan)) return false;
+      if (
+        query.disbursedAt &&
+        !matchesExportDatetimeRangeFilter(row.disbursedAt, query.disbursedAt, 'disbursedAt')
+      )
+        return false;
+      if (
+        query.disbursedAmount &&
+        !matchesExportNumberFilter(row.disbursedAmount, query.disbursedAmount)
+      )
+        return false;
+      if (
+        query.interestReceived &&
+        !matchesExportNumberFilter(row.interestReceived, query.interestReceived)
+      )
+        return false;
+      if (query.interestRate && !matchesExportNumberFilter(row.interestRate, query.interestRate)) return false;
+      if (
+        query.processingFeePercent &&
+        !matchesExportNumberFilter(row.processingFeePercent, query.processingFeePercent)
+      )
+        return false;
+      if (
+        query.processingFeeAmount &&
+        !matchesExportNumberFilter(row.processingFeeAmount, query.processingFeeAmount)
+      )
+        return false;
+      if (
+        query.gstOnPfPercent &&
+        !matchesExportNumberFilter(row.gstOnPfPercent, query.gstOnPfPercent)
+      )
+        return false;
+      if (query.gstAmount && !matchesExportNumberFilter(row.gstAmount, query.gstAmount)) return false;
+      if (query.dueDate && !matchesExportDateFilter(row.dueDate, query.dueDate)) return false;
+      if (
+        query.repaymentAt &&
+        !matchesExportDatetimeRangeFilter(row.repaymentAt, query.repaymentAt, 'repaymentAt')
+      )
+        return false;
+      if (query.daysExceeded && !matchesExportNumberFilter(row.daysExceeded, query.daysExceeded)) return false;
+      if (query.penalCharges && !matchesExportNumberFilter(row.penalCharges, query.penalCharges)) return false;
+      return true;
+    });
     const sheet: SimpleXlsxCell[][] = [
       [...TRANSACTION_REPORT_HEADERS],
       ...rows.map((row) => [

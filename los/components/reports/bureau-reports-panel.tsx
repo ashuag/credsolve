@@ -5,11 +5,14 @@ import {
   isoDateTimestamp,
   LOS_LISTING_PAGE_SIZE,
   LOS_LISTING_PAGE_SIZE_OPTIONS,
+  useDataTableFilterState,
   type DataTableColumn,
 } from '@/components/ui/data-table';
+import { DownloadDumpButton } from '@/components/ui/download-dump-button';
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { downloadBureauReportsExport, getBureauReports, type LosBureauReportListItem } from '@/lib/api';
 import { getLosToken } from '@/lib/auth';
+import { CIBIL_GRADE_FILTER_OPTIONS } from '@/lib/constants/cibil-grades';
 import { formatPersonName } from '@/lib/format-person-name';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -82,8 +85,8 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
 export function BureauReportsPanel() {
   const [reports, setReports] = useState<LosBureauReportListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [downloading, setDownloading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const { filteredCount, filtersActive, activeColumnFilters, onFilteredItemsChange } = useDataTableFilterState();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -196,7 +199,7 @@ export function BureauReportsPanel() {
       filter: {
         type: 'multi-select',
         placeholder: 'Grades',
-        options: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((g) => ({ value: g, label: g })),
+        options: CIBIL_GRADE_FILTER_OPTIONS,
       },
       cellClassName: 'whitespace-nowrap',
       render: (row) => <GradeBadge category={row.cibilCreditAssessmentCategory} />,
@@ -271,29 +274,19 @@ export function BureauReportsPanel() {
         pageSize={LOS_LISTING_PAGE_SIZE}
         pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         initialSort={{ key: 'fetched', dir: 'desc' }}
+        onFilteredItemsChange={onFilteredItemsChange}
         toolbarActions={
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={downloading}
-              onClick={() => {
-                const token = getLosToken();
-                if (!token) {
-                  setFetchError('Session expired — please log in again.');
-                  return;
-                }
-                setDownloading(true);
-                setFetchError(null);
-                void downloadBureauReportsExport(token)
-                  .catch((err) => {
-                    setFetchError(err instanceof Error ? err.message : 'Failed to download bureau reports');
-                  })
-                  .finally(() => setDownloading(false));
-              }}
-              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-wait disabled:opacity-60"
-            >
-              {downloading ? 'Downloading…' : '⬇ Download'}
-            </button>
+            <DownloadDumpButton
+              filtersActive={filtersActive}
+              loading={loading}
+              resultCount={filteredCount}
+              onDownload={(token) => downloadBureauReportsExport(token, activeColumnFilters)}
+              onSessionExpired={() => setFetchError('Session expired — please log in again.')}
+              onError={(message) => setFetchError(message)}
+              label="⬇ Download"
+              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            />
             <button
               type="button"
               onClick={() => void load()}

@@ -26,11 +26,14 @@ import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbu
 import { formatLosPersonName } from '../format-los-person-name';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
+import {
+  parseExportDateOnly,
+  parseExportIstDayRange,
+  requireAtLeastOneExportFilter,
+} from '../../../common/xlsx/export-row-filter.util';
+import { CIBIL_CATEGORY_SET, type CibilCategory } from '../../../common/cibil/cibil-credit-assessment.engine';
 import type { ExportLoansQueryDto } from '../los-data.controller';
 import { LosLoanRepaymentSyncService } from './los-loan-repayment-sync.service';
-
-const CIBIL_GRADES = new Set(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']);
-const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
 function toExcelDate(iso: string | null | undefined): Date | null {
   if (!iso) return null;
@@ -256,6 +259,11 @@ export class LosLoanService {
    * staying disabled until a filter matches at least one loan.
    */
   async exportLoansWorkbook(query: ExportLoansQueryDto): Promise<Buffer> {
+    const { access_token: _accessToken, ...filterFields } = query;
+    requireAtLeastOneExportFilter(
+      Object.values(filterFields),
+      'Apply at least one filter before downloading the loans dump.',
+    );
     const where = this.buildExportWhere(query);
     const loans = await this.listLoans(where);
     const rows: SimpleXlsxCell[][] = [
@@ -324,7 +332,7 @@ export class LosLoanService {
 
     const grade = query.grade?.trim().toUpperCase();
     if (grade) {
-      if (!CIBIL_GRADES.has(grade)) {
+      if (!CIBIL_CATEGORY_SET.has(grade as CibilCategory)) {
         throw new BadRequestException('grade must be one of A-H.');
       }
       and.push({
@@ -334,12 +342,12 @@ export class LosLoanService {
       });
     }
 
-    const repayByDate = this.parseDateOnly(query.repayBy, 'repayBy');
+    const repayByDate = parseExportDateOnly(query.repayBy, 'repayBy');
     if (repayByDate) {
       and.push({ loanMaturityDate: repayByDate });
     }
 
-    const disbursedRange = this.parseIstDayRange(query.disbursed, 'disbursed');
+    const disbursedRange = parseExportIstDayRange(query.disbursed, 'disbursed');
     if (disbursedRange) {
       and.push({ disbursedAt: { gte: disbursedRange.start, lt: disbursedRange.end } });
     }
@@ -347,10 +355,6 @@ export class LosLoanService {
     const statusText = query.status?.trim();
     if (statusText) {
       and.push(this.buildStatusWhere(statusText));
-    }
-
-    if (and.length === 0) {
-      throw new BadRequestException('Apply at least one filter before downloading the loans dump.');
     }
 
     return { AND: and };
@@ -388,29 +392,6 @@ export class LosLoanService {
     });
 
     return { OR: or };
-  }
-
-  private parseDateOnly(value: string | undefined, field: string): Date | undefined {
-    const trimmed = value?.trim();
-    if (!trimmed) return undefined;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-      throw new BadRequestException(`${field} must be YYYY-MM-DD.`);
-    }
-    const [y, m, d] = trimmed.split('-').map(Number);
-    const date = new Date(Date.UTC(y!, m! - 1, d!));
-    if (Number.isNaN(date.getTime())) {
-      throw new BadRequestException(`${field} is not a valid date.`);
-    }
-    return date;
-  }
-
-  /** UTC instant range covering the given IST calendar day (for `@db.DateTime` columns like disbursedAt). */
-  private parseIstDayRange(value: string | undefined, field: string): { start: Date; end: Date } | undefined {
-    const dayUtc = this.parseDateOnly(value, field);
-    if (!dayUtc) return undefined;
-    const start = new Date(dayUtc.getTime() - IST_OFFSET_MS);
-    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-    return { start, end };
   }
 
   async getLoanDetails(loanUuid: string) {
