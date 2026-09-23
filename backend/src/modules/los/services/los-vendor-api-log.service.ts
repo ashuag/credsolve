@@ -6,6 +6,8 @@ import { PrismaService } from '../../../prisma/prisma.service';
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+/** Excel cells max out near 32,767 chars — truncate payloads so the workbook stays openable. */
+const EXCEL_CELL_TEXT_LIMIT = 32000;
 
 /** Fields that gate the export — at least one must be set so a dump can't be pulled unfiltered. */
 const EXPORT_FILTER_KEYS = [
@@ -39,11 +41,15 @@ const VENDOR_API_LOG_DUMP_HEADERS = [
 
 function stringifyPayload(value: unknown): string | null {
   if (value == null) return null;
+  let text: string;
   try {
-    return JSON.stringify(value);
+    text = JSON.stringify(value);
   } catch {
-    return String(value);
+    text = String(value);
   }
+  return text.length > EXCEL_CELL_TEXT_LIMIT
+    ? `${text.slice(0, EXCEL_CELL_TEXT_LIMIT)}…(truncated)`
+    : text;
 }
 
 const SORT_KEYS = [

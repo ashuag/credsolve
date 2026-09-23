@@ -67,7 +67,7 @@ export class LosDeveloperToolsController {
   @ApiOperation({
     summary: 'Download filtered vendor_api_log rows as an Excel dump workbook (.xlsx)',
     description:
-      'Requires at least one filter (provider, service, method, status, id, lead, application, path, outcome, or date range) to avoid an unbounded dump. Omits log id, lead id, request headers, and request path.',
+      'Requires at least one filter (provider, service, method, status, id, lead, application, path, outcome, or date range) to avoid an unbounded dump. Truncates oversized payload cells. Omits log id, lead id, request headers, and request path.',
   })
   async exportVendorApiLogs(
     @Query() query: ListVendorApiLogsQueryDto,
