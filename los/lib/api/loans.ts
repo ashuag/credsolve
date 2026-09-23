@@ -1,4 +1,4 @@
-import { authorizedLosRequest, cachedAuthorizedLosGet } from './_shared';
+import { authorizedLosRequest, cachedAuthorizedLosGet, resolveLosClientApiUrl } from './_shared';
 
 export type LosLoan = {
   uuid: string;
@@ -113,6 +113,17 @@ export type LosLoanDetails = LosLoan & {
 
 export async function getLoans(token: string): Promise<LosLoan[]> {
   return cachedAuthorizedLosGet<LosLoan[]>(token, '/loans', 'Failed to fetch loans');
+}
+
+/** URL for the loans dump workbook download. Caller must pass the table's active column filters (same keys as the Loans table's columns) — the backend rejects an empty set. */
+export function getLoansExportUrl(token: string, filters: Partial<Record<string, string>>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    const text = value?.trim();
+    if (text) params.set(key, text);
+  }
+  params.set('access_token', token);
+  return `${resolveLosClientApiUrl('/loans/export')}?${params.toString()}`;
 }
 
 export async function getLoanDetails(token: string, loanUuid: string): Promise<LosLoanDetails> {

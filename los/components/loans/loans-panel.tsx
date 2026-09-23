@@ -5,9 +5,10 @@ import {
   isoDateTimestamp,
   LOS_LISTING_PAGE_SIZE,
   LOS_LISTING_PAGE_SIZE_OPTIONS,
+  type ColumnFilters,
   type DataTableColumn,
 } from '@/components/ui/data-table';
-import { getLoans, markApplicationInternalTesting, refreshLoanPayment, type LosLoan } from '@/lib/api';
+import { getLoans, getLoansExportUrl, markApplicationInternalTesting, refreshLoanPayment, type LosLoan } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
 import { RefreshPaymentButton, useCanRefreshLoanPayment } from '@/components/loans/refresh-payment-button';
@@ -156,6 +157,9 @@ export function LoansPanel() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [busyUuid, setBusyUuid] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ tone: 'ok' | 'warn' | 'err'; text: string } | null>(null);
+  const [filteredCount, setFilteredCount] = useState(0);
+  const [filtersActive, setFiltersActive] = useState(false);
+  const [activeColumnFilters, setActiveColumnFilters] = useState<ColumnFilters>({});
   const canMarkTesting = useCanMarkInternalTesting();
   const canRefreshPayment = useCanRefreshLoanPayment();
 
@@ -457,6 +461,22 @@ export function LoansPanel() {
     ? allColumns
     : allColumns.filter((column) => column.key !== 'actions');
 
+  const canDownloadDump = filtersActive && !loading && filteredCount > 0;
+
+  const downloadDump = useCallback(() => {
+    const token = getToken();
+    if (!token) {
+      setFetchError('Session expired — please log in again.');
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = getLoansExportUrl(token, activeColumnFilters);
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }, [activeColumnFilters]);
+
   const overdueCount = loans.filter((loan) => isLoanPastDue(loan)).length;
   const activeCount = loans.filter((loan) => effectiveStatusCode(loan).toUpperCase() === 'ACTIVE').length;
   const totalDisbursed = loans.reduce((sum, loan) => sum + (Number(loan.netDisbursedAmount) || 0), 0);
@@ -509,14 +529,36 @@ export function LoansPanel() {
             ? 'border-b border-[rgba(239,68,68,0.12)] bg-[rgba(239,68,68,0.06)] transition-colors hover:bg-[rgba(239,68,68,0.1)]'
             : undefined
         }
+        onFilteredItemsChange={(items, active, filters) => {
+          setFilteredCount(items.length);
+          setFiltersActive(active);
+          setActiveColumnFilters(filters);
+        }}
         toolbarActions={
-          <button
-            type="button"
-            onClick={() => void loadLoans()}
-            className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
-          >
-            ↺ Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={downloadDump}
+              disabled={!canDownloadDump}
+              title={
+                !filtersActive
+                  ? 'Apply a filter to enable the dump download'
+                  : filteredCount === 0
+                    ? 'No records match the current filters'
+                    : undefined
+              }
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              ⬇ Download dump
+            </button>
+            <button
+              type="button"
+              onClick={() => void loadLoans()}
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+            >
+              ↺ Refresh
+            </button>
+          </div>
         }
       />
     </div>

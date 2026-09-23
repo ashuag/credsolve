@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { APPLICATION_STATUS } from '../../../common/constants/application.constants';
 import { isClosedLoanStatus, LOAN_STATUS } from '../../../common/constants/loan.constants';
 import { mapEasebuzzTransferLog } from '../../../common/easebuzz/easebuzz-transfer-log.util';
@@ -8,6 +9,7 @@ import {
   computeInterestAmountInr,
   resolveContractedTenureDays,
   decimalToNumber,
+  istCalendarDateUtc,
 } from '../../../common/loan/loan-calculation.util';
 import { loadRepayCoolingPeriodDays } from '../../../common/loan/repay-cooling-period.util';
 import {
@@ -23,7 +25,57 @@ import { isCollectedRepaymentStatus } from '../../../common/constants/loan-repay
 import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbursement-view.util';
 import { formatLosPersonName } from '../format-los-person-name';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
+import type { ExportLoansQueryDto } from '../los-data.controller';
 import { LosLoanRepaymentSyncService } from './los-loan-repayment-sync.service';
+
+const CIBIL_GRADES = new Set(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']);
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+function toExcelDate(iso: string | null | undefined): Date | null {
+  if (!iso) return null;
+  const parsed = new Date(iso);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
+function toExcelNumber(value: string | number | null | undefined): number | null {
+  if (value == null || value === '') return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+const LOAN_DUMP_HEADERS = [
+  'Loan number',
+  'Application ID',
+  'Name',
+  'Mobile',
+  'Email',
+  'Grade',
+  'Principal',
+  'Net disbursed',
+  'Interest rate %',
+  'Repayment amount',
+  'Repayment + penal',
+  'Overdue interest',
+  'Penal amount',
+  'Waived amount',
+  'Waived by',
+  'Overdue days',
+  'Processing fee',
+  'GST',
+  'Bank name',
+  'Bank account (masked)',
+  'IFSC',
+  'UTR',
+  'Loan status',
+  'Application status',
+  'Disbursed at',
+  'Repay by',
+  'Closed at',
+  'Loan UUID',
+  'Application UUID',
+  'Customer UUID',
+] as const;
 
 function displayName(name: string, displayNameValue: string | null | undefined): string {
   return displayNameValue?.trim() || name;
@@ -44,10 +96,12 @@ export class LosLoanService {
     private readonly repaymentSync: LosLoanRepaymentSyncService,
   ) {}
 
-  async listLoans() {
+  /** `extraWhere`, when given, further restricts the result (used by the filtered export dump). */
+  async listLoans(extraWhere?: Prisma.LoanAccountWhereInput) {
     const loans = await this.prisma.read.loanAccount.findMany({
       where: {
         application: { lead: { isInternalTesting: false } },
+        ...(extraWhere ?? {}),
       },
       orderBy: { disbursedAt: 'desc' },
       include: {
@@ -192,6 +246,171 @@ export class LosLoanService {
         unsettledPaymentLink: unsettledByLoanId.get(loan.id.toString()) === true,
       };
     });
+  }
+
+  /**
+   * Dump export for LOS Loans → Download dump. Mirrors the LOS Loans table's own column filters
+   * (same field names as the table's column keys) as real Prisma `where` conditions — including
+   * "Overdue", which isn't a stored value but derived from maturity date vs. today — so the query
+   * itself narrows the result at the database. Requires at least one filter, same as the button
+   * staying disabled until a filter matches at least one loan.
+   */
+  async exportLoansWorkbook(query: ExportLoansQueryDto): Promise<Buffer> {
+    const where = this.buildExportWhere(query);
+    const loans = await this.listLoans(where);
+    const rows: SimpleXlsxCell[][] = [
+      [...LOAN_DUMP_HEADERS],
+      ...loans.map((loan) => [
+        loan.loanNumber,
+        loan.applicationNumber,
+        loan.fullName,
+        loan.mobileNumber,
+        loan.email,
+        loan.cibilCreditAssessmentCategory,
+        toExcelNumber(loan.principalAmount),
+        toExcelNumber(loan.netDisbursedAmount),
+        toExcelNumber(loan.interestRate),
+        toExcelNumber(loan.totalRepaymentAmount),
+        toExcelNumber(loan.totalRepaymentWithPenalAmount),
+        toExcelNumber(loan.overdueInterestInr),
+        toExcelNumber(loan.penalAmount),
+        toExcelNumber(loan.waivedAmountInr),
+        loan.waivedByName,
+        loan.overdueDays,
+        toExcelNumber(loan.processingFeeAmount),
+        toExcelNumber(loan.gstAmount),
+        loan.bankName,
+        loan.bankAccountMasked,
+        loan.ifscCode,
+        loan.utr,
+        loan.loanStatusLabel,
+        loan.applicationStatusLabel,
+        toExcelDate(loan.disbursedAt),
+        loan.loanMaturityDate,
+        toExcelDate(loan.closedAt),
+        loan.uuid,
+        loan.applicationUuid,
+        loan.customerUuid,
+      ]),
+    ];
+    return buildSimpleXlsxWorkbook(rows, 'Loans');
+  }
+
+  /** Builds the export's Prisma `where` from the LOS Loans table's own filters. Throws when none are set. */
+  private buildExportWhere(query: ExportLoansQueryDto): Prisma.LoanAccountWhereInput {
+    const and: Prisma.LoanAccountWhereInput[] = [];
+
+    const loanText = query.loan?.trim();
+    if (loanText) {
+      and.push({
+        OR: [
+          { loanNumber: { contains: loanText } },
+          { loanAccountNumber: { contains: loanText } },
+          { application: { applicationNumber: { contains: loanText } } },
+        ],
+      });
+    }
+
+    const borrowerText = query.borrower?.trim();
+    if (borrowerText) {
+      and.push({
+        OR: [
+          { application: { lead: { leadDetail: { fullName: { contains: borrowerText } } } } },
+          { customer: { mobileNumber: { contains: borrowerText } } },
+          { application: { details: { emailId: { contains: borrowerText } } } },
+        ],
+      });
+    }
+
+    const grade = query.grade?.trim().toUpperCase();
+    if (grade) {
+      if (!CIBIL_GRADES.has(grade)) {
+        throw new BadRequestException('grade must be one of A-H.');
+      }
+      and.push({
+        application: {
+          lead: { leadDetail: { bureauReport: { cibilCreditAssessment: { category: grade } } } },
+        },
+      });
+    }
+
+    const repayByDate = this.parseDateOnly(query.repayBy, 'repayBy');
+    if (repayByDate) {
+      and.push({ loanMaturityDate: repayByDate });
+    }
+
+    const disbursedRange = this.parseIstDayRange(query.disbursed, 'disbursed');
+    if (disbursedRange) {
+      and.push({ disbursedAt: { gte: disbursedRange.start, lt: disbursedRange.end } });
+    }
+
+    const statusText = query.status?.trim();
+    if (statusText) {
+      and.push(this.buildStatusWhere(statusText));
+    }
+
+    if (and.length === 0) {
+      throw new BadRequestException('Apply at least one filter before downloading the loans dump.');
+    }
+
+    return { AND: and };
+  }
+
+  /**
+   * "Overdue" isn't a stored status — it's an ACTIVE loan past its maturity date (see
+   * resolveEffectiveLoanStatus). Matches the table's status filter: substring against the
+   * effective label, with "Overdue" as a synthetic candidate alongside the stored display name.
+   */
+  private buildStatusWhere(statusText: string): Prisma.LoanAccountWhereInput {
+    const needle = statusText.toLowerCase();
+    const today = istCalendarDateUtc();
+    const overdueCondition: Prisma.LoanAccountWhereInput = {
+      closedAt: null,
+      loanMaturityDate: { lt: today },
+      loanStatus: { name: { in: [LOAN_STATUS.ACTIVE, LOAN_STATUS.OVERDUE] } },
+    };
+    const activeButOverdue: Prisma.LoanAccountWhereInput = {
+      closedAt: null,
+      loanMaturityDate: { lt: today },
+      loanStatus: { name: LOAN_STATUS.ACTIVE },
+    };
+
+    const or: Prisma.LoanAccountWhereInput[] = [];
+    if ('overdue'.includes(needle)) {
+      or.push(overdueCondition);
+    }
+    // Raw stored label, excluding ACTIVE rows that are actually displayed as "Overdue" above.
+    or.push({
+      AND: [
+        { OR: [{ loanStatus: { displayName: { contains: statusText } } }, { loanStatus: { name: { contains: statusText } } }] },
+        { NOT: activeButOverdue },
+      ],
+    });
+
+    return { OR: or };
+  }
+
+  private parseDateOnly(value: string | undefined, field: string): Date | undefined {
+    const trimmed = value?.trim();
+    if (!trimmed) return undefined;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      throw new BadRequestException(`${field} must be YYYY-MM-DD.`);
+    }
+    const [y, m, d] = trimmed.split('-').map(Number);
+    const date = new Date(Date.UTC(y!, m! - 1, d!));
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException(`${field} is not a valid date.`);
+    }
+    return date;
+  }
+
+  /** UTC instant range covering the given IST calendar day (for `@db.DateTime` columns like disbursedAt). */
+  private parseIstDayRange(value: string | undefined, field: string): { start: Date; end: Date } | undefined {
+    const dayUtc = this.parseDateOnly(value, field);
+    if (!dayUtc) return undefined;
+    const start = new Date(dayUtc.getTime() - IST_OFFSET_MS);
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+    return { start, end };
   }
 
   async getLoanDetails(loanUuid: string) {

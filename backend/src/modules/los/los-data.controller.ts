@@ -1,5 +1,6 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 import type { Request, Response } from 'express';
 import { LosAuthGuard } from './auth/los-auth.guard';
 import { LosDenyAgentGuard } from './auth/los-deny-agent.guard';
@@ -22,6 +23,101 @@ import { LosTransactionReportService } from './services/los-transaction-report.s
 import { LosCheckCibilService } from './services/los-check-cibil.service';
 
 type LosRequest = Request & { losUser: LosSessionPayload };
+
+/**
+ * Mirrors the LOS Loans table's column filters (same keys as the table's column `key`s) so the
+ * export can push the exact same filter the user applied down into the Prisma query — no per-row
+ * data (e.g. a UUID list) travels from the browser, which matters at production loan volumes.
+ */
+export class ExportLoansQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  loan?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  borrower?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  grade?: string;
+
+  /** YYYY-MM-DD */
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  repayBy?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  status?: string;
+
+  /** YYYY-MM-DD */
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  disbursed?: string;
+
+  /** Only used by the export endpoint (download link can't set an Authorization header); ignored otherwise. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  access_token?: string;
+}
+
+/**
+ * Builds the "(grade A, status Overdue)" part of the export filename from the applied filters, so
+ * the download itself hints at what's in it. Values are user-typed filter text landing in an HTTP
+ * response header — strip quotes/control chars/reserved filename chars and non-ASCII, and cap
+ * length, before they're ever concatenated into `Content-Disposition`.
+ */
+function describeLoansExportFilters(query: ExportLoansQueryDto): string | null {
+  const clean = (raw: string | undefined, maxLength = 40): string | null => {
+    const value = raw?.trim();
+    if (!value) return null;
+    const sanitized = value
+      .replace(/[\r\n\u0000-\u001F"\\/:*?<>|]/g, '')
+      .replace(/[^\x20-\x7E]/g, '')
+      .trim()
+      .slice(0, maxLength);
+    return sanitized || null;
+  };
+
+  const parts: string[] = [];
+  const loan = clean(query.loan);
+  if (loan) parts.push(`loan ${loan}`);
+  const borrower = clean(query.borrower);
+  if (borrower) parts.push(`borrower ${borrower}`);
+  const grade = clean(query.grade, 1);
+  if (grade) parts.push(`grade ${grade.toUpperCase()}`);
+  const repayBy = clean(query.repayBy, 10);
+  if (repayBy) parts.push(`repay by ${repayBy}`);
+  const status = clean(query.status);
+  if (status) parts.push(`status ${status}`);
+  const disbursed = clean(query.disbursed, 10);
+  if (disbursed) parts.push(`disbursed ${disbursed}`);
+
+  return parts.length > 0 ? parts.join(', ').slice(0, 150) : null;
+}
+
+/** IST timestamp for the export filename, e.g. `2026-09-23 1830` — filename-safe (no colons). */
+function istTimestampForFilename(at: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(at);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}${get('minute')}`;
+}
 
 @ApiTags('LOS Data')
 @Controller('los')
@@ -165,6 +261,29 @@ export class LosDataController {
   @ApiOperation({ summary: 'List disbursed loans for LOS loan management' })
   loans() {
     return this.losLoan.listLoans();
+  }
+
+  @Get('loans/export')
+  @ApiOperation({
+    summary: 'Download filtered LOS loans as an Excel dump workbook (.xlsx)',
+    description:
+      'Requires at least one filter (loan/application number, borrower, grade, status, or a repay-by/disbursed date) to avoid an unbounded dump — the button stays disabled until a filter matches at least one loan.',
+  })
+  async loansExport(@Query() query: ExportLoansQueryDto, @Res() res: Response): Promise<void> {
+    const buffer = await this.losLoan.exportLoansWorkbook(query);
+    const filterSummary = describeLoansExportFilters(query);
+    const timestamp = istTimestampForFilename();
+    const filenameText = filterSummary
+      ? `Loans dump (${filterSummary}) ${timestamp}.xlsx`
+      : `Loans dump ${timestamp}.xlsx`;
+    const filename = filenameText.replace(/ /g, '_');
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.send(buffer);
   }
 
   @Get('loans/:loanUuid')

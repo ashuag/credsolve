@@ -78,6 +78,8 @@ export type DataTableProps<T, K extends string = string> = {
   showToolbar?: boolean;
   showPagination?: boolean;
   initialSort?: SortState<K>;
+  /** Fires whenever the filtered (pre-pagination) rows change — e.g. to gate a "download dump" button and forward the active column filter values to a server-side export. */
+  onFilteredItemsChange?: (items: T[], filtersActive: boolean, columnFilters: ColumnFilters) => void;
 };
 
 export const FILTER_CONTROL_CLASS =
@@ -517,6 +519,7 @@ export function DataTable<T, K extends string = string>({
   showToolbar = true,
   showPagination = true,
   initialSort = null,
+  onFilteredItemsChange,
 }: DataTableProps<T, K>) {
   const defaultPageSize = pageSizeProp ?? pageSizeOptions?.[0] ?? LOS_TABLE_PAGE_SIZE;
   const [pageSize, setPageSize] = useState(defaultPageSize);
@@ -545,6 +548,12 @@ export function DataTable<T, K extends string = string>({
     () => filterAndSortItems(items, columns, columnFilters, sort as SortState<K>),
     [items, columns, columnFilters, sort],
   );
+
+  useEffect(() => {
+    onFilteredItemsChange?.(processed, hasActiveColumnFilters(columnFilters), columnFilters);
+    // onFilteredItemsChange identity isn't expected to be stable across renders; keep this to the data it reports on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [processed, columnFilters]);
 
   const { paginated, safePage, totalPages, rangeStart, rangeEnd, count } = showPagination
     ? paginateItems(processed, currentPage, pageSize)
