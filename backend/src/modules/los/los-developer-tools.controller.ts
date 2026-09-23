@@ -67,11 +67,10 @@ export class LosDeveloperToolsController {
   @ApiOperation({
     summary: 'Download filtered vendor_api_log rows as an Excel dump workbook (.xlsx)',
     description:
-      'Requires at least one filter (provider, service, method, status, id, lead, application, path, outcome, or date range) to avoid an unbounded dump. Omits log id, lead id, request headers, and request path. ' +
-      'Query is read raw (like leads/export) so access_token can ride along without tripping the ValidationPipe whitelist.',
+      'Requires at least one filter (provider, service, method, status, id, lead, application, path, outcome, or date range) to avoid an unbounded dump. Omits log id, lead id, request headers, and request path.',
   })
   async exportVendorApiLogs(
-    @Query() query: Record<string, string>,
+    @Query() query: ListVendorApiLogsQueryDto,
     @Res() res: Response,
   ): Promise<void> {
     const buffer = await this.vendorApiLogs.exportWorkbook(query);

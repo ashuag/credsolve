@@ -335,6 +335,8 @@ export function VendorApiLogsPanel() {
   }, [page, pageSize, total]);
 
   const filtersActive = hasActiveColumnFilters(columnFilters);
+  const filtersSettled = columnFilters === debouncedFilters;
+  const canDownloadDump = filtersActive && filtersSettled && !loading && total > 0;
 
   const downloadDump = useCallback(() => {
     const token = getLosToken();
@@ -378,8 +380,16 @@ export function VendorApiLogsPanel() {
             <button
               type="button"
               onClick={downloadDump}
-              disabled={!filtersActive}
-              title={filtersActive ? undefined : 'Apply a filter to enable the dump download'}
+              disabled={!canDownloadDump}
+              title={
+                !filtersActive
+                  ? 'Apply a filter to enable the dump download'
+                  : !filtersSettled || loading
+                    ? undefined
+                    : total === 0
+                      ? 'No records match the current filters'
+                      : undefined
+              }
               className="min-h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
             >
               ⬇ Download dump

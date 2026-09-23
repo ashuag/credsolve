@@ -6,9 +6,6 @@ import { PrismaService } from '../../../prisma/prisma.service';
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
-/** Dump export is filter-gated (see exportWorkbook); this cap is a second guard against a huge filtered result. */
-const MAX_EXPORT_ROWS = 5000;
-const EXCEL_CELL_TEXT_LIMIT = 32000;
 
 /** Fields that gate the export — at least one must be set so a dump can't be pulled unfiltered. */
 const EXPORT_FILTER_KEYS = [
@@ -42,15 +39,11 @@ const VENDOR_API_LOG_DUMP_HEADERS = [
 
 function stringifyPayload(value: unknown): string | null {
   if (value == null) return null;
-  let text: string;
   try {
-    text = JSON.stringify(value);
+    return JSON.stringify(value);
   } catch {
-    text = String(value);
+    return String(value);
   }
-  return text.length > EXCEL_CELL_TEXT_LIMIT
-    ? `${text.slice(0, EXCEL_CELL_TEXT_LIMIT)}…(truncated)`
-    : text;
 }
 
 const SORT_KEYS = [
@@ -212,7 +205,6 @@ export class LosVendorApiLogService {
     const rows = await this.prisma.read.vendorApiLog.findMany({
       where,
       orderBy: { requestedAt: 'desc' },
-      take: MAX_EXPORT_ROWS,
       select: {
         uuid: true,
         providerName: true,
