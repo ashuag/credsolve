@@ -414,7 +414,7 @@ export class VerifyPanUseCase {
           await this.rejectLead(
             leadRow.id,
             'Bureau soft-pull failed: credit bureau returned a non-200 response.',
-            REJECTION_REASON.REJECTED_BY_CLIENTS,
+            REJECTION_REASON.BUREAU_SOFT_PULL_FAILED,
           );
           this.fireRejectionSms(customer.mobileNumber, leadRow.id);
           return {

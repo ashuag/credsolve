@@ -8,7 +8,10 @@ export const REJECTION_REASON = {
   NEGATIVE_STATE: 'NEGATIVE_STATE',
   GENDER_BRE_FAILED: 'GENDER_BRE_FAILED',
   OCCUPATION_FAILED: 'OCCUPATION_FAILED',
+  /** Manual LOS reject only — never set by automated bureau / BRE flows. */
   REJECTED_BY_CLIENTS: 'REJECTED_BY_CLIENTS',
+  /** Automated: bureau soft-pull transport / non-success response (recoverable on re-fetch). */
+  BUREAU_SOFT_PULL_FAILED: 'BUREAU_SOFT_PULL_FAILED',
   BUREAU_IDENTITY_MISMATCH: 'BUREAU_IDENTITY_MISMATCH',
   BUREAU_PHONE_MISMATCH: 'BUREAU_PHONE_MISMATCH',
   NEW_TO_CREDIT: 'NEW_TO_CREDIT',
@@ -35,6 +38,8 @@ export const REJECTION_REASON = {
 export type RejectionReason = (typeof REJECTION_REASON)[keyof typeof REJECTION_REASON];
 
 const REJECTION_REASON_LABEL: Partial<Record<string, string>> = {
+  [REJECTION_REASON.REJECTED_BY_CLIENTS]: 'Rejected by clients',
+  [REJECTION_REASON.BUREAU_SOFT_PULL_FAILED]: 'Bureau soft-pull failed',
   [REJECTION_REASON.PENNYDROP_FAILED]: 'Penny drop failed',
   [REJECTION_REASON.KYC_FAILED]: 'KYC failed',
   [REJECTION_REASON.BANK_NAME_MISMATCH]: 'Bank account name mismatch',

@@ -2,7 +2,11 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class RejectWorkspaceRecordDto {
-  @ApiProperty({ example: 'REJECTED_BY_CLIENTS', description: 'Active rejection reason master code (`rejection_reason.name`)' })
+  @ApiProperty({
+    example: 'REJECTED_BY_CLIENTS',
+    description:
+      'Active rejection reason master code (`rejection_reason.name`). Use REJECTED_BY_CLIENTS only for manual agent rejects.',
+  })
   @IsString()
   @MinLength(1)
   @MaxLength(64)

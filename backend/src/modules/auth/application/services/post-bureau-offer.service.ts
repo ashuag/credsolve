@@ -72,10 +72,15 @@ export class PostBureauOfferService {
         cibilScore: postBre.cibilScore,
         ineligibleReason: postBre.rejectReason,
       });
+      if (!postBre.rejectionReasonCode) {
+        this.logger.error(
+          `Post-BRE failed without rejectionReasonCode (leadId=${params.leadId.toString()})`,
+        );
+      }
       return {
         ok: false,
         rejectReason: postBre.rejectReason ?? 'Post-BRE check failed',
-        rejectionReasonCode: postBre.rejectionReasonCode ?? 'REJECTED_BY_CLIENTS',
+        rejectionReasonCode: postBre.rejectionReasonCode ?? 'CIBIL_SCORE_LOW',
         cibilScore: postBre.cibilScore,
       };
     }
