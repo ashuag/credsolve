@@ -29,6 +29,7 @@ import {
   uniqueRequestNumberFromVendorPayload,
 } from '../../../common/easebuzz/easebuzz-transfer-log.util';
 import { EmailService } from '../../../common/email/email.service';
+import { KycCompletionService } from '../../../common/kyc/kyc-completion.service';
 import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import { isCustomerJourneyComplete } from '../../../common/loan/customer-journey-complete.util';
 import { resolveLoanAccountNumberAtDisbursement } from '../../../common/loan/loan-account-number.util';
@@ -63,6 +64,7 @@ export class LosDisbursementService {
     private readonly prisma: PrismaService,
     private readonly loanDocs: LoanDocumentApplicationService,
     private readonly kycFiles: KycFilesService,
+    private readonly kycCompletion: KycCompletionService,
     private readonly emailService: EmailService,
     private readonly easebuzzWire: EasebuzzWireService,
     private readonly redis: RedisService,
@@ -108,6 +110,18 @@ export class LosDisbursementService {
             ? 'Bank name match is still pending credit review. Approve the name match first.'
             : `Cannot approve an application in ${statusName} status.`,
       );
+    }
+
+    // DigiLocker re-download / early liveness return can leave face step done but kyc_status=0.
+    const healedKyc = await this.kycCompletion.ensureCompletedWhenFaceStepDone({
+      applicationId: application.id,
+      customerId: application.customerId,
+    });
+    if (healedKyc.healed) {
+      application.kyc = {
+        kycStatus: healedKyc.kycStatus,
+        kycCompletedAt: healedKyc.kycCompletedAt,
+      };
     }
 
     if (!(await this.isJourneyComplete(application))) {
