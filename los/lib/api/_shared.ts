@@ -35,11 +35,12 @@ export function isFetchTimeoutError(err: unknown): boolean {
   );
 }
 
-/** Builds the query string every filtered-export endpoint takes — same keys as the table's active column filters, blank values dropped. */
-export function buildExportFilterParams(filters: Partial<Record<string, string>>): URLSearchParams {
+/** Builds a query string from a filters/params object — same keys as the table's active column filters, blank/nullish values dropped. Used by every filtered-list and filtered-export endpoint (Loans, Leads, Applications, Vendor API Logs, the LOS Reports dumps). */
+export function buildExportFilterParams(filters: Partial<Record<string, string | number>>): URLSearchParams {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
-    const text = value?.trim();
+    if (value == null) continue;
+    const text = String(value).trim();
     if (text) params.set(key, text);
   }
   return params;

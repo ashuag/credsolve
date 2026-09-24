@@ -36,9 +36,24 @@ import { LosKycDevToolsService } from './services/los-kyc-dev-tools.service';
 import { LosNameMatchDevToolsService } from './services/los-name-match-dev-tools.service';
 import { LosPanDevToolsService } from './services/los-pan-dev-tools.service';
 import { LosTenacioFaceDevToolsService } from './services/los-tenacio-face-dev-tools.service';
-import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
+import { EXPORT_FILTER_KEYS, LosVendorApiLogService } from './services/los-vendor-api-log.service';
+import {
+  buildFilteredExportFilename,
+  cleanExportFilterValue,
+  joinExportFilterSummary,
+} from '../../common/xlsx/export-filename.util';
 
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+
+/** Builds the export filename's filter summary from the Vendor API Logs table's applied filters. */
+function describeVendorApiLogsExportFilters(query: ListVendorApiLogsQueryDto): string | null {
+  return joinExportFilterSummary(
+    EXPORT_FILTER_KEYS.map((key) => {
+      const value = query[key];
+      return value ? `${key} ${cleanExportFilterValue(value, 60)}` : null;
+    }),
+  );
+}
 
 @ApiTags('LOS Developer Tools')
 @Controller(['los/developer-tools', 'los/los/developer-tools'])
@@ -74,11 +89,15 @@ export class LosDeveloperToolsController {
     @Res() res: Response,
   ): Promise<void> {
     const buffer = await this.vendorApiLogs.exportWorkbook(query);
+    const filename = buildFilteredExportFilename(
+      'Vendor API logs dump',
+      describeVendorApiLogsExportFilters(query),
+    );
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-    res.setHeader('Content-Disposition', 'attachment; filename="Vendor API logs dump.xlsx"');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     res.send(buffer);
   }

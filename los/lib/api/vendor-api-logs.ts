@@ -1,4 +1,4 @@
-import { authorizedLosRequest, resolveLosClientApiUrl } from './_shared';
+import { authorizedLosRequest, buildExportFilterParams, resolveLosClientApiUrl } from './_shared';
 
 export type VendorApiLogOutcome = 'success' | 'failure';
 
@@ -52,14 +52,7 @@ export type ListVendorApiLogsResponse = {
 };
 
 function buildQuery(params: ListVendorApiLogsParams): string {
-  const q = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value == null) continue;
-    const text = String(value).trim();
-    if (!text) continue;
-    q.set(key, text);
-  }
-  const s = q.toString();
+  const s = buildExportFilterParams(params).toString();
   return s ? `?${s}` : '';
 }
 
@@ -80,13 +73,7 @@ export function getVendorApiLogsExportUrl(
   token: string,
   params: ListVendorApiLogsParams = {},
 ): string {
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value == null) continue;
-    const text = String(value).trim();
-    if (!text) continue;
-    query.set(key, text);
-  }
+  const query = buildExportFilterParams(params);
   query.set('access_token', token);
   return `${resolveLosClientApiUrl('/developer-tools/vendor-api-logs/export')}?${query.toString()}`;
 }

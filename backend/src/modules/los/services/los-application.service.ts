@@ -718,7 +718,11 @@ export class LosApplicationService {
     const reason = query.reason?.trim().toLowerCase();
     if (reason) {
       applications = applications.filter((app) =>
-        (app.leadRejectionReason?.label ?? '').toLowerCase().includes(reason),
+        [app.leadRejectionReason?.code, app.leadRejectionReason?.label, app.leadStatusNote]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(reason),
       );
     }
 

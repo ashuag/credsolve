@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import type { Prisma, VendorHttpMethod } from '@prisma/client';
 import { classifyVendorApiLogOutcome } from '../../../common/vendor/vendor-api-log-outcome.util';
 import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
+import { requireAtLeastOneExportFilter } from '../../../common/xlsx/export-row-filter.util';
 import { PrismaService } from '../../../prisma/prisma.service';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -9,8 +10,8 @@ const MAX_PAGE_SIZE = 100;
 /** Excel cells max out near 32,767 chars — truncate payloads so the workbook stays openable. */
 const EXCEL_CELL_TEXT_LIMIT = 32000;
 
-/** Fields that gate the export — at least one must be set so a dump can't be pulled unfiltered. */
-const EXPORT_FILTER_KEYS = [
+/** Fields that gate the export — at least one must be set so a dump can't be pulled unfiltered. Also used to build the export filename's filter summary (see the controller). */
+export const EXPORT_FILTER_KEYS = [
   'providerName',
   'serviceName',
   'requestMethod',
@@ -202,10 +203,10 @@ export class LosVendorApiLogService {
 
   /** Dump export: requires at least one filter (see EXPORT_FILTER_KEYS) to avoid unbounded loads. */
   async exportWorkbook(query: ListVendorApiLogsQuery): Promise<Buffer> {
-    const hasFilter = EXPORT_FILTER_KEYS.some((key) => query[key]?.toString().trim());
-    if (!hasFilter) {
-      throw new BadRequestException('Apply at least one filter before downloading the vendor API log dump.');
-    }
+    requireAtLeastOneExportFilter(
+      EXPORT_FILTER_KEYS.map((key) => query[key]?.toString()),
+      'Apply at least one filter before downloading the vendor API log dump.',
+    );
 
     const where = this.buildWhere(query);
     const rows = await this.prisma.read.vendorApiLog.findMany({

@@ -183,7 +183,8 @@ function StageCell({ app }: { app: LosApplication }) {
 }
 
 function RejectionReasonCell({ app }: { app: LosApplication }) {
-  const note = app.leadStatusNote?.trim().toLowerCase() ?? '';
+  const noteRaw = app.leadStatusNote?.trim() ?? '';
+  const note = noteRaw.toLowerCase();
   const pennyDropFailed =
     app.statusCode.toUpperCase() === 'PENNYDROP_FAILED' ||
     app.leadRejectionReason?.code === 'PENNYDROP_FAILED' ||
@@ -194,17 +195,26 @@ function RejectionReasonCell({ app }: { app: LosApplication }) {
       ? rejectionReasonDisplayLabel(app.leadRejectionReason.code)
       : app.leadRejectionReason?.label?.trim()) ||
     (pennyDropFailed ? PENNY_DROP_FAILED_LABEL : '');
-  if (!label) {
+  // Don't repeat the note when it's the exact text the synthetic penny-drop/bank-detail label came from.
+  const showNote = Boolean(noteRaw) && note !== label.toLowerCase();
+
+  if (!label && !showNote) {
     return <span className="text-brand-muted">—</span>;
   }
 
   return (
-    <p
-      className="m-0 min-w-[140px] max-w-[220px] text-[0.72rem] font-extrabold uppercase tracking-[0.04em] text-[#991b1b] line-clamp-2"
-      title={label}
-    >
-      {label}
-    </p>
+    <div className="min-w-[140px] max-w-[220px]" title={[label, showNote ? noteRaw : null].filter(Boolean).join(' — ')}>
+      {label ? (
+        <p className="m-0 text-[0.72rem] font-extrabold uppercase tracking-[0.04em] text-[#991b1b] line-clamp-2">
+          {label}
+        </p>
+      ) : null}
+      {showNote ? (
+        <p className={`m-0 text-[0.72rem] font-semibold leading-snug text-brand-muted line-clamp-2 ${label ? 'mt-0.5' : ''}`}>
+          {noteRaw}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -397,7 +407,7 @@ export function ApplicationsPanel() {
         type: 'text',
         placeholder: 'Search reason…',
         matches: (row, value) => {
-          const reasonText = [row.leadRejectionReason?.code, row.leadRejectionReason?.label]
+          const reasonText = [row.leadRejectionReason?.code, row.leadRejectionReason?.label, row.leadStatusNote]
             .filter(Boolean)
             .join(' ')
             .toLowerCase();
