@@ -9,6 +9,7 @@ import { RejectWorkspaceRecordDto } from './dto/reject-workspace-record.dto';
 import { WaiveLoanChargesDto } from './dto/waive-loan-charges.dto';
 import { LosLeadService } from './services/los-lead.service';
 import { LosApplicationService } from './services/los-application.service';
+import { LosPennyDropRecheckService } from './services/los-penny-drop-recheck.service';
 import { LosCustomerService } from './services/los-customer.service';
 import { LosDashboardService } from './services/los-dashboard.service';
 import { LosMasterService } from './services/los-master.service';
@@ -30,6 +31,7 @@ export class LosDataController {
   constructor(
     private readonly losLead: LosLeadService,
     private readonly losApplication: LosApplicationService,
+    private readonly losPennyDropRecheck: LosPennyDropRecheckService,
     private readonly losCustomer: LosCustomerService,
     private readonly losDashboard: LosDashboardService,
     private readonly losMaster: LosMasterService,
@@ -318,6 +320,16 @@ export class LosDataController {
   })
   grantPennyDropAttempt(@Param('applicationUuid') applicationUuid: string) {
     return this.losApplication.grantPennyDropAttempt(applicationUuid);
+  }
+
+  @Post('applications/:applicationUuid/bank/recheck-penny-drop')
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({
+    summary:
+      'Re-run penny drop on the last submitted bank account. Does not use a customer attempt.',
+  })
+  recheckPennyDrop(@Param('applicationUuid') applicationUuid: string) {
+    return this.losPennyDropRecheck.recheck(applicationUuid);
   }
 
   @Get('applications/:applicationUuid/kyc/selfie-photo')

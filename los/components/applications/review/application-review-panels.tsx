@@ -59,6 +59,7 @@ import { KycPhotoGallery } from '@/components/shared/kyc-photo-gallery';
 import { KycEnableReKycButton } from '@/components/applications/kyc-enable-re-kyc-button';
 import { KycEnableAadhaarReattemptButton } from '@/components/applications/kyc-enable-aadhaar-reattempt-button';
 import { GrantPennyDropAttemptButton } from '@/components/applications/grant-penny-drop-attempt-button';
+import { RecheckPennyDropButton } from '@/components/applications/recheck-penny-drop-button';
 import { AadhaarDownloadLogHistory } from '@/components/applications/aadhaar-download-log-history';
 import { PennyDropAttemptHistory } from '@/components/applications/penny-drop-attempt-history';
 import {
@@ -898,6 +899,12 @@ export function ReviewBankPanel({
       }
     >
       <GrantPennyDropAttemptButton
+        row={row}
+        applicationUuid={applicationUuid}
+        authToken={authToken}
+        onSuccess={onRefresh}
+      />
+      <RecheckPennyDropButton
         row={row}
         applicationUuid={applicationUuid}
         authToken={authToken}

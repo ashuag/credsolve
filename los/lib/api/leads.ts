@@ -315,6 +315,8 @@ export type LosApplicationDetails = {
   } | null;
   /** True when LOS ops may grant one more penny-drop (bank verification) attempt. */
   canGrantPennyDropAttempt?: boolean;
+  /** True when LOS ops may re-run penny drop on the last submitted account. */
+  canRecheckPennyDrop?: boolean;
   /** Every penny-drop try from `application_bank_account_detail` (pass and fail). */
   bankAccountAttempts?: Array<{
     id: string;
