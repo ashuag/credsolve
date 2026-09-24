@@ -23,6 +23,7 @@ import { resolveEffectiveLoanStatus } from '../../../common/loan/effective-loan-
 import { roundInr2 } from '../../../common/loan/loan-repayment-outstanding.util';
 import { isCollectedRepaymentStatus } from '../../../common/constants/loan-repayment.constants';
 import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbursement-view.util';
+import { NocLetterService } from '../../../common/noc/noc-letter.service';
 import { formatLosPersonName } from '../format-los-person-name';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { LosLoanRepaymentSyncService } from './los-loan-repayment-sync.service';
@@ -45,6 +46,7 @@ export class LosLoanService {
     private readonly bounceChargeTiers: BounceChargeTierResolverService,
     private readonly repaymentSync: LosLoanRepaymentSyncService,
     private readonly kycFiles: KycFilesService,
+    private readonly nocLetter: NocLetterService,
   ) {}
 
   async listLoans() {
@@ -599,6 +601,43 @@ export class LosLoanService {
     res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     res.send(buf);
+  }
+
+  /**
+   * Generate + store + email NOC for a fully repaid loan that has not been sent yet.
+   * Idempotent when already sent — returns current loan details.
+   */
+  async sendNocLetter(loanUuid: string) {
+    const loan = await this.prisma.read.loanAccount.findUnique({
+      where: { uuid: loanUuid },
+      select: {
+        id: true,
+        uuid: true,
+        closedAt: true,
+        isNocSent: true,
+        loanStatus: { select: { name: true } },
+      },
+    });
+    if (!loan) throw new NotFoundException('Loan not found.');
+
+    const status = (loan.loanStatus.name ?? '').toUpperCase();
+    if (status === LOAN_STATUS.WRITTEN_OFF) {
+      throw new BadRequestException('NOC is not available for written-off loans.');
+    }
+    if (loan.closedAt == null) {
+      throw new BadRequestException('NOC can only be sent after the loan is fully repaid.');
+    }
+
+    if (!loan.isNocSent) {
+      const ok = await this.nocLetter.issueIfNeeded(loan.id);
+      if (!ok) {
+        throw new BadRequestException(
+          'Failed to generate or send the NOC letter. Check email/S3 configuration and server logs.',
+        );
+      }
+    }
+
+    return this.getLoanDetails(loan.uuid);
   }
 
   private resolveLoanNumber(loan: { loanAccountNumber: string } & Record<string, unknown>): string {

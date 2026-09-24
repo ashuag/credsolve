@@ -191,6 +191,18 @@ export class LosDataController {
     await this.losLoan.serveNocPdf(loanUuid, res);
   }
 
+  @Post('loans/:loanUuid/noc/send')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({
+    summary: 'Generate and email the NOC / closure letter for a fully repaid loan',
+    description:
+      'Allowed when the loan is CLOSED or SETTLED and NOC has not been sent yet. Idempotent if already sent.',
+  })
+  sendLoanNoc(@Param('loanUuid') loanUuid: string) {
+    return this.losLoan.sendNocLetter(loanUuid);
+  }
+
   @Post('loans/:loanUuid/waive-charges')
   @HttpCode(HttpStatus.OK)
   @UseGuards(LosAdminGuard)

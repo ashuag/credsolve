@@ -175,3 +175,16 @@ export async function refreshLoanPayment(
     90_000,
   );
 }
+
+export async function sendLoanNocLetter(token: string, loanUuid: string): Promise<LosLoanDetails> {
+  return authorizedLosRequest<LosLoanDetails>(
+    token,
+    `/loans/${encodeURIComponent(loanUuid)}/noc/send`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    },
+    'Failed to send NOC letter.',
+    120_000,
+  );
+}
