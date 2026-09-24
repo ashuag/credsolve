@@ -55,6 +55,8 @@ export type CustomerLoanCard = {
   /** When the loan was closed / fully repaid (ISO datetime). */
   repaidAt: string | null;
   bankDisplay: string | null;
+  /** True after NOC / closure letter PDF was stored (and emailed when possible). */
+  isNocSent: boolean;
 };
 
 export type CustomerLoansDashboardResult = {

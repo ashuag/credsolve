@@ -27,7 +27,8 @@ export type LegalDocumentContent = {
   navLabel: string;
   title: string;
   description: string;
-  registeredOffice: string;
+  /** Optional; when omitted the registered-office meta card is hidden. */
+  registeredOffice?: string;
   contactEmail: string;
   generatedAt: string;
   sections: LegalSection[];

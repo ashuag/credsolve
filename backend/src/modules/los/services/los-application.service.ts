@@ -64,7 +64,7 @@ import { SettingKey } from '../../../common/constants/setting.constants';
 import { LEAD_STATUS } from '../../../common/constants/lead.constants';
 import { REJECTION_REASON, toRejectionReasonDto } from '../../../common/constants/rejection-reason.constants';
 import { canEnableAadhaarReattempt, canEnableReKyc } from '../kyc-grant-retry.util';
-import { canGrantPennyDropAttempt } from '../penny-drop-grant-retry.util';
+import { canGrantPennyDropAttempt, canRecheckPennyDrop } from '../penny-drop-grant-retry.util';
 import {
   extractPanNsdlSnapshot,
   panNsdlVendorServiceNames,
@@ -1054,6 +1054,24 @@ export class LosApplicationService {
         applicationStatusCode: application.applicationStatus.name,
         leadStatusCode: lead.leadStatus.name,
       }),
+      canRecheckPennyDrop: canRecheckPennyDrop({
+        hasAccountToRecheck: Boolean(
+          (application.bankAccountDetails[0]?.bankAccountNumber?.trim() &&
+            application.bankAccountDetails[0]?.ifscCode?.trim()) ||
+            (application.details?.bankAccountNumber?.trim() && application.details?.ifscCode?.trim()),
+        ),
+        bankVerified: Boolean(application.details?.bankAccountNumber?.trim()),
+        nameMatchPendingReview: isBankNameMatchReviewPending({
+          statusName: application.applicationStatus.name,
+          statusNote: application.applicationStatusNote,
+        }),
+        latestAttemptMatched: application.bankAccountDetails[0]
+          ? application.bankAccountDetails[0].status
+          : null,
+        disbursed: Boolean(application.loanAccount?.disbursedAt),
+        applicationStatusCode: application.applicationStatus.name,
+        leadStatusCode: lead.leadStatus.name,
+      }),
       bankAccountAttempts: application.bankAccountDetails.map((attempt) => ({
         id: attempt.id.toString(),
         bankAccountNumber: attempt.bankAccountNumber,
@@ -2024,11 +2042,16 @@ export class LosApplicationService {
         uuid: true,
         applicationStatus: { select: { name: true } },
         applicationStatusNote: true,
-        details: { select: { bankAccountNumber: true, ifscCode: true } },
+        details: { select: { bankAccountNumber: true, ifscCode: true, bankName: true } },
         bankAccountDetails: {
           orderBy: { createdAt: 'desc' },
           take: 1,
-          select: { id: true },
+          select: {
+            id: true,
+            bankAccountNumber: true,
+            ifscCode: true,
+            bankName: true,
+          },
         },
       },
     });
@@ -2043,9 +2066,23 @@ export class LosApplicationService {
     ) {
       throw new ConflictException('This application is not waiting for a bank name review.');
     }
-    if (!application.details?.bankAccountNumber?.trim() || !application.details?.ifscCode?.trim()) {
+
+    // Disbursement reads application_detail; attempt history is the source of truth when
+    // detail bank fields were cleared (e.g. loan re-selection) after a name-match hold.
+    const latestAttempt = application.bankAccountDetails[0];
+    const accountNumber =
+      application.details?.bankAccountNumber?.trim() ||
+      latestAttempt?.bankAccountNumber?.trim() ||
+      '';
+    const ifscCode =
+      application.details?.ifscCode?.trim() || latestAttempt?.ifscCode?.trim() || '';
+    const bankName =
+      application.details?.bankName?.trim() || latestAttempt?.bankName?.trim() || '';
+    if (!accountNumber || !ifscCode) {
       throw new BadRequestException('Bank account details are missing; cannot approve the name match.');
     }
+    const detailsNeedBankSync =
+      !application.details?.bankAccountNumber?.trim() || !application.details?.ifscCode?.trim();
 
     const inReview = await this.prisma.client.applicationStatus.findFirst({
       where: { name: APPLICATION_STATUS.IN_REVIEW, isActive: true },
@@ -2055,8 +2092,6 @@ export class LosApplicationService {
       throw new NotFoundException('IN_REVIEW application status is not configured.');
     }
 
-    const latestAttemptId = application.bankAccountDetails[0]?.id;
-
     await this.prisma.client.$transaction(async (tx) => {
       await tx.application.update({
         where: { id: application.id },
@@ -2065,9 +2100,24 @@ export class LosApplicationService {
           applicationStatusNote: null,
         },
       });
-      if (latestAttemptId) {
+      if (detailsNeedBankSync) {
+        const synced = await tx.applicationDetail.updateMany({
+          where: { applicationId: application.id },
+          data: {
+            bankAccountNumber: accountNumber,
+            ifscCode: ifscCode,
+            ...(bankName ? { bankName } : {}),
+          },
+        });
+        if (synced.count === 0) {
+          throw new BadRequestException(
+            'Application details are missing; cannot approve the name match.',
+          );
+        }
+      }
+      if (latestAttempt?.id) {
         await tx.applicationBankAccountDetail.update({
-          where: { id: latestAttemptId },
+          where: { id: latestAttempt.id },
           data: { status: true },
         });
       }

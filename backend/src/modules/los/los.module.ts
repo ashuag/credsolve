@@ -15,6 +15,7 @@ import { LosSessionService } from './auth/los-session.service';
 import { LosDataController } from './los-data.controller';
 import { LosLeadService } from './services/los-lead.service';
 import { LosApplicationService } from './services/los-application.service';
+import { LosPennyDropRecheckService } from './services/los-penny-drop-recheck.service';
 import { LosCustomerService } from './services/los-customer.service';
 import { LosDashboardService } from './services/los-dashboard.service';
 import { LosMasterService } from './services/los-master.service';
@@ -67,6 +68,7 @@ import { KycCompletionService } from '../../common/kyc/kyc-completion.service';
     LosTeamService,
     LosLeadService,
     LosApplicationService,
+    LosPennyDropRecheckService,
     LosCustomerService,
     LosDashboardService,
     LosMasterService,

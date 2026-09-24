@@ -315,6 +315,8 @@ export type LosApplicationDetails = {
   } | null;
   /** True when LOS ops may grant one more penny-drop (bank verification) attempt. */
   canGrantPennyDropAttempt?: boolean;
+  /** True when LOS ops may re-run penny drop on the last submitted account. */
+  canRecheckPennyDrop?: boolean;
   /** Every penny-drop try from `application_bank_account_detail` (pass and fail). */
   bankAccountAttempts?: Array<{
     id: string;
@@ -612,6 +614,14 @@ export async function fetchApplicationLoanDocumentBlob(
     token,
     `/applications/${encodeURIComponent(applicationUuid)}/loan-documents/${encodeURIComponent(docType)}`,
     'Failed to fetch loan document PDF.',
+  );
+}
+
+export async function fetchLoanNocPdfBlob(token: string, loanUuid: string): Promise<Blob> {
+  return fetchLosAuthenticatedBlob(
+    token,
+    `/loans/${encodeURIComponent(loanUuid)}/noc`,
+    'Failed to fetch NOC letter PDF.',
   );
 }
 

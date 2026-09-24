@@ -30,6 +30,8 @@ export type ZeptomailEmailSendInput = {
   text: string;
   html: string;
   attachments?: EmailAttachment[];
+  /** Override default EMAIL_FROM when set (sanction / NOC). */
+  from?: { address: string; name?: string };
   audit?: SendEmailAuditContext;
 };
 
@@ -52,11 +54,14 @@ export class ZeptomailEmailVendorService {
   }
 
   async send(input: ZeptomailEmailSendInput): Promise<ZeptomailEmailSendResult> {
-    const from = resolveEmailFromConfig(this.config);
+    const defaultFrom = resolveEmailFromConfig(this.config);
     const token = resolveEmailPassword(this.config);
     const apiUrl = resolveZeptomailApiUrl(this.config);
 
-    if (!from || !token) {
+    const fromAddress = input.from?.address?.trim() || defaultFrom?.fromAddress || '';
+    const fromName = input.from?.name?.trim() || defaultFrom?.fromName || 'MoneyCash';
+
+    if (!fromAddress || !token) {
       throw new Error('EMAIL_FROM and EMAIL_AUTH_KEY (Zeptomail send-mail token) are required');
     }
 
@@ -67,7 +72,7 @@ export class ZeptomailEmailVendorService {
     }));
 
     const body: ZeptomailSendBody = {
-      from: { address: from.fromAddress, name: from.fromName },
+      from: { address: fromAddress, name: fromName },
       to: [{ email_address: { address: input.to } }],
       subject: input.subject.slice(0, 500),
       htmlbody: input.html,
