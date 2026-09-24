@@ -272,20 +272,24 @@ export class SettleEasebuzzRepaymentService {
           throw new Error('status_missing');
         }
 
-        const collected = Math.round((paidBefore + paidThis) * 100) / 100;
-        await tx.loanAccount.update({
-          where: { id: input.loan.id },
-          data: {
-            totalRepaymentAmount: collected.toFixed(2),
-            ...(closesLoan && closedStatus
-              ? {
-                  loanStatusId: closedStatus.id,
-                  closedAt: paidAt,
-                  interestAmount: due ? due.interestAmount.toFixed(2) : undefined,
-                }
-              : {}),
-          },
-        });
+        if (closesLoan && closedStatus) {
+          const bookedInterest = due?.interestAmount;
+          const bookedRepayable =
+            principal != null && bookedInterest != null
+              ? Math.round((principal + bookedInterest) * 100) / 100
+              : null;
+          await tx.loanAccount.update({
+            where: { id: input.loan.id },
+            data: {
+              loanStatusId: closedStatus.id,
+              closedAt: paidAt,
+              ...(bookedInterest != null ? { interestAmount: bookedInterest.toFixed(2) } : {}),
+              ...(bookedRepayable != null
+                ? { totalRepaymentAmount: bookedRepayable.toFixed(2) }
+                : {}),
+            },
+          });
+        }
 
         if (closesLoan) {
           closedLoan = true;

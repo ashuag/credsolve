@@ -45,6 +45,7 @@ export type LosLoan = {
   applicationStatusCode: string;
   applicationStatusLabel: string;
   closedAt: string | null;
+  isNocSent: boolean;
   /** Pay Now link was initiated and is not yet recorded as a SUCCESS repayment. */
   unsettledPaymentLink: boolean;
 };
@@ -82,7 +83,6 @@ export type LosLoanDetails = LosLoan & {
   bankAccountNumber: string | null;
   loanDocumentsAcceptedAt: string | null;
   keyFactReady: boolean;
-  isNocSent: boolean;
   nocSentAt: string | null;
   nocLetterNumber: string | null;
   totalPaidAmount: string;

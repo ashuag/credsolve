@@ -139,13 +139,17 @@ export class LosLoanService {
           ? computeInterestAmountInr(principal, dailyRate, overdueDays)
           : 0;
       const storedWaiverInr = waivedAmountFromLoan(loan.waivedAmount);
+      const interestBooked = decimalToNumber(loan.interestAmount);
+      const totalRepayment =
+        principal != null && interestBooked != null
+          ? Math.round((principal + interestBooked) * 100) / 100
+          : (decimalToNumber(loan.totalRepaymentAmount) ?? 0);
       const bill = billDueNowAfterWaiverInr({
-        amountDueBeforePenal: (decimalToNumber(loan.totalRepaymentAmount) ?? 0) + overdueInterestInr,
+        amountDueBeforePenal: totalRepayment + overdueInterestInr,
         penalInr: penalAmount,
         overdueInterestInr,
         waivedAmountInr: storedWaiverInr,
       });
-      const totalRepayment = decimalToNumber(loan.totalRepaymentAmount) ?? 0;
 
       return {
         uuid: loan.uuid,
@@ -163,8 +167,8 @@ export class LosLoanService {
         principalAmount: loan.principalAmount.toString(),
         netDisbursedAmount: loan.netDisbursedAmount.toString(),
         interestRate: loan.interestRate.toString(),
-        interestAmount: loan.interestAmount.toString(),
-        totalRepaymentAmount: loan.totalRepaymentAmount.toString(),
+        interestAmount: interestBooked != null ? interestBooked.toFixed(2) : loan.interestAmount.toString(),
+        totalRepaymentAmount: totalRepayment.toFixed(2),
         /** Unused for overdue charges (penal % applies instead); kept for API compatibility. */
         bounceRatePerDayInr: '0.00',
         /** Penal charge (rate % of principal, min/max capped); 0 unless past due and still open. */
@@ -194,6 +198,7 @@ export class LosLoanService {
           loan.application.applicationStatus.displayName,
         ),
         closedAt: loan.closedAt?.toISOString() ?? null,
+        isNocSent: loan.isNocSent === true,
         unsettledPaymentLink: unsettledByLoanId.get(loan.id.toString()) === true,
       };
     });
@@ -335,12 +340,13 @@ export class LosLoanService {
         : principal != null && dailyRate != null && contractedTenureDays != null
           ? computeInterestAmountInr(principal, dailyRate, contractedTenureDays)
           : decimalToNumber(loan.interestAmount);
+    // Contractual amount due on the repay date: principal + tenure interest.
+    // Closed loans must not use the stored total — settlement used to overwrite it
+    // with the amount collected, which folds penal into this figure.
     const amountDueAtMaturity =
-      loan.closedAt != null
-        ? decimalToNumber(loan.totalRepaymentAmount)
-        : principal != null && interestAtMaturity != null
-          ? Math.round((principal + interestAtMaturity) * 100) / 100
-          : decimalToNumber(loan.totalRepaymentAmount);
+      principal != null && interestAtMaturity != null
+        ? Math.round((principal + interestAtMaturity) * 100) / 100
+        : decimalToNumber(loan.totalRepaymentAmount);
 
     // Same overdue test as `listLoans`: live days if open, days-at-payoff if closed after due.
     const daysPastDue = overdueDaysFromMaturity(
@@ -386,7 +392,7 @@ export class LosLoanService {
     } else if (loan.closedAt != null) {
       daysOutstanding = calendarDaysBetween(loan.disbursedAt, loan.closedAt) + 1;
       interestTillToday = loan.interestAmount.toFixed(2);
-      amountDueToday = loan.totalRepaymentAmount.toFixed(2);
+      amountDueToday = (amountDueAtMaturity ?? decimalToNumber(loan.totalRepaymentAmount) ?? 0).toFixed(2);
     }
 
     const bookedTotal = amountDueAtMaturity ?? decimalToNumber(loan.totalRepaymentAmount) ?? 0;

@@ -2,6 +2,7 @@
 
 import { getLoanDetails, fetchLoanNocPdfBlob, markApplicationInternalTesting, refreshLoanPayment, sendLoanNocLetter, waiveLoanCharges, type LosLoanDetails } from '@/lib/api';
 import { canWaiveLoanCharges } from '@/lib/access';
+import { useCanSendLoanNoc } from '@/components/loans/send-noc-button';
 import { getLosStoredUser, LOS_STORAGE_KEY } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
 import { RefreshPaymentButton } from '@/components/loans/refresh-payment-button';
@@ -728,6 +729,7 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
   const [openingNoc, setOpeningNoc] = useState(false);
   const [sendingNoc, setSendingNoc] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ tone: 'ok' | 'warn' | 'err'; text: string } | null>(null);
+  const canSendNoc = useCanSendLoanNoc();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -902,7 +904,7 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
   }
 
   const closed = isClosedLoan(row.closedAt, row.loanStatusCode);
-  const showSendNoc = canSendNocLetter(row);
+  const showSendNoc = canSendNoc && canSendNocLetter(row);
   const maturity = maturityMeta(row.daysToMaturity, closed, row.loanStatusCode);
   const statusStyles = losStatusPillStyles(row.loanStatusCode);
   const transfer = row.disbursementTransfer;

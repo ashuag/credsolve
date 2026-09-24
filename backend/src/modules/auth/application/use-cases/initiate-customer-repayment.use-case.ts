@@ -396,14 +396,14 @@ export class InitiateCustomerRepaymentUseCase {
       `;
 
       if (closesLoan && closedStatus) {
-        const collected = Math.round((totalPaid + totalDue) * 100) / 100;
+        const bookedRepayable = Math.round((principal + due.interestAmount) * 100) / 100;
         await tx.loanAccount.update({
           where: { id: loan.id },
           data: {
             loanStatusId: closedStatus.id,
             closedAt: paidAt,
             interestAmount: due.interestAmount.toFixed(2),
-            totalRepaymentAmount: collected.toFixed(2),
+            totalRepaymentAmount: bookedRepayable.toFixed(2),
           },
         });
 
