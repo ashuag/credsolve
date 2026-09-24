@@ -19,6 +19,7 @@ import {
   sumSuccessfulRepaymentsInr,
 } from '../loan/loan-repayment-outstanding.util';
 import { loadRepayCoolingPeriodDays } from '../loan/repay-cooling-period.util';
+import { NocLetterService } from '../noc/noc-letter.service';
 import { RedisService } from '../redis/redis.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -55,6 +56,7 @@ export class SettleEasebuzzRepaymentService {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly bounceChargeTiers: BounceChargeTierResolverService,
+    private readonly nocLetter: NocLetterService,
   ) {}
 
   async findSuccessByVendorRef(txnid: string): Promise<boolean> {
@@ -90,6 +92,8 @@ export class SettleEasebuzzRepaymentService {
 
     if (await this.findSuccessByVendorRef(vendorRef)) {
       await this.clearIntent(input.loan.uuid, txnid);
+      // Already settled — still try NOC if the loan is closed and letter was never sent.
+      this.nocLetter.scheduleIssueIfNeeded(input.loan.id);
       return {
         alreadySettled: true,
         closedLoan: false,
@@ -109,6 +113,7 @@ export class SettleEasebuzzRepaymentService {
     });
     if (loanStatus?.closedAt != null || isClosedLoanStatus(loanStatus?.loanStatus.name)) {
       await this.clearIntent(input.loan.uuid, txnid);
+      this.nocLetter.scheduleIssueIfNeeded(input.loan.id);
       return {
         alreadySettled: true,
         closedLoan: true,
@@ -306,6 +311,9 @@ export class SettleEasebuzzRepaymentService {
     }
 
     await this.clearIntent(input.loan.uuid, txnid);
+    if (closedLoan) {
+      this.nocLetter.scheduleIssueIfNeeded(input.loan.id);
+    }
     this.logger.log(
       `[repay-settle] ${repaymentStatus} loan=${input.loan.loanNumber} txnid=${txnid} ` +
         `vendorRef=${vendorRef} repayment=${repaymentUuid} closed=${closedLoan} remaining=${remainingAfterInr}`,

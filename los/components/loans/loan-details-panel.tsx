@@ -1,6 +1,6 @@
 'use client';
 
-import { getLoanDetails, markApplicationInternalTesting, refreshLoanPayment, waiveLoanCharges, type LosLoanDetails } from '@/lib/api';
+import { getLoanDetails, fetchLoanNocPdfBlob, markApplicationInternalTesting, refreshLoanPayment, waiveLoanCharges, type LosLoanDetails } from '@/lib/api';
 import { canWaiveLoanCharges } from '@/lib/access';
 import { getLosStoredUser, LOS_STORAGE_KEY } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
@@ -707,6 +707,7 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
   const [error, setError] = useState<string | null>(null);
   const [markingInternal, setMarkingInternal] = useState(false);
   const [refreshingPayment, setRefreshingPayment] = useState(false);
+  const [openingNoc, setOpeningNoc] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ tone: 'ok' | 'warn' | 'err'; text: string } | null>(null);
 
   const load = useCallback(async () => {
@@ -790,6 +791,27 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
       setRefreshingPayment(false);
     }
   }, [row, loanUuid]);
+
+  const openNocPdf = useCallback(async () => {
+    if (!row?.isNocSent) return;
+    const token = getToken();
+    if (!token) {
+      setError('Session expired — please log in again.');
+      return;
+    }
+    setOpeningNoc(true);
+    setError(null);
+    try {
+      const blob = await fetchLoanNocPdfBlob(token, loanUuid);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener');
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to open NOC letter.');
+    } finally {
+      setOpeningNoc(false);
+    }
+  }, [row?.isNocSent, loanUuid]);
 
   const name = useMemo(
     () => (row ? formatPersonName(row.fullName, 'Borrower (name pending)') : ''),
@@ -1326,6 +1348,59 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+      </SectionCard>
+
+      <SectionCard
+        title="NOC / closure letter"
+        subtitle="Loan closure NOC emailed to the borrower after full repayment"
+        action={
+          row.isNocSent ? (
+            <button
+              type="button"
+              disabled={openingNoc}
+              onClick={() => void openNocPdf()}
+              className="cursor-pointer rounded-full border border-[rgba(20,150,243,0.28)] bg-[rgba(20,150,243,0.08)] px-3.5 py-1.5 text-[0.72rem] font-extrabold text-brand-blue hover:bg-[rgba(20,150,243,0.14)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {openingNoc ? 'Opening…' : 'View NOC PDF'}
+            </button>
+          ) : null
+        }
+      >
+        {row.isNocSent ? (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-[14px] border border-[rgba(16,185,129,0.22)] bg-[rgba(16,185,129,0.06)] px-4 py-3">
+              <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-[#047857]">Status</p>
+              <p className="m-0 mt-1 text-[1rem] font-extrabold text-[#047857]">Sent</p>
+            </div>
+            <div className="rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[#fbfcff] px-4 py-3">
+              <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
+                Sent at
+              </p>
+              <p className="m-0 mt-1 text-[0.95rem] font-extrabold text-brand-navy">
+                {row.nocSentAt ? formatDateTime(row.nocSentAt) : '—'}
+              </p>
+            </div>
+            <div className="rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[#fbfcff] px-4 py-3">
+              <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
+                Letter number
+              </p>
+              <p className="m-0 mt-1 break-all font-mono text-[0.88rem] font-extrabold text-brand-navy">
+                {row.nocLetterNumber ?? '—'}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-[14px] border border-dashed border-[rgba(23,44,113,0.16)] bg-[#f8fafc] px-4 py-5 text-center">
+            <p className="m-0 text-[0.9rem] font-bold text-brand-navy">
+              {closed ? 'NOC not sent yet' : 'Not available yet'}
+            </p>
+            <p className="mt-1 mb-0 text-[0.8rem] font-semibold text-brand-muted">
+              {closed
+                ? 'The closure letter should be generated after full repayment. If missing, check email/S3 issuance logs.'
+                : 'The NOC letter and sent timestamp appear here after the loan is fully repaid.'}
+            </p>
           </div>
         )}
       </SectionCard>

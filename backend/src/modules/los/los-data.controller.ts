@@ -185,6 +185,12 @@ export class LosDataController {
     return this.losLoanRepaymentSync.refreshPayment(loanUuid);
   }
 
+  @Get('loans/:loanUuid/noc')
+  @ApiOperation({ summary: 'Stream the sent NOC / loan-closure PDF for a loan (LOS auth)' })
+  async loanNocPdf(@Param('loanUuid') loanUuid: string, @Res() res: Response): Promise<void> {
+    await this.losLoan.serveNocPdf(loanUuid, res);
+  }
+
   @Post('loans/:loanUuid/waive-charges')
   @HttpCode(HttpStatus.OK)
   @UseGuards(LosAdminGuard)

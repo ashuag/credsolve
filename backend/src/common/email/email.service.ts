@@ -353,6 +353,37 @@ export class EmailService {
     });
   }
 
+  /** NOC / loan closure letter after full repayment. */
+  async sendNocLetterEmail(
+    to: string,
+    attachments: EmailAttachment[],
+    audit?: Pick<SendEmailAuditContext, 'leadId'>,
+  ): Promise<void> {
+    const subject = 'Your MoneyCash loan closure / NOC letter';
+    const text = [
+      'Your MoneyCash loan has been fully repaid and closed.',
+      '',
+      'Attached is your No Objection Certificate (loan closure letter) for your records.',
+      '',
+      'If you have any questions, please contact support@aasrafincorp.com.',
+    ].join('\n');
+
+    const html = `
+      <p>Your MoneyCash loan has been <strong>fully repaid and closed</strong>.</p>
+      <p>Attached is your <strong>No Objection Certificate (loan closure letter)</strong> for your records.</p>
+      <p style="color:#555;font-size:0.85em;">If you have any questions, please contact support@aasrafincorp.com.</p>
+    `.trim();
+
+    await this.sendEmail({
+      to,
+      subject,
+      text,
+      html,
+      attachments,
+      audit: { serviceName: 'email-noc-letter', leadId: audit?.leadId ?? null },
+    });
+  }
+
   async sendLosInvitationEmail(
     to: string,
     invitation: { fullName: string; inviteUrl: string; expiresAt: Date },

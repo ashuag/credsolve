@@ -109,8 +109,7 @@ export class SurepassDigilockerService {
       isLoopbackOrLocalhostUrl(surepassRedirect);
     if (localhostRedirectBlocked) {
       const msg =
-        'Surepass DigiLocker rejected redirect_url: localhost / 127.0.0.1 callbacks are blocked (HTTP 403). ' +
-        'Set SUREPASS_DIGILOCKER_REDIRECT_URL to a public HTTPS callback (e.g. https://www.moneycash.in/kyc/digilocker-callback).';
+        'Somethig went wrong';
       this.logger.warn(`${msg} redirect_url=${surepassRedirect}`);
       return {
         configured: true,

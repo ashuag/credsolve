@@ -41,6 +41,7 @@ import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
+import { NocLetterService } from '../../../../common/noc/noc-letter.service';
 
 const REPAY_LOCK_TTL_SEC = 90;
 
@@ -67,6 +68,7 @@ export class InitiateCustomerRepaymentUseCase {
     private readonly redis: RedisService,
     private readonly bounceChargeTiers: BounceChargeTierResolverService,
     private readonly settings: SettingsRepository,
+    private readonly nocLetter: NocLetterService,
   ) {}
 
   async execute(
@@ -422,6 +424,10 @@ export class InitiateCustomerRepaymentUseCase {
       `[repay] Success loan=${loan.loanNumber} amount=${amountInr} vendor=${vendor} ` +
         `repayment=${repaymentUuid} ${closesLoan ? 'closed' : 'partial'}`,
     );
+
+    if (closesLoan) {
+      this.nocLetter.scheduleIssueIfNeeded(loan.id);
+    }
 
     return {
       success: true as const,

@@ -82,6 +82,9 @@ export type LosLoanDetails = LosLoan & {
   bankAccountNumber: string | null;
   loanDocumentsAcceptedAt: string | null;
   keyFactReady: boolean;
+  isNocSent: boolean;
+  nocSentAt: string | null;
+  nocLetterNumber: string | null;
   totalPaidAmount: string;
   outstandingAmount: string;
   /** Processing fee % saved on the application at selection. */

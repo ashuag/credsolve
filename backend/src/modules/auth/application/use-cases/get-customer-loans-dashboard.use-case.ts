@@ -108,6 +108,7 @@ function mapRow(
       disbursedAt: Date;
       closedAt: Date | null;
       waivedAmount: Prisma.Decimal;
+      isNocSent: boolean;
       bankAccountNumber: string | null;
       loanStatus: { name: string };
       repayments: Array<{ amount: Prisma.Decimal; status: string }>;
@@ -252,6 +253,7 @@ function mapRow(
       loanDetail?.bankName ?? null,
       loanAccount?.bankAccountNumber ?? loanDetail?.bankAccountNumber ?? null,
     ),
+    isNocSent: loanAccount?.isNocSent === true,
   };
 }
 
@@ -284,6 +286,7 @@ const APPLICATION_DASHBOARD_SELECT = {
       disbursedAt: true,
       closedAt: true,
       waivedAmount: true,
+      isNocSent: true,
       bankAccountNumber: true,
       loanStatus: { select: { name: true } },
       repayments: {

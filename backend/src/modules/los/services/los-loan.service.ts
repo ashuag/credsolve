@@ -1,7 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import type { Response } from 'express';
 import { APPLICATION_STATUS } from '../../../common/constants/application.constants';
 import { isClosedLoanStatus, LOAN_STATUS } from '../../../common/constants/loan.constants';
 import { mapEasebuzzTransferLog } from '../../../common/easebuzz/easebuzz-transfer-log.util';
+import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import {
   calendarDaysBetween,
   computeAmountDueNowInr,
@@ -42,6 +44,7 @@ export class LosLoanService {
     private readonly prisma: PrismaService,
     private readonly bounceChargeTiers: BounceChargeTierResolverService,
     private readonly repaymentSync: LosLoanRepaymentSyncService,
+    private readonly kycFiles: KycFilesService,
   ) {}
 
   async listLoans() {
@@ -450,6 +453,9 @@ export class LosLoanService {
       ),
       loanDocumentsAcceptedAt: details?.loanDocumentsAcceptedAt?.toISOString() ?? null,
       keyFactReady: Boolean(details?.keyFactPdfRelativePath?.trim()),
+      isNocSent: loan.isNocSent === true,
+      nocSentAt: loan.nocSentAt?.toISOString() ?? null,
+      nocLetterNumber: loan.nocLetterNumber ?? null,
       closedAt: loan.closedAt?.toISOString() ?? null,
       totalPaidAmount: totalPaid.toFixed(2),
       outstandingAmount: outstanding.toFixed(2),
@@ -561,6 +567,38 @@ export class LosLoanService {
     });
 
     return this.getLoanDetails(loan.uuid);
+  }
+
+  async serveNocPdf(loanUuid: string, res: Response): Promise<void> {
+    const loan = await this.prisma.read.loanAccount.findUnique({
+      where: { uuid: loanUuid },
+      select: {
+        isNocSent: true,
+        nocPdfRelativePath: true,
+        nocLetterNumber: true,
+        loanNumber: true,
+      },
+    });
+    if (!loan) throw new NotFoundException('Loan not found.');
+    const rel = loan.nocPdfRelativePath?.trim() ?? '';
+    if (!loan.isNocSent || !rel) {
+      throw new NotFoundException('NOC letter has not been sent yet.');
+    }
+    let buf: Buffer;
+    try {
+      buf = await this.kycFiles.readBytes(rel);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('NoSuchKey') || msg.includes('S3 GET failed (404)')) {
+        throw new NotFoundException('NOC letter file is missing from storage.');
+      }
+      throw err;
+    }
+    const fileName = `NOC-${loan.nocLetterNumber ?? loan.loanNumber}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.send(buf);
   }
 
   private resolveLoanNumber(loan: { loanAccountNumber: string } & Record<string, unknown>): string {

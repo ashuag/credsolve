@@ -615,6 +615,14 @@ export async function fetchApplicationLoanDocumentBlob(
   );
 }
 
+export async function fetchLoanNocPdfBlob(token: string, loanUuid: string): Promise<Blob> {
+  return fetchLosAuthenticatedBlob(
+    token,
+    `/loans/${encodeURIComponent(loanUuid)}/noc`,
+    'Failed to fetch NOC letter PDF.',
+  );
+}
+
 export async function generateApplicationLoanDocuments(
   token: string,
   applicationUuid: string,
