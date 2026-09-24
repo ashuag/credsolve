@@ -460,7 +460,6 @@ export class LosDataController {
     @Query() query: ExportBureauReportsQueryDto,
     @Res() res: Response,
   ): Promise<void> {
-    const buffer = await this.losBureauReport.exportBureauReportsWorkbook(query);
     const filename = buildFilteredExportFilename(
       'Credit Assessment data',
       describeBureauReportsExportFilters(query),
@@ -471,7 +470,7 @@ export class LosDataController {
     );
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    res.send(buffer);
+    await this.losBureauReport.exportBureauReportsWorkbook(query, res);
   }
 
   @Get('lead-reports')
@@ -492,7 +491,6 @@ export class LosDataController {
     @Query() query: ExportLeadReportsQueryDto,
     @Res() res: Response,
   ): Promise<void> {
-    const buffer = await this.losLeadReport.exportLeadReportsWorkbook(query);
     const filename = buildFilteredExportFilename(
       'Lead report',
       describeLeadReportsExportFilters(query),
@@ -503,7 +501,7 @@ export class LosDataController {
     );
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    res.send(buffer);
+    await this.losLeadReport.exportLeadReportsWorkbook(query, res);
   }
 
   @Get('lead-reports/:leadUuid')
@@ -533,7 +531,6 @@ export class LosDataController {
     @Query() query: ExportTransactionReportsQueryDto,
     @Res() res: Response,
   ): Promise<void> {
-    const buffer = await this.losTransactionReport.exportTransactionReportsWorkbook(query);
     const filename = buildFilteredExportFilename(
       'Transaction report',
       describeTransactionReportsExportFilters(query),
@@ -544,7 +541,7 @@ export class LosDataController {
     );
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    res.send(buffer);
+    await this.losTransactionReport.exportTransactionReportsWorkbook(query, res);
   }
 
   @Get('leads/new')
@@ -562,7 +559,6 @@ export class LosDataController {
       'Requires at least one filter (lead id, customer, PAN, mobile, occupation, city, CIBIL, PAN status, status, rejection reason, source, or a created date) to avoid an unbounded dump — the button stays disabled until a filter matches at least one lead.',
   })
   async leadsExport(@Query() query: ExportLeadsQueryDto, @Res() res: Response): Promise<void> {
-    const buffer = await this.losLead.exportLeadsWorkbook(query);
     const filename = buildFilteredExportFilename('Leads dump', describeLeadsExportFilters(query));
     res.setHeader(
       'Content-Type',
@@ -570,7 +566,7 @@ export class LosDataController {
     );
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    res.send(buffer);
+    await this.losLead.exportLeadsWorkbook(query, res);
   }
 
   @Get('applications')
@@ -589,7 +585,6 @@ export class LosDataController {
     @Query() query: ExportApplicationsQueryDto,
     @Res() res: Response,
   ): Promise<void> {
-    const buffer = await this.losApplication.exportApplicationsWorkbook(query);
     const filename = buildFilteredExportFilename(
       'Applications dump',
       describeApplicationsExportFilters(query),
@@ -600,7 +595,7 @@ export class LosDataController {
     );
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    res.send(buffer);
+    await this.losApplication.exportApplicationsWorkbook(query, res);
   }
 
   @Get('loans')
@@ -616,7 +611,6 @@ export class LosDataController {
       'Requires at least one filter (loan/application number, borrower, grade, status, or a repay-by/disbursed date) to avoid an unbounded dump — the button stays disabled until a filter matches at least one loan.',
   })
   async loansExport(@Query() query: ExportLoansQueryDto, @Res() res: Response): Promise<void> {
-    const buffer = await this.losLoan.exportLoansWorkbook(query);
     const filename = buildFilteredExportFilename('Loans dump', describeLoansExportFilters(query));
     res.setHeader(
       'Content-Type',
@@ -624,7 +618,7 @@ export class LosDataController {
     );
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    res.send(buffer);
+    await this.losLoan.exportLoansWorkbook(query, res);
   }
 
   @Get('loans/:loanUuid')

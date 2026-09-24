@@ -73,6 +73,7 @@ model ApplicationDetail {
   application   Application    @relation(fields: [applicationId], references: [id])
   reasonForLoan ReasonForLoan? @relation(fields: [reasonForLoanId], references: [id])
 
+  @@index([selectedLoanAmount])
   @@map("application_detail")
 }
 

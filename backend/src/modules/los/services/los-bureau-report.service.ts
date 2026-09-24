@@ -1,12 +1,13 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import type { Response } from 'express';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
 import {
   buildCibilAssessmentExportRow,
   CIBIL_ASSESSMENT_EXPORT_HEADERS,
 } from '../../../common/cibil/cibil-assessment-export';
-import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
+import { streamXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 import {
   parseExportDatetimeRange,
   parseExportNumberRange,
@@ -82,21 +83,32 @@ export class LosBureauReportService {
    * Builds the "Credit Assessment data" workbook (raw per-report feature columns) for LOS Reports
    * → Bureau Report. Mirrors the LOS Bureau Report table's own column filters (same field names as
    * the table's column keys) as a Prisma `where`, pushed into the same batched cursor query used to
-   * avoid loading every `raw_payload` CIBIL JSON at once. Requires at least one filter, same as the
-   * download button staying disabled until a filter matches at least one report.
+   * avoid loading every `raw_payload` CIBIL JSON at once — streamed straight to `res` as each batch
+   * comes back, rather than buffered into one in-memory workbook. Requires at least one filter,
+   * same as the download button staying disabled until a filter matches at least one report.
    */
-  async exportBureauReportsWorkbook(query: ExportBureauReportsQueryDto): Promise<Buffer> {
+  async exportBureauReportsWorkbook(query: ExportBureauReportsQueryDto, res: Response): Promise<void> {
     requireAtLeastOneExportFilter(
       Object.values(query),
       'Apply at least one filter before downloading the bureau report dump.',
     );
     const where = this.buildExportWhere(query);
-    const rows: SimpleXlsxCell[][] = [['Lead ID', ...CIBIL_ASSESSMENT_EXPORT_HEADERS]];
+
+    await streamXlsxWorkbook(res, {
+      sheetName: 'Sheet1',
+      headers: ['Lead ID', ...CIBIL_ASSESSMENT_EXPORT_HEADERS],
+      rows: this.streamRowsForExport(where),
+    });
+  }
+
+  // Batch so we never load every `raw_payload` CIBIL JSON into memory at once
+  // (that query stalls, OOMs, and 500s the Next proxy after ~30s).
+  private async *streamRowsForExport(
+    where: Prisma.BureauReportWhereInput,
+  ): AsyncGenerator<SimpleXlsxCell[]> {
     let cursorId: bigint | undefined;
     let index = 0;
 
-    // Batch so we never load every `raw_payload` CIBIL JSON into memory at once
-    // (that query stalls, OOMs, and 500s the Next proxy after ~30s).
     for (;;) {
       const batch = await this.prisma.read.bureauReport.findMany({
         take: EXPORT_BATCH_SIZE,
@@ -115,7 +127,7 @@ export class LosBureauReportService {
           },
         },
       });
-      if (batch.length === 0) break;
+      if (batch.length === 0) return;
 
       for (const report of batch) {
         index += 1;
@@ -130,14 +142,12 @@ export class LosBureauReportService {
           );
           featureCells = CIBIL_ASSESSMENT_EXPORT_HEADERS.map(() => null);
         }
-        rows.push([report.leadDetails[0]?.lead.leadNumber ?? '', ...featureCells]);
+        yield [report.leadDetails[0]?.lead.leadNumber ?? '', ...featureCells];
       }
 
       cursorId = batch[batch.length - 1]!.id;
-      if (batch.length < EXPORT_BATCH_SIZE) break;
+      if (batch.length < EXPORT_BATCH_SIZE) return;
     }
-
-    return buildSimpleXlsxWorkbook(rows, 'Sheet1');
   }
 
   /** Builds the export's Prisma `where` from the LOS Bureau Report table's own filters. Throws when none are set. */

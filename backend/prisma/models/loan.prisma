@@ -46,6 +46,7 @@ model LoanAccount {
   @@index([customerId, loanStatusId])
   @@index([disbursedAt])
   @@index([loanStatusId, closedAt, loanMaturityDate])
+  @@index([loanMaturityDate])
   @@index([waivedByUserId])
   @@map("loan_account")
 }

@@ -88,7 +88,6 @@ export class LosDeveloperToolsController {
     @Query() query: ListVendorApiLogsQueryDto,
     @Res() res: Response,
   ): Promise<void> {
-    const buffer = await this.vendorApiLogs.exportWorkbook(query);
     const filename = buildFilteredExportFilename(
       'Vendor API logs dump',
       describeVendorApiLogsExportFilters(query),
@@ -99,7 +98,7 @@ export class LosDeveloperToolsController {
     );
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    res.send(buffer);
+    await this.vendorApiLogs.exportWorkbook(query, res);
   }
 
   @Get('vendor-api-logs/:uuid')

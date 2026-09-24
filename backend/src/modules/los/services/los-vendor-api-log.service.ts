@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma, VendorHttpMethod } from '@prisma/client';
+import type { Response } from 'express';
 import { classifyVendorApiLogOutcome } from '../../../common/vendor/vendor-api-log-outcome.util';
-import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
+import { streamXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 import { requireAtLeastOneExportFilter } from '../../../common/xlsx/export-row-filter.util';
 import { PrismaService } from '../../../prisma/prisma.service';
 
@@ -9,6 +10,8 @@ const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 /** Excel cells max out near 32,767 chars — truncate payloads so the workbook stays openable. */
 const EXCEL_CELL_TEXT_LIMIT = 32000;
+/** Batch size for the export's cursor-paged fetch — kept small since each row can carry a large request/response JSON payload. */
+const EXPORT_BATCH_SIZE = 25;
 
 /** Fields that gate the export — at least one must be set so a dump can't be pulled unfiltered. Also used to build the export filename's filter summary (see the controller). */
 export const EXPORT_FILTER_KEYS = [
@@ -201,46 +204,65 @@ export class LosVendorApiLogService {
     };
   }
 
-  /** Dump export: requires at least one filter (see EXPORT_FILTER_KEYS) to avoid unbounded loads. */
-  async exportWorkbook(query: ListVendorApiLogsQuery): Promise<Buffer> {
+  /**
+   * Dump export: requires at least one filter (see EXPORT_FILTER_KEYS) to avoid unbounded loads,
+   * and streams the result straight to `res` — cursor-paged from the DB (never loads every row's
+   * request/response payload into memory at once) and deflated off the main thread as it's
+   * written, so a large dump doesn't stall the event loop for the rest of the server.
+   */
+  async exportWorkbook(query: ListVendorApiLogsQuery, res: Response): Promise<void> {
     requireAtLeastOneExportFilter(
       EXPORT_FILTER_KEYS.map((key) => query[key]?.toString()),
       'Apply at least one filter before downloading the vendor API log dump.',
     );
-
     const where = this.buildWhere(query);
-    const rows = await this.prisma.read.vendorApiLog.findMany({
-      where,
-      orderBy: { requestedAt: 'desc' },
-      select: {
-        uuid: true,
-        providerName: true,
-        serviceName: true,
-        requestMethod: true,
-        httpStatus: true,
-        requestedAt: true,
-        respondedAt: true,
-        requestPayload: true,
-        responsePayload: true,
-        lead: {
-          select: {
-            applications: {
-              orderBy: { createdAt: 'desc' },
-              take: 1,
-              select: { applicationNumber: true },
+
+    await streamXlsxWorkbook(res, {
+      sheetName: 'Vendor API Logs',
+      headers: VENDOR_API_LOG_DUMP_HEADERS,
+      rows: this.streamRowsForExport(where),
+    });
+  }
+
+  private async *streamRowsForExport(
+    where: Prisma.VendorApiLogWhereInput,
+  ): AsyncGenerator<SimpleXlsxCell[]> {
+    let cursorId: bigint | undefined;
+    for (;;) {
+      const batch = await this.prisma.read.vendorApiLog.findMany({
+        take: EXPORT_BATCH_SIZE,
+        ...(cursorId != null ? { skip: 1, cursor: { id: cursorId } } : {}),
+        where,
+        orderBy: { id: 'desc' },
+        select: {
+          id: true,
+          uuid: true,
+          providerName: true,
+          serviceName: true,
+          requestMethod: true,
+          httpStatus: true,
+          requestedAt: true,
+          respondedAt: true,
+          requestPayload: true,
+          responsePayload: true,
+          lead: {
+            select: {
+              applications: {
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+                select: { applicationNumber: true },
+              },
             },
           },
         },
-      },
-    });
+      });
+      if (batch.length === 0) return;
 
-    const sheetRows: SimpleXlsxCell[][] = [
-      [...VENDOR_API_LOG_DUMP_HEADERS],
-      ...rows.map((row) => {
+      for (const row of batch) {
         const durationMs = Math.max(0, row.respondedAt.getTime() - row.requestedAt.getTime());
         const outcome = classifyVendorApiLogOutcome(row.httpStatus, row.responsePayload);
         const application = row.lead?.applications[0] ?? null;
-        return [
+        yield [
           row.uuid,
           application?.applicationNumber ?? null,
           row.providerName,
@@ -254,10 +276,11 @@ export class LosVendorApiLogService {
           stringifyPayload(row.requestPayload),
           stringifyPayload(row.responsePayload),
         ];
-      }),
-    ];
+      }
 
-    return buildSimpleXlsxWorkbook(sheetRows, 'Vendor API Logs');
+      cursorId = batch[batch.length - 1]!.id;
+      if (batch.length < EXPORT_BATCH_SIZE) return;
+    }
   }
 
   private toListItem(
