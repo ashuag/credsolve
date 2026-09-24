@@ -120,6 +120,11 @@ const leadReportInclude = {
     take: 1,
     select: { requestPayload: true, responsePayload: true },
   },
+  leadUtms: {
+    orderBy: { createdAt: 'desc' as const },
+    take: 1,
+    select: { utmSource: true, utmMedium: true, utmCampaign: true, utmTerm: true, utmContent: true },
+  },
   applications: {
     orderBy: { createdAt: 'desc' as const },
     take: 1,
@@ -195,6 +200,7 @@ function mapLeadReport(lead: LeadReportRecord, liveRepayDate?: Date | null) {
   });
   const enteredName = formatLosPersonName(profile?.fullName);
   const panLog = lead.vendorApiLogs[0];
+  const latestUtm = lead.leadUtms[0] ?? null;
   const fees = computeFeeAmountsFromLoanDetail(
     details
       ? {
@@ -235,6 +241,11 @@ function mapLeadReport(lead: LeadReportRecord, liveRepayDate?: Date | null) {
     cibilCreditAssessmentCategory: profile?.bureauReport?.cibilCreditAssessment?.category ?? null,
     leadStatusCode: lead.leadStatus.name,
     leadStatusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
+    utmSource: latestUtm?.utmSource ?? null,
+    utmMedium: latestUtm?.utmMedium ?? null,
+    utmCampaign: latestUtm?.utmCampaign ?? null,
+    utmTerm: latestUtm?.utmTerm ?? null,
+    utmContent: latestUtm?.utmContent ?? null,
     applicationUuid: application?.uuid ?? null,
     applicationNumber: application?.applicationNumber ?? null,
     applicationStatusCode: application?.applicationStatus.name ?? null,
@@ -300,6 +311,11 @@ const LEAD_REPORT_HEADERS = [
   'Expected repay date',
   'Repayment amount',
   'Lead status',
+  'UTM source',
+  'UTM medium',
+  'UTM campaign',
+  'UTM term',
+  'UTM content',
   'Application ID',
   'Application status',
   'Loan ID',
@@ -397,6 +413,11 @@ export class LosLeadReportService {
         !matchesExportMultiSelectFilter(row.leadStatusCode, query.leadStatus)
       )
         return false;
+      if (query.utmSource && !matchesExportTextFilter(row.utmSource, query.utmSource)) return false;
+      if (query.utmMedium && !matchesExportTextFilter(row.utmMedium, query.utmMedium)) return false;
+      if (query.utmCampaign && !matchesExportTextFilter(row.utmCampaign, query.utmCampaign)) return false;
+      if (query.utmTerm && !matchesExportTextFilter(row.utmTerm, query.utmTerm)) return false;
+      if (query.utmContent && !matchesExportTextFilter(row.utmContent, query.utmContent)) return false;
       if (
         query.applicationStatus &&
         !matchesExportMultiSelectFilter(row.applicationStatusCode, query.applicationStatus)
@@ -450,6 +471,11 @@ export class LosLeadReportService {
         toExcelDate(row.expectedRepaymentDate),
         toExcelNumber(row.repaymentAmount),
         row.leadStatusLabel,
+        row.utmSource,
+        row.utmMedium,
+        row.utmCampaign,
+        row.utmTerm,
+        row.utmContent,
         samePublicId(row.leadNumber, row.applicationNumber) ? null : row.applicationNumber,
         row.applicationStatusLabel,
         samePublicId(row.leadNumber, row.loanNumber) ? null : row.loanNumber,

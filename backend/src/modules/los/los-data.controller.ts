@@ -359,6 +359,11 @@ export class ExportLeadReportsQueryDto {
   @IsOptional() @IsString() @MaxLength(20) cibil?: string;
   @IsOptional() @IsString() @MaxLength(40) grade?: string;
   @IsOptional() @IsString() @MaxLength(200) leadStatus?: string;
+  @IsOptional() @IsString() @MaxLength(100) utmSource?: string;
+  @IsOptional() @IsString() @MaxLength(100) utmMedium?: string;
+  @IsOptional() @IsString() @MaxLength(100) utmCampaign?: string;
+  @IsOptional() @IsString() @MaxLength(100) utmTerm?: string;
+  @IsOptional() @IsString() @MaxLength(100) utmContent?: string;
   @IsOptional() @IsString() @MaxLength(200) applicationStatus?: string;
   @IsOptional() @IsString() @MaxLength(200) loanStatus?: string;
   @IsOptional() @IsString() @MaxLength(200) repaymentStatus?: string;

@@ -23,6 +23,11 @@ export type LosLeadReportListItem = {
   cibilCreditAssessmentCategory: string | null;
   leadStatusCode: string;
   leadStatusLabel: string;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  utmTerm: string | null;
+  utmContent: string | null;
   applicationUuid: string | null;
   applicationNumber: string | null;
   applicationStatusCode: string | null;
