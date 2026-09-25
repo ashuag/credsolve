@@ -393,6 +393,18 @@ export class GetCustomerSessionUseCase {
         },
       });
       applicationKycStatus = APPLICATION_KYC_STATUS.NOT_DONE;
+    } else if (
+      application &&
+      faceStepCompleteForJourney &&
+      Number(applicationKycStatus) !== Number(APPLICATION_KYC_STATUS.COMPLETED)
+    ) {
+      const healed = await this.kycCompletion.ensureCompletedWhenFaceStepDone({
+        applicationId: application.id,
+        customerId: customer.id,
+      });
+      if (healed.healed) {
+        applicationKycStatus = healed.kycStatus;
+      }
     }
 
     const kycCompleted = Boolean(

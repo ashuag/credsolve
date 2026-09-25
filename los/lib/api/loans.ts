@@ -45,6 +45,7 @@ export type LosLoan = {
   applicationStatusCode: string;
   applicationStatusLabel: string;
   closedAt: string | null;
+  isNocSent: boolean;
   /** Pay Now link was initiated and is not yet recorded as a SUCCESS repayment. */
   unsettledPaymentLink: boolean;
 };
@@ -82,6 +83,8 @@ export type LosLoanDetails = LosLoan & {
   bankAccountNumber: string | null;
   loanDocumentsAcceptedAt: string | null;
   keyFactReady: boolean;
+  nocSentAt: string | null;
+  nocLetterNumber: string | null;
   totalPaidAmount: string;
   outstandingAmount: string;
   /** Processing fee % saved on the application at selection. */
@@ -177,5 +180,18 @@ export async function refreshLoanPayment(
     },
     'Failed to refresh payment status.',
     90_000,
+  );
+}
+
+export async function sendLoanNocLetter(token: string, loanUuid: string): Promise<LosLoanDetails> {
+  return authorizedLosRequest<LosLoanDetails>(
+    token,
+    `/loans/${encodeURIComponent(loanUuid)}/noc/send`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    },
+    'Failed to send NOC letter.',
+    120_000,
   );
 }

@@ -4,7 +4,6 @@
   "eyebrow": "Privacy",
   "navLabel": "Privacy Policy",
   "description": "How MoneyCash collects, uses, stores, and protects personal information on the website and app.",
-  "registeredOffice": "CREDSOLVE Technologies Private Limited, Flat No. E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh — 201009",
   "contactEmail": "legal@moneycash.in",
   "grievanceOfficer": {
     "name": "Mohammad Uvaid",
@@ -185,7 +184,7 @@
       "title": "Governing law and dispute resolution",
       "paragraphs": [
         "This Privacy Policy shall be governed by and construed in accordance with the laws of India. All disputes in relation to the Privacy Policy will be adjudicated exclusively before a competent court in Delhi, India only.",
-        "NOTWITHSTANDING ANYTHING SPECIFIED IN THIS PRIVACY POLICY, ALL PERMISSIONS GRANTED HEREIN, USE OF DATA / INFORMATION SHARED WITH MONEYCASH (CREDSOLVE TECHNOLOGIES PRIVATE LIMITED) SHALL BE SUBJECT TO APPLICABLE LAWS AND REGULATIONS INCLUDING RULES/GUIDELINES FRAMED BY SECTOR SPECIFIC REGULATORS SUCH AS RBI, UIDAI etc."
+        "NOTWITHSTANDING ANYTHING SPECIFIED IN THIS PRIVACY POLICY, ALL PERMISSIONS GRANTED HEREIN, USE OF DATA / INFORMATION SHARED WITH MONEYCASH SHALL BE SUBJECT TO APPLICABLE LAWS AND REGULATIONS INCLUDING RULES/GUIDELINES FRAMED BY SECTOR SPECIFIC REGULATORS SUCH AS RBI, UIDAI etc."
       ]
     }
   ],

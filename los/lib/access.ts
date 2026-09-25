@@ -44,6 +44,14 @@ export function canCheckCibilScore(
   return !isAgentRole(roleName, hierarchyLevel);
 }
 
+/** Generate and email a loan-closure NOC — Admin only. */
+export function canSendLoanNoc(
+  roleName?: string | null,
+  hierarchyLevel?: number | null,
+): boolean {
+  return isLosAdminRole(roleName, hierarchyLevel);
+}
+
 /** Waive penal + overdue-days interest on an open loan — Admin only. */
 export function canWaiveLoanCharges(
   roleName?: string | null,

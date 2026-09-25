@@ -1,8 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import type { Response } from 'express';
 import { APPLICATION_STATUS } from '../../../common/constants/application.constants';
 import { isClosedLoanStatus, LOAN_STATUS } from '../../../common/constants/loan.constants';
 import { mapEasebuzzTransferLog } from '../../../common/easebuzz/easebuzz-transfer-log.util';
+import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import {
   calendarDaysBetween,
   computeAmountDueNowInr,
@@ -23,8 +25,8 @@ import { resolveEffectiveLoanStatus } from '../../../common/loan/effective-loan-
 import { roundInr2 } from '../../../common/loan/loan-repayment-outstanding.util';
 import { isCollectedRepaymentStatus } from '../../../common/constants/loan-repayment.constants';
 import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbursement-view.util';
+import { NocLetterService } from '../../../common/noc/noc-letter.service';
 import { formatLosPersonName } from '../format-los-person-name';
-import type { Response } from 'express';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { streamXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 import {
@@ -101,6 +103,8 @@ export class LosLoanService {
     private readonly prisma: PrismaService,
     private readonly bounceChargeTiers: BounceChargeTierResolverService,
     private readonly repaymentSync: LosLoanRepaymentSyncService,
+    private readonly kycFiles: KycFilesService,
+    private readonly nocLetter: NocLetterService,
   ) {}
 
   private readonly loanListInclude = {
@@ -189,13 +193,17 @@ export class LosLoanService {
           ? computeInterestAmountInr(principal, dailyRate, overdueDays)
           : 0;
       const storedWaiverInr = waivedAmountFromLoan(loan.waivedAmount);
+      const interestBooked = decimalToNumber(loan.interestAmount);
+      const totalRepayment =
+        principal != null && interestBooked != null
+          ? Math.round((principal + interestBooked) * 100) / 100
+          : (decimalToNumber(loan.totalRepaymentAmount) ?? 0);
       const bill = billDueNowAfterWaiverInr({
-        amountDueBeforePenal: (decimalToNumber(loan.totalRepaymentAmount) ?? 0) + overdueInterestInr,
+        amountDueBeforePenal: totalRepayment + overdueInterestInr,
         penalInr: penalAmount,
         overdueInterestInr,
         waivedAmountInr: storedWaiverInr,
       });
-      const totalRepayment = decimalToNumber(loan.totalRepaymentAmount) ?? 0;
 
       return {
         uuid: loan.uuid,
@@ -213,8 +221,8 @@ export class LosLoanService {
         principalAmount: loan.principalAmount.toString(),
         netDisbursedAmount: loan.netDisbursedAmount.toString(),
         interestRate: loan.interestRate.toString(),
-        interestAmount: loan.interestAmount.toString(),
-        totalRepaymentAmount: loan.totalRepaymentAmount.toString(),
+        interestAmount: interestBooked != null ? interestBooked.toFixed(2) : loan.interestAmount.toString(),
+        totalRepaymentAmount: totalRepayment.toFixed(2),
         /** Unused for overdue charges (penal % applies instead); kept for API compatibility. */
         bounceRatePerDayInr: '0.00',
         /** Penal charge (rate % of principal, min/max capped); 0 unless past due and still open. */
@@ -244,6 +252,7 @@ export class LosLoanService {
           loan.application.applicationStatus.displayName,
         ),
         closedAt: loan.closedAt?.toISOString() ?? null,
+        isNocSent: loan.isNocSent === true,
         unsettledPaymentLink: unsettledByLoanId.get(loan.id.toString()) === true,
       };
     });
@@ -578,12 +587,13 @@ export class LosLoanService {
         : principal != null && dailyRate != null && contractedTenureDays != null
           ? computeInterestAmountInr(principal, dailyRate, contractedTenureDays)
           : decimalToNumber(loan.interestAmount);
+    // Contractual amount due on the repay date: principal + tenure interest.
+    // Closed loans must not use the stored total — settlement used to overwrite it
+    // with the amount collected, which folds penal into this figure.
     const amountDueAtMaturity =
-      loan.closedAt != null
-        ? decimalToNumber(loan.totalRepaymentAmount)
-        : principal != null && interestAtMaturity != null
-          ? Math.round((principal + interestAtMaturity) * 100) / 100
-          : decimalToNumber(loan.totalRepaymentAmount);
+      principal != null && interestAtMaturity != null
+        ? Math.round((principal + interestAtMaturity) * 100) / 100
+        : decimalToNumber(loan.totalRepaymentAmount);
 
     // Same overdue test as `listLoans`: live days if open, days-at-payoff if closed after due.
     const daysPastDue = overdueDaysFromMaturity(
@@ -629,7 +639,7 @@ export class LosLoanService {
     } else if (loan.closedAt != null) {
       daysOutstanding = calendarDaysBetween(loan.disbursedAt, loan.closedAt) + 1;
       interestTillToday = loan.interestAmount.toFixed(2);
-      amountDueToday = loan.totalRepaymentAmount.toFixed(2);
+      amountDueToday = (amountDueAtMaturity ?? decimalToNumber(loan.totalRepaymentAmount) ?? 0).toFixed(2);
     }
 
     const bookedTotal = amountDueAtMaturity ?? decimalToNumber(loan.totalRepaymentAmount) ?? 0;
@@ -698,6 +708,9 @@ export class LosLoanService {
       ),
       loanDocumentsAcceptedAt: details?.loanDocumentsAcceptedAt?.toISOString() ?? null,
       keyFactReady: Boolean(details?.keyFactPdfRelativePath?.trim()),
+      isNocSent: loan.isNocSent === true,
+      nocSentAt: loan.nocSentAt?.toISOString() ?? null,
+      nocLetterNumber: loan.nocLetterNumber ?? null,
       closedAt: loan.closedAt?.toISOString() ?? null,
       totalPaidAmount: totalPaid.toFixed(2),
       outstandingAmount: outstanding.toFixed(2),
@@ -807,6 +820,75 @@ export class LosLoanService {
               waivedAt: null,
             },
     });
+
+    return this.getLoanDetails(loan.uuid);
+  }
+
+  async serveNocPdf(loanUuid: string, res: Response): Promise<void> {
+    const loan = await this.prisma.read.loanAccount.findUnique({
+      where: { uuid: loanUuid },
+      select: {
+        isNocSent: true,
+        nocPdfRelativePath: true,
+        nocLetterNumber: true,
+        loanNumber: true,
+      },
+    });
+    if (!loan) throw new NotFoundException('Loan not found.');
+    const rel = loan.nocPdfRelativePath?.trim() ?? '';
+    if (!loan.isNocSent || !rel) {
+      throw new NotFoundException('NOC letter has not been sent yet.');
+    }
+    let buf: Buffer;
+    try {
+      buf = await this.kycFiles.readBytes(rel);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('NoSuchKey') || msg.includes('S3 GET failed (404)')) {
+        throw new NotFoundException('NOC letter file is missing from storage.');
+      }
+      throw err;
+    }
+    const fileName = `NOC-${loan.nocLetterNumber ?? loan.loanNumber}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.send(buf);
+  }
+
+  /**
+   * Generate + store + email NOC for a fully repaid loan that has not been sent yet.
+   * Idempotent when already sent — returns current loan details.
+   */
+  async sendNocLetter(loanUuid: string) {
+    const loan = await this.prisma.read.loanAccount.findUnique({
+      where: { uuid: loanUuid },
+      select: {
+        id: true,
+        uuid: true,
+        closedAt: true,
+        isNocSent: true,
+        loanStatus: { select: { name: true } },
+      },
+    });
+    if (!loan) throw new NotFoundException('Loan not found.');
+
+    const status = (loan.loanStatus.name ?? '').toUpperCase();
+    if (status === LOAN_STATUS.WRITTEN_OFF) {
+      throw new BadRequestException('NOC is not available for written-off loans.');
+    }
+    if (loan.closedAt == null) {
+      throw new BadRequestException('NOC can only be sent after the loan is fully repaid.');
+    }
+
+    if (!loan.isNocSent) {
+      const ok = await this.nocLetter.issueIfNeeded(loan.id);
+      if (!ok) {
+        throw new BadRequestException(
+          'Failed to generate or send the NOC letter. Check email/S3 configuration and server logs.',
+        );
+      }
+    }
 
     return this.getLoanDetails(loan.uuid);
   }

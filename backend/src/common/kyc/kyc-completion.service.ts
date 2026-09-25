@@ -13,6 +13,11 @@ import {
   pickLatestSuccessfulCustomerAadhaar,
   shouldStartNewCustomerKycBundle,
 } from './customer-aadhaar-for-application.util';
+import {
+  extractActiveLivenessBlock,
+  readHeadMovementSnapshot,
+} from './kyc-head-movement.util';
+import { isKycHeadMovementRequired } from './kyc-liveness-env.util';
 import { PrismaService } from '../../prisma/prisma.service';
 
 const REUSABLE_AADHAAR_SELECT = {
@@ -79,8 +84,8 @@ export class KycCompletionService {
 
   /**
    * Persists DigiLocker Aadhaar (and optional PAN) on `customer_kyc`.
-   * DigiLocker is one KYC step — always keeps application KYC as NOT_DONE so
-   * journey does not advance to bank details until full KYC is completed later.
+   * DigiLocker alone must not finish KYC — keeps NOT_DONE unless the face step
+   * already passed (selfie + liveness). Re-downloads must not wipe COMPLETED.
    */
   async completeFromDigilockerAadhaar(params: {
     applicationId: bigint;
@@ -93,19 +98,53 @@ export class KycCompletionService {
     aadhaarKycType?: number | null;
   }): Promise<void> {
     await this.prisma.client.$transaction(async (tx) => {
+      const existing = await tx.applicationKyc.findUnique({
+        where: { applicationId: params.applicationId },
+        select: {
+          kycStatus: true,
+          kycCompletedAt: true,
+          livenessPassed: true,
+          livenessSelfiePath: true,
+          livenessDoneAt: true,
+          livenessCheckedAt: true,
+        },
+      });
+      // `livenessPassed` is only set after the full face pipeline (including head movement).
+      const faceStepAlreadyDone =
+        existing?.livenessPassed === true && Boolean(existing.livenessSelfiePath?.trim());
+      const completedAt =
+        existing?.kycCompletedAt ??
+        existing?.livenessDoneAt ??
+        existing?.livenessCheckedAt ??
+        params.verifiedAt;
+
       await tx.applicationKyc.upsert({
         where: { applicationId: params.applicationId },
         create: {
           applicationId: params.applicationId,
-          kycStatus: APPLICATION_KYC_STATUS.NOT_DONE,
-          kycCompletedAt: null,
+          kycStatus: faceStepAlreadyDone
+            ? APPLICATION_KYC_STATUS.COMPLETED
+            : APPLICATION_KYC_STATUS.NOT_DONE,
+          kycCompletedAt: faceStepAlreadyDone ? completedAt : null,
         },
-        update: {
-          // Clear stale COMPLETED left by the older DigiLocker-finishes-KYC behaviour.
-          kycStatus: APPLICATION_KYC_STATUS.NOT_DONE,
-          kycCompletedAt: null,
-        },
+        update: faceStepAlreadyDone
+          ? {
+              kycStatus: APPLICATION_KYC_STATUS.COMPLETED,
+              kycCompletedAt: completedAt,
+            }
+          : {
+              // Clear stale COMPLETED left by the older DigiLocker-finishes-KYC behaviour.
+              kycStatus: APPLICATION_KYC_STATUS.NOT_DONE,
+              kycCompletedAt: null,
+            },
       });
+
+      if (faceStepAlreadyDone) {
+        await tx.customer.update({
+          where: { id: params.customerId },
+          data: { kycVerifiedAt: completedAt },
+        });
+      }
 
       const customerKyc = await this.resolveCustomerKycForApplication(tx, {
         applicationId: params.applicationId,
@@ -181,6 +220,114 @@ export class KycCompletionService {
         },
       });
     });
+  }
+
+  /**
+   * Heals applications where DigiLocker + face/liveness already passed but
+   * `application_kyc.kyc_status` stayed / was reset to NOT_DONE (Approve blocked,
+   * LOS progress still 100%).
+   */
+  async ensureCompletedWhenFaceStepDone(params: {
+    applicationId: bigint;
+    customerId: bigint;
+  }): Promise<{
+    healed: boolean;
+    kycStatus: number;
+    kycCompletedAt: Date | null;
+  }> {
+    const application = await this.prisma.client.application.findUnique({
+      where: { id: params.applicationId },
+      select: {
+        createdAt: true,
+        kyc: {
+          select: {
+            kycStatus: true,
+            kycCompletedAt: true,
+            livenessPassed: true,
+            livenessSelfiePath: true,
+            livenessDoneAt: true,
+            livenessCheckedAt: true,
+            livenessVendorJson: true,
+          },
+        },
+      },
+    });
+    const kyc = application?.kyc;
+    if (!kyc) {
+      return {
+        healed: false,
+        kycStatus: APPLICATION_KYC_STATUS.NOT_DONE,
+        kycCompletedAt: null,
+      };
+    }
+    if (
+      kyc.kycStatus === APPLICATION_KYC_STATUS.COMPLETED &&
+      kyc.kycCompletedAt
+    ) {
+      return {
+        healed: false,
+        kycStatus: kyc.kycStatus,
+        kycCompletedAt: kyc.kycCompletedAt,
+      };
+    }
+    if (kyc.kycStatus === APPLICATION_KYC_STATUS.FAILED) {
+      return {
+        healed: false,
+        kycStatus: kyc.kycStatus,
+        kycCompletedAt: kyc.kycCompletedAt,
+      };
+    }
+
+    const ownRows = await this.prisma.client.customerKyc.findMany({
+      where: { customerId: params.customerId },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+      select: {
+        aadhaarData: true,
+        aadhaarPhotoPath: true,
+        aadhaarVerifiedAt: true,
+      },
+    });
+    const applying =
+      ownRows.find((row) =>
+        customerAadhaarAppliesToApplication(row, {
+          applicationCreatedAt: application.createdAt,
+          applicationKycStatus: kyc.kycStatus,
+        }),
+      ) ?? pickLatestSuccessfulCustomerAadhaar(ownRows);
+
+    const hasAadhaar = isDigilockerAadhaarCaptureComplete(applying?.aadhaarData);
+    const hasSelfie = Boolean(kyc.livenessSelfiePath?.trim());
+    const headMovement = readHeadMovementSnapshot(
+      extractActiveLivenessBlock(kyc.livenessVendorJson),
+    );
+    const headMovementSatisfied = !isKycHeadMovementRequired() || headMovement.passed;
+    const faceStepDone =
+      hasAadhaar && hasSelfie && kyc.livenessPassed === true && headMovementSatisfied;
+
+    if (!faceStepDone || !applying) {
+      return {
+        healed: false,
+        kycStatus: kyc.kycStatus,
+        kycCompletedAt: kyc.kycCompletedAt,
+      };
+    }
+
+    const verifiedAt = kyc.livenessDoneAt ?? kyc.livenessCheckedAt ?? new Date();
+    await this.completeAfterFaceLiveness({
+      applicationId: params.applicationId,
+      customerId: params.customerId,
+      digilockerAadhaarFormJson: (applying.aadhaarData ?? null) as Prisma.JsonValue,
+      aadhaarPhotoRelativePath: applying.aadhaarPhotoPath,
+      selfieRelativePath: kyc.livenessSelfiePath,
+      verifiedAt,
+    });
+
+    return {
+      healed: true,
+      kycStatus: APPLICATION_KYC_STATUS.COMPLETED,
+      kycCompletedAt: verifiedAt,
+    };
   }
 
   async findLatestSuccessfulCustomerAadhaar(params: {

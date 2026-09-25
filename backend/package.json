@@ -26,6 +26,7 @@
     "loan-docs:setup-chromium": "bash scripts/setup-chromium-staging.sh",
     "cron:expire-leads": "npm run build && node build/src/cli/expire-leads.js",
     "cron:mark-loans-overdue": "npm run build && node build/src/cli/mark-loans-overdue.js",
+    "noc:send-missing": "npm run build && node build/src/cli/send-missing-noc-letters.js",
     "nest": "nest"
   },
   "dependencies": {

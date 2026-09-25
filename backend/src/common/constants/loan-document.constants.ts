@@ -1,5 +1,5 @@
 /** NBFC entity details — used in sanction letter (Key Fact Statement) header. */
-export const NBFC_NAME = 'CREDSOLVE TECHNOLOGIES PRIVATE LIMITED';
+export const NBFC_NAME = 'MoneyCash';
 export const NBFC_ADDRESS =
   'Flat No.: E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh-201009';
 export const NBFC_EMAIL = 'info@moneycash.in';
@@ -8,9 +8,9 @@ export const NBFC_LOGO_FILE = 'moneycash-logo.png';
 /** Lender / LSP details per RBI Digital Lending Guidelines — Sanction Letter KFS fields. */
 export const LENDER_NAME = 'Aasra Fincorp Pvt. Ltd.';
 export const LENDER_LOGO_FILE = 'asra-fincorp-logo.png';
-export const LSP_NAME = 'CREDSOLVE TECHNOLOGIES PRIVATE LIMITED';
+export const LSP_NAME = 'MoneyCash';
 export const DLA_NAME = 'MoneyCash (moneycash.in)';
-export const RECOVERY_AGENT_NAME = 'CREDSOLVE TECHNOLOGIES PRIVATE LIMITED';
+export const RECOVERY_AGENT_NAME = 'MoneyCash';
 export const PAYABLE_TO = 'Aasra Fincorp Pvt. Ltd.';
 
 /** Grievance / nodal contacts shown on KFS (LSP = NBFC/MoneyCash, RE = Lender). */

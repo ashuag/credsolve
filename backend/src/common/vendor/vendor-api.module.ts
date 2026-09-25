@@ -3,6 +3,7 @@ import { EasebuzzRepaymentNotificationService } from '../easebuzz/easebuzz-repay
 import { EasebuzzWireService } from '../easebuzz/easebuzz-wire.service';
 import { BureauFetchService } from './bureau-fetch.service';
 import { BankTenacioVendorService } from './bank-tenacio-vendor.service';
+import { CredostackIfscService } from './credostack/credostack-ifsc.service';
 import { DigilockerFetchService } from './digilocker-fetch.service';
 import { AadhaarXmlOtpVendorService } from './aadhaar-xml-otp-vendor.service';
 import { DigilockerVendorService } from './digilocker-vendor.service';
@@ -48,6 +49,7 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
     AadhaarXmlOtpVendorService,
     DigilockerFetchService,
     BankTenacioVendorService,
+    CredostackIfscService,
     LivenessVendorService,
     KycTenacioVendorService,
     EasebuzzWireService,
@@ -65,6 +67,7 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
     AadhaarXmlOtpVendorService,
     DigilockerFetchService,
     BankTenacioVendorService,
+    CredostackIfscService,
     LivenessVendorService,
     KycTenacioVendorService,
     EasebuzzWireService,

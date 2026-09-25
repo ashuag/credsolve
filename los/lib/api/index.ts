@@ -30,6 +30,7 @@ export * from './disbursement';
 export * from './kyc-enable-re-kyc';
 export * from './kyc-enable-aadhaar-reattempt';
 export * from './grant-penny-drop-attempt';
+export * from './recheck-penny-drop';
 export * from './restart-rejected-journey';
 export * from './cibil-vendor-checks';
 export * from './kyc-face-match-check';

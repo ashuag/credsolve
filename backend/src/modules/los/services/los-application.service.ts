@@ -64,7 +64,7 @@ import { SettingKey } from '../../../common/constants/setting.constants';
 import { LEAD_STATUS } from '../../../common/constants/lead.constants';
 import { REJECTION_REASON, toRejectionReasonDto } from '../../../common/constants/rejection-reason.constants';
 import { canEnableAadhaarReattempt, canEnableReKyc } from '../kyc-grant-retry.util';
-import { canGrantPennyDropAttempt } from '../penny-drop-grant-retry.util';
+import { canGrantPennyDropAttempt, canRecheckPennyDrop } from '../penny-drop-grant-retry.util';
 import {
   extractPanNsdlSnapshot,
   panNsdlVendorServiceNames,
@@ -1219,6 +1219,24 @@ export class LosApplicationService {
         attemptsUsed: application.details?.pennyDropAttempts ?? 0,
         attemptsAllowed: pennyDropAttemptsAllowed,
         bankVerified: Boolean(application.details?.bankAccountNumber?.trim()),
+        disbursed: Boolean(application.loanAccount?.disbursedAt),
+        applicationStatusCode: application.applicationStatus.name,
+        leadStatusCode: lead.leadStatus.name,
+      }),
+      canRecheckPennyDrop: canRecheckPennyDrop({
+        hasAccountToRecheck: Boolean(
+          (application.bankAccountDetails[0]?.bankAccountNumber?.trim() &&
+            application.bankAccountDetails[0]?.ifscCode?.trim()) ||
+            (application.details?.bankAccountNumber?.trim() && application.details?.ifscCode?.trim()),
+        ),
+        bankVerified: Boolean(application.details?.bankAccountNumber?.trim()),
+        nameMatchPendingReview: isBankNameMatchReviewPending({
+          statusName: application.applicationStatus.name,
+          statusNote: application.applicationStatusNote,
+        }),
+        latestAttemptMatched: application.bankAccountDetails[0]
+          ? application.bankAccountDetails[0].status
+          : null,
         disbursed: Boolean(application.loanAccount?.disbursedAt),
         applicationStatusCode: application.applicationStatus.name,
         leadStatusCode: lead.leadStatus.name,

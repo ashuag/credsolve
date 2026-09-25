@@ -1,10 +1,46 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { BadRequestException } from '@nestjs/common';
+import { APPLICATION_STATUS } from '../../../common/constants/application.constants';
 import { BUREAU_FETCHED } from '../../../common/constants/bureau-fetch.constants';
 import { LEAD_STATUS } from '../../../common/constants/lead.constants';
 import { REJECTION_REASON } from '../../../common/constants/rejection-reason.constants';
-import { isCibilVendorServiceName, LosCheckCibilService, wrapCibilHitJson } from './los-check-cibil.service';
+import { isCibilVendorServiceName, isRecoverableBureauSoftPullRejection, LosCheckCibilService, wrapCibilHitJson } from './los-check-cibil.service';
+
+describe('isRecoverableBureauSoftPullRejection', () => {
+  it('matches the dedicated soft-pull rejection reason', () => {
+    assert.equal(
+      isRecoverableBureauSoftPullRejection({
+        leadStatus: { name: LEAD_STATUS.REJECTED },
+        rejectionReason: { name: REJECTION_REASON.BUREAU_SOFT_PULL_FAILED },
+        leadStatusNote: null,
+      }),
+      true,
+    );
+  });
+
+  it('matches legacy soft-pull notes that used REJECTED_BY_CLIENTS', () => {
+    assert.equal(
+      isRecoverableBureauSoftPullRejection({
+        leadStatus: { name: LEAD_STATUS.REJECTED },
+        rejectionReason: { name: REJECTION_REASON.REJECTED_BY_CLIENTS },
+        leadStatusNote: 'Bureau soft-pull failed: credit bureau returned a non-success response.',
+      }),
+      true,
+    );
+  });
+
+  it('ignores manual REJECTED_BY_CLIENTS without a soft-pull note', () => {
+    assert.equal(
+      isRecoverableBureauSoftPullRejection({
+        leadStatus: { name: LEAD_STATUS.REJECTED },
+        rejectionReason: { name: REJECTION_REASON.REJECTED_BY_CLIENTS },
+        leadStatusNote: 'Ops decided not to proceed',
+      }),
+      false,
+    );
+  });
+});
 
 describe('isCibilVendorServiceName', () => {
   it('matches Tenacio, Surepass, and CIBIL07 CIBIL service names', () => {
@@ -121,6 +157,21 @@ describe('LosCheckCibilService', () => {
     fetchResult?: Record<string, unknown>;
     postBre?: { passed: boolean; rejectReason: string | null; rejectionReasonCode: string | null; cibilScore: number | null };
     leadStatusName?: string;
+    leadStatusNote?: string | null;
+    rejectionReasonName?: string | null;
+    existingApplication?: {
+      id: bigint;
+      kyc: { kycStatus: number; kycCompletedAt: Date | null } | null;
+      details: {
+        selectedLoanAmount: number | null;
+        emailVerifiedAt: Date | null;
+        loanDocumentsAcceptedAt: Date | null;
+        bankAccountNumber: string | null;
+      } | null;
+      _count: { references: number };
+    } | null;
+    onLeadUpdate?: (data: Record<string, unknown>) => void;
+    onApplicationUpdate?: (data: Record<string, unknown>) => void;
   }) {
     const vendorLogs = overrides?.vendorLogs ?? [];
     const reports = overrides?.reports ?? [];
@@ -135,12 +186,16 @@ describe('LosCheckCibilService', () => {
       uuid: 'lead-uuid',
       customerId,
       createdAt,
+      leadStatusNote: overrides?.leadStatusNote ?? null,
       customer: { uuid: 'cust-uuid', mobileNumber: '9876543210' },
       leadStatus: { name: overrides?.leadStatusName ?? LEAD_STATUS.NEW, displayName: 'New' },
-      rejectionReason: null,
+      rejectionReason: overrides?.rejectionReasonName
+        ? { name: overrides.rejectionReasonName }
+        : null,
       leadDetail: {
         fullName: 'Test User',
         panNumber: 'ABCDE1234F',
+        panVerified: 1,
         bureauFetched: BUREAU_FETCHED.NOT_FETCHED,
       },
     };
@@ -166,8 +221,9 @@ describe('LosCheckCibilService', () => {
       client: {
         lead: {
           findUnique: async () => leadRow,
-          update: async () => {
+          update: async ({ data }: { data: Record<string, unknown> }) => {
             leadUpdated = true;
+            overrides?.onLeadUpdate?.(data);
             return leadRow;
           },
         },
@@ -175,19 +231,30 @@ describe('LosCheckCibilService', () => {
           update: async () => ({}),
         },
         leadStatus: {
-          findFirst: async ({ where }: { where: { name: string } }) =>
-            ({ id: where.name === LEAD_STATUS.REJECTED ? 9 : 3 }),
+          findFirst: async ({ where }: { where: { name: string } }) => {
+            if (where.name === LEAD_STATUS.REJECTED) return { id: 9 };
+            if (where.name === LEAD_STATUS.CONVERTED) return { id: 5 };
+            return { id: 3 };
+          },
         },
         applicationStatus: {
-          findFirst: async () => ({ id: 4 }),
+          findFirst: async ({ where }: { where: { name: string } }) => {
+            if (where.name === APPLICATION_STATUS.IN_REVIEW) return { id: 2 };
+            if (where.name === APPLICATION_STATUS.DRAFT) return { id: 1 };
+            if (where.name === APPLICATION_STATUS.REJECTED) return { id: 4 };
+            return { id: 4 };
+          },
         },
         rejectionReason: {
           findFirst: async () => ({ id: 7 }),
         },
         application: {
-          findFirst: async () => null,
+          findFirst: async () => overrides?.existingApplication ?? null,
           create: async () => ({ id: 50n }),
-          update: async () => ({}),
+          update: async ({ data }: { data: Record<string, unknown> }) => {
+            overrides?.onApplicationUpdate?.(data);
+            return {};
+          },
         },
         customer: {
           findUnique: async () => ({ mobileNumber: '9876543210' }),
@@ -403,5 +470,37 @@ describe('LosCheckCibilService', () => {
     assert.equal(result.postBre?.rejectionReasonCode, REJECTION_REASON.CIBIL_SCORE_LOW);
     assert.equal(flags.leadUpdated, true);
     assert.equal(flags.rejectionSmsSent, true);
+  });
+
+  it('restores a soft-pull-rejected lead to IN_REVIEW when the journey is already complete', async () => {
+    const leadUpdates: Array<Record<string, unknown>> = [];
+    const appUpdates: Array<Record<string, unknown>> = [];
+
+    const { service, flags } = buildService({
+      leadStatusName: LEAD_STATUS.REJECTED,
+      leadStatusNote: 'Bureau soft-pull failed: credit bureau returned a non-success response.',
+      rejectionReasonName: REJECTION_REASON.BUREAU_SOFT_PULL_FAILED,
+      existingApplication: {
+        id: 88n,
+        kyc: { kycStatus: 1, kycCompletedAt: new Date('2026-08-20T10:00:00.000Z') },
+        details: {
+          selectedLoanAmount: 30000,
+          emailVerifiedAt: new Date('2026-08-20T10:00:00.000Z'),
+          loanDocumentsAcceptedAt: new Date('2026-08-21T10:00:00.000Z'),
+          bankAccountNumber: '1234567890',
+        },
+        _count: { references: 2 },
+      },
+      onLeadUpdate: (data) => leadUpdates.push(data),
+      onApplicationUpdate: (data) => appUpdates.push(data),
+    });
+
+    const result = await service.checkForLead('lead-uuid');
+    assert.equal(flags.postBreCalled, true);
+    assert.equal(result.rejected, false);
+    assert.equal(result.outcome, 'fetched_and_passed');
+    assert.match(result.message, /IN_REVIEW/);
+    assert.equal(leadUpdates.some((u) => u.rejectionReasonId === null), true);
+    assert.equal(appUpdates.some((u) => u.applicationStatusId === 2), true);
   });
 });
