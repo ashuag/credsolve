@@ -182,7 +182,7 @@ export default function BankDetailsPage() {
           if (!out.ok || !out.details || Object.keys(out.details).length === 0) {
             setIfscLookup('error');
             setIfscDetails(null);
-            setIfscLookupNote('Could not resolve this IFSC. Check the code and try again.');
+            setIfscLookupNote('Something went wrong while looking up this IFSC. Please try again.');
             return;
           }
           setIfscDetails(out.details);

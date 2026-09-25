@@ -39,14 +39,29 @@ function normalizePincode(raw: string | null): string | null {
   return clip(raw, 10);
 }
 
-/** Vendor envelope `{ data: { … } }` or a flat Razorpay-style IFSC object. */
+const BANK_NAME_KEYS = ['bankName', 'BANK', 'bank', 'BANKNAME', 'bank_name', 'BANK_NAME'];
+
+function recordHasBankName(data: Record<string, unknown>): boolean {
+  return pickString(data, BANK_NAME_KEYS) != null;
+}
+
+/**
+ * Vendor envelope `{ data: { … } }`, a flat Razorpay-style IFSC object, or one
+ * extra `{ data: { data: { … } } }` wrap when only the inner object has a bank name.
+ */
 export function extractVendorIfscData(vendor: unknown): Record<string, unknown> | null {
   if (!isRecord(vendor)) return null;
   const nested = vendor.data;
-  if (isRecord(nested)) return nested;
+  if (isRecord(nested)) {
+    if (!recordHasBankName(nested) && isRecord(nested.data) && recordHasBankName(nested.data)) {
+      return nested.data;
+    }
+    return nested;
+  }
   if (
     typeof vendor.BANK === 'string' ||
     typeof vendor.bankName === 'string' ||
+    typeof vendor.bank_name === 'string' ||
     typeof vendor.IFSC === 'string' ||
     typeof vendor.ifsc === 'string'
   ) {
@@ -56,10 +71,10 @@ export function extractVendorIfscData(vendor: unknown): Record<string, unknown> 
 }
 
 export function mapIfscDataToFields(ifsc: string, data: Record<string, unknown>): IfscCodeFields {
-  const fromPayload = pickString(data, ['ifsc', 'IFSC', 'ifscCode', 'ifscNumber']);
+  const fromPayload = pickString(data, ['ifsc', 'IFSC', 'ifscCode', 'ifscNumber', 'ifsc_code']);
   return {
     ifscCode: (fromPayload ?? ifsc).toUpperCase(),
-    bankName: clip(pickString(data, ['bankName', 'BANK', 'bank', 'BANKNAME']) ?? '', 150),
+    bankName: clip(pickString(data, BANK_NAME_KEYS) ?? '', 150),
     address: clipNullable(pickString(data, ['address', 'ADDRESS']), 500),
     city: clipNullable(pickString(data, ['city', 'CITY']), 100),
     state: clipNullable(pickString(data, ['state', 'STATE']), 100),
@@ -82,7 +97,7 @@ export function detailsFromIfscRow(row: {
   const extras = isRecord(row.apiPayload) ? row.apiPayload : {};
   return {
     ...extras,
-    bankName: row.bankName || pickString(extras, ['bankName', 'BANK', 'bank']) || row.bankName,
+    bankName: row.bankName || pickString(extras, BANK_NAME_KEYS) || row.bankName,
     ifsc: row.ifscCode,
     address: row.address ?? pickString(extras, ['address', 'ADDRESS']),
     city: row.city ?? pickString(extras, ['city', 'CITY']),

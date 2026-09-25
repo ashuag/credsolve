@@ -44,7 +44,7 @@ export class CredostackIfscService {
       path: `${ifscPath}/${encodeURIComponent(ifscCode)}`,
       headers: { 'X-Client-Code': clientCode, 'X-Api-Key': apiKey },
       leadId,
-      sensitiveHeaderNames: ['x-api-key'],
+      sensitiveHeaderNames: ['x-api-key', 'x-client-code'],
     });
 
     return {

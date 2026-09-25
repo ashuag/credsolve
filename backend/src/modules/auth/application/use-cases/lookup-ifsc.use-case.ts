@@ -70,21 +70,23 @@ export class LookupIfscUseCase {
     const vendorData = extractVendorIfscData(vendor);
     if (out.ok && vendorData) {
       const fields = mapIfscDataToFields(ifsc, vendorData);
-      await this.ifscCodes.upsertFromLookup(fields);
-      return {
-        configured: true,
-        ok: true,
-        httpStatus: out.httpStatus,
-        details: detailsFromIfscRow(fields),
-        vendor,
-      };
+      if (fields.bankName.length > 0) {
+        await this.ifscCodes.upsertFromLookup(fields);
+        return {
+          configured: true,
+          ok: true,
+          httpStatus: out.httpStatus,
+          details: detailsFromIfscRow(fields),
+          vendor,
+        };
+      }
     }
 
     return {
       configured: true,
-      ok: out.ok,
+      ok: false,
       httpStatus: out.httpStatus,
-      details: vendorData,
+      details: null,
       vendor,
     };
   }
