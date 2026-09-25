@@ -3,8 +3,9 @@ import { APPLICATION_STATUS } from '../constants/application.constants';
 import { LEAD_STATUS } from '../constants/lead.constants';
 import { SmsService } from '../sms/sms.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { isDigilockerAadhaarCaptureComplete } from '../kyc/aadhaar-vendor-parse.util';
 import { KYC_VENDOR_TECHNICAL_ISSUE_LEAD_NOTE } from '../constants/kyc.constants';
-import { buildVendor5xxNote } from './vendor-api-error.util';
+import { buildVendor5xxNote, isAadhaarXmlOtpFallbackService } from './vendor-api-error.util';
 import {
   classifyVendorApiLogOutcome,
   parseVendorServiceFromLeadStatusNote,
@@ -46,6 +47,12 @@ export class VendorInternalErrorService {
     body: unknown;
     transportError?: string;
   }): Promise<void> {
+    if (isAadhaarXmlOtpFallbackService(params.serviceName)) {
+      this.logger.log(
+        `Skipping INTERNAL_ERROR for Aadhaar XML OTP (${params.providerName}/${params.serviceName}) — DigiLocker is the fallback.`,
+      );
+      return;
+    }
     await this.markLeadInternalError({
       leadId: params.leadId,
       providerName: params.providerName,
@@ -81,21 +88,8 @@ export class VendorInternalErrorService {
     leadId: bigint,
     providerName: string,
   ): Promise<boolean> {
-    const lead = await this.prisma.client.lead.findUnique({
-      where: { id: leadId },
-      select: {
-        id: true,
-        leadStatusNote: true,
-        leadStatus: { select: { name: true } },
-        applications: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: { id: true, applicationStatus: { select: { name: true } } },
-        },
-      },
-    });
-
-    if (!lead || lead.leadStatus.name !== LEAD_STATUS.INTERNAL_ERROR) {
+    const lead = await this.loadInternalErrorLead(leadId);
+    if (!lead) {
       return false;
     }
 
@@ -121,47 +115,35 @@ export class VendorInternalErrorService {
       }
     }
 
-    const [inProgressLeadStatus, inReviewAppStatus] = await Promise.all([
-      this.prisma.client.leadStatus.findFirst({
-        where: { name: LEAD_STATUS.IN_PROGRESS, isActive: true },
-        select: { id: true },
-      }),
-      this.prisma.client.applicationStatus.findFirst({
-        where: { name: APPLICATION_STATUS.IN_REVIEW, isActive: true },
-        select: { id: true },
-      }),
-    ]);
+    return this.restoreLeadFromInternalError({
+      lead,
+      logReason: `latest ${servicesToCheck.join(', ')} vendor log(s) are success`,
+    });
+  }
 
-    if (!inProgressLeadStatus) {
-      this.logger.warn('LeadStatus IN_PROGRESS not found — cannot recover from INTERNAL_ERROR.');
+  /**
+   * DigiLocker (or XML OTP) Aadhaar is on file — clear INTERNAL_ERROR from an earlier
+   * Aadhaar OTP 5xx so the customer can continue to selfie / bank details.
+   */
+  async recoverLeadIfAadhaarCaptured(leadId: bigint): Promise<boolean> {
+    const lead = await this.loadInternalErrorLead(leadId);
+    if (!lead) {
       return false;
     }
 
-    const applicationId = lead.applications[0]?.id;
-    const applicationWasInternalError =
-      lead.applications[0]?.applicationStatus.name === APPLICATION_STATUS.INTERNAL_ERROR;
-
-    await this.prisma.client.$transaction(async (tx) => {
-      await tx.lead.update({
-        where: { id: leadId },
-        data: {
-          leadStatusId: inProgressLeadStatus.id,
-          leadStatusNote: null,
-        },
-      });
-
-      if (applicationId && applicationWasInternalError && inReviewAppStatus) {
-        await tx.application.update({
-          where: { id: applicationId },
-          data: { applicationStatusId: inReviewAppStatus.id },
-        });
-      }
-    });
-
-    this.logger.log(
-      `Lead ${leadId.toString()} recovered to IN_PROGRESS — latest ${servicesToCheck.join(', ')} vendor log(s) are success.`,
+    const latestKyc = lead.applications[0]?.customer.customerKycs[0];
+    const aadhaarCaptured = Boolean(
+      latestKyc?.aadhaarVerifiedAt &&
+        isDigilockerAadhaarCaptureComplete(latestKyc.aadhaarData),
     );
-    return true;
+    if (!aadhaarCaptured) {
+      return false;
+    }
+
+    return this.restoreLeadFromInternalError({
+      lead,
+      logReason: 'Aadhaar captured via DigiLocker / XML OTP fallback',
+    });
   }
 
   /**
@@ -178,7 +160,115 @@ export class VendorInternalErrorService {
     if (classifyVendorApiLogOutcome(latest.httpStatus, latest.responsePayload) !== 'success') {
       return;
     }
-    await this.recoverLeadIfVendorFailuresCleared(params.leadId, params.providerName);
+    const recovered = await this.recoverLeadIfVendorFailuresCleared(
+      params.leadId,
+      params.providerName,
+    );
+    if (!recovered) {
+      await this.recoverLeadIfAadhaarCaptured(params.leadId);
+    }
+  }
+
+  private async loadInternalErrorLead(leadId: bigint) {
+    const lead = await this.prisma.client.lead.findUnique({
+      where: { id: leadId },
+      select: {
+        id: true,
+        leadStatusNote: true,
+        leadStatus: { select: { name: true } },
+        applications: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            applicationStatus: { select: { name: true } },
+            details: {
+              select: {
+                selectedLoanAmount: true,
+                expectedRepaymentDays: true,
+              },
+            },
+            customer: {
+              select: {
+                customerKycs: {
+                  orderBy: { createdAt: 'desc' },
+                  take: 1,
+                  select: {
+                    aadhaarData: true,
+                    aadhaarVerifiedAt: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!lead || lead.leadStatus.name !== LEAD_STATUS.INTERNAL_ERROR) {
+      return null;
+    }
+    return lead;
+  }
+
+  private async restoreLeadFromInternalError(params: {
+    lead: NonNullable<Awaited<ReturnType<VendorInternalErrorService['loadInternalErrorLead']>>>;
+    logReason: string;
+  }): Promise<boolean> {
+    const { lead, logReason } = params;
+    const application = lead.applications[0];
+    const loanSelectionCompleted = Boolean(
+      application?.details?.selectedLoanAmount != null &&
+        application?.details?.expectedRepaymentDays != null,
+    );
+
+    const [inProgressLeadStatus, convertedLeadStatus, inReviewAppStatus] = await Promise.all([
+      this.prisma.client.leadStatus.findFirst({
+        where: { name: LEAD_STATUS.IN_PROGRESS, isActive: true },
+        select: { id: true },
+      }),
+      this.prisma.client.leadStatus.findFirst({
+        where: { name: LEAD_STATUS.CONVERTED, isActive: true },
+        select: { id: true },
+      }),
+      this.prisma.client.applicationStatus.findFirst({
+        where: { name: APPLICATION_STATUS.IN_REVIEW, isActive: true },
+        select: { id: true },
+      }),
+    ]);
+
+    const recoveryLeadStatus =
+      loanSelectionCompleted && convertedLeadStatus ? convertedLeadStatus : inProgressLeadStatus;
+    const recoveredStatusName =
+      loanSelectionCompleted && convertedLeadStatus ? LEAD_STATUS.CONVERTED : LEAD_STATUS.IN_PROGRESS;
+
+    if (!recoveryLeadStatus) {
+      this.logger.warn('LeadStatus IN_PROGRESS not found — cannot recover from INTERNAL_ERROR.');
+      return false;
+    }
+
+    const applicationWasInternalError =
+      application?.applicationStatus.name === APPLICATION_STATUS.INTERNAL_ERROR;
+
+    await this.prisma.client.$transaction(async (tx) => {
+      await tx.lead.update({
+        where: { id: lead.id },
+        data: {
+          leadStatusId: recoveryLeadStatus.id,
+          leadStatusNote: null,
+        },
+      });
+
+      if (application?.id && applicationWasInternalError && inReviewAppStatus) {
+        await tx.application.update({
+          where: { id: application.id },
+          data: { applicationStatusId: inReviewAppStatus.id },
+        });
+      }
+    });
+
+    this.logger.log(`Lead ${lead.id.toString()} recovered to ${recoveredStatusName} — ${logReason}.`);
+    return true;
   }
 
   private async findLatestVendorLogForLead(

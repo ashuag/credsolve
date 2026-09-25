@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { LOAN_REPAYMENT_STATUS } from '../../../common/constants/loan-repayment.constants';
-import { LOAN_STATUS } from '../../../common/constants/loan.constants';
+import { COLLECTED_REPAYMENT_STATUSES, LOAN_REPAYMENT_STATUS } from '../../../common/constants/loan-repayment.constants';
+import { isClosedLoanStatus } from '../../../common/constants/loan.constants';
 import { EasebuzzWireService } from '../../../common/easebuzz/easebuzz-wire.service';
 import {
   amountsMatchInr,
@@ -120,7 +120,7 @@ export class LosLoanRepaymentSyncService {
     const successRows = await this.prisma.read.loanRepayment.findMany({
       where: {
         loanAccountId: { in: loanIds },
-        status: 'SUCCESS',
+        status: { in: COLLECTED_REPAYMENT_STATUSES },
         vendorRef: { not: null },
       },
       select: { loanAccountId: true, vendorRef: true },
@@ -225,7 +225,7 @@ export class LosLoanRepaymentSyncService {
         closedAt,
       });
 
-    if (loan.closedAt != null || loan.loanStatus.name === LOAN_STATUS.CLOSED) {
+    if (loan.closedAt != null || isClosedLoanStatus(loan.loanStatus.name)) {
       const status = statusOf(loan.closedAt, loan.loanStatus.name, loan.loanStatus.displayName);
       return {
         outcome: 'already_closed',
@@ -326,6 +326,7 @@ export class LosLoanRepaymentSyncService {
         const result = await this.settleRepayment.settleSuccessfulPayment({
           loan,
           txnid: candidate.txnid,
+          vendorRef: txn.easepayid || candidate.txnid,
           amountInr,
           bankRef,
         });
@@ -514,7 +515,7 @@ export class LosLoanRepaymentSyncService {
     for (const row of repaymentRefs) {
       const ref = row.vendor_ref?.trim();
       if (!ref) continue;
-      if (row.status === LOAN_REPAYMENT_STATUS.SUCCESS) {
+      if (row.status === LOAN_REPAYMENT_STATUS.SUCCESS || row.status === LOAN_REPAYMENT_STATUS.PARTIAL) {
         successRefs.add(ref);
         seen.delete(ref);
       }

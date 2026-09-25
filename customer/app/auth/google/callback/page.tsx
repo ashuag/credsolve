@@ -65,7 +65,7 @@ export default function GoogleAuthCallbackPage() {
             Signing you in.
           </h1>
           <p className="mt-3 text-brand-muted leading-[1.6]">
-            We are finishing your Google login and updating your MoneyCash application.
+            We are finishing your Google login and updating your CredSolve application.
           </p>
           <div className="mx-auto mt-6 flex justify-center">
             <Spinner size={40} />

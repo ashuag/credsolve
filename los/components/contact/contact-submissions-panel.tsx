@@ -34,7 +34,7 @@ function formatDateTime(iso: string): string {
 function SummaryCard({ label, value }: { label: string; value: number }) {
   return (
     <article
-      className="rounded-[10px] border border-[rgba(23,44,113,0.1)] px-4 py-3"
+      className="rounded-[10px] border border-[rgba(15,39,72,0.1)] px-4 py-3"
       style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.97), rgba(240,246,255,0.94))' }}
     >
       <span className="block text-[0.78rem] text-brand-muted">{label}</span>
@@ -71,7 +71,7 @@ function DetailModal({
       aria-label="Contact submission detail"
     >
       <div
-        className="w-full max-w-[560px] rounded-[20px] border border-[rgba(23,44,113,0.12)] p-6 shadow-[0_28px_70px_rgba(23,44,113,0.22)]"
+        className="w-full max-w-[560px] rounded-[20px] border border-[rgba(15,39,72,0.12)] p-6 shadow-[0_28px_70px_rgba(15,39,72,0.22)]"
         style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.99), rgba(241,247,255,0.96))' }}
       >
         <div className="mb-5 flex items-start justify-between gap-4">
@@ -87,7 +87,7 @@ function DetailModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded-[10px] border border-[rgba(23,44,113,0.12)] bg-[rgba(255,255,255,0.9)] text-brand-navy"
+            className="flex h-9 w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded-[10px] border border-[rgba(15,39,72,0.12)] bg-[rgba(255,255,255,0.9)] text-brand-navy"
             aria-label="Close"
           >
             <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden>
@@ -114,7 +114,7 @@ function DetailModal({
           </div>
           <div className="grid gap-1.5">
             <span className="text-[0.88rem] font-bold text-brand-muted">Message</span>
-            <div className="max-h-[280px] overflow-y-auto whitespace-pre-wrap rounded-[12px] border border-[rgba(23,44,113,0.1)] bg-white p-4 text-[0.9rem] leading-[1.6]">
+            <div className="max-h-[280px] overflow-y-auto whitespace-pre-wrap rounded-[12px] border border-[rgba(15,39,72,0.1)] bg-white p-4 text-[0.9rem] leading-[1.6]">
               {item.message}
             </div>
           </div>
@@ -262,8 +262,8 @@ export function ContactSubmissionsPanel() {
           className={cx(
             'inline-flex items-center rounded-full px-2.5 py-1 text-[0.72rem] font-bold',
             item.isRead
-              ? 'bg-[rgba(23,44,113,0.08)] text-brand-muted'
-              : 'bg-[rgba(20,150,243,0.12)] text-brand-blue',
+              ? 'bg-[rgba(15,39,72,0.08)] text-brand-muted'
+              : 'bg-[rgba(34,197,94,0.12)] text-brand-blue',
           )}
         >
           {item.isRead ? 'Read' : 'Unread'}
@@ -280,7 +280,7 @@ export function ContactSubmissionsPanel() {
           <button
             type="button"
             onClick={() => openDetail(item)}
-            className="min-h-[32px] cursor-pointer rounded-[8px] border border-[rgba(20,150,243,0.28)] bg-[rgba(20,150,243,0.08)] px-3 text-[0.8rem] font-bold text-brand-blue"
+            className="min-h-[32px] cursor-pointer rounded-[8px] border border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.08)] px-3 text-[0.8rem] font-bold text-brand-blue"
           >
             View
           </button>
@@ -288,7 +288,7 @@ export function ContactSubmissionsPanel() {
             type="button"
             disabled={busyKey === item.uuid}
             onClick={() => void handleToggleRead(item, !item.isRead)}
-            className="min-h-[32px] cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text disabled:opacity-50"
+            className="min-h-[32px] cursor-pointer rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text disabled:opacity-50"
           >
             {busyKey === item.uuid ? '...' : item.isRead ? 'Mark unread' : 'Mark read'}
           </button>
@@ -329,7 +329,7 @@ export function ContactSubmissionsPanel() {
           onRetry={() => void load()}
           emptyMessage="No contact submissions available right now."
           noResultsMessage="No contact submissions match your filters."
-          renderRowClassName={(item) => (!item.isRead ? 'bg-[rgba(20,150,243,0.04)]' : undefined)}
+          renderRowClassName={(item) => (!item.isRead ? 'bg-[rgba(34,197,94,0.04)]' : undefined)}
           tableClassName="text-[0.88rem]"
           initialSort={{ key: 'received', dir: 'desc' }}
         />

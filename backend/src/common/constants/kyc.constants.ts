@@ -1,5 +1,8 @@
-/** Max failed DigiLocker Aadhaar download attempts before the lead is rejected. */
+/** Max failed DigiLocker Aadhaar download attempts before the lead is rejected (last-resort path). */
 export const DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS = 3;
+
+/** Fallback max failed XML-OTP generate/download attempts when the settings row is missing. */
+export const AADHAAR_XML_OTP_MAX_ATTEMPTS = 2;
 
 /**
  * Max KYC liveness / face-match attempts before the lead is escalated to

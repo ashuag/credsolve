@@ -149,6 +149,7 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
 
     const lead = session.lead;
     const storedEmail = lead?.email?.trim() ?? '';
+    const addressEmail = session.profile?.emailId?.trim() ?? '';
     const emailVerified = lead?.emailVerified ?? false;
     const { detailsCompleted, loanSelectionCompleted } = session.journey;
 
@@ -171,7 +172,7 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
         const requestedMode = new URLSearchParams(window.location.search).get('mode');
         const initialMode: CustomerOnboardingMode = requestedMode === 'login' ? 'login' : 'register';
         setEmailMode(initialMode);
-        setEmail(storedEmail);
+        setEmail(storedEmail || addressEmail);
         // Always show email entry first in email-only flow:
         // loan selection -> email screen -> email OTP -> sanction letter.
         setStep('email');
@@ -190,7 +191,7 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
       const requestedMode = new URLSearchParams(window.location.search).get('mode');
       const initialMode: CustomerOnboardingMode = requestedMode === 'login' ? 'login' : 'register';
       setEmailMode(initialMode);
-      setEmail(storedEmail);
+      setEmail(storedEmail || addressEmail);
 
       if (!detailsCompleted) {
         setStep('details');
@@ -290,7 +291,7 @@ export function OnboardingFlow({ variant = 'full' }: OnboardingFlowProps) {
   if (sessionGateLoading) {
     return (
       <FlowLoader
-        eyebrow="MoneyCash"
+        eyebrow="CredSolve"
         title="Loading your application"
         description="We are checking your sign-in and opening the right step in your loan journey."
         steps={['Verifying your session', 'Reading your loan status', 'Preparing the next step']}

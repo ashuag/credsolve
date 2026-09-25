@@ -16,7 +16,7 @@ export function LegalPageShell({ children }: LegalPageShellProps) {
     <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-[#f7f9fc]">
       <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
         <div className="absolute -left-24 top-0 h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(20,150,243,0.14),transparent_68%)]" />
-        <div className="absolute -right-20 top-32 h-[380px] w-[380px] rounded-full bg-[radial-gradient(circle,rgba(255,197,25,0.16),transparent_70%)]" />
+        <div className="absolute -right-20 top-32 h-[380px] w-[380px] rounded-full bg-[radial-gradient(circle,rgba(34,197,94,0.16),transparent_70%)]" />
       </div>
 
       <Suspense

@@ -4,7 +4,7 @@ import { CrmDashboardClient } from '@/components/dashboard/crm-dashboard-client'
 export default function CrmDashboardPage() {
   return (
     <CrmShell
-      title="MoneyCash Short-Term Loan LOS"
+      title="CredSolve LOS"
       subtitle="Summary report — UTC day bounds, live counts from the book."
       showPageHead={false}
     >

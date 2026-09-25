@@ -1,8 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
+import { BrandLogo } from '@/components/brand/brand-logo';
 import { JourneySpeedometer } from './journey-speedometer';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 
@@ -39,7 +38,7 @@ function MobileProgressBar() {
   return (
     <div className="h-[3px] w-full bg-slate-100 lg:hidden" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
       <div
-        className="h-full rounded-full bg-gradient-to-r from-[#1496f3] to-[#60c3ff] transition-[width] duration-500 ease-out"
+        className="h-full rounded-full bg-[#22C55E] transition-[width] duration-500 ease-out"
         style={{ width: `${pct}%` }}
       />
     </div>
@@ -60,7 +59,7 @@ export function LoanLandingShell({
   hideMobileChrome = false,
 }: LoanLandingShellProps) {
   const defaultTitle = (
-    <>Fast. Secure. <span className="text-transparent bg-clip-text bg-gradient-to-br from-[#1fa2ff] to-[#1496f3] drop-shadow-[0_0_12px_rgba(20,150,243,0.3)]">Instant.</span></>
+    <>Credit made <span className="text-[#22C55E]">easy.</span></>
   );
 
   const defaultStats = [
@@ -83,18 +82,9 @@ export function LoanLandingShell({
       {!hideMobileChrome ? (
       <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 pt-[env(safe-area-inset-top)] shadow-[0_1px_0_rgba(18,36,79,0.06)] backdrop-blur-md lg:hidden">
         <div className="relative flex h-14 items-center px-4">
-          <Link href="/" className="absolute left-1/2 -translate-x-1/2">
-            <Image
-              src="/images/moneycash-logo.png"
-              alt="MoneyCash"
-              width={957}
-              height={379}
-              sizes="110px"
-              quality={95}
-              className="h-10 w-auto object-contain"
-              priority
-            />
-          </Link>
+          <div className="absolute left-1/2 -translate-x-1/2">
+            <BrandLogo variant="mark" />
+          </div>
         </div>
 
         <MobileProgressBar />
@@ -103,7 +93,7 @@ export function LoanLandingShell({
 
       {/* Mobile / narrow: full gauge (desktop shows this in the dark left rail). */}
       {showSpeedometer && !hideMobileChrome ? (
-        <div className="lg:hidden shrink-0 border-b border-white/10 bg-[#0a1628] py-3 flex justify-center">
+        <div className="flex shrink-0 justify-center bg-[#0F2748] px-4 py-5 lg:hidden">
           <JourneySpeedometer />
         </div>
       ) : null}
@@ -119,22 +109,18 @@ export function LoanLandingShell({
         {/* ── Left panel (desktop only) ── */}
         {/* Stretch to the row height (do not use h-full — percentage height blocks flex stretch when the parent has no explicit height). */}
         {/* `overflow-x-hidden` alone makes `overflow-y` compute to `auto` (CSS overflow pairing), which shows a vertical scrollbar on this rail when content is a few px taller than the column. */}
-        <div className="relative hidden min-h-0 w-full flex-col overflow-hidden bg-[#0a1628] lg:flex lg:w-5/12 lg:self-stretch">
+        <div className="relative hidden min-h-0 w-full flex-col overflow-hidden bg-[#0F2748] lg:flex lg:w-5/12 lg:self-stretch">
 
           {/* Background Mesh */}
           <div className="absolute inset-0 stats-mesh opacity-90 pointer-events-none" />
 
           {/* Ambient blobs */}
-          <div className="absolute -top-24 -left-24 w-96 h-96 bg-[#1496f3] rounded-full mix-blend-screen blur-[100px] opacity-30 animate-blob" />
-          <div className="absolute top-1/2 right-0 w-80 h-80 bg-[#ffc519] rounded-full mix-blend-screen blur-[100px] opacity-15 animate-blob animation-delay-2000" />
-          <div className="absolute -bottom-20 -left-16 w-80 h-80 bg-[#818cf8] rounded-full mix-blend-screen blur-[100px] opacity-25 animate-blob animation-delay-4000" />
+          <div className="absolute -top-24 -left-24 w-96 h-96 bg-[#22C55E] rounded-full mix-blend-screen blur-[110px] opacity-25 animate-blob" />
+          <div className="absolute -bottom-24 right-0 w-72 h-72 bg-[#22C55E] rounded-full mix-blend-screen blur-[100px] opacity-15 animate-blob animation-delay-2000" />
 
           {showSpeedometer ? (
-            <div className="relative z-20 flex shrink-0 flex-col items-center px-4 pb-0.5 pt-3">
-              <div className="flex w-full max-w-[min(100%,280px)] justify-center">
-                <JourneySpeedometer compact />
-              </div>
-              <div className="mt-2 h-px w-[calc(100%-2rem)] max-w-[280px] shrink-0 bg-white/10" />
+            <div className="relative z-20 flex shrink-0 justify-center px-6 pb-1 pt-7">
+              <JourneySpeedometer compact />
             </div>
           ) : null}
 
@@ -142,11 +128,11 @@ export function LoanLandingShell({
           <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-2 px-8 pb-3 pt-1 xl:px-10">
             {/* Headline */}
             <div className="shrink-0 text-center">
-              <h1 className="mb-1 text-xl font-[900] leading-[1.1] tracking-tight text-white xl:text-[1.65rem]">
+              <h1 className="mb-1 text-xl font-[700] leading-[1.1] tracking-tight text-white xl:text-[1.65rem]">
                 {leftTitle || defaultTitle}
               </h1>
               <p className="mx-auto max-w-sm text-[0.8rem] font-[500] leading-snug text-slate-300">
-                {leftDescription || 'Experience a seamless digital journey. Get your loan approved in minutes without the hassle of paperwork.'}
+                {leftDescription || ''}
               </p>
             </div>
 
@@ -160,13 +146,13 @@ export function LoanLandingShell({
             ) : (
               <div className="flex flex-col gap-3 max-w-sm mx-auto w-full min-h-0 flex-1 justify-center">
                 {featureList.map((f) => (
-                  <div key={f.label} className="flex items-center gap-3.5 group">
-                    <div className="shrink-0 flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-sm transition-all duration-300 group-hover:bg-[#1496f3]/20 group-hover:border-[#1496f3]/40 group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(20,150,243,0.3)]">
-                      <svg viewBox="0 0 24 24" className="h-4.5 w-4.5 text-[#ffc519] transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <div key={f.label} className="flex items-center gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#22C55E]/15 text-[#22C55E]">
+                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d={f.icon} />
                       </svg>
-                    </div>
-                    <span className="text-[0.95rem] text-slate-200 font-[600] leading-snug transition-colors duration-300 group-hover:text-white">{f.label}</span>
+                    </span>
+                    <span className="text-[0.92rem] font-[600] leading-snug text-white/90">{f.label}</span>
                   </div>
                 ))}
               </div>
@@ -179,7 +165,7 @@ export function LoanLandingShell({
                   <div className="mb-0.5 text-[1.15rem] font-[900] leading-none tracking-tight text-white xl:text-[1.25rem]">
                     {stat.value}
                   </div>
-                  <div className="text-[0.58rem] font-[800] uppercase tracking-[0.14em] text-[#1496f3]">{stat.label}</div>
+                  <div className="text-[0.58rem] font-[700] uppercase tracking-[0.14em] text-[#22C55E]">{stat.label}</div>
                 </div>
               ))}
             </div>

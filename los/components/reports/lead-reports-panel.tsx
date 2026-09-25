@@ -63,6 +63,27 @@ function emptyAwareValue(value: string | null | undefined): string {
   return !trimmed || trimmed === 'NOT_APPLICABLE' ? EMPTY_FILTER_VALUE : trimmed;
 }
 
+const GRADE_TONE: Record<string, { background: string; color: string }> = {
+  A: { background: 'rgba(16,185,129,0.1)', color: '#10b981' },
+  B: { background: 'rgba(16,185,129,0.1)', color: '#10b981' },
+  C: { background: 'rgba(16,185,129,0.1)', color: '#10b981' },
+  D: { background: 'rgba(245,158,11,0.1)', color: '#f59e0b' },
+  E: { background: 'rgba(245,158,11,0.1)', color: '#f59e0b' },
+  F: { background: 'rgba(245,158,11,0.1)', color: '#f59e0b' },
+  G: { background: 'rgba(239,68,68,0.1)', color: '#ef4444' },
+  H: { background: 'rgba(239,68,68,0.1)', color: '#ef4444' },
+};
+
+function GradeBadge({ category }: { category: string | null | undefined }) {
+  if (!category) return <span className="text-brand-muted">—</span>;
+  const style = GRADE_TONE[category] ?? { background: 'rgba(99,102,241,0.12)', color: '#4f46e5' };
+  return (
+    <span className="inline-flex items-center justify-center min-w-[32px] h-7 px-2 rounded-[7px] text-[0.8rem] font-extrabold" style={style}>
+      {category}
+    </span>
+  );
+}
+
 function CibilScorePill({ score }: { score: number | null }) {
   if (score == null) return <span className="text-brand-muted">—</span>;
   return (
@@ -101,7 +122,7 @@ function StatusBadge({ code, label }: { code: string | null; label: string | nul
 function SummaryCard({ label, value }: { label: string; value: number }) {
   return (
     <article
-      className="rounded-[10px] border border-[rgba(23,44,113,0.1)] px-4 py-3"
+      className="rounded-[10px] border border-[rgba(15,39,72,0.1)] px-4 py-3"
       style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.97), rgba(240,246,255,0.94))' }}
     >
       <span className="block text-[0.78rem] text-brand-muted">{label}</span>
@@ -297,6 +318,20 @@ export function LeadReportsPanel() {
       render: (row) => <CibilScorePill score={row.cibilScore} />,
     },
     {
+      key: 'grade',
+      label: 'Grade',
+      headerClassName: 'min-w-[108px] whitespace-nowrap',
+      getFilterValue: (row) => row.cibilCreditAssessmentCategory ?? '',
+      getSortValue: (row) => row.cibilCreditAssessmentCategory ?? '',
+      filter: {
+        type: 'multi-select',
+        placeholder: 'Grades',
+        options: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((g) => ({ value: g, label: g })),
+      },
+      cellClassName: 'whitespace-nowrap',
+      render: (row) => <GradeBadge category={row.cibilCreditAssessmentCategory} />,
+    },
+    {
       key: 'leadStatus',
       label: 'Lead status',
       headerClassName: 'min-w-[128px] whitespace-nowrap',
@@ -379,7 +414,7 @@ export function LeadReportsPanel() {
         onRetry={() => void load()}
         emptyMessage="No leads have been recorded yet."
         noResultsMessage="No leads match your filters."
-        minWidth="1960px"
+        minWidth="2070px"
         pageSize={LOS_LISTING_PAGE_SIZE}
         pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         initialSort={{ key: 'created', dir: 'desc' }}
@@ -397,14 +432,14 @@ export function LeadReportsPanel() {
                   setFetchError(err instanceof Error ? err.message : 'Failed to download lead report');
                 });
               }}
-              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)]"
             >
               ⬇ Download
             </button>
             <button
               type="button"
               onClick={() => void load()}
-              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)]"
             >
               ↺ Refresh
             </button>

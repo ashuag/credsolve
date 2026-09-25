@@ -38,6 +38,9 @@ const COMPLETE_JOURNEY_HREF = '/apply-for-loan';
 function statusBadgeClass(status: string): string {
   const s = status.toUpperCase();
   // Loan account outcomes
+  if (s === 'SETTLED') {
+    return 'bg-indigo-50 text-indigo-800 border-indigo-200 ring-1 ring-indigo-500/20';
+  }
   if (s === 'CLOSED' || s === 'PAID' || s === 'PAID_FULLY') {
     return 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-1 ring-emerald-500/20';
   }
@@ -66,6 +69,7 @@ function statusBadgeClass(status: string): string {
 
 function statusBadgeLabel(status: string): string {
   const s = status.toUpperCase();
+  if (s === 'SETTLED') return 'Settled';
   if (s === 'CLOSED') return 'Paid fully';
   if (s === 'OVERDUE') return 'Overdue';
   if (s === 'ACTIVE') return 'Active loan';
@@ -151,6 +155,14 @@ function CheckIcon() {
   return (
     <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
       <path d="M5 10l3.5 3.5L15 6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function CrossIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
+      <path d="M6 6l8 8M14 6l-8 8" strokeLinecap="round" />
     </svg>
   );
 }
@@ -256,6 +268,7 @@ function JourneyTracker({ steps }: { steps: CustomerJourneyProgressStep[] }) {
     <ol className="m-0 list-none p-0">
       {steps.map((step, index) => {
         const done = step.state === 'done';
+        const failed = step.state === 'failed';
         const current = step.state === 'current';
         const last = index === steps.length - 1;
         const stepNumber =
@@ -266,15 +279,17 @@ function JourneyTracker({ steps }: { steps: CustomerJourneyProgressStep[] }) {
               <span
                 className={cn(
                   'relative z-[1] flex h-8 w-8 items-center justify-center rounded-full text-[0.72rem] font-black',
-                  done
-                    ? 'bg-emerald-500 text-white shadow-[0_6px_14px_rgba(16,185,129,0.28)]'
-                    : current
-                      ? 'bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-[#12244f] shadow-[0_8px_18px_rgba(246,180,0,0.38)] ring-4 ring-[#ffc519]/25'
-                      : 'bg-[#eef2f8] text-slate-400',
+                  failed
+                    ? 'bg-red-500 text-white shadow-[0_6px_14px_rgba(239,68,68,0.28)]'
+                    : done
+                      ? 'bg-emerald-500 text-white shadow-[0_6px_14px_rgba(16,185,129,0.28)]'
+                      : current
+                        ? 'bg-gradient-to-br from-[#22c55e] to-[#16a34a] text-[#12244f] shadow-[0_8px_18px_rgba(34,197,94,0.38)] ring-4 ring-[#22c55e]/25'
+                        : 'bg-[#eef2f8] text-slate-400',
                 )}
                 aria-current={current ? 'step' : undefined}
               >
-                {done ? <CheckIcon /> : stepNumber}
+                {failed ? <CrossIcon /> : done ? <CheckIcon /> : stepNumber}
               </span>
               {!last ? (
                 <span
@@ -291,13 +306,13 @@ function JourneyTracker({ steps }: { steps: CustomerJourneyProgressStep[] }) {
                 'min-w-0 flex-1 pb-4',
                 last && 'pb-0',
                 current &&
-                'mb-3 rounded-2xl bg-[#fffbeb] px-3 py-2.5 ring-1 ring-[#ffc519]/35',
+                'mb-3 rounded-2xl bg-[#f0fdf4] px-3 py-2.5 ring-1 ring-[#22c55e]/35',
               )}
             >
               <p
                 className={cn(
                   'm-0 text-[0.92rem] font-extrabold leading-tight',
-                  done ? 'text-emerald-800' : current ? 'text-brand-navy' : 'text-slate-500',
+                  failed ? 'text-red-700' : done ? 'text-emerald-800' : current ? 'text-brand-navy' : 'text-slate-500',
                 )}
               >
                 {step.label}
@@ -373,14 +388,14 @@ function CompleteJourneyCard({
       <div className="relative overflow-hidden bg-[linear-gradient(145deg,#12244f_0%,#1c347d_58%,#1496f3_140%)] px-5 py-5 sm:px-6">
         <div
           aria-hidden
-          className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(255,197,25,0.22),transparent_68%)]"
+          className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(34,197,94,0.22),transparent_68%)]"
         />
         <div className="flex items-center gap-2">
-          <span className="relative inline-flex items-center rounded-full bg-[#ffc519]/20 px-2.5 py-0.5 text-[0.68rem] font-black uppercase tracking-[0.14em] text-[#ffc519]">
+          <span className="relative inline-flex items-center rounded-full bg-[#22c55e]/20 px-2.5 py-0.5 text-[0.68rem] font-black uppercase tracking-[0.14em] text-[#22c55e]">
             Application in progress
           </span>
         </div>
-        <h2 className="relative mt-2 mb-0 text-[1.35rem] font-extrabold leading-tight tracking-tight text-white sm:text-[1.5rem]">
+        <h2 className="relative mt-2 mb-0 text-[1.35rem] font-bold leading-tight tracking-tight text-white sm:text-[1.5rem]">
           Continue from {nextLabel}
         </h2>
         <p className="relative mt-1 mb-0 text-[0.85rem] font-medium text-white/75">
@@ -395,13 +410,13 @@ function CompleteJourneyCard({
           aria-label="Loan journey progress"
         >
           <div
-            className="h-full rounded-full bg-gradient-to-r from-[#ffc519] to-[#ffe08a] transition-[width] duration-500"
+            className="h-full rounded-full bg-gradient-to-r from-[#22c55e] to-[#86efac] transition-[width] duration-500"
             style={{ width: `${barWidth}%` }}
           />
         </div>
         <Link
           href={resumeHref}
-          className="group relative mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#ffc519] px-6 py-3.5 text-[0.96rem] font-extrabold text-[#12244f] shadow-[0_12px_28px_rgba(246,180,0,0.28)] transition-all hover:brightness-105 hover:shadow-[0_16px_32px_rgba(246,180,0,0.36)] sm:w-auto"
+          className="group relative mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#22c55e] px-6 py-3.5 text-[0.96rem] font-extrabold text-[#12244f] shadow-[0_12px_28px_rgba(34,197,94,0.28)] transition-all hover:brightness-105 hover:shadow-[0_16px_32px_rgba(34,197,94,0.36)] sm:w-auto"
         >
           Continue application
           <span className="transition-transform duration-200 group-hover:translate-x-0.5">
@@ -442,6 +457,11 @@ function ActiveLoanCard({
   const minPayN = parseAmount(minPayAmountInr) ?? 100;
   const bounceN = parseAmount(loan.bounceFeeInr);
   const showBounce = bounceN != null && bounceN > 0;
+  const waivedN = parseAmount(loan.waivedAmountInr);
+  const showWaiver = waivedN != null && waivedN > 0;
+  const overdueDays = loan.overdueDays != null && loan.overdueDays > 0 ? loan.overdueDays : 0;
+  const overdueInterestN = parseAmount(loan.overdueInterestInr);
+  const showOverdueInterest = overdueDays > 0 && overdueInterestN != null && overdueInterestN > 0;
   const savings =
     remainingN != null && maturityN != null && (paidN == null || paidN <= 0)
       ? Math.round((maturityN - remainingN) * 100) / 100
@@ -517,7 +537,7 @@ function ActiveLoanCard({
       : timing.tone === 'today'
         ? 'bg-amber-50 text-amber-900 ring-amber-300'
         : timing.tone === 'soon'
-          ? 'bg-[#fff4d6] text-[#8a5a00] ring-[#ffc519]/50'
+          ? 'bg-[#dcfce7] text-[#166534] ring-[#22c55e]/50'
           : 'bg-[#eef6ff] text-brand-navy ring-[rgba(20,150,243,0.22)]';
 
   return (
@@ -567,7 +587,9 @@ function ActiveLoanCard({
             </p>
             <p className="mt-2 text-[0.8rem] font-medium text-slate-500">
               Principal + interest
+              {showOverdueInterest ? ' + overdue interest' : ''}
               {showBounce ? ' + penal charge' : ''}
+              {showWaiver ? ' − waived' : ''}
               {hasPaid ? ' − paid so far' : ''}
             </p>
             {hasPaid ? (
@@ -587,7 +609,7 @@ function ActiveLoanCard({
                 setPayMode('full');
               }}
               disabled={paying || remainingN == null || remainingN <= 0}
-              className="inline-flex w-full items-center justify-center rounded-2xl bg-[#ffc519] px-5 py-3.5 text-[0.95rem] font-extrabold text-[#12244f] shadow-[0_10px_24px_rgba(255,197,25,0.32)] transition-all hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+              className="inline-flex w-full items-center justify-center rounded-2xl bg-[#22c55e] px-5 py-3.5 text-[0.95rem] font-extrabold text-[#12244f] shadow-[0_10px_24px_rgba(34,197,94,0.32)] transition-all hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
             >
               Pay full amount
             </button>
@@ -610,7 +632,14 @@ function ActiveLoanCard({
           <div className="mt-4 rounded-2xl bg-[#f8fafd] p-4 ring-1 ring-[rgba(18,36,79,0.08)]">
             <p className="text-[0.8rem] font-semibold text-slate-600">
               You will pay the remaining {remaining ? formatInr(remaining) : '—'}
-              {showBounce ? ', including the penal charge' : ''}
+              {showOverdueInterest || showBounce
+                ? `, including ${[
+                    showOverdueInterest ? 'overdue interest' : null,
+                    showBounce ? 'the penal charge' : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' and ')}`
+                : ''}
               {hasPaid ? ' after earlier payments' : ''}.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -618,7 +647,7 @@ function ActiveLoanCard({
                 type="button"
                 onClick={() => void onPayFull()}
                 disabled={paying}
-                className="inline-flex min-w-[11.5rem] items-center justify-center rounded-2xl bg-[#ffc519] px-5 py-3 text-[0.95rem] font-extrabold text-[#12244f] shadow-[0_10px_24px_rgba(255,197,25,0.32)] transition hover:brightness-105 disabled:cursor-wait disabled:opacity-70"
+                className="inline-flex min-w-[11.5rem] items-center justify-center rounded-2xl bg-[#22c55e] px-5 py-3 text-[0.95rem] font-extrabold text-[#12244f] shadow-[0_10px_24px_rgba(34,197,94,0.32)] transition hover:brightness-105 disabled:cursor-wait disabled:opacity-70"
               >
                 {paying ? 'Preparing payment…' : `Pay ${remaining ? formatInr(remaining) : ''}`}
               </button>
@@ -657,7 +686,7 @@ function ActiveLoanCard({
                 type="button"
                 onClick={() => void onPayPartial()}
                 disabled={paying}
-                className="inline-flex min-w-[11.5rem] items-center justify-center rounded-2xl bg-[#ffc519] px-5 py-3 text-[0.95rem] font-extrabold text-[#12244f] shadow-[0_10px_24px_rgba(255,197,25,0.32)] transition hover:brightness-105 disabled:cursor-wait disabled:opacity-70"
+                className="inline-flex min-w-[11.5rem] items-center justify-center rounded-2xl bg-[#22c55e] px-5 py-3 text-[0.95rem] font-extrabold text-[#12244f] shadow-[0_10px_24px_rgba(34,197,94,0.32)] transition hover:brightness-105 disabled:cursor-wait disabled:opacity-70"
               >
                 {paying ? 'Preparing payment…' : 'Pay this amount'}
               </button>
@@ -699,11 +728,13 @@ function ActiveLoanCard({
               {loan.interestTillToday != null ? formatInr(loan.interestTillToday) : '—'}
             </dd>
             <p className="mt-0.5 text-[0.62rem] font-semibold text-slate-400">
-              {loan.usedFullTenureInterest
-                ? 'Full tenure'
-                : daysUsed != null
-                  ? `${daysUsed} day${daysUsed === 1 ? '' : 's'} used`
-                  : 'Till today'}
+              {showOverdueInterest
+                ? `Full tenure + ${overdueDays} overdue day${overdueDays === 1 ? '' : 's'}`
+                : loan.usedFullTenureInterest
+                  ? 'Full tenure'
+                  : daysUsed != null
+                    ? `${daysUsed} day${daysUsed === 1 ? '' : 's'} used`
+                    : 'Till today'}
             </p>
           </div>
           <div className="px-3 py-3 sm:px-4">
@@ -717,9 +748,23 @@ function ActiveLoanCard({
           </div>
         </dl>
 
-        {showBounce ? (
+        {showOverdueInterest || showBounce || showWaiver ? (
           <p className="mt-3 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[0.78rem] font-semibold text-rose-800 ring-1 ring-rose-100">
-            Includes a penal charge of {formatInr(loan.bounceFeeInr)} because repayment is overdue.
+            Includes{' '}
+            {[
+              showOverdueInterest
+                ? `${overdueDays} day${overdueDays === 1 ? '' : 's'} of overdue interest${
+                    overdueInterestN != null ? ` (${formatInr(loan.overdueInterestInr)})` : ''
+                  }`
+                : null,
+              showBounce ? `a penal charge of ${formatInr(loan.bounceFeeInr)}` : null,
+            ]
+              .filter(Boolean)
+              .join(' and ')}
+            {showOverdueInterest || showBounce ? ' because repayment is overdue.' : ''}
+            {showWaiver
+              ? ` ${formatInr(loan.waivedAmountInr)} of penal + overdue interest has been waived.`
+              : ''}
           </p>
         ) : null}
 
@@ -727,6 +772,12 @@ function ActiveLoanCard({
           <p className="mt-3 rounded-xl bg-emerald-50 px-3.5 py-2.5 text-[0.78rem] font-semibold text-emerald-800 ring-1 ring-emerald-100">
             Paying today saves {formatInr(savings.toFixed(2))} versus waiting until{' '}
             {formatFriendlyDate(loan.maturityDate)}.
+          </p>
+        ) : showOverdueInterest ? (
+          <p className="mt-3 rounded-xl bg-[#f4f8ff] px-3.5 py-2.5 text-[0.78rem] font-medium leading-relaxed text-slate-600 ring-1 ring-[rgba(20,150,243,0.1)]">
+            Past the due date — interest is the
+            {loan.tenureDays != null ? ` full ${loan.tenureDays}-day` : ' full'} tenure plus{' '}
+            {overdueDays} overdue day{overdueDays === 1 ? '' : 's'}.
           </p>
         ) : loan.usedFullTenureInterest ? (
           <p className="mt-3 rounded-xl bg-[#f4f8ff] px-3.5 py-2.5 text-[0.78rem] font-medium leading-relaxed text-slate-600 ring-1 ring-[rgba(20,150,243,0.1)]">
@@ -848,7 +899,7 @@ function InProgressLoanCard({ loan }: { loan: CustomerLoanCard }) {
                 'flex h-8 w-8 items-center justify-center rounded-full text-xs font-black ring-4',
                 isApproved || isDisbursed
                   ? 'bg-emerald-500 text-white ring-emerald-100'
-                  : 'bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-[#12244f] ring-[#ffc519]/30 shadow-[0_4px_12px_rgba(246,180,0,0.3)]'
+                  : 'bg-gradient-to-br from-[#22c55e] to-[#16a34a] text-[#12244f] ring-[#22c55e]/30 shadow-[0_4px_12px_rgba(34,197,94,0.3)]'
               )}>
                 {isApproved || isDisbursed ? <CheckIcon /> : <ClockIcon />}
               </div>
@@ -902,7 +953,7 @@ function InProgressLoanCard({ loan }: { loan: CustomerLoanCard }) {
 }
 
 function LoanSummaryCard({ loan }: { loan: CustomerLoanCard }) {
-  const isPaidFully = loan.status.toUpperCase() === 'CLOSED';
+  const isPaidFully = ['CLOSED', 'SETTLED'].includes(loan.status.toUpperCase());
   const repaymentDays = isPaidFully
     ? (loan.daysOutstanding ?? loan.tenureDays)
     : loan.tenureDays;
@@ -952,6 +1003,9 @@ function LoanSummaryCard({ loan }: { loan: CustomerLoanCard }) {
             : 'Closed'
           : `Due ${formatFriendlyDate(loan.maturityDate)}`}
         {loan.bankDisplay ? ` · ${loan.bankDisplay}` : null}
+        {parseAmount(loan.waivedAmountInr) != null && parseAmount(loan.waivedAmountInr)! > 0
+          ? ` · Waived ${formatInr(loan.waivedAmountInr)}`
+          : null}
       </p>
     </div>
   );
@@ -978,7 +1032,7 @@ function EmptyStateCard({
       {action ? (
         <Link
           href={action.href}
-          className="relative mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#ffc519] px-6 py-3.5 text-[0.92rem] font-black text-[#12244f] shadow-[0_10px_24px_rgba(255,197,25,0.32)] transition-all hover:scale-[1.02] hover:brightness-105"
+          className="relative mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#22c55e] px-6 py-3.5 text-[0.92rem] font-black text-[#12244f] shadow-[0_10px_24px_rgba(34,197,94,0.32)] transition-all hover:scale-[1.02] hover:brightness-105"
         >
           {action.label}
           <ResumeArrow />
@@ -1004,7 +1058,7 @@ function AccountHero({
     <header className="relative overflow-hidden rounded-[24px] border border-[rgba(18,36,79,0.08)] bg-white/95 p-5 shadow-[0_12px_32px_rgba(23,44,113,0.05)] backdrop-blur-md sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-xl font-black text-[#12244f] shadow-[0_8px_20px_rgba(246,180,0,0.32)] ring-4 ring-[#ffc519]/20">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#22c55e] to-[#16a34a] text-xl font-black text-[#12244f] shadow-[0_8px_20px_rgba(34,197,94,0.32)] ring-4 ring-[#22c55e]/20">
             {initial}
           </span>
           <div className="min-w-0">
@@ -1013,7 +1067,7 @@ function AccountHero({
                 Customer Account
               </span>
             </div>
-            <h1 className="m-0 truncate text-[clamp(1.35rem,3.2vw,1.75rem)] font-black tracking-tight text-brand-navy">
+            <h1 className="m-0 truncate text-[clamp(1.35rem,3.2vw,1.75rem)] font-bold tracking-tight text-brand-navy">
               {greetingName ? `Hi, ${greetingName}` : 'Welcome back'}
             </h1>
             {mobileNumber ? (
@@ -1113,10 +1167,10 @@ function SupportSidebarCard() {
 
       <div className="mt-4 space-y-2">
         <a
-          href="mailto:contact@moneycash.in"
+          href="mailto:hello@credsolve.in"
           className="flex items-center justify-between rounded-xl bg-[#f8fafd] px-3.5 py-2.5 text-[0.8rem] font-bold text-brand-navy transition hover:bg-[#eef6ff] ring-1 ring-[rgba(18,36,79,0.05)]"
         >
-          <span>contact@moneycash.in</span>
+          <span>hello@credsolve.in</span>
           <ResumeArrow />
         </a>
 

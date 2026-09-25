@@ -13,6 +13,8 @@ model BureauReport {
   /// Full parsed vendor JSON envelope (bounded by DB / app limits).
   rawPayload            Json?    @map("raw_payload")
   dummyFetched          Boolean? @default(false) @map("dummy_fetched")
+  /// Integration that pulled this report (`Tenacio`, `Surepass`, `CIBIL07`).
+  vendorName            String?  @map("vendor_name") @db.VarChar(80)
   createdAt             DateTime @default(now()) @map("created_at")
 
   customer Customer @relation(fields: [customerId], references: [id])

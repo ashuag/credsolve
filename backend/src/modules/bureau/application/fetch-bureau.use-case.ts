@@ -73,6 +73,7 @@ export class FetchBureauUseCase {
             parsed,
             httpStatus: out.httpStatus,
             dummyFetched: out.dummyPayload,
+            vendorKind: out.vendorKind,
           });
           await this.bureauReportPdf.generateAndAttachForReport({
             bureauReportId: created.id,

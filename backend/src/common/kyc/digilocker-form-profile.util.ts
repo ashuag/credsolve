@@ -22,6 +22,7 @@ const NAME_KEYS = [
 ] as const;
 
 const DOB_KEYS = ['dateOfBirth', 'dob', 'date_of_birth', 'dateOfbirth', 'birthDate', 'birth_date'] as const;
+const GENDER_KEYS = ['gender', 'Gender', 'sex'] as const;
 
 function pushRecordBag(bags: Record<string, unknown>[], value: unknown): void {
   if (isRecord(value) && !bags.includes(value)) bags.push(value);
@@ -78,15 +79,17 @@ function parseDob(raw: string | null): Date | null {
   return null;
 }
 
-/** Best-effort name / DOB from DigiLocker `digilockerAadhaarFormJson` / vendor `data`. */
+/** Best-effort name / DOB / gender from DigiLocker `digilockerAadhaarFormJson` / vendor `data`. */
 export function extractProfileFromDigilockerFormJson(formJson: unknown): {
   fullName: string | null;
   dateOfBirth: Date | null;
+  gender: string | null;
 } {
   if (!isRecord(formJson)) {
-    return { fullName: null, dateOfBirth: null };
+    return { fullName: null, dateOfBirth: null, gender: null };
   }
   const fullName = pickDigilockerAadhaarString(formJson, NAME_KEYS);
   const dateOfBirth = parseDob(pickDigilockerAadhaarString(formJson, DOB_KEYS));
-  return { fullName, dateOfBirth };
+  const gender = pickDigilockerAadhaarString(formJson, GENDER_KEYS);
+  return { fullName, dateOfBirth, gender };
 }

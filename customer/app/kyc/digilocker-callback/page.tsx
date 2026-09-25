@@ -23,7 +23,7 @@ import {
 } from '@/lib/api/digilocker';
 import {
   getPostDigilockerAadhaarContinuePath,
-  isLeadRejectedAndLocked,
+  isSessionLeadRejectedAndLocked,
 } from '@/lib/api/customer-session';
 import { kycJourneyProgressFromSession } from '@/lib/kyc-journey-progress';
 
@@ -72,7 +72,7 @@ function downloadErrorMessage(out: DownloadAadhaarDigilockerResponse): string {
   if (out.identityMismatch) {
     return (
       out.identityMismatchMessage ??
-      'Name or date of birth on Aadhaar does not match your loan application. This application cannot proceed.'
+      'Date of birth or gender on Aadhaar does not match your loan application. This application cannot proceed.'
     );
   }
   if (!out.configured) {
@@ -208,11 +208,7 @@ function DigilockerCallbackContent() {
     async (out: DownloadAadhaarDigilockerResponse) => {
       applyAttemptCounts(out);
       const next = await refresh();
-      if (
-        next.authenticated === true &&
-        next.lead &&
-        (out.terminalFailure || isLeadRejectedAndLocked(next.lead))
-      ) {
+      if (out.identityMismatch || out.terminalFailure || out.leadRejected || isSessionLeadRejectedAndLocked(next)) {
         router.replace('/thank-you-interest');
         return true;
       }
@@ -265,23 +261,24 @@ function DigilockerCallbackContent() {
             router.replace(href);
             return;
           }
-          if (next.authenticated === true && next.lead && isLeadRejectedAndLocked(next.lead)) {
+          if (isSessionLeadRejectedAndLocked(next)) {
             router.replace('/thank-you-interest');
             return;
           }
         }
         if (out.identityMismatch) {
-          const redirected = await handleTerminalFailure(out);
-          if (redirected) return;
-          setStatus('error');
-          setFailureKind('identity_mismatch');
-          setError(downloadErrorMessage(out));
+          router.replace('/thank-you-interest');
           return;
         }
 
-        if (out.terminalFailure || used >= allowed) {
+        if (out.terminalFailure || out.leadRejected) {
           const redirected = await handleTerminalFailure(out);
           if (redirected) return;
+        }
+
+        if (used >= allowed) {
+          router.replace('/thank-you-interest');
+          return;
         }
 
         setStatus('error');
@@ -319,6 +316,7 @@ function DigilockerCallbackContent() {
       const result = await startDigilockerLoginFlow('/kyc/digilocker-callback');
       if (!result.ok) {
         setError(result.message);
+        setStatus('error');
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to restart DigiLocker.');
@@ -361,20 +359,13 @@ function DigilockerCallbackContent() {
         return;
       }
 
-      if (
-        currentSession.authenticated === true &&
-        currentSession.lead &&
-        isLeadRejectedAndLocked(currentSession.lead)
-      ) {
+      if (isSessionLeadRejectedAndLocked(currentSession)) {
         router.replace('/thank-you-interest');
         return;
       }
 
       if (priorAttempts >= maxAttempts) {
-        clearDigilockerExpectSelfie();
-        setStatus('error');
-        setFailureKind('retryable');
-        setError('Maximum download attempts reached.');
+        router.replace('/thank-you-interest');
         return;
       }
 
@@ -401,7 +392,7 @@ function DigilockerCallbackContent() {
   const attemptsRemaining = Math.max(0, attemptsAllowed - attemptsUsed);
   const canRetry =
     status === 'error' &&
-    failureKind === 'retryable' &&
+    failureKind !== 'identity_mismatch' &&
     attemptsRemaining > 0 &&
     !retryBusy;
 
@@ -412,7 +403,9 @@ function DigilockerCallbackContent() {
       journeyPanel={
         <div
           className={
-            status === 'working' || status === 'error' ? 'flex min-h-[40vh] flex-col justify-center' : undefined
+            status === 'working' || status === 'error'
+              ? 'flex min-h-[40vh] flex-col justify-center'
+              : undefined
           }
         >
             {status === 'working' ? (

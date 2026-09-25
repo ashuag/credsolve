@@ -1,13 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { VendorApiService } from './vendor-api.service';
 
-export type TenacioIfscLookupBody = {
-  input: {
-    ifscNumber: string;
-    consent: boolean;
-  };
-};
-
 export type TenacioPennyDropBody = {
   input: {
     mobileNumber: string;
@@ -30,11 +23,13 @@ type UrlResolved = { absoluteUrl: string } | { baseUrl: string; path: string };
 
 type PickUrlOutcome = VendorCallResult | { resolved: UrlResolved };
 
+/** Penny-drop can sit behind the bank IMPS/name-enquiry hop; 30s is too tight. */
+const PENNY_DROP_TIMEOUT_MS = 60_000;
+
 /**
- * Tenacio IFSC details + penny-drop style bank verification.
+ * Tenacio penny-drop style bank verification.
  *
- * IFSC lookup env: `TENACIO_IFSC_LOOKUP_WORKFLOW_ID`, and either `TENACIO_IFSC_LOOKUP_URL` or
- * `VENDOR_HOST` + `TENACIO_IFSC_LOOKUP_SERVICE`.
+ * (IFSC lookup has moved to Credostack — see `CredostackIfscService`.)
  *
  * Penny drop env: `TENACIO_PENNY_DROP_WORKFLOW_ID`, and either `TENACIO_PENNY_DROP_URL` or
  * `VENDOR_HOST` + `TENACIO_PENNY_DROP_SERVICE`.
@@ -44,52 +39,6 @@ export class BankTenacioVendorService {
   private readonly logger = new Logger(BankTenacioVendorService.name);
 
   constructor(private readonly vendorApi: VendorApiService) {}
-
-  async postIfscLookup(body: TenacioIfscLookupBody, leadId: bigint | null): Promise<VendorCallResult> {
-    const auth = this.resolveAuth();
-    if (!auth) {
-      return this.authMissing();
-    }
-    const workflowId = (process.env.TENACIO_IFSC_LOOKUP_WORKFLOW_ID ?? '').trim();
-    if (!workflowId) {
-      return this.fail('Set TENACIO_IFSC_LOOKUP_WORKFLOW_ID for IFSC lookup.');
-    }
-
-    const fullUrl = (process.env.TENACIO_IFSC_LOOKUP_URL ?? '').trim();
-    const baseUrl = (process.env.VENDOR_HOST ?? '').trim();
-    const serviceSlug = (process.env.TENACIO_IFSC_LOOKUP_SERVICE ?? '').trim();
-    const picked = this.pickPostTarget(
-      fullUrl,
-      baseUrl,
-      serviceSlug,
-      'TENACIO_IFSC_LOOKUP_URL',
-      'TENACIO_IFSC_LOOKUP_SERVICE',
-    );
-    if (!('resolved' in picked)) {
-      return picked;
-    }
-
-    const auditName = (process.env.TENACIO_IFSC_LOOKUP_AUDIT_SERVICE ?? 'ifsc-lookup').trim().slice(0, 120);
-    return this.postTenacio({
-      auditName,
-      picked: picked.resolved,
-      workflowId,
-      body,
-      leadId,
-      redactRequest: (b) => {
-        const input = b?.input as Record<string, unknown> | undefined;
-        const code = input?.ifscNumber;
-        if (typeof code !== 'string') return b;
-        return {
-          ...b,
-          input: {
-            ...input,
-            ifscNumber: code.length > 6 ? `${code.slice(0, 4)}…${code.slice(-2)}` : '[ifsc]',
-          },
-        };
-      },
-    });
-  }
 
   async postPennyDrop(body: TenacioPennyDropBody, leadId: bigint | null): Promise<VendorCallResult> {
     const auth = this.resolveAuth();
@@ -122,6 +71,7 @@ export class BankTenacioVendorService {
       workflowId,
       body,
       leadId,
+      timeoutMs: PENNY_DROP_TIMEOUT_MS,
       redactRequest: (b) => {
         const input = b?.input as Record<string, unknown> | undefined;
         const acct = input?.bankAccountNumber;
@@ -199,9 +149,10 @@ export class BankTenacioVendorService {
     auditName: string;
     picked: UrlResolved;
     workflowId: string;
-    body: TenacioIfscLookupBody | TenacioPennyDropBody;
+    body: TenacioPennyDropBody;
     leadId: bigint | null;
-    redactRequest: (body: TenacioIfscLookupBody | TenacioPennyDropBody | undefined) => unknown;
+    timeoutMs?: number;
+    redactRequest: (body: TenacioPennyDropBody | undefined) => unknown;
   }): Promise<VendorCallResult> {
     const auth = this.resolveAuth();
     if (!auth) {
@@ -219,6 +170,7 @@ export class BankTenacioVendorService {
       headers: this.headers(auth.clientId, auth.apiKey, params.workflowId),
       body: params.body,
       leadId: params.leadId,
+      timeoutMs: params.timeoutMs,
       redactRequest: params.redactRequest,
     });
 

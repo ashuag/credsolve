@@ -60,6 +60,7 @@ export type LosCustomerDetails = {
     pincode: string | null;
     addressLine1: string | null;
     addressLine2: string | null;
+    emailId: string | null;
     city: string | null;
     state: string | null;
     stateCode: string | null;

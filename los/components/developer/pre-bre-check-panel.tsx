@@ -87,7 +87,7 @@ export function PreBreCheckPanel() {
 
       {mastersError ? <p className="m-0 text-[0.84rem] font-bold text-[#991b1b]">{mastersError}</p> : null}
 
-      <form onSubmit={handleSubmit} className="grid gap-4 rounded-[16px] border border-[rgba(23,44,113,0.1)] bg-white p-5">
+      <form onSubmit={handleSubmit} className="grid gap-4 rounded-[16px] border border-[rgba(15,39,72,0.1)] bg-white p-5">
         <div className="grid gap-4 md:grid-cols-2">
           <label className="grid gap-1.5 text-[0.8rem] font-bold text-brand-navy">
             Date of birth
@@ -96,7 +96,7 @@ export function PreBreCheckPanel() {
               required
               value={dateOfBirth}
               onChange={(e) => setDateOfBirth(e.target.value)}
-              className="rounded-[10px] border border-[rgba(23,44,113,0.12)] px-3 py-2 text-[0.88rem] font-normal"
+              className="rounded-[10px] border border-[rgba(15,39,72,0.12)] px-3 py-2 text-[0.88rem] font-normal"
             />
           </label>
           <label className="grid gap-1.5 text-[0.8rem] font-bold text-brand-navy">
@@ -108,7 +108,7 @@ export function PreBreCheckPanel() {
               pattern="\d{6}"
               value={pincode}
               onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="rounded-[10px] border border-[rgba(23,44,113,0.12)] px-3 py-2 text-[0.88rem] font-normal"
+              className="rounded-[10px] border border-[rgba(15,39,72,0.12)] px-3 py-2 text-[0.88rem] font-normal"
               placeholder="110001"
             />
           </label>
@@ -118,7 +118,7 @@ export function PreBreCheckPanel() {
               required
               value={genderId}
               onChange={(e) => setGenderId(e.target.value)}
-              className="rounded-[10px] border border-[rgba(23,44,113,0.12)] px-3 py-2 text-[0.88rem] font-normal"
+              className="rounded-[10px] border border-[rgba(15,39,72,0.12)] px-3 py-2 text-[0.88rem] font-normal"
             >
               <option value="">Select gender</option>
               {genders.map((g) => (
@@ -134,7 +134,7 @@ export function PreBreCheckPanel() {
               required
               value={occupationId}
               onChange={(e) => setOccupationId(e.target.value)}
-              className="rounded-[10px] border border-[rgba(23,44,113,0.12)] px-3 py-2 text-[0.88rem] font-normal"
+              className="rounded-[10px] border border-[rgba(15,39,72,0.12)] px-3 py-2 text-[0.88rem] font-normal"
             >
               <option value="">Select occupation</option>
               {occupations.map((o) => (
@@ -149,7 +149,7 @@ export function PreBreCheckPanel() {
             <select
               value={cityId}
               onChange={(e) => setCityId(e.target.value)}
-              className="rounded-[10px] border border-[rgba(23,44,113,0.12)] px-3 py-2 text-[0.88rem] font-normal"
+              className="rounded-[10px] border border-[rgba(15,39,72,0.12)] px-3 py-2 text-[0.88rem] font-normal"
             >
               <option value="">No city selected</option>
               {cities.map((c) => (

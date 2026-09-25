@@ -26,7 +26,7 @@ export default function LosRouteError({
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-[var(--los-bg,#f4f7ff)]">
-      <div className="w-full max-w-md rounded-[14px] border border-[rgba(23,44,113,0.12)] bg-white p-6 shadow-[0_8px_28px_rgba(23,44,113,0.08)]">
+      <div className="w-full max-w-md rounded-[14px] border border-[rgba(15,39,72,0.12)] bg-white p-6 shadow-[0_8px_28px_rgba(15,39,72,0.08)]">
         <h1 className="text-[1.15rem] font-extrabold text-brand-navy">Something went wrong.</h1>
         <p className="mt-2 text-[0.88rem] leading-relaxed text-brand-muted">
           We hit an unexpected error rendering this page. The team has been notified.
@@ -47,7 +47,7 @@ export default function LosRouteError({
           </button>
           <Link
             href="/dashboard"
-            className="inline-flex flex-1 items-center justify-center rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 py-2 text-[0.86rem] font-bold text-brand-text"
+            className="inline-flex flex-1 items-center justify-center rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 py-2 text-[0.86rem] font-bold text-brand-text"
           >
             Go to dashboard
           </Link>

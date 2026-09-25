@@ -89,7 +89,7 @@ export async function canDeactivateConvertedLeadForReapply(
       application: { leadId },
       OR: [
         { closedAt: { not: null } },
-        { loanStatus: { name: { in: [LOAN_STATUS.CLOSED, LOAN_STATUS.WRITTEN_OFF] } } },
+        { loanStatus: { name: { in: [LOAN_STATUS.CLOSED, LOAN_STATUS.SETTLED, LOAN_STATUS.WRITTEN_OFF] } } },
       ],
     },
     select: { id: true },

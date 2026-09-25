@@ -78,14 +78,14 @@ export function LoggedOutRedirectModal({
       aria-describedby="logged-out-desc"
     >
       <div className="w-full max-w-md overflow-hidden rounded-[24px] border border-[rgba(23,44,113,0.12)] bg-white shadow-[0_28px_64px_rgba(18,36,79,0.28)]">
-        <div className="h-1.5 w-full bg-gradient-to-r from-[#1c347d] via-[#1496f3] to-[#ffc519]" aria-hidden />
+        <div className="h-1.5 w-full bg-gradient-to-r from-[#1c347d] via-[#1496f3] to-[#22c55e]" aria-hidden />
         <div className="px-6 py-7 sm:px-8 sm:py-8">
           <p className="m-0 text-[0.65rem] font-black uppercase tracking-[0.16em] text-brand-muted">
             Session ended
           </p>
           <h2
             id="logged-out-title"
-            className="mt-2 text-[1.45rem] font-black tracking-tight text-brand-navy sm:text-[1.6rem]"
+            className="mt-2 text-[1.45rem] font-bold tracking-tight text-brand-navy sm:text-[1.6rem]"
           >
             You are logged out
           </h2>

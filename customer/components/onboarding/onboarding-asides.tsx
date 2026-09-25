@@ -13,7 +13,7 @@ export function EmailAside({ mode }: { mode: EmailMode }) {
       </h2>
       <p className="text-brand-muted leading-[1.6]">
         {isLogin
-          ? 'Authenticate with your registered email to access your MoneyCash account and check your loan status.'
+          ? 'Authenticate with your registered email to access your CredSolve account and check your loan status.'
           : 'A quick email OTP verifies your identity before we collect your KYC details to process the loan.'}
       </p>
       <div className="grid gap-3 mt-[18px]">
@@ -95,7 +95,7 @@ function SectionSummaryCard({ eyebrow, title, description, isActive, isComplete 
       <div className="flex items-start justify-between gap-3">
         <div className="grid gap-1">
           <span className="text-[0.72rem] font-extrabold uppercase tracking-[0.12em] text-brand-blue">{eyebrow}</span>
-          <h2 className="text-[1rem] font-extrabold tracking-[-0.02em] text-brand-navy">{title}</h2>
+          <h2 className="text-[1rem] font-bold tracking-[-0.02em] text-brand-navy">{title}</h2>
           <p className="text-[0.84rem] leading-[1.55] text-brand-muted">{description}</p>
         </div>
         <span

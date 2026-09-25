@@ -1,9 +1,9 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { BrandLogo } from '@/components/brand/brand-logo';
 import { CustomerAccountMenu } from '@/components/layout/customer-account-menu';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
 import {
@@ -36,24 +36,9 @@ export function BrandHeader() {
   const accountMenuTriggerLabel = useMemo(() => getCustomerAccountMenuTriggerLabel(session), [session]);
 
   return (
-    <header className="sticky top-0 z-20 border-b border-b-[rgba(18,36,79,0.09)] bg-[rgba(255,253,248,0.95)] backdrop-blur-[24px] shadow-[0_4px_32px_rgba(23,44,113,0.08)]">
+    <header className="sticky top-0 z-20 border-b border-b-[rgba(18,36,79,0.09)] bg-[rgba(247,251,249,0.95)] backdrop-blur-[24px] shadow-[0_4px_32px_rgba(15,39,72,0.08)]">
       <div className="mx-auto flex h-[72px] max-w-[min(1280px,calc(100%-32px))] items-center justify-between gap-3 sm:gap-6 sm:h-20">
-        <Link href="/" className="inline-flex h-full items-center shrink-0 transition-transform duration-200 hover:scale-[1.02]" aria-label="MoneyCash home">
-          {!mounted ? (
-            <div className="block h-14 sm:h-16 aspect-[957/379]" aria-hidden />
-          ) : (
-            <Image
-              src="/images/moneycash-logo.png"
-              alt="MoneyCash — Instant Digital Loans"
-              width={957}
-              height={379}
-              sizes="(max-width: 640px) 150px, 175px"
-              quality={95}
-              priority
-              className="block h-14 w-auto object-contain sm:h-16"
-            />
-          )}
-        </Link>
+        {!mounted ? <div className="h-10 w-40" aria-hidden /> : <BrandLogo />}
 
         <nav className="flex shrink-0 items-center justify-end gap-2 sm:gap-4" aria-label="Primary">
           {loading ? (
@@ -67,9 +52,9 @@ export function BrandHeader() {
               {showApplyForLoanNav && (
                 <Link
                   href={applyHref}
-                  className="inline-flex items-center justify-center min-h-[40px] sm:min-h-[42px] px-4 sm:px-6 py-2 sm:py-2.5 rounded-full border border-[rgba(18,36,79,0.15)] bg-white font-extrabold text-[0.85rem] sm:text-[0.96rem] text-brand-navy shadow-[0_8px_24px_rgba(23,44,113,0.12)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(23,44,113,0.2)]"
+                  className="inline-flex items-center justify-center min-h-[40px] sm:min-h-[42px] px-4 sm:px-6 py-2 sm:py-2.5 rounded-full border border-[rgba(15,39,72,0.15)] bg-white font-extrabold text-[0.85rem] sm:text-[0.96rem] text-brand-navy shadow-[0_8px_24px_rgba(15,39,72,0.12)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(15,39,72,0.2)]"
                 >
-                  <span className="hidden sm:inline">Apply for a loan</span>
+                  <span className="hidden sm:inline">Get Loan</span>
                   <span className="sm:hidden">Apply</span>
                 </Link>
               )}
@@ -79,7 +64,7 @@ export function BrandHeader() {
               ) : showGuestNav ? (
                 <Link
                   href={loginHref}
-                  className="inline-flex items-center justify-center min-h-[40px] sm:min-h-[42px] px-6 sm:px-8 py-2 sm:py-2.5 rounded-full font-extrabold text-[0.9rem] sm:text-[0.96rem] text-[#fff8df] bg-[linear-gradient(135deg,#1c347d_0%,#12244f_100%)] shadow-[0_12px_28px_rgba(23,44,113,0.25)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(23,44,113,0.35)]"
+                  className="inline-flex items-center justify-center min-h-[40px] sm:min-h-[42px] px-6 sm:px-8 py-2 sm:py-2.5 rounded-full font-extrabold text-[0.9rem] sm:text-[0.96rem] text-white bg-[linear-gradient(135deg,#0f2748_0%,#0a1b33_100%)] shadow-[0_12px_28px_rgba(15,39,72,0.25)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(15,39,72,0.35)]"
                 >
                   Log in
                 </Link>

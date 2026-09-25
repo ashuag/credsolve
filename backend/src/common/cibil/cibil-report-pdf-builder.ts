@@ -435,7 +435,7 @@ function computeReportRiskHighlights(data: CibilReportData): ReportRiskHighlight
 
 function drawRiskSummaryStrip(ctx: PdfCanvas, data: CibilReportData) {
   const risk = computeReportRiskHighlights(data);
-  const panelH = 88;
+  const panelH = 72;
   ctx.ensure(panelH + 8);
   const panelTop = ctx.y;
   const panelBase = panelTop - panelH;
@@ -452,7 +452,7 @@ function drawRiskSummaryStrip(ctx: PdfCanvas, data: CibilReportData) {
 
   ctx.page.drawText('CREDIT RISK SNAPSHOT', {
     x: MARGIN + 10,
-    y: panelTop - 14,
+    y: panelTop - 11,
     size: TYPE.bodySm,
     font: ctx.fonts.bold,
     color: CIBIL_NAVY,
@@ -491,16 +491,16 @@ function drawRiskSummaryStrip(ctx: PdfCanvas, data: CibilReportData) {
     },
   ];
 
-  drawRiskMetricRow(ctx, row1, panelBase + 34, panelTop - 20);
+  drawRiskMetricRow(ctx, row1, panelTop - 25, panelTop - 39);
   ctx.page.drawLine({
-    start: { x: MARGIN + 8, y: panelBase + 30 },
-    end: { x: PAGE_W - MARGIN - 8, y: panelBase + 30 },
+    start: { x: MARGIN + 8, y: panelTop - 42 },
+    end: { x: PAGE_W - MARGIN - 8, y: panelTop - 42 },
     thickness: 0.4,
     color: BORDER,
   });
-  drawRiskMetricRow(ctx, row2, panelBase + 8, panelBase + 30);
+  drawRiskMetricRow(ctx, row2, panelTop - 54, panelTop - 68);
 
-  ctx.y = panelBase - 12;
+  ctx.y = panelBase - 10;
 }
 
 function drawRiskMetricRow(
@@ -514,7 +514,7 @@ function drawRiskMetricRow(
     const x = MARGIN + index * colW + 8;
     ctx.page.drawText(pdfSafeText(metric.label), {
       x,
-      y: valueY - 14,
+      y: valueY - 12,
       size: TYPE.caption,
       font: ctx.fonts.regular,
       color: LABEL,
@@ -529,7 +529,7 @@ function drawRiskMetricRow(
     if (index > 0) {
       ctx.page.drawLine({
         start: { x: MARGIN + index * colW, y: dividerTop },
-        end: { x: MARGIN + index * colW, y: dividerTop + 22 },
+        end: { x: MARGIN + index * colW, y: dividerTop + 18 },
         thickness: 0.5,
         color: BORDER,
       });
@@ -585,7 +585,7 @@ function stampPageFooters(pdf: PDFDocument, fonts: Fonts, data: CibilReportData)
 
 function drawScoreSection(ctx: PdfCanvas, data: CibilReportData) {
   const score = data.cibilScore ?? 0;
-  const panelH = 118;
+  const panelH = 96;
   ctx.ensure(panelH + 12);
   const panelTop = ctx.y;
   const panelBase = panelTop - panelH;
@@ -608,9 +608,9 @@ function drawScoreSection(ctx: PdfCanvas, data: CibilReportData) {
   });
 
   const gaugeY = panelTop - 18;
-  drawSemiCircularGauge(ctx, MARGIN + 62, gaugeY, 52, score);
+  drawSemiCircularGauge(ctx, MARGIN + 82, gaugeY, 50, score);
 
-  const textX = MARGIN + 148;
+  const textX = MARGIN + 168;
   let ty = gaugeY - 4;
   ty = ctx.drawText(`Hello, ${data.consumerName}`, textX, ty, TYPE.title, { bold: true });
   const asOf = data.reportDateDisplay ?? '-';
@@ -619,25 +619,21 @@ function drawScoreSection(ctx: PdfCanvas, data: CibilReportData) {
     textX,
     ty - 6,
     TYPE.subheading,
-    { bold: true, maxWidth: CONTENT_W - 148 },
+    { bold: true, maxWidth: CONTENT_W - 168 },
   );
   if (data.scoreRatingLabel) {
     ty = ctx.drawText(`Rating: ${data.scoreRatingLabel}`, textX, ty - 6, TYPE.body, {
       bold: true,
       color: OPEN_GREEN,
-      maxWidth: CONTENT_W - 148,
+      maxWidth: CONTENT_W - 168,
     });
   }
-  const meta: string[] = [];
-  if (data.scoreName) meta.push(`Model: ${data.scoreName}`);
-  if (data.populationRank) meta.push(`Population rank: ${data.populationRank}`);
-  if (meta.length) {
-    ty = ctx.drawText(meta.join('  |  '), textX, ty - 6, TYPE.bodySm, {
+  if (data.populationRank) {
+    ctx.drawText(`Population rank: ${data.populationRank}`, textX, ty - 6, TYPE.bodySm, {
       color: MUTED,
-      maxWidth: CONTENT_W - 148,
+      maxWidth: CONTENT_W - 168,
     });
   }
-  drawScoreParagraph(ctx, textX, ty - 8);
   ctx.y = panelBase - 14;
 }
 
@@ -785,13 +781,8 @@ function drawAccountsSummary(ctx: PdfCanvas, data: CibilReportData) {
   );
 }
 
-function drawScoreParagraph(ctx: PdfCanvas, x: number, startY: number): number {
-  const para =
-    'Your CIBIL Score is a 3-digit numeric summary of your credit history. Lenders use it as a measure of your creditworthiness when you apply for a loan or credit card.';
-  return ctx.drawText(para, x, startY, TYPE.bodySm, { color: MUTED, maxWidth: CONTENT_W - (x - MARGIN) });
-}
-
 function drawSemiCircularGauge(ctx: PdfCanvas, cx: number, cy: number, radius: number, score: number) {
+  const stroke = 8;
   const segments = 24;
   for (let i = 0; i < segments; i++) {
     const t0 = i / segments;
@@ -802,16 +793,28 @@ function drawSemiCircularGauge(ctx: PdfCanvas, cx: number, cy: number, radius: n
     ctx.page.drawLine({
       start: { x: cx + Math.cos(a0) * radius, y: cy + Math.sin(a0) * radius },
       end: { x: cx + Math.cos(a1) * radius, y: cy + Math.sin(a1) * radius },
-      thickness: 8,
+      thickness: stroke,
       color,
     });
   }
-  ctx.page.drawText('300', { x: cx - radius - 6, y: cy - 4, size: TYPE.gaugeScale, font: ctx.fonts.regular, color: LABEL });
+  const scaleSize = TYPE.gaugeScale;
+  const scaleFont = ctx.fonts.regular;
+  const w300 = scaleFont.widthOfTextAtSize('300', scaleSize);
+  const w900 = scaleFont.widthOfTextAtSize('900', scaleSize);
+  const outward = stroke / 2 + 3;
+  const labelY = cy - scaleSize - 3;
+  ctx.page.drawText('300', {
+    x: cx - radius - outward - w300,
+    y: labelY,
+    size: scaleSize,
+    font: scaleFont,
+    color: LABEL,
+  });
   ctx.page.drawText('900', {
-    x: cx + radius - 12,
-    y: cy - 4,
-    size: TYPE.gaugeScale,
-    font: ctx.fonts.regular,
+    x: cx + radius + outward,
+    y: labelY,
+    size: scaleSize,
+    font: scaleFont,
     color: LABEL,
   });
   const label = score > 0 ? String(score) : 'N/A';

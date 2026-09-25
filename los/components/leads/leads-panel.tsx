@@ -48,7 +48,7 @@ function getInitials(name: string | null | undefined) {
 }
 
 const AVATAR_COLORS: [string, string][] = [
-  ['#1496f3','#0e7cd1'],['#6366f1','#4f46e5'],['#0d9488','#0f766e'],
+  ['#22C55E','#16A34A'],['#6366f1','#4f46e5'],['#0d9488','#0f766e'],
   ['#f59e0b','#d97706'],['#8b5cf6','#7c3aed'],['#ec4899','#db2777'],
 ];
 function avatarColor(name: string): [string, string] {
@@ -391,7 +391,7 @@ export function LeadsPanel() {
     <div className="flex flex-col gap-4">
       {!loading && !fetchError && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard label="Total Leads"    value={leads.length}  color="#1496f3" />
+          <StatCard label="Total Leads"    value={leads.length}  color="#22C55E" />
           <StatCard label="Today"          value={todayLeads}    color="#6366f1" sub="new today" />
           <StatCard label="PAN Verified"   value={verified}      color="#10b981" sub={`of ${leads.length}`} />
           <StatCard label="CIBIL ≥ 700"    value={highCibil}     color="#f59e0b" sub="high quality" />
@@ -428,14 +428,14 @@ export function LeadsPanel() {
                 link.click();
                 link.remove();
               }}
-              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)]"
             >
               ⬇ Download dump
             </button>
             <button
               type="button"
               onClick={() => void loadLeads()}
-              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)]"
             >
               ↺ Refresh
             </button>

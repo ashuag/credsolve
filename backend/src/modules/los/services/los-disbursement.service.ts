@@ -11,8 +11,8 @@ import {
   APPLICATION_STATUS,
 } from '../../../common/constants/application.constants';
 import { isBankNameMatchReviewPending } from '../../../common/constants/bank.constants';
+import { isAadhaarNameMismatchPendingReview } from '../../../common/kyc/aadhaar-vendor-parse.util';
 import {
-  LOAN_COMMERCIAL_TERMS_PDF_FILENAME,
   LOAN_DOCUMENT_PDF_FILES,
   LOAN_DOCUMENT_TYPE,
 } from '../../../common/constants/loan-document.constants';
@@ -29,6 +29,7 @@ import {
   uniqueRequestNumberFromVendorPayload,
 } from '../../../common/easebuzz/easebuzz-transfer-log.util';
 import { EmailService } from '../../../common/email/email.service';
+import { KycCompletionService } from '../../../common/kyc/kyc-completion.service';
 import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import { isCustomerJourneyComplete } from '../../../common/loan/customer-journey-complete.util';
 import { resolveLoanAccountNumberAtDisbursement } from '../../../common/loan/loan-account-number.util';
@@ -63,6 +64,7 @@ export class LosDisbursementService {
     private readonly prisma: PrismaService,
     private readonly loanDocs: LoanDocumentApplicationService,
     private readonly kycFiles: KycFilesService,
+    private readonly kycCompletion: KycCompletionService,
     private readonly emailService: EmailService,
     private readonly easebuzzWire: EasebuzzWireService,
     private readonly redis: RedisService,
@@ -87,21 +89,42 @@ export class LosDisbursementService {
       statusName,
       statusNote: application.applicationStatusNote,
     });
+    const customerKyc = await this.prisma.client.customerKyc.findFirst({
+      where: { customerId: application.customerId },
+      orderBy: { createdAt: 'desc' },
+      select: { aadhaarData: true },
+    });
+    const aadhaarNameReviewPending = isAadhaarNameMismatchPendingReview(customerKyc?.aadhaarData);
     if (
       statusName === APPLICATION_STATUS.REJECTED ||
       statusName === APPLICATION_STATUS.CANCELLED ||
       statusName === APPLICATION_STATUS.KYC_FAILED ||
       statusName === APPLICATION_STATUS.PENNYDROP_FAILED ||
-      nameReviewPending
+      nameReviewPending ||
+      aadhaarNameReviewPending
     ) {
       throw new ConflictException(
-        nameReviewPending
-          ? 'Bank name match is still pending credit review. Approve the name match first.'
-          : `Cannot approve an application in ${statusName} status.`,
+        aadhaarNameReviewPending
+          ? 'Aadhaar name match is still pending credit review. Approve the name match first.'
+          : nameReviewPending
+            ? 'Bank name match is still pending credit review. Approve the name match first.'
+            : `Cannot approve an application in ${statusName} status.`,
       );
     }
 
-    if (!this.isJourneyComplete(application)) {
+    // DigiLocker re-download / early liveness return can leave face step done but kyc_status=0.
+    const healedKyc = await this.kycCompletion.ensureCompletedWhenFaceStepDone({
+      applicationId: application.id,
+      customerId: application.customerId,
+    });
+    if (healedKyc.healed) {
+      application.kyc = {
+        kycStatus: healedKyc.kycStatus,
+        kycCompletedAt: healedKyc.kycCompletedAt,
+      };
+    }
+
+    if (!(await this.isJourneyComplete(application))) {
       throw new BadRequestException(
         'Customer journey is incomplete. Approve is available only after profile, credit, loan, email, sanction letter, KYC, bank, and references are done.',
       );
@@ -594,15 +617,23 @@ export class LosDisbursementService {
     }
   }
 
-  private isJourneyComplete(
+  private async isJourneyComplete(
     application: Awaited<ReturnType<LosDisbursementService['loadApplicationForDecision']>>,
-  ): boolean {
+  ): Promise<boolean> {
     const detail = application.lead.leadDetail;
+    let hasBureauReport = Boolean(detail?.bureauReportId);
+    if (!hasBureauReport) {
+      const prior = await this.prisma.client.bureauReport.findFirst({
+        where: { customerId: application.customerId },
+        select: { id: true },
+      });
+      hasBureauReport = Boolean(prior);
+    }
     return isCustomerJourneyComplete({
       fullName: detail?.fullName,
       panVerified: detail?.panVerified,
       bureauFetched: detail?.bureauFetched,
-      hasBureauReport: Boolean(detail?.bureauReportId),
+      hasBureauReport,
       selectedLoanAmount: application.details?.selectedLoanAmount,
       emailVerifiedAt: application.details?.emailVerifiedAt,
       loanDocumentsAcceptedAt: application.details?.loanDocumentsAcceptedAt,
@@ -712,7 +743,7 @@ export class LosDisbursementService {
         loanAgreementPdfRelativePath: application.details?.loanAgreementPdfRelativePath ?? null,
       });
 
-      // Revised sanction letter at disbursement — keep acceptance PDF untouched; never overwrite prior disbursement PDF.
+      // Revised sanction letter + commercial terms at disbursement — keep acceptance PDF untouched; never overwrite prior disbursement PDF.
       const rel = await this.loanDocs.ensurePdf(
         LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT,
         application.customer.uuid,
@@ -733,14 +764,10 @@ export class LosDisbursementService {
       }
 
       const content = await this.kycFiles.readBytes(rel);
-      const commercialTerms = await this.loanDocs.generateCommercialTermsPdf(merge);
 
       await this.emailService.sendFinalSanctionLetterEmail(
         email,
-        [
-          { filename: LOAN_DOCUMENT_PDF_FILES[LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT], content },
-          { filename: LOAN_COMMERCIAL_TERMS_PDF_FILENAME, content: commercialTerms },
-        ],
+        [{ filename: LOAN_DOCUMENT_PDF_FILES[LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT], content }],
         { leadId: application.leadId },
       );
       this.logger.log(

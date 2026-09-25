@@ -9,7 +9,7 @@ export default function NotFound() {
           Page not found.
         </h1>
         <p className="text-brand-muted leading-[1.6] mb-6">
-          The page you are looking for does not exist or has been moved. Head back to continue your MoneyCash journey.
+          The page you are looking for does not exist or has been moved. Head back to continue your CredSolve journey.
         </p>
         <Link href="/" className="mc-btn-primary inline-flex w-full justify-center">
           Back to home

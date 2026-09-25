@@ -9,7 +9,7 @@ import { FormEvent, useState } from 'react';
 import { cx, getLosToken } from '@/components/eligibility/eligibility-ui';
 
 const INPUT_CLASS =
-  'rounded-[10px] border border-[rgba(23,44,113,0.12)] px-3 py-2 text-[0.88rem] font-normal';
+  'rounded-[10px] border border-[rgba(15,39,72,0.12)] px-3 py-2 text-[0.88rem] font-normal';
 
 export function CibilVendorFetchPanel({ vendor }: { vendor: 'tenacio' | 'surepass' }) {
   const isSurepass = vendor === 'surepass';
@@ -69,7 +69,7 @@ export function CibilVendorFetchPanel({ vendor }: { vendor: 'tenacio' | 'surepas
           : ''}
       </p>
 
-      <form onSubmit={handleSubmit} className="grid gap-4 rounded-[16px] border border-[rgba(23,44,113,0.1)] bg-white p-5">
+      <form onSubmit={handleSubmit} className="grid gap-4 rounded-[16px] border border-[rgba(15,39,72,0.1)] bg-white p-5">
         <div className="grid gap-4 md:grid-cols-2">
           <label className="grid gap-1.5 text-[0.8rem] font-bold text-brand-navy">
             Mobile number

@@ -12,8 +12,8 @@ export function MastersPanel() {
           key={master.slug}
           href={`/masters/${master.slug}`}
           className={cx(
-            'group rounded-[18px] border border-[rgba(23,44,113,0.1)] p-5 no-underline transition-transform',
-            'hover:-translate-y-[1px] hover:border-[rgba(20,150,243,0.26)]',
+            'group rounded-[18px] border border-[rgba(15,39,72,0.1)] p-5 no-underline transition-transform',
+            'hover:-translate-y-[1px] hover:border-[rgba(34,197,94,0.26)]',
           )}
           style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(240,246,255,0.95))' }}
         >
@@ -29,7 +29,7 @@ export function MastersPanel() {
                 {master.description}
               </p>
             </div>
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border border-[rgba(23,44,113,0.08)] bg-[rgba(255,255,255,0.92)] text-brand-navy transition-transform group-hover:translate-x-[2px]">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border border-[rgba(15,39,72,0.08)] bg-[rgba(255,255,255,0.92)] text-brand-navy transition-transform group-hover:translate-x-[2px]">
               <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="M5 12h14" />
                 <path d="m12 5 7 7-7 7" />
@@ -37,15 +37,15 @@ export function MastersPanel() {
             </span>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            <span className="rounded-full border border-[rgba(23,44,113,0.08)] bg-[rgba(255,255,255,0.84)] px-3 py-1 text-[0.77rem] font-bold text-brand-navy">
+            <span className="rounded-full border border-[rgba(15,39,72,0.08)] bg-[rgba(255,255,255,0.84)] px-3 py-1 text-[0.77rem] font-bold text-brand-navy">
               Active / Inactive
             </span>
             {master.canCreate ? (
-              <span className="rounded-full border border-[rgba(23,44,113,0.08)] bg-[rgba(255,255,255,0.84)] px-3 py-1 text-[0.77rem] font-bold text-brand-navy">
+              <span className="rounded-full border border-[rgba(15,39,72,0.08)] bg-[rgba(255,255,255,0.84)] px-3 py-1 text-[0.77rem] font-bold text-brand-navy">
                 Add / Edit Name
               </span>
             ) : (
-              <span className="rounded-full border border-[rgba(23,44,113,0.08)] bg-[rgba(255,255,255,0.84)] px-3 py-1 text-[0.77rem] font-bold text-brand-navy">
+              <span className="rounded-full border border-[rgba(15,39,72,0.08)] bg-[rgba(255,255,255,0.84)] px-3 py-1 text-[0.77rem] font-bold text-brand-navy">
                 {master.slug === 'settings' ? 'Edit Value' : 'Edit Label'}
               </span>
             )}

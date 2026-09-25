@@ -15,7 +15,7 @@ export function CreditScoreCard() {
           {/* Why Choose Section */}
           <div className="mc-card border-[rgba(18,36,79,0.06)] bg-[#f8fbff]/50 p-10">
             <h2 className="mb-8 text-3xl font-black tracking-tight text-[#12244f]">
-              Why Choose <span className="text-[#1496f3]">MoneyCash?</span>
+              Why Choose <span className="text-[#1496f3]">CredSolve?</span>
             </h2>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               {[
@@ -41,7 +41,7 @@ export function CreditScoreCard() {
           {/* Credit Score Section */}
           <div className="mc-card border-[rgba(18,36,79,0.06)] bg-white p-10 shadow-2xl">
             <div className="mb-8">
-              <h2 className="text-3xl font-black tracking-tight text-[#12244f]">Check Your <span className="text-[#ffc519]">Credit Score</span></h2>
+              <h2 className="text-3xl font-black tracking-tight text-[#12244f]">Check Your <span className="text-[#22c55e]">Credit Score</span></h2>
               <p className="mt-2 text-sm font-medium text-[#12244f]/60">Know your credit health • Absolutely Free</p>
             </div>
             
@@ -54,7 +54,7 @@ export function CreditScoreCard() {
                   <defs>
                     <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
                       <stop offset="0%" stopColor="#ef4444" />
-                      <stop offset="50%" stopColor="#ffc519" />
+                      <stop offset="50%" stopColor="#22c55e" />
                       <stop offset="100%" stopColor="#22c55e" />
                     </linearGradient>
                   </defs>
@@ -79,7 +79,7 @@ export function CreditScoreCard() {
                     <span className="text-sm font-bold text-[#12244f]/80">{text}</span>
                   </div>
                 ))}
-                <Link href={applyHref} className="mc-btn-primary mt-4 !bg-[#ffc519] !text-[#12244f] shadow-[#ffc519]/20 hover:!bg-[#ffc519]/90">
+                <Link href={applyHref} className="mc-btn-primary mt-4 !bg-[#22c55e] !text-[#12244f] shadow-[#22c55e]/20 hover:!bg-[#22c55e]/90">
                   Check Free Credit Score
                 </Link>
               </div>

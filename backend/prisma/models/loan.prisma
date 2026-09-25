@@ -29,18 +29,30 @@ model LoanAccount {
   ifscCode             String?   @map("ifsc_code") @db.VarChar(11)
   loanStatusId         Int       @map("loan_status_id") @db.SmallInt
   closedAt             DateTime? @map("closed_at") @db.DateTime(3)
+  /// True after NOC / loan-closure PDF was uploaded to S3 (email is best-effort after that).
+  isNocSent            Boolean   @default(false) @map("is_noc_sent")
+  nocSentAt            DateTime? @map("noc_sent_at") @db.DateTime(3)
+  nocPdfRelativePath   String?   @map("noc_pdf_relative_path") @db.VarChar(512)
+  /// Printed letter number: `{loanNumber}{YYYYMMDDHHmmss}` (IST).
+  nocLetterNumber      String?   @unique @map("noc_letter_number") @db.VarChar(40)
+  /// Waiver of negotiable overdue charges (penal + overdue-days interest). Does not reduce principal or tenure interest.
+  waivedAmount         Decimal   @default(0) @map("waived_amount") @db.Decimal(12, 2)
+  waivedByUserId       BigInt?   @map("waived_by_user_id") @db.UnsignedBigInt
+  waivedAt             DateTime? @map("waived_at") @db.DateTime(3)
   createdAt            DateTime  @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt            DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
 
   application               Application                       @relation(fields: [applicationId], references: [id])
   customer                  Customer                          @relation(fields: [customerId], references: [id])
   loanStatus                LoanStatus                        @relation(fields: [loanStatusId], references: [id])
+  waivedByUser              User?                             @relation("LoanChargeWaivedBy", fields: [waivedByUserId], references: [id], onDelete: SetNull)
   repayments                LoanRepayment[]
   easebuzzNotifications     EasebuzzRepaymentNotification[]
 
   @@index([customerId, loanStatusId])
   @@index([disbursedAt])
   @@index([loanStatusId, closedAt, loanMaturityDate])
+  @@index([waivedByUserId])
   @@map("loan_account")
 }
 
@@ -61,6 +73,7 @@ model LoanRepayment {
 
   @@index([loanAccountId, paidAt])
   @@index([loanAccountId, status])
+  @@index([vendorRef, status])
   @@map("loan_repayment")
 }
 

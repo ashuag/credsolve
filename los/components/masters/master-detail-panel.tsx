@@ -84,7 +84,7 @@ function IconButton({
     ? 'border-[rgba(239,68,68,0.16)] text-[#9f1c1c] hover:border-[rgba(239,68,68,0.3)]'
     : tone === 'success'
       ? 'border-[rgba(34,197,94,0.18)] text-[#166534] hover:border-[rgba(34,197,94,0.32)]'
-      : 'border-[rgba(23,44,113,0.12)] text-brand-navy hover:border-[rgba(20,150,243,0.24)]';
+      : 'border-[rgba(15,39,72,0.12)] text-brand-navy hover:border-[rgba(34,197,94,0.24)]';
 
   return (
     <button
@@ -134,7 +134,7 @@ function ModalShell({
       aria-label={title}
     >
       <div
-        className="w-full max-w-[460px] rounded-[20px] border border-[rgba(23,44,113,0.12)] p-6 shadow-[0_28px_70px_rgba(23,44,113,0.22)]"
+        className="w-full max-w-[460px] rounded-[20px] border border-[rgba(15,39,72,0.12)] p-6 shadow-[0_28px_70px_rgba(15,39,72,0.22)]"
         style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.99), rgba(241,247,255,0.96))' }}
       >
         <div className="mb-5 flex items-start justify-between gap-4">
@@ -152,7 +152,7 @@ function ModalShell({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded-[10px] border border-[rgba(23,44,113,0.12)] bg-[rgba(255,255,255,0.9)] text-brand-navy"
+            className="flex h-9 w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded-[10px] border border-[rgba(15,39,72,0.12)] bg-[rgba(255,255,255,0.9)] text-brand-navy"
             aria-label="Close"
           >
             <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden>
@@ -223,7 +223,7 @@ function StatusModal({
         ) : null}
 
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className="min-h-[40px] flex-1 cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent font-bold text-brand-text">
+          <button type="button" onClick={onClose} className="min-h-[40px] flex-1 cursor-pointer rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent font-bold text-brand-text">
             Cancel
           </button>
           <button type="submit" className="los-btn-primary flex-1" disabled={saving}>
@@ -288,7 +288,7 @@ function LeadSourceModal({
         ) : null}
 
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className="min-h-[40px] flex-1 cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent font-bold text-brand-text">
+          <button type="button" onClick={onClose} className="min-h-[40px] flex-1 cursor-pointer rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent font-bold text-brand-text">
             Cancel
           </button>
           <button type="submit" className="los-btn-primary flex-1" disabled={saving}>
@@ -347,7 +347,7 @@ function StateModal({
         ) : null}
 
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className="min-h-[40px] flex-1 cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent font-bold text-brand-text">
+          <button type="button" onClick={onClose} className="min-h-[40px] flex-1 cursor-pointer rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent font-bold text-brand-text">
             Cancel
           </button>
           <button type="submit" className="los-btn-primary flex-1" disabled={saving}>
@@ -423,7 +423,7 @@ function CityModal({
         ) : null}
 
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className="min-h-[40px] flex-1 cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent font-bold text-brand-text">
+          <button type="button" onClick={onClose} className="min-h-[40px] flex-1 cursor-pointer rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent font-bold text-brand-text">
             Cancel
           </button>
           <button type="submit" className="los-btn-primary flex-1" disabled={saving}>
@@ -544,8 +544,8 @@ function DueDateModal({
                   onClick={() => applyMonth(year, value)}
                   className={`min-h-[36px] rounded-[8px] border text-[0.8rem] font-bold transition-colors ${
                     selected
-                      ? 'border-[rgba(20,150,243,0.55)] bg-[rgba(20,150,243,0.12)] text-brand-navy'
-                      : 'border-[rgba(23,44,113,0.12)] bg-white text-brand-text hover:border-[rgba(20,150,243,0.35)]'
+                      ? 'border-[rgba(34,197,94,0.55)] bg-[rgba(34,197,94,0.12)] text-brand-navy'
+                      : 'border-[rgba(15,39,72,0.12)] bg-white text-brand-text hover:border-[rgba(34,197,94,0.35)]'
                   } disabled:cursor-not-allowed disabled:opacity-60`}
                 >
                   {label.slice(0, 3)}
@@ -574,7 +574,7 @@ function DueDateModal({
         ) : null}
 
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className="min-h-[40px] flex-1 cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent font-bold text-brand-text">
+          <button type="button" onClick={onClose} className="min-h-[40px] flex-1 cursor-pointer rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent font-bold text-brand-text">
             Cancel
           </button>
           <button type="submit" className="los-btn-primary flex-1" disabled={saving}>
@@ -638,7 +638,7 @@ function NamedMasterModal({
         ) : null}
 
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className="min-h-[40px] flex-1 cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent font-bold text-brand-text">
+          <button type="button" onClick={onClose} className="min-h-[40px] flex-1 cursor-pointer rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent font-bold text-brand-text">
             Cancel
           </button>
           <button type="submit" className="los-btn-primary flex-1" disabled={saving}>
@@ -693,7 +693,7 @@ function SummaryCards({ total, active, inactive }: { total: number; active: numb
       ].map((item) => (
         <article
           key={item.label}
-          className="rounded-[10px] border border-[rgba(23,44,113,0.1)] px-4 py-3"
+          className="rounded-[10px] border border-[rgba(15,39,72,0.1)] px-4 py-3"
           style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.97), rgba(240,246,255,0.94))' }}
         >
           <span className="block text-[0.78rem] text-brand-muted">{item.label}</span>
@@ -1233,7 +1233,7 @@ export function MasterDetailPanel({ master }: { master: MasterSlug }) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/masters"
-            className="inline-flex min-h-[38px] items-center gap-2 rounded-full border border-[rgba(23,44,113,0.12)] bg-[rgba(255,255,255,0.88)] px-4 text-[0.82rem] font-bold text-brand-navy no-underline"
+            className="inline-flex min-h-[38px] items-center gap-2 rounded-full border border-[rgba(15,39,72,0.12)] bg-[rgba(255,255,255,0.88)] px-4 text-[0.82rem] font-bold text-brand-navy no-underline"
           >
             <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M19 12H5" />
@@ -1241,7 +1241,7 @@ export function MasterDetailPanel({ master }: { master: MasterSlug }) {
             </svg>
             Back to Masters
           </Link>
-          <span className="rounded-full border border-[rgba(23,44,113,0.1)] bg-[rgba(255,255,255,0.84)] px-3 py-1 text-[0.78rem] font-bold text-brand-muted">
+          <span className="rounded-full border border-[rgba(15,39,72,0.1)] bg-[rgba(255,255,255,0.84)] px-3 py-1 text-[0.78rem] font-bold text-brand-muted">
             {definition.label}
           </span>
         </div>

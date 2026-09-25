@@ -47,10 +47,10 @@ const REVIEWS = [
     name: 'Rajan Mehta',
     city: 'Ahmedabad, GJ',
     initials: 'RM',
-    avatarColor: '#ffc519',
+    avatarColor: '#22c55e',
     rating: 5,
     title: 'Got 8k for bike repair in minutes',
-    body: 'Bike clutch plate gave up suddenly and the mechanic wanted 7-8k on the spot. Who gives such small loans quickly? Tried MoneyCash - PAN and Aadhaar verification hardly took 3-4 minutes. Repaid after 20 days when salary came.',
+    body: 'Bike clutch plate gave up suddenly and the mechanic wanted 7-8k on the spot. Who gives such small loans quickly? Tried CredSolve - PAN and Aadhaar verification hardly took 3-4 minutes. Repaid after 20 days when salary came.',
     loan: 'Emergency Fund — ₹8,000',
     loanColor: '#1496f3',
     date: 'February 2026',
@@ -91,7 +91,7 @@ function StarRating({count}: {count: number}) {
         <svg
           key={i}
           viewBox="0 0 16 16"
-          className={`h-3.5 w-3.5 ${i < count ? 'text-[#ffc519]' : 'text-[#12244f]/10'}`}
+          className={`h-3.5 w-3.5 ${i < count ? 'text-[#22c55e]' : 'text-[#12244f]/10'}`}
           fill="currentColor"
         >
           <path d="M8 1l1.854 3.756 4.146.602-3 2.924.708 4.128L8 10.41l-3.708 2L5 8.282 2 5.358l4.146-.602L8 1z" />
@@ -214,7 +214,7 @@ export function TestimonialsSection() {
         aria-hidden
       />
       <div className="pointer-events-none absolute -top-32 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-[#1496f3]/8 blur-[100px]" aria-hidden />
-      <div className="pointer-events-none absolute bottom-0 right-0 h-64 w-64 rounded-full bg-[#ffc519]/6 blur-[80px]" aria-hidden />
+      <div className="pointer-events-none absolute bottom-0 right-0 h-64 w-64 rounded-full bg-[#22c55e]/6 blur-[80px]" aria-hidden />
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 

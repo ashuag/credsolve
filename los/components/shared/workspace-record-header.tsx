@@ -16,7 +16,7 @@ function statusAccentColor(code: string): string {
   const c = code.toUpperCase();
   if (c.includes('REJECT') || c.includes('FAIL') || c.includes('DECLIN')) return '#ef4444';
   if (c === 'CONVERTED' || c.includes('APPROV') || c.includes('DISBURS')) return '#10b981';
-  if (c === 'NEW' || c === 'IN_PROGRESS' || c === 'DRAFT') return '#1496f3';
+  if (c === 'NEW' || c === 'IN_PROGRESS' || c === 'DRAFT') return '#22C55E';
   if (c === 'INTERNAL_ERROR' || c === 'IN_REVIEW' || c === 'UNDER_REVIEW') return '#f59e0b';
   return '#6366f1';
 }
@@ -32,7 +32,7 @@ function Chip({ label, value }: { label: string; value: ReactNode }) {
 
 function ContactChip({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex items-center rounded-full border border-[rgba(23,44,113,0.1)] bg-white px-2.5 py-1 text-[0.74rem] font-semibold text-brand-text">
+    <span className="inline-flex items-center rounded-full border border-[rgba(15,39,72,0.1)] bg-white px-2.5 py-1 text-[0.74rem] font-semibold text-brand-text">
       {children}
     </span>
   );
@@ -51,7 +51,7 @@ function HighlightStat({
 }) {
   return (
     <div
-      className="min-w-[136px] rounded-[12px] border border-[rgba(23,44,113,0.1)] bg-white px-4 py-3 shadow-[0_1px_10px_rgba(23,44,113,0.07)]"
+      className="min-w-[136px] rounded-[12px] border border-[rgba(15,39,72,0.1)] bg-white px-4 py-3 shadow-[0_1px_10px_rgba(15,39,72,0.07)]"
       style={accent ? { borderColor: `${accent}33`, background: `linear-gradient(180deg, white, ${accent}08)` } : undefined}
     >
       <p className="m-0 text-[0.58rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">{label}</p>
@@ -88,7 +88,7 @@ export function WorkspaceRecordHeader({
 
   return (
     <header
-      className="overflow-hidden rounded-[14px] border border-[rgba(23,44,113,0.1)]"
+      className="overflow-hidden rounded-[14px] border border-[rgba(15,39,72,0.1)]"
       style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.99),rgba(239,247,255,0.96))' }}
     >
       {/* Top accent bar */}
@@ -139,16 +139,16 @@ export function WorkspaceRecordHeader({
         </div>
 
         {(recordIds || quickStats?.length) ? (
-          <div className="mt-3 grid gap-3 border-t border-[rgba(23,44,113,0.07)] pt-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-start">
+          <div className="mt-3 grid gap-3 border-t border-[rgba(15,39,72,0.07)] pt-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-start">
             {recordIds}
-            <dl className="m-0 grid grid-cols-2 gap-x-4 gap-y-2 rounded-[10px] border border-[rgba(23,44,113,0.09)] bg-[rgba(248,250,255,0.6)] px-3 py-2.5 sm:grid-cols-3">
+            <dl className="m-0 grid grid-cols-2 gap-x-4 gap-y-2 rounded-[10px] border border-[rgba(15,39,72,0.09)] bg-[rgba(248,250,255,0.6)] px-3 py-2.5 sm:grid-cols-3">
               <Chip label={createdLabel} value={createdAt} />
               <Chip label={updatedLabel} value={updatedAt} />
               {quickStats?.map((s) => <Chip key={s.label} label={s.label} value={s.value} />)}
             </dl>
           </div>
         ) : (
-          <dl className="m-0 mt-3 grid grid-cols-2 gap-x-4 gap-y-2 rounded-[10px] border border-[rgba(23,44,113,0.09)] bg-[rgba(248,250,255,0.6)] px-3 py-2.5 sm:grid-cols-3 lg:grid-cols-5">
+          <dl className="m-0 mt-3 grid grid-cols-2 gap-x-4 gap-y-2 rounded-[10px] border border-[rgba(15,39,72,0.09)] bg-[rgba(248,250,255,0.6)] px-3 py-2.5 sm:grid-cols-3 lg:grid-cols-5">
             <Chip label={createdLabel} value={createdAt} />
             <Chip label={updatedLabel} value={updatedAt} />
             {quickStats?.map((s) => <Chip key={s.label} label={s.label} value={s.value} />)}

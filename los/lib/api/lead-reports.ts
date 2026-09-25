@@ -19,6 +19,8 @@ export type LosLeadReportListItem = {
   address: string | null;
   netMonthlyIncome: string | null;
   cibilScore: number | null;
+  /** CIBIL credit-assessment grade (A–H) from the current bureau report. */
+  cibilCreditAssessmentCategory: string | null;
   leadStatusCode: string;
   leadStatusLabel: string;
   applicationUuid: string | null;

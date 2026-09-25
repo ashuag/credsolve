@@ -13,6 +13,7 @@ export type CustomerPortalProfile = {
   occupation: string | null;
   addressLine1: string | null;
   addressLine2: string | null;
+  emailId: string | null;
   currentCity: string | null;
   pincode: string | null;
   monthlyIncome: string | null;
@@ -58,6 +59,7 @@ export type CustomerKycFaceProgress = {
   selfieUpdatedAt?: string | null;
   digilockerAadhaarDownloadAttempts?: number;
   digilockerAadhaarDownloadMaxAttempts?: number;
+  digilockerFallbackAvailable?: boolean;
   livenessAttempts?: number;
   livenessMaxAttempts?: number;
   /** When true, KYC stays open until a head-movement clip scores a pass. */
@@ -91,10 +93,12 @@ export type CustomerSessionResponse =
         kycCompleted: boolean;
         referencesCompleted: boolean;
         bankDetailsCompleted: boolean;
-        /** Penny-drop succeeded but name match is waiting for credit approval. */
+        /** Penny-drop succeeded but name match is waiting for credit; journey continues to references / thank-you. */
         bankNameReviewPending?: boolean;
-        /** Penny-drop retries exhausted — finish references / eSign; a representative will call. */
+        /** Penny-drop failed or bank name mismatch — finish references / eSign; a representative will call. */
         bankVerificationFailed?: boolean;
+        /** Aadhaar name vs application is waiting for credit; journey continues; thank-you uses KYC follow-up copy. */
+        aadhaarNameReviewPending?: boolean;
       };
       /** Post-BRE pre-approved ceiling; set after bureau pass. */
       preApprovedAmountInr: number | null;
@@ -121,12 +125,16 @@ export function isBankVerificationRetryExhausted(
   return progress.retryLimitReached === true;
 }
 
-/** Bank step is done for routing: verified account, or penny-drop failed and they may continue. */
+/** Bank step is done for routing: verified account, name-match review, or penny-drop failed. */
 export function isBankStepDoneForJourney(
   session: CustomerSessionResponse | null | undefined,
 ): boolean {
   if (!session?.authenticated) return false;
-  return session.journey.bankDetailsCompleted || isBankVerificationRetryExhausted(session);
+  return (
+    session.journey.bankDetailsCompleted ||
+    session.journey.bankNameReviewPending === true ||
+    isBankVerificationRetryExhausted(session)
+  );
 }
 
 /** Email entry + OTP during the loan journey (after loan selection). */
@@ -267,6 +275,14 @@ export function isLeadRejectedAndLocked(lead: CustomerPortalLead | null | undefi
   return lead.status === 'REJECTED' || lead.status === 'BLACKLISTED';
 }
 
+/** Safe on the session union — `{ authenticated: false }` has no `lead`. */
+export function isSessionLeadRejectedAndLocked(
+  session: CustomerSessionResponse | null | undefined,
+): boolean {
+  if (!session || session.authenticated !== true) return false;
+  return isLeadRejectedAndLocked(session.lead);
+}
+
 /** True when the customer still has loan-application steps left (hub should show "Complete your journey"). */
 export function isCustomerJourneyIncomplete(
   session: CustomerSessionResponse | null | undefined,
@@ -320,7 +336,7 @@ export function getCustomerJourneyResumePath(
     if (canResumeKycAfterInternalError(session)) {
       return shouldResumeKycSelfie(session) ? '/kyc/selfie' : '/kyc';
     }
-    return '/thank-you';
+    // DigiLocker already captured (Aadhaar OTP 5xx leftover) — continue the remaining steps.
   }
 
   const journey = session.journey;
@@ -393,6 +409,9 @@ export function getCustomerPostMobileOtpRedirectPath(
   }
 
   if (isInternalErrorLead(lead, otpLeadStatus)) {
+    if (session?.authenticated && lead) {
+      return getCustomerJourneyResumePath(session);
+    }
     if (canResumeKycAfterInternalError(session)) {
       return shouldResumeKycSelfie(session) ? '/kyc/selfie' : '/kyc';
     }

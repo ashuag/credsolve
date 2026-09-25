@@ -32,9 +32,9 @@ import { createPortal } from 'react-dom';
 
 const DUAL_BREAKPOINT = 720;
 const FIELD_CLASS =
-  'w-full min-w-[72px] h-[28px] rounded-[6px] border border-[rgba(23,44,113,0.12)] bg-white px-1.5 text-[0.72rem] font-medium text-brand-text';
+  'w-full min-w-[72px] h-[28px] rounded-[6px] border border-[rgba(15,39,72,0.12)] bg-white px-1.5 text-[0.72rem] font-medium text-brand-text';
 const INPUT_CLASS =
-  'h-[32px] w-full rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-white px-2 text-[0.78rem] font-semibold text-brand-navy outline-none focus:border-[rgba(20,150,243,0.45)]';
+  'h-[32px] w-full rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-white px-2 text-[0.78rem] font-semibold text-brand-navy outline-none focus:border-[rgba(34,197,94,0.45)]';
 
 function MonthCalendar({
   year,
@@ -96,14 +96,14 @@ function MonthCalendar({
               onMouseLeave={() => onDayHover(null)}
               className={cx(
                 'relative h-8 text-[0.75rem] font-semibold transition-colors',
-                inSpan && !isStart && !isEnd ? 'bg-[rgba(20,150,243,0.1)] text-brand-blue' : '',
+                inSpan && !isStart && !isEnd ? 'bg-[rgba(34,197,94,0.1)] text-brand-blue' : '',
                 inSpan && isRowStart && !isStart ? 'rounded-l-full' : '',
                 inSpan && isRowEnd && !isEnd ? 'rounded-r-full' : '',
-                isStart || isEnd ? 'z-[1] text-white' : 'text-brand-navy hover:bg-[rgba(20,150,243,0.08)]',
+                isStart || isEnd ? 'z-[1] text-white' : 'text-brand-navy hover:bg-[rgba(34,197,94,0.08)]',
                 isSingle && isStart ? 'rounded-full' : '',
                 isStart && !isSingle ? 'rounded-l-full' : '',
                 isEnd && !isSingle && !isStart ? 'rounded-r-full' : '',
-                isToday && !isStart && !isEnd ? 'ring-1 ring-inset ring-[rgba(20,150,243,0.45)] rounded-[8px]' : '',
+                isToday && !isStart && !isEnd ? 'ring-1 ring-inset ring-[rgba(34,197,94,0.45)] rounded-[8px]' : '',
               )}
             >
               {(isStart || isEnd) ? (
@@ -273,8 +273,8 @@ export function DatetimeRangeFilter({
               'h-8 rounded-[8px] border px-2.5 text-left text-[0.72rem] font-bold transition-colors',
               dual ? 'w-full' : 'rounded-full',
               selected
-                ? 'border-[rgba(20,150,243,0.35)] bg-[rgba(20,150,243,0.12)] text-brand-blue'
-                : 'border-[rgba(23,44,113,0.12)] bg-white text-brand-navy hover:border-[rgba(20,150,243,0.28)]',
+                ? 'border-[rgba(34,197,94,0.35)] bg-[rgba(34,197,94,0.12)] text-brand-blue'
+                : 'border-[rgba(15,39,72,0.12)] bg-white text-brand-navy hover:border-[rgba(34,197,94,0.28)]',
             )}
           >
             {preset.label}
@@ -285,7 +285,7 @@ export function DatetimeRangeFilter({
   );
 
   const navButtonClass =
-    'grid h-8 w-8 place-items-center rounded-[8px] border border-[rgba(23,44,113,0.12)] bg-white text-brand-navy hover:border-[rgba(20,150,243,0.28)]';
+    'grid h-8 w-8 place-items-center rounded-[8px] border border-[rgba(15,39,72,0.12)] bg-white text-brand-navy hover:border-[rgba(34,197,94,0.28)]';
 
   const panel = open && mounted ? (
     <div
@@ -293,7 +293,7 @@ export function DatetimeRangeFilter({
       role="dialog"
       aria-labelledby={labelId}
       className={cx(
-        'fixed z-[90] rounded-[18px] border border-[rgba(23,44,113,0.14)] bg-white p-3 shadow-[0_18px_50px_rgba(23,44,113,0.22)]',
+        'fixed z-[90] rounded-[18px] border border-[rgba(15,39,72,0.14)] bg-white p-3 shadow-[0_18px_50px_rgba(15,39,72,0.22)]',
         dual ? 'w-[min(736px,calc(100vw-16px))]' : 'w-[min(352px,calc(100vw-16px))]',
       )}
       style={{ top: pos.top, left: pos.left }}
@@ -394,7 +394,7 @@ export function DatetimeRangeFilter({
           </p>
 
           <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-[12px] border border-[rgba(23,44,113,0.1)] bg-[rgba(248,250,255,0.8)] p-2">
+            <div className="rounded-[12px] border border-[rgba(15,39,72,0.1)] bg-[rgba(248,250,255,0.8)] p-2">
               <p className="m-0 mb-1.5 text-[0.64rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">From</p>
               <div className="grid grid-cols-2 gap-1.5">
                 <input
@@ -419,7 +419,7 @@ export function DatetimeRangeFilter({
                 />
               </div>
             </div>
-            <div className="rounded-[12px] border border-[rgba(23,44,113,0.1)] bg-[rgba(248,250,255,0.8)] p-2">
+            <div className="rounded-[12px] border border-[rgba(15,39,72,0.1)] bg-[rgba(248,250,255,0.8)] p-2">
               <p className="m-0 mb-1.5 text-[0.64rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">To</p>
               <div className="grid grid-cols-2 gap-1.5">
                 <input
@@ -456,7 +456,7 @@ export function DatetimeRangeFilter({
             onChange('');
             setOpen(false);
           }}
-          className="h-8 rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.76rem] font-bold text-brand-text hover:bg-[rgba(20,150,243,0.06)]"
+          className="h-8 rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.76rem] font-bold text-brand-text hover:bg-[rgba(34,197,94,0.06)]"
         >
           Clear
         </button>
@@ -466,7 +466,7 @@ export function DatetimeRangeFilter({
             setPendingEnd(false);
             commit(draft, true);
           }}
-          className="h-8 rounded-[8px] border border-[rgba(20,150,243,0.28)] bg-[rgba(20,150,243,0.12)] px-3 text-[0.76rem] font-bold text-brand-blue"
+          className="h-8 rounded-[8px] border border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.12)] px-3 text-[0.76rem] font-bold text-brand-blue"
         >
           Apply
         </button>
@@ -486,7 +486,7 @@ export function DatetimeRangeFilter({
         className={cx(
           FIELD_CLASS,
           'mt-1.5 inline-flex min-w-[148px] items-center justify-between gap-1 text-left',
-          parsed ? 'border-[rgba(20,150,243,0.28)] text-brand-navy' : 'text-brand-muted',
+          parsed ? 'border-[rgba(34,197,94,0.28)] text-brand-navy' : 'text-brand-muted',
         )}
       >
         <span className="min-w-0 truncate">{triggerLabel}</span>

@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'MoneyCash',
+    name: 'CredSolve',
     short_name: 'MCash',
     description: 'Instant digital loans — secure OTP login, account access, and loan journey.',
     start_url: '/',

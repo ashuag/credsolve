@@ -50,6 +50,7 @@ export type LosApplication = {
   statusCode: string;
   statusLabel: string;
   nameMatchPendingReview?: boolean;
+  aadhaarNameMatchPendingReview?: boolean;
   leadStatusCode: string;
   leadStatusLabel: string;
   leadRejectionReason: { code: string; label: string } | null;
@@ -112,6 +113,7 @@ export type LosLeadDetails = {
     pincode: string | null;
     addressLine1: string | null;
     addressLine2: string | null;
+    emailId: string | null;
     city: string | null;
     state: string | null;
     stateCode: string | null;
@@ -129,6 +131,8 @@ export type LosLeadDetails = {
     uuid: string;
     cibilScore: number | null;
     fetchedAt: string;
+    /** Integration that pulled this CIBIL report (`Tenacio`, `Surepass`, `CIBIL07`). */
+    vendorName: string | null;
   } | null;
   applications: Array<{
     uuid: string;
@@ -210,18 +214,55 @@ export type LosMoneyCashFaceMatch = {
     detectionScore: number | null;
     imageWidth: number;
     imageHeight: number;
+    childLikeness?: number | null;
+    ageBand?: string | null;
+    estimatedAge?: number | null;
+    gender?: 'male' | 'female' | null;
   } | null;
   probe: {
     faceDetected: boolean;
     detectionScore: number | null;
     imageWidth: number;
     imageHeight: number;
+    childLikeness?: number | null;
+    ageBand?: string | null;
+    estimatedAge?: number | null;
+    gender?: 'male' | 'female' | null;
   } | null;
+  checks?: {
+    descriptor?: { passed?: boolean; strength?: string };
+    geometry?: { passed?: boolean; applied?: boolean; reason?: string };
+    ageEstimate?: { passed?: boolean; applied?: boolean; reason?: string };
+  } | null;
+};
+
+export type LosPreviousLoan = {
+  uuid: string;
+  loanNumber: string;
+  applicationUuid: string;
+  applicationNumber: string;
+  loanAmount: string;
+  disbursementAmount: string;
+  repayAmount: string;
+  disbursedAt: string;
+  repaymentDate: string;
+  overdueDays: number;
+  overdue: boolean;
+  loanStatusCode: string;
+  loanStatusLabel: string;
+  closedAt: string | null;
 };
 
 export type LosApplicationDetails = {
   uuid: string;
   applicationNumber: string;
+  /** Previous application for this customer (re-apply). Open in a new tab from the header. */
+  priorApplication?: {
+    uuid: string;
+    applicationNumber: string;
+  } | null;
+  /** Earlier disbursed loans for this customer (excludes the current application). */
+  previousLoans?: LosPreviousLoan[];
   customerUuid: string;
   leadUuid: string;
   leadNumber: string;
@@ -231,6 +272,14 @@ export type LosApplicationDetails = {
   statusCode: string;
   statusLabel: string;
   nameMatchPendingReview?: boolean;
+  aadhaarNameMatchPendingReview?: boolean;
+  /** Live profile vs DigiLocker Aadhaar comparison. Read-only; does not reject the lead. */
+  aadhaarKycMismatch?: {
+    name: boolean;
+    dob: boolean;
+    gender: boolean;
+    messages: string[];
+  } | null;
   kycStatus: number;
   kycStatusLabel: string;
   kycCompletedAt: string | null;
@@ -266,6 +315,8 @@ export type LosApplicationDetails = {
   } | null;
   /** True when LOS ops may grant one more penny-drop (bank verification) attempt. */
   canGrantPennyDropAttempt?: boolean;
+  /** True when LOS ops may re-run penny drop on the last submitted account. */
+  canRecheckPennyDrop?: boolean;
   /** Every penny-drop try from `application_bank_account_detail` (pass and fail). */
   bankAccountAttempts?: Array<{
     id: string;
@@ -280,6 +331,8 @@ export type LosApplicationDetails = {
   }>;
   /** True when LOS ops may re-enable KYC selfie (DigiLocker Aadhaar is kept if already captured). */
   canEnableReKyc?: boolean;
+  /** True when LOS ops may reset Aadhaar OTP / DigiLocker attempts so the customer starts OTP again. */
+  canEnableAadhaarReattempt?: boolean;
   preApprovedLoanAmount: string | null;
   createdAt: string;
   updatedAt: string;
@@ -305,6 +358,14 @@ export type LosApplicationDetails = {
     panVerified: number;
     profile: LosLeadDetails['profile'];
   };
+  /** Latest Tenacio NSDL PAN check for this lead, else the customer PAN NSDL cache. */
+  panNsdl?: {
+    fullName: string | null;
+    panNumber: string | null;
+    nameMatch: boolean | null;
+    dobMatch: boolean | null;
+    panStatus: string | null;
+  } | null;
   referencesCount: number;
   references: Array<{
     referenceIndex: number;
@@ -318,17 +379,23 @@ export type LosApplicationDetails = {
     gender: string | null;
     address: string | null;
     maskedAadhaar: string | null;
+    aadhaarKycType?: 1 | 2 | null;
+    aadhaarKycProcess?: 'DIGILOCKER' | 'OTP' | null;
+    aadhaarKycProcessLabel?: 'DigiLocker' | 'OTP based';
+    reusedFromPrior?: boolean;
   } | null;
-  /** Present when DigiLocker returned Aadhaar but KYC failed on name / DOB (or a stored mismatch). */
+  /** Present when DigiLocker returned Aadhaar but KYC failed on DOB / gender (or a stored mismatch). */
   aadhaarIdentityFailure?: {
     reason: string;
     message: string;
     applicationName: string | null;
     applicationDob: string | null;
+    applicationGender?: string | null;
     aadhaarName: string | null;
     aadhaarDob: string | null;
+    aadhaarGender?: string | null;
   } | null;
-  /** `vendor_api_log` rows for DigiLocker Aadhaar download (`aadhaar-download` / Surepass equivalent). */
+  /** `vendor_api_log` rows for Aadhaar KYC (DigiLocker init/download + XML OTP generate/download). */
   aadhaarDownloadLogs?: Array<{
     id: string;
     uuid: string;
@@ -367,9 +434,13 @@ export type LosApplicationDetails = {
     cibilScore: number | null;
     reportPdfUrl: string | null;
     fetchedAt: string;
+    /** Integration that pulled this CIBIL report (`Tenacio`, `Surepass`, `CIBIL07`). */
+    vendorName: string | null;
     /** Rule-based CIBIL credit-assessment category (A best .. H worst); null if not yet computed. */
     creditAssessmentCategory: string | null;
     creditAssessmentRecommendation: 'Approved' | 'Rejected' | null;
+    /** True when this report was pulled on a previous application and reused for display. */
+    fromPriorApplication?: boolean;
   } | null;
   agreement: {
     documentName: string | null;
@@ -543,6 +614,14 @@ export async function fetchApplicationLoanDocumentBlob(
     token,
     `/applications/${encodeURIComponent(applicationUuid)}/loan-documents/${encodeURIComponent(docType)}`,
     'Failed to fetch loan document PDF.',
+  );
+}
+
+export async function fetchLoanNocPdfBlob(token: string, loanUuid: string): Promise<Blob> {
+  return fetchLosAuthenticatedBlob(
+    token,
+    `/loans/${encodeURIComponent(loanUuid)}/noc`,
+    'Failed to fetch NOC letter PDF.',
   );
 }
 

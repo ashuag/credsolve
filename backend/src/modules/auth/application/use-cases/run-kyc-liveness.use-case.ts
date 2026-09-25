@@ -131,6 +131,10 @@ export class RunKycLivenessUseCase {
     }
 
     if (isApplicationFaceStepComplete(application)) {
+      await this.kycCompletion.ensureCompletedWhenFaceStepDone({
+        applicationId: application.id,
+        customerId: customer.id,
+      });
       return {
         configured: true,
         ok: true,

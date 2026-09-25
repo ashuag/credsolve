@@ -201,17 +201,17 @@ function ListPanelShell({
 }) {
   return (
     <section
-      className="flex h-full min-h-0 flex-col overflow-hidden rounded-[16px] border border-[rgba(23,44,113,0.1)]"
+      className="flex h-full min-h-0 flex-col overflow-hidden rounded-[16px] border border-[rgba(15,39,72,0.1)]"
       style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(240,246,255,0.95))' }}
     >
-      <div className="border-b border-[rgba(23,44,113,0.07)] px-4 py-3">
+      <div className="border-b border-[rgba(15,39,72,0.07)] px-4 py-3">
         <h2 className="m-0 text-[1.02rem] font-extrabold tracking-[-0.03em] text-brand-navy">{title}</h2>
         <p className="m-0 mt-1 text-[0.8rem] leading-[1.45] text-brand-muted">{description}</p>
       </div>
 
-      <div className="border-b border-[rgba(23,44,113,0.07)] px-4 py-3">{addForm}</div>
+      <div className="border-b border-[rgba(15,39,72,0.07)] px-4 py-3">{addForm}</div>
 
-      <div className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.72)] px-4 py-3">
+      <div className="border-b border-[rgba(15,39,72,0.07)] bg-[rgba(248,250,255,0.72)] px-4 py-3">
         <SummaryCards total={summary.total} active={summary.active} inactive={summary.inactive} />
       </div>
 
@@ -604,7 +604,7 @@ export function NegativeListsPanel({ scope = 'all' }: { scope?: 'all' | 'pincode
 
   if (loading) {
     return (
-      <div className="rounded-[14px] border border-[rgba(23,44,113,0.1)] bg-white px-5 py-10 text-center text-[0.9rem] text-brand-muted">
+      <div className="rounded-[14px] border border-[rgba(15,39,72,0.1)] bg-white px-5 py-10 text-center text-[0.9rem] text-brand-muted">
         Loading serviceability lists…
       </div>
     );

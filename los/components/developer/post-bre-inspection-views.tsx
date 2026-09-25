@@ -17,7 +17,7 @@ function RuleBadges({ rules = [] }: { rules?: string[] }) {
       {rules.map((id) => (
         <span
           key={id}
-          className="inline-flex rounded-[6px] bg-[rgba(20,150,243,0.1)] px-1.5 py-0.5 font-mono text-[0.65rem] font-bold text-brand-blue"
+          className="inline-flex rounded-[6px] bg-[rgba(34,197,94,0.1)] px-1.5 py-0.5 font-mono text-[0.65rem] font-bold text-brand-blue"
         >
           {id}
         </span>
@@ -37,7 +37,7 @@ function SignalPill({ active, label }: { active: boolean; label: string }) {
 
 export function PostBreCriteriaTable({ rows }: { rows: PostBreCriteriaConfigRow[] }) {
   return (
-    <div className="overflow-x-auto rounded-[12px] border border-[rgba(23,44,113,0.1)]">
+    <div className="overflow-x-auto rounded-[12px] border border-[rgba(15,39,72,0.1)]">
       <table className="w-full min-w-[720px] border-collapse text-left text-[0.78rem]">
         <thead>
           <tr className="bg-[rgba(248,250,255,0.95)] text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
@@ -50,7 +50,7 @@ export function PostBreCriteriaTable({ rows }: { rows: PostBreCriteriaConfigRow[
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.key} className="border-t border-[rgba(23,44,113,0.06)]">
+            <tr key={row.key} className="border-t border-[rgba(15,39,72,0.06)]">
               <td className="px-3 py-2.5 font-mono font-semibold text-brand-navy">{row.key}</td>
               <td className="px-3 py-2.5 text-brand-text">
                 <p className="m-0 font-semibold text-brand-navy">{row.label}</p>
@@ -104,7 +104,7 @@ export function PostBreBureauSummaryCards({ result }: { result: PostBreDryRunRes
       {cards.map((card) => (
         <div
           key={card.label}
-          className="rounded-[12px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.85)] px-3 py-2.5"
+          className="rounded-[12px] border border-[rgba(15,39,72,0.08)] bg-[rgba(248,250,255,0.85)] px-3 py-2.5"
         >
           <p className="m-0 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
             {card.label}
@@ -124,7 +124,7 @@ export function PostBreTradelinesTable({ rows }: { rows: PostBreTradelineInspect
   }
 
   return (
-    <div className="overflow-x-auto rounded-[12px] border border-[rgba(23,44,113,0.1)]">
+    <div className="overflow-x-auto rounded-[12px] border border-[rgba(15,39,72,0.1)]">
       <table className="w-full min-w-[960px] border-collapse text-left text-[0.76rem]">
         <thead>
           <tr className="bg-[rgba(248,250,255,0.95)] text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
@@ -142,7 +142,7 @@ export function PostBreTradelinesTable({ rows }: { rows: PostBreTradelineInspect
             <tr
               key={`${row.rowIndex}-${row.creditorName}-${row.accountNumber ?? ''}`}
               className={cx(
-                'border-t border-[rgba(23,44,113,0.06)]',
+                'border-t border-[rgba(15,39,72,0.06)]',
                 (row.restructureSignal || row.smaPwosSignal) && 'bg-[rgba(239,68,68,0.03)]',
               )}
             >
@@ -162,7 +162,7 @@ export function PostBreTradelinesTable({ rows }: { rows: PostBreTradelineInspect
                   className={cx(
                     'inline-flex rounded-full px-2 py-0.5 text-[0.68rem] font-extrabold',
                     row.isOpen
-                      ? 'bg-[rgba(20,150,243,0.1)] text-brand-blue'
+                      ? 'bg-[rgba(34,197,94,0.1)] text-brand-blue'
                       : 'bg-[rgba(148,163,184,0.15)] text-brand-muted',
                   )}
                 >
@@ -197,7 +197,7 @@ export function PostBreEnquiriesTable({ rows }: { rows: PostBreEnquiryInspection
   }
 
   return (
-    <div className="overflow-x-auto rounded-[12px] border border-[rgba(23,44,113,0.1)]">
+    <div className="overflow-x-auto rounded-[12px] border border-[rgba(15,39,72,0.1)]">
       <table className="w-full min-w-[800px] border-collapse text-left text-[0.76rem]">
         <thead>
           <tr className="bg-[rgba(248,250,255,0.95)] text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
@@ -213,8 +213,8 @@ export function PostBreEnquiriesTable({ rows }: { rows: PostBreEnquiryInspection
             <tr
               key={`${row.controlNumber ?? row.inquiryDate}-${index}`}
               className={cx(
-                'border-t border-[rgba(23,44,113,0.06)]',
-                row.countsTowardLoanEnquiryLimit && 'bg-[rgba(20,150,243,0.04)]',
+                'border-t border-[rgba(15,39,72,0.06)]',
+                row.countsTowardLoanEnquiryLimit && 'bg-[rgba(34,197,94,0.04)]',
               )}
             >
               <td className="px-2.5 py-2 font-mono text-brand-navy">{row.inquiryDate}</td>

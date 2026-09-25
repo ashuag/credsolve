@@ -65,7 +65,7 @@ export function PreApprovedOfferPanel() {
             value={jsonText}
             onChange={(e) => setJsonText(e.target.value)}
             rows={14}
-            className="font-mono rounded-[12px] border border-[rgba(23,44,113,0.12)] bg-[rgba(248,250,255,0.9)] p-3 text-[0.78rem] leading-[1.45]"
+            className="font-mono rounded-[12px] border border-[rgba(15,39,72,0.12)] bg-[rgba(248,250,255,0.9)] p-3 text-[0.78rem] leading-[1.45]"
             placeholder='{ "data": { "cibilData": { ... } } }'
           />
         </label>
@@ -84,7 +84,7 @@ export function PreApprovedOfferPanel() {
       {result ? (
         <div className="grid gap-4">
           <div className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-[14px] border border-[rgba(20,150,243,0.2)] bg-[rgba(20,150,243,0.06)] p-4">
+            <div className="rounded-[14px] border border-[rgba(34,197,94,0.2)] bg-[rgba(34,197,94,0.06)] p-4">
               <p className="m-0 text-[0.72rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
                 CIBIL / bureau score
               </p>
@@ -112,7 +112,7 @@ export function PreApprovedOfferPanel() {
             </div>
           </div>
 
-          <section className="rounded-[14px] border border-[rgba(23,44,113,0.1)] bg-white p-4">
+          <section className="rounded-[14px] border border-[rgba(15,39,72,0.1)] bg-white p-4">
             <h3 className="m-0 text-[0.8rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
               Unsecured exposure
             </h3>
@@ -121,7 +121,7 @@ export function PreApprovedOfferPanel() {
               tradelines (open and closed), not open-only and not the largest single account.
             </p>
             <dl className="m-0 mt-3 grid gap-2 text-[0.84rem] sm:grid-cols-3">
-              <div className="rounded-[10px] bg-[rgba(20,150,243,0.06)] p-3">
+              <div className="rounded-[10px] bg-[rgba(34,197,94,0.06)] p-3">
                 <dt className="font-bold text-brand-muted">Total unsecured (tier driver)</dt>
                 <dd className="m-0 mt-1 text-[1.1rem] font-extrabold text-brand-navy">
                   {formatInr(result.totalUnsecuredExposureInr)}
@@ -145,7 +145,7 @@ export function PreApprovedOfferPanel() {
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full min-w-[720px] border-collapse text-left text-[0.8rem]">
                   <thead>
-                    <tr className="border-b border-[rgba(23,44,113,0.12)] text-[0.7rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted">
+                    <tr className="border-b border-[rgba(15,39,72,0.12)] text-[0.7rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted">
                       <th className="py-2 pr-3">Lender</th>
                       <th className="py-2 pr-3">Account</th>
                       <th className="py-2 pr-3">Type</th>
@@ -159,7 +159,7 @@ export function PreApprovedOfferPanel() {
                     {result.openUnsecuredTradelines.map((row, idx) => (
                       <tr
                         key={`${row.creditorName}-${row.accountNumber}-${idx}`}
-                        className="border-b border-[rgba(23,44,113,0.06)]"
+                        className="border-b border-[rgba(15,39,72,0.06)]"
                       >
                         <td className="py-2.5 pr-3 font-semibold text-brand-navy">{row.creditorName}</td>
                         <td className="py-2.5 pr-3 font-mono text-[0.75rem] text-brand-text">{row.accountNumber}</td>
@@ -195,7 +195,7 @@ export function PreApprovedOfferPanel() {
             )}
           </section>
 
-          <dl className="m-0 grid gap-2 rounded-[14px] border border-[rgba(23,44,113,0.1)] bg-white p-4 text-[0.84rem]">
+          <dl className="m-0 grid gap-2 rounded-[14px] border border-[rgba(15,39,72,0.1)] bg-white p-4 text-[0.84rem]">
             {result.tier ? (
               <>
                 <div className="grid grid-cols-[minmax(140px,42%)_1fr] gap-2">

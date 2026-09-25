@@ -120,3 +120,23 @@ export function parseEasebuzzAddedOn(value: string | undefined): Date | null {
   if (!Number.isFinite(parsed)) return null;
   return new Date(parsed);
 }
+
+/**
+ * Unique id for a single Easebuzz collection.
+ * EasyCollect reuses merchant `txnid` as the loan/application number, so we prefer
+ * `easepayid` (then bank ref) to tell payments apart.
+ */
+export function easebuzzPaymentVendorRef(fields: Record<string, string>): string {
+  const easepayid = (fields.easepayid ?? '').trim();
+  if (easepayid && easepayid.toUpperCase() !== 'NA') return easepayid.slice(0, 50);
+  const bankRef = (fields.bank_ref_num ?? '').trim();
+  if (bankRef && bankRef.toUpperCase() !== 'NA') return bankRef.slice(0, 50);
+  const txnid = (fields.txnid ?? '').trim();
+  const addedon = (fields.addedon ?? '').trim();
+  if (txnid && addedon) return `${txnid}:${addedon}`.slice(0, 50);
+  return txnid.slice(0, 50);
+}
+
+export function isEasebuzzCallbackSuccessStatus(status: string): boolean {
+  return status === 'success' || status === 'successful';
+}

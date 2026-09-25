@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   title: doc.title,
   description: doc.description,
   openGraph: {
-    title: `${doc.title} | MoneyCash`,
+    title: `${doc.title} | CredSolve`,
     description: doc.description,
     type: 'website',
   },

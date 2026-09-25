@@ -1,5 +1,5 @@
 /** NBFC entity details — used in sanction letter (Key Fact Statement) header. */
-export const NBFC_NAME = 'CREDSOLVE TECHNOLOGIES PRIVATE LIMITED';
+export const NBFC_NAME = 'MoneyCash';
 export const NBFC_ADDRESS =
   'Flat No.: E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh-201009';
 export const NBFC_EMAIL = 'info@moneycash.in';
@@ -8,9 +8,9 @@ export const NBFC_LOGO_FILE = 'moneycash-logo.png';
 /** Lender / LSP details per RBI Digital Lending Guidelines — Sanction Letter KFS fields. */
 export const LENDER_NAME = 'Aasra Fincorp Pvt. Ltd.';
 export const LENDER_LOGO_FILE = 'asra-fincorp-logo.png';
-export const LSP_NAME = 'CREDSOLVE TECHNOLOGIES PRIVATE LIMITED';
+export const LSP_NAME = 'MoneyCash';
 export const DLA_NAME = 'MoneyCash (moneycash.in)';
-export const RECOVERY_AGENT_NAME = 'CREDSOLVE TECHNOLOGIES PRIVATE LIMITED';
+export const RECOVERY_AGENT_NAME = 'MoneyCash';
 export const PAYABLE_TO = 'Aasra Fincorp Pvt. Ltd.';
 
 /** Grievance / nodal contacts shown on KFS (LSP = NBFC/MoneyCash, RE = Lender). */
@@ -45,7 +45,7 @@ export const LOAN_DOCUMENT_HTML_TEMPLATE = 'MoneyCash_Loan_Document.html';
 
 export const LOAN_DOCUMENT_TYPE = {
   KEY_FACT: 'key-fact',
-  /** Revised sanction letter generated at disbursement (separate from customer acceptance copy). */
+  /** Revised sanction letter + commercial terms generated at disbursement (separate from customer acceptance copy). */
   KEY_FACT_DISBURSEMENT: 'key-fact-disbursement',
   LOAN_AGREEMENT: 'loan-agreement',
 } as const;
@@ -71,5 +71,5 @@ export const LOAN_DOCUMENT_PDF_FILES: Record<LoanDocumentType, string> = {
   [LOAN_DOCUMENT_TYPE.LOAN_AGREEMENT]: 'loan-agreement.pdf',
 };
 
-/** Loan cum Commercial Terms — emailed alongside the sanction letter, not persisted separately. */
+/** Loan cum Commercial Terms — emailed alongside the post-acceptance sanction letter only. At disbursement it is merged into the KFS PDF. */
 export const LOAN_COMMERCIAL_TERMS_PDF_FILENAME = 'loan-cum-commercial-terms.pdf';

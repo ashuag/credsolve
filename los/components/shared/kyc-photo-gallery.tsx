@@ -75,7 +75,7 @@ export function KycPhotoTile({
     <button
       type="button"
       onClick={onOpen}
-      className="group grid cursor-pointer gap-2 rounded-[12px] border border-[rgba(23,44,113,0.12)] bg-white p-2 text-left transition-colors hover:border-[rgba(20,150,243,0.35)]"
+      className="group grid cursor-pointer gap-2 rounded-[12px] border border-[rgba(15,39,72,0.12)] bg-white p-2 text-left transition-colors hover:border-[rgba(34,197,94,0.35)]"
     >
       <span className="text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">{label}</span>
       <span className="relative block overflow-hidden rounded-[10px] bg-[rgba(248,250,255,0.9)]">
@@ -97,7 +97,7 @@ export function KycLivenessVideoPlayer({
   label?: string;
 }) {
   return (
-    <div className="grid h-full gap-2 rounded-[12px] border border-[rgba(23,44,113,0.12)] bg-white p-2">
+    <div className="grid h-full gap-2 rounded-[12px] border border-[rgba(15,39,72,0.12)] bg-white p-2">
       <span className="text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
         {label}
       </span>

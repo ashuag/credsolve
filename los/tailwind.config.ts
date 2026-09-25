@@ -8,14 +8,14 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        'brand-blue': '#1496f3',
-        'brand-navy': '#172c71',
-        'brand-gold': '#ffc519',
-        'brand-gold-deep': '#f0af00',
-        'brand-text': '#12244f',
+        'brand-blue': '#22C55E',
+        'brand-navy': '#0F2748',
+        'brand-gold': '#22C55E',
+        'brand-gold-deep': '#16A34A',
+        'brand-text': '#0F2748',
         'brand-muted': '#5e6782',
-        'brand-success': '#1d9d70',
-        'brand-warning': '#f7b500',
+        'brand-success': '#16A34A',
+        'brand-warning': '#16A34A',
         'brand-danger': '#e75f5f'
       },
       screens: {

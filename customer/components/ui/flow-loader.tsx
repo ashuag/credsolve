@@ -33,7 +33,7 @@ function StepGlyph({
 
   if (state === 'active') {
     return (
-      <span className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-[12px] bg-[linear-gradient(135deg,rgba(255,197,25,0.32),rgba(20,150,243,0.28))] text-[#fff9e8]">
+      <span className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-[12px] bg-[linear-gradient(135deg,rgba(34,197,94,0.32),rgba(20,150,243,0.28))] text-[#fff9e8]">
         <span
           className="h-[16px] w-[16px] rounded-full border-2 border-white/25 border-t-white animate-spin"
           aria-hidden
@@ -44,7 +44,7 @@ function StepGlyph({
 
   return (
     <span
-      className={`inline-flex h-[34px] w-[34px] items-center justify-center rounded-[12px] bg-[linear-gradient(135deg,rgba(255,197,25,0.26),rgba(20,150,243,0.22))] text-[#fff9e8] text-[0.84rem] font-black ${
+      className={`inline-flex h-[34px] w-[34px] items-center justify-center rounded-[12px] bg-[linear-gradient(135deg,rgba(34,197,94,0.26),rgba(20,150,243,0.22))] text-[#fff9e8] text-[0.84rem] font-black ${
         state === 'pending' ? 'opacity-45' : ''
       }`}
     >
@@ -72,7 +72,7 @@ export function FlowLoader({
 
   return (
     <div
-      className="fixed inset-0 z-[120] grid place-items-center p-6 backdrop-blur-[16px] bg-[radial-gradient(circle_at_top,rgba(20,150,243,0.26),transparent_32rem),radial-gradient(circle_at_bottom,rgba(255,197,25,0.2),transparent_28rem),rgba(8,18,48,0.54)] max-sm:p-4"
+      className="fixed inset-0 z-[120] grid place-items-center p-6 backdrop-blur-[16px] bg-[radial-gradient(circle_at_top,rgba(20,150,243,0.26),transparent_32rem),radial-gradient(circle_at_bottom,rgba(34,197,94,0.2),transparent_28rem),rgba(8,18,48,0.54)] max-sm:p-4"
       role="status"
       aria-live="polite"
       aria-label={
@@ -106,7 +106,7 @@ export function FlowLoader({
         >
           {/* Rings */}
           <div className="absolute w-[172px] h-[172px] rounded-full border border-[rgba(255,255,255,0.14)] animate-orbit max-sm:w-[146px] max-sm:h-[146px]" />
-          <div className="absolute w-[132px] h-[132px] rounded-full border border-dashed border-[rgba(255,197,25,0.28)] animate-orbit-rev max-sm:w-[114px] max-sm:h-[114px]" />
+          <div className="absolute w-[132px] h-[132px] rounded-full border border-dashed border-[rgba(34,197,94,0.28)] animate-orbit-rev max-sm:w-[114px] max-sm:h-[114px]" />
           <div className="absolute w-[92px] h-[92px] rounded-full border border-[rgba(20,150,243,0.3)] animate-pulse-ring max-sm:w-[82px] max-sm:h-[82px]" />
 
           {/* Scan beam */}
@@ -116,7 +116,7 @@ export function FlowLoader({
           />
 
           {/* Core */}
-          <div className="w-7 h-7 rounded-full bg-[radial-gradient(circle_at_32%_30%,#fffbe6_0_18%,#ffc519_32%,#1496f3_100%)] shadow-[0_0_0_10px_rgba(255,255,255,0.06),0_0_46px_rgba(20,150,243,0.35)] animate-core-pulse" />
+          <div className="w-7 h-7 rounded-full bg-[radial-gradient(circle_at_32%_30%,#ecfdf5_0_18%,#22c55e_32%,#1496f3_100%)] shadow-[0_0_0_10px_rgba(255,255,255,0.06),0_0_46px_rgba(20,150,243,0.35)] animate-core-pulse" />
 
           {/* Orbit dots */}
           <span className="absolute w-[14px] h-[14px] rounded-full bg-white shadow-[0_0_18px_rgba(255,255,255,0.32)] animate-orbit-1" />
@@ -182,7 +182,7 @@ export function FlowLoader({
             className={`block h-full rounded-[inherit] ${tracked ? 'transition-[width] duration-500 ease-out' : 'w-[42%] animate-loader-bar'}`}
             style={{
               width: tracked ? `${progressPct}%` : undefined,
-              background: 'linear-gradient(90deg, #1496f3, #ffc519, #1496f3)',
+              background: 'linear-gradient(90deg, #1496f3, #22c55e, #1496f3)',
               backgroundSize: '200% 100%',
             }}
           />

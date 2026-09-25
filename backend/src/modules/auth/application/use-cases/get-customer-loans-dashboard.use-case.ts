@@ -2,7 +2,7 @@ import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { APPLICATION_STATUS } from '../../../../common/constants/application.constants';
-import { LOAN_REPAYMENT_STATUS } from '../../../../common/constants/loan-repayment.constants';
+import { LOAN_REPAYMENT_STATUS, COLLECTED_REPAYMENT_STATUSES } from '../../../../common/constants/loan-repayment.constants';
 import { LOAN_STATUS } from '../../../../common/constants/loan.constants';
 import {
   computeAmountDueNowInr,
@@ -17,6 +17,7 @@ import {
   overdueDaysFromMaturity,
   type PenalChargeConfig,
 } from '../../../../common/loan/bounce-charge.util';
+import { billDueNowAfterWaiverInr, waivedAmountFromLoan } from '../../../../common/loan/loan-charge-waiver.util';
 import {
   remainingDueInr,
   sumRepaymentAmounts,
@@ -106,6 +107,8 @@ function mapRow(
       loanMaturityDate: Date;
       disbursedAt: Date;
       closedAt: Date | null;
+      waivedAmount: Prisma.Decimal;
+      isNocSent: boolean;
       bankAccountNumber: string | null;
       loanStatus: { name: string };
       repayments: Array<{ amount: Prisma.Decimal; status: string }>;
@@ -154,26 +157,39 @@ function mapRow(
   let interestTillToday: number | null = null;
   let amountDueToday: number | null = null;
   let bounceFeeInr: number | null = null;
+  let overdueDaysOut: number | null = null;
+  let overdueInterestInr: number | null = null;
   let usedFullTenureInterest = false;
+  const storedWaiverInr = loanAccount != null ? waivedAmountFromLoan(loanAccount.waivedAmount) : 0;
+  let appliedWaiverInr = storedWaiverInr;
   const totalPaid = sumRepaymentAmounts(loanAccount?.repayments ?? []);
 
   if (loanAccount && loanAccount.closedAt == null && principal != null && dailyRate != null) {
-    const due = computeAmountDueNowInr(principal, dailyRate, loanAccount.disbursedAt, {
-      coolingPeriodDays,
-      tenureDays: tenureDays ?? 1,
-    });
-    daysOutstanding = due.daysOutstanding;
-    interestTillToday = due.interestAmount;
-    usedFullTenureInterest = due.usedFullTenureInterest;
     const pastDue =
       loanAccount.loanStatus.name === LOAN_STATUS.OVERDUE ||
       isRepaymentPastDue(loanAccount.loanMaturityDate);
     const overdueDays = pastDue
       ? Math.max(overdueDaysFromMaturity(loanAccount.loanMaturityDate), 1)
       : 0;
+    const due = computeAmountDueNowInr(principal, dailyRate, loanAccount.disbursedAt, {
+      coolingPeriodDays,
+      tenureDays: tenureDays ?? 1,
+      overdueDays,
+    });
+    daysOutstanding = due.daysOutstanding;
+    interestTillToday = due.totalInterestAmount;
+    overdueDaysOut = overdueDays;
+    overdueInterestInr = due.overdueInterestAmount;
+    usedFullTenureInterest = due.usedFullTenureInterest;
     bounceFeeInr = computePenalChargeInr(principal, overdueDays, penal);
-    const billDueNow = Math.round((due.amountDue + bounceFeeInr) * 100) / 100;
-    amountDueToday = remainingDueInr(billDueNow, totalPaid);
+    const bill = billDueNowAfterWaiverInr({
+      amountDueBeforePenal: due.amountDue,
+      penalInr: bounceFeeInr,
+      overdueInterestInr: due.overdueInterestAmount,
+      waivedAmountInr: storedWaiverInr,
+    });
+    appliedWaiverInr = bill.appliedWaiverInr;
+    amountDueToday = remainingDueInr(bill.billDueNow, totalPaid);
   } else if (loanAccount?.closedAt != null) {
     // Inclusive days from disbursement through repayment (disbursement day = day 1).
     daysOutstanding = calendarDaysBetween(loanAccount.disbursedAt, loanAccount.closedAt) + 1;
@@ -187,11 +203,14 @@ function mapRow(
   const interestTillTodayStr = interestTillToday != null ? interestTillToday.toFixed(2) : null;
   const amountDueTodayStr = amountDueToday != null ? amountDueToday.toFixed(2) : null;
   const bounceFeeStr = bounceFeeInr != null ? bounceFeeInr.toFixed(2) : null;
+  const overdueInterestStr = overdueInterestInr != null ? overdueInterestInr.toFixed(2) : null;
 
   const displayStatus =
     loanAccount != null
       ? loanAccount.closedAt != null
-        ? 'CLOSED'
+        ? loanAccount.loanStatus.name === LOAN_STATUS.SETTLED
+          ? LOAN_STATUS.SETTLED
+          : 'CLOSED'
         : loanAccount.loanStatus.name
       : r.applicationStatus.name;
 
@@ -209,6 +228,11 @@ function mapRow(
     interestTillToday: interestTillTodayStr,
     amountDueToday: amountDueTodayStr,
     usedFullTenureInterest,
+    overdueDays: overdueDaysOut,
+    overdueInterestInr: overdueInterestStr,
+    waivedAmountInr: (loanAccount?.closedAt != null ? storedWaiverInr : appliedWaiverInr) > 0.009
+      ? (loanAccount?.closedAt != null ? storedWaiverInr : appliedWaiverInr).toFixed(2)
+      : null,
     bounceFeeInr: bounceFeeStr,
     totalPaidInr: loanAccount != null ? totalPaid.toFixed(2) : null,
     outstandingInr: amountDueTodayStr,
@@ -229,6 +253,7 @@ function mapRow(
       loanDetail?.bankName ?? null,
       loanAccount?.bankAccountNumber ?? loanDetail?.bankAccountNumber ?? null,
     ),
+    isNocSent: loanAccount?.isNocSent === true,
   };
 }
 
@@ -260,10 +285,12 @@ const APPLICATION_DASHBOARD_SELECT = {
       loanMaturityDate: true,
       disbursedAt: true,
       closedAt: true,
+      waivedAmount: true,
+      isNocSent: true,
       bankAccountNumber: true,
       loanStatus: { select: { name: true } },
       repayments: {
-        where: { status: LOAN_REPAYMENT_STATUS.SUCCESS },
+        where: { status: { in: COLLECTED_REPAYMENT_STATUSES } },
         select: { amount: true, status: true },
       },
     },
@@ -404,9 +431,13 @@ export class GetCustomerLoansDashboardUseCase {
         if (maturityStart < todayStart) lineStatus = 'overdue';
         else if (maturityStart.getTime() === todayStart.getTime()) lineStatus = 'due';
         const suffix = activeLoans.length > 1 ? ` · ${card.loanNumber ?? card.applicationUuid.slice(0, 8)}…` : '';
+        const overdueBits =
+          card.overdueDays != null && card.overdueDays > 0
+            ? ' + overdue interest + penal'
+            : '';
         repaymentSchedule.push({
           dueDate: isoDateOnly(maturity) ?? '',
-          label: `${card.totalPaidInr != null && Number(card.totalPaidInr) > 0 ? 'Remaining repayment' : 'Full repayment'} (principal + interest)${suffix}`,
+          label: `${card.totalPaidInr != null && Number(card.totalPaidInr) > 0 ? 'Remaining repayment' : 'Full repayment'} (principal + interest${overdueBits})${suffix}`,
           amount: card.amountDueToday ?? total,
           status: lineStatus,
         });

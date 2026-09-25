@@ -88,6 +88,19 @@ export function isVendorApi5xxFailure(params: {
   return apiCode != null && apiCode >= 500 && apiCode < 600;
 }
 
+const AADHAAR_XML_OTP_FALLBACK_SERVICES = new Set(['xml-generate-otp', 'xml-download']);
+
+/**
+ * Aadhaar XML OTP generate/download failures unlock DigiLocker.
+ * Those 5xxs must not park the lead as INTERNAL_ERROR.
+ */
+export function isAadhaarXmlOtpFallbackService(serviceName: string | null | undefined): boolean {
+  const n = (serviceName ?? '').trim().toLowerCase();
+  if (!n) return false;
+  if (AADHAAR_XML_OTP_FALLBACK_SERVICES.has(n)) return true;
+  return n.includes('xml-generate-otp') || n.includes('xml-download');
+}
+
 export function buildVendor5xxNote(params: {
   providerName: string;
   serviceName: string;

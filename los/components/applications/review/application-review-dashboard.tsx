@@ -18,13 +18,14 @@ import { ApplicationReviewToolbar } from '@/components/applications/review/appli
 import { RestartRejectedJourneyButton } from '@/components/shared/restart-rejected-journey-button';
 import { canRejectApplicationStatus, RejectRecordModal } from '@/components/shared/reject-record-modal';
 import { canDecideLosApplication } from '@/lib/access';
-import { buildReviewFlags } from '@/lib/application-review-flags';
+import { buildReviewFlags, hasAadhaarKycMismatch } from '@/lib/application-review-flags';
 import { isApplicationRecordRejected } from '@/lib/application-workspace-status';
 import { buildApplicationJourney, isLosAadhaarKycComplete, journeyProgressPercent } from '@/lib/customer-journey';
 import { extractCibilPan } from '@/lib/kyc-field-match';
 import { formatPersonName } from '@/lib/format-person-name';
 import {
   approveApplication,
+  approveAadhaarNameMatch,
   approveBankNameMatch,
   disburseApplication,
   getApplicationCibilReport,
@@ -34,6 +35,30 @@ import { getLosStoredUser } from '@/lib/auth';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type ReviewTab = 'personal' | 'cibil' | 'loan' | 'kyc' | 'bank' | 'refs' | 'utm' | 'ids' | 'timeline';
+
+const REVIEW_TABS: readonly ReviewTab[] = [
+  'personal',
+  'cibil',
+  'loan',
+  'kyc',
+  'bank',
+  'refs',
+  'utm',
+  'ids',
+  'timeline',
+];
+
+function parseReviewTab(value: string | null | undefined): ReviewTab | null {
+  const tab = value?.trim().toLowerCase();
+  return REVIEW_TABS.includes(tab as ReviewTab) ? (tab as ReviewTab) : null;
+}
+
+function defaultReviewTab(row: LosApplicationDetails): ReviewTab {
+  if (hasAadhaarKycMismatch(row)) return 'kyc';
+  if (row.nameMatchPendingReview || row.statusCode.toUpperCase() === 'UNDER_REVIEW') return 'bank';
+  if (row.details?.loanAmount) return 'loan';
+  return 'personal';
+}
 
 export function ApplicationReviewDashboard({
   row,
@@ -46,18 +71,19 @@ export function ApplicationReviewDashboard({
   authToken: string | null;
   onRefresh: () => void;
 }) {
-  const [activeTab, setActiveTab] = useState<ReviewTab>(
-    row.nameMatchPendingReview || row.statusCode.toUpperCase() === 'UNDER_REVIEW'
-      ? 'bank'
-      : row.details?.loanAmount
-        ? 'loan'
-        : 'personal',
-  );
-  const [bureauPan, setBureauPan] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ReviewTab>(() => {
+    if (typeof window !== 'undefined') {
+      const fromUrl = parseReviewTab(new URLSearchParams(window.location.search).get('tab'));
+      if (fromUrl) return fromUrl;
+    }
+    return defaultReviewTab(row);
+  });
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [bureauPan, setBureauPan] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [approveBusy, setApproveBusy] = useState(false);
   const [approveNameMatchBusy, setApproveNameMatchBusy] = useState(false);
+  const [approveAadhaarNameBusy, setApproveAadhaarNameBusy] = useState(false);
   const [disburseBusy, setDisburseBusy] = useState(false);
   const [canDecide] = useState(() => {
     const user = getLosStoredUser();
@@ -74,14 +100,21 @@ export function ApplicationReviewDashboard({
   const isRejected = isApplicationRecordRejected(row);
   const flags = useMemo(() => buildReviewFlags(row, bureauPan), [row, bureauPan]);
   const statusCode = row.statusCode.toUpperCase();
+  const nameReviewPending = Boolean(row.nameMatchPendingReview) || statusCode === 'UNDER_REVIEW';
   const journeyComplete =
     !isRejected &&
     journeySteps.length > 0 &&
     journeySteps.every((step) => step.state === 'done');
   const canApprove =
-    canDecide && journeyComplete && statusCode !== 'APPROVED' && statusCode !== 'DISBURSED';
+    canDecide &&
+    journeyComplete &&
+    statusCode !== 'APPROVED' &&
+    statusCode !== 'DISBURSED' &&
+    !row.aadhaarNameMatchPendingReview &&
+    !nameReviewPending;
   const canApproveNameMatch =
     canDecide && (Boolean(row.nameMatchPendingReview) || statusCode === 'UNDER_REVIEW');
+  const canApproveAadhaarName = canDecide && Boolean(row.aadhaarNameMatchPendingReview);
   const canDisburse = canDecide && statusCode === 'APPROVED' && !row.loanAccount;
   const canReject = canDecide && canRejectApplicationStatus(row.statusCode);
 
@@ -101,6 +134,11 @@ export function ApplicationReviewDashboard({
   useEffect(() => {
     void loadBureauPan();
   }, [loadBureauPan]);
+
+  useEffect(() => {
+    const fromUrl = parseReviewTab(new URLSearchParams(window.location.search).get('tab'));
+    if (fromUrl) setActiveTab(fromUrl);
+  }, [row.uuid]);
 
   const handleApproveNameMatch = useCallback(async () => {
     if (!authToken || approveNameMatchBusy) return;
@@ -122,6 +160,36 @@ export function ApplicationReviewDashboard({
       setApproveNameMatchBusy(false);
     }
   }, [applicationUuid, approveNameMatchBusy, authToken, onRefresh, row.applicationNumber, row.bankAccountAttempts]);
+
+  const handleApproveAadhaarName = useCallback(async () => {
+    if (!authToken || approveAadhaarNameBusy) return;
+    const confirmed = window.confirm(
+      journeyComplete
+        ? `Approve Aadhaar name match and approve application ${row.applicationNumber}? Status will change to APPROVED.`
+        : `Approve Aadhaar name match for ${row.applicationNumber}?\n\nThe customer can continue the journey. When all steps are done, you can approve the application.`,
+    );
+    if (!confirmed) return;
+    setApproveAadhaarNameBusy(true);
+    setActionError(null);
+    try {
+      await approveAadhaarNameMatch(authToken, applicationUuid);
+      if (journeyComplete) {
+        await approveApplication(authToken, applicationUuid);
+      }
+      onRefresh();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Failed to approve Aadhaar name match.');
+    } finally {
+      setApproveAadhaarNameBusy(false);
+    }
+  }, [
+    applicationUuid,
+    approveAadhaarNameBusy,
+    authToken,
+    journeyComplete,
+    onRefresh,
+    row.applicationNumber,
+  ]);
 
   const handleApprove = useCallback(async () => {
     if (!authToken || approveBusy) return;
@@ -166,18 +234,22 @@ export function ApplicationReviewDashboard({
     {
       id: 'kyc',
       label: 'KYC detail',
-      badge:
-        row.kycStatus === 1 ? (
-          <span className="cnt ok">✓</span>
-        ) : isLosAadhaarKycComplete(row) ? (
-          <span className="cnt ok">Aadhaar</span>
-        ) : null,
+      badge: hasAadhaarKycMismatch(row) ? (
+        <span className="cnt bad">✕</span>
+      ) : row.kycStatus === 1 ? (
+        <span className="cnt ok">✓</span>
+      ) : isLosAadhaarKycComplete(row) ? (
+        <span className="cnt ok">Aadhaar</span>
+      ) : null,
     },
     {
       id: 'bank',
       label: 'Bank details',
-      badge:
-        row.disbursement?.accountNumber?.trim() ? <span className="cnt ok">✓</span> : null,
+      badge: nameReviewPending ? (
+        <span className="cnt bad">✕</span>
+      ) : row.disbursement?.accountNumber?.trim() ? (
+        <span className="cnt ok">✓</span>
+      ) : null,
     },
     {
       id: 'refs',
@@ -249,6 +321,8 @@ export function ApplicationReviewDashboard({
             rejectDisabled={!canReject}
             onApproveNameMatch={canApproveNameMatch ? () => void handleApproveNameMatch() : undefined}
             approveNameMatchBusy={approveNameMatchBusy}
+            onApproveAadhaarName={canApproveAadhaarName ? () => void handleApproveAadhaarName() : undefined}
+            approveAadhaarNameBusy={approveAadhaarNameBusy}
             onApprove={canApprove ? () => void handleApprove() : undefined}
             approveBusy={approveBusy}
             onDisburse={canDisburse ? () => void handleDisburse() : undefined}
@@ -269,7 +343,12 @@ export function ApplicationReviewDashboard({
             <ReviewLoanPanel row={row} applicationUuid={applicationUuid} authToken={authToken} onDataChange={onRefresh} />
           </div>
           <div className={`panel${activeTab === 'kyc' ? ' on' : ''}`}>
-            <ReviewKycPanel row={row} applicationUuid={applicationUuid} authToken={authToken} onRefresh={onRefresh} />
+            <ReviewKycPanel
+              row={row}
+              applicationUuid={applicationUuid}
+              authToken={authToken}
+              onRefresh={onRefresh}
+            />
           </div>
           <div className={`panel${activeTab === 'bank' ? ' on' : ''}`}>
             <ReviewBankPanel

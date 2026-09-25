@@ -54,7 +54,7 @@ function AmountVisual({
   return (
     <div className="relative overflow-hidden rounded-[22px] border border-[rgba(255,255,255,0.12)] bg-[linear-gradient(145deg,#0f1f57,#1b3788_58%,#1b91e8_120%)] p-4 shadow-[0_18px_40px_rgba(17,33,88,0.24)] sm:rounded-[24px] sm:p-5 min-w-0">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-        <div className="absolute left-[-15%] top-[-20%] h-[12rem] w-[12rem] rounded-full bg-[radial-gradient(circle,rgba(255,197,25,0.24),transparent_70%)]" />
+        <div className="absolute left-[-15%] top-[-20%] h-[12rem] w-[12rem] rounded-full bg-[radial-gradient(circle,rgba(34,197,94,0.24),transparent_70%)]" />
         <div className="absolute right-[-20%] bottom-[-20%] h-[16rem] w-[16rem] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.12),transparent_74%)]" />
       </div>
 
@@ -68,7 +68,7 @@ function AmountVisual({
 
       <div className="relative grid min-h-[280px] place-items-center pt-10 sm:min-h-[320px]">
         <div className="absolute h-[226px] w-[226px] rounded-full border border-[rgba(255,255,255,0.1)] sm:h-[250px] sm:w-[250px]" />
-        <div className="absolute h-[184px] w-[184px] rounded-full border border-dashed border-[rgba(255,197,25,0.24)] sm:h-[206px] sm:w-[206px]" />
+        <div className="absolute h-[184px] w-[184px] rounded-full border border-dashed border-[rgba(34,197,94,0.24)] sm:h-[206px] sm:w-[206px]" />
         <div className="absolute h-[140px] w-[140px] rounded-full border border-[rgba(20,150,243,0.32)] sm:h-[156px] sm:w-[156px]" />
         <div className="absolute h-[208px] w-[208px] rounded-full bg-[radial-gradient(circle,rgba(20,150,243,0.16),transparent_68%)] sm:h-[230px] sm:w-[230px]" />
 

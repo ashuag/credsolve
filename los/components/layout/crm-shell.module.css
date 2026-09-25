@@ -132,10 +132,10 @@
 }
 
 .navItemActive {
-  background: linear-gradient(135deg, rgba(20, 150, 243, 0.2), rgba(99, 102, 241, 0.15));
-  border-color: rgba(20, 150, 243, 0.3);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(99, 102, 241, 0.15));
+  border-color: rgba(34, 197, 94, 0.3);
   color: #e8f4ff;
-  box-shadow: 0 0 0 1px rgba(20,150,243,0.12) inset;
+  box-shadow: 0 0 0 1px rgba(34,197,94,0.12) inset;
 }
 
 .navIcon {
@@ -151,9 +151,9 @@
 }
 
 .navItemActive .navIcon {
-  background: rgba(20,150,243,0.25);
+  background: rgba(34,197,94,0.25);
   color: #60b8ff;
-  box-shadow: 0 0 12px rgba(20,150,243,0.2);
+  box-shadow: 0 0 12px rgba(34,197,94,0.2);
 }
 
 .navItem:hover .navIcon {
@@ -195,7 +195,7 @@
   width: 32px;
   height: 32px;
   border-radius: 9px;
-  background: linear-gradient(135deg, #1496f3, #3b5fd4);
+  background: linear-gradient(135deg, #22C55E, #3b5fd4);
   color: #fff;
   font-weight: 800;
   font-size: 0.78rem;
@@ -229,19 +229,19 @@
 
 /* ── Unused legacy classes kept for compile safety ─────────────────────────── */
 .brandCopy { display: grid; gap: 6px; }
-.brandEyebrow { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: #1496f3; }
+.brandEyebrow { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: #22C55E; }
 .brandTitle { font-size: 1.1rem; font-weight: 800; line-height: 1.2; }
 .brandText { margin: 0; color: var(--muted); line-height: 1.5; }
-.menuSection { display: grid; gap: 12px; padding: 16px; border-radius: 24px; border: 1px solid rgba(23,44,113,0.1); background: rgba(255,255,255,0.88); }
+.menuSection { display: grid; gap: 12px; padding: 16px; border-radius: 24px; border: 1px solid rgba(15,39,72,0.1); background: rgba(255,255,255,0.88); }
 .menuSectionToggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
 .menuSectionHead { display: flex; align-items: center; justify-content: space-between; flex: 1; gap: 10px; }
-.menuSectionTitle { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #1496f3; }
-.menuSectionCount { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; padding: 4px 8px; border-radius: 999px; background: rgba(20,150,243,0.08); color: #172c71; font-size: 0.76rem; font-weight: 800; }
-.menuChevron { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 12px; background: rgba(255,197,25,0.14); color: #172c71; }
+.menuSectionTitle { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #22C55E; }
+.menuSectionCount { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; padding: 4px 8px; border-radius: 999px; background: rgba(34,197,94,0.08); color: #0F2748; font-size: 0.76rem; font-weight: 800; }
+.menuChevron { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 12px; background: rgba(34,197,94,0.14); color: #0F2748; }
 .menuList { display: grid; gap: 10px; }
-.menuItem { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 12px 14px; border-radius: 20px; border: 1px solid rgba(23,44,113,0.08); background: linear-gradient(180deg,rgba(246,250,255,0.96),rgba(255,255,255,0.92)); }
+.menuItem { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 12px 14px; border-radius: 20px; border: 1px solid rgba(15,39,72,0.08); background: linear-gradient(180deg,rgba(246,250,255,0.96),rgba(255,255,255,0.92)); }
 .menuItemText { display: grid; gap: 3px; min-width: 0; }
-.menuBadge { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; padding: 6px 10px; border-radius: 999px; background: rgba(20,150,243,0.08); color: #172c71; font-size: 0.78rem; font-weight: 800; }
+.menuBadge { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; padding: 6px 10px; border-radius: 999px; background: rgba(34,197,94,0.08); color: #0F2748; font-size: 0.78rem; font-weight: 800; }
 
 /* ── Main content wrap ─────────────────────────────────────────────────────── */
 .mainWrap {
@@ -268,9 +268,9 @@
   gap: 14px;
   padding: 6px 16px;
   border-radius: 14px;
-  border: 1px solid rgba(23,44,113,0.1);
+  border: 1px solid rgba(15,39,72,0.1);
   background: linear-gradient(180deg, rgba(255,255,255,0.99), rgba(239,247,255,0.97));
-  box-shadow: 0 2px 12px rgba(23,44,113,0.07);
+  box-shadow: 0 2px 12px rgba(15,39,72,0.07);
 }
 
 .topBarLeft,
@@ -291,30 +291,30 @@
   justify-content: center;
   width: 36px;
   height: 36px;
-  border: 1px solid rgba(23,44,113,0.12);
+  border: 1px solid rgba(15,39,72,0.12);
   border-radius: 10px;
   background: rgba(255,255,255,0.9);
-  color: #172c71;
+  color: #0F2748;
   cursor: pointer;
   transition: all 140ms ease;
 }
 
 .sidebarToggle:hover:not(:disabled) {
-  border-color: rgba(20,150,243,0.28);
+  border-color: rgba(34,197,94,0.28);
   background: white;
 }
 
 .sidebarToggle:disabled { opacity: 0.42; cursor: not-allowed; }
-.sidebarToggleStage { background: rgba(255,197,25,0.1); border-color: rgba(255,197,25,0.22); }
+.sidebarToggleStage { background: rgba(34,197,94,0.1); border-color: rgba(34,197,94,0.22); }
 .toggleIcon { display: inline-flex; }
 
 .breadcrumb { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .breadcrumbLink { font-size: 0.84rem; font-weight: 600; color: rgba(94,103,130,0.8); }
 .breadcrumbSep { color: rgba(94,103,130,0.4); font-size: 0.84rem; }
-.breadcrumbCurrent { font-size: 0.84rem; font-weight: 700; color: #12244f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.breadcrumbCurrent { font-size: 0.84rem; font-weight: 700; color: #0F2748; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.workspaceChip { display: inline-flex; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 999px; background: rgba(255,197,25,0.18); color: #172c71; font-size: 0.86rem; font-weight: 800; }
-.workspaceChipDot { width: 8px; height: 8px; border-radius: 999px; background: #f59e0b; box-shadow: 0 0 0 4px rgba(255,197,25,0.2); }
+.workspaceChip { display: inline-flex; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 999px; background: rgba(34,197,94,0.18); color: #0F2748; font-size: 0.86rem; font-weight: 800; }
+.workspaceChipDot { width: 8px; height: 8px; border-radius: 999px; background: #f59e0b; box-shadow: 0 0 0 4px rgba(34,197,94,0.2); }
 
 .notificationWrap { position: relative; }
 
@@ -325,17 +325,17 @@
   gap: 8px;
   min-height: 36px;
   padding: 6px 12px;
-  border: 1px solid rgba(23,44,113,0.12);
+  border: 1px solid rgba(15,39,72,0.12);
   border-radius: 10px;
   background: rgba(255,255,255,0.9);
-  color: #172c71;
+  color: #0F2748;
   cursor: pointer;
   transition: all 140ms ease;
   font-size: 0.82rem;
   font-weight: 600;
 }
 
-.notificationButton:hover { border-color: rgba(20,150,243,0.24); background: white; }
+.notificationButton:hover { border-color: rgba(34,197,94,0.24); background: white; }
 .notificationIcon { display: inline-flex; }
 .notificationLabel { font-size: 0.82rem; font-weight: 600; }
 
@@ -347,7 +347,7 @@
   height: 20px;
   padding: 0 5px;
   border-radius: 999px;
-  background: #1496f3;
+  background: #22C55E;
   color: white;
   font-size: 0.62rem;
   font-weight: 900;
@@ -362,16 +362,16 @@
   gap: 12px;
   padding: 16px;
   border-radius: 16px;
-  border: 1px solid rgba(23,44,113,0.12);
+  border: 1px solid rgba(15,39,72,0.12);
   background: linear-gradient(180deg, rgba(255,255,255,0.99), rgba(239,247,255,0.97));
-  box-shadow: 0 16px 40px rgba(23,44,113,0.16);
+  box-shadow: 0 16px 40px rgba(15,39,72,0.16);
   z-index: 50;
 }
 
 .notificationPanelHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.notificationEyebrow { display: block; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #1496f3; }
+.notificationEyebrow { display: block; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #22C55E; }
 .notificationTitle { display: block; margin-top: 4px; font-size: 0.96rem; font-weight: 700; }
-.notificationCount { display: inline-flex; align-items: center; justify-content: center; padding: 5px 10px; border-radius: 999px; background: #1496f3; color: white; font-size: 0.7rem; font-weight: 800; }
+.notificationCount { display: inline-flex; align-items: center; justify-content: center; padding: 5px 10px; border-radius: 999px; background: #22C55E; color: white; font-size: 0.7rem; font-weight: 800; }
 .notificationList { display: grid; gap: 8px; }
 
 .notificationItem {
@@ -379,7 +379,7 @@
   gap: 6px;
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid rgba(23,44,113,0.07);
+  border: 1px solid rgba(15,39,72,0.07);
   background: rgba(255,255,255,0.9);
 }
 
@@ -387,10 +387,10 @@
 .notificationTop strong { font-size: 0.88rem; }
 .notificationItem p { margin: 0; color: rgba(94,103,130,0.9); line-height: 1.45; font-size: 0.78rem; }
 .notificationTone { width: 8px; height: 8px; border-radius: 999px; flex-shrink: 0; }
-.notificationToneLead { background: #1496f3; }
+.notificationToneLead { background: #22C55E; }
 .notificationToneDisbursal { background: #1d9d70; }
-.notificationTonePayment { background: #ffc519; }
-.notificationToneRisk { background: #172c71; }
+.notificationTonePayment { background: #4ADE80; }
+.notificationToneRisk { background: #0F2748; }
 .notificationTime { font-size: 0.72rem; font-weight: 700; color: rgba(94,103,130,0.7); }
 
 /* ── Top bar user menu ─────────────────────────────────────────────────────── */
@@ -403,7 +403,7 @@
   padding: 5px 10px 5px 5px;
   border-radius: 10px;
   background: rgba(255,255,255,0.88);
-  border: 1px solid rgba(23,44,113,0.09);
+  border: 1px solid rgba(15,39,72,0.09);
   cursor: pointer;
 }
 
@@ -414,14 +414,14 @@
   width: 28px;
   height: 28px;
   border-radius: 7px;
-  background: linear-gradient(145deg, #1496f3, #172c71);
+  background: linear-gradient(145deg, #22C55E, #0F2748);
   color: white;
   font-size: 0.72rem;
   font-weight: 800;
 }
 
 .userMenuText { display: flex; flex-direction: column; min-width: 0; text-align: left; }
-.userMenuText strong { font-size: 0.84rem; font-weight: 700; color: #12244f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+.userMenuText strong { font-size: 0.84rem; font-weight: 700; color: #0F2748; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
 .userMenuText span { font-size: 0.7rem; color: rgba(94,103,130,0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
 
 .userMenuPanel {
@@ -430,9 +430,9 @@
   right: 0;
   width: 240px;
   border-radius: 12px;
-  border: 1px solid rgba(23,44,113,0.12);
+  border: 1px solid rgba(15,39,72,0.12);
   padding: 8px;
-  box-shadow: 0 12px 36px rgba(23,44,113,0.14);
+  box-shadow: 0 12px 36px rgba(15,39,72,0.14);
   background: white;
   z-index: 50;
 }
@@ -447,17 +447,17 @@
   background: transparent;
   font-size: 0.84rem;
   font-weight: 600;
-  color: #12244f;
+  color: #0F2748;
   cursor: pointer;
   transition: background 120ms ease;
 }
-.userMenuAction:hover { background: rgba(20,150,243,0.07); }
+.userMenuAction:hover { background: rgba(34,197,94,0.07); }
 
-.themeSection { margin-top: 6px; padding-top: 8px; border-top: 1px solid rgba(23,44,113,0.08); padding-inline: 2px; }
+.themeSection { margin-top: 6px; padding-top: 8px; border-top: 1px solid rgba(15,39,72,0.08); padding-inline: 2px; }
 .themeLabel { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(94,103,130,0.7); margin: 0 0 6px 2px; }
 .themeButtons { display: flex; gap: 6px; }
-.themeBtn { flex: 1; min-height: 28px; border-radius: 999px; border: 1px solid rgba(23,44,113,0.12); background: white; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: rgba(94,103,130,0.8); }
-.themeBtnActive { border-color: #1496f3; color: #1496f3; background: rgba(20,150,243,0.07); }
+.themeBtn { flex: 1; min-height: 28px; border-radius: 999px; border: 1px solid rgba(15,39,72,0.12); background: white; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: rgba(94,103,130,0.8); }
+.themeBtnActive { border-color: #22C55E; color: #22C55E; background: rgba(34,197,94,0.07); }
 
 /* ── Logout button ─────────────────────────────────────────────────────────── */
 .logoutButton {
@@ -468,16 +468,16 @@
   padding: 7px 16px;
   border: 0;
   border-radius: 10px;
-  background: linear-gradient(135deg, #1c347d, #12244f 72%);
+  background: linear-gradient(135deg, #0F2748, #0F2748 72%);
   color: #fff8df;
   font-weight: 700;
   font-size: 0.84rem;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(23,44,113,0.2);
+  box-shadow: 0 4px 14px rgba(15,39,72,0.2);
   transition: all 140ms ease;
 }
 
-.logoutButton:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(23,44,113,0.28); }
+.logoutButton:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(15,39,72,0.28); }
 
 /* ── Page head ─────────────────────────────────────────────────────────────── */
 .pageHead {
@@ -486,12 +486,12 @@
   gap: 14px;
   padding: 14px 18px;
   border-radius: 14px;
-  border: 1px solid rgba(23,44,113,0.09);
+  border: 1px solid rgba(15,39,72,0.09);
   background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(239,247,255,0.96));
-  box-shadow: 0 2px 10px rgba(23,44,113,0.05);
+  box-shadow: 0 2px 10px rgba(15,39,72,0.05);
 }
 
-.pageEyebrow { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #1496f3; line-height: 1; margin-bottom: 4px; }
+.pageEyebrow { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #22C55E; line-height: 1; margin-bottom: 4px; }
 .pageTitle { margin: 0; font-size: 1.4rem; line-height: 1.2; letter-spacing: -0.03em; font-weight: 800; }
 .pageSubtitle { margin: 4px 0 0; max-width: 72ch; color: rgba(94,103,130,0.9); line-height: 1.45; font-size: 0.84rem; }
 
@@ -514,8 +514,8 @@
 
 /* ── Password modal ─────────────────────────────────────────────────────────── */
 .modalOverlay { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(10,28,66,0.42); padding: 16px; backdrop-filter: blur(4px); }
-.modalCard { width: 100%; max-width: 440px; border-radius: 16px; border: 1px solid rgba(23,44,113,0.12); background: white; padding: 20px; box-shadow: 0 20px 56px rgba(23,44,113,0.22); }
-.modalTitle { margin: 0; font-size: 1.05rem; font-weight: 800; color: #12244f; }
+.modalCard { width: 100%; max-width: 440px; border-radius: 16px; border: 1px solid rgba(15,39,72,0.12); background: white; padding: 20px; box-shadow: 0 20px 56px rgba(15,39,72,0.22); }
+.modalTitle { margin: 0; font-size: 1.05rem; font-weight: 800; color: #0F2748; }
 .modalSub { margin: 4px 0 12px; font-size: 0.82rem; color: rgba(94,103,130,0.9); }
 .modalForm { display: grid; gap: 8px; }
 .modalActions { display: flex; gap: 8px; margin-top: 4px; }

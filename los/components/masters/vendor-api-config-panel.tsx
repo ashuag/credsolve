@@ -164,7 +164,7 @@ function AddVendorApiModal({
           <button
             type="button"
             onClick={onClose}
-            className="min-h-[40px] flex-1 cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent font-bold text-brand-text"
+            className="min-h-[40px] flex-1 cursor-pointer rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent font-bold text-brand-text"
           >
             Cancel
           </button>

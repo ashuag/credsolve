@@ -15,7 +15,7 @@ function FindingDataTable({ data }: { data: Record<string, string | number | boo
   if (!entries.length) return null;
 
   return (
-    <dl className="m-0 mt-2 grid gap-1.5 rounded-[8px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.85)] p-2.5">
+    <dl className="m-0 mt-2 grid gap-1.5 rounded-[8px] border border-[rgba(15,39,72,0.08)] bg-[rgba(248,250,255,0.85)] p-2.5">
       {entries.map(([key, value]) => (
         <div key={key} className="grid grid-cols-[minmax(100px,38%)_1fr] gap-2 text-[0.75rem]">
           <dt className="m-0 font-mono text-brand-muted">{key}</dt>
@@ -28,7 +28,7 @@ function FindingDataTable({ data }: { data: Record<string, string | number | boo
 
 function FindingBlock({ finding, index }: { finding: PostBreRuleFinding; index: number }) {
   return (
-    <li className="rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-white p-3">
+    <li className="rounded-[10px] border border-[rgba(15,39,72,0.08)] bg-white p-3">
       <p className="m-0 text-[0.8rem] font-extrabold text-brand-navy">
         {index + 1}. {finding.title}
       </p>
@@ -53,7 +53,7 @@ function CheckCard({ check }: { check: PostBreRuleCheck }) {
         check.passed && !isInfo
           ? 'border-[rgba(34,197,94,0.2)] bg-[rgba(34,197,94,0.04)]'
           : isInfo
-            ? 'border-[rgba(20,150,243,0.18)] bg-[rgba(20,150,243,0.04)]'
+            ? 'border-[rgba(34,197,94,0.18)] bg-[rgba(34,197,94,0.04)]'
             : 'border-[rgba(239,68,68,0.22)] bg-[rgba(239,68,68,0.04)]',
       )}
     >
@@ -63,7 +63,7 @@ function CheckCard({ check }: { check: PostBreRuleCheck }) {
           <p className="m-0 mt-0.5 font-mono text-[0.68rem] text-brand-muted">{check.id}</p>
         </div>
         {isInfo ? (
-          <span className="inline-flex rounded-full bg-[rgba(20,150,243,0.1)] px-2.5 py-0.5 text-[0.72rem] font-extrabold text-brand-blue">
+          <span className="inline-flex rounded-full bg-[rgba(34,197,94,0.1)] px-2.5 py-0.5 text-[0.72rem] font-extrabold text-brand-blue">
             Info
           </span>
         ) : (
@@ -96,10 +96,10 @@ function CheckCard({ check }: { check: PostBreRuleCheck }) {
       ) : null}
 
       {showDrillDown ? (
-        <div className="mt-3 border-t border-[rgba(23,44,113,0.08)] pt-3">
+        <div className="mt-3 border-t border-[rgba(15,39,72,0.08)] pt-3">
           <button
             type="button"
-            className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-[8px] border border-[rgba(23,44,113,0.1)] bg-[rgba(255,255,255,0.9)] px-3 py-2 text-left text-[0.8rem] font-bold text-brand-navy transition-colors hover:border-[rgba(20,150,243,0.28)]"
+            className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-[8px] border border-[rgba(15,39,72,0.1)] bg-[rgba(255,255,255,0.9)] px-3 py-2 text-left text-[0.8rem] font-bold text-brand-navy transition-colors hover:border-[rgba(34,197,94,0.28)]"
             aria-expanded={expanded}
             onClick={() => setExpanded((open) => !open)}
           >
@@ -151,7 +151,7 @@ export function PostBreResultsSummary({ result }: { result: PostBreDryRunResult 
       </div>
 
       {result.unsecuredExposure && (
-        <div className="rounded-[14px] border border-[rgba(20,150,243,0.22)] bg-[rgba(20,150,243,0.06)] px-4 py-4 grid gap-3">
+        <div className="rounded-[14px] border border-[rgba(34,197,94,0.22)] bg-[rgba(34,197,94,0.06)] px-4 py-4 grid gap-3">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div>
               <p className="m-0 text-[0.7rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
@@ -180,7 +180,7 @@ export function PostBreResultsSummary({ result }: { result: PostBreDryRunResult 
           </div>
 
           {result.overallPassed && result.creditLimit && (
-            <div className="grid gap-2 border-t border-[rgba(20,150,243,0.14)] pt-3">
+            <div className="grid gap-2 border-t border-[rgba(34,197,94,0.14)] pt-3">
               <div>
                 <p className="m-0 text-[0.72rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">
                   Pre-Approved Credit Limit
@@ -216,7 +216,7 @@ export function PostBreResultsSummary({ result }: { result: PostBreDryRunResult 
         </div>
       </section>
 
-      <details className="rounded-xl border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.72)] p-3">
+      <details className="rounded-xl border border-[rgba(15,39,72,0.08)] bg-[rgba(248,250,255,0.72)] p-3">
         <summary className="cursor-pointer text-[0.84rem] font-bold text-brand-navy">
           Resolved thresholds (raw JSON)
         </summary>
@@ -280,7 +280,7 @@ export function PostBureauBrePanel() {
   return (
     <div className="grid gap-6">
       <form
-        className="grid gap-4 rounded-2xl border border-[rgba(23,44,113,0.1)] bg-[rgba(255,255,255,0.94)] p-5 shadow-[0_12px_40px_rgba(23,44,113,0.06)]"
+        className="grid gap-4 rounded-2xl border border-[rgba(15,39,72,0.1)] bg-[rgba(255,255,255,0.94)] p-5 shadow-[0_12px_40px_rgba(15,39,72,0.06)]"
         onSubmit={handleSubmit}
       >
         <div>
@@ -352,7 +352,7 @@ export function PostBureauBrePanel() {
           </button>
           <button
             type="button"
-            className="min-h-10.5 cursor-pointer rounded-[10px] border border-[rgba(23,44,113,0.14)] bg-white px-5 text-[0.88rem] font-bold text-brand-navy transition-colors hover:border-[rgba(20,150,243,0.28)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-10.5 cursor-pointer rounded-[10px] border border-[rgba(15,39,72,0.14)] bg-white px-5 text-[0.88rem] font-bold text-brand-navy transition-colors hover:border-[rgba(34,197,94,0.28)] disabled:cursor-not-allowed disabled:opacity-50"
             disabled={loading}
             onClick={() => {
               setJsonText('');

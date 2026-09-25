@@ -34,6 +34,7 @@ describe('digilocker-form-profile.util', () => {
         ['maskedAadhaar', 'masked_aadhaar'],
       ),
     ).toBe('XXXXXXXX1234');
+    expect(profile.gender).toBe('M');
   });
 
   it('reads Surepass maskedaadhaar and nested address bags', () => {
@@ -55,6 +56,7 @@ describe('digilocker-form-profile.util', () => {
     const profile = extractProfileFromDigilockerFormJson(form);
     expect(profile.fullName).toBe('SANTHI FRANCIS');
     expect(profile.dateOfBirth?.toISOString().slice(0, 10)).toBe('1981-05-08');
+    expect(profile.gender).toBe('F');
     expect(pickDigilockerAadhaarString(form, ['maskedAadhaar', 'masked_aadhaar', 'maskedaadhaar'])).toBe(
       'xxxxxxxx4351',
     );

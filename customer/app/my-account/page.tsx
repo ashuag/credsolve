@@ -2,13 +2,13 @@ import type { Metadata } from 'next';
 import { MyAccountClientPage } from './my-account-client-page';
 
 export const metadata: Metadata = {
-  title: 'My account — MoneyCash',
+  title: 'My account — CredSolve',
   description:
-    'Your MoneyCash account hub — view previous loans, track active repayments, and complete your loan journey.',
+    'Your CredSolve account hub — view previous loans, track active repayments, and complete your loan journey.',
   openGraph: {
-    title: 'Log in — My account | MoneyCash',
+    title: 'Log in — My account | CredSolve',
     description:
-      'Secure OTP login to your MoneyCash account — dashboard, applications, and loan management.',
+      'Secure OTP login to your CredSolve account — dashboard, applications, and loan management.',
     type: 'website'
   }
 };

@@ -7,7 +7,7 @@ export const PENNY_DROP_FAILED_NOTE = 'Penny drop failed';
 /** Written to `application.application_status_note` while credit reviews a bank name mismatch. */
 export const BANK_NAME_REVIEW_NOTE = 'Bank name mismatch pending credit review';
 
-/** Credit is holding the case at bank details for a name-match decision. */
+/** Credit is reviewing a bank vs customer name mismatch (customer can still finish the journey). */
 export function isBankNameMatchReviewPending(input: {
   statusName?: string | null;
   statusNote?: string | null;

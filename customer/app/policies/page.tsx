@@ -6,10 +6,10 @@ import { LEGAL_DOCUMENTS, LEGAL_NAV_ITEMS } from '@/lib/legal-content';
 export const metadata: Metadata = {
   title: 'Policies & Disclosures',
   description:
-    'All MoneyCash legal documents, policies, and regulatory disclosures — terms, privacy, fair practices, grievance redressal, KYC & AML, governance, and information security.',
+    'All CredSolve legal documents, policies, and regulatory disclosures — terms, privacy, fair practices, grievance redressal, KYC & AML, governance, and information security.',
   openGraph: {
-    title: 'Policies & Disclosures | MoneyCash',
-    description: 'Browse all MoneyCash policies, terms, and regulatory disclosures.',
+    title: 'Policies & Disclosures | CredSolve',
+    description: 'Browse all CredSolve policies, terms, and regulatory disclosures.',
     type: 'website',
   },
 };
@@ -24,7 +24,7 @@ export default function PoliciesIndexPage() {
           </div>
           <h1 className="legal-title">Policies &amp; Disclosures</h1>
           <p className="legal-lead">
-            Everything that governs how MoneyCash operates — our terms, privacy commitments, fair practices, and
+            Everything that governs how CredSolve operates — our terms, privacy commitments, fair practices, and
             regulatory disclosures, all in one place.
           </p>
         </header>

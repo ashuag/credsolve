@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 export const metadata: Metadata = {
   title: 'Pre-approved loan',
-  description: 'Your pre-approved loan amount on MoneyCash.',
+  description: 'Your pre-approved loan amount on CredSolve.',
 };
 
 export default function EligibilityLayout({ children }: { children: ReactNode }) {

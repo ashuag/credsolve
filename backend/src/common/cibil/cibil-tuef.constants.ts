@@ -185,30 +185,138 @@ export const PHONE_TYPE_LABELS: Record<string, string> = {
 };
 
 export const CIBIL_UNSECURED_ACCOUNT_TYPE_SYMBOLS = new Set([
-  '00', // Other
+ // '00', // Other
   '05', // Personal Loan
   '06', // Consumer Loan
   '08', // Education Loan
   '09', // Loan to Professional
   '10', // Credit Card
-  '12', // Overdraft
+  //'12', // Overdraft
   '16', // Fleet Card
   '37', // Loan on Credit Card
-  '38', // PMJDY Overdraft
-  '39', // Mudra Loans
-  '40', // Microfinance – Unsecured
-  '41', // Microfinance – Unsecured (Govt. Mandated)
-  '42', // Microfinance – Unsecured (Other)
-  '43', // Microfinance – Unsecured (Other, Govt. Mandated)
+  //'38', // PMJDY Overdraft
+  //'39', // Mudra Loans
+  //'40', // Microfinance – Unsecured
+  //'41', // Microfinance – Unsecured (Govt. Mandated)
+  //'42', // Microfinance – Unsecured (Other)
+  //'43', // Microfinance – Unsecured (Other, Govt. Mandated)
   '45', // P2P Personal Loan
   '46', // P2P Business Loan
   '47', // P2P Consumer Loan
-  '51', // Business Loan – Secured
-  '61', // Business Loan – Unsecured
+  //'51', // Business Loan – Secured
+  //'61', // Business Loan – Unsecured
   '69', // Short Term Personal Loan
-  '99', // Current Unsecured (portfolio group)
+  //'99', // Current Unsecured (portfolio group)
 ]);
 
 /** Credit card account types use sanctioned limit when available. */
 export const CIBIL_CREDIT_CARD_ACCOUNT_TYPE_SYMBOLS = new Set(['10']);
+
+/**
+ * CIBIL / TransUnion short codes that appear as `(CODE) Label` on vendor reports
+ * (CIBIL07 / PayMe India `original_loan_type`).
+ */
+const CIBIL_ACCOUNT_TYPE_ABBREVIATIONS: Record<string, string> = {
+  'BLPS-AGR': '53',
+  'BLPS-SB': '52',
+  'BLPS-OTH': '54',
+  BLG: '51',
+  BLS: '50',
+  BLU: '61',
+  BLABD: '59',
+  'BNFCF-PS': '56',
+  'BNFCF-PS-AGR': '57',
+  'BNFCF-PS-OTH': '58',
+};
+
+function normalizeAccountTypeLookupKey(label: string): string {
+  return label
+    .toLowerCase()
+    .replace(/[–—]/g, '-')
+    .replace(/[()]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const ACCOUNT_TYPE_SYMBOL_BY_LABEL: Record<string, string> = (() => {
+  const out: Record<string, string> = {};
+  for (const [symbol, label] of Object.entries(ACCOUNT_TYPE_LABELS)) {
+    out[normalizeAccountTypeLookupKey(label)] = symbol;
+  }
+  return out;
+})();
+
+function padTuefAccountTypeSymbol(raw: string): string | null {
+  if (!/^\d+$/.test(raw)) return null;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) ? String(n).padStart(2, '0') : null;
+}
+
+/**
+ * Strip a CIBIL `(CODE)` prefix:
+ * `(BLPS-AGR) Business Loan - Priority Sector - Agriculture`
+ * → `Business Loan - Priority Sector - Agriculture`.
+ */
+export function stripCibilAccountTypeCodePrefix(raw: string): string {
+  const trimmed = raw.trim();
+  const match = trimmed.match(/^\(([^)]+)\)\s*(.*)$/);
+  if (!match) return trimmed;
+  const rest = match[2].trim();
+  return rest || match[1].trim();
+}
+
+/**
+ * Map a vendor loan-type string to a TUEF account-type symbol.
+ * Accepts numeric codes, TUEF labels, and `(BLPS-AGR) Label` forms.
+ */
+export function cibilAccountTypeToTuefSymbol(raw: string | null | undefined): string | null {
+  if (raw == null) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const paddedWhole = padTuefAccountTypeSymbol(trimmed);
+  if (paddedWhole) return paddedWhole;
+
+  const match = trimmed.match(/^\(([^)]+)\)\s*(.*)$/);
+  const prefix = match?.[1]?.trim() || null;
+  const label = match ? match[2].trim() || prefix || trimmed : trimmed;
+
+  const paddedLabel = padTuefAccountTypeSymbol(label);
+  if (paddedLabel) return paddedLabel;
+
+  const fromLabel = ACCOUNT_TYPE_SYMBOL_BY_LABEL[normalizeAccountTypeLookupKey(label)];
+  if (fromLabel) return fromLabel;
+
+  if (prefix) {
+    const paddedPrefix = padTuefAccountTypeSymbol(prefix);
+    if (paddedPrefix) return paddedPrefix;
+    const fromPrefix = CIBIL_ACCOUNT_TYPE_ABBREVIATIONS[prefix.toUpperCase()];
+    if (fromPrefix) return fromPrefix;
+  }
+
+  return (
+    CIBIL_ACCOUNT_TYPE_ABBREVIATIONS[label.toUpperCase()] ??
+    CIBIL_ACCOUNT_TYPE_ABBREVIATIONS[trimmed.toUpperCase()] ??
+    null
+  );
+}
+
+/** Display enquiry purpose: `PERSONAL_LOAN` → `Personal Loan`. */
+export function formatCibilEnquiryPurposeLabel(raw: string): string {
+  const mapped = cibilAccountTypeToTuefSymbol(raw);
+  const source =
+    mapped && ACCOUNT_TYPE_LABELS[mapped]
+      ? ACCOUNT_TYPE_LABELS[mapped]
+      : stripCibilAccountTypeCodePrefix(raw);
+  const spaced = source.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!spaced) return raw;
+  return spaced
+    .split(' ')
+    .map((word) => {
+      const match = word.match(/^([^A-Za-z]*)([A-Za-z])(.*)$/);
+      if (!match) return word;
+      return `${match[1]}${match[2].toUpperCase()}${match[3].toLowerCase()}`;
+    })
+    .join(' ');
+}
 

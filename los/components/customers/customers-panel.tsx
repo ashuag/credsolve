@@ -41,7 +41,7 @@ function getInitials(name: string | null | undefined) {
 }
 
 const AVATAR_COLORS: [string, string][] = [
-  ['#1496f3', '#0e7cd1'],
+  ['#22C55E', '#16A34A'],
   ['#6366f1', '#4f46e5'],
   ['#0d9488', '#0f766e'],
   ['#f59e0b', '#d97706'],
@@ -227,7 +227,7 @@ export function CustomersPanel() {
     <div className="flex flex-col gap-4">
       {!loading && !fetchError ? (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard label="Total Customers" value={customers.length} color="#1496f3" />
+          <StatCard label="Total Customers" value={customers.length} color="#22C55E" />
           <StatCard label="With Applications" value={withApplications} color="#6366f1" sub="active pipeline" />
           <StatCard label="KYC Verified" value={kycVerified} color="#10b981" sub={`of ${customers.length}`} />
           <StatCard
@@ -252,7 +252,7 @@ export function CustomersPanel() {
           <button
             type="button"
             onClick={() => void loadCustomers()}
-            className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+            className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)]"
           >
             ↺ Refresh
           </button>

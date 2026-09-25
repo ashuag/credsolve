@@ -11,7 +11,7 @@ export function AccountLoginInfographic() {
         aria-hidden
       >
         <div className="absolute -left-10 top-1/4 h-44 w-44 rounded-full bg-[#1496f3]/22 blur-3xl" />
-        <div className="absolute -right-6 bottom-1/4 h-44 w-44 rounded-full bg-[#ffc519]/14 blur-3xl" />
+        <div className="absolute -right-6 bottom-1/4 h-44 w-44 rounded-full bg-[#22c55e]/14 blur-3xl" />
       </div>
 
       <div className="relative flex w-full justify-center">
@@ -98,8 +98,8 @@ function PhoneMockup() {
           <Sparkline />
         </div>
 
-        <div className="mt-1.5 flex items-center justify-center gap-1 rounded-full bg-[#12244f] py-1 text-[0.55rem] font-black uppercase tracking-wider text-[#ffc519]">
-          <span className="h-1 w-1 rounded-full bg-[#ffc519]" />
+        <div className="mt-1.5 flex items-center justify-center gap-1 rounded-full bg-[#12244f] py-1 text-[0.55rem] font-black uppercase tracking-wider text-[#22c55e]">
+          <span className="h-1 w-1 rounded-full bg-[#22c55e]" />
           Continue
         </div>
       </div>
@@ -118,7 +118,7 @@ function MiniStat({
 }) {
   const accent =
     tone === 'gold'
-      ? 'bg-[#fff8df] text-amber-800 ring-amber-200'
+      ? 'bg-[#ecfdf5] text-amber-800 ring-amber-200'
       : 'bg-[#eaf5ff] text-brand-navy ring-blue-200';
   return (
     <div className={`rounded-[10px] p-1.5 ring-1 ${accent}`}>
@@ -173,7 +173,7 @@ function FloatingChip({
 }) {
   const palette =
     tone === 'gold'
-      ? 'bg-gradient-to-br from-[#fff8df] to-[#ffe492] text-amber-900 ring-[#ffc519]/40'
+      ? 'bg-gradient-to-br from-[#ecfdf5] to-[#86efac] text-amber-900 ring-[#22c55e]/40'
       : tone === 'green'
         ? 'bg-gradient-to-br from-[#dcfce7] to-[#bbf7d0] text-emerald-900 ring-emerald-300/50'
         : 'bg-gradient-to-br from-white to-[#dbeafe] text-brand-navy ring-blue-200/70';
@@ -205,20 +205,20 @@ function StepPill({
     <div
       className={`relative flex min-h-[58px] flex-col items-center justify-center rounded-[14px] px-2 py-2 text-center ${
         highlight
-          ? 'border border-[#ffc519]/55 bg-gradient-to-br from-[#ffc519]/16 to-[#ffc519]/[0.04] shadow-[0_10px_24px_rgba(255,197,25,0.18)]'
+          ? 'border border-[#22c55e]/55 bg-gradient-to-br from-[#22c55e]/16 to-[#22c55e]/[0.04] shadow-[0_10px_24px_rgba(34,197,94,0.18)]'
           : 'border border-white/10 bg-white/[0.05] backdrop-blur-sm'
       }`}
     >
       <span
         className={`absolute -top-2 inline-flex h-4 w-4 items-center justify-center rounded-full text-[0.55rem] font-black ${
-          highlight ? 'bg-[#ffc519] text-[#12244f]' : 'bg-white/20 text-white'
+          highlight ? 'bg-[#22c55e] text-[#12244f]' : 'bg-white/20 text-white'
         }`}
       >
         {index}
       </span>
       <p
         className={`text-[0.62rem] font-black uppercase tracking-[0.12em] ${
-          highlight ? 'text-[#ffe492]' : 'text-white'
+          highlight ? 'text-[#86efac]' : 'text-white'
         }`}
       >
         {label}

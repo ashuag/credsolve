@@ -11,6 +11,12 @@ import {
   type LosEligibilityCriterion,
   updateEligibilityCriterion,
 } from '@/lib/api';
+import {
+  CIBIL_TRADELINE_ACCOUNT_TYPES,
+  cibilAccountTypeLabel,
+  parseCibilLoanTypeIds,
+  serializeCibilLoanTypeIds,
+} from '@/lib/cibil-account-types';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   cx,
@@ -25,6 +31,8 @@ const REJECTED_CREDIT_ASSESSMENT_GRADE_KEYS = new Set([
   'REJECTED_CREDIT_ASSESSMENT_GRADES_NEW',
   'REJECTED_CREDIT_ASSESSMENT_GRADES_EXISTING',
 ]);
+
+const REJECT_LOAN_TYPE_KEYS = new Set(['REJECT_OPEN_LOAN_TYPES', 'REJECT_LOAN_TYPES']);
 
 const CREDIT_ASSESSMENT_GRADES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
 
@@ -73,6 +81,27 @@ function GradeValuePills({ value }: { value: string }) {
   );
 }
 
+function LoanTypeValuePills({ value }: { value: string }) {
+  const ids = parseCibilLoanTypeIds(value);
+  if (!ids.length) {
+    return <span>—</span>;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {ids.map((id) => (
+        <span
+          key={id}
+          className="inline-flex rounded-[6px] bg-[rgba(239,68,68,0.1)] px-1.5 py-0.5 text-[0.78rem] font-extrabold text-[#991b1b]"
+          title={cibilAccountTypeLabel(id)}
+        >
+          {id}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function ProfileCriterionModal({
   item,
   onClose,
@@ -83,10 +112,17 @@ function ProfileCriterionModal({
   onSubmit: (value: string) => Promise<unknown>;
 }) {
   const isGradeRule = REJECTED_CREDIT_ASSESSMENT_GRADE_KEYS.has(item.key);
+  const isLoanTypeRule = REJECT_LOAN_TYPE_KEYS.has(item.key);
   const [value, setValue] = useState(item.value);
   const [selectedGrades, setSelectedGrades] = useState(() => parseCreditAssessmentGrades(item.value));
+  const [selectedLoanTypes, setSelectedLoanTypes] = useState(() => parseCibilLoanTypeIds(item.value));
+  const [extraLoanTypeId, setExtraLoanTypeId] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const extraLoanTypes = selectedLoanTypes.filter(
+    (id) => !CIBIL_TRADELINE_ACCOUNT_TYPES.some((type) => type.id === id),
+  );
 
   function toggleGrade(grade: string) {
     setSelectedGrades((current) =>
@@ -94,11 +130,38 @@ function ProfileCriterionModal({
     );
   }
 
+  function toggleLoanType(id: string) {
+    setSelectedLoanTypes((current) =>
+      current.includes(id) ? current.filter((selected) => selected !== id) : [...current, id],
+    );
+  }
+
+  function addExtraLoanType() {
+    const parsed = parseCibilLoanTypeIds(extraLoanTypeId);
+    if (!parsed.length) {
+      setError('Enter a numeric CIBIL loan type id (e.g. 05 or 70).');
+      return;
+    }
+    setSelectedLoanTypes((current) => serializeCibilLoanTypeIds([...current, ...parsed]).split(',').filter(Boolean));
+    setExtraLoanTypeId('');
+    setError(null);
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    const nextValue = isGradeRule ? serializeCreditAssessmentGrades(selectedGrades) : value.trim();
+    const nextValue = isGradeRule
+      ? serializeCreditAssessmentGrades(selectedGrades)
+      : isLoanTypeRule
+        ? serializeCibilLoanTypeIds(selectedLoanTypes)
+        : value.trim();
     if (!nextValue) {
-      setError(isGradeRule ? 'Select at least one grade, or deactivate the rule instead.' : 'Value cannot be empty.');
+      setError(
+        isGradeRule
+          ? 'Select at least one grade, or deactivate the rule instead.'
+          : isLoanTypeRule
+            ? 'Select at least one loan type, or deactivate the rule instead.'
+            : 'Value cannot be empty.',
+      );
       return;
     }
 
@@ -114,16 +177,17 @@ function ProfileCriterionModal({
     }
   }
 
+  const modalTitle = isGradeRule || isLoanTypeRule ? `Edit ${item.label}` : 'Edit Profile Eligibility Rule';
+  const modalSubtitle = isGradeRule
+    ? 'Select the CIBIL credit-assessment grades (A–H) that should fail post-BRE for this customer type. The rule key stays fixed.'
+    : isLoanTypeRule
+      ? item.key === 'REJECT_OPEN_LOAN_TYPES'
+        ? 'Select CIBIL loan type IDs. Post-BRE rejects when a matching tradeline exists and is open.'
+        : 'Select CIBIL loan type IDs. Post-BRE rejects when a matching tradeline exists (open or closed).'
+      : 'Update the stored rule value while keeping the internal rule key and label fixed.';
+
   return (
-    <ModalShell
-      title={isGradeRule ? `Edit ${item.label}` : 'Edit Profile Eligibility Rule'}
-      subtitle={
-        isGradeRule
-          ? 'Select the CIBIL credit-assessment grades (A–H) that should fail post-BRE for this customer type. The rule key stays fixed.'
-          : 'Update the stored rule value while keeping the internal rule key and label fixed.'
-      }
-      onClose={onClose}
-    >
+    <ModalShell title={modalTitle} subtitle={modalSubtitle} onClose={onClose}>
       <form className="grid gap-4" onSubmit={handleSubmit}>
         <label className="grid gap-1.5">
           <span className="text-[0.84rem] font-bold text-brand-muted">Rule label</span>
@@ -136,7 +200,7 @@ function ProfileCriterionModal({
         </label>
 
         {item.description ? (
-          <div className="rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.72)] p-[12px_14px] text-[0.84rem] leading-[1.45] text-brand-muted">
+          <div className="rounded-[10px] border border-[rgba(15,39,72,0.08)] bg-[rgba(248,250,255,0.72)] p-[12px_14px] text-[0.84rem] leading-[1.45] text-brand-muted">
             {item.description}
           </div>
         ) : null}
@@ -157,7 +221,7 @@ function ProfileCriterionModal({
                       'flex cursor-pointer items-start gap-2.5 rounded-[10px] border px-3 py-2.5',
                       checked
                         ? 'border-[rgba(239,68,68,0.28)] bg-[rgba(239,68,68,0.06)]'
-                        : 'border-[rgba(23,44,113,0.1)] bg-white',
+                        : 'border-[rgba(15,39,72,0.1)] bg-white',
                     )}
                   >
                     <input
@@ -177,6 +241,72 @@ function ProfileCriterionModal({
               })}
             </div>
           </fieldset>
+        ) : isLoanTypeRule ? (
+          <fieldset className="grid gap-2">
+            <legend className="text-[0.9rem] font-bold">Rejected loan types</legend>
+            <p className="m-0 text-[0.8rem] leading-[1.45] text-brand-muted">
+              Stored as comma-separated CIBIL TUEF account type IDs.
+            </p>
+            <div className="grid max-h-[320px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+              {CIBIL_TRADELINE_ACCOUNT_TYPES.map((type) => {
+                const checked = selectedLoanTypes.includes(type.id);
+                return (
+                  <label
+                    key={type.id}
+                    className={cx(
+                      'flex cursor-pointer items-start gap-2.5 rounded-[10px] border px-3 py-2.5',
+                      checked
+                        ? 'border-[rgba(239,68,68,0.28)] bg-[rgba(239,68,68,0.06)]'
+                        : 'border-[rgba(15,39,72,0.1)] bg-white',
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={checked}
+                      onChange={() => toggleLoanType(type.id)}
+                    />
+                    <span className="grid gap-0.5">
+                      <span className="text-[0.88rem] font-extrabold tracking-wide">{type.id}</span>
+                      <span className="text-[0.76rem] leading-[1.35] text-brand-muted">{type.label}</span>
+                    </span>
+                  </label>
+                );
+              })}
+              {extraLoanTypes.map((id) => (
+                <label
+                  key={id}
+                  className="flex cursor-pointer items-start gap-2.5 rounded-[10px] border border-[rgba(239,68,68,0.28)] bg-[rgba(239,68,68,0.06)] px-3 py-2.5"
+                >
+                  <input type="checkbox" className="mt-1" checked onChange={() => toggleLoanType(id)} />
+                  <span className="grid gap-0.5">
+                    <span className="text-[0.88rem] font-extrabold tracking-wide">{id}</span>
+                    <span className="text-[0.76rem] leading-[1.35] text-brand-muted">{cibilAccountTypeLabel(id)}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="grid min-w-[140px] flex-1 gap-1.5">
+                <span className="text-[0.8rem] font-bold text-brand-muted">Add other type ID</span>
+                <input
+                  className="los-input"
+                  value={extraLoanTypeId}
+                  onChange={(event) => setExtraLoanTypeId(event.target.value)}
+                  placeholder="70"
+                  maxLength={2}
+                  inputMode="numeric"
+                />
+              </label>
+              <button
+                type="button"
+                className="min-h-[40px] rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-white px-3 font-bold text-brand-navy"
+                onClick={addExtraLoanType}
+              >
+                Add ID
+              </button>
+            </div>
+          </fieldset>
         ) : (
           <label className="grid gap-1.5">
             <span className="text-[0.9rem] font-bold">Rule value</span>
@@ -185,7 +315,7 @@ function ProfileCriterionModal({
               value={value}
               onChange={(event) => setValue(event.target.value)}
               minLength={1}
-              maxLength={100}
+              maxLength={255}
               required
             />
           </label>
@@ -198,7 +328,7 @@ function ProfileCriterionModal({
         ) : null}
 
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className="min-h-[40px] flex-1 cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent font-bold text-brand-text">
+          <button type="button" onClick={onClose} className="min-h-[40px] flex-1 cursor-pointer rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent font-bold text-brand-text">
             Cancel
           </button>
           <button type="submit" className="los-btn-primary flex-1" disabled={saving}>
@@ -328,7 +458,13 @@ export function ProfileEligibilityPanel({
       filter: { type: 'text', placeholder: 'Search values…' },
       cellClassName: 'text-brand-muted',
       render: (item) =>
-        REJECTED_CREDIT_ASSESSMENT_GRADE_KEYS.has(item.key) ? <GradeValuePills value={item.value} /> : item.value,
+        REJECTED_CREDIT_ASSESSMENT_GRADE_KEYS.has(item.key) ? (
+          <GradeValuePills value={item.value} />
+        ) : REJECT_LOAN_TYPE_KEYS.has(item.key) ? (
+          <LoanTypeValuePills value={item.value} />
+        ) : (
+          item.value
+        ),
     },
     {
       key: 'status',

@@ -21,9 +21,9 @@ import {
 import { createPortal } from 'react-dom';
 
 const FIELD_CLASS =
-  'w-full min-w-[72px] h-[28px] rounded-[6px] border border-[rgba(23,44,113,0.12)] bg-white px-1.5 text-[0.72rem] font-medium text-brand-text';
+  'w-full min-w-[72px] h-[28px] rounded-[6px] border border-[rgba(15,39,72,0.12)] bg-white px-1.5 text-[0.72rem] font-medium text-brand-text';
 const INPUT_CLASS =
-  'h-[32px] w-full rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-white px-2.5 text-[0.8rem] font-semibold text-brand-navy outline-none focus:border-[rgba(20,150,243,0.45)]';
+  'h-[32px] w-full rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-white px-2.5 text-[0.8rem] font-semibold text-brand-navy outline-none focus:border-[rgba(34,197,94,0.45)]';
 
 function emptyRange(): NumberRangeValue {
   return { min: null, max: null };
@@ -144,7 +144,7 @@ export function NumberRangeFilter({
       ref={panelRef}
       role="dialog"
       aria-labelledby={labelId}
-      className="fixed z-[90] w-[280px] rounded-[16px] border border-[rgba(23,44,113,0.14)] bg-white p-3 shadow-[0_18px_50px_rgba(23,44,113,0.22)]"
+      className="fixed z-[90] w-[280px] rounded-[16px] border border-[rgba(15,39,72,0.14)] bg-white p-3 shadow-[0_18px_50px_rgba(15,39,72,0.22)]"
       style={{ top: pos.top, left: pos.left }}
     >
       <p id={labelId} className="m-0 mb-2 text-[0.68rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
@@ -201,8 +201,8 @@ export function NumberRangeFilter({
                 className={cx(
                   'h-7 rounded-full border px-2.5 text-[0.7rem] font-bold transition-colors',
                   selected
-                    ? 'border-[rgba(20,150,243,0.35)] bg-[rgba(20,150,243,0.12)] text-brand-blue'
-                    : 'border-[rgba(23,44,113,0.12)] bg-white text-brand-navy hover:border-[rgba(20,150,243,0.28)]',
+                    ? 'border-[rgba(34,197,94,0.35)] bg-[rgba(34,197,94,0.12)] text-brand-blue'
+                    : 'border-[rgba(15,39,72,0.12)] bg-white text-brand-navy hover:border-[rgba(34,197,94,0.28)]',
                 )}
               >
                 {preset.label}
@@ -219,7 +219,7 @@ export function NumberRangeFilter({
             onChange('');
             setOpen(false);
           }}
-          className="h-8 rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.76rem] font-bold text-brand-text hover:bg-[rgba(20,150,243,0.06)]"
+          className="h-8 rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.76rem] font-bold text-brand-text hover:bg-[rgba(34,197,94,0.06)]"
         >
           Clear
         </button>
@@ -229,7 +229,7 @@ export function NumberRangeFilter({
             applyRange(draft);
             setOpen(false);
           }}
-          className="h-8 rounded-[8px] border border-[rgba(20,150,243,0.28)] bg-[rgba(20,150,243,0.12)] px-3 text-[0.76rem] font-bold text-brand-blue"
+          className="h-8 rounded-[8px] border border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.12)] px-3 text-[0.76rem] font-bold text-brand-blue"
         >
           Apply
         </button>
@@ -249,7 +249,7 @@ export function NumberRangeFilter({
         className={cx(
           FIELD_CLASS,
           'mt-1.5 inline-flex min-w-[108px] items-center justify-between gap-1 text-left',
-          parsed ? 'border-[rgba(20,150,243,0.28)] text-brand-navy' : 'text-brand-muted',
+          parsed ? 'border-[rgba(34,197,94,0.28)] text-brand-navy' : 'text-brand-muted',
         )}
       >
         <span className="min-w-0 truncate">{triggerLabel}</span>

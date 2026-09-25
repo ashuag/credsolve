@@ -16,13 +16,14 @@ import {
   savePendingRepayIntent,
 } from '../../../../common/easebuzz/repay-intent.util';
 import { LOAN_REPAYMENT_STATUS } from '../../../../common/constants/loan-repayment.constants';
-import { LOAN_STATUS } from '../../../../common/constants/loan.constants';
+import { closeLoanStatusName, isClosedLoanStatus, LOAN_STATUS } from '../../../../common/constants/loan.constants';
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import {
   computeAmountDueNowInr,
   computeTenureDays,
   decimalToNumber,
 } from '../../../../common/loan/loan-calculation.util';
+import { billDueNowAfterWaiverInr, waivedAmountFromLoan } from '../../../../common/loan/loan-charge-waiver.util';
 import {
   isRepaymentPastDue,
   overdueDaysFromMaturity,
@@ -40,6 +41,7 @@ import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
+import { NocLetterService } from '../../../../common/noc/noc-letter.service';
 
 const REPAY_LOCK_TTL_SEC = 90;
 
@@ -66,6 +68,7 @@ export class InitiateCustomerRepaymentUseCase {
     private readonly redis: RedisService,
     private readonly bounceChargeTiers: BounceChargeTierResolverService,
     private readonly settings: SettingsRepository,
+    private readonly nocLetter: NocLetterService,
   ) {}
 
   async execute(
@@ -133,6 +136,7 @@ export class InitiateCustomerRepaymentUseCase {
             disbursedAt: true,
             loanMaturityDate: true,
             closedAt: true,
+            waivedAmount: true,
             loanStatus: { select: { name: true } },
           },
         },
@@ -147,7 +151,7 @@ export class InitiateCustomerRepaymentUseCase {
     if (!loan) {
       throw new BadRequestException('No disbursed loan found for this application.');
     }
-    if (loan.closedAt != null || loan.loanStatus.name === LOAN_STATUS.CLOSED) {
+    if (loan.closedAt != null || isClosedLoanStatus(loan.loanStatus.name)) {
       throw new ConflictException('This loan is already closed.');
     }
     if (
@@ -164,26 +168,33 @@ export class InitiateCustomerRepaymentUseCase {
     }
 
     const coolingPeriodDays = await this.settings.loadRepayCoolingPeriodDays();
-    const due = computeAmountDueNowInr(principal, dailyRate, loan.disbursedAt, {
-      coolingPeriodDays,
-      tenureDays: computeTenureDays(loan.disbursedAt, loan.loanMaturityDate),
-    });
-    if (!(due.amountDue > 0)) {
-      throw new BadRequestException('Nothing due on this loan right now.');
-    }
-
-    // Late repayment (after maturity / OVERDUE): penal charge is rate % of principal,
-    // clamped between PENAL_MIN_INR and PENAL_MAX_INR. A loan flagged OVERDUE bills at least one day.
+    // Late repayment (after maturity / OVERDUE): full tenure interest + overdue-days
+    // interest + penal (rate % of principal, clamped between PENAL_MIN_INR and PENAL_MAX_INR).
+    // A loan flagged OVERDUE bills at least one overdue day.
     const pastDue =
       loan.loanStatus.name === LOAN_STATUS.OVERDUE || isRepaymentPastDue(loan.loanMaturityDate);
     const overdueDays = pastDue
       ? Math.max(overdueDaysFromMaturity(loan.loanMaturityDate), 1)
       : 0;
+    const due = computeAmountDueNowInr(principal, dailyRate, loan.disbursedAt, {
+      coolingPeriodDays,
+      tenureDays: computeTenureDays(loan.disbursedAt, loan.loanMaturityDate),
+      overdueDays,
+    });
+    if (!(due.amountDue > 0)) {
+      throw new BadRequestException('Nothing due on this loan right now.');
+    }
     const bounceFeeInr = await this.bounceChargeTiers.resolveChargeForAmount(
       principal,
       overdueDays,
     );
-    const billDueNow = Math.round((due.amountDue + bounceFeeInr) * 100) / 100;
+    const bill = billDueNowAfterWaiverInr({
+      amountDueBeforePenal: due.amountDue,
+      penalInr: bounceFeeInr,
+      overdueInterestInr: due.overdueInterestAmount,
+      waivedAmountInr: waivedAmountFromLoan(loan.waivedAmount),
+    });
+    const billDueNow = bill.billDueNow;
     const totalPaid = await sumSuccessfulRepaymentsInr(this.prisma.client, loan.id);
     const remaining = remainingDueInr(billDueNow, totalPaid);
     const minPayAmountInr = await this.settings.loadMinPayAmountInr();
@@ -325,14 +336,21 @@ export class InitiateCustomerRepaymentUseCase {
     const remainingAfter = remainingDueInr(billDueNow, totalPaid + totalDue);
     const closesLoan = shouldCloseLoanAfterPayment(remainingAfter);
 
+    const closeStatusName = closeLoanStatusName(bill.appliedWaiverInr);
     const closedStatus = closesLoan
-      ? await this.prisma.client.loanStatus.findFirst({
-          where: { name: LOAN_STATUS.CLOSED, isActive: true },
+      ? (await this.prisma.client.loanStatus.findFirst({
+          where: { name: closeStatusName, isActive: true },
           select: { id: true },
-        })
+        })) ??
+        (closeStatusName === LOAN_STATUS.SETTLED
+          ? await this.prisma.client.loanStatus.findFirst({
+              where: { name: LOAN_STATUS.CLOSED, isActive: true },
+              select: { id: true },
+            })
+          : null)
       : null;
     if (closesLoan && !closedStatus) {
-      throw new NotFoundException('CLOSED loan status is not configured.');
+      throw new NotFoundException(`${closeStatusName} loan status is not configured.`);
     }
 
     const repaymentUuid = randomUUID();
@@ -378,14 +396,14 @@ export class InitiateCustomerRepaymentUseCase {
       `;
 
       if (closesLoan && closedStatus) {
-        const collected = Math.round((totalPaid + totalDue) * 100) / 100;
+        const bookedRepayable = Math.round((principal + due.interestAmount) * 100) / 100;
         await tx.loanAccount.update({
           where: { id: loan.id },
           data: {
             loanStatusId: closedStatus.id,
             closedAt: paidAt,
             interestAmount: due.interestAmount.toFixed(2),
-            totalRepaymentAmount: collected.toFixed(2),
+            totalRepaymentAmount: bookedRepayable.toFixed(2),
           },
         });
 
@@ -407,6 +425,10 @@ export class InitiateCustomerRepaymentUseCase {
         `repayment=${repaymentUuid} ${closesLoan ? 'closed' : 'partial'}`,
     );
 
+    if (closesLoan) {
+      this.nocLetter.scheduleIssueIfNeeded(loan.id);
+    }
+
     return {
       success: true as const,
       applicationUuid: application.uuid,
@@ -415,7 +437,7 @@ export class InitiateCustomerRepaymentUseCase {
       amountInr,
       bounceFeeInr: bounceFeeInrStr,
       repaymentUuid,
-      loanStatus: closesLoan ? LOAN_STATUS.CLOSED : loan.loanStatus.name,
+      loanStatus: closesLoan ? closeStatusName : loan.loanStatus.name,
       redirectPath: '/my-account',
       paymentUrl: null,
       vendor,

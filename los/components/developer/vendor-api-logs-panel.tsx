@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/data-table';
 import {
   getVendorApiLog,
+  getVendorApiLogsExportUrl,
   listVendorApiLogs,
   type LosVendorApiLogDetail,
   type LosVendorApiLogListItem,
@@ -121,10 +122,10 @@ function DetailModal({
       aria-label="Vendor API log detail"
     >
       <div
-        className="flex max-h-[90vh] w-full max-w-[920px] flex-col overflow-hidden rounded-[20px] border border-[rgba(23,44,113,0.12)] shadow-[0_28px_70px_rgba(23,44,113,0.22)]"
+        className="flex max-h-[90vh] w-full max-w-[920px] flex-col overflow-hidden rounded-[20px] border border-[rgba(15,39,72,0.12)] shadow-[0_28px_70px_rgba(15,39,72,0.22)]"
         style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.99), rgba(241,247,255,0.96))' }}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-[rgba(23,44,113,0.08)] px-6 py-5">
+        <div className="flex items-start justify-between gap-4 border-b border-[rgba(15,39,72,0.08)] px-6 py-5">
           <div>
             <span className="mb-1 block text-[0.68rem] font-extrabold uppercase tracking-[0.16em] text-brand-blue">
               Vendor API Log
@@ -147,7 +148,7 @@ function DetailModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded-[10px] border border-[rgba(23,44,113,0.12)] bg-[rgba(255,255,255,0.9)] text-brand-navy"
+            className="flex h-9 w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded-[10px] border border-[rgba(15,39,72,0.12)] bg-[rgba(255,255,255,0.9)] text-brand-navy"
             aria-label="Close"
           >
             <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden>
@@ -206,7 +207,7 @@ function DetailModal({
               ).map(([label, value]) => (
                 <div key={label} className="grid gap-1.5">
                   <span className="text-[0.82rem] font-bold text-brand-muted">{label}</span>
-                  <pre className="m-0 max-h-[240px] overflow-auto whitespace-pre-wrap break-all rounded-[12px] border border-[rgba(23,44,113,0.1)] bg-white p-3 font-mono text-[0.72rem] leading-[1.45]">
+                  <pre className="m-0 max-h-[240px] overflow-auto whitespace-pre-wrap break-all rounded-[12px] border border-[rgba(15,39,72,0.1)] bg-white p-3 font-mono text-[0.72rem] leading-[1.45]">
                     {formatJson(value)}
                   </pre>
                 </div>
@@ -334,11 +335,41 @@ export function VendorApiLogsPanel() {
   }, [page, pageSize, total]);
 
   const filtersActive = hasActiveColumnFilters(columnFilters);
+  const filtersSettled = columnFilters === debouncedFilters;
+  const canDownloadDump = filtersActive && filtersSettled && !loading && total > 0;
+
+  const downloadDump = useCallback(() => {
+    const token = getLosToken();
+    if (!token) {
+      setError('Session expired - please log in again.');
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = getVendorApiLogsExportUrl(token, {
+      sortBy: sort?.key ?? 'requestedAt',
+      sortDir: sort?.dir ?? 'desc',
+      providerName: debouncedFilters.providerName,
+      serviceName: debouncedFilters.serviceName,
+      requestMethod: debouncedFilters.requestMethod,
+      httpStatus: debouncedFilters.httpStatus,
+      id: debouncedFilters.id,
+      leadId: debouncedFilters.leadId,
+      applicationNumber: debouncedFilters.applicationNumber,
+      requestPath: debouncedFilters.requestPath,
+      outcome: debouncedFilters.outcome,
+      requestedFrom: debouncedFilters.requestedFrom,
+      requestedTo: debouncedFilters.requestedTo,
+    });
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }, [sort, debouncedFilters]);
 
   return (
     <>
-      <div className="overflow-hidden rounded-[14px] border border-[rgba(23,44,113,0.1)] bg-white">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[rgba(23,44,113,0.07)] px-4 py-3">
+      <div className="overflow-hidden rounded-[14px] border border-[rgba(15,39,72,0.1)] bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[rgba(15,39,72,0.07)] px-4 py-3">
           <div>
             <h2 className="m-0 text-[1rem] font-extrabold tracking-[-0.02em]">Vendor API logs</h2>
             <p className="m-0 mt-0.5 text-[0.8rem] text-brand-muted">
@@ -346,11 +377,28 @@ export function VendorApiLogsPanel() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={downloadDump}
+              disabled={!canDownloadDump}
+              title={
+                !filtersActive
+                  ? 'Apply a filter to enable the dump download'
+                  : !filtersSettled || loading
+                    ? undefined
+                    : total === 0
+                      ? 'No records match the current filters'
+                      : undefined
+              }
+              className="min-h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text hover:bg-[rgba(34,197,94,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              ⬇ Download dump
+            </button>
             {filtersActive ? (
               <button
                 type="button"
                 onClick={clearColumnFilters}
-                className="min-h-[32px] cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text hover:bg-[rgba(20,150,243,0.05)]"
+                className="min-h-[32px] cursor-pointer rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text hover:bg-[rgba(34,197,94,0.05)]"
               >
                 Clear filters
               </button>
@@ -358,7 +406,7 @@ export function VendorApiLogsPanel() {
             <button
               type="button"
               onClick={() => void load()}
-              className="min-h-[32px] cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text hover:bg-[rgba(20,150,243,0.05)]"
+              className="min-h-[32px] cursor-pointer rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text hover:bg-[rgba(34,197,94,0.05)]"
             >
               Refresh
             </button>
@@ -371,7 +419,7 @@ export function VendorApiLogsPanel() {
             <button
               type="button"
               onClick={() => void load()}
-              className="min-h-[32px] cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] px-3 text-[0.8rem] font-bold"
+              className="min-h-[32px] cursor-pointer rounded-[8px] border border-[rgba(15,39,72,0.14)] px-3 text-[0.8rem] font-bold"
             >
               Retry
             </button>
@@ -380,7 +428,7 @@ export function VendorApiLogsPanel() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1320px] border-collapse text-left text-[0.84rem]">
               <thead className="sticky top-0 z-[1] bg-[rgba(248,250,255,0.96)]">
-                <tr className="border-b border-[rgba(23,44,113,0.08)]">
+                <tr className="border-b border-[rgba(15,39,72,0.08)]">
                   <th className="px-3 py-2 align-bottom">
                     <DataTableColumnHeader label="Log ID" sortKey="id" sort={sort} onSort={toggleSort}>
                       <DataTableColumnFilter
@@ -532,7 +580,7 @@ export function VendorApiLogsPanel() {
                 {items.map((row) => (
                   <tr
                     key={row.uuid}
-                    className="border-b border-[rgba(23,44,113,0.06)] hover:bg-[rgba(20,150,243,0.03)]"
+                    className="border-b border-[rgba(15,39,72,0.06)] hover:bg-[rgba(34,197,94,0.03)]"
                   >
                     <td className="whitespace-nowrap px-3 py-2.5 font-mono text-[0.78rem] font-bold">
                       {row.id}
@@ -573,7 +621,7 @@ export function VendorApiLogsPanel() {
                       <button
                         type="button"
                         onClick={() => void openDetail(row)}
-                        className="cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-2.5 py-1 text-[0.75rem] font-bold text-brand-blue hover:bg-[rgba(20,150,243,0.06)]"
+                        className="cursor-pointer rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-2.5 py-1 text-[0.75rem] font-bold text-brand-blue hover:bg-[rgba(34,197,94,0.06)]"
                       >
                         View
                       </button>

@@ -24,6 +24,8 @@ describe('computeAmountDueNowInr cooling period', () => {
     expect(due.interestDays).toBe(3);
     expect(due.usedFullTenureInterest).toBe(false);
     expect(due.interestAmount).toBe(computeInterestAmountInr(principal, dailyRate, 3));
+    expect(due.overdueInterestAmount).toBe(0);
+    expect(due.totalInterestAmount).toBe(due.interestAmount);
     expect(due.amountDue).toBe(principal + due.interestAmount);
   });
 
@@ -61,6 +63,37 @@ describe('computeAmountDueNowInr cooling period', () => {
     expect(due.daysOutstanding).toBe(1);
     expect(due.usedFullTenureInterest).toBe(true);
     expect(due.interestDays).toBe(tenureDays);
+  });
+
+  it('adds overdue-days interest on top of full tenure interest after the due date', () => {
+    const lateDisbursedAt = new Date('2026-08-01T06:00:00.000Z');
+    const lateTenureDays = computeTenureDays(lateDisbursedAt, new Date('2026-08-31T00:00:00.000Z'));
+    const due = computeAmountDueNowInr(principal, dailyRate, lateDisbursedAt, {
+      asOf: new Date('2026-09-05T10:00:00.000Z'),
+      coolingPeriodDays: 7,
+      tenureDays: lateTenureDays,
+      overdueDays: 5,
+    });
+    const tenureInterest = computeInterestAmountInr(principal, dailyRate, lateTenureDays);
+    const overdueInterest = computeInterestAmountInr(principal, dailyRate, 5);
+    expect(due.usedFullTenureInterest).toBe(true);
+    expect(due.interestAmount).toBe(tenureInterest);
+    expect(due.overdueDays).toBe(5);
+    expect(due.overdueInterestAmount).toBe(overdueInterest);
+    expect(due.totalInterestAmount).toBe(tenureInterest + overdueInterest);
+    expect(due.amountDue).toBe(principal + tenureInterest + overdueInterest);
+  });
+
+  it('does not add overdue interest when overdueDays is 0', () => {
+    const due = computeAmountDueNowInr(principal, dailyRate, disbursedAt, {
+      asOf: new Date('2026-07-31T10:00:00.000Z'),
+      coolingPeriodDays: 7,
+      tenureDays,
+      overdueDays: 0,
+    });
+    expect(due.overdueInterestAmount).toBe(0);
+    expect(due.totalInterestAmount).toBe(due.interestAmount);
+    expect(due.amountDue).toBe(principal + due.interestAmount);
   });
 });
 

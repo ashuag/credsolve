@@ -53,7 +53,8 @@ export class LoanDocumentGeneratorService {
     }
 
     const pdf = await this.htmlPdfGenerator.generatePdf(preparedMerge, {
-      section: 'sanction-kfs',
+      section:
+        docType === LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT ? 'disbursement' : 'sanction-kfs',
       includeAcceptanceBlock: digitallySign,
     });
     if (!digitallySign) {
@@ -72,8 +73,9 @@ export class LoanDocumentGeneratorService {
 
   /**
    * Loan cum Commercial Terms alone (Section C), plain — no NBFC DSC signature.
-   * Generated fresh at send time and attached alongside the sanction letter email;
-   * not persisted to storage and not shown in the customer's in-app review/eSign PDF.
+   * Generated fresh at post-acceptance email time and attached alongside the
+   * sanction letter. Not shown in the customer's in-app review/eSign PDF.
+   * At disbursement, Section C is instead merged into the signed KFS PDF.
    */
   async generateCommercialTermsPdf(merge: LoanDocumentMergeInput): Promise<Buffer> {
     return this.htmlPdfGenerator.generatePdf(merge, { section: 'commercial-terms' });

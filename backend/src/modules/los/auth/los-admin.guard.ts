@@ -12,7 +12,7 @@ export class LosAdminGuard implements CanActivate {
     const roleName = req.losUser?.roleName ?? null;
     const hierarchyLevel = req.losUser?.hierarchyLevel ?? null;
     if (!isLosAdminRole(roleName, hierarchyLevel)) {
-      throw new ForbiddenException('Only the Admin role can reapply a rejected customer journey.');
+      throw new ForbiddenException('Only the Admin role can perform this action.');
     }
     return true;
   }

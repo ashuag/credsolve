@@ -81,7 +81,7 @@ export type DataTableProps<T, K extends string = string> = {
 };
 
 export const FILTER_CONTROL_CLASS =
-  'mt-1.5 w-full min-w-[72px] h-[28px] rounded-[6px] border border-[rgba(23,44,113,0.12)] bg-white px-1.5 text-[0.72rem] font-medium text-brand-text';
+  'mt-1.5 w-full min-w-[72px] h-[28px] rounded-[6px] border border-[rgba(15,39,72,0.12)] bg-white px-1.5 text-[0.72rem] font-medium text-brand-text';
 
 export const ACTIVE_INACTIVE_FILTER_OPTIONS = [
   { value: 'active', label: 'Active' },
@@ -350,7 +350,7 @@ export function DataTablePagination({
   onPageSizeChange?: (size: number) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.6)] px-4 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[rgba(15,39,72,0.07)] bg-[rgba(248,250,255,0.6)] px-4 py-3">
       <span className="text-[0.78rem] text-brand-muted">
         {count === 0 ? `No ${entityLabel} found` : `${start}–${end} of ${count} ${entityLabel}`}
       </span>
@@ -361,7 +361,7 @@ export function DataTablePagination({
             <select
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="h-[32px] rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-2 text-[0.8rem] font-bold text-brand-text"
+              className="h-[32px] rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-2 text-[0.8rem] font-bold text-brand-text"
             >
               {pageSizeOptions.map((size) => (
                 <option key={size} value={size}>
@@ -375,7 +375,7 @@ export function DataTablePagination({
           type="button"
           onClick={onPrev}
           disabled={page <= 1}
-          className="min-h-[32px] cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.05)] disabled:cursor-not-allowed disabled:opacity-40"
+          className="min-h-[32px] cursor-pointer rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.05)] disabled:cursor-not-allowed disabled:opacity-40"
         >
           ← Prev
         </button>
@@ -386,7 +386,7 @@ export function DataTablePagination({
           type="button"
           onClick={onNext}
           disabled={page >= total}
-          className="min-h-[32px] cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.05)] disabled:cursor-not-allowed disabled:opacity-40"
+          className="min-h-[32px] cursor-pointer rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.05)] disabled:cursor-not-allowed disabled:opacity-40"
         >
           Next →
         </button>
@@ -561,7 +561,7 @@ export function DataTable<T, K extends string = string>({
   const anyFilterable = columns.some((column) => getColumnFilterConfig(column) != null);
 
   const shellClass = bordered
-    ? `overflow-hidden rounded-[14px] border border-[rgba(23,44,113,0.1)] ${className ?? ''}`
+    ? `overflow-hidden rounded-[14px] border border-[rgba(15,39,72,0.1)] ${className ?? ''}`
     : className ?? '';
 
   const shellStyle = bordered
@@ -571,7 +571,7 @@ export function DataTable<T, K extends string = string>({
   return (
     <div className={shellClass} style={shellStyle}>
       {showToolbar && (anyFilterable || toolbarActions || hint) ? (
-        <div className="flex flex-wrap items-center gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.72)] px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-2 border-b border-[rgba(15,39,72,0.07)] bg-[rgba(248,250,255,0.72)] px-4 py-2.5">
           {hint ? (
             <p className="m-0 min-w-[180px] flex-1 text-[0.76rem] text-brand-muted">{hint}</p>
           ) : (
@@ -581,7 +581,7 @@ export function DataTable<T, K extends string = string>({
             <button
               type="button"
               onClick={clearColumnFilters}
-              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)]"
             >
               Clear filters
             </button>
@@ -597,7 +597,7 @@ export function DataTable<T, K extends string = string>({
             <button
               type="button"
               onClick={onRetry}
-              className="mx-auto h-[36px] cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-4 text-[0.84rem] font-bold text-brand-text"
+              className="mx-auto h-[36px] cursor-pointer rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-4 text-[0.84rem] font-bold text-brand-text"
             >
               Retry
             </button>
@@ -621,7 +621,7 @@ export function DataTable<T, K extends string = string>({
                     : 'align-top'
                 }
               >
-                <tr className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)]">
+                <tr className="border-b border-[rgba(15,39,72,0.07)] bg-[rgba(248,250,255,0.9)]">
                   {columns.map((column) => (
                     <th
                       key={column.key}
@@ -676,7 +676,7 @@ export function DataTable<T, K extends string = string>({
                       key={getRowKey(item, index)}
                       className={
                         renderRowClassName?.(item, index) ??
-                        `border-b border-[rgba(23,44,113,0.05)] transition-colors hover:bg-[rgba(20,150,243,0.025)] ${
+                        `border-b border-[rgba(15,39,72,0.05)] transition-colors hover:bg-[rgba(34,197,94,0.025)] ${
                           index === paginated.length - 1 ? 'border-b-0' : ''
                         }`
                       }

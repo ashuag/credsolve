@@ -1,10 +1,12 @@
 import {
   ACCOUNT_TYPE_LABELS,
   DWELLING_LABELS,
+  formatCibilEnquiryPurposeLabel,
   PHONE_TYPE_LABELS,
 } from './cibil-tuef.constants';
 import { formatInrAmountForPdf } from '../pdf/pdf-safe-text.util';
 import {
+  extractBureauInquiries,
   formatSuitFiledWilfulDefaultLabel,
   parseCibilDate,
 } from './cibil-bureau-rules.parser';
@@ -16,7 +18,6 @@ import {
 } from './cibil-tradeline.parser';
 import { parseTenacioBureauVendorBody } from '../vendor/tenacio-bureau-payload.mapper';
 import { extractCibilAssessmentInsights, type CibilAssessmentInsights } from './cibil-assessment-insights';
-import { response } from 'express';
 
 export type CibilReportPaymentMonth = {
   year: number;
@@ -230,9 +231,22 @@ function accountTypeLabel(symbol: string | null): string {
 }
 
 function inquiryPurposeLabel(code: unknown): string {
-  const s = String(code ?? '').trim().padStart(2, '0');
-  const labels: Record<string, string> = { '00': 'Other', '05': 'Personal loan', '06': 'Consumer loan', '10': 'Credit card' };
-  return labels[s] ?? (s ? `Purpose ${s}` : '-');
+  const rec = asRecord(code);
+  if (rec) {
+    const description = rec.description ?? rec.Description;
+    if (description != null && String(description).trim()) {
+      return formatCibilEnquiryPurposeLabel(String(description).trim());
+    }
+    const symbol = readSymbol(code);
+    return symbol ? inquiryPurposeLabel(symbol) : '-';
+  }
+  const s = String(code ?? '').trim();
+  if (!s) return '-';
+  if (/^\d+$/.test(s)) {
+    const norm = s.padStart(2, '0');
+    return formatCibilEnquiryPurposeLabel(ACCOUNT_TYPE_LABELS[norm] ?? `Purpose ${norm}`);
+  }
+  return formatCibilEnquiryPurposeLabel(s);
 }
 
 function scoreRatingFromScore(score: number | null): string | null {
@@ -646,7 +660,9 @@ export function extractCibilReportData(vendorBody: unknown): CibilReportData {
         const payHistory = resolvePayStatusHistory(lineRec);
         const parsedLine = parseCibilTradeline(rawLine, partitionSymbol);
         const creditor = String(lineRec.creditorName ?? 'Lender').trim() || 'Lender';
-        const acctType = accountTypeLabel(partitionSymbol);
+        const description =
+          lineRec.accountTypeDescription != null ? String(lineRec.accountTypeDescription).trim() : '';
+        const acctType = accountTypeLabel(partitionSymbol || description || parsedLine?.accountTypeSymbol || null);
 
         if (parsedLine) {
           accountOverview.push({
@@ -698,23 +714,15 @@ export function extractCibilReportData(vendorBody: unknown): CibilReportData {
     }
   }
 
-  const inquiries: CibilReportInquiryRow[] = [];
-  if (tlr) {
-    for (const partition of asArray(tlr.InquiryPartition)) {
-      const partitionRec = asRecord(partition);
-      const inquiry = partitionRec ? asRecord(partitionRec.Inquiry) : null;
-      if (!inquiry) continue;
-      const date = parseCibilDate(inquiry.inquiryDate);
-      if (!date) continue;
-      inquiries.push({
-        date: formatIndianDate(date) ?? '-',
-        member: String(inquiry.subscriberName ?? 'Enquirer').trim() || 'Enquirer',
-        purpose: inquiryPurposeLabel(inquiry.inquiryType),
-        amount: formatInrAmountForPdf(inquiry.amount),
-      });
-    }
-  }
-  inquiries.sort((a, b) => (a.date < b.date ? 1 : -1));
+  const inquiries: CibilReportInquiryRow[] = extractBureauInquiries(vendorBody)
+    .slice()
+    .sort((a, b) => b.date.getTime() - a.date.getTime())
+    .map((inq) => ({
+      date: formatIndianDate(inq.date) ?? '-',
+      member: inq.subscriberName?.trim() || 'Enquirer',
+      purpose: inquiryPurposeLabel(inq.inquiryType),
+      amount: formatInrAmountForPdf(inq.amount),
+    }));
 
   const summary = tlr ? asRecord(tlr.CreditSummaryData) : null;
   const exposureInsight = buildExposureInsight(accountOverview, vendorBody);

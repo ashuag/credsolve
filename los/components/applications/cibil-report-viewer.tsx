@@ -36,7 +36,7 @@ function InsightMetricGrid({
       {rows.map((row) => (
         <div
           key={row.label}
-          className="rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(255,255,255,0.78)] px-3 py-2.5"
+          className="rounded-[10px] border border-[rgba(15,39,72,0.08)] bg-[rgba(255,255,255,0.78)] px-3 py-2.5"
         >
           <dt className="text-[0.62rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted leading-tight">
             {row.label}
@@ -145,7 +145,7 @@ function CibilInsightsSection({ insights }: { insights: CibilAssessmentInsights 
       <p className="mb-2 mt-5 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
         Adverse flags
       </p>
-      <dl className="m-0 divide-y divide-[rgba(23,44,113,0.08)]">
+      <dl className="m-0 divide-y divide-[rgba(15,39,72,0.08)]">
         {flagRows.map((row) => (
           <div key={row.label} className="grid gap-1 py-2.5 first:pt-0 last:pb-0 sm:grid-cols-[minmax(160px,220px)_1fr] sm:items-start sm:gap-3">
             <dt>
@@ -238,7 +238,7 @@ function CibilCreditAssessmentSection({ assessment }: { assessment: CibilCreditA
       />
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(255,255,255,0.78)] px-3 py-2.5">
+        <div className="rounded-[10px] border border-[rgba(15,39,72,0.08)] bg-[rgba(255,255,255,0.78)] px-3 py-2.5">
           <dt className="text-[0.62rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted leading-tight">
             Credit status
           </dt>
@@ -251,7 +251,7 @@ function CibilCreditAssessmentSection({ assessment }: { assessment: CibilCreditA
             </div>
           ) : null}
         </div>
-        <div className="rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(255,255,255,0.78)] px-3 py-2.5">
+        <div className="rounded-[10px] border border-[rgba(15,39,72,0.08)] bg-[rgba(255,255,255,0.78)] px-3 py-2.5">
           <dt className="text-[0.62rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted leading-tight">
             Credit recommendation
           </dt>
@@ -274,6 +274,11 @@ function CibilCreditAssessmentSection({ assessment }: { assessment: CibilCreditA
           { label: 'Total tradelines', value: formatInsightCount(assessment.signals.noOfLoans) },
           { label: 'Credit cards', value: formatInsightCount(assessment.signals.noOfCreditCards) },
           { label: 'Unsecured loans', value: formatInsightCount(assessment.signals.noOfUnsecuredLoans) },
+          {
+            label: 'Active unsecured loans',
+            hint: 'Open unsecured tradelines only',
+            value: formatInsightCount(assessment.signals.noOfActiveUnsecuredLoans),
+          },
           { label: 'Secured loans', value: formatInsightCount(assessment.signals.noOfSecuredLoans) },
           { label: 'Gold loans', value: formatInsightCount(assessment.signals.noOfGoldLoans) },
           { label: 'Enquiries (6 months)', value: formatInsightCount(assessment.signals.sixMonthEnquiries) },
@@ -318,7 +323,7 @@ function formatDateTime(iso: string | null | undefined) {
 
 function DetailGrid({ rows }: { rows: Array<{ label: string; value: ReactNode }> }) {
   return (
-    <dl className="m-0 divide-y divide-[rgba(23,44,113,0.08)]">
+    <dl className="m-0 divide-y divide-[rgba(15,39,72,0.08)]">
       {rows.map((row, idx) => (
         <div
           key={`${row.label}-${idx}`}
@@ -354,7 +359,7 @@ function ReportSection({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-start justify-between gap-3 border-0 bg-[rgba(20,150,243,0.04)] px-5 py-4 text-left md:px-6"
+        className="flex w-full items-start justify-between gap-3 border-0 bg-[rgba(34,197,94,0.04)] px-5 py-4 text-left md:px-6"
         aria-expanded={open}
       >
         <div className="min-w-0 flex-1">
@@ -367,7 +372,7 @@ function ReportSection({
           {badge}
           <span
             className={cx(
-              'inline-flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(23,44,113,0.12)] bg-white text-brand-navy transition-transform',
+              'inline-flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(15,39,72,0.12)] bg-white text-brand-navy transition-transform',
               open && 'rotate-180',
             )}
             aria-hidden
@@ -378,7 +383,7 @@ function ReportSection({
           </span>
         </div>
       </button>
-      {open ? <div className="border-t border-[rgba(23,44,113,0.08)] px-5 py-4 md:px-6 md:py-5">{children}</div> : null}
+      {open ? <div className="border-t border-[rgba(15,39,72,0.08)] px-5 py-4 md:px-6 md:py-5">{children}</div> : null}
     </section>
   );
 }
@@ -468,7 +473,7 @@ function PaymentHistoryGrid({ history }: { history: CibilReportPaymentMonth[] })
                         {status || '—'}
                       </span>
                     ) : (
-                      <span className="flex h-10 w-full items-center justify-center rounded bg-[rgba(23,44,113,0.03)] text-sm text-[rgba(23,44,113,0.2)]">
+                      <span className="flex h-10 w-full items-center justify-center rounded bg-[rgba(15,39,72,0.03)] text-sm text-[rgba(15,39,72,0.2)]">
                         –
                       </span>
                     )}
@@ -487,7 +492,7 @@ function AccountCard({ account, index }: { account: CibilReportAccountRow; index
   const [open, setOpen] = useState(index === 0);
 
   return (
-    <article className="rounded-[12px] border border-[rgba(23,44,113,0.1)] bg-white">
+    <article className="rounded-[12px] border border-[rgba(15,39,72,0.1)] bg-white">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -516,7 +521,7 @@ function AccountCard({ account, index }: { account: CibilReportAccountRow; index
         </div>
       </button>
       {open ? (
-        <div className="border-t border-[rgba(23,44,113,0.08)] px-4 py-3">
+        <div className="border-t border-[rgba(15,39,72,0.08)] px-4 py-3">
           <DetailGrid
             rows={[
               { label: 'Ownership', value: account.ownership || '—' },
@@ -563,8 +568,8 @@ function SectionNav({
               className={cx(
                 'w-full rounded-[8px] px-2.5 py-2 text-left text-[0.78rem] font-bold transition-colors',
                 activeId === section.id
-                  ? 'bg-[rgba(20,150,243,0.12)] text-brand-blue'
-                  : 'text-brand-navy hover:bg-[rgba(23,44,113,0.05)]',
+                  ? 'bg-[rgba(34,197,94,0.12)] text-brand-blue'
+                  : 'text-brand-navy hover:bg-[rgba(15,39,72,0.05)]',
               )}
             >
               {section.label}
@@ -607,7 +612,7 @@ export function CibilReportViewer({
 
   const scoreBadge =
     report.cibilScore != null ? (
-      <span className="inline-flex rounded-full bg-[rgba(20,150,243,0.12)] px-2.5 py-0.5 text-[0.72rem] font-extrabold text-brand-blue">
+      <span className="inline-flex rounded-full bg-[rgba(34,197,94,0.12)] px-2.5 py-0.5 text-[0.72rem] font-extrabold text-brand-blue">
         {report.cibilScore === -1 || report.cibilScore === 0 || report.cibilScore === 1 ? 'NTC' : report.cibilScore}
       </span>
     ) : null;
@@ -626,6 +631,12 @@ export function CibilReportViewer({
               </h2>
               <p className="m-0 mt-1.5 text-[0.84rem] text-brand-muted">
                 Bureau pulled {formatDateTime(payload.fetchedAt)}
+                {payload.vendorName ? (
+                  <>
+                    {' '}
+                    · via <span className="font-semibold text-brand-navy">{payload.vendorName}</span>
+                  </>
+                ) : null}
                 {report.controlNumber ? (
                   <>
                     {' '}
@@ -635,7 +646,7 @@ export function CibilReportViewer({
               </p>
             </div>
             {report.cibilScore != null ? (
-              <div className="rounded-[14px] border border-[rgba(20,150,243,0.22)] bg-[rgba(20,150,243,0.06)] px-5 py-3 text-center">
+              <div className="rounded-[14px] border border-[rgba(34,197,94,0.22)] bg-[rgba(34,197,94,0.06)] px-5 py-3 text-center">
                 <p className="m-0 text-[0.65rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
                   CIBIL score
                 </p>
@@ -656,7 +667,7 @@ export function CibilReportViewer({
                 href={pdfDownloadUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-[36px] items-center rounded-full border border-[rgba(23,44,113,0.12)] bg-white px-4 text-[0.8rem] font-bold text-brand-blue no-underline hover:border-[rgba(20,150,243,0.35)]"
+                className="inline-flex min-h-[36px] items-center rounded-full border border-[rgba(15,39,72,0.12)] bg-white px-4 text-[0.8rem] font-bold text-brand-blue no-underline hover:border-[rgba(34,197,94,0.35)]"
               >
                 Download CIBIL report
               </a>
@@ -666,7 +677,7 @@ export function CibilReportViewer({
                 href={report.vendorHtmlUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-[36px] items-center rounded-full border border-[rgba(23,44,113,0.12)] bg-white px-4 text-[0.8rem] font-bold text-brand-navy no-underline hover:border-[rgba(20,150,243,0.35)]"
+                className="inline-flex min-h-[36px] items-center rounded-full border border-[rgba(15,39,72,0.12)] bg-white px-4 text-[0.8rem] font-bold text-brand-navy no-underline hover:border-[rgba(34,197,94,0.35)]"
               >
                 Official bureau portal
               </a>
@@ -690,7 +701,7 @@ export function CibilReportViewer({
               {report.scoreFactors.map((factor) => (
                 <li
                   key={factor.code}
-                  className="rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.85)] px-3 py-2.5"
+                  className="rounded-[10px] border border-[rgba(15,39,72,0.08)] bg-[rgba(248,250,255,0.85)] px-3 py-2.5"
                 >
                   <span className="font-mono text-[0.68rem] font-bold text-brand-muted">{factor.code}</span>
                   <p className="m-0 mt-1 text-[0.84rem] leading-relaxed text-brand-text">{factor.text}</p>
@@ -700,7 +711,6 @@ export function CibilReportViewer({
           ) : null}
           <DetailGrid
             rows={[
-              { label: 'Score name', value: report.scoreName ?? '—' },
               { label: 'Population rank', value: report.populationRank ?? '—' },
               { label: 'On-time payments', value: report.creditSummary.onTimePaymentHistory ?? '—' },
               { label: 'Card utilization', value: report.creditSummary.creditCardUtilization ?? '—' },
@@ -720,7 +730,7 @@ export function CibilReportViewer({
           {report.accountOverview.length === 0 ? (
             <p className="m-0 text-[0.86rem] text-brand-muted">No tradelines in bureau payload.</p>
           ) : (
-            <div className="overflow-x-auto rounded-[12px] border border-[rgba(23,44,113,0.1)]">
+            <div className="overflow-x-auto rounded-[12px] border border-[rgba(15,39,72,0.1)]">
               <table className="w-full min-w-[640px] border-collapse text-left text-[0.78rem]">
                 <thead>
                   <tr className="bg-[rgba(248,250,255,0.95)] text-[0.65rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
@@ -733,7 +743,7 @@ export function CibilReportViewer({
                 </thead>
                 <tbody>
                   {report.accountOverview.map((row, idx) => (
-                    <tr key={`${row.creditor}-${idx}`} className="border-t border-[rgba(23,44,113,0.06)]">
+                    <tr key={`${row.creditor}-${idx}`} className="border-t border-[rgba(15,39,72,0.06)]">
                       <td className="px-3 py-2.5 font-semibold text-brand-navy">{row.creditor}</td>
                       <td className="px-3 py-2.5 text-brand-text">{row.accountType}</td>
                       <td className="px-3 py-2.5">{row.status}</td>
@@ -777,7 +787,7 @@ export function CibilReportViewer({
                 {report.addresses.map((addr, idx) => (
                   <li
                     key={idx}
-                    className="rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.85)] px-3 py-2.5 text-[0.84rem]"
+                    className="rounded-[10px] border border-[rgba(15,39,72,0.08)] bg-[rgba(248,250,255,0.85)] px-3 py-2.5 text-[0.84rem]"
                   >
                     <span className="font-extrabold text-brand-navy">{addr.category}</span>
                     <p className="m-0 mt-1 text-brand-text">{addr.address}</p>
@@ -805,7 +815,7 @@ export function CibilReportViewer({
           title="Tradelines"
           description="Expand each account for balances and monthly payment status."
           badge={
-            <span className="inline-flex rounded-full bg-[rgba(23,44,113,0.08)] px-2 py-0.5 text-[0.68rem] font-extrabold text-brand-navy">
+            <span className="inline-flex rounded-full bg-[rgba(15,39,72,0.08)] px-2 py-0.5 text-[0.68rem] font-extrabold text-brand-navy">
               {report.accounts.length}
             </span>
           }
@@ -826,7 +836,7 @@ export function CibilReportViewer({
           title="Credit enquiries"
           description="Hard/soft enquiry records in the bureau window."
           badge={
-            <span className="inline-flex rounded-full bg-[rgba(23,44,113,0.08)] px-2 py-0.5 text-[0.68rem] font-extrabold text-brand-navy">
+            <span className="inline-flex rounded-full bg-[rgba(15,39,72,0.08)] px-2 py-0.5 text-[0.68rem] font-extrabold text-brand-navy">
               {report.inquiries.length}
             </span>
           }
@@ -834,7 +844,7 @@ export function CibilReportViewer({
           {report.inquiries.length === 0 ? (
             <p className="m-0 text-[0.86rem] text-brand-muted">No enquiries listed.</p>
           ) : (
-            <div className="overflow-x-auto rounded-[12px] border border-[rgba(23,44,113,0.1)]">
+            <div className="overflow-x-auto rounded-[12px] border border-[rgba(15,39,72,0.1)]">
               <table className="w-full min-w-[560px] border-collapse text-left text-[0.78rem]">
                 <thead>
                   <tr className="bg-[rgba(248,250,255,0.95)] text-[0.65rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
@@ -846,7 +856,7 @@ export function CibilReportViewer({
                 </thead>
                 <tbody>
                   {report.inquiries.map((row, idx) => (
-                    <tr key={idx} className="border-t border-[rgba(23,44,113,0.06)]">
+                    <tr key={idx} className="border-t border-[rgba(15,39,72,0.06)]">
                       <td className="px-3 py-2.5 font-semibold text-brand-navy">{row.date}</td>
                       <td className="px-3 py-2.5">{row.member}</td>
                       <td className="px-3 py-2.5">{row.purpose}</td>

@@ -121,7 +121,7 @@ export function InviteRegistrationForm({ token }: InviteRegistrationFormProps) {
           </h1>
         </div>
         <p className="m-0 text-[0.92rem] leading-[1.6] text-brand-muted">
-          {successMessage ?? 'Your password has been set successfully. You can now sign in to MoneyCash LOS.'}
+          {successMessage ?? 'Your password has been set successfully. You can now sign in to CredSolve LOS.'}
         </p>
         <Link href="/login" className="los-btn-primary inline-flex items-center justify-center no-underline">
           Go to login
@@ -135,7 +135,7 @@ export function InviteRegistrationForm({ token }: InviteRegistrationFormProps) {
       <div className="grid gap-2">
         <div>
           <span className="block text-[0.68rem] font-extrabold tracking-[0.16em] uppercase text-brand-blue mb-1">
-            Welcome to MoneyCash LOS
+            Welcome to CredSolve LOS
           </span>
           <h1 className="m-0 text-[1.9rem] font-extrabold leading-[1.02] tracking-[-0.05em]">
             Set your password
@@ -146,7 +146,7 @@ export function InviteRegistrationForm({ token }: InviteRegistrationFormProps) {
         </p>
       </div>
 
-      <div className="rounded-[18px] border border-[rgba(23,44,113,0.1)] bg-[rgba(255,255,255,0.78)] p-4">
+      <div className="rounded-[18px] border border-[rgba(15,39,72,0.1)] bg-[rgba(255,255,255,0.78)] p-4">
         <strong className="block text-[0.96rem]">{preview?.fullName}</strong>
         <span className="block mt-1 text-[0.84rem] text-brand-muted">{preview?.email}</span>
         <span className="block mt-1 text-[0.82rem] text-brand-muted">

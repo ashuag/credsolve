@@ -8,8 +8,11 @@ import {
 import { LEAD_STATUS } from '../../../../common/constants/lead.constants';
 import { getRejectedUntilIso } from '../../../../common/lead/lead-reapply-policy.util';
 import { APPLICATION_KYC_STATUS, APPLICATION_STATUS } from '../../../../common/constants/application.constants';
+import { BUREAU_FETCHED } from '../../../../common/constants/bureau-fetch.constants';
 import { isBankNameMatchReviewPending } from '../../../../common/constants/bank.constants';
-import { isDigilockerAadhaarCaptureComplete } from '../../../../common/kyc/aadhaar-vendor-parse.util';
+import { isAadhaarNameMismatchPendingReview } from '../../../../common/kyc/aadhaar-vendor-parse.util';
+import { sessionAadhaarAllowsSkip } from '../../../../common/kyc/customer-aadhaar-for-application.util';
+import { KycCompletionService } from '../../../../common/kyc/kyc-completion.service';
 import {
   formatLeadDetailForPortal,
   isLeadEmailVerifiedForPortal,
@@ -57,6 +60,7 @@ export class GetCustomerSessionUseCase {
     private readonly bureauReports: BureauReportRepository,
     private readonly postBureauOffer: PostBureauOfferService,
     private readonly vendorInternalError: VendorInternalErrorService,
+    private readonly kycCompletion: KycCompletionService,
   ) {}
 
   async execute(req: Request): Promise<CustomerSessionResult> {
@@ -87,6 +91,7 @@ export class GetCustomerSessionUseCase {
         bankDetailsCompleted: false,
         bankNameReviewPending: false,
         bankVerificationFailed: false,
+        aadhaarNameReviewPending: false,
       },
       preApprovedAmountInr: null,
       loanSelection: null,
@@ -119,10 +124,11 @@ export class GetCustomerSessionUseCase {
 
     if (statusName === LEAD_STATUS.INTERNAL_ERROR) {
       const providerName = (process.env.TENACIO_PROVIDER ?? 'Tenacio').trim();
-      const recovered = await this.vendorInternalError.recoverLeadIfVendorFailuresCleared(
-        leadRow.id,
-        providerName,
-      );
+      const recovered =
+        (await this.vendorInternalError.recoverLeadIfVendorFailuresCleared(
+          leadRow.id,
+          providerName,
+        )) || (await this.vendorInternalError.recoverLeadIfAadhaarCaptured(leadRow.id));
       if (recovered) {
         const refreshedLead = await this.leads.findActiveByCustomerId(customer.id);
         if (refreshedLead) {
@@ -176,9 +182,36 @@ export class GetCustomerSessionUseCase {
       }
     }
 
-    const application = await fetchLatestApplicationKycSnapshot(this.prisma.client, {
+    const leadIdentity = {
+      leadFullName: leadRow.leadDetail?.fullName ?? null,
+      leadDateOfBirth: leadRow.leadDetail?.dateOfBirth ?? null,
+      leadGender: leadRow.leadDetail?.gender?.key ?? leadRow.leadDetail?.gender?.name ?? null,
+    };
+    let application = await fetchLatestApplicationKycSnapshot(this.prisma.client, {
       leadId: leadRow.id,
+      customerId: customer.id,
     });
+    if (
+      application &&
+      !sessionAadhaarAllowsSkip({
+        formJson: application.digilockerAadhaarFormJson ?? null,
+        ...leadIdentity,
+      })
+    ) {
+      const linked = await this.kycCompletion.linkReusableAadhaarToApplication({
+        applicationId: application.id,
+        customerId: customer.id,
+        mobileNumber: customer.mobileNumber,
+        ...leadIdentity,
+      });
+      if (linked.linked || linked.complete) {
+        application =
+          (await fetchLatestApplicationKycSnapshot(this.prisma.client, {
+            leadId: leadRow.id,
+            customerId: customer.id,
+          })) ?? application;
+      }
+    }
 
     const emailVerified = isLeadEmailVerifiedForPortal(
       statusName,
@@ -195,10 +228,11 @@ export class GetCustomerSessionUseCase {
       currentProfile?.addressLine1?.trim() &&
       currentProfile?.currentCity?.trim() &&
       currentProfile?.pincode?.trim() &&
+      currentProfile?.emailId?.trim() &&
       currentProfile?.panNumber?.trim()
     );
 
-    const [applicationExtras, latestCustomerKyc, leadReferenceRows, priorLeadDetail] = await Promise.all([
+    const [applicationExtras, leadReferenceRows, priorLeadDetail] = await Promise.all([
       application
         ? this.prisma.client.application.findUnique({
             where: { id: application.id },
@@ -229,13 +263,6 @@ export class GetCustomerSessionUseCase {
             },
           })
         : Promise.resolve(null),
-      this.prisma.client.customerKyc.findFirst({
-        where: { customerId: customer.id },
-        orderBy: { createdAt: 'desc' },
-        select: {
-          aadhaarData: true,
-        },
-      }),
       application
         ? this.prisma.client.applicationReference.findMany({
             where: {
@@ -297,10 +324,19 @@ export class GetCustomerSessionUseCase {
     const panChecksComplete =
       isPanVerifiedFromDb(leadRow.leadDetail?.panVerified) ||
       leadRow.leadDetail?.panVerified === PAN_VERIFIED.API_DISABLED;
-    const detailsCompleted = profileFieldsComplete && panChecksComplete;
+    const bureauFetchEnabled = await this.settings.isBureauFetchEnabled();
+    const bureauChecksComplete =
+      !bureauFetchEnabled ||
+      (leadRow.leadDetail?.bureauFetched ?? 0) === BUREAU_FETCHED.SUCCESS;
+    const detailsCompleted = profileFieldsComplete && panChecksComplete && bureauChecksComplete;
 
+    const postBreOfferReady =
+      applicationExtras?.preApprovedLoanAmount != null &&
+      Number.isFinite(Number(applicationExtras.preApprovedLoanAmount)) &&
+      Number(applicationExtras.preApprovedLoanAmount) > 0;
     const loanSelectionCompleted = Boolean(
-      appDetails?.selectedLoanAmount != null &&
+      postBreOfferReady &&
+        appDetails?.selectedLoanAmount != null &&
         appDetails?.expectedRepaymentDays != null &&
         appDetails?.reasonForLoanId != null,
     );
@@ -308,8 +344,18 @@ export class GetCustomerSessionUseCase {
     const loanDocumentsCompleted = Boolean(loanDocumentsReviewedAt);
     const loanDocumentsAccepted = Boolean(application?.loanDocumentsAcceptedAt);
 
-    const kycDocsCount = countUploadedKycDocuments(latestCustomerKyc?.aadhaarData);
-    const digilockerCaptured = isDigilockerAadhaarCaptureComplete(
+    const kycDocsCount = countUploadedKycDocuments(application?.digilockerAadhaarFormJson);
+    const digilockerCaptured = sessionAadhaarAllowsSkip({
+      formJson: application?.digilockerAadhaarFormJson ?? null,
+      leadFullName: leadRow.leadDetail?.fullName ?? currentProfile?.fullName ?? null,
+      leadDateOfBirth: leadRow.leadDetail?.dateOfBirth ?? null,
+      leadGender:
+        leadRow.leadDetail?.gender?.key ??
+        leadRow.leadDetail?.gender?.name ??
+        currentProfile?.gender ??
+        null,
+    });
+    const aadhaarNameReviewPending = isAadhaarNameMismatchPendingReview(
       application?.digilockerAadhaarFormJson ?? null,
     );
     const hasSavedSelfie = Boolean(application?.selfieRelativePath?.trim());
@@ -347,6 +393,18 @@ export class GetCustomerSessionUseCase {
         },
       });
       applicationKycStatus = APPLICATION_KYC_STATUS.NOT_DONE;
+    } else if (
+      application &&
+      faceStepCompleteForJourney &&
+      Number(applicationKycStatus) !== Number(APPLICATION_KYC_STATUS.COMPLETED)
+    ) {
+      const healed = await this.kycCompletion.ensureCompletedWhenFaceStepDone({
+        applicationId: application.id,
+        customerId: customer.id,
+      });
+      if (healed.healed) {
+        applicationKycStatus = healed.kycStatus;
+      }
     }
 
     const kycCompleted = Boolean(
@@ -356,7 +414,7 @@ export class GetCustomerSessionUseCase {
           hasSavedSelfie &&
           livenessPassed &&
           headMovementSatisfied) ||
-        (latestCustomerKyc && kycDocsCount >= 3 && livenessPassed && headMovementSatisfied),
+        (kycDocsCount >= 3 && livenessPassed && headMovementSatisfied && digilockerCaptured),
     );
 
     const leadReferences = leadReferenceRows.map((row) => ({
@@ -373,14 +431,14 @@ export class GetCustomerSessionUseCase {
       statusNote: applicationExtras?.applicationStatusNote,
     });
     const bankDetailsCompleted = Boolean(
-      appDetails?.bankAccountNumber?.trim() && appDetails?.ifscCode?.trim() && !bankNameReviewPending,
+      appDetails?.bankAccountNumber?.trim() && appDetails?.ifscCode?.trim(),
     );
     const pennyDropRetryCount = await this.settings.loadPennyDropRetryCount();
     const pennyDropAttempts = applicationExtras?.details?.pennyDropAttempts ?? 0;
     const bankVerificationFailed =
+      bankNameReviewPending ||
       applicationStatusName === APPLICATION_STATUS.PENNYDROP_FAILED ||
       (!bankDetailsCompleted &&
-        !bankNameReviewPending &&
         pennyDropRetryCount > 0 &&
         pennyDropAttempts >= pennyDropRetryCount);
 
@@ -408,15 +466,24 @@ export class GetCustomerSessionUseCase {
           }
         : null;
 
-    const digilockerAadhaarDownloadAttempts =
+    const applicationKycFlags =
       application != null
-        ? (
-            await this.prisma.client.applicationKyc.findUnique({
-              where: { applicationId: application.id },
-              select: { digilockerAadhaarDownloadAttempts: true },
-            })
-          )?.digilockerAadhaarDownloadAttempts ?? 0
-        : 0;
+        ? await this.prisma.client.applicationKyc.findUnique({
+            where: { applicationId: application.id },
+            select: {
+              digilockerAadhaarDownloadAttempts: true,
+              digilockerFallbackEligible: true,
+            },
+          })
+        : null;
+    const digilockerAadhaarDownloadAttempts =
+      applicationKycFlags?.digilockerAadhaarDownloadAttempts ?? 0;
+    const digilockerFallbackAvailable = Boolean(
+      applicationKycFlags?.digilockerFallbackEligible &&
+        !digilockerCaptured &&
+        statusName !== LEAD_STATUS.REJECTED &&
+        statusName !== LEAD_STATUS.BLACKLISTED,
+    );
 
     const kycFaceProgress =
       application != null
@@ -439,6 +506,7 @@ export class GetCustomerSessionUseCase {
                 : null,
             digilockerAadhaarDownloadAttempts,
             digilockerAadhaarDownloadMaxAttempts: DIGILOCKER_AADHAAR_DOWNLOAD_MAX_ATTEMPTS,
+            digilockerFallbackAvailable,
             livenessAttempts,
             livenessMaxAttempts: KYC_LIVENESS_MAX_ATTEMPTS,
             headMovementRequired,
@@ -485,6 +553,7 @@ export class GetCustomerSessionUseCase {
         bankDetailsCompleted,
         bankNameReviewPending,
         bankVerificationFailed,
+        aadhaarNameReviewPending,
       },
       preApprovedAmountInr:
         preApprovedAmountInr != null && preApprovedAmountInr > 0 ? preApprovedAmountInr : null,

@@ -1,4 +1,4 @@
-name: moneyCash
+name: credsolve
 
 # Per-app install logic lives in `docker/entrypoint-dev.sh`. It uses a
 # lockfile-signature stamp + filesystem mutex so concurrent containers
@@ -25,7 +25,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.dev
-    image: moneycash-backend-dev:local
+    image: credsolve-backend-dev:local
     tty: true
     env_file: ./backend/.env
     # Do NOT force linux/amd64 here. On Apple Silicon that runs the whole Nest
@@ -41,7 +41,7 @@ services:
       # AWS credentials come from backend/.env via env_file. Do not set AWS_ACCESS_KEY_ID here —
       # docker-compose ${VAR:-} interpolation uses the host shell and would override .env with empty strings.
     ports:
-      - "4001:4001"
+      - "4041:4001"
     working_dir: /workspace/backend
     volumes:
       - ./backend:/workspace/backend:cached
@@ -61,11 +61,11 @@ services:
     # Inside the container, localhost is not the API — rewrite target must be `backend`.
     environment:
       NEXT_PUBLIC_API_URL: /api/los
-      API_SERVER_URL: http://backend:4001/api/los
+      API_SERVER_URL: http://backend:4041/api/los
     depends_on:
       - backend
     ports:
-      - "3020:3010"
+      - "3040:3010"
     working_dir: /workspace/los
     volumes:
       - ./los:/workspace/los:cached
@@ -81,11 +81,11 @@ services:
     env_file: ./customer/.env
     # Inside the container, localhost is not the API — Next rewrites must target the `backend` service.
     environment:
-      API_SERVER_URL: http://backend:4001/api
+      API_SERVER_URL: http://backend:4041/api
     depends_on:
       - backend
     ports:
-      - "3021:3011"
+      - "3041:3041"
     working_dir: /workspace/customer
     volumes:
       - ./customer:/workspace/customer:cached

@@ -5,7 +5,6 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { isBankNameMatchReviewPending } from '../../../../common/constants/bank.constants';
 import { personNamesMatch } from '../../../../common/kyc/aadhaar-lead-identity-match.util';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
@@ -94,8 +93,6 @@ export class SaveLeadReferencesUseCase {
         orderBy: { createdAt: 'desc' },
         select: {
           id: true,
-          applicationStatus: { select: { name: true } },
-          applicationStatusNote: true,
           details: {
             select: {
               loanDocumentsAcceptedAt: true,
@@ -105,16 +102,6 @@ export class SaveLeadReferencesUseCase {
       });
       if (!application) {
         throw new BadRequestException('Complete loan selection before adding references.');
-      }
-      if (
-        isBankNameMatchReviewPending({
-          statusName: application.applicationStatus.name,
-          statusNote: application.applicationStatusNote,
-        })
-      ) {
-        throw new BadRequestException(
-          'Your bank account name is under credit review. You can add references after it is approved.',
-        );
       }
 
       const reviewedRows = await tx.$queryRaw<Array<{ loanDocumentsReviewedAt: Date | null }>>`

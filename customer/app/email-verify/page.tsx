@@ -4,8 +4,8 @@ import { JourneyProgressProvider } from '@/components/journey/journey-progress-c
 import { OnboardingFlow } from '@/components/onboarding/onboarding-flow';
 
 export const metadata: Metadata = {
-  title: 'Verify your email | MoneyCash',
-  description: 'Enter the OTP we sent to your email to continue your MoneyCash loan application.',
+  title: 'Verify your email | CredSolve',
+  description: 'Enter the OTP we sent to your email to continue your CredSolve loan application.',
 };
 
 export default function EmailVerifyPage() {

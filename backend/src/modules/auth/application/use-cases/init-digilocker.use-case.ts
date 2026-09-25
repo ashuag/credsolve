@@ -7,6 +7,7 @@ import {
 } from '../../../../common/vendor/digilocker-response.util';
 import { DigilockerSessionStore } from '../../../../common/kyc/digilocker-session.store';
 import { DigilockerFetchService } from '../../../../common/vendor/digilocker-fetch.service';
+import { KycDigilockerDownloadFailureService } from '../../../../common/kyc/kyc-digilocker-download-failure.service';
 import { assertApplicationKycNotCompleted } from '../../../../common/kyc/application-kyc-guard.util';
 import { assertActiveApplicationLoanDocumentsAccepted } from '../../../../common/loan-documents/application-loan-documents-guard.util';
 import { PrismaService } from '../../../../prisma/prisma.service';
@@ -37,6 +38,7 @@ export class InitDigilockerUseCase {
     private readonly applications: ApplicationRepository,
     private readonly digilockerFetch: DigilockerFetchService,
     private readonly digilockerSession: DigilockerSessionStore,
+    private readonly kycDigilockerDownloadFailure: KycDigilockerDownloadFailureService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -70,6 +72,14 @@ export class InitDigilockerUseCase {
       customerId: customer.id,
     });
 
+    const storedSession = await this.digilockerSession.readSession(application.uuid);
+    const eligible = await this.kycDigilockerDownloadFailure.isDigilockerFallbackEligible(application.id);
+    if (!eligible && !storedSession?.token) {
+      throw new BadRequestException(
+        'DigiLocker KYC is available only after Aadhaar OTP download fails. Enter your Aadhaar number first.',
+      );
+    }
+
     const redirectUrl = resolveDigilockerRedirectUrl(dto.redirectUrl);
 
     const out = await this.digilockerFetch.initialize(redirectUrl, lead.id);
@@ -77,16 +87,18 @@ export class InitDigilockerUseCase {
     const vendor = out.vendorBody ?? null;
     const sessionToken =
       out.sessionToken ?? extractDigilockerSessionToken(vendor);
+    const digilockerLoginUrl = out.digilockerLoginUrl ?? extractDigilockerLoginUrl(vendor);
     if (out.ok && sessionToken) {
       await this.digilockerSession.save(application.uuid, sessionToken, out.vendorKind);
     }
+
     return {
       configured: out.configured,
       skipReason: out.skipReason,
       ok: out.ok,
       httpStatus: out.httpStatus,
       vendor,
-      digilockerLoginUrl: out.digilockerLoginUrl ?? extractDigilockerLoginUrl(vendor),
+      digilockerLoginUrl,
       sessionToken,
       vendorName: out.vendorKind
         ? out.vendorKind === 'surepass'

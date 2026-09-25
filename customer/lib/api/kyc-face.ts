@@ -55,7 +55,7 @@ export type PostKycLivenessResponse = {
   selfieQuality?: KycPhotoQualitySummary;
   /** Identity-reference metadata for the DigiLocker Aadhaar photo (quality is not applied). */
   aadhaarQuality?: KycPhotoQualitySummary;
-  /** MoneyCash active liveness (head movement) recorded before this call. */
+  /** CredSolve active liveness (head movement) recorded before this call. */
   headMovementPassed?: boolean;
   /** False when no clip has been recorded yet, so the UI shows guidance instead of an error. */
   headMovementCaptured?: boolean;

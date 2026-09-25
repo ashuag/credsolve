@@ -2,6 +2,7 @@ import {
   ACCOUNT_TYPE_LABELS,
   CIBIL_CREDIT_CARD_ACCOUNT_TYPE_SYMBOLS,
   CIBIL_UNSECURED_ACCOUNT_TYPE_SYMBOLS,
+  cibilAccountTypeToTuefSymbol,
 } from './cibil-tuef.constants';
 
 
@@ -35,11 +36,9 @@ export function normalizeCibilAccountTypeSymbol(raw: string | null | undefined):
   if (raw == null) return null;
   const trimmed = String(raw).trim();
   if (!trimmed) return null;
-  if (/^\d+$/.test(trimmed)) {
-    const n = Number.parseInt(trimmed, 10);
-    return Number.isFinite(n) ? String(n).padStart(2, '0') : trimmed;
-  }
-  return trimmed.toUpperCase();
+  return cibilAccountTypeToTuefSymbol(trimmed) ?? (/^\d+$/.test(trimmed)
+    ? String(Number.parseInt(trimmed, 10)).padStart(2, '0')
+    : trimmed.toUpperCase());
 }
 
 function parseInrAmount(raw: unknown): number | null {
@@ -63,7 +62,14 @@ function resolveAccountTypeSymbol(
     readSymbol(granted?.AccountType) ?? readSymbol(granted?.CreditType);
   const fromTradeline =
     direct != null ? String(direct) : fromGranted;
-  return normalizeCibilAccountTypeSymbol(partitionAccountTypeSymbol ?? fromTradeline);
+  const fromDescription =
+    tradeline.accountTypeDescription != null ? String(tradeline.accountTypeDescription).trim() : '';
+  return normalizeCibilAccountTypeSymbol(
+    (partitionAccountTypeSymbol && String(partitionAccountTypeSymbol).trim()) ||
+      (fromTradeline && String(fromTradeline).trim()) ||
+      fromDescription ||
+      null,
+  );
 }
 
 /** Open when `dateClosed` is absent/blank; optional OpenClosed symbol `C` means closed. */

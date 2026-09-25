@@ -24,12 +24,18 @@ export type CustomerLoanCard = {
   amountDueAtMaturity: string | null;
   /** Inclusive days from disbursement through today (disbursement day = day 1). */
   daysOutstanding: number | null;
-  /** Interest charged if paid today (actual days inside cooling; full tenure after). */
+  /** Interest charged if paid today (actual days inside cooling; full tenure + overdue days after due). */
   interestTillToday: string | null;
-  /** Principal + interest due if paid today (actual days inside cooling; full tenure after). Includes penal charge when past due. */
+  /** Principal + interest due if paid today (actual days inside cooling; full tenure after). Includes overdue interest and penal when past due. */
   amountDueToday: string | null;
   /** True when pay-now interest is the contracted full tenure (cooling period has passed). */
   usedFullTenureInterest: boolean;
+  /** IST calendar days past maturity; null / 0 when not overdue. */
+  overdueDays: number | null;
+  /** Interest for overdue days only (0.00 when not past due). */
+  overdueInterestInr: string | null;
+  /** LOS-negotiated waiver of penal + overdue-days interest. */
+  waivedAmountInr: string | null;
   /** Penal charge included in amountDueToday when repayment is past maturity (else `0.00` / null). */
   bounceFeeInr: string | null;
   /** Sum of successful `loan_repayment` rows. */
@@ -49,6 +55,8 @@ export type CustomerLoanCard = {
   /** When the loan was closed / fully repaid (ISO datetime). */
   repaidAt: string | null;
   bankDisplay: string | null;
+  /** True after NOC / closure letter PDF was stored (and emailed when possible). */
+  isNocSent: boolean;
 };
 
 export type CustomerLoansDashboardResult = {

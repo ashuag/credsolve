@@ -15,21 +15,21 @@ const APPLY_ACTION = {
   eyebrow: 'New customer',
   title: 'Apply for a loan',
   description: 'Start a fresh application with mobile OTP, eligibility checks, and a guided digital journey.',
-  accent: 'bg-[linear-gradient(135deg,#1c347d_0%,#12244f_100%)] text-[#fff8df] shadow-[0_18px_36px_rgba(23,44,113,0.22)]',
+  accent: 'bg-[linear-gradient(135deg,#1c347d_0%,#12244f_100%)] text-[#ecfdf5] shadow-[0_18px_36px_rgba(23,44,113,0.22)]',
 };
 
 const LOGIN_ACTION = {
   href: '/my-account?mode=login',
   eyebrow: 'Existing customer',
   title: 'Login',
-  description: 'Use your registered mobile number to resume your application and check your MoneyCash status.',
+  description: 'Use your registered mobile number to resume your application and check your CredSolve status.',
   accent: 'border border-[rgba(18,36,79,0.1)] bg-[rgba(255,255,255,0.82)] text-brand-navy shadow-[0_14px_28px_rgba(23,44,113,0.08)]',
 };
 
 const RESUME_ACTION = {
   eyebrow: 'Existing customer',
   title: 'Resume application',
-  description: 'Continue from the exact step where you left your MoneyCash journey.',
+  description: 'Continue from the exact step where you left your CredSolve journey.',
   accent: 'border border-[rgba(18,36,79,0.1)] bg-[rgba(255,255,255,0.82)] text-brand-navy shadow-[0_14px_28px_rgba(23,44,113,0.08)]',
 };
 
@@ -82,9 +82,9 @@ export function HomeChoicePanel() {
           {!sessionResolved
             ? 'Please wait while we load your secure customer session.'
             : hasOpenLoan
-              ? 'Repay your current loan to unlock a new MoneyCash application.'
+              ? 'Repay your current loan to unlock a new CredSolve application.'
               : showApplyCard
-                ? 'Pick the path you need on the right, then continue with the same secure MoneyCash onboarding flow.'
+                ? 'Pick the path you need on the right, then continue with the same secure CredSolve onboarding flow.'
                 : 'You already have an application in progress. Login to continue.'}
         </p>
       </div>

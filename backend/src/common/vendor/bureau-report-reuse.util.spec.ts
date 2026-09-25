@@ -32,10 +32,9 @@ describe('canReusePriorBureauReport', () => {
   const fresh = new Date('2026-08-30T12:00:00.000Z');
   const stale = new Date('2026-08-20T12:00:00.000Z');
 
-  it('reuses only for recurring customers with a fresh successful report', () => {
+  it('reuses a fresh successful report (recurring or rejected reapply)', () => {
     assert.equal(
       canReusePriorBureauReport({
-        isRecurring: true,
         daysLimit: 7,
         priorCreatedAt: fresh,
         priorPayload: SUCCESS_PAYLOAD,
@@ -45,12 +44,11 @@ describe('canReusePriorBureauReport', () => {
     );
   });
 
-  it('does not reuse for first-time customers', () => {
+  it('does not reuse when the customer has no prior report', () => {
     assert.equal(
       canReusePriorBureauReport({
-        isRecurring: false,
         daysLimit: 7,
-        priorCreatedAt: fresh,
+        priorCreatedAt: null,
         priorPayload: SUCCESS_PAYLOAD,
         now,
       }),
@@ -61,7 +59,6 @@ describe('canReusePriorBureauReport', () => {
   it('does not reuse a stale or failed report', () => {
     assert.equal(
       canReusePriorBureauReport({
-        isRecurring: true,
         daysLimit: 7,
         priorCreatedAt: stale,
         priorPayload: SUCCESS_PAYLOAD,
@@ -71,20 +68,9 @@ describe('canReusePriorBureauReport', () => {
     );
     assert.equal(
       canReusePriorBureauReport({
-        isRecurring: true,
         daysLimit: 7,
         priorCreatedAt: fresh,
         priorPayload: FAILED_PAYLOAD,
-        now,
-      }),
-      false,
-    );
-    assert.equal(
-      canReusePriorBureauReport({
-        isRecurring: true,
-        daysLimit: 7,
-        priorCreatedAt: null,
-        priorPayload: SUCCESS_PAYLOAD,
         now,
       }),
       false,

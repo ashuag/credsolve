@@ -72,14 +72,15 @@ describe('loan-repayment-outstanding', () => {
     assert.equal(shouldCloseLoanAfterPayment(100), false);
   });
 
-  it('sums SUCCESS repayment rows only', () => {
+  it('sums collected SUCCESS and PARTIAL rows only', () => {
     assert.equal(
       sumRepaymentAmounts([
         { amount: '5000.00', status: 'SUCCESS' },
         { amount: '100.00', status: 'FAILED' },
+        { amount: 2000, status: 'PARTIAL' },
         { amount: 2000, status: 'SUCCESS' },
       ]),
-      7000,
+      9000,
     );
   });
 });

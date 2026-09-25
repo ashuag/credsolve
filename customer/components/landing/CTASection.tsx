@@ -38,30 +38,28 @@ export function CTASection() {
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
           </svg>
           <span className="text-[0.65rem] font-[900] uppercase tracking-[0.24em] text-brand-gold">
-            Get Money in Your Account Today
+            A brighter tomorrow starts today
           </span>
         </div>
 
         {/* Headline */}
         <h2 className="reveal text-[clamp(1.9rem,5vw,3.8rem)] font-[900] leading-[1.1] tracking-tight text-white stagger-1">
-          Don&apos;t Let Financial{' '}
-          <span className="text-grad-gold">Emergencies</span>
-          <br />
-          Slow You Down.
+          Fast. Fair.{' '}
+          <span className="text-grad-gold">Transparent.</span>
         </h2>
 
         <p className="reveal mx-auto mt-6 max-w-xl text-[1.05rem] font-[600] leading-relaxed text-white/55 stagger-2">
-          Apply in 30 seconds. Get approved in 2 minutes. Money in your account in under 10 minutes.
-          {BRAND_TAGLINE}. Zero hidden charges.
+          {BRAND_TAGLINE}. Instant personal loans with RBI-registered NBFC partners — decision in minutes,
+          no charges before disbursal.
         </p>
 
         {/* Benefit chips */}
         <div className="reveal mt-10 flex flex-wrap items-center justify-center gap-3 stagger-3">
           {[
-            '✓ No branch visit',
-            '✓ PAN & Aadhaar only',
-            '✓ Instant approval',
-            '✓ 0 hidden fees',
+            'RBI-registered NBFC partners',
+            'PAN & Aadhaar paperless',
+            'Decision in minutes',
+            'No charge before disbursal',
           ].map((item) => (
             <span
               key={item}
@@ -76,9 +74,9 @@ export function CTASection() {
         <div className="reveal mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center stagger-4">
           <Link
             href={applyHref}
-            className="group relative inline-flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-brand-gold px-10 py-4 text-lg font-[900] text-[#0a1628] glow-gold transition-all active:scale-[0.97] sm:w-auto sm:px-12 sm:py-5 sm:text-xl"
+            className="group relative inline-flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-brand-gold px-10 py-4 text-lg font-[900] text-white glow-gold transition-all active:scale-[0.97] sm:w-auto sm:px-12 sm:py-5 sm:text-xl"
           >
-            Apply Now
+            Get Started Today
             <svg viewBox="0 0 20 20" className="h-5 w-5 transition-transform group-hover:translate-x-1" fill="currentColor">
               <path d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" />
             </svg>

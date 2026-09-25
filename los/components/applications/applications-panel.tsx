@@ -161,6 +161,7 @@ function applicationStageLabel(app: LosApplication): string {
     panVerified: app.panVerified,
     bureauFetched: app.bureauFetched,
     nameMatchPendingReview: app.nameMatchPendingReview,
+    aadhaarNameMatchPendingReview: app.aadhaarNameMatchPendingReview,
   });
 }
 
@@ -458,7 +459,7 @@ export function ApplicationsPanel() {
       {!loading && !fetchError && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard label="Total Applications" value={applications.length} color="#6366f1" />
-          <StatCard label="With Loan Amount" value={withLoan} color="#1496f3" sub={`of ${applications.length}`} />
+          <StatCard label="With Loan Amount" value={withLoan} color="#22C55E" sub={`of ${applications.length}`} />
           <StatCard label="Portfolio Value" value={shortINR(String(totalDisbursed))} color="#10b981" sub="selected amount" />
           <StatCard label="CIBIL ≥ 700" value={highCibil} color="#f59e0b" sub="high quality" />
         </div>
@@ -499,14 +500,14 @@ export function ApplicationsPanel() {
                 link.click();
                 link.remove();
               }}
-              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)]"
             >
               ⬇ Download dump
             </button>
             <button
               type="button"
               onClick={() => void loadApplications()}
-              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)]"
             >
               ↺ Refresh
             </button>

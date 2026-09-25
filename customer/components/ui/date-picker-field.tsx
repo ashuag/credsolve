@@ -300,7 +300,7 @@ export function DatePickerField({
                       isSelected
                         ? 'border-[rgba(15,60,150,0.08)] bg-[linear-gradient(135deg,#1496f3,#172c71)] text-white shadow-[0_16px_28px_rgba(23,44,113,0.24)]'
                         : isToday
-                        ? 'border-[rgba(255,197,25,0.44)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,246,215,0.94))] text-brand-navy'
+                        ? 'border-[rgba(34,197,94,0.44)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,246,215,0.94))] text-brand-navy'
                         : isDisabled
                         ? 'border-[rgba(18,36,79,0.05)] bg-[rgba(244,248,255,0.62)] text-[rgba(94,103,130,0.38)] cursor-not-allowed'
                         : !isCurrentMonth
@@ -344,7 +344,7 @@ export function DatePickerField({
           <button
             type="button"
             disabled={disabled}
-            className="absolute top-1/2 right-3 -translate-y-1/2 inline-flex items-center justify-center w-9 h-9 rounded-[12px] border-0 bg-[rgba(20,150,243,0.08)] text-brand-navy cursor-pointer transition-all duration-[180ms] hover:-translate-y-[calc(50%+1px)] hover:bg-[rgba(255,197,25,0.16)] hover:shadow-[0_10px_20px_rgba(23,44,113,0.08)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-[-50%] disabled:hover:bg-[rgba(20,150,243,0.08)] disabled:hover:shadow-none"
+            className="absolute top-1/2 right-3 -translate-y-1/2 inline-flex items-center justify-center w-9 h-9 rounded-[12px] border-0 bg-[rgba(20,150,243,0.08)] text-brand-navy cursor-pointer transition-all duration-[180ms] hover:-translate-y-[calc(50%+1px)] hover:bg-[rgba(34,197,94,0.16)] hover:shadow-[0_10px_20px_rgba(23,44,113,0.08)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-[-50%] disabled:hover:bg-[rgba(20,150,243,0.08)] disabled:hover:shadow-none"
             aria-label={isOpen ? 'Hide calendar' : 'Show calendar'}
             aria-expanded={isOpen}
             onClick={toggleCalendar}

@@ -1,3 +1,5 @@
+import type { FaceAgeBand, KycFaceMatchChecks } from './kyc-face-match-consistency.util';
+
 export const KYC_FACE_MATCH_MAX_DISTANCE = resolveFaceMatchMaxDistance();
 /** SSD pipeline entry — keep low so backlit webcam / ID photos are found (same as selfie validation). */
 export const KYC_FACE_MATCH_MIN_DETECTION_SCORE = 0.1;
@@ -35,8 +37,9 @@ export function computeDetectionUpscaleSize(
  * confidence scan vs ~0.56 at a degraded ~0.33 confidence scan, against a 0.6 cutoff) — so a
  * low-quality-but-genuine ID photo can tip a legitimate customer into a false reject. When the
  * reference photo's detection confidence is below {@link KYC_FACE_MATCH_LOW_QUALITY_REFERENCE_SCORE},
- * allow a small bounded extra distance tolerance. Both knobs are env-tunable since this is a
- * fraud-tolerance tradeoff, not a pure engineering one.
+ * allow a small bounded extra distance tolerance. Child-vs-adult fraud is handled by
+ * geometry / age-band consistency checks, not by tightening this cutoff (glasses / hair /
+ * an older Aadhaar photo of the same adult routinely land near 0.54).
  */
 export const KYC_FACE_MATCH_LOW_QUALITY_REFERENCE_SCORE = resolveLowQualityReferenceScore();
 export const KYC_FACE_MATCH_LOW_QUALITY_RELAXATION = resolveLowQualityRelaxation();
@@ -80,6 +83,10 @@ export type KycFaceMatchSideResult = {
   faceCount: number;
   /** True when 2+ confident faces were found on this side. */
   dualFaceDetected: boolean;
+  childLikeness?: number | null;
+  ageBand?: FaceAgeBand | null;
+  estimatedAge?: number | null;
+  gender?: 'male' | 'female' | null;
 };
 
 export type KycFaceMatchInspection = {
@@ -90,6 +97,7 @@ export type KycFaceMatchInspection = {
   maxDistanceThreshold: number;
   reference: KycFaceMatchSideResult;
   probe: KycFaceMatchSideResult;
+  checks?: KycFaceMatchChecks;
   reason?: string;
   productionValidationDisabled: boolean;
 };

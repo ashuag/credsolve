@@ -3,7 +3,7 @@ import { CustomerDashboard } from '@/components/dashboard/customer-dashboard';
 
 export const metadata: Metadata = {
   title: 'My accounts',
-  description: 'View your MoneyCash loans, repayment schedule, applications in progress, and history.',
+  description: 'View your CredSolve loans, repayment schedule, applications in progress, and history.',
 };
 
 import { redirect } from 'next/navigation';

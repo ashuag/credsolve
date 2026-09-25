@@ -77,6 +77,7 @@ export type FormattedPortalProfile = {
   occupation: CustomerPortalOccupationSlug | null;
   addressLine1: string | null;
   addressLine2: string | null;
+  emailId: string | null;
   currentCity: string | null;
   pincode: string | null;
   monthlyIncome: string | null;
@@ -118,6 +119,7 @@ export function mergePortalProfileWithPriorPrefill(
     occupation: current.occupation ?? prior.occupation,
     addressLine1: blankToNull(current.addressLine1) ?? prior.addressLine1,
     addressLine2: blankToNull(current.addressLine2) ?? prior.addressLine2,
+    emailId: blankToNull(current.emailId) ?? prior.emailId,
     currentCity: blankToNull(current.currentCity) ?? prior.currentCity,
     pincode: blankToNull(current.pincode) ?? prior.pincode,
     monthlyIncome: blankToNull(current.monthlyIncome) ?? prior.monthlyIncome,
@@ -137,6 +139,7 @@ export function formatLeadDetailForPortal(detail: {
   panVerifiedAt?: Date | null;
   addressLine1: string | null;
   addressLine2: string | null;
+  emailId?: string | null;
   pincode: string | null;
   netMonthlyIncome: { toString(): string } | null;
   annualTurnover: { toString(): string } | null;
@@ -167,6 +170,7 @@ export function formatLeadDetailForPortal(detail: {
       ?? mapOccupationDbNameToPortalSlug(detail.occupation?.name),
     addressLine1: detail.addressLine1,
     addressLine2: detail.addressLine2,
+    emailId: blankToNull(detail.emailId),
     currentCity,
     pincode: detail.pincode,
     monthlyIncome: decimalToString(detail.netMonthlyIncome),

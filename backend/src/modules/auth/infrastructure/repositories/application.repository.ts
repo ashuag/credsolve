@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Prisma, type EmailVerificationType } from '@prisma/client';
 import { APPLICATION_KYC_STATUS, APPLICATION_STATUS } from '../../../../common/constants/application.constants';
+import { shouldStartNewCustomerKycBundle } from '../../../../common/kyc/customer-aadhaar-for-application.util';
 import { generateLeadNumber } from '../../../../common/loan/application-number.util';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import type { DbClient } from './db.client';
@@ -158,14 +159,28 @@ export class ApplicationRepository {
       customerId: bigint;
       digilockerAadhaarFormJson: Prisma.InputJsonValue;
       aadhaarPhotoRelativePath: string | null;
+      aadhaarKycType?: number | null;
     },
     tx?: DbClient,
   ) {
+    const application = await this.db(tx).application.findUnique({
+      where: { id: params.applicationId },
+      select: { createdAt: true, kyc: { select: { kycStatus: true } } },
+    });
     let customerKyc = await this.db(tx).customerKyc.findFirst({
       where: { customerId: params.customerId },
       orderBy: { createdAt: 'desc' },
     });
-    if (!customerKyc) {
+    if (
+      shouldStartNewCustomerKycBundle(customerKyc, {
+        applicationCreatedAt: application?.createdAt ?? new Date(0),
+        applicationKycStatus: application?.kyc?.kycStatus,
+      })
+    ) {
+      customerKyc = await this.db(tx).customerKyc.create({
+        data: { customerId: params.customerId },
+      });
+    } else if (!customerKyc) {
       customerKyc = await this.db(tx).customerKyc.create({
         data: { customerId: params.customerId },
       });
@@ -175,6 +190,9 @@ export class ApplicationRepository {
       data: {
         aadhaarData: params.digilockerAadhaarFormJson,
         aadhaarPhotoPath: params.aadhaarPhotoRelativePath,
+        ...(params.aadhaarKycType != null
+          ? { aadhaarKycType: params.aadhaarKycType }
+          : {}),
       },
     });
   }

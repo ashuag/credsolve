@@ -3,13 +3,16 @@ import { EasebuzzRepaymentNotificationService } from '../easebuzz/easebuzz-repay
 import { EasebuzzWireService } from '../easebuzz/easebuzz-wire.service';
 import { BureauFetchService } from './bureau-fetch.service';
 import { BankTenacioVendorService } from './bank-tenacio-vendor.service';
+import { CredostackIfscService } from './credostack/credostack-ifsc.service';
 import { DigilockerFetchService } from './digilocker-fetch.service';
+import { AadhaarXmlOtpVendorService } from './aadhaar-xml-otp-vendor.service';
 import { DigilockerVendorService } from './digilocker-vendor.service';
 import { KycTenacioVendorService } from './kyc-tenacio-vendor.service';
 import { LivenessVendorService } from './liveness-vendor.service';
 import { PanNsdlCacheRepository } from './pan-nsdl-cache.repository';
 import { PanNsdlCacheService } from './pan-nsdl-cache.service';
 import { PanVerificationService } from './pan-verification.service';
+import { Cibil07CibilModule } from './cibil07/cibil07-cibil.module';
 import { SurepassCibilModule } from './surepass/surepass-cibil.module';
 import { SurepassDigilockerModule } from './surepass/surepass-digilocker.module';
 import { SurepassFaceLivenessModule } from './surepass/surepass-face-liveness.module';
@@ -28,7 +31,12 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
  */
 @Global()
 @Module({
-  imports: [SurepassCibilModule, SurepassDigilockerModule, SurepassFaceLivenessModule],
+  imports: [
+    Cibil07CibilModule,
+    SurepassCibilModule,
+    SurepassDigilockerModule,
+    SurepassFaceLivenessModule,
+  ],
   providers: [
     VendorApiService,
     VendorApiConfigService,
@@ -38,8 +46,10 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
     PanNsdlCacheService,
     BureauFetchService,
     DigilockerVendorService,
+    AadhaarXmlOtpVendorService,
     DigilockerFetchService,
     BankTenacioVendorService,
+    CredostackIfscService,
     LivenessVendorService,
     KycTenacioVendorService,
     EasebuzzWireService,
@@ -54,12 +64,15 @@ import { VendorInternalErrorService } from './vendor-internal-error.service';
     PanNsdlCacheService,
     BureauFetchService,
     DigilockerVendorService,
+    AadhaarXmlOtpVendorService,
     DigilockerFetchService,
     BankTenacioVendorService,
+    CredostackIfscService,
     LivenessVendorService,
     KycTenacioVendorService,
     EasebuzzWireService,
     EasebuzzRepaymentNotificationService,
+    Cibil07CibilModule,
     SurepassCibilModule,
     SurepassDigilockerModule,
     SurepassFaceLivenessModule,

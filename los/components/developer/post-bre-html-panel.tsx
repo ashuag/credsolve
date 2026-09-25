@@ -88,7 +88,7 @@ export function PostBreHtmlPanel() {
   return (
     <div className="grid gap-6">
       <form
-        className="grid gap-4 rounded-2xl border border-[rgba(23,44,113,0.1)] bg-[rgba(255,255,255,0.94)] p-5 shadow-[0_12px_40px_rgba(23,44,113,0.06)]"
+        className="grid gap-4 rounded-2xl border border-[rgba(15,39,72,0.1)] bg-[rgba(255,255,255,0.94)] p-5 shadow-[0_12px_40px_rgba(15,39,72,0.06)]"
         onSubmit={handleSubmit}
       >
         <div>
@@ -159,7 +159,7 @@ export function PostBreHtmlPanel() {
           </button>
           <button
             type="button"
-            className="min-h-10.5 cursor-pointer rounded-[10px] border border-[rgba(23,44,113,0.14)] bg-white px-5 text-[0.88rem] font-bold text-brand-navy transition-colors hover:border-[rgba(20,150,243,0.28)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-10.5 cursor-pointer rounded-[10px] border border-[rgba(15,39,72,0.14)] bg-white px-5 text-[0.88rem] font-bold text-brand-navy transition-colors hover:border-[rgba(34,197,94,0.28)] disabled:cursor-not-allowed disabled:opacity-50"
             disabled={loading}
             onClick={handleClear}
           >
@@ -169,7 +169,7 @@ export function PostBreHtmlPanel() {
       </form>
 
       {result?.conversion ? (
-        <div className="rounded-[14px] border border-[rgba(20,150,243,0.18)] bg-[rgba(20,150,243,0.04)] px-4 py-3">
+        <div className="rounded-[14px] border border-[rgba(34,197,94,0.18)] bg-[rgba(34,197,94,0.04)] px-4 py-3">
           <p className="m-0 text-[0.72rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">
             HTML → JSON conversion
           </p>
@@ -186,7 +186,7 @@ export function PostBreHtmlPanel() {
             {showJson ? 'Hide' : 'Show'} converted bureau JSON
           </button>
           {showJson ? (
-            <pre className="mt-2 max-h-96 overflow-auto rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-white p-3 text-[0.72rem] leading-normal text-brand-muted">
+            <pre className="mt-2 max-h-96 overflow-auto rounded-[10px] border border-[rgba(15,39,72,0.08)] bg-white p-3 text-[0.72rem] leading-normal text-brand-muted">
               {JSON.stringify(result.bureauPayload, null, 2)}
             </pre>
           ) : null}

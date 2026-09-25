@@ -19,6 +19,7 @@ import { InitiateRepaymentDto } from '../application/dto/initiate-repayment.dto'
 import { InitiateCustomerRepaymentUseCase } from '../application/use-cases/initiate-customer-repayment.use-case';
 import { HandleEasebuzzRepaymentCallbackUseCase } from '../application/use-cases/handle-easebuzz-repayment-callback.use-case';
 import { RefreshCustomerRepaymentUseCase } from '../application/use-cases/refresh-customer-repayment.use-case';
+import { ServeCustomerNocPdfUseCase } from '../application/use-cases/serve-customer-noc-pdf.use-case';
 import { LogoutUseCase } from '../application/use-cases/logout.use-case';
 import { SendOtpUseCase } from '../application/use-cases/send-otp.use-case';
 import { SaveLeadDetailsUseCase } from '../application/use-cases/save-lead-details.use-case';
@@ -30,6 +31,8 @@ import { RejectPanClientValidationUseCase } from '../application/use-cases/rejec
 import { RejectPanClientValidationDto } from '../application/dto/reject-pan-client-validation.dto';
 import { InitDigilockerUseCase } from '../application/use-cases/init-digilocker.use-case';
 import { DownloadAadhaarDigilockerUseCase } from '../application/use-cases/download-aadhaar-digilocker.use-case';
+import { GenerateAadhaarXmlOtpUseCase } from '../application/use-cases/generate-aadhaar-xml-otp.use-case';
+import { DownloadAadhaarXmlUseCase } from '../application/use-cases/download-aadhaar-xml.use-case';
 import { GetPendingDigilockerSessionUseCase } from '../application/use-cases/get-pending-digilocker-session.use-case';
 import { ServeDigilockerAadhaarPhotoUseCase } from '../application/use-cases/serve-digilocker-aadhaar-photo.use-case';
 import { ServeKycSelfiePhotoUseCase } from '../application/use-cases/serve-kyc-selfie-photo.use-case';
@@ -42,6 +45,8 @@ import { AcknowledgeLoanDocumentsUseCase } from '../application/use-cases/acknow
 import { AcceptLoanDocumentsDto } from '../application/dto/accept-loan-documents.dto';
 import { InitDigilockerDto } from '../application/dto/init-digilocker.dto';
 import { DownloadAadhaarDigilockerDto } from '../application/dto/download-aadhaar-digilocker.dto';
+import { GenerateAadhaarXmlOtpDto } from '../application/dto/generate-aadhaar-xml-otp.dto';
+import { DownloadAadhaarXmlDto } from '../application/dto/download-aadhaar-xml.dto';
 import { buildCustomerAuthCookieOptions } from '../infrastructure/session/customer-auth-cookie.util';
 import { CustomerGoogleOauthService } from '../infrastructure/google/customer-google-oauth.service';
 import { OptionalCustomerSessionGuard } from './guards/optional-customer-session.guard';
@@ -61,6 +66,7 @@ export class AuthController {
     private readonly customerPaymentHistory: GetCustomerPaymentHistoryUseCase,
     private readonly initiateCustomerRepayment: InitiateCustomerRepaymentUseCase,
     private readonly refreshCustomerRepayment: RefreshCustomerRepaymentUseCase,
+    private readonly serveCustomerNocPdf: ServeCustomerNocPdfUseCase,
     private readonly handleEasebuzzRepaymentCallback: HandleEasebuzzRepaymentCallbackUseCase,
     private readonly logoutFlow: LogoutUseCase,
     private readonly customerGoogleOauth: CustomerGoogleOauthService,
@@ -71,6 +77,8 @@ export class AuthController {
     private readonly rejectPanClientValidationFlow: RejectPanClientValidationUseCase,
     private readonly initDigilockerFlow: InitDigilockerUseCase,
     private readonly downloadAadhaarDigilockerFlow: DownloadAadhaarDigilockerUseCase,
+    private readonly generateAadhaarXmlOtpFlow: GenerateAadhaarXmlOtpUseCase,
+    private readonly downloadAadhaarXmlFlow: DownloadAadhaarXmlUseCase,
     private readonly getPendingDigilockerSessionFlow: GetPendingDigilockerSessionUseCase,
     private readonly serveDigilockerAadhaarPhotoFlow: ServeDigilockerAadhaarPhotoUseCase,
     private readonly serveKycSelfiePhotoFlow: ServeKycSelfiePhotoUseCase,
@@ -265,6 +273,17 @@ export class AuthController {
     return this.refreshCustomerRepayment.execute(req, applicationUuid);
   }
 
+  @Get('my-loans/:applicationUuid/noc')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @ApiOperation({ summary: 'Download the sent NOC / loan-closure PDF for a closed loan' })
+  async myLoanNocPdf(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Param('applicationUuid') applicationUuid: string,
+  ): Promise<void> {
+    await this.serveCustomerNocPdf.execute(req, res, applicationUuid);
+  }
+
   @All('repayments/easebuzz/success')
   @ApiOperation({
     summary:
@@ -425,5 +444,29 @@ export class AuthController {
   downloadAadhaarDigilockerRoute(@Req() req: Request, @Body() body: DownloadAadhaarDigilockerDto) {
     this.logger.log(`POST /api/auth/digilocker/download-aadhaar ip=${readClientIp(req) ?? 'unknown'}`);
     return this.downloadAadhaarDigilockerFlow.execute(req, body);
+  }
+
+  @Post('aadhaar/xml-generate-otp')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @RateLimitByRoute('aadhaar-xml-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Send Aadhaar XML OTP as the default KYC path (Tenacio xml-generate-otp)',
+  })
+  generateAadhaarXmlOtpRoute(@Req() req: Request, @Body() body: GenerateAadhaarXmlOtpDto) {
+    this.logger.log(`POST /api/auth/aadhaar/xml-generate-otp ip=${readClientIp(req) ?? 'unknown'}`);
+    return this.generateAadhaarXmlOtpFlow.execute(req, body);
+  }
+
+  @Post('aadhaar/xml-download')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @RateLimitByRoute('aadhaar-xml-download')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Download Aadhaar via XML OTP (Tenacio xml-download). Exhausted attempts unlock DigiLocker.',
+  })
+  downloadAadhaarXmlRoute(@Req() req: Request, @Body() body: DownloadAadhaarXmlDto) {
+    this.logger.log(`POST /api/auth/aadhaar/xml-download ip=${readClientIp(req) ?? 'unknown'}`);
+    return this.downloadAadhaarXmlFlow.execute(req, body);
   }
 }

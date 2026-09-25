@@ -132,7 +132,7 @@ export function RejectRecordModal({
       aria-labelledby="reject-record-title"
     >
       <div
-        className="w-full max-w-[440px] rounded-[16px] border border-[rgba(23,44,113,0.12)] bg-white p-5 shadow-[0_20px_56px_rgba(23,44,113,0.22)]"
+        className="w-full max-w-[440px] rounded-[16px] border border-[rgba(15,39,72,0.12)] bg-white p-5 shadow-[0_20px_56px_rgba(15,39,72,0.22)]"
         onClick={(event) => event.stopPropagation()}
       >
         <h2 id="reject-record-title" className="m-0 text-[1.05rem] font-extrabold text-brand-navy">
@@ -187,7 +187,7 @@ export function RejectRecordModal({
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="h-[38px] rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-4 text-[0.84rem] font-bold text-brand-text hover:bg-[rgba(20,150,243,0.06)] disabled:opacity-60"
+              className="h-[38px] rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-4 text-[0.84rem] font-bold text-brand-text hover:bg-[rgba(34,197,94,0.06)] disabled:opacity-60"
             >
               Cancel
             </button>

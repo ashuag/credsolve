@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev -p 3011 --turbo",
+    "dev": "next dev -p 3041 --turbo",
     "build": "next build",
-    "start": "next start -p 3011",
+    "start": "next start -p 3041",
     "lint": "tsc --noEmit",
     "legal:build": "node scripts/build-legal-content.mjs"
   },

@@ -35,7 +35,7 @@ function ModeTabs({
   ];
 
   return (
-    <div className="flex flex-wrap gap-1 rounded-[10px] border border-[rgba(23,44,113,0.1)] bg-[rgba(248,250,255,0.8)] p-1">
+    <div className="flex flex-wrap gap-1 rounded-[10px] border border-[rgba(15,39,72,0.1)] bg-[rgba(248,250,255,0.8)] p-1">
       {tabs.map((tab) => (
         <button
           key={tab.id}
@@ -105,7 +105,7 @@ function FaceMatchSideInput({
   const displayPreview = side.mode === 'link' && side.url.trim() ? side.url.trim() : side.preview;
 
   return (
-    <div className="grid gap-3 rounded-[14px] border border-[rgba(23,44,113,0.1)] bg-white p-4">
+    <div className="grid gap-3 rounded-[14px] border border-[rgba(15,39,72,0.1)] bg-white p-4">
       <div>
         <p className="m-0 text-[0.82rem] font-extrabold text-brand-navy">{label}</p>
         <p className="m-0 mt-1 text-[0.78rem] text-brand-muted">{hint}</p>
@@ -125,7 +125,7 @@ function FaceMatchSideInput({
           type="button"
           disabled={disabled}
           onClick={() => inputRef.current?.click()}
-          className="cursor-pointer rounded-[10px] border border-[rgba(23,44,113,0.16)] bg-[rgba(248,250,255,0.9)] px-4 py-2 text-[0.82rem] font-bold text-brand-navy disabled:opacity-60"
+          className="cursor-pointer rounded-[10px] border border-[rgba(15,39,72,0.16)] bg-[rgba(248,250,255,0.9)] px-4 py-2 text-[0.82rem] font-bold text-brand-navy disabled:opacity-60"
         >
           Choose photo
         </button>
@@ -170,7 +170,7 @@ function FaceMatchSideInput({
           }}
         />
       ) : side.mode !== 'selfie' ? (
-        <div className="flex h-32 items-center justify-center rounded-[10px] border border-dashed border-[rgba(23,44,113,0.14)] bg-[rgba(248,250,255,0.65)] text-[0.78rem] text-brand-muted">
+        <div className="flex h-32 items-center justify-center rounded-[10px] border border-dashed border-[rgba(15,39,72,0.14)] bg-[rgba(248,250,255,0.65)] text-[0.78rem] text-brand-muted">
           {side.mode === 'link' ? 'Enter a public image URL' : 'No photo selected'}
         </div>
       ) : null}
@@ -334,7 +334,7 @@ export function TenacioFaceMatchCheckPanel() {
       {error ? <p className="m-0 text-[0.84rem] font-bold text-[#991b1b]">{error}</p> : null}
 
       {needsCamera ? (
-        <div className="overflow-hidden rounded-[12px] border border-[rgba(23,44,113,0.12)] bg-black aspect-[4/3] max-h-[280px]">
+        <div className="overflow-hidden rounded-[12px] border border-[rgba(15,39,72,0.12)] bg-black aspect-[4/3] max-h-[280px]">
           <video ref={videoRef} className="h-full w-full object-cover" autoPlay playsInline muted />
         </div>
       ) : null}

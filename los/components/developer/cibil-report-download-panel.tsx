@@ -68,7 +68,7 @@ export function CibilReportDownloadPanel() {
             value={jsonText}
             onChange={(e) => setJsonText(e.target.value)}
             rows={14}
-            className="font-mono rounded-[12px] border border-[rgba(23,44,113,0.12)] bg-[rgba(248,250,255,0.9)] p-3 text-[0.78rem] leading-[1.45]"
+            className="font-mono rounded-[12px] border border-[rgba(15,39,72,0.12)] bg-[rgba(248,250,255,0.9)] p-3 text-[0.78rem] leading-[1.45]"
             placeholder='{ "data": { "cibilData": { ... } } }'
           />
         </label>

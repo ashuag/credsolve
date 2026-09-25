@@ -16,8 +16,14 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
   const [isFocused, setIsFocused] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
-  const hasActiveMobileBorder = !error && (isFocused || mobileNumber.length > 0);
-  const mobileFieldClassName = `group/field relative isolate overflow-hidden grid items-center min-h-[56px] rounded-[16px] border bg-white transition-all duration-[220ms] ${error ? 'border-[rgba(193,57,43,0.42)] shadow-[0_0_0_3px_rgba(193,57,43,0.08)]' : hasActiveMobileBorder ? 'border-[rgba(20,150,243,0.46)] shadow-[0_22px_42px_rgba(23,44,113,0.12),0_0_0_6px_rgba(20,150,243,0.08)]' : 'border-[rgba(18,36,79,0.16)] shadow-[0_10px_18px_rgba(23,44,113,0.04)]'} ${isFocused ? 'focus-within:-translate-y-0.5 focus-within:scale-[1.01] focus-within:animate-mobile-border-pulse' : ''}`;
+  const mobileFieldClassName = [
+    'flex h-14 items-center rounded-full border bg-white px-5 transition-[border-color,box-shadow] duration-200',
+    error
+      ? 'border-[#C1392B] shadow-[0_0_0_4px_rgba(193,57,43,0.1)]'
+      : isFocused
+        ? 'border-[#0F2748] shadow-[0_0_0_4px_rgba(15,39,72,0.06)]'
+        : 'border-slate-200',
+  ].join(' ');
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,20 +57,12 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-3 group/form" noValidate>
-      <label
-        className="text-[0.95rem] font-extrabold text-brand-navy transition-colors duration-[180ms] group-focus-within/form:text-brand-blue group-focus-within/form:-translate-y-px"
-        htmlFor="mobile"
-      >
-        Mobile number linked with aadhaar
+    <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
+      <label className="sr-only" htmlFor="mobile">
+        Mobile number
       </label>
-
-      <div className={mobileFieldClassName} style={{ gridTemplateColumns: '78px 1fr' }}>
-          <span
-            className="inline-flex justify-center items-center h-full border-r border-[rgba(18,36,79,0.1)] text-brand-navy font-extrabold transition-colors duration-[180ms] group-focus-within/field:text-brand-blue group-focus-within/field:border-r-[rgba(20,150,243,0.16)]"
-          >
-            +91
-          </span>
+      <div className={mobileFieldClassName}>
+        <span className="mr-3 shrink-0 text-[0.95rem] font-[600] text-slate-400">+91</span>
         <input
           id="mobile"
           name="mobile"
@@ -72,7 +70,7 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
           inputMode="numeric"
           autoComplete="tel-national"
           maxLength={10}
-          placeholder="9876543210"
+          placeholder="Mobile number linked with Aadhaar"
           required
           value={mobileNumber}
           onFocus={() => {
@@ -90,17 +88,9 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
           }}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? 'mobile-error' : 'mobile-help-sr'}
-          className="w-full h-full px-4 border-0 outline-0 bg-transparent text-brand-navy text-[1.08rem] font-bold tracking-[0.01em] caret-brand-blue placeholder:text-[#93a0c1] placeholder:tracking-normal transition-transform duration-[220ms] group-focus-within/field:translate-x-0.5"
+          className="h-full w-full border-0 bg-transparent text-[1rem] font-[600] text-[#0F2748] caret-[#22C55E] outline-none placeholder:font-[500] placeholder:text-slate-400"
         />
       </div>
-
-      <p className="-mt-0.5 flex items-center gap-2 text-[0.72rem] font-extrabold uppercase tracking-[0.12em] text-slate-400">
-        <svg className="h-3.5 w-3.5 text-[#1496f3]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
-          <path d="M12 3l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V7l8-4z" strokeLinejoin="round" />
-          <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        OTP · SMS
-      </p>
 
       <span id="mobile-help-sr" className="sr-only">
         We send a one-time 6-digit code by SMS to verify your mobile number.
@@ -128,7 +118,7 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
         </div>
       ) : null}
 
-      <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[rgba(18,36,79,0.08)] bg-gradient-to-br from-white to-[rgba(244,249,255,0.95)] px-4 py-3.5 text-[0.82rem] leading-snug text-slate-700 shadow-[0_8px_24px_rgba(23,44,113,0.05)] transition-[border-color,box-shadow] hover:border-[rgba(20,150,243,0.22)] hover:shadow-[0_12px_28px_rgba(23,44,113,0.07)]">
+      <label className="flex cursor-pointer items-start gap-3 text-[0.84rem] leading-snug text-slate-600">
         <input
           type="checkbox"
           name="acceptTerms"
@@ -137,7 +127,7 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
             setAcceptedTerms(e.target.checked);
             if (error?.includes('accept')) setError('');
           }}
-          className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-brand-blue focus:ring-brand-blue"
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-[#22C55E] focus:ring-[#22C55E]"
         />
         <span>
           I agree to the{' '}
@@ -145,7 +135,7 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
             href="/terms-and-conditions"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-bold text-brand-blue underline underline-offset-2 hover:text-brand-navy"
+            className="font-bold text-[#16A34A] underline underline-offset-2 hover:text-brand-navy"
             onClick={(e) => e.stopPropagation()}
           >
             Terms
@@ -155,7 +145,7 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
             href="/privacy-policy"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-bold text-brand-blue underline underline-offset-2 hover:text-brand-navy"
+            className="font-bold text-[#16A34A] underline underline-offset-2 hover:text-brand-navy"
             onClick={(e) => e.stopPropagation()}
           >
             Privacy
@@ -167,7 +157,7 @@ export function MobileEntryForm({ onSuccess }: { onSuccess?: (otpRequest: SendOt
           <span className="inline-flex items-center justify-center gap-[10px]">
             {isSubmitting ? (
               <span
-                className="w-[18px] h-[18px] rounded-full border-2 border-[rgba(255,248,223,0.28)] border-t-[#fff8df] animate-spin-btn"
+                className="w-[18px] h-[18px] rounded-full border-2 border-[rgba(15,39,72,0.2)] border-t-[#0F2748] animate-spin-btn"
                 aria-hidden
               />
             ) : null}

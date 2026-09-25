@@ -20,6 +20,10 @@ export type KycFaceMatchLocalResult = {
     imageHeight: number;
     faceCount?: number;
     dualFaceDetected?: boolean;
+    childLikeness?: number | null;
+    ageBand?: string | null;
+    estimatedAge?: number | null;
+    gender?: 'male' | 'female' | null;
   };
   probe: {
     faceDetected: boolean;
@@ -28,6 +32,36 @@ export type KycFaceMatchLocalResult = {
     imageHeight: number;
     faceCount?: number;
     dualFaceDetected?: boolean;
+    childLikeness?: number | null;
+    ageBand?: string | null;
+    estimatedAge?: number | null;
+    gender?: 'male' | 'female' | null;
+  };
+  checks?: {
+    descriptor: {
+      passed: boolean;
+      distance: number;
+      maxDistance: number;
+      strength: 'strong' | 'borderline' | 'fail';
+    };
+    geometry: {
+      passed: boolean;
+      applied: boolean;
+      referenceChildLikeness: number | null;
+      probeChildLikeness: number | null;
+      referenceAgeBand: string | null;
+      probeAgeBand: string | null;
+      reason?: string;
+    };
+    ageEstimate: {
+      passed: boolean;
+      applied: boolean;
+      referenceAge: number | null;
+      probeAge: number | null;
+      referenceAgeBand: string | null;
+      probeAgeBand: string | null;
+      reason?: string;
+    };
   };
   reason?: string;
   productionValidationDisabled: boolean;

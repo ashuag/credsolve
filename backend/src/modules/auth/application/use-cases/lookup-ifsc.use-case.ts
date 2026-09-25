@@ -5,7 +5,7 @@ import {
   extractVendorIfscData,
   mapIfscDataToFields,
 } from '../../../../common/ifsc/ifsc-code.util';
-import { BankTenacioVendorService } from '../../../../common/vendor/bank-tenacio-vendor.service';
+import { CredostackIfscService } from '../../../../common/vendor/credostack/credostack-ifsc.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { IfscCodeRepository } from '../../infrastructure/repositories/ifsc-code.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
@@ -23,7 +23,7 @@ export type LookupIfscResult = {
 @Injectable()
 export class LookupIfscUseCase {
   constructor(
-    private readonly bankVendor: BankTenacioVendorService,
+    private readonly ifscVendor: CredostackIfscService,
     private readonly customers: CustomerRepository,
     private readonly ifscCodes: IfscCodeRepository,
     private readonly leads: LeadRepository,
@@ -53,10 +53,7 @@ export class LookupIfscUseCase {
       }
     }
 
-    const out = await this.bankVendor.postIfscLookup(
-      { input: { ifscNumber: ifsc, consent: true } },
-      leadId,
-    );
+    const out = await this.ifscVendor.lookupIfsc(ifsc, leadId);
 
     if (!out.configured) {
       return {
@@ -73,21 +70,23 @@ export class LookupIfscUseCase {
     const vendorData = extractVendorIfscData(vendor);
     if (out.ok && vendorData) {
       const fields = mapIfscDataToFields(ifsc, vendorData);
-      await this.ifscCodes.upsertFromLookup(fields);
-      return {
-        configured: true,
-        ok: true,
-        httpStatus: out.httpStatus,
-        details: detailsFromIfscRow(fields),
-        vendor,
-      };
+      if (fields.bankName.length > 0) {
+        await this.ifscCodes.upsertFromLookup(fields);
+        return {
+          configured: true,
+          ok: true,
+          httpStatus: out.httpStatus,
+          details: detailsFromIfscRow(fields),
+          vendor,
+        };
+      }
     }
 
     return {
       configured: true,
-      ok: out.ok,
+      ok: false,
       httpStatus: out.httpStatus,
-      details: vendorData,
+      details: null,
       vendor,
     };
   }

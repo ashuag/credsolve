@@ -46,15 +46,56 @@ export function canEnableReKyc(snapshot: KycEnableReKycSnapshot): boolean {
     return false;
   }
 
-  const hasProgress =
+  return (
     snapshot.kycStatus === APPLICATION_KYC_STATUS.COMPLETED ||
-    snapshot.kycStatus === APPLICATION_KYC_STATUS.FAILED ||
-    snapshot.kycStatus === APPLICATION_KYC_STATUS.TECHNICAL_ISSUE ||
     snapshot.livenessPassed ||
     snapshot.livenessCheckCompleted ||
-    snapshot.livenessAttempts > 0 ||
     Boolean(snapshot.livenessCheckedAt) ||
-    Boolean(snapshot.hasKycArtifacts);
+    snapshot.livenessAttempts >= 3
+  );
+}
 
-  return hasProgress;
+export type AadhaarReattemptSnapshot = {
+  aadhaarCaptured: boolean;
+  otpAttempts: number;
+  digilockerAttempts: number;
+  digilockerFallbackEligible: boolean;
+  applicationStatusCode: string;
+  leadStatusCode: string;
+  kycFailed: boolean;
+};
+
+/** True when LOS ops may reset Aadhaar OTP/DigiLocker attempts so the customer starts OTP again. */
+export function canEnableAadhaarReattempt(snapshot: AadhaarReattemptSnapshot): boolean {
+  if (snapshot.leadStatusCode === LEAD_STATUS.BLACKLISTED) return false;
+
+  const recoverableKycFailure =
+    snapshot.kycFailed &&
+    (snapshot.applicationStatusCode === APPLICATION_STATUS.KYC_FAILED ||
+      snapshot.applicationStatusCode === APPLICATION_STATUS.REJECTED);
+
+  // Identity-mismatch rejects still have Aadhaar on file — ops must be able to clear it and retry.
+  if (snapshot.aadhaarCaptured && !recoverableKycFailure) return false;
+
+  if (
+    RE_KYC_BLOCKED_APPLICATION_STATUSES.has(snapshot.applicationStatusCode as ApplicationStatus) &&
+    !recoverableKycFailure
+  ) {
+    return false;
+  }
+  if (
+    snapshot.leadStatusCode === LEAD_STATUS.REJECTED &&
+    snapshot.applicationStatusCode !== APPLICATION_STATUS.KYC_FAILED &&
+    snapshot.applicationStatusCode !== APPLICATION_STATUS.REJECTED
+  ) {
+    return false;
+  }
+
+  return (
+    recoverableKycFailure ||
+    snapshot.otpAttempts > 0 ||
+    snapshot.digilockerAttempts > 0 ||
+    snapshot.digilockerFallbackEligible ||
+    snapshot.kycFailed
+  );
 }

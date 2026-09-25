@@ -5,10 +5,10 @@ import { TermsDocument } from './terms-document';
 export const metadata: Metadata = {
   title: 'Terms & Conditions',
   description:
-    'Official Terms & Conditions for the MoneyCash customer portal and digital lending Services.',
+    'Official Terms & Conditions for the CredSolve customer portal and digital lending Services.',
   openGraph: {
-    title: 'Terms & Conditions | MoneyCash',
-    description: 'Official Terms of Use for MoneyCash website and app.',
+    title: 'Terms & Conditions | CredSolve',
+    description: 'Official Terms of Use for CredSolve website and app.',
     type: 'website',
   },
 };

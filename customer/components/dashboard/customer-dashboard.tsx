@@ -77,6 +77,14 @@ function CheckIcon() {
   );
 }
 
+function CrossIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
+      <path d="M6 6l8 8M14 6l-8 8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function JourneyTracker({
   steps,
   completed,
@@ -104,6 +112,7 @@ function JourneyTracker({
       <ol className="flex items-start justify-between gap-0.5 sm:gap-1">
         {steps.map((step) => {
           const done = step.state === 'done';
+          const failed = step.state === 'failed';
           const current = step.state === 'current';
           const stepNumber =
             CUSTOMER_JOURNEY_PROGRESS_STEPS.findIndex((s) => s.key === step.key) + 1;
@@ -112,20 +121,22 @@ function JourneyTracker({
               <span
                 className={cn(
                   'flex h-7 w-7 items-center justify-center rounded-full text-[0.62rem] font-black ring-2 transition-colors',
-                  done
-                    ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 text-white ring-emerald-200'
-                    : current
-                      ? 'animate-ring-pop bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-[#12244f] ring-[#ffc519]/40'
-                      : 'bg-white text-slate-400 ring-slate-200'
+                  failed
+                    ? 'bg-gradient-to-br from-red-400 to-red-600 text-white ring-red-200'
+                    : done
+                      ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 text-white ring-emerald-200'
+                      : current
+                        ? 'animate-ring-pop bg-gradient-to-br from-[#22c55e] to-[#16a34a] text-[#12244f] ring-[#22c55e]/40'
+                        : 'bg-white text-slate-400 ring-slate-200'
                 )}
                 aria-current={current ? 'step' : undefined}
               >
-                {done ? <CheckIcon /> : stepNumber}
+                {failed ? <CrossIcon /> : done ? <CheckIcon /> : stepNumber}
               </span>
               <span
                 className={cn(
                   'truncate text-[0.55rem] font-bold uppercase tracking-wider sm:text-[0.62rem]',
-                  done ? 'text-emerald-700' : current ? 'text-brand-navy' : 'text-slate-400'
+                  failed ? 'text-red-700' : done ? 'text-emerald-700' : current ? 'text-brand-navy' : 'text-slate-400'
                 )}
               >
                 {step.shortLabel}
@@ -170,12 +181,12 @@ function ResumeJourneyCard({
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-[radial-gradient(circle_at_center,rgba(255,197,25,0.18),transparent_70%)]"
+        className="pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-[radial-gradient(circle_at_center,rgba(34,197,94,0.18),transparent_70%)]"
       />
 
       <div className="relative flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ffc519] to-[#f6b400] shadow-[0_8px_18px_rgba(246,180,0,0.4)]">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-[#22c55e] to-[#16a34a] shadow-[0_8px_18px_rgba(34,197,94,0.4)]">
             <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#12244f]" fill="currentColor" aria-hidden>
               <path d="M13 2L3 14h7l-1 8 11-13h-8l1-7z" />
             </svg>
@@ -221,7 +232,7 @@ function ResumeJourneyCard({
         </div>
         <Link
           href={resumeHref}
-          className="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#1c347d] via-[#12244f] to-[#0a1628] px-6 py-3 text-[0.95rem] font-extrabold text-[#fff8df] shadow-[0_14px_32px_rgba(23,44,113,0.35)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_42px_rgba(23,44,113,0.45)]"
+          className="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#1c347d] via-[#12244f] to-[#0a1628] px-6 py-3 text-[0.95rem] font-extrabold text-[#ecfdf5] shadow-[0_14px_32px_rgba(23,44,113,0.35)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_42px_rgba(23,44,113,0.45)]"
         >
           Resume journey
           <span className="transition-transform duration-200 group-hover:translate-x-0.5">
@@ -461,7 +472,7 @@ export function CustomerDashboard() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[0.7rem] font-extrabold uppercase tracking-[0.2em] text-slate-400">Overview</p>
-          <h1 className="mt-1 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold tracking-tight text-brand-navy">
+          <h1 className="mt-1 text-[clamp(1.75rem,4vw,2.25rem)] font-bold tracking-tight text-brand-navy">
             {greetingName ? `Welcome back, ${greetingName}` : 'My accounts'}
           </h1>
           <p className="mt-2 max-w-xl text-brand-muted leading-relaxed">
@@ -483,7 +494,7 @@ export function CustomerDashboard() {
 
       {dash.inProgress.length > 1 && (
         <section className="grid gap-4">
-          <h2 className="text-lg font-extrabold text-brand-navy">Other applications in progress</h2>
+          <h2 className="text-lg font-bold text-brand-navy">Other applications in progress</h2>
           <div className="grid gap-4 lg:grid-cols-2">
             {dash.inProgress.slice(1).map((loan) => (
               <LoanSummaryCard key={loan.applicationUuid} loan={loan} />
@@ -493,7 +504,7 @@ export function CustomerDashboard() {
       )}
 
       <section className="grid gap-4">
-        <h2 className="text-lg font-extrabold text-brand-navy">Running loan{dash.activeLoans.length !== 1 ? 's' : ''}</h2>
+        <h2 className="text-lg font-bold text-brand-navy">Running loan{dash.activeLoans.length !== 1 ? 's' : ''}</h2>
         {dash.activeLoans.length === 0 ? (
           <EmptyStateCard
             icon={<WalletIcon />}
@@ -501,7 +512,7 @@ export function CustomerDashboard() {
             description={
               hasResumeable
                 ? 'Once your application is approved and disbursed, your active loan will appear here.'
-                : 'Once you take a MoneyCash loan it shows up here with principal, repayment, and bank info.'
+                : 'Once you take a CredSolve loan it shows up here with principal, repayment, and bank info.'
             }
             action={
               hasResumeable || dash.activeLoans.length > 0
@@ -519,7 +530,7 @@ export function CustomerDashboard() {
       </section>
 
       <section className="grid gap-4">
-        <h2 className="text-lg font-extrabold text-brand-navy">Repayment — running loan</h2>
+        <h2 className="text-lg font-bold text-brand-navy">Repayment — running loan</h2>
         {dash.repaymentSchedule.length === 0 ? (
           <EmptyStateCard
             icon={<CalendarIcon />}
@@ -560,12 +571,12 @@ export function CustomerDashboard() {
       </section>
 
       <section className="grid gap-4">
-        <h2 className="text-lg font-extrabold text-brand-navy">Previous loans</h2>
+        <h2 className="text-lg font-bold text-brand-navy">Previous loans</h2>
         {dash.pastLoans.length === 0 ? (
           <EmptyStateCard
             icon={<HistoryIcon />}
             title="No history yet"
-            description="Closed and matured loans will appear here so you always have a record of your MoneyCash activity."
+            description="Closed and matured loans will appear here so you always have a record of your CredSolve activity."
           />
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">

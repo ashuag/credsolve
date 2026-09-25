@@ -86,7 +86,7 @@ export function ProfileFields({
         <button type="button" onClick={onContinue} disabled={isBusy} aria-busy={isBusy}
           className="mc-btn-primary flex-1 disabled:opacity-60 disabled:cursor-not-allowed">
           <span className="inline-flex items-center justify-center gap-2.5">
-            {isBusy && <span className="w-4.5 h-4.5 shrink-0 rounded-full border-2 border-[rgba(255,248,223,0.28)] border-t-[#fff8df] animate-spin-btn" aria-hidden />}
+            {isBusy && <span className="w-4.5 h-4.5 shrink-0 rounded-full border-2 border-[rgba(255,248,223,0.28)] border-t-[#ecfdf5] animate-spin-btn" aria-hidden />}
             <span>{busyLabel}</span>
           </span>
         </button>

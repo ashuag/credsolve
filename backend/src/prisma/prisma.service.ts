@@ -4,6 +4,7 @@ import {
   createPrismaClient,
   createReplicaPrismaClient,
   describeDatabaseTarget,
+  describePrismaPoolSettings,
   isReplicaConnectionError,
   resolveReplicaDatabaseUrl,
 } from '../../prisma/prisma-client';
@@ -28,6 +29,11 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit(): Promise<void> {
+    const primaryPool = describePrismaPoolSettings();
+    this.logger.log(
+      `Primary pool connectionLimit=${primaryPool.connectionLimit} acquireTimeoutMs=${primaryPool.acquireTimeoutMs} leakDetectionTimeoutMs=${primaryPool.leakDetectionTimeoutMs}`,
+    );
+
     if (!this.replicaClient) {
       this.logger.log('LOS reads use primary (DATABASE_REPLICA_URL / DATABASE_REPLICA_HOST not set)');
       return;

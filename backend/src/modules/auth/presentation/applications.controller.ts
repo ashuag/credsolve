@@ -125,7 +125,7 @@ export class ApplicationsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Resolve IFSC from the ifsc_code table; on a miss call Tenacio, persist bank/address/city/state/pincode, then return details',
+      'Resolve IFSC from the ifsc_code table; on a miss call Credostack, persist bank/address/city/state/pincode, then return details',
   })
   @ApiOkResponse({ description: 'Cached or vendor `details` (bank name, IFSC, address, city, state, pincode, …)' })
   lookupIfscRoute(@Req() req: Request, @Body() body: LookupIfscDto) {

@@ -140,7 +140,7 @@ export function LegalDocumentView({ document }: LegalDocumentViewProps) {
           <div className="legal-meta-grid">
             <div className="legal-meta-card">
               <p className="legal-meta-label">Platform</p>
-              <p className="legal-meta-value">MoneyCash</p>
+              <p className="legal-meta-value">CredSolve</p>
             </div>
             <div className="legal-meta-card">
               <p className="legal-meta-label">Registered office</p>

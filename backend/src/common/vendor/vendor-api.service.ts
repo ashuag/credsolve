@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { VendorHttpMethod } from '../constants/vendor-http-method.constants';
-import { isVendorApi5xxFailure } from './vendor-api-error.util';
+import { isAadhaarXmlOtpFallbackService, isVendorApi5xxFailure } from './vendor-api-error.util';
 import { VendorInternalErrorService } from './vendor-internal-error.service';
 
 /** Default per-request timeout. Long enough for most KYC vendors, short enough that hung calls don't pile up. */
@@ -28,6 +28,7 @@ const SENSITIVE_HEADER_NAMES: ReadonlySet<string> = new Set([
   'x-api-key',
   'api-key',
   'apikey',
+  'x-access-token',
   'client-id',
   'cookie',
   'set-cookie',
@@ -243,7 +244,10 @@ export class VendorApiService {
     });
 
     if (opts.leadId != null) {
-      if (isVendorApi5xxFailure({ httpStatus, body: parsedResponse })) {
+      if (
+        isVendorApi5xxFailure({ httpStatus, body: parsedResponse }) &&
+        !isAadhaarXmlOtpFallbackService(opts.serviceName)
+      ) {
         void this.internalError
           .handleVendor5xx({
             leadId: opts.leadId,

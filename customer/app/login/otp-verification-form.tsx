@@ -152,7 +152,7 @@ export function OtpVerificationForm({
   const verificationCard = (
     <section className={compact ? "h-full flex flex-col justify-center" : "mc-card mc-card-glow"}>
       <div className="mb-8">
-        <h2 className="text-2xl md:text-[1.8rem] font-extrabold text-brand-navy mb-6 tracking-tight leading-[1.1] whitespace-nowrap">
+        <h2 className="text-2xl md:text-[1.8rem] font-bold text-brand-navy mb-6 tracking-tight leading-[1.1] whitespace-nowrap">
           Verify Your <span className="text-brand-blue">Identity</span>
         </h2>
 
@@ -269,7 +269,7 @@ export function OtpVerificationForm({
             Enter your mobile number.
           </h1>
           <p className="text-brand-muted leading-[1.6]">
-            Use your registered number to receive an OTP and continue your MoneyCash journey securely.
+            Use your registered number to receive an OTP and continue your CredSolve journey securely.
           </p>
           <div className="mt-[22px]">
             <MobileEntryForm onSuccess={handleOtpRequestSuccess} />

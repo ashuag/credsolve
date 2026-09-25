@@ -247,7 +247,7 @@ function HomeCalculatorInner({ embed, applyHref }: HomeCalculatorInnerProps) {
             className="group flex w-full items-center justify-center gap-2 rounded-xl bg-brand-navy py-3.5 text-[0.95rem] font-[900] text-white transition-all hover:bg-[#12244f] active:scale-[0.98]"
           >
             Apply
-            <svg viewBox="0 0 20 20" className="h-4 w-4 text-[#ffc519] transition-transform group-hover:translate-x-0.5" fill="currentColor" aria-hidden>
+            <svg viewBox="0 0 20 20" className="h-4 w-4 text-[#22c55e] transition-transform group-hover:translate-x-0.5" fill="currentColor" aria-hidden>
               <path d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" />
             </svg>
           </Link>
@@ -316,7 +316,7 @@ function EmbedLightCalculator({ applyHref }: { applyHref: string }) {
             <label className="text-[0.68rem] font-[900] uppercase tracking-[0.2em] text-brand-navy/40">Repayment Period</label>
             <div className="mt-1 text-3xl font-[900] text-brand-gold">{tenure} Days</div>
           </div>
-          <RangeTrack variant="light" pct={tenurePct} color="#ffc519" value={tenure} min={tenureMin} max={tenureMax} step={1} onInput={onTenureInput} ariaLabel="Repayment period in days" />
+          <RangeTrack variant="light" pct={tenurePct} color="#22c55e" value={tenure} min={tenureMin} max={tenureMax} step={1} onInput={onTenureInput} ariaLabel="Repayment period in days" />
         </div>
       </div>
 

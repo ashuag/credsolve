@@ -126,6 +126,12 @@ export const SettingKey = {
         default: '2',
         description: 'Number of attempts allowed for PAN validation BEFORE HITTING THE pan nsdl api',
     },
+    AADHAAR_XML_OTP_MAX_ATTEMPTS: {
+        key: 'AADHAAR_XML_OTP_MAX_ATTEMPTS',
+        default: '2',
+        description:
+            'Max failed Aadhaar XML OTP generate/download attempts before DigiLocker KYC is offered',
+    },
     PENNY_DROP_RETRY_COUNT: {
         key: 'PENNY_DROP_RETRY_COUNT',
         default: '2',

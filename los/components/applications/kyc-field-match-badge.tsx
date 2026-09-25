@@ -5,7 +5,7 @@ const STYLES: Record<KycMatchVerdict, string> = {
   match: 'border-[rgba(29,157,112,0.35)] bg-[rgba(29,157,112,0.1)] text-[#14523a]',
   partial: 'border-[rgba(180,100,0,0.35)] bg-[rgba(255,160,0,0.1)] text-[#7a4800]',
   mismatch: 'border-[rgba(231,95,95,0.35)] bg-[rgba(255,241,241,0.9)] text-[#8d3434]',
-  missing: 'border-[rgba(23,44,113,0.12)] bg-[rgba(248,250,255,0.9)] text-brand-muted',
+  missing: 'border-[rgba(15,39,72,0.12)] bg-[rgba(248,250,255,0.9)] text-brand-muted',
 };
 
 const LABELS: Record<KycMatchVerdict, string> = {

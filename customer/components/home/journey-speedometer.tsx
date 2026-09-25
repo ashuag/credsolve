@@ -76,126 +76,129 @@ export function JourneySpeedometer({ compact = false }: { compact?: boolean }) {
 
   const stepText = JOURNEY_STEPS[stepIndex];
 
-  // Semicircle gauge only (no text inside SVG — avoids overlap with hub / needle).
-  const cx = 90;
-  const cy = 62;
-  const r = 56;
+  const cx = 120;
+  const cy = 118;
+  const r = 86;
   const circumference = Math.PI * r;
   const strokeDashoffset = circumference * (1 - progress / 100);
-  const needleAngle = progress * 1.8 - 90;
+  const needleAngle = -90 + (progress / 100) * 180;
+
+  const ticks = Array.from({ length: 11 }, (_, index) => {
+    const angle = Math.PI - (index / 10) * Math.PI;
+    const major = index % 5 === 0;
+    const inner = r - (major ? 16 : 9);
+    const outer = r + 2;
+    return {
+      major,
+      x1: cx + inner * Math.cos(angle),
+      y1: cy - inner * Math.sin(angle),
+      x2: cx + outer * Math.cos(angle),
+      y2: cy - outer * Math.sin(angle),
+    };
+  });
 
   return (
-    <div className={['flex w-full flex-col items-center', compact ? 'gap-1' : 'gap-2'].join(' ')}>
+    <div
+      className={['flex w-full flex-col items-center text-white', compact ? 'max-w-[260px] gap-1' : 'max-w-[300px] gap-2'].join(' ')}
+      role="meter"
+      aria-valuenow={progress}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={`Application progress ${progress} percent, ${stepText}`}
+    >
       <svg
-        viewBox="0 0 180 78"
-        className={
-          compact
-            ? 'w-[min(90vw,200px)] shrink-0'
-            : 'w-[min(90vw,220px)] shrink-0 sm:w-[min(90vw,260px)] lg:w-[min(90vw,280px)]'
-        }
+        viewBox="0 0 240 148"
+        className={compact ? 'w-full' : 'w-[min(78vw,280px)]'}
         aria-hidden
       >
         <defs>
           <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#facc15" />
-            <stop offset="100%" stopColor="#22c55e" />
+            <stop offset="0%" stopColor="#4ADE80" />
+            <stop offset="100%" stopColor="#22C55E" />
           </linearGradient>
         </defs>
 
         <path
           d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
           fill="none"
-          stroke="rgba(255,255,255,0.12)"
-          strokeWidth="9"
+          stroke="rgba(255,255,255,0.16)"
+          strokeWidth="12"
           strokeLinecap="round"
         />
-
         <path
           d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
           fill="none"
           stroke={`url(#${gradientId})`}
-          strokeWidth="9"
+          strokeWidth="12"
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
-          className="transition-all duration-1000 ease-out"
+          className="transition-[stroke-dashoffset] duration-700 ease-out"
         />
 
-        {[0, 25, 50, 75, 100].map((pct) => {
-          const a = (pct / 100) * Math.PI;
-          const ox = Math.cos(Math.PI - a);
-          const oy = -Math.sin(Math.PI - a);
-          return (
-            <line
-              key={pct}
-              x1={cx + r * ox}
-              y1={cy + r * oy}
-              x2={cx + (r - 11) * ox}
-              y2={cy + (r - 11) * oy}
-              stroke="rgba(255,255,255,0.35)"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          );
-        })}
-
-        <g transform={`rotate(${needleAngle} ${cx} ${cy})`}>
-          <rect
-            x={cx - 1.5}
-            y={cy - r + 14}
-            width="3"
-            height={r - 14}
-            rx="1.5"
-            fill="white"
-            opacity="0.92"
+        {ticks.map((tick) => (
+          <line
+            key={`${tick.x1}-${tick.y1}`}
+            x1={tick.x1}
+            y1={tick.y1}
+            x2={tick.x2}
+            y2={tick.y2}
+            stroke={tick.major ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.35)'}
+            strokeWidth={tick.major ? 2.4 : 1.4}
+            strokeLinecap="round"
           />
-        </g>
+        ))}
 
-        <circle cx={cx} cy={cy} r="6" fill="white" />
-        <circle cx={cx} cy={cy} r="2.5" fill="#1e293b" />
+        <text x={cx - r - 2} y={cy + 18} fill="rgba(255,255,255,0.55)" fontSize="11" fontWeight="700" textAnchor="middle">
+          0
+        </text>
+        <text x={cx + r + 2} y={cy + 18} fill="rgba(255,255,255,0.55)" fontSize="11" fontWeight="700" textAnchor="middle">
+          100
+        </text>
+
+        <g
+          style={{
+            transformOrigin: `${cx}px ${cy}px`,
+            transform: `rotate(${needleAngle}deg)`,
+            transition: 'transform 700ms ease-out',
+          }}
+        >
+          <line x1={cx} y1={cy} x2={cx} y2={cy - (r - 24)} stroke="#F8FAFC" strokeWidth="3" strokeLinecap="round" />
+          <circle cx={cx} cy={cy - (r - 24)} r="3.5" fill="#22C55E" />
+        </g>
+        <circle cx={cx} cy={cy} r="8" fill="#07172E" stroke="#22C55E" strokeWidth="3" />
       </svg>
 
-      <div className={['flex flex-col items-center text-center', compact ? 'gap-0 -mt-3' : 'gap-0.5 -mt-2'].join(' ')}>
-        <span
-          className={[
-            'font-black tabular-nums leading-none text-white',
-            compact ? 'text-[1rem]' : 'text-[1.1rem] sm:text-[1.25rem]',
-          ].join(' ')}
-        >
-          {progress}%
-        </span>
-        <span className="text-[0.58rem] font-extrabold uppercase tracking-[0.18em] leading-none text-sky-300/95">
-          {stepText}
-        </span>
+      <div className="-mt-2 text-center">
+        <p className="text-[1.65rem] font-[800] leading-none tabular-nums text-white">
+          {progress}
+          <span className="text-[0.62em] text-[#22C55E]">%</span>
+        </p>
+        <p className="mt-1.5 text-[0.68rem] font-[800] uppercase tracking-[0.2em] text-[#22C55E]">
+          Step {stepIndex + 1} of {STEP_COUNT}
+        </p>
       </div>
 
       {compact ? null : (
-      <div className="flex max-w-full flex-wrap items-start justify-center gap-x-3 gap-y-2 px-1 pt-0.5 sm:gap-x-3 sm:px-2">
-        {JOURNEY_STEPS.map((step, i) => {
-          const done = i < stepIndex;
-          const active = i === stepIndex;
-          return (
-            <div key={step} className="flex flex-col items-center gap-1">
+        <div className="mt-1 flex w-full items-center gap-1 px-1" aria-hidden>
+          {JOURNEY_STEPS.map((step, i) => {
+            const stepState = journey.steps[i]?.state;
+            const failed = stepState === 'failed';
+            const done = !failed && (stepState === 'done' || i < stepIndex);
+            const active = !failed && i === stepIndex;
+            return (
               <div
-                className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${
-                  done
-                    ? 'bg-green-400'
-                    : active
-                      ? 'bg-yellow-400 ring-2 ring-yellow-300/40 scale-125'
-                      : 'bg-white/20'
-                }`}
+                key={step}
+                title={step}
+                className={[
+                  'h-1 flex-1 rounded-full',
+                  failed ? 'bg-red-400' : done || active ? 'bg-[#22C55E]' : 'bg-white/20',
+                  active ? 'h-1.5' : '',
+                ].join(' ')}
               />
-              <span
-                className={`text-[0.45rem] sm:text-[0.5rem] font-[800] uppercase tracking-wide leading-[1.1] text-center max-[380px]:max-w-[52px] ${
-                  active ? 'text-yellow-300' : done ? 'text-green-300' : 'text-white/30'
-                }`}
-              >
-                {step}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

@@ -3,7 +3,7 @@
 import { enableReKyc, type LosApplicationDetails } from '@/lib/api';
 import { canRetryLosApplicationSteps } from '@/lib/access';
 import { getLosStoredUser } from '@/lib/auth';
-import { canEnableReKycFromRow } from '@/lib/kyc-grant-retry-eligibility';
+import { canEnableReKycFromRow, isLivenessFinishedForReKyc } from '@/lib/kyc-grant-retry-eligibility';
 import { useState } from 'react';
 
 export function KycEnableReKycButton({
@@ -38,7 +38,10 @@ export function KycEnableReKycButton({
     return canRetryLosApplicationSteps(user?.roleName ?? user?.role, user?.hierarchyLevel);
   });
 
-  const eligible = allowed && (row.canEnableReKyc || canEnableReKycFromRow(row));
+  const eligible =
+    allowed &&
+    (row.canEnableReKyc || canEnableReKycFromRow(row)) &&
+    isLivenessFinishedForReKyc(row);
 
   if (!eligible) return null;
 

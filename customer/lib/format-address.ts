@@ -78,7 +78,7 @@ function formatToken(token: string, isFirst: boolean, followsDigit: boolean): st
  */
 export function formatAddressForDisplay(value: string | null | undefined): string | null {
   if (value == null) return null;
-  const trimmed = value.trim();
+  const trimmed = value.replace(/[\n\r]+/g, ', ').replace(/\s+/g, ' ').replace(/,\s*,/g, ',').trim();
   if (!trimmed) return null;
   if (/[a-z]/.test(trimmed)) return trimmed;
 

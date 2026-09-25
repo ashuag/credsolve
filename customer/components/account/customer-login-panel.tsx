@@ -74,7 +74,7 @@ export function CustomerLoginPanel() {
 
         <h2
           id="login-entry-heading"
-          className="text-2xl md:text-[1.75rem] font-black tracking-tight text-brand-navy leading-[1.1]"
+          className="text-2xl md:text-[1.75rem] font-bold tracking-tight text-brand-navy leading-[1.1]"
         >
           Sign in
         </h2>

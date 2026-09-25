@@ -246,7 +246,7 @@ export function SourceUtmPanel({
             <Link
               href={`/masters/source-utm/edit?id=${row.id}`}
               title="Edit"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-white text-brand-navy no-underline hover:bg-[rgba(235,242,255,0.8)]"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-white text-brand-navy no-underline hover:bg-[rgba(235,242,255,0.8)]"
             >
               <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
                 <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 0L7 19l-4 1 1-4 12.5-12.5z" />
@@ -275,7 +275,7 @@ export function SourceUtmPanel({
               type="button"
               onClick={() => void copyUrl(row)}
               disabled={busy || !hasParams}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-3 text-[0.75rem] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${copiedId === row.id ? 'border-[rgba(34,197,94,0.3)] bg-[rgba(240,253,244,0.9)] text-[#15803d]' : 'border-[rgba(23,44,113,0.18)] bg-white text-brand-navy hover:bg-[rgba(235,242,255,0.8)]'}`}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-3 text-[0.75rem] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${copiedId === row.id ? 'border-[rgba(34,197,94,0.3)] bg-[rgba(240,253,244,0.9)] text-[#15803d]' : 'border-[rgba(15,39,72,0.18)] bg-white text-brand-navy hover:bg-[rgba(235,242,255,0.8)]'}`}
             >
               {copiedId === row.id ? 'Copied' : 'Copy'}
             </button>
@@ -288,7 +288,7 @@ export function SourceUtmPanel({
   const inp = 'los-input';
 
   if (loading && mode === 'list') {
-    return <div className="rounded-[12px] border border-[rgba(23,44,113,0.08)] bg-white p-6 text-brand-muted">Loading…</div>;
+    return <div className="rounded-[12px] border border-[rgba(15,39,72,0.08)] bg-white p-6 text-brand-muted">Loading…</div>;
   }
 
   return (
@@ -300,8 +300,8 @@ export function SourceUtmPanel({
       )}
 
       {mode === 'create' && (
-        <section className="rounded-[16px] border border-[rgba(23,44,113,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,246,255,0.95))]">
-          <div className="border-b border-[rgba(23,44,113,0.07)] px-5 py-4">
+        <section className="rounded-[16px] border border-[rgba(15,39,72,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,246,255,0.95))]">
+          <div className="border-b border-[rgba(15,39,72,0.07)] px-5 py-4">
             <h2 className="m-0 text-[1.02rem] font-extrabold text-brand-navy">Create Source UTM</h2>
             <p className="m-0 mt-1 text-[0.84rem] text-brand-muted">Select a lead source and fill in the UTM parameters.</p>
           </div>
@@ -325,7 +325,7 @@ export function SourceUtmPanel({
               </label>
             ))}
             <div className="flex gap-2 md:col-span-2">
-              <Link href="/masters/source-utm" className="inline-flex min-h-[38px] items-center justify-center rounded-[8px] border border-[rgba(23,44,113,0.14)] px-4 text-[0.84rem] font-bold text-brand-navy no-underline">Back</Link>
+              <Link href="/masters/source-utm" className="inline-flex min-h-[38px] items-center justify-center rounded-[8px] border border-[rgba(15,39,72,0.14)] px-4 text-[0.84rem] font-bold text-brand-navy no-underline">Back</Link>
               <button type="submit" className="los-btn-primary" disabled={busy || !leadSourceId || (!formSource.trim() && !formCampaign.trim() && !formTerm.trim() && !formMedium.trim() && !formContent.trim())}>
                 Create
               </button>
@@ -335,8 +335,8 @@ export function SourceUtmPanel({
       )}
 
       {mode === 'edit' && (
-        <section className="rounded-[16px] border border-[rgba(23,44,113,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,246,255,0.95))]">
-          <div className="border-b border-[rgba(23,44,113,0.07)] px-5 py-4">
+        <section className="rounded-[16px] border border-[rgba(15,39,72,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,246,255,0.95))]">
+          <div className="border-b border-[rgba(15,39,72,0.07)] px-5 py-4">
             <h2 className="m-0 text-[1.02rem] font-extrabold text-brand-navy">Edit Source UTM</h2>
             <p className="m-0 mt-1 text-[0.84rem] text-brand-muted">Update UTM parameters for this lead source.</p>
           </div>
@@ -376,7 +376,7 @@ export function SourceUtmPanel({
                 </label>
               ))}
               <div className="flex gap-2 md:col-span-2">
-                <Link href="/masters/source-utm" className="inline-flex min-h-[38px] items-center justify-center rounded-[8px] border border-[rgba(23,44,113,0.14)] px-4 text-[0.84rem] font-bold text-brand-navy no-underline">Back</Link>
+                <Link href="/masters/source-utm" className="inline-flex min-h-[38px] items-center justify-center rounded-[8px] border border-[rgba(15,39,72,0.14)] px-4 text-[0.84rem] font-bold text-brand-navy no-underline">Back</Link>
                 <button type="submit" className="los-btn-primary" disabled={busy}>Save Changes</button>
               </div>
             </form>
@@ -394,7 +394,7 @@ export function SourceUtmPanel({
                   {leadSources.length} source{leadSources.length !== 1 ? 's' : ''}
                 </p>
               </div>
-              <Link href="/masters/lead-sources" className="inline-flex min-h-[38px] items-center justify-center rounded-[8px] border border-[rgba(23,44,113,0.14)] px-4 text-[0.84rem] font-bold text-brand-navy no-underline hover:bg-[rgba(235,242,255,0.8)]">
+              <Link href="/masters/lead-sources" className="inline-flex min-h-[38px] items-center justify-center rounded-[8px] border border-[rgba(15,39,72,0.14)] px-4 text-[0.84rem] font-bold text-brand-navy no-underline hover:bg-[rgba(235,242,255,0.8)]">
                 Manage sources
               </Link>
             </div>

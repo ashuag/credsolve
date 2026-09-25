@@ -5,17 +5,18 @@
   :root {
     --brand-blue: #2388e5;
     --brand-blue-light: #4db3ff;
-    --brand-navy: #1c347d;
-    --brand-gold: #f4b400;
-    --brand-text: #1c347d;
+    --brand-navy: #0f2748;
+    /* CredSolve accent (lime) — kept as --brand-gold for existing utility class names */
+    --brand-gold: #22c55e;
+    --brand-text: #0f2748;
   }
 
   html {
-    font-family: var(--font-inter), 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-poppins), 'Segoe UI', system-ui, sans-serif;
     background:
-      radial-gradient(circle at top left, rgba(244, 180, 0, 0.22), transparent 26rem),
-      radial-gradient(circle at top right, rgba(35, 136, 229, 0.18), transparent 24rem),
-      linear-gradient(180deg, #fffdf8 0%, #eef5ff 52%, #f6f9ff 100%);
+      radial-gradient(circle at top left, rgba(34, 197, 94, 0.16), transparent 26rem),
+      radial-gradient(circle at top right, rgba(35, 136, 229, 0.14), transparent 24rem),
+      linear-gradient(180deg, #f7fbf9 0%, #eef5ff 52%, #f6f9ff 100%);
     color: var(--brand-text);
     /* Momentum scrolling on iOS */
     -webkit-overflow-scrolling: touch;
@@ -24,6 +25,7 @@
   }
 
   body {
+    font-family: var(--font-poppins), 'Segoe UI', system-ui, sans-serif;
     margin: 0;
     /* dvh tracks visible viewport (respects mobile browser chrome) */
     min-height: 100dvh;
@@ -117,7 +119,7 @@
     text-transform: uppercase;
   }
 
-  /* Primary navy CTA button */
+  /* Primary CredSolve CTA */
   .mc-btn-primary {
     display: inline-flex;
     justify-content: center;
@@ -126,11 +128,11 @@
     padding: 14px 18px;
     border: 0;
     border-radius: 18px;
-    background: linear-gradient(135deg, #1c347d, #12244f 65%);
-    color: #fff8df;
-    font-weight: 800;
+    background: #22c55e;
+    color: #0f2748;
+    font-weight: 700;
     letter-spacing: 0.01em;
-    box-shadow: 0 18px 34px rgba(23, 44, 113, 0.2);
+    box-shadow: 0 14px 28px rgba(34, 197, 94, 0.28);
     cursor: pointer;
     transition: transform 160ms ease;
   }
@@ -227,12 +229,12 @@
 
 @keyframes mobileBorderPulse {
   0%, 100% {
-    border-color: rgba(20, 150, 243, 0.46);
-    box-shadow: 0 22px 42px rgba(23, 44, 113, 0.12), 0 0 0 6px rgba(20, 150, 243, 0.08);
+    border-color: rgba(34, 197, 94, 0.55);
+    box-shadow: 0 22px 42px rgba(15, 39, 72, 0.08), 0 0 0 6px rgba(34, 197, 94, 0.12);
   }
   50% {
-    border-color: rgba(255, 197, 25, 0.76);
-    box-shadow: 0 22px 42px rgba(23, 44, 113, 0.14), 0 0 0 6px rgba(255, 197, 25, 0.1);
+    border-color: rgba(22, 163, 74, 0.85);
+    box-shadow: 0 22px 42px rgba(15, 39, 72, 0.1), 0 0 0 6px rgba(34, 197, 94, 0.2);
   }
 }
 
@@ -468,16 +470,16 @@
 .hero-mesh {
   background:
     radial-gradient(ellipse 80% 60% at 80% 0%, rgba(255, 255, 255, 0.15) 0%, transparent 70%),
-    radial-gradient(ellipse 60% 50% at 0% 100%, rgba(244, 180, 0, 0.2) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 0% 100%, rgba(34, 197, 94, 0.2) 0%, transparent 60%),
     radial-gradient(ellipse 50% 60% at 50% 50%, rgba(35, 136, 229, 0.4) 0%, transparent 70%),
     linear-gradient(160deg, #4DB3FF 0%, #2388E5 50%, #1C347D 100%);
 }
 
 .stats-mesh {
   background:
-    radial-gradient(ellipse 60% 80% at 20% 50%, rgba(35, 136, 229, 0.18) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 60% at 80% 50%, rgba(244, 180, 0, 0.1) 0%, transparent 60%),
-    linear-gradient(180deg, #0a1628 0%, #0e1e3a 100%);
+    radial-gradient(ellipse 70% 60% at 10% 0%, rgba(34, 197, 94, 0.28) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 50% at 100% 100%, rgba(34, 197, 94, 0.12) 0%, transparent 50%),
+    linear-gradient(165deg, #16365c 0%, #0f2748 58%, #0a1b33 100%);
 }
 
 .glass {
@@ -494,7 +496,7 @@
 }
 
 .text-grad-gold {
-  background: linear-gradient(135deg, #f4b400 0%, #ffdb6b 50%, #e5a800 100%);
+  background: linear-gradient(135deg, #22c55e 0%, #4ade80 50%, #16a34a 100%);
   background-size: 200% auto;
   background-clip: text;
   -webkit-background-clip: text;
@@ -512,11 +514,11 @@
 }
 
 .glow-gold {
-  box-shadow: 0 4px 28px rgba(255, 197, 25, 0.35), 0 8px 60px rgba(255, 197, 25, 0.18);
+  box-shadow: 0 4px 28px rgba(34, 197, 94, 0.35), 0 8px 60px rgba(34, 197, 94, 0.18);
   transition: box-shadow 0.3s ease, transform 0.2s ease;
 }
 .glow-gold:hover {
-  box-shadow: 0 6px 50px rgba(255, 197, 25, 0.55), 0 14px 80px rgba(255, 197, 25, 0.28);
+  box-shadow: 0 6px 50px rgba(34, 197, 94, 0.55), 0 14px 80px rgba(34, 197, 94, 0.28);
   transform: translateY(-2px);
 }
 .glow-blue {
@@ -594,11 +596,11 @@
   border-radius: 999px;
 }
 
-.mc-range-slider.accent-\[\#ffc519\]::-webkit-slider-thumb {
+.mc-range-slider.accent-\[\#22c55e\]::-webkit-slider-thumb {
   background: transparent;
 }
 
-.mc-range-slider.accent-\[\#ffc519\]::-moz-range-thumb {
+.mc-range-slider.accent-\[\#22c55e\]::-moz-range-thumb {
   background: transparent;
 }
 

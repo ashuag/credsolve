@@ -50,14 +50,14 @@ function NameMatchScoreCell({ score }: { score: number | null }) {
 
 function AttemptHistoryTable({ attempts }: { attempts: PennyDropAttemptRow[] }) {
   return (
-    <div className="overflow-x-auto rounded-[10px] border border-[rgba(23,44,113,0.1)]">
+    <div className="overflow-x-auto rounded-[10px] border border-[rgba(15,39,72,0.1)]">
       <table className="w-full min-w-[760px] border-collapse text-[0.84rem]">
         <thead>
-          <tr className="bg-[rgba(23,44,113,0.05)]">
+          <tr className="bg-[rgba(15,39,72,0.05)]">
             {COLUMNS.map((label) => (
               <th
                 key={label}
-                className="border-b border-[rgba(23,44,113,0.08)] px-3 py-2 text-left text-[0.68rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted whitespace-nowrap"
+                className="border-b border-[rgba(15,39,72,0.08)] px-3 py-2 text-left text-[0.68rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted whitespace-nowrap"
               >
                 {label}
               </th>
@@ -73,31 +73,31 @@ function AttemptHistoryTable({ attempts }: { attempts: PennyDropAttemptRow[] }) 
                 key={attempt.id}
                 className={passed ? 'bg-emerald-50/80' : underReview ? 'bg-amber-50/80' : 'bg-rose-50/80'}
               >
-                <td className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2.5 font-extrabold text-brand-navy whitespace-nowrap">
+                <td className="border-b border-[rgba(15,39,72,0.06)] px-3 py-2.5 font-extrabold text-brand-navy whitespace-nowrap">
                   {attempts.length - index}
                 </td>
-                <td className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2.5 whitespace-nowrap">
+                <td className="border-b border-[rgba(15,39,72,0.06)] px-3 py-2.5 whitespace-nowrap">
                   <AttemptStatusCell passed={passed} underReview={underReview} />
                 </td>
-                <td className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2.5 font-semibold text-brand-text whitespace-nowrap">
+                <td className="border-b border-[rgba(15,39,72,0.06)] px-3 py-2.5 font-semibold text-brand-text whitespace-nowrap">
                   {formatReviewDateTime(attempt.createdAt)}
                 </td>
-                <td className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2.5">
+                <td className="border-b border-[rgba(15,39,72,0.06)] px-3 py-2.5">
                   <MaskedSecret value={attempt.bankAccountNumber} mask={maskAccount(attempt.bankAccountNumber)} />
                 </td>
-                <td className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2.5 font-semibold text-brand-text whitespace-nowrap">
+                <td className="border-b border-[rgba(15,39,72,0.06)] px-3 py-2.5 font-semibold text-brand-text whitespace-nowrap">
                   {attempt.ifscCode || '—'}
                 </td>
-                <td className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2.5 font-semibold text-brand-text">
+                <td className="border-b border-[rgba(15,39,72,0.06)] px-3 py-2.5 font-semibold text-brand-text">
                   {attempt.bankName || '—'}
                 </td>
-                <td className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2.5 font-semibold text-brand-text">
+                <td className="border-b border-[rgba(15,39,72,0.06)] px-3 py-2.5 font-semibold text-brand-text">
                   {attempt.accountHolderName || '—'}
                 </td>
-                <td className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2.5 font-semibold text-brand-text">
+                <td className="border-b border-[rgba(15,39,72,0.06)] px-3 py-2.5 font-semibold text-brand-text">
                   {attempt.nameAtBank || '—'}
                 </td>
-                <td className="border-b border-[rgba(23,44,113,0.06)] px-3 py-2.5 whitespace-nowrap">
+                <td className="border-b border-[rgba(15,39,72,0.06)] px-3 py-2.5 whitespace-nowrap">
                   <NameMatchScoreCell score={attempt.nameMatchScore ?? null} />
                 </td>
               </tr>

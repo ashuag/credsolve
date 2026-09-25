@@ -1,7 +1,9 @@
 'use client';
 
-import { getLoanDetails, markApplicationInternalTesting, refreshLoanPayment, type LosLoanDetails } from '@/lib/api';
-import { LOS_STORAGE_KEY } from '@/lib/auth';
+import { getLoanDetails, fetchLoanNocPdfBlob, markApplicationInternalTesting, refreshLoanPayment, sendLoanNocLetter, waiveLoanCharges, type LosLoanDetails } from '@/lib/api';
+import { canWaiveLoanCharges } from '@/lib/access';
+import { useCanSendLoanNoc } from '@/components/loans/send-noc-button';
+import { getLosStoredUser, LOS_STORAGE_KEY } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
 import { RefreshPaymentButton } from '@/components/loans/refresh-payment-button';
 import { LosStatusPill, losStatusPillStyles } from '@/components/shared/los-status-pill';
@@ -95,7 +97,7 @@ function Field({
           <button
             type="button"
             onClick={() => copyText(copyValue)}
-            className="mt-0.5 shrink-0 rounded-md border border-[rgba(23,44,113,0.1)] bg-white px-1.5 py-0.5 text-[0.58rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted hover:border-brand-blue/30 hover:text-brand-blue"
+            className="mt-0.5 shrink-0 rounded-md border border-[rgba(15,39,72,0.1)] bg-white px-1.5 py-0.5 text-[0.58rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted hover:border-brand-blue/30 hover:text-brand-blue"
             title="Copy"
           >
             Copy
@@ -121,9 +123,9 @@ function SectionCard({
 }) {
   return (
     <section
-      className={`overflow-hidden rounded-[18px] border border-[rgba(23,44,113,0.1)] bg-white shadow-[0_8px_28px_rgba(23,44,113,0.04)] ${className}`}
+      className={`overflow-hidden rounded-[18px] border border-[rgba(15,39,72,0.1)] bg-white shadow-[0_8px_28px_rgba(15,39,72,0.04)] ${className}`}
     >
-      <div className="flex items-start justify-between gap-3 border-b border-[rgba(23,44,113,0.06)] bg-gradient-to-r from-[#f8fbff] to-white px-5 py-3.5">
+      <div className="flex items-start justify-between gap-3 border-b border-[rgba(15,39,72,0.06)] bg-gradient-to-r from-[#f8fbff] to-white px-5 py-3.5">
         <div className="min-w-0">
           <h2 className="m-0 text-[0.95rem] font-extrabold tracking-tight text-brand-navy">{title}</h2>
           {subtitle ? <p className="mt-0.5 mb-0 text-[0.74rem] font-semibold text-brand-muted">{subtitle}</p> : null}
@@ -150,7 +152,7 @@ function MoneyTile({
 }) {
   return (
     <div
-      className={`relative overflow-hidden rounded-[16px] border bg-white px-4 py-4 shadow-[0_6px_20px_rgba(23,44,113,0.04)] ${
+      className={`relative overflow-hidden rounded-[16px] border bg-white px-4 py-4 shadow-[0_6px_20px_rgba(15,39,72,0.04)] ${
         emphasis ? 'sm:col-span-1' : ''
       }`}
       style={{ borderColor: `${accent}28` }}
@@ -165,7 +167,7 @@ function MoneyTile({
         style={{ background: accent }}
         aria-hidden
       />
-      <p className="m-0 text-[0.62rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">{label}</p>
+      <p className="m-0 text-[0.62rem] font-extrabold uppercase leading-snug tracking-[0.08em] text-brand-muted">{label}</p>
       <p className="m-0 mt-2 text-[1.45rem] font-extrabold leading-none tracking-[-0.03em]" style={{ color: accent }}>
         {value}
       </p>
@@ -179,20 +181,24 @@ function ActionBtn({
   onClick,
   children,
   variant = 'ghost',
+  size = 'md',
 }: {
   href?: string;
   onClick?: () => void;
   children: ReactNode;
   variant?: 'ghost' | 'primary' | 'soft';
+  size?: 'md' | 'sm';
 }) {
   const base =
-    'inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] px-3.5 text-[0.8rem] font-bold no-underline transition-colors';
+    size === 'sm'
+      ? 'inline-flex h-8 items-center justify-center gap-1.5 rounded-[8px] px-3 text-[0.74rem] font-bold no-underline transition-colors'
+      : 'inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] px-3.5 text-[0.8rem] font-bold no-underline transition-colors';
   const styles =
     variant === 'primary'
-      ? 'bg-[#1c347d] text-[#ffc519] hover:bg-[#152a66]'
+      ? 'bg-[#0F2748] text-[#4ADE80] hover:bg-[#152a66]'
       : variant === 'soft'
-        ? 'border border-[rgba(20,150,243,0.22)] bg-[rgba(20,150,243,0.08)] text-brand-blue hover:bg-[rgba(20,150,243,0.14)]'
-        : 'border border-[rgba(23,44,113,0.12)] bg-white text-brand-text hover:bg-[rgba(20,150,243,0.06)]';
+        ? 'border border-[rgba(34,197,94,0.22)] bg-[rgba(34,197,94,0.08)] text-brand-blue hover:bg-[rgba(34,197,94,0.14)]'
+        : 'border border-[rgba(15,39,72,0.12)] bg-white text-brand-text hover:bg-[rgba(34,197,94,0.06)]';
 
   if (href) {
     return (
@@ -210,7 +216,25 @@ function ActionBtn({
 
 function isClosedLoan(closedAt: string | null | undefined, statusCode: string): boolean {
   const code = statusCode.toUpperCase();
-  return Boolean(closedAt) || code.includes('CLOSED') || code === 'WRITTEN_OFF';
+  return (
+    Boolean(closedAt) ||
+    code === 'CLOSED' ||
+    code === 'SETTLED' ||
+    code.includes('CLOSED') ||
+    code === 'WRITTEN_OFF'
+  );
+}
+
+/** Fully repaid and eligible for manual NOC send (matches backend CLOSED/SETTLED + closedAt). */
+function canSendNocLetter(row: {
+  isNocSent: boolean;
+  closedAt: string | null;
+  loanStatusCode: string;
+}): boolean {
+  if (row.isNocSent) return false;
+  const code = row.loanStatusCode.toUpperCase();
+  if (code === 'WRITTEN_OFF') return false;
+  return Boolean(row.closedAt) || code === 'CLOSED' || code === 'SETTLED';
 }
 
 function maturityMeta(daysToMaturity: number, closed: boolean, statusCode = '') {
@@ -259,6 +283,43 @@ function maturityMeta(daysToMaturity: number, closed: boolean, statusCode = '') 
   };
 }
 
+function lifecycleTone(state: 'done' | 'active' | 'pending' | 'danger') {
+  switch (state) {
+    case 'done':
+      return {
+        dot: '#059669',
+        ring: 'rgba(16,185,129,0.22)',
+        line: '#34d399',
+        text: 'text-emerald-800',
+        badge: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+      };
+    case 'active':
+      return {
+        dot: '#22C55E',
+        ring: 'rgba(34,197,94,0.22)',
+        line: 'rgba(34,197,94,0.4)',
+        text: 'text-brand-navy',
+        badge: 'border-sky-200 bg-sky-50 text-brand-navy',
+      };
+    case 'danger':
+      return {
+        dot: '#dc2626',
+        ring: 'rgba(239,68,68,0.22)',
+        line: '#fca5a5',
+        text: 'text-red-800',
+        badge: 'border-red-200 bg-red-50 text-red-800',
+      };
+    default:
+      return {
+        dot: '#cbd5e1',
+        ring: 'rgba(148,163,184,0.2)',
+        line: '#e2e8f0',
+        text: 'text-brand-muted',
+        badge: 'border-slate-200 bg-slate-50 text-brand-muted',
+      };
+  }
+}
+
 function LoanLifecycle({
   disbursedAt,
   maturityDate,
@@ -274,73 +335,125 @@ function LoanLifecycle({
 }) {
   const closed = isClosedLoan(closedAt, statusCode);
   const overdue = daysToMaturity < 0 && !closed;
-  const steps = [
+  const steps: Array<{
+    key: string;
+    label: string;
+    detail: string;
+    state: 'done' | 'active' | 'pending' | 'danger';
+  }> = [
     {
       key: 'disbursed',
       label: 'Disbursed',
       detail: formatDate(disbursedAt),
-      done: Boolean(disbursedAt),
-      active: Boolean(disbursedAt) && !closed && daysToMaturity >= 0,
+      state: disbursedAt ? 'done' : 'pending',
     },
     {
       key: 'active',
       label: overdue ? 'Overdue' : 'Collecting',
-      detail: overdue ? `${Math.abs(daysToMaturity)}d late` : 'Awaiting repayment',
-      done: closed || overdue,
-      active: !closed && Boolean(disbursedAt) && daysToMaturity >= 0,
-      danger: overdue,
+      detail: overdue ? `${Math.abs(daysToMaturity)}d late` : closed ? 'Repaid' : 'Awaiting repayment',
+      state: overdue ? 'danger' : closed ? 'done' : disbursedAt ? 'active' : 'pending',
     },
     {
       key: 'maturity',
       label: 'Maturity',
       detail: formatDate(maturityDate),
-      done: closed || daysToMaturity <= 0,
-      active: !closed && daysToMaturity <= 7 && daysToMaturity >= 0,
+      state:
+        closed || daysToMaturity < 0
+          ? 'done'
+          : !closed && daysToMaturity <= 7
+            ? 'active'
+            : 'pending',
     },
     {
       key: 'closed',
       label: closed ? 'Paid fully' : 'Closure',
       detail: closed ? formatDate(closedAt) : 'Pending',
-      done: closed,
-      active: closed,
+      state: closed ? 'done' : 'pending',
     },
   ];
 
   return (
-    <div className="rounded-[16px] border border-[rgba(23,44,113,0.08)] bg-gradient-to-br from-[#f7faff] to-white p-4">
-      <p className="m-0 mb-3 text-[0.62rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">
-        Loan lifecycle
+    <ol className="m-0 flex min-w-[520px] list-none p-0">
+      {steps.map((step, idx) => {
+        const tone = lifecycleTone(step.state);
+        const isLast = idx === steps.length - 1;
+        return (
+          <li key={step.key} className="relative flex min-w-0 flex-1 flex-col items-center px-1 text-center">
+            {!isLast ? (
+              <span
+                className="pointer-events-none absolute left-[calc(50%+14px)] top-[13px] h-[2px] w-[calc(100%-28px)]"
+                style={{ background: tone.line }}
+                aria-hidden
+              />
+            ) : null}
+            <span
+              className="relative z-[1] inline-flex h-7 w-7 items-center justify-center rounded-full text-white"
+              style={{ background: tone.dot, boxShadow: `0 0 0 4px ${tone.ring}` }}
+              aria-hidden
+            >
+              {step.state === 'done' ? (
+                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3}>
+                  <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ) : step.state === 'danger' ? (
+                <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3}>
+                  <path d="M12 8v5M12 16h.01" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <span className="text-[0.68rem] font-extrabold">{idx + 1}</span>
+              )}
+            </span>
+            <span className={`mt-2 block text-[0.7rem] font-extrabold uppercase tracking-[0.06em] ${tone.text}`}>
+              {step.label}
+            </span>
+            <span
+              className={`mt-1 inline-block max-w-[9.5rem] truncate rounded-full border px-2 py-0.5 text-[0.62rem] font-semibold ${tone.badge}`}
+            >
+              {step.detail}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function HeroStat({
+  label,
+  value,
+  hint,
+  accent,
+}: {
+  label: string;
+  value: ReactNode;
+  hint?: string;
+  accent: string;
+}) {
+  return (
+    <div
+      className="min-w-[7.25rem] rounded-[12px] border bg-white px-3.5 py-2.5 shadow-[0_1px_10px_rgba(15,39,72,0.06)]"
+      style={{ borderColor: `${accent}33`, background: `linear-gradient(180deg, #fff, ${accent}0d)` }}
+    >
+      <p className="m-0 text-[0.58rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">{label}</p>
+      <p className="m-0 mt-1 text-[1.02rem] font-extrabold leading-tight tracking-[-0.02em]" style={{ color: accent }}>
+        {value}
       </p>
-      <ol className="m-0 grid list-none grid-cols-2 gap-3 p-0 lg:grid-cols-4">
-        {steps.map((step, idx) => {
-          const color = step.danger ? '#b91c1c' : step.done || step.active ? '#1496f3' : '#94a3b8';
-          return (
-            <li key={step.key} className="relative flex items-start gap-2.5">
-              <div className="flex flex-col items-center">
-                <span
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-[0.68rem] font-extrabold text-white"
-                  style={{
-                    background: step.done || step.active ? color : '#e2e8f0',
-                    color: step.done || step.active ? '#fff' : '#64748b',
-                    boxShadow: step.active ? `0 0 0 4px ${color}22` : undefined,
-                  }}
-                >
-                  {step.done ? '✓' : idx + 1}
-                </span>
-                {idx < steps.length - 1 ? (
-                  <span className="mt-1 hidden h-full w-px bg-[rgba(23,44,113,0.08)] lg:block" aria-hidden />
-                ) : null}
-              </div>
-              <div className="min-w-0 pt-0.5">
-                <p className="m-0 text-[0.8rem] font-extrabold text-brand-navy">{step.label}</p>
-                <p className="m-0 mt-0.5 text-[0.72rem] font-semibold text-brand-muted">{step.detail}</p>
-              </div>
-            </li>
-          );
-        })}
-      </ol>
+      {hint ? <p className="m-0 mt-0.5 text-[0.68rem] font-semibold text-brand-muted">{hint}</p> : null}
     </div>
   );
+}
+
+function ContactChip({ href, children }: { href?: string; children: ReactNode }) {
+  const className =
+    'inline-flex items-center rounded-full border border-[rgba(15,39,72,0.1)] bg-white px-2.5 py-1 text-[0.74rem] font-semibold text-brand-text no-underline transition-colors hover:border-brand-blue/30 hover:text-brand-blue';
+  if (href) {
+    return (
+      <a href={href} className={className}>
+        {children}
+      </a>
+    );
+  }
+  return <span className={className}>{children}</span>;
 }
 
 function RepaymentProgress({
@@ -359,21 +472,16 @@ function RepaymentProgress({
   const fullyPaid = owed <= 0 && paid > 0;
 
   return (
-    <div className="rounded-[16px] border border-[rgba(23,44,113,0.08)] bg-white p-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="m-0 text-[0.62rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">Collection progress</p>
-          <p className="m-0 mt-1 text-[1.05rem] font-extrabold text-brand-navy">
-            {fullyPaid ? 'Fully collected' : `${pct}% collected`}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="m-0 text-[0.72rem] font-semibold text-brand-muted">
-            Paid {formatINR(totalPaid)} · Due {formatINR(outstanding)}
-          </p>
-        </div>
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 sm:w-[13.5rem] sm:shrink-0">
+        <p className="m-0 text-[0.88rem] font-extrabold text-brand-navy">
+          {fullyPaid ? 'Fully collected' : `${pct}% collected`}
+        </p>
+        <p className="m-0 text-[0.7rem] font-semibold text-brand-muted">
+          {formatINR(totalPaid)} paid · {formatINR(outstanding)} due
+        </p>
       </div>
-      <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[rgba(23,44,113,0.08)]">
+      <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[rgba(15,39,72,0.08)]">
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{
@@ -382,7 +490,7 @@ function RepaymentProgress({
               ? 'linear-gradient(90deg,#059669,#10b981)'
               : pct === 0
                 ? '#cbd5e1'
-                : 'linear-gradient(90deg,#1c347d,#1496f3)',
+                : 'linear-gradient(90deg,#0F2748,#22C55E)',
           }}
         />
       </div>
@@ -403,6 +511,10 @@ function FeeStack({ row }: { row: LosLoanDetails }) {
   const gstPct = formatPercent(row.gstPercentage);
   const penal = Number(row.penalAmount);
   const hasPenal = Number.isFinite(penal) && penal > 0;
+  const overdueInterest = Number(row.overdueInterestInr);
+  const hasOverdueInterest = Number.isFinite(overdueInterest) && overdueInterest > 0;
+  const waived = Number(row.waivedAmountInr);
+  const hasWaiver = Number.isFinite(waived) && waived > 0;
   const penalLabel = 'Penal charge';
   const lines: Array<{
     label: string;
@@ -424,19 +536,44 @@ function FeeStack({ row }: { row: LosLoanDetails }) {
     },
     { label: 'Net disbursed to bank', value: formatINR(row.netDisbursedAmount), accent: '#047857' },
     { label: 'Interest', value: `+ ${formatINR(row.interestAmount)}`, muted: true },
-    { label: 'Total repayable', value: formatINR(row.totalRepaymentAmount), accent: '#1c347d', strong: true },
+    { label: 'Total repayable', value: formatINR(row.totalRepaymentAmount), accent: '#0F2748', strong: true },
     // Only charged once the loan is past due, so the rows stay hidden on a healthy loan.
-    ...(hasPenal
+    ...(hasOverdueInterest || hasPenal || hasWaiver
       ? [
+          ...(hasOverdueInterest
+            ? [
+                {
+                  label:
+                    row.overdueDays > 0
+                      ? `Overdue interest (${row.overdueDays} ${row.overdueDays === 1 ? 'day' : 'days'})`
+                      : 'Overdue interest',
+                  value: `+ ${formatINRExact(row.overdueInterestInr)}`,
+                  accent: '#b91c1c',
+                },
+              ]
+            : []),
+          ...(hasPenal
+            ? [
+                {
+                  label: penalLabel,
+                  value: `+ ${formatINRExact(row.penalAmount)}`,
+                  accent: '#b91c1c',
+                },
+              ]
+            : []),
+          ...(hasWaiver
+            ? [
+                {
+                  label: 'Waived (penal + overdue interest)',
+                  value: `− ${formatINRExact(row.waivedAmountInr)}`,
+                  accent: '#3730a3',
+                },
+              ]
+            : []),
           {
-            label: penalLabel,
-            value: `+ ${formatINRExact(row.penalAmount)}`,
-            accent: '#b91c1c',
-          },
-          {
-            label: 'Total repayable + penal',
+            label: 'Total due today',
             value: formatINR(row.totalRepaymentWithPenalAmount),
-            accent: '#b91c1c',
+            accent: hasWaiver ? '#3730a3' : '#b91c1c',
             strong: true,
           },
         ]
@@ -444,13 +581,13 @@ function FeeStack({ row }: { row: LosLoanDetails }) {
   ];
 
   return (
-    <div className="overflow-hidden rounded-[14px] border border-[rgba(23,44,113,0.08)]">
+    <div className="overflow-hidden rounded-[14px] border border-[rgba(15,39,72,0.08)]">
       {lines.map((line, i) => (
         <div
           key={line.label}
           className={`flex items-center justify-between gap-3 px-4 py-2.5 ${
             i % 2 === 0 ? 'bg-[#fbfcff]' : 'bg-white'
-          } ${i < lines.length - 1 ? 'border-b border-[rgba(23,44,113,0.05)]' : ''}`}
+          } ${i < lines.length - 1 ? 'border-b border-[rgba(15,39,72,0.05)]' : ''}`}
         >
           <span className={`text-[0.8rem] font-semibold ${line.strong ? 'text-brand-navy font-extrabold' : 'text-brand-muted'}`}>
             {line.label}
@@ -467,6 +604,121 @@ function FeeStack({ row }: { row: LosLoanDetails }) {
   );
 }
 
+function WaiverCard({
+  row,
+  onSaved,
+}: {
+  row: LosLoanDetails;
+  onSaved: (next: LosLoanDetails) => void;
+}) {
+  const canWaive = canWaiveLoanCharges(getLosStoredUser()?.roleName ?? getLosStoredUser()?.role, getLosStoredUser()?.hierarchyLevel);
+  const maxWaiver = Math.max(0, Math.round((Number(row.penalAmount) + Number(row.overdueInterestInr)) * 100) / 100);
+  const [amount, setAmount] = useState(row.waivedAmountInr ?? '0.00');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAmount(row.waivedAmountInr ?? '0.00');
+  }, [row.waivedAmountInr]);
+
+  const save = async () => {
+    const token = getToken();
+    if (!token) {
+      setError('Session expired — please log in again.');
+      return;
+    }
+    const n = Number.parseFloat(amount);
+    if (!Number.isFinite(n) || n < 0) {
+      setError('Enter a waiver of ₹0 or more.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      onSaved(await waiveLoanCharges(token, row.uuid, Math.round(n * 100) / 100));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save the waiver.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (Number(row.waivedAmountInr) > 0) {
+    return (
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <MoneyTile
+          label="Waived off amount"
+          value={formatINRExact(row.waivedAmountInr)}
+          hint={
+            [row.waivedByName ? `By ${row.waivedByName}` : null, row.waivedAt ? formatDateTime(row.waivedAt) : null]
+              .filter(Boolean)
+              .join(' · ') || 'Penal + overdue-days interest'
+          }
+          accent="#3730a3"
+        />
+        <MoneyTile
+          label="Outstanding amount"
+          value={formatINR(row.outstandingAmount)}
+          hint={
+            Number(row.outstandingAmount) <= 0
+              ? row.loanStatusCode.toUpperCase() === 'SETTLED'
+                ? 'Settled'
+                : 'Nothing due'
+              : 'Still to collect'
+          }
+          accent={Number(row.outstandingAmount) > 0 ? '#b45309' : '#047857'}
+          emphasis
+        />
+      </div>
+    );
+  }
+
+  if (row.closedAt || maxWaiver <= 0) {
+    return null;
+  }
+
+  return (
+    <SectionCard
+      title="Charge waiver"
+      subtitle={`Waive any amount of penal + overdue interest (max ${formatINRExact(String(maxWaiver.toFixed(2)))}). Principal and tenure interest stay due.`}
+    >
+      {canWaive ? (
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex min-w-[10rem] flex-col gap-1">
+            <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
+              Waive amount
+            </span>
+            <input
+              type="number"
+              min={0}
+              max={maxWaiver}
+              step="0.01"
+              value={amount}
+              onChange={(event) => setAmount(event.target.value)}
+              className="h-10 rounded-[10px] border border-[rgba(15,39,72,0.14)] bg-white px-3 text-[0.9rem] font-bold text-brand-navy"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void save()}
+            className="h-10 cursor-pointer rounded-[10px] border border-[rgba(79,70,229,0.28)] bg-[rgba(79,70,229,0.08)] px-4 text-[0.8rem] font-extrabold text-[#3730a3] disabled:opacity-60"
+          >
+            {busy ? 'Saving…' : 'Save waiver'}
+          </button>
+        </div>
+      ) : (
+        <p className="m-0 text-[0.8rem] font-semibold text-brand-muted">Only Admin can waive charges.</p>
+      )}
+      {error ? (
+        <p className="m-0 mt-2 text-[0.78rem] font-semibold text-[#b91c1c]" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </SectionCard>
+  );
+}
+
 export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
   const router = useRouter();
   const [row, setRow] = useState<LosLoanDetails | null>(null);
@@ -474,7 +726,10 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
   const [error, setError] = useState<string | null>(null);
   const [markingInternal, setMarkingInternal] = useState(false);
   const [refreshingPayment, setRefreshingPayment] = useState(false);
+  const [openingNoc, setOpeningNoc] = useState(false);
+  const [sendingNoc, setSendingNoc] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ tone: 'ok' | 'warn' | 'err'; text: string } | null>(null);
+  const canSendNoc = useCanSendLoanNoc();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -558,6 +813,53 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
     }
   }, [row, loanUuid]);
 
+  const openNocPdf = useCallback(async () => {
+    if (!row?.isNocSent) return;
+    const token = getToken();
+    if (!token) {
+      setError('Session expired — please log in again.');
+      return;
+    }
+    setOpeningNoc(true);
+    setError(null);
+    try {
+      const blob = await fetchLoanNocPdfBlob(token, loanUuid);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener');
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to open NOC letter.');
+    } finally {
+      setOpeningNoc(false);
+    }
+  }, [row?.isNocSent, loanUuid]);
+
+  const sendNoc = useCallback(async () => {
+    if (!row || row.isNocSent) return;
+    const token = getToken();
+    if (!token) {
+      setError('Session expired — please log in again.');
+      return;
+    }
+    setSendingNoc(true);
+    setError(null);
+    setStatusMessage(null);
+    try {
+      const updated = await sendLoanNocLetter(token, loanUuid);
+      setRow(updated);
+      setStatusMessage({
+        tone: 'ok',
+        text: updated.nocSentAt
+          ? `NOC letter sent at ${formatDateTime(updated.nocSentAt)}.`
+          : 'NOC letter sent.',
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to send NOC letter.');
+    } finally {
+      setSendingNoc(false);
+    }
+  }, [row, loanUuid]);
+
   const name = useMemo(
     () => (row ? formatPersonName(row.fullName, 'Borrower (name pending)') : ''),
     [row],
@@ -566,16 +868,21 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
   if (loading) {
     return (
       <div className="flex animate-pulse flex-col gap-4">
-        <div className="h-[168px] rounded-[18px] bg-[rgba(23,44,113,0.06)]" />
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-[96px] rounded-[16px] bg-[rgba(23,44,113,0.06)]" />
+        <div className="h-[280px] rounded-[14px] bg-[rgba(15,39,72,0.06)]" />
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-[96px] rounded-[16px] bg-[rgba(15,39,72,0.06)]" />
           ))}
         </div>
-        <div className="h-[220px] rounded-[18px] bg-[rgba(23,44,113,0.06)]" />
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-[96px] rounded-[16px] bg-[rgba(15,39,72,0.06)]" />
+          ))}
+        </div>
+        <div className="h-[220px] rounded-[18px] bg-[rgba(15,39,72,0.06)]" />
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="h-[320px] rounded-[18px] bg-[rgba(23,44,113,0.06)]" />
-          <div className="h-[320px] rounded-[18px] bg-[rgba(23,44,113,0.06)]" />
+          <div className="h-[320px] rounded-[18px] bg-[rgba(15,39,72,0.06)]" />
+          <div className="h-[320px] rounded-[18px] bg-[rgba(15,39,72,0.06)]" />
         </div>
       </div>
     );
@@ -597,10 +904,15 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
   }
 
   const closed = isClosedLoan(row.closedAt, row.loanStatusCode);
+  const showSendNoc = canSendNoc && canSendNocLetter(row);
   const maturity = maturityMeta(row.daysToMaturity, closed, row.loanStatusCode);
   const statusStyles = losStatusPillStyles(row.loanStatusCode);
   const transfer = row.disbursementTransfer;
   const transferUtr = transfer?.uniqueTransactionReference ?? row.utr;
+  const overdueInterestInr = Number(row.overdueInterestInr) || 0;
+  const penalAmountInr = Number(row.penalAmount) || 0;
+  const totalRepayAmountInr =
+    Math.round(((Number(row.totalRepaymentAmount) || 0) + overdueInterestInr + penalAmountInr) * 100) / 100;
 
   return (
     <div className="flex flex-col gap-4">
@@ -619,117 +931,103 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
         </p>
       ) : null}
       {/* Hero */}
-      <header className="overflow-hidden rounded-[18px] border border-[rgba(23,44,113,0.1)] bg-gradient-to-br from-white via-[#f7fbff] to-[#eef6ff] shadow-[0_10px_32px_rgba(23,44,113,0.05)]">
+      <header className="overflow-hidden rounded-[14px] border border-[rgba(15,39,72,0.1)] bg-gradient-to-b from-white to-[#f4f8ff] shadow-[0_8px_28px_rgba(15,39,72,0.05)]">
         <div
-          className="h-[3px] w-full"
+          className="h-[2px] w-full"
           style={{ background: `linear-gradient(90deg, ${statusStyles.text}, ${statusStyles.text}55)` }}
           aria-hidden
         />
-        <div className="p-5 sm:p-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex min-w-0 flex-1 items-start gap-4">
+        <div className="px-4 py-4 sm:px-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
               <div
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[16px] text-[1rem] font-extrabold text-white shadow-[0_10px_24px_rgba(23,44,113,0.2)]"
-                style={{ background: `linear-gradient(145deg, ${statusStyles.text}, #1c347d)` }}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] text-[0.82rem] font-extrabold text-white"
+                style={{ background: `linear-gradient(135deg, ${statusStyles.text}, #0F2748)` }}
                 aria-hidden
               >
                 {getInitials(name)}
               </div>
 
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                  <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
                     Loan account
                   </span>
                   <LosStatusPill code={row.loanStatusCode} label={row.loanStatusLabel} />
-                  <span className="text-[0.72rem] font-semibold text-brand-muted">
-                    App · {row.applicationStatusLabel}
-                  </span>
+                  <ContactChip>App · {row.applicationStatusLabel}</ContactChip>
                 </div>
 
-                <h1 className="m-0 mt-2 text-[clamp(1.35rem,2.2vw,1.75rem)] font-extrabold tracking-[-0.03em] text-brand-navy">
+                <h1 className="m-0 mt-1 text-[1.2rem] font-extrabold leading-tight tracking-[-0.03em] text-brand-navy">
                   {name}
                 </h1>
 
-                <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                  <p className="m-0 font-mono text-[0.95rem] font-bold tracking-tight text-brand-text">
-                    {row.loanNumber}
-                  </p>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <ContactChip>
+                    <span className="font-mono text-[0.74rem] font-bold tracking-tight">{row.loanNumber}</span>
+                  </ContactChip>
                   <button
                     type="button"
                     onClick={() => copyText(row.loanNumber)}
-                    className="rounded-md border border-[rgba(23,44,113,0.1)] bg-white px-1.5 py-0.5 text-[0.58rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted transition-colors hover:border-brand-blue/30 hover:text-brand-blue"
+                    className="rounded-full border border-[rgba(15,39,72,0.1)] bg-white px-2 py-1 text-[0.62rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted transition-colors hover:border-brand-blue/30 hover:text-brand-blue"
                     title="Copy loan number"
                   >
                     Copy
                   </button>
+                  <ContactChip href={`tel:${row.mobileNumber}`}>{row.mobileNumber}</ContactChip>
+                  {row.email ? <ContactChip href={`mailto:${row.email}`}>{row.email}</ContactChip> : null}
                 </div>
-
-                <p className="mt-2.5 mb-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.82rem] font-semibold text-brand-muted">
-                  <a
-                    href={`tel:${row.mobileNumber}`}
-                    className="text-brand-text no-underline transition-colors hover:text-brand-blue"
-                  >
-                    {row.mobileNumber}
-                  </a>
-                  {row.email ? (
-                    <>
-                      <span className="text-[rgba(23,44,113,0.25)]" aria-hidden>
-                        ·
-                      </span>
-                      <a
-                        href={`mailto:${row.email}`}
-                        className="min-w-0 truncate text-brand-text no-underline transition-colors hover:text-brand-blue"
-                      >
-                        {row.email}
-                      </a>
-                    </>
-                  ) : null}
-                </p>
               </div>
             </div>
 
-            <div className="flex shrink-0 flex-col gap-3 sm:items-end">
-              <div
-                className="inline-flex min-w-[9.5rem] flex-col rounded-[14px] border px-3.5 py-2.5 sm:text-right"
-                style={{
-                  color: maturity.color,
-                  background: maturity.bg,
-                  borderColor: maturity.border,
-                }}
-              >
-                <span className="text-[0.58rem] font-extrabold uppercase tracking-[0.12em] opacity-80">
-                  Maturity
-                </span>
-                <span className="mt-0.5 text-[0.92rem] font-extrabold leading-tight">{maturity.label}</span>
-                {row.loanMaturityDate ? (
-                  <span className="mt-0.5 text-[0.7rem] font-semibold opacity-80">
-                    {formatDate(row.loanMaturityDate)}
-                  </span>
-                ) : null}
-              </div>
-
-              <div className="flex flex-wrap gap-2 sm:justify-end">
-                <ActionBtn href="/loans">← All loans</ActionBtn>
-                <ActionBtn href={`/applications/${row.applicationUuid}`} variant="soft">
-                  Open application
-                </ActionBtn>
-                <ActionBtn onClick={() => void load()}>Refresh</ActionBtn>
-                {!row.closedAt ? (
-                  <RefreshPaymentButton
-                    busy={refreshingPayment}
-                    onClick={() => void refreshPayment()}
-                  />
-                ) : null}
-                <MarkInternalTestingButton
-                  busy={markingInternal}
-                  onConfirm={() => void markAsInternalTesting()}
-                />
-              </div>
+            <div className="flex flex-wrap gap-2 xl:justify-end">
+              <HeroStat
+                label="Maturity"
+                value={maturity.label}
+                hint={row.loanMaturityDate ? formatDate(row.loanMaturityDate) : undefined}
+                accent={maturity.color}
+              />
+              <HeroStat label="Paid" value={formatINR(row.totalPaidAmount)} hint="Recorded collections" accent="#047857" />
+              <HeroStat
+                label="Outstanding"
+                value={formatINR(row.outstandingAmount)}
+                hint={closed ? 'Nothing due' : 'Balance remaining'}
+                accent={closed || Number(row.outstandingAmount) <= 0 ? '#047857' : row.daysToMaturity < 0 ? '#b91c1c' : '#0F2748'}
+              />
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 lg:grid-cols-[1.4fr_1fr]">
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-[rgba(15,39,72,0.07)] pt-3">
+            <ActionBtn href="/loans" size="sm">
+              ← All loans
+            </ActionBtn>
+            <ActionBtn href={`/applications/${row.applicationUuid}`} variant="soft" size="sm">
+              Open application
+            </ActionBtn>
+            <ActionBtn onClick={() => void load()} size="sm">
+              Refresh
+            </ActionBtn>
+            {!row.closedAt ? (
+              <RefreshPaymentButton busy={refreshingPayment} onClick={() => void refreshPayment()} />
+            ) : null}
+            {showSendNoc ? (
+              <button
+                type="button"
+                disabled={sendingNoc}
+                onClick={() => void sendNoc()}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[rgba(16,185,129,0.4)] bg-[rgba(16,185,129,0.12)] px-3 py-1.5 text-[0.72rem] font-extrabold text-[#047857] hover:bg-[rgba(16,185,129,0.2)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {sendingNoc ? 'Sending NOC…' : 'Send NOC'}
+              </button>
+            ) : null}
+            <MarkInternalTestingButton busy={markingInternal} onConfirm={() => void markAsInternalTesting()} />
+          </div>
+        </div>
+
+        <div className="border-t border-[rgba(15,39,72,0.07)] bg-[rgba(248,250,255,0.7)] px-4 py-4 sm:px-5">
+          <p className="m-0 mb-3 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
+            Loan lifecycle
+          </p>
+          <div className="overflow-x-auto">
             <LoanLifecycle
               disbursedAt={row.disbursedAt}
               maturityDate={row.loanMaturityDate}
@@ -737,6 +1035,11 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
               closedAt={row.closedAt}
               statusCode={row.loanStatusCode}
             />
+          </div>
+          <div className="mt-4 border-t border-[rgba(15,39,72,0.06)] pt-3">
+            <p className="m-0 mb-2 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
+              Collection progress
+            </p>
             <RepaymentProgress
               totalRepayable={row.totalRepaymentAmount}
               totalPaid={row.totalPaidAmount}
@@ -747,90 +1050,84 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
       </header>
 
       {/* Money snapshot */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <MoneyTile label="Principal" value={formatINR(row.principalAmount)} hint="Sanctioned amount" accent="#1c347d" />
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+        <MoneyTile 
+          label="Principal" 
+          value={formatINR(row.principalAmount)} 
+          hint="Sanctioned amount" 
+          accent="#0F2748" 
+        />
         <MoneyTile label="Net disbursed" value={formatINR(row.netDisbursedAmount)} hint="Credited to borrower" accent="#047857" />
-        <MoneyTile label="Total repayable" value={formatINR(row.totalRepaymentAmount)} hint={`Interest ${formatINR(row.interestAmount)}`} accent="#4338ca" />
+        
         <MoneyTile
-          label="Outstanding"
-          value={formatINR(row.outstandingAmount)}
+          label="Interest till repay date"
+          value={formatINRExact(row.interestAmount)}
           hint={
-            Number(row.outstandingAmount) <= 0
-              ? 'Nothing due'
-              : Number(row.penalAmount) > 0
-                ? `Incl. penal ${formatINRExact(row.penalAmount)}`
-                : 'Still to collect'
+            row.expectedRepaymentDays != null
+              ? `Full tenure (${row.expectedRepaymentDays} days)`
+              : 'Full tenure interest'
           }
-          accent={Number(row.outstandingAmount) > 0 ? '#b45309' : '#047857'}
+          accent="#4338ca"
+        />
+        <MoneyTile
+          label="Repayable till repayment date"
+          value={formatINR(row.totalRepaymentAmount)}
+          hint="Principal + tenure interest"
+          accent="#4338ca"
+        />
+        
+        <MoneyTile
+          label="Repay date"
+          value={formatDate(row.loanMaturityDate)}
+          hint="Loan maturity"
+          accent="#0F2748"
+        />
+
+      </div>
+
+      {row.overdueDays > 0 ? (
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <MoneyTile
+          label="Overdue days"
+          value={String(row.overdueDays ?? 0)}
+          hint={row.overdueDays === 1 ? 'Day past repay date' : 'Days past repay date'}
+          accent="#b91c1c"
+        />
+        <MoneyTile
+          label="Interest of overdue days"
+          value={formatINRExact(row.overdueInterestInr)}
+          hint={`${row.overdueDays} overdue day${row.overdueDays === 1 ? '' : 's'}`}
+          accent={overdueInterestInr > 0 ? '#b91c1c' : '#64748b'}
+        />
+        <MoneyTile
+          label="Penal charges"
+          value={formatINRExact(row.penalAmount)}
+          hint="Capped penal fee"
+          accent={penalAmountInr > 0 ? '#b91c1c' : '#64748b'}
+        />
+        <MoneyTile
+          label="Total repay amount"
+          value={formatINR(String(totalRepayAmountInr.toFixed(2)))}
+          hint="Principal + interest + overdue + penal"
+          accent="#0F2748"
+        />
+        <MoneyTile
+          label="Amount paid"
+          value={formatINR(row.totalPaidAmount)}
+          hint="Recorded repayments"
+          accent="#047857"
+        />
+        <MoneyTile
+          label="Repayable after penal + overdue interest"
+          value={formatINR(String(totalRepayAmountInr.toFixed(2)))}
+          hint="Till-date repayable + overdue-days interest + penal"
+          accent="#b45309"
           emphasis
         />
       </div>
+      ) : null}
 
-      {/* Interest till today */}
-      <SectionCard
-        title="Interest till today"
-        subtitle={
-          row.closedAt
-            ? 'Interest charged for the days the loan was open'
-            : row.usedFullTenureInterest
-              ? 'Cooling period has passed — interest is the full contracted tenure'
-              : 'Accrued interest from disbursement through today (within cooling period)'
-        }
-      >
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-[14px] border border-[rgba(67,56,202,0.16)] bg-[rgba(67,56,202,0.05)] px-4 py-3.5">
-            <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-[#4338ca]">
-              Interest till today
-            </p>
-            <p className="m-0 mt-1.5 text-[1.35rem] font-extrabold tracking-tight text-[#4338ca]">
-              {formatINRExact(row.interestTillToday)}
-            </p>
-            <p className="m-0 mt-1 text-[0.72rem] font-semibold text-brand-muted">
-              @ {row.interestRate}% / day
-            </p>
-          </div>
-          <div className="rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[#fbfcff] px-4 py-3.5">
-            <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
-              Amount due today
-            </p>
-            <p className="m-0 mt-1.5 text-[1.35rem] font-extrabold tracking-tight text-brand-navy">
-              {formatINRExact(row.amountDueToday)}
-            </p>
-            <p className="m-0 mt-1 text-[0.72rem] font-semibold text-brand-muted">
-              {Number(row.bounceFeeInr) > 0
-                ? `Principal + interest + penal charge (${formatINRExact(row.bounceFeeInr)})`
-                : row.usedFullTenureInterest
-                  ? 'Principal + full tenure interest'
-                  : 'Principal + interest till today'}
-              {Number(row.totalPaidAmount) > 0 ? ' · before payments' : ''}
-            </p>
-          </div>
-          <div className="rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[#fbfcff] px-4 py-3.5">
-            <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
-              Days outstanding
-            </p>
-            <p className="m-0 mt-1.5 text-[1.35rem] font-extrabold tracking-tight text-brand-navy">
-              {row.daysOutstanding != null ? row.daysOutstanding : '—'}
-            </p>
-            <p className="m-0 mt-1 text-[0.72rem] font-semibold text-brand-muted">
-              {row.closedAt
-                ? 'Inclusive days until closure'
-                : 'Inclusive days since disbursement'}
-            </p>
-          </div>
-          <div className="rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[#fbfcff] px-4 py-3.5">
-            <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
-              Interest at maturity
-            </p>
-            <p className="m-0 mt-1.5 text-[1.35rem] font-extrabold tracking-tight text-brand-navy">
-              {formatINRExact(row.interestAmount)}
-            </p>
-            <p className="m-0 mt-1 text-[0.72rem] font-semibold text-brand-muted">
-              Full tenure ({row.expectedRepaymentDays != null ? `${row.expectedRepaymentDays} days` : '—'})
-            </p>
-          </div>
-        </div>
-      </SectionCard>
+      <WaiverCard row={row} onSaved={setRow} />
 
       {/* Terms + Borrower */}
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
@@ -922,7 +1219,7 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
             </div>
           </div>
 
-          <div className="mt-5 rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-gradient-to-br from-[#f8fbff] to-white p-4">
+          <div className="mt-5 rounded-[14px] border border-[rgba(15,39,72,0.08)] bg-gradient-to-br from-[#f8fbff] to-white p-4">
             <p className="m-0 mb-3 text-[0.62rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
               Disbursement account
             </p>
@@ -956,7 +1253,7 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
         }
       >
         {transfer == null ? (
-          <div className="rounded-[14px] border border-dashed border-[rgba(23,44,113,0.16)] bg-[#f8fafc] px-4 py-6 text-center">
+          <div className="rounded-[14px] border border-dashed border-[rgba(15,39,72,0.16)] bg-[#f8fafc] px-4 py-6 text-center">
             <p className="m-0 text-[0.9rem] font-bold text-brand-navy">No gateway transfer log</p>
             <p className="mt-1 mb-0 text-[0.8rem] font-semibold text-brand-muted">
               {row.utr ? `UTR on loan record: ${row.utr}` : 'Transfer may have been skipped or recorded offline.'}
@@ -965,7 +1262,7 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
         ) : (
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[#fbfcff] px-4 py-3">
+              <div className="rounded-[14px] border border-[rgba(15,39,72,0.08)] bg-[#fbfcff] px-4 py-3">
                 <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">Amount sent</p>
                 <p className="m-0 mt-1 text-[1.2rem] font-extrabold text-brand-navy">
                   {transfer.amount != null
@@ -978,7 +1275,7 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
                   <p className="m-0 mt-1 text-[0.72rem] font-bold text-brand-muted">{transfer.paymentMode}</p>
                 ) : null}
               </div>
-              <div className="rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[#fbfcff] px-4 py-3 sm:col-span-2">
+              <div className="rounded-[14px] border border-[rgba(15,39,72,0.08)] bg-[#fbfcff] px-4 py-3 sm:col-span-2">
                 <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">UTR</p>
                 <p className="m-0 mt-1 break-all font-mono text-[0.95rem] font-extrabold text-brand-navy">
                   {transferUtr ?? '—'}
@@ -1029,7 +1326,7 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
               ) : null}
             </div>
 
-            <details className="rounded-[12px] border border-[rgba(23,44,113,0.08)] bg-[#f8fafc] px-4 py-3">
+            <details className="rounded-[12px] border border-[rgba(15,39,72,0.08)] bg-[#f8fafc] px-4 py-3">
               <summary className="cursor-pointer text-[0.72rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
                 Raw transfer JSON
               </summary>
@@ -1046,13 +1343,13 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
         title="Repayments"
         subtitle="Inbound collections against this loan"
         action={
-          <span className="rounded-full bg-[rgba(23,44,113,0.06)] px-2.5 py-1 text-[0.72rem] font-extrabold text-brand-muted">
+          <span className="rounded-full bg-[rgba(15,39,72,0.06)] px-2.5 py-1 text-[0.72rem] font-extrabold text-brand-muted">
             {row.repayments.length} record{row.repayments.length === 1 ? '' : 's'}
           </span>
         }
       >
         {row.repayments.length === 0 ? (
-          <div className="rounded-[14px] border border-dashed border-[rgba(23,44,113,0.16)] bg-[#f8fafc] px-4 py-8 text-center">
+          <div className="rounded-[14px] border border-dashed border-[rgba(15,39,72,0.16)] bg-[#f8fafc] px-4 py-8 text-center">
             <p className="m-0 text-[0.92rem] font-extrabold text-brand-navy">No repayments yet</p>
             <p className="mt-1 mb-0 text-[0.8rem] font-semibold text-brand-muted">
               Outstanding remains {formatINR(row.outstandingAmount)}.
@@ -1066,7 +1363,7 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
                   {['Date', 'Amount', 'Mode', 'Status', 'UTR / note'].map((h) => (
                     <th
                       key={h}
-                      className="border-b border-[rgba(23,44,113,0.08)] px-3 py-2.5 text-[0.62rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted"
+                      className="border-b border-[rgba(15,39,72,0.08)] px-3 py-2.5 text-[0.62rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted"
                     >
                       {h}
                     </th>
@@ -1076,10 +1373,11 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
               <tbody>
                 {row.repayments.map((payment) => {
                   const failed = payment.status === 'FAILED';
+                  const partial = payment.status === 'PARTIAL';
                   return (
                     <tr
                       key={payment.uuid}
-                      className="border-b border-[rgba(23,44,113,0.05)] last:border-0 hover:bg-[rgba(20,150,243,0.03)]"
+                      className="border-b border-[rgba(15,39,72,0.05)] last:border-0 hover:bg-[rgba(34,197,94,0.03)]"
                     >
                       <td className="whitespace-nowrap px-3 py-3 font-semibold text-brand-text">
                         {formatDateTime(payment.paidAt)}
@@ -1092,10 +1390,12 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
                           style={
                             failed
                               ? { background: 'rgba(239,68,68,0.14)', color: '#b91c1c' }
-                              : { background: 'rgba(16,185,129,0.14)', color: '#047857' }
+                              : partial
+                                ? { background: 'rgba(245,158,11,0.16)', color: '#b45309' }
+                                : { background: 'rgba(16,185,129,0.14)', color: '#047857' }
                           }
                         >
-                          {failed ? 'Unsuccessful' : 'Paid fully'}
+                          {failed ? 'Unsuccessful' : partial ? 'Partially paid' : 'Paid fully'}
                         </span>
                       </td>
                       <td className="px-3 py-3 font-mono text-[0.78rem] text-brand-text">
@@ -1106,6 +1406,78 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+      </SectionCard>
+
+      <SectionCard
+        title="NOC / closure letter"
+        subtitle="Loan closure NOC emailed to the borrower after full repayment"
+        action={
+          row.isNocSent ? (
+            <button
+              type="button"
+              disabled={openingNoc}
+              onClick={() => void openNocPdf()}
+              className="cursor-pointer rounded-full border border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.08)] px-3.5 py-1.5 text-[0.72rem] font-extrabold text-brand-blue hover:bg-[rgba(34,197,94,0.14)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {openingNoc ? 'Opening…' : 'View NOC PDF'}
+            </button>
+          ) : showSendNoc ? (
+            <button
+              type="button"
+              disabled={sendingNoc}
+              onClick={() => void sendNoc()}
+              className="cursor-pointer rounded-full border border-[rgba(16,185,129,0.35)] bg-[rgba(16,185,129,0.1)] px-3.5 py-1.5 text-[0.72rem] font-extrabold text-[#047857] hover:bg-[rgba(16,185,129,0.18)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {sendingNoc ? 'Sending…' : 'Send NOC'}
+            </button>
+          ) : null
+        }
+      >
+        {row.isNocSent ? (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-[14px] border border-[rgba(16,185,129,0.22)] bg-[rgba(16,185,129,0.06)] px-4 py-3">
+              <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-[#047857]">Status</p>
+              <p className="m-0 mt-1 text-[1rem] font-extrabold text-[#047857]">Sent</p>
+            </div>
+            <div className="rounded-[14px] border border-[rgba(15,39,72,0.08)] bg-[#fbfcff] px-4 py-3">
+              <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
+                Sent at
+              </p>
+              <p className="m-0 mt-1 text-[0.95rem] font-extrabold text-brand-navy">
+                {row.nocSentAt ? formatDateTime(row.nocSentAt) : '—'}
+              </p>
+            </div>
+            <div className="rounded-[14px] border border-[rgba(15,39,72,0.08)] bg-[#fbfcff] px-4 py-3">
+              <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
+                Letter number
+              </p>
+              <p className="m-0 mt-1 break-all font-mono text-[0.88rem] font-extrabold text-brand-navy">
+                {row.nocLetterNumber ?? '—'}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-[14px] border border-dashed border-[rgba(15,39,72,0.16)] bg-[#f8fafc] px-4 py-5 text-center">
+            <p className="m-0 text-[0.9rem] font-bold text-brand-navy">
+              {showSendNoc ? 'NOC not sent yet' : 'Not available yet'}
+            </p>
+            <p className="mt-1 mb-0 text-[0.8rem] font-semibold text-brand-muted">
+              {showSendNoc
+                ? 'Loan is fully repaid. Use Send NOC to generate the letter, store it, and email the borrower.'
+                : 'The NOC letter and sent timestamp appear here after the loan is fully repaid.'}
+            </p>
+            {showSendNoc ? (
+              <button
+                type="button"
+                disabled={sendingNoc}
+                onClick={() => void sendNoc()}
+                className="mt-4 cursor-pointer rounded-full border border-[rgba(16,185,129,0.35)] bg-[rgba(16,185,129,0.12)] px-4 py-2 text-[0.78rem] font-extrabold text-[#047857] hover:bg-[rgba(16,185,129,0.2)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {sendingNoc ? 'Sending NOC…' : 'Send NOC'}
+              </button>
+            ) : null}
           </div>
         )}
       </SectionCard>

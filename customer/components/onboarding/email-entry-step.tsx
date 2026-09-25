@@ -22,9 +22,7 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', le
   const [email, setEmail] = useState(initialEmail);
   const [emailError, setEmailError] = useState('');
   const [optionError, setOptionError] = useState('');
-  const [selectedOption, setSelectedOption] = useState<LoginOption>(
-    initialEmail ? 'manual' : null,
-  );
+  const [selectedOption, setSelectedOption] = useState<LoginOption>(null);
   const [isSending, setIsSending] = useState(false);
   const emailInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -33,12 +31,6 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', le
       setEmail(initialEmail);
     }
   }, [email, initialEmail]);
-
-  useEffect(() => {
-    if (initialEmail) {
-      setSelectedOption('manual');
-    }
-  }, [initialEmail]);
 
   useEffect(() => {
     if (selectedOption === 'manual') {
@@ -65,6 +57,9 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', le
     setSelectedOption('manual');
     setOptionError('');
     setEmailError('');
+    if (!email.trim() && initialEmail.trim()) {
+      setEmail(initialEmail.trim());
+    }
   }
 
   async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
@@ -98,7 +93,7 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', le
         <div className="mb-4">
           <h2
             id="email-heading"
-            className="text-xl md:text-[1.8rem] font-extrabold text-brand-navy mb-3 tracking-tight leading-[1.1]"
+            className="text-xl md:text-[1.8rem] font-bold text-brand-navy mb-3 tracking-tight leading-[1.1]"
           >
             {isLogin ? (
               <>
@@ -255,7 +250,7 @@ export function EmailEntryStep({ initialEmail = '', initialMode = 'register', le
               <span className="inline-flex items-center justify-center gap-[10px]">
                 {isSending ? (
                   <span
-                    className="w-[18px] h-[18px] rounded-full border-2 border-[rgba(255,248,223,0.28)] border-t-[#fff8df] animate-spin-btn"
+                    className="w-[18px] h-[18px] rounded-full border-2 border-[rgba(255,248,223,0.28)] border-t-[#ecfdf5] animate-spin-btn"
                     aria-hidden
                   />
                 ) : null}

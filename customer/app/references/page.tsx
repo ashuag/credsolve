@@ -276,7 +276,7 @@ export default function ReferencesPage() {
     phase === 'otp' ? (
       <form onSubmit={handleVerifyOtp} className="flex w-full min-w-0 flex-col gap-6">
         <div>
-          <h2 className="text-xl md:text-[1.8rem] font-extrabold text-brand-navy mb-2 tracking-tight leading-[1.1]">
+          <h2 className="text-xl md:text-[1.8rem] font-bold text-brand-navy mb-2 tracking-tight leading-[1.1]">
             Confirm with <span className="text-brand-blue">OTP</span>
           </h2>
           <p className="m-0 text-[0.88rem] text-slate-600 leading-relaxed">
@@ -325,7 +325,7 @@ export default function ReferencesPage() {
     ) : (
       <section className="h-full flex flex-col">
         <div className="mb-4">
-          <h2 className="text-xl md:text-[1.8rem] font-extrabold text-brand-navy mb-2 tracking-tight leading-[1.1]">
+          <h2 className="text-xl md:text-[1.8rem] font-bold text-brand-navy mb-2 tracking-tight leading-[1.1]">
             Personal <span className="text-brand-blue">References</span>
           </h2>
           <p className="m-0 text-[0.88rem] text-slate-600 leading-relaxed">

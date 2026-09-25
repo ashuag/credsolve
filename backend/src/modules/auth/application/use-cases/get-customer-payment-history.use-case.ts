@@ -10,7 +10,7 @@ export type CustomerPaymentHistoryItem = {
   loanNumber: string;
   amount: string;
   paymentMode: string;
-  status: 'SUCCESS' | 'FAILED';
+  status: 'SUCCESS' | 'FAILED' | 'PARTIAL';
   utr: string | null;
   failureMessage: string | null;
   paidAt: string;
@@ -79,7 +79,9 @@ export class GetCustomerPaymentHistoryUseCase {
         status:
           row.status === LOAN_REPAYMENT_STATUS.FAILED
             ? LOAN_REPAYMENT_STATUS.FAILED
-            : LOAN_REPAYMENT_STATUS.SUCCESS,
+            : row.status === LOAN_REPAYMENT_STATUS.PARTIAL
+              ? LOAN_REPAYMENT_STATUS.PARTIAL
+              : LOAN_REPAYMENT_STATUS.SUCCESS,
         utr: row.utr,
         failureMessage: row.failure_message,
         paidAt: row.paid_at.toISOString(),

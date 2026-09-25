@@ -18,7 +18,7 @@ export function AccessFlowInfographic({ variant = 'dark' }: AccessFlowInfographi
           className={`absolute -left-8 top-1/4 h-44 w-44 rounded-full blur-3xl ${isDark ? 'bg-[#1496f3]/25' : 'bg-[#1496f3]/15'}`}
         />
         <div
-          className={`absolute -right-6 bottom-0 h-48 w-48 rounded-full blur-3xl ${isDark ? 'bg-[#ffc519]/15' : 'bg-[#ffc519]/25'}`}
+          className={`absolute -right-6 bottom-0 h-48 w-48 rounded-full blur-3xl ${isDark ? 'bg-[#22c55e]/15' : 'bg-[#22c55e]/25'}`}
         />
         <div className="absolute left-1/2 top-0 h-px w-[min(90%,320px)] -translate-x-1/2 bg-gradient-to-r from-transparent via-white/25 to-transparent opacity-80" />
       </div>
@@ -86,7 +86,7 @@ function VerticalDash({ dark }: { dark: boolean }) {
   return (
     <div className="flex h-8 w-full flex-col items-center justify-center py-1" aria-hidden>
       <div
-        className={`h-full w-px bg-gradient-to-b ${dark ? 'from-[#1496f3]/50 via-[#ffc519]/70 to-[#1496f3]/50' : 'from-brand-blue/30 via-[#ffc519]/60 to-brand-blue/30'}`}
+        className={`h-full w-px bg-gradient-to-b ${dark ? 'from-[#1496f3]/50 via-[#22c55e]/70 to-[#1496f3]/50' : 'from-brand-blue/30 via-[#22c55e]/60 to-brand-blue/30'}`}
       />
     </div>
   );
@@ -106,12 +106,12 @@ function PipelineConnector({ className, dark }: { className?: string; dark: bool
       <defs>
         <linearGradient id="pipeGradDark" x1="0" y1="0" x2="400" y2="0">
           <stop stopColor="#1496f3" stopOpacity="0.25" />
-          <stop offset="0.5" stopColor="#ffc519" stopOpacity="0.85" />
+          <stop offset="0.5" stopColor="#22c55e" stopOpacity="0.85" />
           <stop offset="1" stopColor="#1496f3" stopOpacity="0.25" />
         </linearGradient>
         <linearGradient id="pipeGradLight" x1="0" y1="0" x2="400" y2="0">
           <stop stopColor="#1496f3" stopOpacity="0.35" />
-          <stop offset="0.5" stopColor="#ffc519" stopOpacity="0.75" />
+          <stop offset="0.5" stopColor="#22c55e" stopOpacity="0.75" />
           <stop offset="1" stopColor="#1496f3" stopOpacity="0.35" />
         </linearGradient>
       </defs>
@@ -142,8 +142,8 @@ function FlowOrb({
         className={`relative flex aspect-square w-[min(104px,28vw)] max-w-[120px] items-center justify-center rounded-[26px] md:w-[120px] ${
           highlight
             ? dark
-              ? 'animate-ring-pop bg-gradient-to-br from-[#ffc519]/25 via-[#fff8df]/10 to-[#1496f3]/20 shadow-[0_0_0_1px_rgba(255,197,25,0.45),0_20px_50px_rgba(0,0,0,0.35)] ring-2 ring-[#ffc519]/70'
-              : 'shadow-[0_16px_40px_rgba(255,197,25,0.35)] ring-2 ring-[#ffc519]/80 bg-gradient-to-br from-amber-50 to-white'
+              ? 'animate-ring-pop bg-gradient-to-br from-[#22c55e]/25 via-[#ecfdf5]/10 to-[#1496f3]/20 shadow-[0_0_0_1px_rgba(34,197,94,0.45),0_20px_50px_rgba(0,0,0,0.35)] ring-2 ring-[#22c55e]/70'
+              : 'shadow-[0_16px_40px_rgba(34,197,94,0.35)] ring-2 ring-[#22c55e]/80 bg-gradient-to-br from-amber-50 to-white'
             : dark
               ? 'border border-white/15 bg-white/[0.07] shadow-[0_16px_40px_rgba(0,0,0,0.25)] backdrop-blur-md'
               : 'border border-[rgba(20,150,243,0.2)] bg-white shadow-[0_14px_32px_rgba(23,44,113,0.08)]'
@@ -152,7 +152,7 @@ function FlowOrb({
         <span
           className={`absolute -left-1 -top-1 flex h-7 w-7 items-center justify-center rounded-full text-[0.65rem] font-black ${
             highlight
-              ? 'bg-[#ffc519] text-[#12244f] shadow-lg'
+              ? 'bg-[#22c55e] text-[#12244f] shadow-lg'
               : dark
                 ? 'bg-white/15 text-white'
                 : 'bg-brand-blue/10 text-brand-navy'
@@ -186,7 +186,7 @@ function GraphicPhone({ large }: { large?: boolean }) {
       </defs>
       <rect x="13" y="7" width="22" height="34" rx="5" stroke={`url(#${grad})`} strokeWidth="2.4" fill="rgba(255,255,255,0.06)" />
       <rect x="18" y="11" width="12" height="22" rx="2" fill="rgba(20,150,243,0.15)" />
-      <circle cx="36" cy="11" r="5.5" fill="#ffc519" />
+      <circle cx="36" cy="11" r="5.5" fill="#22c55e" />
       <path d="M33.5 11l2 2 4.5-4.5" stroke="#12244f" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -207,7 +207,7 @@ function GraphicShield({ large }: { large?: boolean }) {
       <path
         d="M24 5l16 6.5v11.5c0 9.2-6.5 17-16 20-9.5-3-16-10.8-16-20V11.5L24 5z"
         fill={`url(#${grad})`}
-        stroke="#ffc519"
+        stroke="#22c55e"
         strokeWidth="1.4"
       />
       <path d="M16 24l5 5 12-13" stroke="#fff" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -225,8 +225,8 @@ function GraphicLoan({ large }: { large?: boolean }) {
         stroke="#1496f3"
         strokeWidth="2"
       />
-      <path d="M7 17V13a4 4 0 014-4h26a4 4 0 014 4v4" stroke="#ffc519" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="24" cy="29" r="7" fill="#ffc519" stroke="#12244f" strokeWidth="1.5" />
+      <path d="M7 17V13a4 4 0 014-4h26a4 4 0 014 4v4" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="24" cy="29" r="7" fill="#22c55e" stroke="#12244f" strokeWidth="1.5" />
       <path d="M21 29h6M24 26v6" stroke="#12244f" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );

@@ -25,7 +25,7 @@ export function getApiUrl() {
     if (process.env.NODE_ENV === 'development') {
       // eslint-disable-next-line no-console
       console.warn(
-        '[MoneyCash] NEXT_PUBLIC_API_URL points at port 4001 in the browser; using same-origin `/api` instead. ' +
+        '[CredSolve] NEXT_PUBLIC_API_URL points at port 4001 in the browser; using same-origin `/api` instead. ' +
           'Set NEXT_PUBLIC_API_URL=/api in customer/.env, restart `next dev`, and run `rm -rf .next` if requests still hit :4001.'
       );
     }

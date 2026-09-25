@@ -158,6 +158,10 @@ body {
 .lh-email {
   font-family: var(--font-ui); font-size: 11.5px; color: var(--teal);
 }
+.lh-address {
+  font-family: var(--font-ui); font-size: 11px; color: var(--muted);
+  line-height: 1.45; max-width: 320px; margin-left: auto; margin-top: 4px;
+}
 .doc-rule {
   height: 3px;
   background: linear-gradient(90deg, var(--coral), var(--coral-dark));
@@ -582,11 +586,13 @@ th.teal-hdr { background: var(--teal); }
 
   <!-- Letterhead -->
   <div class="letterhead">
-    <img class="letterhead-logo" src="__LENDER_LOGO_SRC__" alt="MoneyCash"><div class="letterhead-info">
+    <img class="letterhead-logo" src="__LENDER_LOGO_SRC__" alt="MoneyCash">
+    <div class="letterhead-info">
       <div class="lh-company">AASRA FINCORP PRIVATE LIMITED</div>
+      <div class="lh-address">16/3/8B Amar Nath Jha Marg, George Town, Prayagraj, Uttar Pradesh, India, 221508</div>
       <div class="lh-sub">Regulated Entity (Lender) &nbsp;·&nbsp; RBI Digital Lending Guidelines</div>
       <div class="lh-partner">Lending partner: <strong>moneycash</strong> (CREDSOLVE Technologies Private Limited)</div>
-      <div class="lh-email">info@moneycash.in</div>
+      <div class="lh-email">mail@aasrafincorp.com</div>
     </div>
   </div>
   <div class="doc-rule"></div>
@@ -624,8 +630,7 @@ th.teal-hdr { background: var(--teal); }
 
   <p class="charge-title">Processing Fee</p>
   <p class="para">
-    The Lender will charge a processing fee of ₹<input type="text" id="sl_proc_fee_amt" class="field lf sm" placeholder="Amount" title="Filled by moneycash / Lender" autocomplete="off"> or <input type="text" id="sl_proc_fee_pct" class="field lf xs" placeholder="_%" title="Filled by moneycash / Lender" autocomplete="off"> of the loan
-    amount, whichever is higher, plus applicable taxes.
+    The Lender will charge a processing fee up to <input type="text" id="sl_proc_fee_pct" class="field lf xs" placeholder="_%" title="Filled by moneycash / Lender" autocomplete="off"> of the Sanctioned loan amount, plus applicable taxes.
   </p>
 
   <p class="charge-title">Penal Charges</p>
@@ -663,7 +668,7 @@ th.teal-hdr { background: var(--teal); }
     on a case-to-case basis.
   </p>
   <p class="para">
-    For any queries, you may write to us at <strong>info@moneycash.in</strong>. We look forward to
+    For any queries, you may write to us at <strong>mail@aasrafincorp.com</strong>. We look forward to
     serving you.
   </p>
   <p class="para lender-dsc-notice">
@@ -681,6 +686,17 @@ th.teal-hdr { background: var(--teal); }
      SECTION B — KFS
      ============================================================ -->
 <div class="doc-section" id="sec-b">
+
+  <!-- Letterhead -->
+  <div class="letterhead">
+    <img class="letterhead-logo" src="__LENDER_LOGO_SRC__" alt="MoneyCash">
+    <div class="letterhead-info">
+      <div class="lh-company">AASRA FINCORP PRIVATE LIMITED</div>
+      <div class="lh-address">16/3/8B Amar Nath Jha Marg, George Town, Prayagraj, Uttar Pradesh, India, 221508</div>
+    </div>
+  </div>
+  <div class="doc-rule"></div>
+
   <div class="sec-band"><div class="sec-band-title">Sanction Letter cum Key Fact Statement</div><div class="sec-sub">In accordance with the RBI Digital Lending Guidelines</div></div>
 
   <!-- Addressee -->
@@ -836,7 +852,7 @@ th.teal-hdr { background: var(--teal); }
   </p>
   <p class="para">
     To apply for cancellation of the loan during the Cooling-off Period, a request must
-    be submitted by the Borrower at <strong>info@moneycash.in</strong>. After submission of such
+    be submitted by the Borrower at <strong>mail@aasrafincorp.com</strong>. After submission of such
     request, the Borrower must submit a copy of the bank account statement into which the
     said loan amount was disbursed, along with an undertaking that such loan amount was
     not utilised by the Borrower during the Cooling-off Period.
@@ -980,7 +996,7 @@ th.teal-hdr { background: var(--teal); }
     other regulatory authorities, <strong>Aasra Fincorp Pvt. Ltd.</strong> has formulated a Grievance
     Redressal Policy to address and resolve complaints received from its customers. The
     said Grievance Redressal Policy is available on the official website,
-    <strong>www.moneycash.in</strong>.
+    <strong>www.aasrafincorp.com/</strong>.
   </p>
 
   <p class="sub-sh">Level 1 — Grievance Redressal Officer (GRO)</p>
@@ -1106,7 +1122,7 @@ th.teal-hdr { background: var(--teal); }
       Short Term Loan.
     </p>
     <p class="para mt8">
-      For any queries, you may write to us at <strong>info@moneycash.in</strong>.
+      For any queries, you may write to us at <strong>mail@aasrafincorp.com</strong>.
       We look forward to serving you.
     </p>
   </div>
@@ -1170,8 +1186,8 @@ th.teal-hdr { background: var(--teal); }
 
 <!-- ============================================================
      SECTION C — LOAN CUM COMMERCIAL TERMS
-     (Emailed separately with the sanction letter; not shown in the
-     customer's in-app review/eSign PDF.)
+     (Emailed separately after eSign; merged into the disbursement
+     PDF. Never shown in the customer's in-app review/eSign PDF.)
      ============================================================ -->
 <div class="doc-section" id="sec-c">
   <div class="sec-band"><div class="sec-band-title">Loan cum Commercial Terms</div></div>
@@ -1345,7 +1361,7 @@ th.teal-hdr { background: var(--teal); }
 
   <p class="para mt24">
     In witness whereof, the Borrower hereby accepts the terms and conditions of this
-    Agreement. For any queries, you may write to us at <strong>info@moneycash.in</strong>.
+    Agreement. For any queries, you may write to us at <strong>mail@aasrafincorp.com</strong>.
     We look forward to serving you.
   </p>
 

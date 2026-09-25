@@ -138,8 +138,10 @@ export function computeAccruedInterestInr(
 /** Bullet amount due now: principal + interest (fees taken at disbursement).
  *
  * Interest days:
- * - within `coolingPeriodDays` (inclusive, disbursement day = day 1): days outstanding
- * - after the cooling period: full contracted `tenureDays`
+ * - within `coolingPeriodDays` (inclusive, disbursement day = day 1): days outstanding only
+ * - after cooling and on/before the due date: full contracted `tenureDays` (no penal)
+ * - after the due date: full contracted `tenureDays` + `overdueDays` interest
+ *   (callers add the settings-capped penal charge on top)
  *
  * `coolingPeriodDays = 0` means no concession (always full tenure).
  */
@@ -151,11 +153,15 @@ export function computeAmountDueNowInr(
     asOf?: Date;
     coolingPeriodDays: number;
     tenureDays: number;
+    overdueDays?: number;
   },
 ): {
   daysOutstanding: number;
   interestDays: number;
   interestAmount: number;
+  overdueDays: number;
+  overdueInterestAmount: number;
+  totalInterestAmount: number;
   amountDue: number;
   usedFullTenureInterest: boolean;
 } {
@@ -170,11 +176,20 @@ export function computeAmountDueNowInr(
     interestRatePercentagePerDay,
     interestDays,
   );
+  const overdueDays = Math.max(0, Math.floor(options.overdueDays ?? 0));
+  const overdueInterestAmount =
+    overdueDays > 0
+      ? computeInterestAmountInr(principal, interestRatePercentagePerDay, overdueDays)
+      : 0;
+  const totalInterestAmount = roundInr2(interestAmount + overdueInterestAmount);
   return {
     daysOutstanding,
     interestDays,
     interestAmount,
-    amountDue: roundInr2(principal + interestAmount),
+    overdueDays,
+    overdueInterestAmount,
+    totalInterestAmount,
+    amountDue: roundInr2(principal + totalInterestAmount),
     usedFullTenureInterest,
   };
 }

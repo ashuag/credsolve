@@ -200,7 +200,7 @@ export function LoanDocumentScrollPanel({
       {isMobile && !mobileViewerOpen ? (
         <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(18,36,79,0.06)]">
           <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-[#1496f3]/10" aria-hidden />
-          <div className="pointer-events-none absolute -bottom-16 -left-8 h-28 w-28 rounded-full bg-[#ffc519]/15" aria-hidden />
+          <div className="pointer-events-none absolute -bottom-16 -left-8 h-28 w-28 rounded-full bg-[#22c55e]/15" aria-hidden />
 
           <div className="relative flex flex-col items-center px-5 py-6 text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1496f3]/10 text-[#1496f3]">

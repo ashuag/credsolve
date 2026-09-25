@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -8,7 +7,6 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -61,7 +59,7 @@ const LEGACY_SIDEBAR_COLLAPSED_KEY = 'moneycash_los_sidebar_collapsed';
 const navGroups: { section: string; color: string; items: NavItem[] }[] = [
   {
     section: 'Overview',
-    color: '#1496f3',
+    color: '#22C55E',
     items: [{ href: '/dashboard', label: 'Dashboard', icon: 'dashboard' }],
   },
   {
@@ -132,7 +130,7 @@ const navGroups: { section: string; color: string; items: NavItem[] }[] = [
   },
   {
     section: 'BRE',
-    color: '#1496f3',
+    color: '#22C55E',
     items: [
       { href: '/eligibility-criteria/pre-bre', label: 'Pre BRE', icon: 'eligibility' },
       { href: '/eligibility-criteria/post-bre', label: 'Post BRE', icon: 'eligibility' },
@@ -174,14 +172,14 @@ const notifications: NotificationItem[] = [
 ];
 
 const GROUP_ACCENT: Record<string, { dot: string; bg: string; border: string; text: string }> = {
-  'Overview':      { dot: 'bg-brand-blue',  bg: 'rgba(20,150,243,0.07)',  border: 'rgba(20,150,243,0.18)',  text: '#1496f3' },
+  'Overview':      { dot: 'bg-brand-blue',  bg: 'rgba(34,197,94,0.07)',  border: 'rgba(34,197,94,0.18)',  text: '#22C55E' },
   'Loan Pipeline': { dot: 'bg-indigo-500',  bg: 'rgba(99,102,241,0.07)', border: 'rgba(99,102,241,0.18)', text: '#6366f1' },
   'Reports':       { dot: 'bg-sky-500',     bg: 'rgba(14,165,233,0.07)', border: 'rgba(14,165,233,0.18)', text: '#0284c7' },
   'Team':          { dot: 'bg-teal-600',    bg: 'rgba(13,148,136,0.07)', border: 'rgba(13,148,136,0.18)', text: '#0d9488' },
   'Configuration': { dot: 'bg-amber-400',  bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)',  text: '#d97706' },
   'Sources & Utm': { dot: 'bg-amber-500',  bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)', text: '#d97706' },
   'Support':       { dot: 'bg-teal-600',   bg: 'rgba(13,148,136,0.07)', border: 'rgba(13,148,136,0.18)', text: '#0d9488' },
-  'BRE':           { dot: 'bg-brand-blue', bg: 'rgba(20,150,243,0.07)', border: 'rgba(20,150,243,0.18)', text: '#1496f3' },
+  'BRE':           { dot: 'bg-brand-blue', bg: 'rgba(34,197,94,0.07)', border: 'rgba(34,197,94,0.18)', text: '#22C55E' },
   'Developer Tool': { dot: 'bg-violet-500', bg: 'rgba(139,92,246,0.08)', border: 'rgba(139,92,246,0.2)', text: '#7c3aed' },
 };
 
@@ -343,35 +341,15 @@ function navigationLabel(href: URL) {
  * first paint. Some browser extensions inject nodes next to <img> (e.g. #imgData),
  * which would otherwise cause a hydration mismatch with next/image.
  */
-function MoneyCashSidebarLogo({ isIcons }: { isIcons: boolean }) {
-  const [mounted, setMounted] = useState(false);
-
-  useLayoutEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return (
-      <div
-        className={cx(
-          'rounded-[4px] bg-[rgba(23,44,113,0.07)]',
-          isIcons ? 'mx-auto aspect-square w-9' : 'aspect-[957/379] w-[min(190px,100%)] max-w-full',
-        )}
-        aria-hidden
-      />
-    );
+function CredSolveSidebarLogo({ isIcons }: { isIcons: boolean }) {
+  if (isIcons) {
+    return <span className="text-lg font-[800] text-[#22C55E]">C</span>;
   }
 
   return (
-    <Image
-      src="/images/moneycash-logo.png"
-      alt="MoneyCash"
-      width={957}
-      height={379}
-      sizes="190px"
-      className={cx('h-auto block', isIcons ? 'w-9' : 'w-[min(190px,100%)]')}
-      priority
-    />
+    <span className="text-[1.35rem] font-[800] tracking-tight text-[#0F2748]">
+      Cred<span className="text-[#22C55E]">Solve</span>
+    </span>
   );
 }
 
@@ -677,7 +655,7 @@ export function CrmShell({
       :            'relative z-50 w-[248px] min-w-[248px] p-3',
   );
 
-  const toolBtn = 'inline-flex items-center justify-center w-8 h-8 border border-[rgba(23,44,113,0.12)] rounded-[8px] bg-[rgba(255,255,255,0.9)] text-brand-navy cursor-pointer transition-all duration-[140ms] hover:border-[rgba(20,150,243,0.28)] hover:bg-white hover:text-brand-blue disabled:opacity-40 disabled:cursor-not-allowed';
+  const toolBtn = 'inline-flex items-center justify-center w-8 h-8 border border-[rgba(15,39,72,0.12)] rounded-[8px] bg-[rgba(255,255,255,0.9)] text-brand-navy cursor-pointer transition-all duration-[140ms] hover:border-[rgba(34,197,94,0.28)] hover:bg-white hover:text-brand-blue disabled:opacity-40 disabled:cursor-not-allowed';
 
   return (
     <div
@@ -718,7 +696,7 @@ export function CrmShell({
                 )}
                 style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
               >
-                <MoneyCashSidebarLogo isIcons={isIcons} />
+                <CredSolveSidebarLogo isIcons={isIcons} />
               </div>
             </Link>
           </div>
@@ -758,8 +736,8 @@ export function CrmShell({
                             style={
                               parentActive
                                 ? {
-                                    background: `linear-gradient(135deg, rgba(20,150,243,0.2), rgba(99,102,241,0.14))`,
-                                    border: '1px solid rgba(20,150,243,0.28)',
+                                    background: `linear-gradient(135deg, rgba(34,197,94,0.2), rgba(99,102,241,0.14))`,
+                                    border: '1px solid rgba(34,197,94,0.28)',
                                     color: '#e8f4ff',
                                   }
                                 : parentExpanded
@@ -773,10 +751,10 @@ export function CrmShell({
                                 width: isIcons ? 36 : 30,
                                 height: isIcons ? 36 : 30,
                                 background: parentActive
-                                  ? 'rgba(20,150,243,0.28)'
+                                  ? 'rgba(34,197,94,0.28)'
                                   : 'rgba(255,255,255,0.05)',
                                 color: parentActive ? '#60b8ff' : 'rgba(148,175,230,0.65)',
-                                boxShadow: parentActive ? '0 0 12px rgba(20,150,243,0.2)' : 'none',
+                                boxShadow: parentActive ? '0 0 12px rgba(34,197,94,0.2)' : 'none',
                               }}
                               aria-hidden
                             >
@@ -813,7 +791,7 @@ export function CrmShell({
                                     className="flex items-center gap-2 rounded-[8px] px-2.5 py-1.5 text-[0.78rem] font-semibold leading-snug transition-all duration-[120ms]"
                                     style={
                                       childActive
-                                        ? { background: 'rgba(20,150,243,0.18)', color: '#93c5fd', border: '1px solid rgba(20,150,243,0.2)' }
+                                        ? { background: 'rgba(34,197,94,0.18)', color: '#93c5fd', border: '1px solid rgba(34,197,94,0.2)' }
                                         : { color: 'rgba(148,175,230,0.6)', border: '1px solid transparent' }
                                     }
                                   >
@@ -846,13 +824,13 @@ export function CrmShell({
               >
                 <span
                   className="flex-shrink-0 grid place-items-center w-8 h-8 rounded-[9px] text-white text-[0.75rem] font-extrabold"
-                  style={{ background: 'linear-gradient(135deg,#1496f3,#3b5fd4)' }}
+                  style={{ background: 'linear-gradient(135deg,#22C55E,#3b5fd4)' }}
                 >
                   {(session?.user?.fullName ?? 'M').slice(0, 1).toUpperCase()}
                 </span>
                 <span className="flex flex-col min-w-0 flex-1">
                   <strong className="text-[0.8rem] truncate leading-tight" style={{ color: '#d8e6ff' }}>
-                    {session?.user?.fullName ?? 'MoneyCash Ops'}
+                    {session?.user?.fullName ?? 'CredSolve Ops'}
                   </strong>
                   <span className="text-[0.68rem] truncate leading-tight" style={{ color: 'rgba(148,163,210,0.6)' }}>
                     {session?.user?.roleName ?? session?.user?.role ?? 'LOS'}
@@ -870,7 +848,7 @@ export function CrmShell({
         <header className={cx('sticky z-20 grid gap-2', isMobileLayout ? 'top-3' : 'top-0')}>
           {/* Top bar */}
           <div
-            className={cx('rounded-[12px] border border-[rgba(23,44,113,0.1)] shadow-[0_2px_10px_rgba(23,44,113,0.06)] flex items-center justify-between gap-3 px-3 py-2', isMobileLayout && 'flex-col items-start')}
+            className={cx('rounded-[12px] border border-[rgba(15,39,72,0.1)] shadow-[0_2px_10px_rgba(15,39,72,0.06)] flex items-center justify-between gap-3 px-3 py-2', isMobileLayout && 'flex-col items-start')}
             style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.99), rgba(239,247,255,0.97))' }}
           >
             {/* Left */}
@@ -886,7 +864,7 @@ export function CrmShell({
                     <span className="inline-flex" aria-hidden>{sidebarMode === 'expanded' ? <ToggleIcon mode="collapse" /> : <ToggleIcon mode="expand" />}</span>
                     <span className="sr-only">{sidebarMode === 'icons' ? 'Expand sidebar' : 'Compact sidebar'}</span>
                   </button>
-                  <button type="button" className={cx(toolBtn, 'bg-[rgba(255,197,25,0.1)] border-[rgba(255,197,25,0.22)]')} aria-pressed={sidebarMode === 'hidden'} onClick={handleHideToggle} title={sidebarMode === 'hidden' ? 'Show sidebar as icon rail' : 'Hide sidebar'}>
+                  <button type="button" className={cx(toolBtn, 'bg-[rgba(34,197,94,0.1)] border-[rgba(34,197,94,0.22)]')} aria-pressed={sidebarMode === 'hidden'} onClick={handleHideToggle} title={sidebarMode === 'hidden' ? 'Show sidebar as icon rail' : 'Hide sidebar'}>
                     <span className="inline-flex" aria-hidden>{sidebarMode === 'hidden' ? <ShowStageIcon /> : <HideStageIcon />}</span>
                     <span className="sr-only">{sidebarMode === 'hidden' ? 'Show sidebar' : 'Hide sidebar'}</span>
                   </button>
@@ -926,7 +904,7 @@ export function CrmShell({
               <div className="relative" ref={notificationRef}>
                 <button
                   type="button"
-                  className="relative inline-flex items-center gap-1.5 px-3 py-1.5 border border-[rgba(23,44,113,0.12)] rounded-[9px] bg-[rgba(255,255,255,0.9)] text-brand-navy cursor-pointer transition-all duration-[120ms] hover:border-[rgba(20,150,243,0.24)] hover:bg-white text-[0.82rem] font-semibold"
+                  className="relative inline-flex items-center gap-1.5 px-3 py-1.5 border border-[rgba(15,39,72,0.12)] rounded-[9px] bg-[rgba(255,255,255,0.9)] text-brand-navy cursor-pointer transition-all duration-[120ms] hover:border-[rgba(34,197,94,0.24)] hover:bg-white text-[0.82rem] font-semibold"
                   aria-expanded={notificationsOpen}
                   aria-haspopup="dialog"
                   onClick={() => setNotificationsOpen((o) => !o)}
@@ -938,7 +916,7 @@ export function CrmShell({
 
                 {notificationsOpen && (
                   <div
-                    className={cx('absolute top-[calc(100%+8px)] w-[min(380px,calc(100vw-24px))] flex flex-col gap-3 p-4 rounded-[14px] border border-[rgba(23,44,113,0.12)] shadow-[0_12px_36px_rgba(23,44,113,0.14)] z-50', isMobileLayout ? 'left-0' : 'right-0')}
+                    className={cx('absolute top-[calc(100%+8px)] w-[min(380px,calc(100vw-24px))] flex flex-col gap-3 p-4 rounded-[14px] border border-[rgba(15,39,72,0.12)] shadow-[0_12px_36px_rgba(15,39,72,0.14)] z-50', isMobileLayout ? 'left-0' : 'right-0')}
                     style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.99), rgba(239,247,255,0.97))' }}
                     role="dialog"
                     aria-label="Notifications"
@@ -949,7 +927,7 @@ export function CrmShell({
                     </div>
                     <div className="flex flex-col gap-1.5">
                       {notifications.map((item) => (
-                        <article key={`${item.title}-${item.time}`} className="flex flex-col gap-1 p-3 rounded-[9px] border border-[rgba(23,44,113,0.07)] bg-[rgba(255,255,255,0.9)]">
+                        <article key={`${item.title}-${item.time}`} className="flex flex-col gap-1 p-3 rounded-[9px] border border-[rgba(15,39,72,0.07)] bg-[rgba(255,255,255,0.9)]">
                           <div className="flex items-center gap-2">
                             <span className={cx('w-[7px] h-[7px] flex-shrink-0 rounded-full', toneColors[item.tone])} />
                             <strong className="text-[0.87rem] flex-1 min-w-0 truncate text-brand-navy">{item.title}</strong>
@@ -967,28 +945,28 @@ export function CrmShell({
               <div className="relative" ref={userMenuRef}>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-2 min-w-0 px-2 py-1.5 rounded-[9px] bg-[rgba(255,255,255,0.88)] border border-[rgba(23,44,113,0.09)] cursor-pointer"
+                  className="inline-flex items-center gap-2 min-w-0 px-2 py-1.5 rounded-[9px] bg-[rgba(255,255,255,0.88)] border border-[rgba(15,39,72,0.09)] cursor-pointer"
                   onClick={() => setUserMenuOpen((v) => !v)}
                   aria-expanded={userMenuOpen}
                   aria-haspopup="menu"
                 >
-                  <span className="flex-shrink-0 grid place-items-center w-7 h-7 rounded-[7px] bg-[linear-gradient(145deg,#1496f3,#172c71)] text-white text-[0.72rem] font-extrabold" aria-hidden>
+                  <span className="flex-shrink-0 grid place-items-center w-7 h-7 rounded-[7px] bg-[linear-gradient(145deg,#22C55E,#0F2748)] text-white text-[0.72rem] font-extrabold" aria-hidden>
                     {(session?.user?.fullName ?? 'M').slice(0, 1).toUpperCase()}
                   </span>
                   <span className="flex flex-col min-w-0 text-left">
-                    <strong className="text-[0.84rem] truncate leading-tight text-brand-navy">{session?.user?.fullName ?? 'MoneyCash Ops'}</strong>
+                    <strong className="text-[0.84rem] truncate leading-tight text-brand-navy">{session?.user?.fullName ?? 'CredSolve Ops'}</strong>
                     <span className="text-[0.71rem] text-brand-muted truncate leading-tight">{session?.user?.roleName ?? session?.user?.role ?? 'LOS'}</span>
                   </span>
                 </button>
 
                 {userMenuOpen && (
                   <div
-                    className={cx('absolute top-[calc(100%+8px)] w-[260px] rounded-[12px] border border-[rgba(23,44,113,0.12)] p-2 shadow-[0_12px_36px_rgba(23,44,113,0.14)] z-50 bg-white', isMobileLayout ? 'left-0' : 'right-0')}
+                    className={cx('absolute top-[calc(100%+8px)] w-[260px] rounded-[12px] border border-[rgba(15,39,72,0.12)] p-2 shadow-[0_12px_36px_rgba(15,39,72,0.14)] z-50 bg-white', isMobileLayout ? 'left-0' : 'right-0')}
                     role="menu"
                   >
                     <button
                       type="button"
-                      className="w-full text-left min-h-[34px] px-3 rounded-[8px] hover:bg-[rgba(20,150,243,0.08)] text-[0.84rem] font-semibold text-brand-navy cursor-pointer"
+                      className="w-full text-left min-h-[34px] px-3 rounded-[8px] hover:bg-[rgba(34,197,94,0.08)] text-[0.84rem] font-semibold text-brand-navy cursor-pointer"
                       onClick={() => {
                         setShowPasswordModal(true);
                         setUserMenuOpen(false);
@@ -998,19 +976,19 @@ export function CrmShell({
                     >
                       Update password
                     </button>
-                    <div className="mt-1 border-t border-[rgba(23,44,113,0.08)] pt-2 px-2">
+                    <div className="mt-1 border-t border-[rgba(15,39,72,0.08)] pt-2 px-2">
                       <p className="m-0 text-[0.72rem] uppercase tracking-[0.08em] text-brand-muted font-extrabold">Theme</p>
                       <div className="mt-1 flex gap-2">
                         <button
                           type="button"
-                          className={cx('min-h-[30px] px-3 rounded-[999px] border text-[0.78rem] font-bold cursor-pointer', themeMode === 'light' ? 'border-brand-blue text-brand-blue bg-[rgba(20,150,243,0.08)]' : 'border-[rgba(23,44,113,0.12)] text-brand-muted bg-white')}
+                          className={cx('min-h-[30px] px-3 rounded-[999px] border text-[0.78rem] font-bold cursor-pointer', themeMode === 'light' ? 'border-brand-blue text-brand-blue bg-[rgba(34,197,94,0.08)]' : 'border-[rgba(15,39,72,0.12)] text-brand-muted bg-white')}
                           onClick={() => applyTheme('light')}
                         >
                           Light
                         </button>
                         <button
                           type="button"
-                          className={cx('min-h-[30px] px-3 rounded-[999px] border text-[0.78rem] font-bold cursor-pointer', themeMode === 'dark' ? 'border-brand-blue text-brand-blue bg-[rgba(20,150,243,0.08)]' : 'border-[rgba(23,44,113,0.12)] text-brand-muted bg-white')}
+                          className={cx('min-h-[30px] px-3 rounded-[999px] border text-[0.78rem] font-bold cursor-pointer', themeMode === 'dark' ? 'border-brand-blue text-brand-blue bg-[rgba(34,197,94,0.08)]' : 'border-[rgba(15,39,72,0.12)] text-brand-muted bg-white')}
                           onClick={() => applyTheme('dark')}
                         >
                           Dark
@@ -1028,14 +1006,14 @@ export function CrmShell({
           {/* Page head */}
           {showPageHead && !blockConfigContent && (
             <div
-              className="flex items-center gap-4 px-4 py-3 rounded-[12px] border border-[rgba(23,44,113,0.09)] shadow-[0_2px_8px_rgba(23,44,113,0.05)]"
+              className="flex items-center gap-4 px-4 py-3 rounded-[12px] border border-[rgba(15,39,72,0.09)] shadow-[0_2px_8px_rgba(15,39,72,0.05)]"
               style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(239,247,255,0.96))' }}
             >
               {activeGroup && (
                 <span className="flex-shrink-0 w-[3px] h-8 rounded-full" style={{ background: activeGroup.color }} aria-hidden />
               )}
               <div className="min-w-0">
-                <span className="block text-[0.68rem] font-extrabold tracking-[0.16em] uppercase text-brand-blue leading-none mb-0.5">MoneyCash LOS</span>
+                <span className="block text-[0.68rem] font-extrabold tracking-[0.16em] uppercase text-brand-blue leading-none mb-0.5">CredSolve LOS</span>
                 <h1 className="m-0 text-brand-text text-[1.5rem] leading-tight tracking-[-0.03em] font-extrabold">{title}</h1>
                 {subtitle ? (
                   <p className="m-0 mt-1 max-w-[72ch] text-[0.84rem] leading-[1.45] text-brand-muted">
@@ -1057,7 +1035,7 @@ export function CrmShell({
             if (event.target === event.currentTarget) setShowPasswordModal(false);
           }}
         >
-          <div className="w-full max-w-[460px] rounded-[16px] border border-[rgba(23,44,113,0.12)] bg-white p-5 shadow-[0_20px_56px_rgba(23,44,113,0.22)]">
+          <div className="w-full max-w-[460px] rounded-[16px] border border-[rgba(15,39,72,0.12)] bg-white p-5 shadow-[0_20px_56px_rgba(15,39,72,0.22)]">
             <h3 className="m-0 text-[1.1rem] font-extrabold text-brand-navy">Update Password</h3>
             <p className="m-0 mt-1 text-[0.82rem] text-brand-muted">Use your current password to set a new one.</p>
             <form className="mt-3 grid gap-2" onSubmit={(e) => void handlePasswordSubmit(e)}>
@@ -1090,7 +1068,7 @@ export function CrmShell({
               <div className="mt-1 flex gap-2">
                 <button
                   type="button"
-                  className="min-h-[36px] flex-1 rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent font-bold text-brand-text cursor-pointer"
+                  className="min-h-[36px] flex-1 rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent font-bold text-brand-text cursor-pointer"
                   onClick={() => setShowPasswordModal(false)}
                 >
                   Close

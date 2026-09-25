@@ -15,6 +15,7 @@ import { LosSessionService } from './auth/los-session.service';
 import { LosDataController } from './los-data.controller';
 import { LosLeadService } from './services/los-lead.service';
 import { LosApplicationService } from './services/los-application.service';
+import { LosPennyDropRecheckService } from './services/los-penny-drop-recheck.service';
 import { LosCustomerService } from './services/los-customer.service';
 import { LosDashboardService } from './services/los-dashboard.service';
 import { LosMasterService } from './services/los-master.service';
@@ -41,6 +42,9 @@ import { LosNameMatchDevToolsService } from './services/los-name-match-dev-tools
 import { LosPanDevToolsService } from './services/los-pan-dev-tools.service';
 import { LosTenacioFaceDevToolsService } from './services/los-tenacio-face-dev-tools.service';
 import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
+import { LosCheckCibilService } from './services/los-check-cibil.service';
+import { BureauReportRepository } from '../auth/infrastructure/repositories/bureau-report.repository';
+import { KycCompletionService } from '../../common/kyc/kyc-completion.service';
 
 @Module({
   imports: [BreModule, CibilModule, StorageModule, LoanDocumentsModule, SmsModule, ContactModule, EmailModule],
@@ -64,6 +68,7 @@ import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
     LosTeamService,
     LosLeadService,
     LosApplicationService,
+    LosPennyDropRecheckService,
     LosCustomerService,
     LosDashboardService,
     LosMasterService,
@@ -83,6 +88,9 @@ import { LosVendorApiLogService } from './services/los-vendor-api-log.service';
     LosPanDevToolsService,
     LosTenacioFaceDevToolsService,
     LosVendorApiLogService,
+    BureauReportRepository,
+    KycCompletionService,
+    LosCheckCibilService,
   ],
   exports: [LosSessionService, LosLoanRepaymentSyncService],
 })

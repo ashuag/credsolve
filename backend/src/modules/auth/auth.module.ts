@@ -4,6 +4,7 @@ import { CibilModule } from '../../common/cibil/cibil.module';
 import { EmailModule } from '../../common/email/email.module';
 import { VendorApiModule } from '../../common/vendor/vendor-api.module';
 import { LoanDocumentsModule } from '../../common/loan-documents/loan-documents.module';
+import { AadhaarXmlOtpStore } from '../../common/kyc/aadhaar-xml-otp.store';
 import { DigilockerSessionStore } from '../../common/kyc/digilocker-session.store';
 import { KycCompletionService } from '../../common/kyc/kyc-completion.service';
 import { KycDigilockerDownloadFailureService } from '../../common/kyc/kyc-digilocker-download-failure.service';
@@ -19,6 +20,7 @@ import { LosModule } from '../los/los.module';
 import { InitiateCustomerRepaymentUseCase } from './application/use-cases/initiate-customer-repayment.use-case';
 import { HandleEasebuzzRepaymentCallbackUseCase } from './application/use-cases/handle-easebuzz-repayment-callback.use-case';
 import { RefreshCustomerRepaymentUseCase } from './application/use-cases/refresh-customer-repayment.use-case';
+import { ServeCustomerNocPdfUseCase } from './application/use-cases/serve-customer-noc-pdf.use-case';
 import { LogoutUseCase } from './application/use-cases/logout.use-case';
 import { SendOtpUseCase } from './application/use-cases/send-otp.use-case';
 import { SaveLeadDetailsUseCase } from './application/use-cases/save-lead-details.use-case';
@@ -33,6 +35,8 @@ import { VerifyPanUseCase } from './application/use-cases/verify-pan.use-case';
 import { RejectPanClientValidationUseCase } from './application/use-cases/reject-pan-client-validation.use-case';
 import { InitDigilockerUseCase } from './application/use-cases/init-digilocker.use-case';
 import { DownloadAadhaarDigilockerUseCase } from './application/use-cases/download-aadhaar-digilocker.use-case';
+import { GenerateAadhaarXmlOtpUseCase } from './application/use-cases/generate-aadhaar-xml-otp.use-case';
+import { DownloadAadhaarXmlUseCase } from './application/use-cases/download-aadhaar-xml.use-case';
 import { GetPendingDigilockerSessionUseCase } from './application/use-cases/get-pending-digilocker-session.use-case';
 import { ServeDigilockerAadhaarPhotoUseCase } from './application/use-cases/serve-digilocker-aadhaar-photo.use-case';
 import { ServeKycSelfiePhotoUseCase } from './application/use-cases/serve-kyc-selfie-photo.use-case';
@@ -128,8 +132,11 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     RejectPanClientValidationUseCase,
     InitDigilockerUseCase,
     DownloadAadhaarDigilockerUseCase,
+    GenerateAadhaarXmlOtpUseCase,
+    DownloadAadhaarXmlUseCase,
     GetPendingDigilockerSessionUseCase,
     DigilockerSessionStore,
+    AadhaarXmlOtpStore,
     KycIdentityRejectionService,
     KycDigilockerDownloadFailureService,
     KycCompletionService,
@@ -147,6 +154,7 @@ import { RequiredCustomerSessionGuard } from './presentation/guards/required-cus
     InitiateCustomerRepaymentUseCase,
     HandleEasebuzzRepaymentCallbackUseCase,
     RefreshCustomerRepaymentUseCase,
+    ServeCustomerNocPdfUseCase,
     LogoutUseCase,
   ],
   exports: [CustomerSessionService, BureauReportRepository],

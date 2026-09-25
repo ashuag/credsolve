@@ -9,6 +9,8 @@ export type LosLoan = {
   customerUuid: string;
   leadUuid: string;
   fullName: string | null;
+  /** CIBIL credit-assessment grade (A–H) from the current bureau report. */
+  cibilCreditAssessmentCategory: string | null;
   mobileNumber: string;
   email: string | null;
   principalAmount: string;
@@ -20,7 +22,13 @@ export type LosLoan = {
   bounceRatePerDayInr: string;
   /** Penal charge (rate % of principal, min/max capped); "0.00" unless past due. */
   penalAmount: string;
-  /** `totalRepaymentAmount` plus the penal charge. */
+  /** Interest for overdue days only; "0.00" unless past due. */
+  overdueInterestInr: string;
+  /** Waiver of penal + overdue-days interest. */
+  waivedAmountInr: string;
+  waivedByName: string | null;
+  waivedAt: string | null;
+  /** `totalRepaymentAmount` plus overdue-days interest and the penal charge, minus waiver. */
   totalRepaymentWithPenalAmount: string;
   /** IST calendar days past maturity; 0 when not overdue. */
   overdueDays: number;
@@ -37,6 +45,7 @@ export type LosLoan = {
   applicationStatusCode: string;
   applicationStatusLabel: string;
   closedAt: string | null;
+  isNocSent: boolean;
   /** Pay Now link was initiated and is not yet recorded as a SUCCESS repayment. */
   unsettledPaymentLink: boolean;
 };
@@ -74,6 +83,8 @@ export type LosLoanDetails = LosLoan & {
   bankAccountNumber: string | null;
   loanDocumentsAcceptedAt: string | null;
   keyFactReady: boolean;
+  nocSentAt: string | null;
+  nocLetterNumber: string | null;
   totalPaidAmount: string;
   outstandingAmount: string;
   /** Processing fee % saved on the application at selection. */
@@ -82,9 +93,9 @@ export type LosLoanDetails = LosLoan & {
   gstPercentage: string | null;
   /** Inclusive days from disbursement through today (or closedAt if closed). */
   daysOutstanding: number | null;
-  /** Interest charged if paid today (actual days inside cooling; full tenure after). */
+  /** Interest charged if paid today (actual days inside cooling; full tenure + overdue days after due). */
   interestTillToday: string | null;
-  /** Principal + interest due today. */
+  /** Principal + interest due today (includes overdue interest; callers add penal). */
   amountDueToday: string | null;
   /** True when pay-now interest is the contracted full tenure (cooling period has passed). */
   usedFullTenureInterest: boolean;
@@ -95,7 +106,7 @@ export type LosLoanDetails = LosLoan & {
     uuid: string;
     amount: string;
     paymentMode: string;
-    status: 'SUCCESS' | 'FAILED';
+  status: 'SUCCESS' | 'FAILED' | 'PARTIAL';
     utr: string | null;
     failureMessage: string | null;
     paidAt: string;
@@ -132,6 +143,23 @@ export type LosRefreshPaymentResult = {
   unsettledPaymentLink: boolean;
 };
 
+export async function waiveLoanCharges(
+  token: string,
+  loanUuid: string,
+  waivedAmountInr: number,
+): Promise<LosLoanDetails> {
+  return authorizedLosRequest<LosLoanDetails>(
+    token,
+    `/loans/${encodeURIComponent(loanUuid)}/waive-charges`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ waivedAmountInr }),
+    },
+    'Failed to save the charge waiver.',
+  );
+}
+
 export async function refreshLoanPayment(
   token: string,
   loanUuid: string,
@@ -145,5 +173,18 @@ export async function refreshLoanPayment(
     },
     'Failed to refresh payment status.',
     90_000,
+  );
+}
+
+export async function sendLoanNocLetter(token: string, loanUuid: string): Promise<LosLoanDetails> {
+  return authorizedLosRequest<LosLoanDetails>(
+    token,
+    `/loans/${encodeURIComponent(loanUuid)}/noc/send`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    },
+    'Failed to send NOC letter.',
+    120_000,
   );
 }

@@ -19,6 +19,9 @@ export type CustomerLoanCard = {
   interestTillToday: string | null;
   amountDueToday: string | null;
   usedFullTenureInterest?: boolean;
+  overdueDays?: number | null;
+  overdueInterestInr?: string | null;
+  waivedAmountInr?: string | null;
   bounceFeeInr: string | null;
   totalPaidInr: string | null;
   outstandingInr: string | null;
@@ -62,7 +65,7 @@ export type CustomerPaymentHistoryItem = {
   loanNumber: string;
   amount: string;
   paymentMode: string;
-  status: 'SUCCESS' | 'FAILED';
+  status: 'SUCCESS' | 'FAILED' | 'PARTIAL';
   utr: string | null;
   failureMessage: string | null;
   paidAt: string;

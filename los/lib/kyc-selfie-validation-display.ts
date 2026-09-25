@@ -74,6 +74,12 @@ export function formatMoneyCashFaceMatchSummary(row: {
       ? `Passed · score ${formatConfidencePercent(m.matchScore)}`
       : 'Passed';
   }
+  if (m.checks?.ageEstimate?.passed === false && m.checks.ageEstimate.reason) {
+    return `Failed · ${m.checks.ageEstimate.reason}`;
+  }
+  if (m.checks?.geometry?.passed === false && m.checks.geometry.reason) {
+    return `Failed · ${m.checks.geometry.reason}`;
+  }
   if (m.matchScore != null) {
     return `Failed · score ${formatConfidencePercent(m.matchScore)} · distance ${formatDistance(m.distance)} (max ${formatDistance(m.maxDistanceThreshold)})`;
   }
@@ -189,7 +195,7 @@ export function explainKycNotDone(row: KycIncompleteInput): string | null {
   if (row.kycStatus === 2) {
     return row.aadhaarIdentityFailure?.message?.trim() ||
       row.kycStatusLabel?.trim() ||
-      'KYC verification failed — name or date of birth did not match Aadhaar.';
+      'KYC verification failed — date of birth or gender did not match Aadhaar.';
   }
 
   if (row.kycStatus === 3) {

@@ -87,7 +87,7 @@ function RoleModal({
       aria-label={isEdit ? 'Edit role' : 'Create role'}
     >
       <div
-        className="w-full max-w-[420px] rounded-[20px] border border-[rgba(23,44,113,0.12)] shadow-[0_32px_64px_rgba(23,44,113,0.22)] p-6"
+        className="w-full max-w-[420px] rounded-[20px] border border-[rgba(15,39,72,0.12)] shadow-[0_32px_64px_rgba(15,39,72,0.22)] p-6"
         style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(241,247,255,0.96))' }}
       >
         <div className="flex items-start justify-between gap-4 mb-5">
@@ -102,7 +102,7 @@ function RoleModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-[10px] border border-[rgba(23,44,113,0.12)] bg-[rgba(255,255,255,0.9)] text-brand-navy cursor-pointer hover:-translate-y-px transition-transform"
+            className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-[10px] border border-[rgba(15,39,72,0.12)] bg-[rgba(255,255,255,0.9)] text-brand-navy cursor-pointer hover:-translate-y-px transition-transform"
             aria-label="Close"
           >
             <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden>
@@ -155,7 +155,7 @@ function RoleModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 min-h-[38px] rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent font-bold text-brand-text cursor-pointer hover:bg-[rgba(20,150,243,0.06)] transition-colors"
+              className="flex-1 min-h-[38px] rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent font-bold text-brand-text cursor-pointer hover:bg-[rgba(34,197,94,0.06)] transition-colors"
             >
               Cancel
             </button>
@@ -241,7 +241,7 @@ export function RolesPanel() {
       getSortValue: (role) => role.hierarchyLevel,
       filter: { type: 'number', placeholder: 'Level…' },
       render: (role) => (
-        <span className="inline-flex items-center rounded-full bg-[rgba(20,150,243,0.08)] px-3 py-1 text-[0.8rem] font-extrabold text-brand-blue">
+        <span className="inline-flex items-center rounded-full bg-[rgba(34,197,94,0.08)] px-3 py-1 text-[0.8rem] font-extrabold text-brand-blue">
           L{role.hierarchyLevel}
         </span>
       ),
@@ -269,7 +269,7 @@ export function RolesPanel() {
             type="button"
             onClick={() => setModal({ role })}
             title="Edit role"
-            className="inline-flex items-center justify-center w-7 h-7 rounded-[6px] border border-[rgba(23,44,113,0.12)] bg-[rgba(255,255,255,0.9)] text-brand-navy cursor-pointer hover:border-[rgba(20,150,243,0.24)] transition-colors"
+            className="inline-flex items-center justify-center w-7 h-7 rounded-[6px] border border-[rgba(15,39,72,0.12)] bg-[rgba(255,255,255,0.9)] text-brand-navy cursor-pointer hover:border-[rgba(34,197,94,0.24)] transition-colors"
           >
             <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -315,7 +315,7 @@ export function RolesPanel() {
         ].map((stat) => (
           <div
             key={stat.label}
-            className="rounded-[8px] border border-[rgba(23,44,113,0.1)] px-4 py-3"
+            className="rounded-[8px] border border-[rgba(15,39,72,0.1)] px-4 py-3"
             style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.97), rgba(240,246,255,0.94))' }}
           >
             <span className="block text-[0.78rem] text-brand-muted">{stat.label}</span>

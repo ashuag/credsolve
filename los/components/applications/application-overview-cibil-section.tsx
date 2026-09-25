@@ -12,6 +12,7 @@ import {
   extractCibilPan,
   formatAadhaarNumberDisplay,
   formatDobWithAge,
+  isKycMismatchHighlight,
   nameMatchVerdict,
   normalizeAadhaarGender,
 } from '@/lib/kyc-field-match';
@@ -25,10 +26,16 @@ import {
   type LosApplicationDetails,
 } from '@/lib/api';
 import { KycEnableReKycButton } from '@/components/applications/kyc-enable-re-kyc-button';
+import { KycEnableAadhaarReattemptButton } from '@/components/applications/kyc-enable-aadhaar-reattempt-button';
 import { GrantPennyDropAttemptButton } from '@/components/applications/grant-penny-drop-attempt-button';
+import { RecheckPennyDropButton } from '@/components/applications/recheck-penny-drop-button';
 import { AadhaarDownloadLogHistory } from '@/components/applications/aadhaar-download-log-history';
 import { PennyDropAttemptHistory } from '@/components/applications/penny-drop-attempt-history';
-import { canEnableReKycFromRow } from '@/lib/kyc-grant-retry-eligibility';
+import {
+  canEnableAadhaarReattemptFromRow,
+  canEnableReKycFromRow,
+  isLivenessFinishedForReKyc,
+} from '@/lib/kyc-grant-retry-eligibility';
 import { BANK_DETAIL_FAILED_LABEL, canGrantPennyDropAttemptFromRow, isBankDetailFailed } from '@/lib/penny-drop-grant-retry-eligibility';
 import { KycPipelineSteps } from '@/components/applications/kyc-pipeline-steps';
 import { KycPhotoGallery } from '@/components/shared/kyc-photo-gallery';
@@ -40,15 +47,26 @@ function DetailGrid({
   rows,
   columns = 1,
 }: {
-  rows: Array<{ label: string; value: ReactNode }>;
+  rows: Array<{ label: string; value: ReactNode; highlight?: boolean }>;
   columns?: 1 | 2 | 3;
 }) {
   if (columns === 1) {
     return (
-      <dl className="m-0 divide-y divide-[rgba(23,44,113,0.06)]">
+      <dl className="m-0 divide-y divide-[rgba(15,39,72,0.06)]">
         {rows.map((row, idx) => (
-          <div key={`${row.label}-${idx}`} className="flex items-baseline gap-3 py-1.5 first:pt-0 last:pb-0">
-            <dt className="w-[148px] flex-shrink-0 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-brand-muted leading-tight">
+          <div
+            key={`${row.label}-${idx}`}
+            className={cx(
+              'flex items-baseline gap-3 py-1.5 first:pt-0 last:pb-0',
+              row.highlight ? '-mx-2 rounded-[8px] border border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.95)] px-2' : '',
+            )}
+          >
+            <dt
+              className={cx(
+                'w-[148px] flex-shrink-0 text-[0.68rem] font-bold uppercase tracking-[0.08em] leading-tight',
+                row.highlight ? 'text-[#92400e]' : 'text-brand-muted',
+              )}
+            >
               {row.label}
             </dt>
             <dd className="m-0 min-w-0 flex-1 text-[0.84rem] font-semibold text-brand-text leading-snug">{row.value}</dd>
@@ -65,9 +83,21 @@ function DetailGrid({
       {rows.map((row, idx) => (
         <div
           key={`${row.label}-${idx}`}
-          className="rounded-[8px] border border-[rgba(23,44,113,0.07)] bg-[rgba(255,255,255,0.72)] px-3 py-2"
+          className={cx(
+            'rounded-[8px] border px-3 py-2',
+            row.highlight
+              ? 'border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.95)]'
+              : 'border-[rgba(15,39,72,0.07)] bg-[rgba(255,255,255,0.72)]',
+          )}
         >
-          <dt className="text-[0.62rem] font-bold uppercase tracking-[0.08em] text-brand-muted leading-tight">{row.label}</dt>
+          <dt
+            className={cx(
+              'text-[0.62rem] font-bold uppercase tracking-[0.08em] leading-tight',
+              row.highlight ? 'text-[#92400e]' : 'text-brand-muted',
+            )}
+          >
+            {row.label}
+          </dt>
           <dd className="m-0 mt-1 break-words text-[0.84rem] font-semibold text-brand-text leading-snug">{row.value}</dd>
         </div>
       ))}
@@ -115,8 +145,8 @@ function buildEmploymentRows(profile: NonNullable<LosApplicationDetails['lead'][
 
 function ProfileSection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)]">
-      <div className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
+    <div className="overflow-hidden rounded-[10px] border border-[rgba(15,39,72,0.08)] bg-[rgba(248,250,255,0.65)]">
+      <div className="border-b border-[rgba(15,39,72,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
         <span className="text-[0.82rem] font-extrabold text-brand-navy">{title}</span>
       </div>
       <div className="px-3 py-2.5">{children}</div>
@@ -318,6 +348,7 @@ function CustomerProfilePanel({
             rows={[
               {
                 label: 'Name',
+                highlight: isKycMismatchHighlight(profileNameVerdict),
                 value: (
                   <KycComparedValue
                     value={formatPersonName(profile.fullName)}
@@ -339,6 +370,7 @@ function CustomerProfilePanel({
               },
               {
                 label: 'Gender',
+                highlight: isKycMismatchHighlight(profileGenderVerdict),
                 value: (
                   <KycComparedValue
                     value={profile.gender ?? '—'}
@@ -357,18 +389,49 @@ function CustomerProfilePanel({
                   />
                 ),
               },
+              { label: 'Mobile', value: row.mobileNumber || '—' },
+              { label: 'Email ID', value: row.email?.trim() || profile.emailId || '—' },
             ]}
           />
-          <div className="mt-3 border-t border-[rgba(23,44,113,0.06)] pt-3">
-            <ProfileSubheading>Aadhaar details (DigiLocker)</ProfileSubheading>
+          <div className="mt-3 border-t border-[rgba(15,39,72,0.06)] pt-3">
+            <ProfileSubheading>
+              Aadhaar details ({
+                aadhaar?.aadhaarKycProcessLabel
+                  ? aadhaar.aadhaarKycType
+                    ? `${aadhaar.aadhaarKycProcessLabel} (${aadhaar.aadhaarKycType})`
+                    : aadhaar.aadhaarKycProcessLabel
+                  : 'DigiLocker'
+              })
+            </ProfileSubheading>
             {hasAadhaar ? (
               <div className="mt-2">
                 <DetailGrid
                   columns={2}
                   rows={[
-                    { label: 'Aadhaar name', value: formatPersonName(aadhaar?.fullName) },
+                    {
+                      label: 'Aadhaar name',
+                      highlight: isKycMismatchHighlight(profileNameVerdict),
+                      value: (
+                        <KycComparedValue
+                          value={formatPersonName(aadhaar?.fullName)}
+                          verdict={profileNameVerdict}
+                          score={profileNameScore}
+                          compareLabel="Profile"
+                        />
+                      ),
+                    },
                     { label: 'Aadhaar DOB', value: formatDobWithAge(aadhaar?.dateOfBirth) },
-                    { label: 'Aadhaar gender', value: normalizeAadhaarGender(aadhaar?.gender) ?? '—' },
+                    {
+                      label: 'Aadhaar gender',
+                      highlight: isKycMismatchHighlight(profileGenderVerdict),
+                      value: (
+                        <KycComparedValue
+                          value={normalizeAadhaarGender(aadhaar?.gender) ?? '—'}
+                          verdict={profileGenderVerdict}
+                          compareLabel="Profile"
+                        />
+                      ),
+                    },
                     {
                       label: 'Aadhaar number',
                       value: formatAadhaarNumberDisplay(aadhaar?.maskedAadhaar, true),
@@ -382,7 +445,7 @@ function CustomerProfilePanel({
             )}
           </div>
           {cibilReport ? (
-            <div className="mt-3 border-t border-[rgba(23,44,113,0.06)] pt-3">
+            <div className="mt-3 border-t border-[rgba(15,39,72,0.06)] pt-3">
               <ProfileSubheading>CIBIL identity match</ProfileSubheading>
               <div className="mt-2">
                 <DetailGrid
@@ -414,7 +477,7 @@ function CustomerProfilePanel({
               </div>
             </div>
           ) : null}
-          <div className="mt-3 border-t border-[rgba(23,44,113,0.06)] pt-3">
+          <div className="mt-3 border-t border-[rgba(15,39,72,0.06)] pt-3">
             <ProfileSubheading>Other government IDs (CIBIL)</ProfileSubheading>
             <div className="mt-2">
               <CibilGovernmentIdsBlock
@@ -495,7 +558,7 @@ function LoanDocumentCard({
   };
 
   return (
-    <div className="rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)] px-3 py-2.5">
+    <div className="rounded-[10px] border border-[rgba(15,39,72,0.08)] bg-[rgba(248,250,255,0.65)] px-3 py-2.5">
       <span className="block text-[0.78rem] font-extrabold text-brand-navy">{label}</span>
       {ready ? (
         <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -513,7 +576,7 @@ function LoanDocumentCard({
             type="button"
             disabled={opening || !token}
             onClick={() => void handleView()}
-            className="inline-flex items-center gap-1 rounded-[6px] border border-[rgba(20,150,243,0.28)] bg-[rgba(20,150,243,0.07)] px-2 py-0.5 text-[0.68rem] font-bold text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 hover:bg-[rgba(20,150,243,0.13)]"
+            className="inline-flex items-center gap-1 rounded-[6px] border border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.07)] px-2 py-0.5 text-[0.68rem] font-bold text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 hover:bg-[rgba(34,197,94,0.13)]"
           >
             {opening ? 'Opening…' : 'View PDF'}
           </button>
@@ -614,7 +677,7 @@ function LoanDetailsPanel({
                 setGeneratingDocs(false);
               }
             }}
-            className="inline-flex min-h-[38px] cursor-pointer items-center gap-2 rounded-[10px] border border-[rgba(23,44,113,0.18)] bg-[rgba(23,44,113,0.06)] px-4 text-[0.82rem] font-bold text-brand-navy disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-[38px] cursor-pointer items-center gap-2 rounded-[10px] border border-[rgba(15,39,72,0.18)] bg-[rgba(15,39,72,0.06)] px-4 text-[0.82rem] font-bold text-brand-navy disabled:cursor-not-allowed disabled:opacity-50"
           >
             {generatingDocs ? 'Generating…' : 'Generate PDFs'}
           </button>
@@ -652,7 +715,7 @@ function LoanDetailsPanel({
           ) : null}
           {row.loanDocuments.keyFactDisbursementReady || row.statusCode === 'DISBURSED' || row.loanAccount ? (
             <LoanDocumentCard
-              label="Sanction letter cum KFS (disbursement)"
+              label="Sanction letter cum KFS + commercial terms (disbursement)"
               ready={row.loanDocuments.keyFactDisbursementReady}
               esigned={row.loanDocuments.keyFactDisbursementEsigned}
               docType="key-fact-disbursement"
@@ -676,7 +739,7 @@ function ReferenceDetailsPanel({ row }: { row: LosApplicationDetails }) {
       {row.references.map((ref) => (
         <div
           key={`${ref.referenceIndex}-${ref.mobileNumber}`}
-          className="rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)] px-3 py-2.5"
+          className="rounded-[10px] border border-[rgba(15,39,72,0.08)] bg-[rgba(248,250,255,0.65)] px-3 py-2.5"
         >
           <p className="m-0 text-[0.72rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted">
             Reference {ref.referenceIndex + 1}
@@ -711,21 +774,40 @@ function KycDetailPanel({
   const aadhaar = row.aadhaarDetail;
   const kycDone = row.kycStatus === 1;
   const livenessDone = row.livenessPassed === true || kycDone;
-  const showEnableReKyc = row.canEnableReKyc || canEnableReKycFromRow(row);
+  const showEnableReKyc =
+    (row.canEnableReKyc || canEnableReKycFromRow(row)) && isLivenessFinishedForReKyc(row);
+  const showEnableAadhaarReattempt =
+    row.canEnableAadhaarReattempt || canEnableAadhaarReattemptFromRow(row);
+  const profileName = row.lead.profile?.fullName;
+  const aadhaarNameScore = computeNameMatchScore(profileName, aadhaar?.fullName);
+  const aadhaarNameVerdict = nameMatchVerdict(
+    aadhaarNameScore,
+    Boolean(profileName?.trim() && aadhaar?.fullName?.trim()),
+  );
+  const aadhaarGenderVerdict = compareGenders(row.lead.profile?.gender, aadhaar?.gender);
   return (
     <div className="grid gap-4">
-      <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)]">
-        <div className="flex items-center justify-between gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
+      <div className="overflow-hidden rounded-[10px] border border-[rgba(15,39,72,0.08)] bg-[rgba(248,250,255,0.65)]">
+        <div className="flex items-center justify-between gap-2 border-b border-[rgba(15,39,72,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
           <span className="text-[0.82rem] font-extrabold text-brand-navy">Aadhaar photo, selfie &amp; liveness video</span>
+          {showEnableAadhaarReattempt ? (
+            <KycEnableAadhaarReattemptButton
+              row={row}
+              applicationUuid={applicationUuid}
+              authToken={authToken}
+              onSuccess={onRefresh}
+              className="shrink-0"
+            />
+          ) : null}
         </div>
         <div className="px-3 py-2.5">
           <KycPhotoGallery row={row} authToken={authToken} />
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)]">
-        <div className="flex items-center justify-between gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
-          <span className="text-[0.82rem] font-extrabold text-brand-navy">DigiLocker Aadhaar KYC</span>
+      <div className="overflow-hidden rounded-[10px] border border-[rgba(15,39,72,0.08)] bg-[rgba(248,250,255,0.65)]">
+        <div className="flex items-center justify-between gap-2 border-b border-[rgba(15,39,72,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
+          <span className="text-[0.82rem] font-extrabold text-brand-navy">Aadhaar KYC</span>
           <span className="text-[0.72rem] font-bold text-brand-muted">
             {aadhaarComplete ? 'Complete' : identityFailure ? 'Failed' : 'Pending'}
           </span>
@@ -748,26 +830,59 @@ function KycDetailPanel({
           ) : !aadhaarFetched ? (
             <p className="m-0 rounded-[10px] border border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.9)] px-3 py-2.5 text-[0.84rem] leading-[1.45] text-[#92400e]">
               {(row.aadhaarDownloadLogs?.length ?? 0) > 0
-                ? 'Aadhaar download was called, but DigiLocker Aadhaar was not captured. Review the logs below.'
-                : 'DigiLocker Aadhaar has not been captured yet.'}
+                ? 'Aadhaar download was called, but Aadhaar was not captured. Review the logs below.'
+                : 'Aadhaar has not been captured yet.'}
+            </p>
+          ) : aadhaar?.reusedFromPrior ? (
+            <p className="m-0 rounded-[10px] border border-[rgba(37,99,235,0.2)] bg-[rgba(239,246,255,0.9)] px-3 py-2.5 text-[0.84rem] leading-[1.45] text-[#1e3a8a]">
+              Linked from previous Aadhaar KYC for this mobile number.
             </p>
           ) : null}
           <DetailGrid
             columns={2}
             rows={[
+              { label: 'Aadhaar KYC', value: aadhaarComplete ? 'Complete' : identityFailure ? 'Fetched — identity failed' : 'Not complete' },
               {
-                label: 'Aadhaar KYC',
-                value: aadhaarComplete ? 'Complete' : identityFailure ? 'Fetched — identity failed' : 'Not complete',
+                label: 'KYC process',
+                value: aadhaar?.aadhaarKycProcessLabel
+                  ? aadhaar.aadhaarKycType
+                    ? `${aadhaar.aadhaarKycProcessLabel} (${aadhaar.aadhaarKycType})`
+                    : aadhaar.aadhaarKycProcessLabel
+                  : aadhaarFetched
+                    ? 'DigiLocker'
+                    : '—',
               },
               {
-                label: 'DigiLocker Aadhaar',
+                label: 'Aadhaar number',
                 value: formatAadhaarNumberDisplay(aadhaar?.maskedAadhaar, aadhaarFetched),
               },
-              { label: 'Aadhaar name', value: aadhaarFetched ? formatPersonName(aadhaar?.fullName) : '—' },
+              {
+                label: 'Aadhaar name',
+                highlight: aadhaarFetched && isKycMismatchHighlight(aadhaarNameVerdict),
+                value: aadhaarFetched ? (
+                  <KycComparedValue
+                    value={formatPersonName(aadhaar?.fullName)}
+                    verdict={aadhaarNameVerdict}
+                    score={aadhaarNameScore}
+                    compareLabel="Profile"
+                  />
+                ) : (
+                  '—'
+                ),
+              },
               { label: 'Aadhaar DOB', value: aadhaarFetched ? formatDobWithAge(aadhaar?.dateOfBirth) : '—' },
               {
                 label: 'Aadhaar gender',
-                value: aadhaarFetched ? (normalizeAadhaarGender(aadhaar?.gender) ?? '—') : '—',
+                highlight: aadhaarFetched && isKycMismatchHighlight(aadhaarGenderVerdict),
+                value: aadhaarFetched ? (
+                  <KycComparedValue
+                    value={normalizeAadhaarGender(aadhaar?.gender) ?? '—'}
+                    verdict={aadhaarGenderVerdict}
+                    compareLabel="Profile"
+                  />
+                ) : (
+                  '—'
+                ),
               },
               { label: 'Aadhaar address', value: aadhaarFetched ? (aadhaar?.address ?? '—') : '—' },
               { label: 'DigiLocker PAN', value: row.digilockerPan?.panCardNumber ?? '—' },
@@ -781,30 +896,28 @@ function KycDetailPanel({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)]">
-        <div className="flex items-center justify-between gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
+      <div className="overflow-hidden rounded-[10px] border border-[rgba(15,39,72,0.08)] bg-[rgba(248,250,255,0.65)]">
+        <div className="flex items-center justify-between gap-2 border-b border-[rgba(15,39,72,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
           <span className="text-[0.82rem] font-extrabold text-brand-navy">Liveness check</span>
-          <span className="text-[0.72rem] font-bold text-brand-muted">
-            {livenessDone ? 'Passed' : 'Pending'}
-          </span>
-        </div>
-        <div className="grid gap-3 px-3 py-2.5">
-          {!aadhaarComplete ? (
-            <p className="m-0 rounded-[10px] border border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.9)] px-3 py-2.5 text-[0.84rem] leading-[1.45] text-[#92400e]">
-              Liveness check starts after DigiLocker Aadhaar KYC.
-            </p>
-          ) : !livenessDone ? (
-            <p className="m-0 rounded-[10px] border border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.9)] px-3 py-2.5 text-[0.84rem] leading-[1.45] text-[#92400e]">
-              Aadhaar KYC is complete. Liveness check is still pending.
-            </p>
-          ) : null}
           {showEnableReKyc ? (
             <KycEnableReKycButton
               row={row}
               applicationUuid={applicationUuid}
               authToken={authToken}
               onSuccess={onRefresh}
+              className="shrink-0"
             />
+          ) : (
+            <span className="text-[0.72rem] font-bold text-brand-muted">
+              {livenessDone ? 'Passed' : 'Pending'}
+            </span>
+          )}
+        </div>
+        <div className="grid gap-3 px-3 py-2.5">
+          {aadhaarComplete && !livenessDone ? (
+            <p className="m-0 rounded-[10px] border border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.9)] px-3 py-2.5 text-[0.84rem] leading-[1.45] text-[#92400e]">
+              Aadhaar KYC is complete. Liveness check is still pending.
+            </p>
           ) : null}
           <div>
             <ProfileSubheading>Liveness pipeline</ProfileSubheading>
@@ -835,10 +948,10 @@ function KycDetailPanel({
       </div>
 
       {row.agreement ? (
-        <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)]">
-          <div className="flex items-center gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
+        <div className="overflow-hidden rounded-[10px] border border-[rgba(15,39,72,0.08)] bg-[rgba(248,250,255,0.65)]">
+          <div className="flex items-center gap-2 border-b border-[rgba(15,39,72,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
             <span className="text-[0.58rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">Agreement</span>
-            <span className="w-px h-3 bg-[rgba(23,44,113,0.1)]" aria-hidden />
+            <span className="w-px h-3 bg-[rgba(15,39,72,0.1)]" aria-hidden />
             <span className="text-[0.82rem] font-extrabold text-brand-navy">E-sign & legal</span>
           </div>
           <div className="px-3 py-2.5">
@@ -875,8 +988,8 @@ function SourcesUtmPanel({ row }: { row: LosApplicationDetails }) {
 
   return (
     <div className="grid gap-4">
-      <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)]">
-        <div className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
+      <div className="overflow-hidden rounded-[10px] border border-[rgba(15,39,72,0.08)] bg-[rgba(248,250,255,0.65)]">
+        <div className="border-b border-[rgba(15,39,72,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
           <span className="text-[0.82rem] font-extrabold text-brand-navy">Lead source</span>
         </div>
         <div className="px-3 py-2.5">
@@ -890,8 +1003,8 @@ function SourcesUtmPanel({ row }: { row: LosApplicationDetails }) {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)]">
-        <div className="border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
+      <div className="overflow-hidden rounded-[10px] border border-[rgba(15,39,72,0.08)]">
+        <div className="border-b border-[rgba(15,39,72,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
           <span className="text-[0.82rem] font-extrabold text-brand-navy">UTM tags</span>
           <span className="ml-2 text-[0.76rem] font-semibold text-brand-muted">
             {utms.length} capture{utms.length === 1 ? '' : 's'}
@@ -903,11 +1016,11 @@ function SourcesUtmPanel({ row }: { row: LosApplicationDetails }) {
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-[0.84rem]">
               <thead>
-                <tr className="bg-[rgba(23,44,113,0.04)]">
+                <tr className="bg-[rgba(15,39,72,0.04)]">
                   {['Captured at', 'Source', 'Medium', 'Campaign', 'Term', 'Content'].map((label) => (
                     <th
                       key={label}
-                      className="border-b border-[rgba(23,44,113,0.08)] px-3 py-2 text-left text-[0.68rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted"
+                      className="border-b border-[rgba(15,39,72,0.08)] px-3 py-2 text-left text-[0.68rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted"
                     >
                       {label}
                     </th>
@@ -917,11 +1030,11 @@ function SourcesUtmPanel({ row }: { row: LosApplicationDetails }) {
               <tbody>
                 {utms.map((utm, index) => (
                   <tr key={`${utm.capturedAt}-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-[rgba(248,250,255,0.55)]'}>
-                    <td className="border-b border-[rgba(23,44,113,0.04)] px-3 py-2.5 font-semibold text-brand-text whitespace-nowrap">
+                    <td className="border-b border-[rgba(15,39,72,0.04)] px-3 py-2.5 font-semibold text-brand-text whitespace-nowrap">
                       {formatDateTime(utm.capturedAt)}
                     </td>
                     {[utm.source, utm.medium, utm.campaign, utm.term, utm.content].map((value, cellIndex) => (
-                      <td key={cellIndex} className="border-b border-[rgba(23,44,113,0.04)] px-3 py-2.5">
+                      <td key={cellIndex} className="border-b border-[rgba(15,39,72,0.04)] px-3 py-2.5">
                         {value ? (
                           <span className="inline-block rounded-[6px] bg-[rgba(59,130,246,0.08)] px-2 py-0.5 font-semibold text-[0.81rem] text-[#1e40af]">
                             {value}
@@ -962,6 +1075,12 @@ function BankDetailsPanel({
   return (
     <div className="grid gap-4">
       <GrantPennyDropAttemptButton
+        row={row}
+        applicationUuid={applicationUuid}
+        authToken={authToken}
+        onSuccess={onRefresh}
+      />
+      <RecheckPennyDropButton
         row={row}
         applicationUuid={applicationUuid}
         authToken={authToken}
@@ -1042,11 +1161,11 @@ export function ApplicationOverviewCibilSection({
 
   return (
     <section
-      className="overflow-hidden rounded-[12px] border border-[rgba(23,44,113,0.09)]"
+      className="overflow-hidden rounded-[12px] border border-[rgba(15,39,72,0.09)]"
       style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,246,255,0.95))' }}
     >
       <nav
-        className="flex flex-wrap gap-1 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.45)] p-1.5"
+        className="flex flex-wrap gap-1 border-b border-[rgba(15,39,72,0.07)] bg-[rgba(248,250,255,0.45)] p-1.5"
         aria-label="Application overview sections"
       >
         {tabs.map((tab) => (
@@ -1058,7 +1177,7 @@ export function ApplicationOverviewCibilSection({
               'min-h-[36px] rounded-[8px] px-3.5 text-[0.8rem] font-extrabold transition-colors',
               activeTab === tab.id
                 ? 'bg-brand-navy text-white shadow-sm'
-                : 'text-brand-navy hover:bg-[rgba(23,44,113,0.06)]',
+                : 'text-brand-navy hover:bg-[rgba(15,39,72,0.06)]',
             )}
             aria-current={activeTab === tab.id ? 'page' : undefined}
           >

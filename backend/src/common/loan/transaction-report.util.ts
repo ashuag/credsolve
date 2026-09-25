@@ -32,7 +32,7 @@ export function resolveTransactionReportMetrics(input: {
     return { interestReceived: 0, daysExceeded };
   }
 
-  const { interestAmount } = computeAmountDueNowInr(
+  const { totalInterestAmount } = computeAmountDueNowInr(
     input.principal,
     input.interestRatePerDay,
     input.disbursedAt,
@@ -40,7 +40,8 @@ export function resolveTransactionReportMetrics(input: {
       asOf: input.repaymentAt,
       coolingPeriodDays: input.coolingPeriodDays,
       tenureDays: computeTenureDays(input.disbursedAt, input.dueDate),
+      overdueDays: daysExceeded,
     },
   );
-  return { interestReceived: interestAmount, daysExceeded };
+  return { interestReceived: totalInterestAmount, daysExceeded };
 }

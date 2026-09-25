@@ -52,7 +52,7 @@ function parseForwardedHostProto(header: string | null): { host: string; proto?:
 /**
  * Public origin for absolute redirects. Next.js requires absolute URLs for `NextResponse.redirect`
  * (see https://nextjs.org/docs/messages/middleware-relative-urls). Prefer env / proxy headers so
- * `request.nextUrl.origin` is not `http://localhost:3011` behind misconfigured proxies.
+ * `request.nextUrl.origin` is not `http://localhost:3041` behind misconfigured proxies.
  */
 function resolvePublicOrigin(request: NextRequest): string {
   const fromEnv =

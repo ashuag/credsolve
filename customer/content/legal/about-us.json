@@ -4,14 +4,12 @@
   "navLabel": "About Us",
   "title": "About MoneyCash",
   "description": "Empowering financial access through technology — fast access, a transparent process, and responsible lending.",
-  "registeredOffice": "CREDSOLVE Technologies Private Limited, Flat No. E-2748, Gaur Siddhartham, Siddharth Vihar, Ghaziabad, Uttar Pradesh — 201009",
   "contactEmail": "support@moneycash.in",
   "sections": [
     {
       "id": "who-we-are",
       "title": "Who We Are",
       "paragraphs": [
-        "MoneyCash is a digital lending platform developed and operated by CredSolve Technologies Private Limited, a technology company focused on building secure, scalable, and customer-centric financial technology solutions.",
         "Founded by experienced industry professionals with decades of leadership experience across global technology, financial services, customer operations, cloud platforms, and digital transformation, MoneyCash was created with a simple vision: to make access to short-term credit faster, simpler, and more transparent for everyday consumers."
       ]
     },
@@ -19,7 +17,7 @@
       "id": "leadership",
       "title": "Built by Industry Leaders",
       "paragraphs": [
-        "MoneyCash is backed by the leadership team of CredSolve Technologies, bringing together more than 40 years of combined experience across:",
+        "MoneyCash is backed by an experienced leadership team bringing together more than 40 years of combined expertise across:",
         "- Banking & Financial Services",
         "- Digital Lending",
         "- Information Technology",

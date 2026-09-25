@@ -4,6 +4,7 @@ const LOAN_STATUSES = [
   { name: 'ACTIVE', displayName: 'Active' },
   { name: 'OVERDUE', displayName: 'Overdue' },
   { name: 'CLOSED', displayName: 'Closed' },
+  { name: 'SETTLED', displayName: 'Settled' },
   { name: 'WRITTEN_OFF', displayName: 'Written off' },
 ] as const;
 

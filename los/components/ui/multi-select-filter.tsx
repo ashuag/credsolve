@@ -17,7 +17,7 @@ import {
 import { createPortal } from 'react-dom';
 
 const FIELD_CLASS =
-  'w-full min-w-[72px] h-[28px] rounded-[6px] border border-[rgba(23,44,113,0.12)] bg-white px-1.5 text-[0.72rem] font-medium text-brand-text';
+  'w-full min-w-[72px] h-[28px] rounded-[6px] border border-[rgba(15,39,72,0.12)] bg-white px-1.5 text-[0.72rem] font-medium text-brand-text';
 
 export function MultiSelectFilter({
   value,
@@ -109,7 +109,7 @@ export function MultiSelectFilter({
       role="listbox"
       aria-multiselectable="true"
       aria-labelledby={labelId}
-      className="fixed z-[90] min-w-[168px] overflow-hidden rounded-[14px] border border-[rgba(23,44,113,0.14)] bg-white py-1.5 shadow-[0_18px_50px_rgba(23,44,113,0.22)]"
+      className="fixed z-[90] min-w-[168px] overflow-hidden rounded-[14px] border border-[rgba(15,39,72,0.14)] bg-white py-1.5 shadow-[0_18px_50px_rgba(15,39,72,0.22)]"
       style={{ top: pos.top, left: pos.left, width: Math.max(168, triggerRef.current?.offsetWidth ?? 0) }}
     >
       <p id={labelId} className="m-0 px-3 pb-1.5 pt-0.5 text-[0.64rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
@@ -122,7 +122,7 @@ export function MultiSelectFilter({
             <label
               key={option.value}
               className={cx(
-                'flex cursor-pointer items-center gap-2 px-3 py-1.5 text-[0.78rem] font-semibold transition-colors hover:bg-[rgba(20,150,243,0.07)]',
+                'flex cursor-pointer items-center gap-2 px-3 py-1.5 text-[0.78rem] font-semibold transition-colors hover:bg-[rgba(34,197,94,0.07)]',
                 checked ? 'text-brand-navy' : 'text-brand-text',
               )}
             >
@@ -130,7 +130,7 @@ export function MultiSelectFilter({
                 type="checkbox"
                 checked={checked}
                 onChange={() => toggle(option.value)}
-                className="h-3.5 w-3.5 accent-[#1496f3]"
+                className="h-3.5 w-3.5 accent-[#22C55E]"
                 aria-label={option.label}
               />
               <span>{option.label}</span>
@@ -138,7 +138,7 @@ export function MultiSelectFilter({
           );
         })}
       </div>
-      <div className="mt-1 flex items-center justify-between gap-2 border-t border-[rgba(23,44,113,0.08)] px-2 pt-1.5">
+      <div className="mt-1 flex items-center justify-between gap-2 border-t border-[rgba(15,39,72,0.08)] px-2 pt-1.5">
         <button
           type="button"
           onClick={() => onChange('')}
@@ -171,7 +171,7 @@ export function MultiSelectFilter({
         className={cx(
           FIELD_CLASS,
           'mt-1.5 inline-flex min-w-[88px] items-center justify-between gap-1 text-left',
-          selected.length > 0 ? 'border-[rgba(20,150,243,0.28)] text-brand-navy' : 'text-brand-muted',
+          selected.length > 0 ? 'border-[rgba(34,197,94,0.28)] text-brand-navy' : 'text-brand-muted',
         )}
       >
         <span className="min-w-0 truncate">{triggerLabel}</span>

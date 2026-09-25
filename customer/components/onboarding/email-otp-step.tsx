@@ -133,7 +133,7 @@ export function EmailOtpStep({
           <h2
             id="email-otp-heading"
             className={cn(
-              'text-xl md:text-[1.8rem] font-extrabold text-brand-navy tracking-tight leading-[1.1]',
+              'text-xl md:text-[1.8rem] font-bold text-brand-navy tracking-tight leading-[1.1]',
               compact ? 'mb-3' : 'mb-4',
             )}
           >
@@ -192,7 +192,7 @@ export function EmailOtpStep({
               <span className="inline-flex items-center justify-center gap-[10px]">
                 {isVerifying && (
                   <span
-                    className="w-[18px] h-[18px] rounded-full border-2 border-[rgba(255,248,223,0.28)] border-t-[#fff8df] animate-spin-btn"
+                    className="w-[18px] h-[18px] rounded-full border-2 border-[rgba(255,248,223,0.28)] border-t-[#ecfdf5] animate-spin-btn"
                     aria-hidden
                   />
                 )}

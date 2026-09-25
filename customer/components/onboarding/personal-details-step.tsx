@@ -19,7 +19,7 @@ import { saveLeadDetails, saveLeadProfile, verifyLeadPan } from '@/lib/api/lead'
 import { fetchPincodeLookup } from '@/lib/api/lookup';
 import { formatDateDisplay, formatDateIso, getAge, parseDobDisplay, parseIsoDate } from '@/lib/date-utils';
 import { useCustomerDetailLookups } from '@/lib/use-customer-detail-lookups';
-import { isValidPan, isValidPersonName, PERSON_NAME_VALIDATION_MESSAGE, PINCODE_REGEX, sanitizePersonNameInput, isValidAddressLine1, ADDRESS_LINE1_VALIDATION_MESSAGE } from '@/lib/validators';
+import { isValidPan, isValidPersonName, PERSON_NAME_VALIDATION_MESSAGE, PINCODE_REGEX, sanitizePersonNameInput, isValidAddressLine1, ADDRESS_LINE1_VALIDATION_MESSAGE, isValidEmail } from '@/lib/validators';
 import { useJourneyProgressOptional } from '@/components/journey/journey-progress-context';
 import { ProfileFields } from './profile-fields';
 import { FinancialFields } from './financial-fields';
@@ -89,11 +89,12 @@ function profileCompletion(fields: Fields, dobDisplay: string): number {
 
 function financialCompletion(fields: Fields): number {
   const s = [
+    isValidEmail(fields.emailId),
     PINCODE_REGEX.test(fields.pincode),
     Boolean(fields.currentCity.trim()),
     fields.addressLine1.trim().length >= 5 && isValidAddressLine1(fields.addressLine1),
     fields.creditConsentAccepted
-  ].filter((v) => Boolean(v)).length / 4;
+  ].filter((v) => Boolean(v)).length / 5;
 
   return fields.addressLine2.trim() ? Math.min(1, s + 0.05) : s;
 }
@@ -103,7 +104,7 @@ const EMPTY_FIELDS: Fields = {
   gender: '', dob: '',
   panNumber: '',
   occupation: '',
-  addressLine1: '', addressLine2: '', currentCity: '', currentCityId: null,
+  addressLine1: '', addressLine2: '', emailId: '', currentCity: '', currentCityId: null,
   pincode: '', monthlyIncome: '', annualTurnover: '', annualProfit: '', creditConsentAccepted: false,
 };
 
@@ -201,6 +202,7 @@ export function PersonalDetailsStep(
       occupation: (p.occupation as Fields['occupation']) || prev.occupation,
       addressLine1: p.addressLine1 || prev.addressLine1,
       addressLine2: p.addressLine2 || prev.addressLine2,
+      emailId: p.emailId || prev.emailId,
       currentCity: p.currentCity || prev.currentCity || '',
       currentCityId: null,
       pincode: p.pincode || prev.pincode,
@@ -264,6 +266,7 @@ export function PersonalDetailsStep(
       let v = e.target.value;
       if (['monthlyIncome', 'annualTurnover', 'annualProfit'].includes(key)) v = v.replace(/\D/g, '').slice(0, 12);
       else if (key === 'pincode') v = v.replace(/\D/g, '').slice(0, 6);
+      else if (key === 'emailId') v = v.replace(/\s/g, '').toLowerCase().slice(0, 150);
       else if (key === 'fullName') v = sanitizePersonNameInput(v);
       else if (key === 'addressLine1' || key === 'addressLine2') v = v.toUpperCase();
       setFields((prev) => {
@@ -324,6 +327,7 @@ export function PersonalDetailsStep(
 
   function validateFinancial(): FieldError {
     const err: FieldError = {};
+    if (!isValidEmail(fields.emailId)) err.emailId = 'Please enter a valid email address.';
     if (!PINCODE_REGEX.test(fields.pincode)) err.pincode = 'Please enter a valid 6-digit pincode.';
     if (!fields.currentCity.trim()) err.currentCity = 'Please enter your current city.';
     if (!fields.addressLine1.trim() || !isValidAddressLine1(fields.addressLine1)) {
@@ -394,6 +398,7 @@ export function PersonalDetailsStep(
       await saveLeadDetails({
         ...profilePayload(), addressLine1: fields.addressLine1.trim(),
         ...(fields.addressLine2.trim() ? { addressLine2: fields.addressLine2.trim() } : {}),
+        emailId: fields.emailId.trim().toLowerCase(),
         currentCity: fields.currentCity.trim(), ...(fields.currentCityId != null ? { currentCityId: fields.currentCityId } : {}),
         pincode: fields.pincode, creditConsentAccepted: fields.creditConsentAccepted,
       });
@@ -438,7 +443,7 @@ export function PersonalDetailsStep(
     <>
       <section className="h-full flex flex-col" aria-labelledby="details-heading">
         <div className="mb-4">
-          <h2 id="details-heading" className="text-xl md:text-[1.8rem] font-extrabold text-brand-navy mb-3 tracking-tight leading-[1.1]">
+          <h2 id="details-heading" className="text-xl md:text-[1.8rem] font-bold text-brand-navy mb-3 tracking-tight leading-[1.1]">
             Complete Your <span className="text-brand-blue">Profile</span>
           </h2>
           <div className="flex items-start gap-3 p-3 rounded-2xl bg-linear-to-br from-blue-50/80 to-indigo-50/50 border border-blue-100/60">
@@ -452,7 +457,7 @@ export function PersonalDetailsStep(
                 ? lockIdentityFields
                   ? 'Name, gender, date of birth, and PAN are locked from your previous repaid loan. You can update occupation and income.'
                   : 'Please provide your personal and financial details to complete your loan profile.'
-                : 'Enter your residential pincode and address to finish your application.'}
+                : 'Enter your email ID and residential address to finish your application.'}
             </p>
           </div>
         </div>

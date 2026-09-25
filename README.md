@@ -41,5 +41,5 @@ Recommended rule:
 2. Run `docker compose up --build`
 3. Open:
    - LOS: `http://localhost:3010`
-   - Customer: `http://localhost:3011`
+   - Customer: `http://localhost:3041`
    - API: `http://localhost:4001/api`

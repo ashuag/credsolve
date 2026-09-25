@@ -68,7 +68,7 @@ function GradeBadge({ category }: { category: string | null }) {
 function SummaryCard({ label, value }: { label: string; value: number }) {
   return (
     <article
-      className="rounded-[10px] border border-[rgba(23,44,113,0.1)] px-4 py-3"
+      className="rounded-[10px] border border-[rgba(15,39,72,0.1)] px-4 py-3"
       style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.97), rgba(240,246,255,0.94))' }}
     >
       <span className="block text-[0.78rem] text-brand-muted">{label}</span>
@@ -290,14 +290,14 @@ export function BureauReportsPanel() {
                   })
                   .finally(() => setDownloading(false));
               }}
-              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-wait disabled:opacity-60"
+              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)] disabled:cursor-wait disabled:opacity-60"
             >
               {downloading ? 'Downloading…' : '⬇ Download'}
             </button>
             <button
               type="button"
               onClick={() => void load()}
-              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)]"
             >
               ↺ Refresh
             </button>

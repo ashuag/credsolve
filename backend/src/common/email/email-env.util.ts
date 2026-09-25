@@ -55,6 +55,32 @@ export function resolveEmailFromConfig(config: ConfigService): ResolvedEmailFrom
   };
 }
 
+/**
+ * From-address for sanction / KFS / NOC (loan document) emails.
+ * Prefers `LOAN_DOCUMENTS_EMAIL_FROM`, then falls back to the default `EMAIL_FROM`.
+ */
+export function resolveLoanDocumentsEmailFromConfig(
+  config: ConfigService,
+): ResolvedEmailFromConfig | null {
+  const fromAddress =
+    config.get<string>('LOAN_DOCUMENTS_EMAIL_FROM')?.trim()
+    || config.get<string>('EMAIL_FROM')?.trim()
+    || config.get<string>('MAIL_FROM_ADDRESS')?.trim()
+    || '';
+  if (!fromAddress) {
+    return resolveEmailFromConfig(config);
+  }
+
+  return {
+    fromAddress,
+    fromName:
+      config.get<string>('LOAN_DOCUMENTS_EMAIL_FROM_NAME')?.trim()
+      || config.get<string>('MAIL_FROM_NAME')?.trim()
+      || 'MoneyCash',
+    provider: config.get<string>('EMAIL_PROVIDER')?.trim() || null,
+  };
+}
+
 /** Zeptomail REST send-mail endpoint (India default). Override with `EMAIL_API_URL`. */
 export function resolveZeptomailApiUrl(config: ConfigService): string {
   const explicit = config.get<string>('EMAIL_API_URL')?.trim();

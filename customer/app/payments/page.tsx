@@ -29,11 +29,12 @@ function formatPaidAt(iso: string): string {
 
 function PaymentCard({ payment }: { payment: CustomerPaymentHistoryItem }) {
   const failed = payment.status === 'FAILED';
+  const partial = payment.status === 'PARTIAL';
   return (
     <article
       className={cn(
         'rounded-[22px] border bg-white p-5 shadow-[0_12px_32px_rgba(23,44,113,0.06)]',
-        failed ? 'border-rose-200' : 'border-[rgba(18,36,79,0.1)]',
+        failed ? 'border-rose-200' : partial ? 'border-amber-200' : 'border-[rgba(18,36,79,0.1)]',
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -50,10 +51,12 @@ function PaymentCard({ payment }: { payment: CustomerPaymentHistoryItem }) {
             'inline-flex items-center rounded-full px-3 py-1 text-[0.68rem] font-extrabold uppercase tracking-wider',
             failed
               ? 'bg-rose-100 text-rose-800'
-              : 'bg-emerald-100 text-emerald-800',
+              : partial
+                ? 'bg-amber-100 text-amber-800'
+                : 'bg-emerald-100 text-emerald-800',
           )}
         >
-          {failed ? 'Unsuccessful' : 'Paid fully'}
+          {failed ? 'Unsuccessful' : partial ? 'Partially paid' : 'Paid fully'}
         </span>
       </div>
 
@@ -137,7 +140,7 @@ export default function PaymentsPage() {
     );
   }
 
-  const successful = payments.filter((p) => p.status === 'SUCCESS');
+  const successful = payments.filter((p) => p.status === 'SUCCESS' || p.status === 'PARTIAL');
   const failed = payments.filter((p) => p.status === 'FAILED');
   const latestSuccess = successful[0] ?? null;
 
@@ -145,7 +148,7 @@ export default function PaymentsPage() {
     <div className="relative mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -right-16 -top-10 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(20,150,243,0.12),transparent_70%)]" />
-        <div className="absolute -bottom-16 -left-10 h-52 w-52 rounded-full bg-[radial-gradient(circle,rgba(255,197,25,0.16),transparent_70%)]" />
+        <div className="absolute -bottom-16 -left-10 h-52 w-52 rounded-full bg-[radial-gradient(circle,rgba(34,197,94,0.16),transparent_70%)]" />
       </div>
 
       <div className="relative grid gap-6">
@@ -153,11 +156,11 @@ export default function PaymentsPage() {
           <p className="inline-flex rounded-full bg-[rgba(20,150,243,0.12)] px-3 py-1 text-[0.65rem] font-black uppercase tracking-[0.16em] text-brand-navy">
             Payments
           </p>
-          <h1 className="mt-3 text-[clamp(1.7rem,4vw,2.2rem)] font-black tracking-tight text-brand-navy">
+          <h1 className="mt-3 text-[clamp(1.7rem,4vw,2.2rem)] font-bold tracking-tight text-brand-navy">
             Your repayment history
           </h1>
           <p className="mt-2 max-w-xl text-brand-muted leading-relaxed">
-            Actual amounts paid toward your MoneyCash loans — including unsuccessful attempts.
+            Actual amounts paid toward your CredSolve loans — including unsuccessful attempts.
           </p>
         </header>
 

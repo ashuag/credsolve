@@ -9,19 +9,19 @@ export const dynamic = 'force-static';
 export const metadata: Metadata = {
   title: 'Apply for a loan',
   description:
-    'Start your MoneyCash loan application with mobile OTP verification, digital onboarding, and a guided eligibility journey.',
+    'Start your CredSolve loan application with mobile OTP verification, digital onboarding, and a guided eligibility journey.',
   openGraph: {
-    title: 'Apply for a loan | MoneyCash',
+    title: 'Apply for a loan | CredSolve',
     description:
-      'Start your MoneyCash loan application with mobile OTP verification, digital onboarding, and a guided eligibility journey.',
+      'Start your CredSolve loan application with mobile OTP verification, digital onboarding, and a guided eligibility journey.',
     type: 'website'
   }
 };
 
 export default function ApplyForLoanPage() {
   return (
-    <div className="flex min-h-screen flex-col selection:bg-[#ffc519]/30 bg-[#fffdf8]">
-      <Suspense fallback={<div className="min-h-screen bg-[#fffdf8]" aria-hidden />}>
+    <div className="flex min-h-screen flex-col selection:bg-[#22c55e]/30 bg-[#f7fbf9]">
+      <Suspense fallback={<div className="min-h-screen bg-[#f7fbf9]" aria-hidden />}>
         <div className="hidden lg:block">
           <LandingNavbar />
         </div>

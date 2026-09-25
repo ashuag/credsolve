@@ -1,183 +1,166 @@
 'use client';
 
-import { useScrollReveal } from '@/lib/hooks/use-scroll-reveal';
 import { CountUp } from '@/components/ui/count-up';
-import { RadialProgress } from '@/components/ui/radial-progress';
-
-type Stat = {
-  to: number;
-  prefix?: string;
-  suffix?: string;
-  decimals?: number;
-  /** Gauge fill 0–100. */
-  progress: number;
-  label: string;
-  desc: string;
-  color: string;
-  icon: React.ReactNode;
-};
-
-const STATS: Stat[] = [
-  {
-    to: 5000,
-    suffix: '+',
-    progress: 95,
-    label: 'Happy Customers',
-    desc: 'Across India trust us every month',
-    color: '#4DB3FF',
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-        <circle cx="9" cy="8" r="3" />
-        <path d="M3 20c0-3.3 2.7-6 6-6" strokeLinecap="round" />
-        <circle cx="16" cy="9" r="2.5" />
-        <path d="M14 20c0-2.8 2.2-5 5-5" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    to: 5,
-    prefix: '₹',
-    suffix: 'Cr+',
-    progress: 90,
-    label: 'Total Disbursed',
-    desc: 'Loans disbursed to date',
-    color: '#F4B400',
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-        <rect x="3" y="6" width="18" height="12" rx="2" />
-        <circle cx="12" cy="12" r="2.5" />
-        <path d="M7 9v6M17 9v6" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    to: 2,
-    suffix: ' Min',
-    progress: 96,
-    label: 'Avg. Approval',
-    desc: 'Average loan sanction time',
-    color: '#34d399',
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-        <circle cx="12" cy="13" r="8" />
-        <path d="M12 9v4l2.5 2M9 2h6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    to: 10,
-    suffix: ' Min',
-    progress: 92,
-    label: 'Avg. Disbursal',
-    desc: 'Approval to money in bank',
-    color: '#f43f5e',
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-        <path d="M12 3v12M8 11l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M5 19h14" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    to: 4.9,
-    suffix: '/5',
-    decimals: 1,
-    progress: 98,
-    label: 'Customer Rating',
-    desc: 'Average satisfaction score',
-    color: '#a78bfa',
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden>
-        <path d="M12 3l2.6 6.3 6.8.5-5.2 4.4 1.7 6.6L12 17.8 6.1 21.3l1.7-6.6L2.6 9.8l6.8-.5z" />
-      </svg>
-    ),
-  },
-];
 
 export function StatsSection() {
-  const sectionRef = useScrollReveal();
-
   return (
-    <section ref={sectionRef} className="relative overflow-hidden stats-mesh py-20 lg:py-28">
-      {/* Grid overlay */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.04]"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
-          backgroundSize: '60px 60px',
-        }}
-      />
-      {/* Animated blobs */}
-      <div className="pointer-events-none absolute top-0 right-0 h-96 w-96 rounded-full bg-[#1496f3]/10 blur-[100px] animate-blob" />
-      <div className="pointer-events-none absolute bottom-0 left-0 h-80 w-80 rounded-full bg-[#ffc519]/8 blur-[80px] animate-blob animation-delay-2000" />
-
-      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-14 text-center">
-          <div className="reveal mb-5 inline-flex items-center gap-2.5 rounded-full bg-white/8 px-4 py-2">
-            <span className="flex h-2 w-2 animate-pulse rounded-full bg-green-400" />
-            <span className="text-[0.65rem] font-[900] uppercase tracking-[0.24em] text-white/55">
-              Platform Performance
-            </span>
-          </div>
-          <h2 className="reveal text-[clamp(2rem,4.5vw,3.2rem)] font-[900] tracking-tight text-white stagger-1">
-            Numbers That{' '}
-            <span className="text-grad-gold">Speak for Themselves.</span>
-          </h2>
-        </div>
-
-        {/* Stats grid — radial gauge infographics */}
-        <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-5">
-          {STATS.map((s, idx) => (
-            <div
-              key={s.label}
-              className={`reveal reveal-scale glass group flex flex-col items-center gap-4 rounded-[24px] p-5 text-center transition-all duration-300 hover:-translate-y-2 hover:bg-white/10 sm:p-6 stagger-${Math.min(idx + 1, 6)}`}
-            >
-              {/* Gauge */}
-              <RadialProgress value={s.progress} color={s.color} duration={1600 + idx * 120}>
-                <span
-                  className="flex h-7 w-7 items-center justify-center rounded-full"
-                  style={{ backgroundColor: `${s.color}22`, color: s.color }}
-                >
-                  {s.icon}
-                </span>
-                <span className="mt-1" style={{ color: s.color }}>
-                  <CountUp
-                    to={s.to}
-                    prefix={s.prefix}
-                    suffix={s.suffix}
-                    decimals={s.decimals}
-                    className="text-[1.35rem] font-[900] leading-none tabular-nums sm:text-[1.55rem]"
-                  />
-                </span>
-              </RadialProgress>
-
-              {/* Label */}
-              <div className="flex flex-col gap-1">
-                <div className="text-sm font-[800] text-white">{s.label}</div>
-                <div className="text-[0.65rem] font-[600] leading-snug text-white/40">{s.desc}</div>
+    <section className="relative overflow-hidden bg-[#FAFBFD] py-16 sm:py-24 border-t border-slate-100">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {/* Top Stats Banner — Dark Navy Pill Container from Page 4 */}
+        <div className="overflow-hidden rounded-3xl bg-[#0B1E3D] px-6 py-10 text-white shadow-xl sm:px-12 sm:py-14">
+          <div className="grid grid-cols-1 gap-8 text-center sm:grid-cols-3 sm:gap-6 divide-y sm:divide-y-0 sm:divide-x divide-white/10">
+            {/* Stat 1: 1 Lakh+ */}
+            <div className="flex flex-col items-center pt-4 sm:pt-0 sm:px-4">
+              <div className="text-[clamp(2.4rem,4.5vw,3.6rem)] font-[900] tracking-tight text-white">
+                <CountUp to={1} suffix=" Lakh+" />
               </div>
+              <p className="mt-2 text-xs font-[800] uppercase tracking-widest text-white/70">
+                CUSTOMERS SERVED
+              </p>
             </div>
-          ))}
+
+            {/* Stat 2: ₹20 Cr+ */}
+            <div className="flex flex-col items-center pt-4 sm:pt-0 sm:px-4">
+              <div className="text-[clamp(2.4rem,4.5vw,3.6rem)] font-[900] tracking-tight text-white">
+                <CountUp to={20} prefix="₹" suffix=" Cr+" />
+              </div>
+              <p className="mt-2 text-xs font-[800] uppercase tracking-widest text-white/70">
+                MONEY DISBURSED
+              </p>
+            </div>
+
+            {/* Stat 3: 2 */}
+            <div className="flex flex-col items-center pt-4 sm:pt-0 sm:px-4">
+              <div className="text-[clamp(2.4rem,4.5vw,3.6rem)] font-[900] tracking-tight text-white">
+                <CountUp to={2} />
+              </div>
+              <p className="mt-2 text-xs font-[800] uppercase tracking-widest text-white/70">
+                NBFC LENDING PARTNERS
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* Trust badges */}
-        <div className="reveal mt-12 flex flex-wrap items-center justify-center gap-3 stagger-6">
-          {[
-            'Advance Fraud Detection',
-            'DigiLocker Integrated',
-            'Bank Verification',
-            'Secure Data Privacy',
-          ].map((badge) => (
-            <span
-              key={badge}
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[0.62rem] font-[800] uppercase tracking-[0.18em] text-white/55 backdrop-blur-sm transition-colors hover:bg-white/10 hover:text-white/75"
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-green-400" aria-hidden />
-              {badge}
+        {/* Timestamp caption below pill */}
+        <p className="mt-3 text-center text-xs font-[500] text-slate-400">
+          Figures as on March 2026
+        </p>
+
+        {/* Lending Partners Section */}
+        <div className="mt-20">
+          <div className="text-center">
+            {/* Badge */}
+            <span className="text-xs font-[800] uppercase tracking-[0.2em] text-[#22C55E]">
+              LENDING PARTNERS
             </span>
-          ))}
+            {/* Heading */}
+            <h2 className="mt-2 text-[clamp(2rem,4vw,3rem)] font-[700] tracking-tight text-[#081735]">
+              Backed by RBI-registered NBFCs
+            </h2>
+            {/* Green accent line */}
+            <div className="mx-auto mt-2.5 h-1 w-12 rounded-full bg-[#22C55E]" />
+
+            {/* Subtitle */}
+            <p className="mx-auto mt-4 max-w-2xl text-sm font-[400] leading-relaxed text-[#081735]/75 sm:text-base">
+              We build and run the journey; our NBFC partners sanction and fund the loan.
+              You always know who your lender is, and you can reach them directly.
+            </p>
+          </div>
+
+          {/* 2 NBFC Partner Disclosure Cards */}
+          <div className="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+            {/* Partner 1: Aasra Fincorp Private Limited */}
+            <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-xs sm:p-8">
+              <div className="border-b border-slate-100 pb-5">
+                <h3 className="text-xl font-[900] text-[#0B1E3D]">
+                  Aasra Fincorp Private Limited
+                </h3>
+                <p className="mt-1 text-xs font-[700] text-[#10B981]">
+                  RBI-registered NBFC &bull; Registration no. B-14.02078
+                </p>
+              </div>
+
+              <dl className="mt-5 space-y-3.5 text-xs sm:text-sm">
+                <div className="grid grid-cols-3 gap-2">
+                  <dt className="font-[700] text-slate-400">Registered office</dt>
+                  <dd className="col-span-2 font-[600] text-[#0B1E3D]">
+                    16, Community Centre, 1st Floor, East of Kailash, New Delhi - 110065
+                  </dd>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <dt className="font-[700] text-slate-400">Website</dt>
+                  <dd className="col-span-2 font-[600] text-[#0284C7]">
+                    <a href="https://aasrafincorp.com" target="_blank" rel="noopener noreferrer" className="hover:underline">
+                      https://aasrafincorp.com
+                    </a>
+                  </dd>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <dt className="font-[700] text-slate-400">Nodal Officer</dt>
+                  <dd className="col-span-2 font-[600] text-[#0B1E3D]">
+                    Mr. Vikas Sharma &bull; +91 11 4100 8900 &bull; nodal@aasrafincorp.com
+                  </dd>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <dt className="font-[700] text-slate-400">Grievance Officer</dt>
+                  <dd className="col-span-2 font-[600] text-[#0B1E3D]">
+                    Mr. Sandeep Kumar &bull; +91 11 4100 8901 &bull; grievance@aasrafincorp.com
+                  </dd>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <dt className="font-[700] text-slate-400">Products</dt>
+                  <dd className="col-span-2 font-[600] text-[#0B1E3D]">
+                    Personal loan &bull; Short-term loan
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            {/* Partner 2: Regulated NBFC Partner Card */}
+            <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-xs sm:p-8">
+              <div className="border-b border-slate-100 pb-5">
+                <h3 className="text-xl font-[900] text-[#0B1E3D]">
+                  Regulated NBFC Partner
+                </h3>
+                <p className="mt-1 text-xs font-[700] text-[#10B981]">
+                  RBI-registered NBFC &bull; Registration no. [N-XX.XXXXX]
+                </p>
+              </div>
+
+              <dl className="mt-5 space-y-3.5 text-xs sm:text-sm">
+                <div className="grid grid-cols-3 gap-2">
+                  <dt className="font-[700] text-slate-400">Registered office</dt>
+                  <dd className="col-span-2 font-[600] text-[#0B1E3D]">
+                    [Corporate Office Address, Registered in India]
+                  </dd>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <dt className="font-[700] text-slate-400">Website</dt>
+                  <dd className="col-span-2 font-[600] text-[#0284C7]">
+                    https://partner-nbfc.in
+                  </dd>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <dt className="font-[700] text-slate-400">Nodal Officer</dt>
+                  <dd className="col-span-2 font-[600] text-[#0B1E3D]">
+                    [Nodal Officer Name] &bull; +91 [phone] &bull; nodal@partner-nbfc.in
+                  </dd>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <dt className="font-[700] text-slate-400">Grievance Officer</dt>
+                  <dd className="col-span-2 font-[600] text-[#0B1E3D]">
+                    [Grievance Officer Name] &bull; +91 [phone] &bull; grievance@partner-nbfc.in
+                  </dd>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <dt className="font-[700] text-slate-400">Products</dt>
+                  <dd className="col-span-2 font-[600] text-[#0B1E3D]">
+                    Instant Personal Loan &bull; Emergency Credit
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
         </div>
       </div>
     </section>

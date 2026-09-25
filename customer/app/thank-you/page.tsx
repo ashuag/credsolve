@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { CustomerJourneyGuard } from '@/components/auth/customer-journey-guard';
 import { LoanLandingShell } from '@/components/home/loan-landing-shell';
 import { useCustomerSession } from '@/components/providers/customer-session-provider';
-import { hasOpenCustomerLoan } from '@/lib/api/customer-session';
+import { getCustomerJourneyResumePath, hasOpenCustomerLoan } from '@/lib/api/customer-session';
 import { Spinner } from '@/components/ui/spinner';
 
 function ThankYouContent() {
@@ -23,6 +23,11 @@ function ThankYouContent() {
     // Do not keep them on the post-application thank-you screen.
     if (!hasOpenCustomerLoan(session) && !session.lead) {
       router.replace('/my-account');
+      return;
+    }
+    const resumePath = getCustomerJourneyResumePath(session);
+    if (resumePath !== '/thank-you') {
+      router.replace(resumePath);
     }
   }, [loading, session, router]);
 
@@ -43,17 +48,25 @@ function ThankYouContent() {
   }
 
   const bankVerificationFailed =
-    session?.authenticated === true && session.journey.bankVerificationFailed === true;
+    session?.authenticated === true &&
+    (session.journey.bankVerificationFailed === true ||
+      session.journey.bankNameReviewPending === true);
+  const aadhaarNameReviewPending =
+    session?.authenticated === true && session.journey.aadhaarNameReviewPending === true;
+  const pendingFollowUp = bankVerificationFailed || aadhaarNameReviewPending;
+  const followUpBody = aadhaarNameReviewPending
+    ? 'Thank you for your request. One of our representatives will contact you shortly for additional information. We appreciate your patience.'
+    : 'Thank you for completing your application. Bank verification could not be completed automatically. One of our representatives will call you shortly.';
 
   const journeyPanel = (
     <div className="h-full flex flex-col justify-center">
       <div className="mb-6">
-        <h1 className="text-2xl md:text-[2.5rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">
-          {bankVerificationFailed ? 'Thank you.' : 'Application Received.'}
+        <h1 className="text-2xl md:text-[2.5rem] font-bold text-brand-navy mb-4 tracking-tight leading-[1.1]">
+          {pendingFollowUp ? 'Thank you.' : 'Application Received.'}
         </h1>
         <p className="text-[1rem] text-slate-500 mb-8 leading-relaxed">
-          {bankVerificationFailed
-            ? 'Thank you for completing your application. Bank verification could not be completed automatically. One of our representatives will call you shortly.'
+          {pendingFollowUp
+            ? followUpBody
             : 'Your application is now being processed by our automated systems and lending partners.'}
         </p>
 
@@ -71,11 +84,13 @@ function ThankYouContent() {
             </div>
             <div>
               <h3 className="font-bold text-brand-navy text-[1rem]">
-                {bankVerificationFailed ? 'A representative will call' : 'Under Review'}
+                {pendingFollowUp ? 'A representative will call' : 'Under Review'}
               </h3>
               <p className="text-[0.85rem] text-slate-500">
-                {bankVerificationFailed
-                  ? 'One of our team members will contact you shortly to complete bank verification.'
+                {pendingFollowUp
+                  ? aadhaarNameReviewPending
+                    ? 'One of our team members will contact you shortly for additional information.'
+                    : 'One of our team members will contact you shortly to complete bank verification.'
                   : 'Most applications are reviewed within 1–2 business days.'}
               </p>
             </div>
@@ -114,7 +129,7 @@ function ThankYouContent() {
         showSpeedometer={!hasOpenCustomerLoan(session)}
         journeyPanel={journeyPanel}
         leftTitle={
-          bankVerificationFailed ? (
+          pendingFollowUp ? (
             <>
               We&apos;ll <span className="text-green-400">call you.</span>
             </>
@@ -125,8 +140,10 @@ function ThankYouContent() {
           )
         }
         leftDescription={
-          bankVerificationFailed
-            ? 'Your application is in. A MoneyCash representative will contact you shortly about bank verification.'
+          pendingFollowUp
+            ? aadhaarNameReviewPending
+              ? 'Your application is in. A CredSolve representative will contact you shortly for additional information.'
+              : 'Your application is in. A CredSolve representative will contact you shortly about bank verification.'
             : 'Your loan application journey is complete. Sit back and relax while we handle the rest.'
         }
         leftInfographic={

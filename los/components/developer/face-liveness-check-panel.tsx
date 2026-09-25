@@ -32,7 +32,7 @@ function ModeTabs({
   ];
 
   return (
-    <div className="flex flex-wrap gap-1 rounded-[10px] border border-[rgba(23,44,113,0.1)] bg-[rgba(248,250,255,0.8)] p-1">
+    <div className="flex flex-wrap gap-1 rounded-[10px] border border-[rgba(15,39,72,0.1)] bg-[rgba(248,250,255,0.8)] p-1">
       {tabs.map((tab) => (
         <button
           key={tab.id}
@@ -192,7 +192,7 @@ export function FaceLivenessCheckPanel() {
 
       {error ? <p className="m-0 text-[0.84rem] font-bold text-[#991b1b]">{error}</p> : null}
 
-      <div className="grid gap-3 rounded-[14px] border border-[rgba(23,44,113,0.1)] bg-white p-4 max-w-md">
+      <div className="grid gap-3 rounded-[14px] border border-[rgba(15,39,72,0.1)] bg-white p-4 max-w-md">
         <ModeTabs
           mode={mode}
           disabled={loading}
@@ -207,7 +207,7 @@ export function FaceLivenessCheckPanel() {
             type="button"
             disabled={loading}
             onClick={() => inputRef.current?.click()}
-            className="cursor-pointer rounded-[10px] border border-[rgba(23,44,113,0.16)] bg-[rgba(248,250,255,0.9)] px-4 py-2 text-[0.82rem] font-bold text-brand-navy disabled:opacity-60"
+            className="cursor-pointer rounded-[10px] border border-[rgba(15,39,72,0.16)] bg-[rgba(248,250,255,0.9)] px-4 py-2 text-[0.82rem] font-bold text-brand-navy disabled:opacity-60"
           >
             Choose image or PDF
           </button>
@@ -215,7 +215,7 @@ export function FaceLivenessCheckPanel() {
 
         {mode === 'selfie' ? (
           <div className="grid gap-2">
-            <div className="overflow-hidden rounded-[12px] border border-[rgba(23,44,113,0.12)] bg-black aspect-[4/3] max-h-[280px]">
+            <div className="overflow-hidden rounded-[12px] border border-[rgba(15,39,72,0.12)] bg-black aspect-[4/3] max-h-[280px]">
               <video ref={videoRef} className="h-full w-full object-cover" autoPlay playsInline muted />
             </div>
             {cameraError ? <p className="m-0 text-[0.78rem] font-bold text-[#991b1b]">{cameraError}</p> : null}
@@ -252,7 +252,7 @@ export function FaceLivenessCheckPanel() {
             className="max-h-48 w-full rounded-[10px] object-contain bg-[rgba(248,250,255,0.9)]"
           />
         ) : mode !== 'selfie' ? (
-          <div className="flex h-36 items-center justify-center rounded-[10px] border border-dashed border-[rgba(23,44,113,0.14)] bg-[rgba(248,250,255,0.65)] text-[0.78rem] text-brand-muted">
+          <div className="flex h-36 items-center justify-center rounded-[10px] border border-dashed border-[rgba(15,39,72,0.14)] bg-[rgba(248,250,255,0.65)] text-[0.78rem] text-brand-muted">
             {mode === 'link' ? 'Enter a public image URL' : 'No file selected'}
           </div>
         ) : null}

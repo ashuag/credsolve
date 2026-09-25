@@ -24,6 +24,7 @@ model Customer {
   loanAccounts  LoanAccount[]
 
   @@index([panNsdlCacheId])
+  @@index([createdAt])
   @@map("customer")
 }
 
@@ -35,11 +36,13 @@ model CustomerKyc {
   aadhaarVerifiedAt DateTime? @map("aadhaar_verified_at") @db.DateTime(3)
   aadhaarData       Json?     @map("aadhaar_data")
   aadhaarPhotoPath  String?   @map("aadhaar_photo_path") @db.VarChar(512)
+  /** `1` DigiLocker, `2` OTP based — how Aadhaar KYC was captured. */
+  aadhaarKycType    Int?      @map("aadhaar_kyc_type") @db.SmallInt
   createdAt         DateTime  @default(now()) @map("created_at") @db.DateTime(3)
 
   customer Customer @relation(fields: [customerId], references: [id])
 
-  @@index([customerId])
+  @@index([customerId, createdAt])
   @@index([panCardNumber])
   @@map("customer_kyc")
 }

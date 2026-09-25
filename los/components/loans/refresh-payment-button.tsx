@@ -5,7 +5,7 @@ import { getLosStoredUser } from '@/lib/auth';
 import { useEffect, useState } from 'react';
 
 const BUTTON_CLASS =
-  'h-[28px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(20,150,243,0.28)] bg-[rgba(20,150,243,0.08)] px-2 text-[0.72rem] font-bold text-brand-blue transition-colors hover:bg-[rgba(20,150,243,0.14)] disabled:cursor-not-allowed disabled:opacity-50';
+  'h-[28px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.08)] px-2 text-[0.72rem] font-bold text-brand-blue transition-colors hover:bg-[rgba(34,197,94,0.14)] disabled:cursor-not-allowed disabled:opacity-50';
 
 export function useCanRefreshLoanPayment() {
   const [allowed, setAllowed] = useState(false);

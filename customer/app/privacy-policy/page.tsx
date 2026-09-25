@@ -5,11 +5,11 @@ import { PrivacyDocument } from './privacy-document';
 export const metadata: Metadata = {
   title: 'Privacy Policy',
   description:
-    'Official Privacy Policy for MoneyCash — how we collect, use, retain, and protect your personal information on the website and app.',
+    'Official Privacy Policy for CredSolve — how we collect, use, retain, and protect your personal information on the website and app.',
   openGraph: {
-    title: 'Privacy Policy | MoneyCash',
+    title: 'Privacy Policy | CredSolve',
     description:
-      'Official Privacy Policy for the MoneyCash digital lending platform — personal loans and account data.',
+      'Official Privacy Policy for the CredSolve digital lending platform — personal loans and account data.',
     type: 'website',
   },
 };

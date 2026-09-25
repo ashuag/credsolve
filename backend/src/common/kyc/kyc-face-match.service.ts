@@ -2,6 +2,14 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import type * as tf from '@tensorflow/tfjs-node';
 import path from 'node:path';
 import {
+  computeFaceGeometry,
+  evaluateFaceMatchConsistency,
+  extraFaceMatchChecksPassed,
+  geometryInputFromLandmarks,
+  type FaceAgeEstimate,
+  type FaceGeometryMetrics,
+} from './kyc-face-match-consistency.util';
+import {
   computeDetectionUpscaleSize,
   emptyFaceMatchInspection,
   evaluateFaceMatch,
@@ -18,27 +26,42 @@ import {
   KYC_SELFIE_SECONDARY_FACE_MIN_AREA_RATIO,
 } from './kyc-selfie-face-validation.util';
 
+type FaceApiLandmarks = {
+  getLeftEye(): Array<{ x: number; y: number }>;
+  getRightEye(): Array<{ x: number; y: number }>;
+  getNose(): Array<{ x: number; y: number }>;
+  getMouth(): Array<{ x: number; y: number }>;
+};
+
 type FaceApiDetectionWithDescriptor = {
   detection: {
     score: number;
     box: { x: number; y: number; width: number; height: number };
   };
   descriptor: Float32Array;
+  landmarks?: FaceApiLandmarks;
+  age?: number;
+  gender?: string;
+  genderProbability?: number;
 };
 
 type FaceSideDetection = {
   best: FaceApiDetectionWithDescriptor | null;
   /** Faces at/above {@link KYC_SELFIE_MIN_FACE_CONFIDENCE} (dual-face gate). */
   confidentFaceCount: number;
+  geometry: FaceGeometryMetrics | null;
+  ageEstimate: FaceAgeEstimate | null;
 };
 
 @Injectable()
 export class KycFaceMatchService implements OnModuleDestroy {
   private readonly logger = new Logger(KycFaceMatchService.name);
   private modelsReady: Promise<void> | null = null;
+  private ageGenderReady = false;
 
   onModuleDestroy(): void {
     this.modelsReady = null;
+    this.ageGenderReady = false;
   }
 
   async compareJpegBuffers(reference: Buffer, probe: Buffer): Promise<KycFaceMatchInspection> {
@@ -137,7 +160,16 @@ export class KycFaceMatchService implements OnModuleDestroy {
         probeFaces.best.descriptor,
       );
       const effectiveMaxDistance = resolveEffectiveMaxDistance(referenceFaces.best.detection.score);
-      const { matchPassed, matchScore } = evaluateFaceMatch(distance, effectiveMaxDistance);
+      const { matchScore } = evaluateFaceMatch(distance, effectiveMaxDistance);
+      const checks = evaluateFaceMatchConsistency({
+        distance,
+        maxDistance: effectiveMaxDistance,
+        referenceGeometry: referenceFaces.geometry,
+        probeGeometry: probeFaces.geometry,
+        referenceAge: referenceFaces.ageEstimate,
+        probeAge: probeFaces.ageEstimate,
+      });
+      const matchPassed = extraFaceMatchChecksPassed(checks);
 
       return {
         ok: matchPassed,
@@ -147,6 +179,7 @@ export class KycFaceMatchService implements OnModuleDestroy {
         maxDistanceThreshold: effectiveMaxDistance,
         reference: referenceSide,
         probe: probeSide,
+        checks,
         reason: matchPassed
           ? undefined
           : 'The selfie does not match the Aadhaar photo. Retake a well-lit selfie with your full face visible.',
@@ -207,13 +240,20 @@ export class KycFaceMatchService implements OnModuleDestroy {
       minConfidence: KYC_FACE_MATCH_MIN_DETECTION_SCORE,
       maxResults: 5,
     });
-    const detections = (await faceapi
+    const withDescriptors = faceapi
       .detectAllFaces(tensor, opts)
       .withFaceLandmarks()
-      .withFaceDescriptors()) as FaceApiDetectionWithDescriptor[];
+      .withFaceDescriptors();
+    const detections = (this.ageGenderReady
+      ? await (
+          withDescriptors as unknown as {
+            withAgeAndGender: () => PromiseLike<FaceApiDetectionWithDescriptor[]>;
+          }
+        ).withAgeAndGender()
+      : await withDescriptors) as FaceApiDetectionWithDescriptor[];
 
     if (!detections.length) {
-      return { best: null, confidentFaceCount: 0 };
+      return { best: null, confidentFaceCount: 0, geometry: null, ageEstimate: null };
     }
 
     const confident = detections.filter(
@@ -227,6 +267,8 @@ export class KycFaceMatchService implements OnModuleDestroy {
     return {
       best,
       confidentFaceCount: countForegroundFaces(confident),
+      geometry: geometryFromDetection(best),
+      ageEstimate: ageEstimateFromDetection(best),
     };
   }
 
@@ -243,6 +285,19 @@ export class KycFaceMatchService implements OnModuleDestroy {
     await faceapi.nets.ssdMobilenetv1.loadFromDisk(modelDir);
     await faceapi.nets.faceLandmark68Net.loadFromDisk(modelDir);
     await faceapi.nets.faceRecognitionNet.loadFromDisk(modelDir);
+    try {
+      const ageNet = (
+        faceapi.nets as { ageGenderNet?: { loadFromDisk: (dir: string) => Promise<unknown> } }
+      ).ageGenderNet;
+      if (!ageNet) throw new Error('ageGenderNet is not available');
+      await ageNet.loadFromDisk(modelDir);
+      this.ageGenderReady = true;
+    } catch (err) {
+      this.ageGenderReady = false;
+      this.logger.warn(
+        `KYC age/gender net not loaded; age-band check skipped (${err instanceof Error ? err.message : String(err)}).`,
+      );
+    }
     this.logger.log(`KYC face match models loaded from ${modelDir}`);
   }
 }
@@ -272,5 +327,31 @@ function toSideResult(faces: FaceSideDetection, tensor: tf.Tensor3D): KycFaceMat
     imageHeight,
     faceCount,
     dualFaceDetected: faceCount > 1,
+    childLikeness: faces.geometry?.childLikeness ?? null,
+    ageBand: faces.geometry?.ageBand ?? null,
+    estimatedAge: faces.ageEstimate?.age ?? null,
+    gender: faces.ageEstimate?.gender ?? null,
+  };
+}
+
+function geometryFromDetection(face: FaceApiDetectionWithDescriptor): FaceGeometryMetrics | null {
+  if (!face.landmarks) return null;
+  const input = geometryInputFromLandmarks({
+    box: face.detection.box,
+    leftEye: face.landmarks.getLeftEye(),
+    rightEye: face.landmarks.getRightEye(),
+    nose: face.landmarks.getNose(),
+    mouth: face.landmarks.getMouth(),
+  });
+  return input ? computeFaceGeometry(input) : null;
+}
+
+function ageEstimateFromDetection(face: FaceApiDetectionWithDescriptor): FaceAgeEstimate | null {
+  if (typeof face.age !== 'number' || !Number.isFinite(face.age)) return null;
+  const gender = face.gender === 'male' || face.gender === 'female' ? face.gender : null;
+  return {
+    age: face.age,
+    gender,
+    genderProbability: typeof face.genderProbability === 'number' ? face.genderProbability : null,
   };
 }

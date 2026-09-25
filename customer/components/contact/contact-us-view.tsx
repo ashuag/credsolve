@@ -14,7 +14,9 @@ import {
 } from '@/lib/form-styles';
 import { cn } from '@/lib/cn';
 
-const CONTACT_EMAIL = 'contact@moneycash.in';
+const CONTACT_EMAIL = 'hello@credsolve.in';
+const CONTACT_PHONE_DISPLAY = '+91-9650111801';
+const CONTACT_PHONE_TEL = '+91-9650111801';
 const CONTACT_ADDRESS =
   'E-2748 Gaur Siddhartham, Siddharth Vihar, Ghaziabad City, Ghaziabad, Ghaziabad- 201009, Uttar Pradesh';
 const CONTACT_MAP_LINK = 'https://maps.app.goo.gl/1cc4TMr1Wm6SEq6g8';
@@ -96,7 +98,7 @@ export function ContactUsView() {
         <span className="inline-flex items-center gap-2 rounded-full border border-[rgba(20,150,243,0.2)] bg-white px-4 py-1.5 text-[0.72rem] font-[900] uppercase tracking-[0.18em] text-brand-blue shadow-sm">
           Contact Us
         </span>
-        <h1 className="mt-5 text-3xl font-[900] leading-tight text-brand-navy sm:text-4xl">
+        <h1 className="mt-5 text-3xl font-[700] leading-tight text-brand-navy sm:text-4xl">
           We&rsquo;d love to hear from you
         </h1>
         <p className="mt-3 text-base font-[500] leading-relaxed text-brand-muted">
@@ -125,6 +127,26 @@ export function ContactUsView() {
           </a>
 
           <a
+            href={`tel:${CONTACT_PHONE_TEL}`}
+            className="group flex items-start gap-4 rounded-[20px] border border-[rgba(18,36,79,0.08)] bg-white p-5 shadow-[0_12px_24px_rgba(23,44,113,0.05)] transition-all hover:-translate-y-0.5 hover:border-[rgba(20,150,243,0.28)] hover:shadow-[0_18px_36px_rgba(23,44,113,0.1)]"
+          >
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[rgba(20,150,243,0.1)] text-brand-blue transition-colors group-hover:bg-brand-blue group-hover:text-white">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+                <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.67A2 2 0 012 .96h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 15.92v1z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+            <div className="min-w-0">
+              <div className="text-[0.68rem] font-[900] uppercase tracking-[0.16em] text-brand-muted">Phone Support</div>
+              <div className="mt-1 text-base font-[800] text-brand-navy">{CONTACT_PHONE_DISPLAY}</div>
+              <p className="mt-1 text-sm font-[600] leading-relaxed text-brand-muted">
+                Hours: Monday–Saturday, 8:00 AM–5:00 PM
+                <br />
+                Excluding Public Holidays
+              </p>
+            </div>
+          </a>
+
+          <a
             href={CONTACT_MAP_LINK}
             target="_blank"
             rel="noopener noreferrer"
@@ -146,7 +168,7 @@ export function ContactUsView() {
 
           <div className="overflow-hidden rounded-[20px] border border-[rgba(18,36,79,0.08)] bg-white shadow-[0_12px_24px_rgba(23,44,113,0.05)]">
             <iframe
-              title="MoneyCash office location on Google Maps"
+              title="CredSolve office location on Google Maps"
               src={CONTACT_MAP_EMBED}
               className="h-[260px] w-full border-0"
               loading="lazy"
@@ -165,7 +187,7 @@ export function ContactUsView() {
                   <path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </span>
-              <h2 className="text-xl font-[900] text-brand-navy">Message sent!</h2>
+              <h2 className="text-xl font-[700] text-brand-navy">Message sent!</h2>
               <p className="max-w-md text-sm font-[500] leading-relaxed text-brand-muted">
                 Thanks for reaching out. Our team has received your message and will get back to you at your
                 email shortly.

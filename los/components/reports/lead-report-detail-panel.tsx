@@ -34,14 +34,14 @@ function SectionCard({
 }) {
   return (
     <section
-      className="overflow-hidden rounded-[12px] border border-[rgba(23,44,113,0.09)]"
+      className="overflow-hidden rounded-[12px] border border-[rgba(15,39,72,0.09)]"
       style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,246,255,0.95))' }}
     >
-      <div className="flex items-center gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.7)] px-4 py-2.5">
+      <div className="flex items-center gap-2 border-b border-[rgba(15,39,72,0.07)] bg-[rgba(248,250,255,0.7)] px-4 py-2.5">
         <span className="text-[0.6rem] font-extrabold uppercase tracking-[0.14em]" style={{ color: 'rgba(94,103,130,0.6)' }}>
           {eyebrow}
         </span>
-        <span className="h-3 w-px bg-[rgba(23,44,113,0.1)]" aria-hidden />
+        <span className="h-3 w-px bg-[rgba(15,39,72,0.1)]" aria-hidden />
         <h2 className="m-0 text-[0.88rem] font-extrabold tracking-[-0.01em] text-brand-navy">{title}</h2>
       </div>
       <div className="px-4 py-3">{children}</div>
@@ -51,7 +51,7 @@ function SectionCard({
 
 function DetailGrid({ rows }: { rows: Array<{ label: string; value: ReactNode }> }) {
   return (
-    <dl className="m-0 divide-y divide-[rgba(23,44,113,0.06)]">
+    <dl className="m-0 divide-y divide-[rgba(15,39,72,0.06)]">
       {rows.map((row, idx) => (
         <div key={`${row.label}-${idx}`} className="flex items-baseline gap-3 py-1.5 first:pt-0 last:pb-0">
           <dt className="w-[148px] flex-shrink-0 text-[0.68rem] font-bold uppercase tracking-[0.08em] leading-tight text-brand-muted">
@@ -86,7 +86,7 @@ function GhostLink({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link
       href={href}
-      className="inline-flex min-h-[34px] items-center rounded-full border border-[rgba(23,44,113,0.12)] bg-white px-4 text-[0.78rem] font-bold text-brand-navy no-underline hover:border-[rgba(20,150,243,0.35)]"
+      className="inline-flex min-h-[34px] items-center rounded-full border border-[rgba(15,39,72,0.12)] bg-white px-4 text-[0.78rem] font-bold text-brand-navy no-underline hover:border-[rgba(34,197,94,0.35)]"
     >
       {children}
     </Link>
@@ -185,6 +185,7 @@ export function LeadReportDetailPanel({ leadUuid }: { leadUuid: string }) {
                   { label: 'Monthly income', value: formatReviewInr(row.netMonthlyIncome) },
                   { label: 'Email', value: row.email ?? '—' },
                   { label: 'CIBIL', value: formatCibilScoreLabel(row.cibilScore) },
+                  { label: 'Grade', value: row.cibilCreditAssessmentCategory ?? '—' },
                 ]}
               />
             </SectionCard>

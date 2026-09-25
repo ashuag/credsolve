@@ -165,6 +165,7 @@ export type CibilCreditAssessmentSignals = {
   noOfCreditCards: number;
   noOfSecuredLoans: number;
   noOfUnsecuredLoans: number;
+  noOfActiveUnsecuredLoans: number;
   noOfGoldLoans: number;
   sixMonthEnquiries: number;
   totalEnquiries: number;
@@ -202,6 +203,8 @@ export type CibilCreditAssessment = {
 export type LosApplicationCibilReportPayload = {
   bureauReportUuid: string;
   fetchedAt: string;
+  /** Integration that pulled this CIBIL report (`Tenacio`, `Surepass`, `CIBIL07`). */
+  vendorName: string | null;
   reportPdfUrl: string | null;
   /** Original Tenacio / TrueLink bureau JSON stored on the bureau report row. */
   rawPayload: unknown;

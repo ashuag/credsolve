@@ -45,7 +45,7 @@ export function IconButton({
     ? 'border-[rgba(239,68,68,0.16)] text-[#9f1c1c] hover:border-[rgba(239,68,68,0.3)]'
     : tone === 'success'
       ? 'border-[rgba(34,197,94,0.18)] text-[#166534] hover:border-[rgba(34,197,94,0.32)]'
-      : 'border-[rgba(23,44,113,0.12)] text-brand-navy hover:border-[rgba(20,150,243,0.24)]';
+      : 'border-[rgba(15,39,72,0.12)] text-brand-navy hover:border-[rgba(34,197,94,0.24)]';
 
   return (
     <button
@@ -95,7 +95,7 @@ export function ModalShell({
       aria-label={title}
     >
       <div
-        className="w-full max-w-[520px] rounded-[20px] border border-[rgba(23,44,113,0.12)] p-6 shadow-[0_28px_70px_rgba(23,44,113,0.22)]"
+        className="w-full max-w-[520px] rounded-[20px] border border-[rgba(15,39,72,0.12)] p-6 shadow-[0_28px_70px_rgba(15,39,72,0.22)]"
         style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.99), rgba(241,247,255,0.96))' }}
       >
         <div className="mb-5 flex items-start justify-between gap-4">
@@ -113,7 +113,7 @@ export function ModalShell({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded-[10px] border border-[rgba(23,44,113,0.12)] bg-[rgba(255,255,255,0.9)] text-brand-navy"
+            className="flex h-9 w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded-[10px] border border-[rgba(15,39,72,0.12)] bg-[rgba(255,255,255,0.9)] text-brand-navy"
             aria-label="Close"
           >
             <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden>
@@ -138,7 +138,7 @@ export function SummaryCards({ total, active, inactive }: { total: number; activ
       ].map((item) => (
         <article
           key={item.label}
-          className="rounded-[10px] border border-[rgba(23,44,113,0.1)] px-4 py-3"
+          className="rounded-[10px] border border-[rgba(15,39,72,0.1)] px-4 py-3"
           style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.97), rgba(240,246,255,0.94))' }}
         >
           <span className="block text-[0.78rem] text-brand-muted">{item.label}</span>

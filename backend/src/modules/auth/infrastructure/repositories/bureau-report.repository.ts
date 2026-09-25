@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { ParsedTenacioBureauFields } from '../../../../common/vendor/tenacio-bureau-payload.mapper';
+import { resolveCibilVendorDisplayName, type CibilVendorKind } from '../../../../common/vendor/cibil-vendor.util';
 import { PrismaService } from '../../../../prisma/prisma.service';
 
 @Injectable()
@@ -15,6 +16,8 @@ export class BureauReportRepository {
     httpStatus: number | null;
     /** Set when bureau data came from mock mode (`BUREAU_FETCH_ENABLED=2`), not live CIBIL. */
     dummyFetched?: boolean;
+    /** Integration that produced this snapshot (`tenacio` / `surepass` / `cibil07`). */
+    vendorKind?: CibilVendorKind | null;
   }) {
     const rawPayload =
       params.vendorBody === null || params.vendorBody === undefined
@@ -31,6 +34,10 @@ export class BureauReportRepository {
           responseStatus: params.parsed.responseStatus,
           rawPayload,
           dummyFetched: Boolean(params.dummyFetched),
+          vendorName: resolveCibilVendorDisplayName({
+            vendorKind: params.vendorKind,
+            vendorBody: params.vendorBody,
+          }),
         },
         select: { id: true, uuid: true },
       });

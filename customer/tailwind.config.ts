@@ -8,15 +8,17 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-inter)', 'Segoe UI', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-poppins)', 'Segoe UI', 'system-ui', 'sans-serif'],
+        script: ['var(--font-caveat)', 'Caveat', 'Kalam', 'cursive'],
       },
       colors: {
         'brand-blue': '#2388E5',
         'brand-blue-light': '#4DB3FF',
-        'brand-navy': '#1C347D',
-        'brand-gold': '#F4B400',
-        'brand-gold-deep': '#E5A800',
-        'brand-text': '#1C347D',
+        'brand-navy': '#0F2748',
+        /* CredSolve lime accent (class name retained for existing call sites) */
+        'brand-gold': '#22C55E',
+        'brand-gold-deep': '#16A34A',
+        'brand-text': '#0F2748',
         'brand-muted': '#5e6782',
       },
       screens: {

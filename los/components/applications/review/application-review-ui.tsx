@@ -44,7 +44,7 @@ export function ReviewField({
   sub,
   tone,
   badge,
-  badgeInValue = false,
+  badgeInValue: _badgeInValue = false,
 }: {
   label: string;
   value: ReactNode;
@@ -57,19 +57,12 @@ export function ReviewField({
   const valueNode = isEmpty ? '—' : value;
 
   return (
-    <div className={`field${tone ? ` ${tone}` : ''}`}>
-      <div className="lab">{label}</div>
-      <div className={`val${isEmpty ? ' empty' : ''}`}>
-        {badgeInValue && badge ? (
-          <span className="val-inline">
-            {valueNode}
-            {badge}
-          </span>
-        ) : (
-          valueNode
-        )}
+    <div className={`field${tone ? ` ${tone}` : ''}${badge ? ' has-badge' : ''}`}>
+      <div className="lab">
+        <span className="lab-text">{label}</span>
+        {badge}
       </div>
-      {!badgeInValue && badge ? <div className="field-badge-row">{badge}</div> : null}
+      <div className={`val${isEmpty ? ' empty' : ''}`}>{valueNode}</div>
       {sub ? <div className="sub">{sub}</div> : null}
     </div>
   );
@@ -112,10 +105,11 @@ export function ReviewMatchBadge({
           ? 'Mismatch'
           : 'N/A';
   const label = verdict !== 'missing' && score != null ? `${base} ${score}%` : base;
+  const display = verdict === 'mismatch' ? `✕ ${label}` : label;
 
   return (
     <span className={`match-badge ${verdict}`} title={title}>
-      {label}
+      {display}
     </span>
   );
 }
@@ -197,6 +191,8 @@ export function ApplicationReviewToolbar({
   rejectDisabled = false,
   onApproveNameMatch,
   approveNameMatchBusy = false,
+  onApproveAadhaarName,
+  approveAadhaarNameBusy = false,
   onApprove,
   approveDisabled = false,
   approveBusy = false,
@@ -209,6 +205,8 @@ export function ApplicationReviewToolbar({
   rejectDisabled?: boolean;
   onApproveNameMatch?: () => void;
   approveNameMatchBusy?: boolean;
+  onApproveAadhaarName?: () => void;
+  approveAadhaarNameBusy?: boolean;
   onApprove?: () => void;
   approveDisabled?: boolean;
   approveBusy?: boolean;
@@ -238,6 +236,16 @@ export function ApplicationReviewToolbar({
           {approveNameMatchBusy ? 'Approving…' : 'Approve'}
         </button>
       ) : null}
+      {onApproveAadhaarName ? (
+        <button
+          type="button"
+          onClick={onApproveAadhaarName}
+          disabled={approveAadhaarNameBusy}
+          className="min-h-[38px] rounded-[8px] border border-[rgba(16,185,129,0.35)] bg-[#ecfdf5] px-4 text-[0.82rem] font-bold text-[#047857] hover:bg-[#d1fae5] disabled:cursor-not-allowed disabled:opacity-55"
+        >
+          {approveAadhaarNameBusy ? 'Approving…' : 'Approve application'}
+        </button>
+      ) : null}
       {onApprove ? (
         <button
           type="button"
@@ -253,7 +261,7 @@ export function ApplicationReviewToolbar({
           type="button"
           onClick={onDisburse}
           disabled={disburseDisabled || disburseBusy}
-          className="min-h-[38px] rounded-[8px] bg-[#1c347d] px-4 text-[0.82rem] font-bold text-[#ffc519] hover:bg-[#12244f] disabled:cursor-not-allowed disabled:opacity-55"
+          className="min-h-[38px] rounded-[8px] bg-[#0F2748] px-4 text-[0.82rem] font-bold text-[#4ADE80] hover:bg-[#0F2748] disabled:cursor-not-allowed disabled:opacity-55"
         >
           {disburseBusy ? 'Disbursing…' : 'Disburse'}
         </button>

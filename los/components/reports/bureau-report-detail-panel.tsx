@@ -59,7 +59,7 @@ export function BureauReportDetailPanel({ leadUuid }: { leadUuid: string }) {
         {lead ? (
           <Link
             href={`/leads/${lead.uuid}`}
-            className="inline-flex min-h-[34px] items-center rounded-full border border-[rgba(23,44,113,0.12)] bg-white px-4 text-[0.78rem] font-bold text-brand-navy no-underline hover:border-[rgba(20,150,243,0.35)]"
+            className="inline-flex min-h-[34px] items-center rounded-full border border-[rgba(15,39,72,0.12)] bg-white px-4 text-[0.78rem] font-bold text-brand-navy no-underline hover:border-[rgba(34,197,94,0.35)]"
           >
             Open lead
           </Link>

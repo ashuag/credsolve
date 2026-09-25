@@ -4,7 +4,7 @@ export type CustomerLookupOption = {
 };
 
 export const CUSTOMER_CREDIT_CONSENT_TEXT =
-  "I accept the T&Cs of TU CIBIL and authorize MoneyCash to check my CIBIL Score & Report. I consent to MoneyCash app's lenders/lending partners retrieving my CKYC records, accessing my CIBIL profile, and conducting credit checks to assign my credit limit.";
+  "I accept the T&Cs of TU CIBIL and authorize CredSolve to check my CIBIL Score & Report. I consent to CredSolve app's lenders/lending partners retrieving my CKYC records, accessing my CIBIL profile, and conducting credit checks to assign my credit limit.";
 
 /**
  * Shown with the consent checkbox. Accurate because the bureau call is a soft pull

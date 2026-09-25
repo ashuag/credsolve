@@ -17,6 +17,7 @@ import {
   ACCOUNT_TYPE_LABELS,
   CIBIL_CREDIT_CARD_ACCOUNT_TYPE_SYMBOLS,
   CIBIL_UNSECURED_ACCOUNT_TYPE_SYMBOLS,
+  formatCibilEnquiryPurposeLabel,
 } from './cibil-tuef.constants';
 import { ELIGIBILITY_CRITERIA as EC } from '../constants/eligibility-criteria.constants';
 import {
@@ -110,13 +111,37 @@ function normalizeTuefStatusCode(raw: unknown): string | null {
   return s.toUpperCase();
 }
 
-function isCreditFacilityStatusNode(node: unknown): boolean {
+function accountConditionAbbreviation(node: unknown): string {
   const rec = asRecord(node);
-  if (!rec) return false;
-  const abbr = String(rec.abbreviation ?? rec.Abbreviation ?? '')
+  if (!rec) return '';
+  return String(rec.abbreviation ?? rec.Abbreviation ?? '')
     .trim()
-    .toLowerCase();
-  return abbr === 'creditfacilitystatus';
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function isCreditFacilityStatusNode(node: unknown): boolean {
+  return accountConditionAbbreviation(node) === 'creditfacilitystatus';
+}
+
+/** Tenacio wraps TUEF Tag 34 onto AccountCondition with abbreviation `suitFiledStatus`. */
+function isSuitFiledAccountCondition(node: unknown): boolean {
+  const abbr = accountConditionAbbreviation(node);
+  return (
+    abbr === 'suitfiledstatus' ||
+    abbr === 'suitfiledwilfuldefault' ||
+    abbr === 'suitfiledwilfuldefaultstatus'
+  );
+}
+
+/**
+ * AccountCondition is a catch-all on TrueLink. Tag 33 fall-through is only valid
+ * when the node is unlabeled (or itself a write-off / settled node). Credit
+ * Facility Status and Suit Filed / Wilful Default share numeric codes with Tag 33
+ * (`01` = restructure vs suit filed) so labeled nodes must not be read as Tag 33.
+ */
+function isNonWrittenOffSettledAccountCondition(node: unknown): boolean {
+  return isCreditFacilityStatusNode(node) || isSuitFiledAccountCondition(node);
 }
 
 /** TUEF Tag 33 — Written-off and Settled Status on TrueLink tradelines. */
@@ -132,9 +157,7 @@ function readWrittenOffSettledStatusCode(lineRec: Record<string, unknown>): stri
   const fromWrittenOffSettled = normalizeTuefStatusCode(readSymbol(lineRec.WrittenOffSettled));
   if (fromWrittenOffSettled) return fromWrittenOffSettled;
 
-  // TrueLink maps Credit Facility Status onto AccountCondition (abbreviation
-  // creditFacilityStatus). That is not TUEF Tag 33 write-off / settled status.
-  if (isCreditFacilityStatusNode(lineRec.AccountCondition)) return null;
+  if (isNonWrittenOffSettledAccountCondition(lineRec.AccountCondition)) return null;
 
   return normalizeTuefStatusCode(readSymbol(lineRec.AccountCondition));
 }
@@ -245,8 +268,13 @@ function resolveTradelineAccountTypeSymbol(
     readSymbol(granted?.AccountType) ?? readSymbol(granted?.CreditType);
   if (isMfiAccountType(fromGranted)) return normalizeCibilAccountTypeSymbol(fromGranted);
 
-  if (partitionSymbol != null) return normalizeCibilAccountTypeSymbol(partitionSymbol);
-  return fromGranted;
+  if (partitionSymbol != null && String(partitionSymbol).trim()) {
+    return normalizeCibilAccountTypeSymbol(partitionSymbol);
+  }
+  if (fromGranted) return fromGranted;
+  const description =
+    lineRec.accountTypeDescription != null ? String(lineRec.accountTypeDescription).trim() : '';
+  return description ? normalizeCibilAccountTypeSymbol(description) : null;
 }
 
 function isMicrofinanceTradeline(partitionSymbol: string | null, lineRec: Record<string, unknown>): boolean {
@@ -273,11 +301,23 @@ export function readSuitFiledWilfulDefaultCode(lineRec: Record<string, unknown>)
   if (fromDirect) return fromDirect;
 
   for (const node of [lineRec.SuitFiled, lineRec.suitFiled]) {
+    if (node == null || node === '') continue;
     const symbol = normalizeTuefStatusCode(readSymbol(node));
     if (symbol) return symbol;
     const rec = asRecord(node);
-    const fromDescription = normalizeSuitFiledWilfulDefaultText(rec?.description ?? rec?.Description);
+    if (!rec) {
+      const fromText = normalizeSuitFiledWilfulDefaultText(node);
+      if (fromText) return fromText;
+      continue;
+    }
+    const description = rec.description ?? rec.Description;
+    if (description == null || String(description).trim() === '') continue;
+    const fromDescription = normalizeSuitFiledWilfulDefaultText(description);
     if (fromDescription) return fromDescription;
+  }
+
+  if (isSuitFiledAccountCondition(lineRec.AccountCondition)) {
+    return normalizeTuefStatusCode(readSymbol(lineRec.AccountCondition));
   }
 
   return null;
@@ -601,6 +641,29 @@ export type ParsedBureauInquiry = {
   amount: string | null;
 };
 
+function nonEmptyInquiryText(raw: unknown): string | null {
+  if (raw == null) return null;
+  if (typeof raw === 'object') {
+    const fromSymbol = readSymbol(raw);
+    if (fromSymbol) return fromSymbol;
+    const rec = asRecord(raw);
+    if (!rec) return null;
+    for (const key of ['description', 'Description', 'name', 'Name', 'text', 'Text']) {
+      const nested = rec[key];
+      if (typeof nested === 'string' && nested.trim()) return nested.trim();
+    }
+    return null;
+  }
+  const s = String(raw).trim();
+  return s.length > 0 ? s : null;
+}
+
+function readInquiryTypeCode(raw: unknown): string | null {
+  const s = nonEmptyInquiryText(raw);
+  if (!s) return null;
+  return /^\d+$/.test(s) ? s.padStart(2, '0') : s;
+}
+
 /**
  * Decode base64 OriginalData and return a map of enqControlNum → ParsedBureauInquiry.
  * The TUEF data uses clean YYYYMMDD dates, unlike the TrueLinkCreditReport which can
@@ -634,13 +697,12 @@ function buildOriginalDataInquiryMap(tlr: Record<string, unknown>): Map<string, 
       if (!controlNumber) continue;
       const date = parseCibilDate(inq.dateOfInquiry);
       if (!date) continue;
-      const purposeRaw = inq.inquiryPurpose != null ? String(inq.inquiryPurpose).trim().padStart(2, '0') : null;
       map.set(controlNumber, {
         date,
-        inquiryType: purposeRaw,
+        inquiryType: readInquiryTypeCode(inq.inquiryPurpose),
         controlNumber,
-        subscriberName: inq.memberShortName != null ? String(inq.memberShortName).trim() : null,
-        amount: inq.inquiryAmount != null ? String(inq.inquiryAmount).trim() : null,
+        subscriberName: nonEmptyInquiryText(inq.memberShortName),
+        amount: nonEmptyInquiryText(inq.inquiryAmount),
       });
     }
   }
@@ -674,16 +736,32 @@ export function extractBureauInquiries(body: unknown): ParsedBureauInquiry[] {
         const inquiry = partitionRec ? asRecord(partitionRec.Inquiry) : null;
         if (!inquiry) continue;
         const controlNumber = inquiry.enqControlNum != null ? String(inquiry.enqControlNum).trim() : null;
+        const fromOriginal = controlNumber ? originalDataMap.get(controlNumber) ?? null : null;
         // TrueLinkCreditReport dates can be malformed (e.g. month=20); fall back to OriginalData date
-        const date = parseCibilDate(inquiry.inquiryDate) ?? (controlNumber ? originalDataMap.get(controlNumber)?.date ?? null : null);
+        const date =
+          parseCibilDate(inquiry.inquiryDate) ??
+          fromOriginal?.date ??
+          null;
         if (!date) continue;
         push({
           date,
-          inquiryType: inquiry.inquiryType != null ? String(inquiry.inquiryType).trim() : null,
+          inquiryType:
+            readInquiryTypeCode(inquiry.inquiryType ?? inquiry.InquiryType) ??
+            fromOriginal?.inquiryType ??
+            null,
           controlNumber,
           subscriberName:
-            inquiry.subscriberName != null ? String(inquiry.subscriberName).trim() : null,
-          amount: inquiry.amount != null ? String(inquiry.amount).trim() : null,
+            nonEmptyInquiryText(
+              inquiry.subscriberName ??
+                inquiry.memberShortName ??
+                inquiry.memberName ??
+                inquiry.MemberName ??
+                inquiry.member,
+            ) ?? fromOriginal?.subscriberName ?? null,
+          amount:
+            nonEmptyInquiryText(inquiry.amount ?? inquiry.enquiryAmount) ??
+            fromOriginal?.amount ??
+            null,
         });
       }
     } else {
@@ -1130,6 +1208,163 @@ export function checkNoActiveMfiLoans(body: unknown): BureauAdverseTradelineChec
 }
 
 /**
+ * Rejects when any CIBIL loan/account type has overdue (amount past due)
+ * greater than `maxAllowedInr`. Overdue is summed per TUEF account type.
+ */
+export function auditLoanTypeOverdue(
+  body: unknown,
+  maxAllowedInr: number,
+): BureauTradelineRuleCheck {
+  const byType = new Map<
+    string,
+    {
+      label: string;
+      totalInr: number;
+      lines: Array<{
+        creditor: string;
+        overdueInr: number;
+        accountNumber: string | null;
+        isOpen: boolean;
+      }>;
+    }
+  >();
+
+  walkTradelines(body, ({ lineRec, partitionSymbol, creditor }) => {
+    const granted = asRecord(lineRec.GrantedTrade);
+    const overdueInr = parseAssessmentAmountInr(granted?.amountPastDue ?? lineRec.amountPastDue);
+    const accountType =
+      resolveTradelineAccountTypeSymbol(partitionSymbol, lineRec) ??
+      normalizeCibilAccountTypeSymbol(partitionSymbol) ??
+      'UNKNOWN';
+    const label = cibilAccountTypeDisplayLabel(accountType === 'UNKNOWN' ? null : accountType);
+    const bucket = byType.get(accountType) ?? { label, totalInr: 0, lines: [] };
+    bucket.totalInr += overdueInr;
+    if (overdueInr > 0) {
+      const accountNumber =
+        lineRec.accountNumber != null ? String(lineRec.accountNumber).trim() : null;
+      bucket.lines.push({
+        creditor,
+        overdueInr,
+        accountNumber: accountNumber || null,
+        isOpen: isCibilTradelineOpen(lineRec),
+      });
+    }
+    byType.set(accountType, bucket);
+  });
+
+  const findings: BureauRuleFinding[] = [];
+  const failingSummaries: string[] = [];
+  for (const [symbol, bucket] of byType) {
+    if (bucket.totalInr <= maxAllowedInr) continue;
+    failingSummaries.push(`${bucket.label} ${bucket.totalInr} INR`);
+    findings.push({
+      title: bucket.label,
+      detail: `Loan type overdue amount ${bucket.totalInr} INR exceeds maximum ${maxAllowedInr} INR.`,
+      data: {
+        accountType: symbol,
+        loanType: bucket.label,
+        overdueAmountInr: bucket.totalInr,
+        maxAllowedInr,
+        tradelineCount: bucket.lines.length,
+      },
+    });
+    for (const line of bucket.lines) {
+      findings.push({
+        title: line.creditor,
+        detail: `${bucket.label} overdue ${line.overdueInr} INR${line.isOpen ? '' : ' (closed)'}.`,
+        data: {
+          accountType: symbol,
+          overdueAmountInr: line.overdueInr,
+          accountNumber: line.accountNumber,
+          isOpen: line.isOpen,
+        },
+      });
+    }
+  }
+
+  return {
+    passed: findings.length === 0,
+    detail: failingSummaries.length
+      ? `Overdue amount on loan type(s): ${failingSummaries.join('; ')} (max allowed ${maxAllowedInr} INR).`
+      : null,
+    findings,
+  };
+}
+
+export function checkLoanTypeOverdue(body: unknown, maxAllowedInr: number): BureauAdverseTradelineCheck {
+  const audit = auditLoanTypeOverdue(body, maxAllowedInr);
+  return { passed: audit.passed, detail: audit.detail };
+}
+
+/**
+ * Rejects when any tradeline's CIBIL account type is in `loanTypeIds`.
+ * When `openOnly` is true, closed matching tradelines are ignored.
+ */
+export function auditRejectedLoanTypes(
+  body: unknown,
+  loanTypeIds: readonly string[],
+  options: { openOnly: boolean },
+): BureauTradelineRuleCheck {
+  const blocked = new Set(
+    loanTypeIds
+      .map((id) => normalizeCibilAccountTypeSymbol(id))
+      .filter((id): id is string => Boolean(id)),
+  );
+  if (!blocked.size) {
+    return { passed: true, detail: null, findings: [] };
+  }
+
+  const findings: BureauRuleFinding[] = [];
+  walkTradelines(body, ({ lineRec, partitionSymbol, creditor }) => {
+    const isOpen = isCibilTradelineOpen(lineRec);
+    if (options.openOnly && !isOpen) return;
+
+    const accountType =
+      resolveTradelineAccountTypeSymbol(partitionSymbol, lineRec) ??
+      normalizeCibilAccountTypeSymbol(partitionSymbol);
+    if (!accountType || !blocked.has(accountType)) return;
+
+    const label = cibilAccountTypeDisplayLabel(accountType);
+    const accountNumber =
+      lineRec.accountNumber != null ? String(lineRec.accountNumber).trim() : null;
+    findings.push({
+      title: creditor,
+      detail: options.openOnly
+        ? `Open ${label} (${accountType}) tradeline is in the rejected open loan-type set.`
+        : `${label} (${accountType}) tradeline is in the rejected loan-type set${isOpen ? '' : ' (closed)'}.`,
+      data: {
+        accountType,
+        loanType: label,
+        isOpen,
+        accountNumber: accountNumber || null,
+      },
+    });
+  });
+
+  const labels = [
+    ...new Set(findings.map((f) => String(f.data?.loanType ?? f.data?.accountType ?? '')).filter(Boolean)),
+  ];
+  return {
+    passed: findings.length === 0,
+    detail: findings.length
+      ? options.openOnly
+        ? `Open rejected loan type(s) found: ${labels.join(', ')}.`
+        : `Rejected loan type(s) found: ${labels.join(', ')}.`
+      : null,
+    findings,
+  };
+}
+
+export function checkRejectedLoanTypes(
+  body: unknown,
+  loanTypeIds: readonly string[],
+  options: { openOnly: boolean },
+): BureauAdverseTradelineCheck {
+  const audit = auditRejectedLoanTypes(body, loanTypeIds, options);
+  return { passed: audit.passed, detail: audit.detail };
+}
+
+/**
  * Counts (tradeline × month) pairs where DPD > 0 in the last N months.
  * A "missed payment" is any month on any tradeline with positive DPD.
  */
@@ -1205,8 +1440,13 @@ export type PostBreBureauSummary = {
 
 function enquiryPurposeLabel(code: string | null): string {
   if (!code) return 'Unknown';
-  const norm = code.trim().padStart(2, '0');
-  return ACCOUNT_TYPE_LABELS[norm] ?? `Purpose ${norm}`;
+  const trimmed = code.trim();
+  if (!trimmed) return 'Unknown';
+  if (/^\d+$/.test(trimmed)) {
+    const norm = trimmed.padStart(2, '0');
+    return formatCibilEnquiryPurposeLabel(ACCOUNT_TYPE_LABELS[norm] ?? `Purpose ${norm}`);
+  }
+  return formatCibilEnquiryPurposeLabel(ACCOUNT_TYPE_LABELS[trimmed] ?? trimmed);
 }
 
 function readBureauInquiryDate(body: unknown): string | null {
@@ -1257,7 +1497,15 @@ function resolveTradelineEvaluatedRules(input: {
     input.activeRuleIds.has(EC.MIN_UNSECURED_LOAN_AMOUNT) && input.isOpen && input.isUnsecured
       ? [EC.MIN_UNSECURED_LOAN_AMOUNT]
       : [];
-  return [...always, ...mfi, ...dpd, ...unsecuredMin];
+  const overdue = input.activeRuleIds.has(EC.MAX_LOAN_TYPE_OVERDUE_AMOUNT)
+    ? [EC.MAX_LOAN_TYPE_OVERDUE_AMOUNT]
+    : [];
+  const rejectOpen =
+    input.activeRuleIds.has(EC.REJECT_OPEN_LOAN_TYPES) && input.isOpen
+      ? [EC.REJECT_OPEN_LOAN_TYPES]
+      : [];
+  const rejectAny = input.activeRuleIds.has(EC.REJECT_LOAN_TYPES) ? [EC.REJECT_LOAN_TYPES] : [];
+  return [...always, ...mfi, ...dpd, ...unsecuredMin, ...overdue, ...rejectOpen, ...rejectAny];
 }
 
 /** Every tradeline on the bureau report with flags and which post-BRE rules evaluate it. */
@@ -1384,6 +1632,8 @@ export type CibilAssessmentSignals = {
   noOfCreditCards: number;
   noOfSecuredLoans: number;
   noOfUnsecuredLoans: number;
+  /** Open unsecured tradelines only (same unsecured set as `noOfUnsecuredLoans`). */
+  noOfActiveUnsecuredLoans: number;
   noOfGoldLoans: number;
   sixMonthEnquiries: number;
   totalEnquiries: number;
@@ -1437,6 +1687,7 @@ export function computeCibilAssessmentSignals(
   let noOfCreditCards = 0;
   let noOfSecuredLoans = 0;
   let noOfUnsecuredLoans = 0;
+  let noOfActiveUnsecuredLoans = 0;
   let noOfGoldLoans = 0;
   let totalOverdueAmountInr = 0;
   let hasWilfulDefault = false;
@@ -1460,8 +1711,12 @@ export function computeCibilAssessmentSignals(
         noOfCreditCards += 1;
       }
       if (parsed.accountTypeSymbol === '07') noOfGoldLoans += 1;
-      if (parsed.isUnsecured) noOfUnsecuredLoans += 1;
-      else noOfSecuredLoans += 1;
+      if (parsed.isUnsecured) {
+        noOfUnsecuredLoans += 1;
+        if (parsed.isOpen) noOfActiveUnsecuredLoans += 1;
+      } else {
+        noOfSecuredLoans += 1;
+      }
     }
 
     const granted = asRecord(lineRec.GrantedTrade);
@@ -1528,6 +1783,7 @@ export function computeCibilAssessmentSignals(
     noOfCreditCards,
     noOfSecuredLoans,
     noOfUnsecuredLoans,
+    noOfActiveUnsecuredLoans,
     noOfGoldLoans,
     sixMonthEnquiries,
     totalEnquiries,

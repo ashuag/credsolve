@@ -10,6 +10,7 @@ import {
   resolveKycStagePath,
   shouldResumeKycSelfie,
   isBankStepDoneForJourney,
+  getCustomerJourneyResumePath,
   CUSTOMER_EMAIL_JOURNEY_PATH,
   hasOpenCustomerLoan,
 } from '@/lib/api/customer-session';
@@ -184,18 +185,20 @@ export function CustomerJourneyGuard({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (isInternalErrorLead(session.lead)) {
-      if (canResumeKycAfterInternalError(session)) {
-        const resumePath = shouldResumeKycSelfie(session) ? '/kyc/selfie' : '/kyc';
-        if (pathname !== resumePath && !(resumePath === '/kyc' && pathname.startsWith('/kyc/'))) {
-          router.replace(resumePath);
-        }
-        return;
-      }
-      if (pathname !== '/thank-you') {
-        router.replace('/thank-you');
+    if (isInternalErrorLead(session.lead) && canResumeKycAfterInternalError(session)) {
+      const resumePath = shouldResumeKycSelfie(session) ? '/kyc/selfie' : '/kyc';
+      if (pathname !== resumePath && !(resumePath === '/kyc' && pathname.startsWith('/kyc/'))) {
+        router.replace(resumePath);
       }
       return;
+    }
+
+    if (pathname === '/thank-you') {
+      const resumePath = getCustomerJourneyResumePath(session);
+      if (resumePath !== '/thank-you') {
+        router.replace(resumePath);
+        return;
+      }
     }
 
     // DigiLocker done but selfie/liveness still pending — force face step.

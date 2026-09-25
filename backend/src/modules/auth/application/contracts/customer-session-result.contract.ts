@@ -20,6 +20,7 @@ export type CustomerPortalProfileSnapshot = {
   occupation: OccupationKey | null;
   addressLine1: string | null;
   addressLine2: string | null;
+  emailId: string | null;
   currentCity: string | null;
   pincode: string | null;
   monthlyIncome: string | null;
@@ -43,13 +44,21 @@ export type CustomerPortalJourneySnapshot = {
   referencesCompleted: boolean;
   /** Customer has provided bank details on `application_detail`. */
   bankDetailsCompleted: boolean;
-  /** Penny-drop succeeded but bank vs customer name is waiting for credit approval. */
+  /**
+   * Penny-drop succeeded but bank vs customer name is waiting for credit approval.
+   * The customer can still finish references / eSign; thank-you stays under review.
+   */
   bankNameReviewPending: boolean;
   /**
-   * Penny-drop retries were exhausted (application PENNYDROP_FAILED).
-   * The customer can still finish references / eSign; a representative will call.
+   * Penny-drop retries were exhausted, or bank vs customer name is pending credit review.
+   * The customer can still finish references / eSign; thank-you shows a representative will call.
    */
   bankVerificationFailed: boolean;
+  /**
+   * DigiLocker Aadhaar name does not match the application name.
+   * The customer continues KYC / bank / references; thank-you uses the KYC follow-up copy.
+   */
+  aadhaarNameReviewPending: boolean;
 };
 
 /** DigiLocker Aadhaar + selfie/liveness progress for the active application. */
@@ -71,6 +80,8 @@ export type CustomerKycFaceProgressSnapshot = {
   /** Failed DigiLocker Aadhaar download attempts for the active lead. */
   digilockerAadhaarDownloadAttempts: number;
   digilockerAadhaarDownloadMaxAttempts: number;
+  /** True after Aadhaar XML OTP attempts are exhausted — DigiLocker may start. */
+  digilockerFallbackAvailable: boolean;
   /** Failed KYC liveness / face-match runs so far. */
   livenessAttempts: number;
   /** Total allowed liveness runs before escalation to thank-you. */

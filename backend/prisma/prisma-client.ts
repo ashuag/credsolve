@@ -151,6 +151,49 @@ function envPositiveNumber(name: string, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
+/** Integer env var; `min` may be 0 (e.g. disable leak detection). */
+function envInteger(name: string, fallback: number, min: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= min ? Math.trunc(n) : fallback;
+}
+
+function poolLimits(options?: {readOnly?: boolean}) {
+  const connectionLimit = options?.readOnly
+    ? envPositiveNumber('DB_REPLICA_CONNECTION_LIMIT', envPositiveNumber('DB_CONNECTION_LIMIT', 20))
+    : envPositiveNumber('DB_CONNECTION_LIMIT', 20);
+
+  return {
+    connectionLimit,
+    connectTimeout: options?.readOnly
+      ? envPositiveNumber('DB_REPLICA_CONNECT_TIMEOUT_MS', 3_000)
+      : envPositiveNumber('DB_CONNECT_TIMEOUT_MS', 10_000),
+    acquireTimeout: options?.readOnly
+      ? envPositiveNumber('DB_REPLICA_ACQUIRE_TIMEOUT_MS', 5_000)
+      : envPositiveNumber('DB_ACQUIRE_TIMEOUT_MS', 8_000),
+    initializationTimeout: options?.readOnly
+      ? envPositiveNumber(
+          'DB_REPLICA_INITIALIZATION_TIMEOUT_MS',
+          envPositiveNumber('DB_REPLICA_ACQUIRE_TIMEOUT_MS', 5_000),
+        )
+      : envPositiveNumber('DB_INITIALIZATION_TIMEOUT_MS', 15_000),
+    idleTimeout: envPositiveNumber('DB_IDLE_TIMEOUT_SECONDS', 600),
+    leakDetectionTimeout: envInteger('DB_LEAK_DETECTION_TIMEOUT_MS', 15_000, 0),
+  };
+}
+
+export function describePrismaPoolSettings(options?: {readOnly?: boolean}) {
+  const limits = poolLimits(options);
+  return {
+    connectionLimit: limits.connectionLimit,
+    acquireTimeoutMs: limits.acquireTimeout,
+    connectTimeoutMs: limits.connectTimeout,
+    idleTimeoutSeconds: limits.idleTimeout,
+    leakDetectionTimeoutMs: limits.leakDetectionTimeout,
+  };
+}
+
 function createPoolConfig(databaseUrl: string, options?: {readOnly?: boolean}): PrismaMariaDbConfig {
   let url: URL;
   try {
@@ -170,9 +213,7 @@ function createPoolConfig(databaseUrl: string, options?: {readOnly?: boolean}): 
     throw new Error('Invalid DATABASE_URL: database name is missing from the URL path.');
   }
 
-  const connectionLimit = options?.readOnly
-    ? envPositiveNumber('DB_REPLICA_CONNECTION_LIMIT', envPositiveNumber('DB_CONNECTION_LIMIT', 10))
-    : envPositiveNumber('DB_CONNECTION_LIMIT', 10);
+  const limits = poolLimits(options);
 
   const config: PrismaMariaDbConfig = {
     host: url.hostname,
@@ -183,21 +224,19 @@ function createPoolConfig(databaseUrl: string, options?: {readOnly?: boolean}): 
     // MySQL 8 caching_sha2_password over non-TLS needs the server RSA key;
     // without this, every connect fails and the pool times out at idle=0.
     allowPublicKeyRetrieval: process.env.DB_ALLOW_PUBLIC_KEY_RETRIEVAL !== 'false',
-    connectTimeout: options?.readOnly
-      ? envPositiveNumber('DB_REPLICA_CONNECT_TIMEOUT_MS', 3_000)
-      : envPositiveNumber('DB_CONNECT_TIMEOUT_MS', 10_000),
-    acquireTimeout: options?.readOnly
-      ? envPositiveNumber('DB_REPLICA_ACQUIRE_TIMEOUT_MS', 5_000)
-      : envPositiveNumber('DB_ACQUIRE_TIMEOUT_MS', 60_000),
-    initializationTimeout: options?.readOnly
-      ? envPositiveNumber(
-          'DB_REPLICA_INITIALIZATION_TIMEOUT_MS',
-          envPositiveNumber('DB_REPLICA_ACQUIRE_TIMEOUT_MS', 5_000),
-        )
-      : envPositiveNumber('DB_INITIALIZATION_TIMEOUT_MS', 60_000),
-    connectionLimit,
+    connectTimeout: limits.connectTimeout,
+    acquireTimeout: limits.acquireTimeout,
+    initializationTimeout: limits.initializationTimeout,
+    connectionLimit: limits.connectionLimit,
+    // Seconds. Recycle idle sockets before MySQL wait_timeout drops them.
+    idleTimeout: limits.idleTimeout,
     timezone: 'Z',
   };
+
+  if (limits.leakDetectionTimeout > 0) {
+    (config as PrismaMariaDbConfig & {leakDetectionTimeout?: number}).leakDetectionTimeout =
+      limits.leakDetectionTimeout;
+  }
 
   if (options?.readOnly) {
     (config as PrismaMariaDbConfig & {initSql?: string}).initSql = 'SET SESSION TRANSACTION READ ONLY';

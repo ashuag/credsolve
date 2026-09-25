@@ -105,12 +105,12 @@ function SectionCard({
 }: { eyebrow: string; title: string; description?: string; children: ReactNode }) {
   return (
     <section
-      className="overflow-hidden rounded-[12px] border border-[rgba(23,44,113,0.09)]"
+      className="overflow-hidden rounded-[12px] border border-[rgba(15,39,72,0.09)]"
       style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,246,255,0.95))' }}
     >
-      <div className="flex items-center gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.7)] px-4 py-2.5">
+      <div className="flex items-center gap-2 border-b border-[rgba(15,39,72,0.07)] bg-[rgba(248,250,255,0.7)] px-4 py-2.5">
         <span className="text-[0.6rem] font-extrabold uppercase tracking-[0.14em]" style={{ color: 'rgba(94,103,130,0.6)' }}>{eyebrow}</span>
-        <span className="w-px h-3 bg-[rgba(23,44,113,0.1)]" aria-hidden />
+        <span className="w-px h-3 bg-[rgba(15,39,72,0.1)]" aria-hidden />
         <h2 className="m-0 text-[0.88rem] font-extrabold tracking-[-0.01em] text-brand-navy">{title}</h2>
       </div>
       <div className="px-4 py-3">{children}</div>
@@ -120,7 +120,7 @@ function SectionCard({
 
 function DetailGrid({ rows }: { rows: Array<{ label: string; value: ReactNode }> }) {
   return (
-    <dl className="m-0 divide-y divide-[rgba(23,44,113,0.06)]">
+    <dl className="m-0 divide-y divide-[rgba(15,39,72,0.06)]">
       {rows.map((row, idx) => (
         <div key={`${row.label}-${idx}`} className="flex items-baseline gap-3 py-1.5 first:pt-0 last:pb-0">
           <dt className="w-[140px] flex-shrink-0 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-brand-muted leading-tight">{row.label}</dt>
@@ -147,7 +147,7 @@ function CopyIdButton({ value, label }: { value: string; label: string }) {
           /* ignore */
         }
       }}
-      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[8px] border border-[rgba(23,44,113,0.12)] bg-[rgba(255,255,255,0.85)] px-2.5 text-[0.72rem] font-bold text-brand-navy transition-colors hover:border-[rgba(20,150,243,0.35)]"
+      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[8px] border border-[rgba(15,39,72,0.12)] bg-[rgba(255,255,255,0.85)] px-2.5 text-[0.72rem] font-bold text-brand-navy transition-colors hover:border-[rgba(34,197,94,0.35)]"
     >
       <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
         <rect x="9" y="9" width="13" height="13" rx="2" />
@@ -182,7 +182,7 @@ function UtmGrid({ utm }: { utm: NonNullable<LosLeadDetails['utm']> }) {
       {cells.map((cell) => (
         <div
           key={cell.k}
-          className="rounded-[12px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)] px-3 py-2.5"
+          className="rounded-[12px] border border-[rgba(15,39,72,0.08)] bg-[rgba(248,250,255,0.65)] px-3 py-2.5"
         >
           <span className="block text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">{cell.k}</span>
           <span className="mt-0.5 block text-[0.88rem] font-bold text-brand-text">{cell.v}</span>
@@ -226,12 +226,12 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
     return (
       <div className="los-card p-8">
         <div className="mx-auto max-w-md animate-pulse space-y-4">
-          <div className="h-4 w-40 rounded bg-[rgba(23,44,113,0.08)]" />
-          <div className="h-10 w-full max-w-lg rounded-lg bg-[rgba(23,44,113,0.06)]" />
-          <div className="h-24 rounded-xl bg-[rgba(23,44,113,0.05)]" />
+          <div className="h-4 w-40 rounded bg-[rgba(15,39,72,0.08)]" />
+          <div className="h-10 w-full max-w-lg rounded-lg bg-[rgba(15,39,72,0.06)]" />
+          <div className="h-24 rounded-xl bg-[rgba(15,39,72,0.05)]" />
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="h-32 rounded-xl bg-[rgba(23,44,113,0.05)]" />
-            <div className="h-32 rounded-xl bg-[rgba(23,44,113,0.05)]" />
+            <div className="h-32 rounded-xl bg-[rgba(15,39,72,0.05)]" />
+            <div className="h-32 rounded-xl bg-[rgba(15,39,72,0.05)]" />
           </div>
         </div>
       </div>
@@ -246,7 +246,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
         <div className="mt-4 flex flex-wrap gap-2">
           <Link
             href="/leads"
-            className="inline-flex min-h-[38px] items-center gap-2 rounded-full border border-[rgba(23,44,113,0.14)] bg-[rgba(255,255,255,0.9)] px-4 text-[0.82rem] font-bold text-brand-navy no-underline"
+            className="inline-flex min-h-[38px] items-center gap-2 rounded-full border border-[rgba(15,39,72,0.14)] bg-[rgba(255,255,255,0.9)] px-4 text-[0.82rem] font-bold text-brand-navy no-underline"
           >
             Back to leads
           </Link>
@@ -289,7 +289,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           href="/leads"
-          className="inline-flex min-h-[38px] items-center gap-2 rounded-full border border-[rgba(23,44,113,0.12)] bg-[rgba(255,255,255,0.88)] px-4 text-[0.82rem] font-bold text-brand-navy no-underline shadow-sm transition-colors hover:border-[rgba(20,150,243,0.28)]"
+          className="inline-flex min-h-[38px] items-center gap-2 rounded-full border border-[rgba(15,39,72,0.12)] bg-[rgba(255,255,255,0.88)] px-4 text-[0.82rem] font-bold text-brand-navy no-underline shadow-sm transition-colors hover:border-[rgba(34,197,94,0.28)]"
         >
           <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M19 12H5" />
@@ -300,7 +300,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={`/customers/${lead.customerUuid}`}
-            className="inline-flex min-h-[38px] items-center rounded-full border border-[rgba(23,44,113,0.14)] bg-white px-4 text-[0.82rem] font-bold text-brand-navy no-underline hover:border-[rgba(20,150,243,0.28)]"
+            className="inline-flex min-h-[38px] items-center rounded-full border border-[rgba(15,39,72,0.14)] bg-white px-4 text-[0.82rem] font-bold text-brand-navy no-underline hover:border-[rgba(34,197,94,0.28)]"
           >
             Customer profile
           </Link>
@@ -387,6 +387,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
                 />
                 <DetailGrid
                   rows={[
+                    { label: 'Email ID', value: profile.emailId ?? '—' },
                     { label: 'City', value: profile.city ?? '—' },
                     { label: 'State', value: profile.state ?? '—' },
                     { label: 'PIN', value: profile.pincode ?? '—' },
@@ -412,7 +413,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
           </SectionCard>
 
           {lead.applications.length === 0 ? (
-            <div className="rounded-[14px] border border-dashed border-[rgba(23,44,113,0.14)] bg-[rgba(248,250,255,0.5)] px-4 py-5 text-center text-[0.84rem] text-brand-muted">
+            <div className="rounded-[14px] border border-dashed border-[rgba(15,39,72,0.14)] bg-[rgba(248,250,255,0.5)] px-4 py-5 text-center text-[0.84rem] text-brand-muted">
               No application yet — customer is still in lead intake.
             </div>
           ) : null}
@@ -438,7 +439,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
           <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2 lg:grid-cols-3">
             {lead.applications.map((application) => (
               <li key={application.uuid}>
-                <article className="flex h-full flex-col rounded-[14px] border border-[rgba(23,44,113,0.1)] bg-white p-3.5 shadow-sm">
+                <article className="flex h-full flex-col rounded-[14px] border border-[rgba(15,39,72,0.1)] bg-white p-3.5 shadow-sm">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
                       <span className="text-[0.65rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">Application</span>
@@ -446,7 +447,7 @@ export function LeadDetailsPanel({ leadUuid }: { leadUuid: string }) {
                     </div>
                     <LosStatusPill code={application.statusCode} label={application.statusLabel} />
                   </div>
-                  <dl className="m-0 mt-3 grid gap-1.5 border-t border-[rgba(23,44,113,0.06)] pt-2.5 text-[0.8rem]">
+                  <dl className="m-0 mt-3 grid gap-1.5 border-t border-[rgba(15,39,72,0.06)] pt-2.5 text-[0.8rem]">
                     <div className="flex justify-between gap-2">
                       <dt className="text-brand-muted">Amount</dt>
                       <dd className="m-0 font-bold text-brand-navy">{formatInr(application.loanAmount)}</dd>

@@ -78,4 +78,10 @@ export class ListVendorApiLogsQueryDto {
   @IsString()
   @MaxLength(40)
   requestedTo?: string;
+
+  /** Only used by the export endpoint (download link can't set an Authorization header); ignored by list(). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  access_token?: string;
 }

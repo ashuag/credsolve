@@ -95,6 +95,7 @@ export function ApplicationDetailsPanel({ applicationUuid }: { applicationUuid: 
 
   return (
     <ApplicationReviewDashboard
+      key={applicationUuid}
       row={row}
       applicationUuid={applicationUuid}
       authToken={getToken()}

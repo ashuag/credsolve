@@ -36,6 +36,30 @@ export function canMarkInternalTesting(
   return !isAgentRole(roleName, hierarchyLevel);
 }
 
+/** Pull CIBIL and run production post-BRE from LOS — not available to Agent. */
+export function canCheckCibilScore(
+  roleName?: string | null,
+  hierarchyLevel?: number | null,
+): boolean {
+  return !isAgentRole(roleName, hierarchyLevel);
+}
+
+/** Generate and email a loan-closure NOC — Admin only. */
+export function canSendLoanNoc(
+  roleName?: string | null,
+  hierarchyLevel?: number | null,
+): boolean {
+  return isLosAdminRole(roleName, hierarchyLevel);
+}
+
+/** Waive penal + overdue-days interest on an open loan — Admin only. */
+export function canWaiveLoanCharges(
+  roleName?: string | null,
+  hierarchyLevel?: number | null,
+): boolean {
+  return isLosAdminRole(roleName, hierarchyLevel);
+}
+
 /** Reject / Approve / Disburse on LOS applications — not available to Agent. */
 export function canDecideLosApplication(
   roleName?: string | null,

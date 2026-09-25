@@ -104,6 +104,10 @@ export function hasLosAadhaarRecord(row: {
     gender: string | null;
     address: string | null;
     maskedAadhaar: string | null;
+    aadhaarKycType?: 1 | 2 | null;
+    aadhaarKycProcess?: 'DIGILOCKER' | 'OTP' | null;
+    aadhaarKycProcessLabel?: 'DigiLocker' | 'OTP based';
+    reusedFromPrior?: boolean;
   } | null;
   kycPhotos?: { aadhaarPhotoPath: string | null };
 }): boolean {
@@ -123,6 +127,7 @@ export function hasLosAadhaarRecord(row: {
 
 export function isLosAadhaarKycComplete(row: {
   aadhaarKycCompleted?: boolean;
+  aadhaarNameMatchPendingReview?: boolean;
   aadhaarIdentityFailure?: { reason?: string; message?: string } | null;
   aadhaarDetail?: {
     fullName: string | null;
@@ -130,13 +135,16 @@ export function isLosAadhaarKycComplete(row: {
     gender: string | null;
     address: string | null;
     maskedAadhaar: string | null;
+    aadhaarKycType?: 1 | 2 | null;
+    aadhaarKycProcess?: 'DIGILOCKER' | 'OTP' | null;
+    aadhaarKycProcessLabel?: 'DigiLocker' | 'OTP based';
+    reusedFromPrior?: boolean;
   } | null;
   kycPhotos?: { aadhaarPhotoPath: string | null };
 }): boolean {
-  if (row.aadhaarIdentityFailure) return false;
-  if (row.aadhaarKycCompleted) return true;
-  if (row.aadhaarKycCompleted === false) return false;
-  return hasLosAadhaarRecord(row);
+  if (row.aadhaarIdentityFailure && !row.aadhaarNameMatchPendingReview) return false;
+  if (hasLosAadhaarRecord(row)) return true;
+  return Boolean(row.aadhaarKycCompleted);
 }
 
 function isSelfieCaptured(row: { selfieCaptured?: boolean; kycPhotos?: { selfiePath: string | null } }): boolean {
@@ -186,7 +194,8 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
 
   const profileDone = Boolean(profile?.fullName?.trim());
   const panDone = (row.lead.panVerified ?? 0) === PAN_VERIFIED.VERIFIED;
-  const bureauDone = (row.lead.bureauFetched ?? 0) === BUREAU_FETCHED.SUCCESS || Boolean(row.bureauReport);
+  const bureauDone =
+    (row.lead.bureauFetched ?? 0) === BUREAU_FETCHED.SUCCESS || Boolean(row.bureauReport);
   const loanDone = Boolean(row.details?.loanAmount);
   const refsDone = (row.referencesCount ?? 0) >= 2;
   const emailDone = Boolean(row.emailVerifiedAt);
@@ -225,12 +234,15 @@ export function buildApplicationJourney(row: LosApplicationDetails): JourneyStep
     letter: false,
     digilockerKyc: kycFailed && !aadhaarDone,
     livenessKyc: kycFailed && aadhaarDone && (selfieDone || row.livenessAttempts > 0),
-    bank: bankFailed,
+    bank: bankFailed || nameReviewPending,
     refs: false,
     esign: false,
   } as const;
   const detailById: Partial<Record<(typeof APPLICATION_JOURNEY_STAGES)[number]['id'], string | undefined>> = {
-    credit: row.bureauReport?.cibilScore != null ? `CIBIL ${row.bureauReport.cibilScore}` : undefined,
+    credit:
+      row.bureauReport?.cibilScore != null
+        ? `${row.bureauReport.fromPriorApplication ? 'Prior CIBIL' : 'CIBIL'} ${row.bureauReport.cibilScore}`
+        : undefined,
     loan: row.details?.loanAmount ? `₹${row.details.loanAmount}` : undefined,
     letter: letterAccepted ? 'Accepted' : letterReviewed ? 'Reviewed' : undefined,
     digilockerKyc: digilockerKycDetail(aadhaarDone, selfieDone),
@@ -299,6 +311,7 @@ export type ApplicationListStageInput = {
   panVerified: number;
   bureauFetched: number;
   nameMatchPendingReview?: boolean;
+  aadhaarNameMatchPendingReview?: boolean;
 };
 
 /** Active journey stage for application list rows (matches application review hero). */

@@ -7,6 +7,7 @@ export type RestartRejectedJourneyResult = {
   newLeadUuid: string;
   newLeadNumber: string;
   copiedFields: string[];
+  preBreRejected?: boolean;
 };
 
 export async function restartRejectedLeadJourney(

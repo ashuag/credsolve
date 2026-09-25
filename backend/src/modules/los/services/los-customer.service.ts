@@ -135,6 +135,7 @@ export class LosCustomerService {
             pincode: detail.pincode,
             addressLine1: detail.addressLine1,
             addressLine2: detail.addressLine2,
+            emailId: detail.emailId?.trim() || null,
             city: detail.city?.name ?? null,
             state: detail.city?.state?.name ?? null,
             stateCode: detail.city?.state?.code ?? null,

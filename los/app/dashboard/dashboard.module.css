@@ -6,7 +6,7 @@
 .reportSkeleton,
 .reportError {
   border-radius: 10px;
-  border: 1px solid rgba(23, 44, 113, 0.12);
+  border: 1px solid rgba(15, 39, 72, 0.12);
   background: rgba(255, 255, 255, 0.95);
   padding: 2rem;
   text-align: center;
@@ -55,16 +55,16 @@
 .refreshBtnInline {
   padding: 5px 12px;
   border-radius: 6px;
-  border: 1px solid rgba(23, 44, 113, 0.2);
+  border: 1px solid rgba(15, 39, 72, 0.2);
   background: #fff;
   font-size: 0.76rem;
   font-weight: 800;
-  color: var(--brand-navy, #172c71);
+  color: var(--brand-navy, #0F2748);
   cursor: pointer;
 }
 
 .refreshBtnInline:hover:not(:disabled) {
-  border-color: rgba(20, 150, 243, 0.45);
+  border-color: rgba(34, 197, 94, 0.45);
 }
 
 .refreshBtnInline:disabled {
@@ -80,7 +80,7 @@
 
 .kpiCell {
   border-radius: 8px;
-  border: 1px solid rgba(23, 44, 113, 0.1);
+  border: 1px solid rgba(15, 39, 72, 0.1);
   background: linear-gradient(180deg, #fff, rgba(247, 251, 255, 0.96));
   padding: 10px 12px;
   min-height: 4.25rem;
@@ -115,8 +115,8 @@
   gap: 6px 4px;
   padding: 8px 12px;
   border-radius: 8px;
-  border: 1px solid rgba(23, 44, 113, 0.1);
-  background: rgba(20, 150, 243, 0.05);
+  border: 1px solid rgba(15, 39, 72, 0.1);
+  background: rgba(34, 197, 94, 0.05);
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--brand-text, #0f172a);
@@ -128,14 +128,14 @@
 }
 
 .queueSep {
-  color: rgba(23, 44, 113, 0.25);
+  color: rgba(15, 39, 72, 0.25);
   user-select: none;
   padding: 0 2px;
 }
 
 .funnelSection {
   border-radius: 10px;
-  border: 1px solid rgba(23, 44, 113, 0.12);
+  border: 1px solid rgba(15, 39, 72, 0.12);
   background: rgba(255, 255, 255, 0.96);
   padding: 12px 14px;
   box-shadow: var(--shadow-md);
@@ -166,7 +166,7 @@
 .funnelArrow {
   padding: 0 6px;
   font-size: 0.85rem;
-  color: rgba(23, 44, 113, 0.35);
+  color: rgba(15, 39, 72, 0.35);
   font-weight: 700;
 }
 
@@ -177,7 +177,7 @@
   min-width: 5.5rem;
   padding: 8px 10px;
   border-radius: 8px;
-  border: 1px solid rgba(23, 44, 113, 0.12);
+  border: 1px solid rgba(15, 39, 72, 0.12);
   background: rgba(247, 251, 255, 0.95);
 }
 
@@ -206,12 +206,12 @@
   border-radius: 999px;
   overflow: hidden;
   margin-bottom: 10px;
-  background: rgba(23, 44, 113, 0.06);
+  background: rgba(15, 39, 72, 0.06);
 }
 
 .funnelBarSeg {
   min-width: 2px;
-  background: linear-gradient(90deg, #1496f3, #ffc519);
+  background: linear-gradient(90deg, #22C55E, #4ADE80);
   opacity: 0.85;
 }
 
@@ -241,7 +241,7 @@
 
 .reportPanel {
   border-radius: 10px;
-  border: 1px solid rgba(23, 44, 113, 0.12);
+  border: 1px solid rgba(15, 39, 72, 0.12);
   background: rgba(255, 255, 255, 0.96);
   padding: 12px 14px;
   box-shadow: var(--shadow-md);
@@ -257,7 +257,7 @@
 .reportTable td {
   padding: 6px 8px;
   text-align: left;
-  border-bottom: 1px solid rgba(23, 44, 113, 0.08);
+  border-bottom: 1px solid rgba(15, 39, 72, 0.08);
   vertical-align: top;
 }
 
@@ -267,13 +267,13 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-  background: rgba(23, 44, 113, 0.04);
+  background: rgba(15, 39, 72, 0.04);
 }
 
 .reportTable tfoot td {
   font-weight: 800;
   border-bottom: none;
-  border-top: 1px solid rgba(23, 44, 113, 0.12);
+  border-top: 1px solid rgba(15, 39, 72, 0.12);
 }
 
 .reportTableTight td {
@@ -340,7 +340,7 @@
 
 .chartPanel {
   border-radius: 10px;
-  border: 1px solid rgba(23, 44, 113, 0.12);
+  border: 1px solid rgba(15, 39, 72, 0.12);
   background: rgba(255, 255, 255, 0.96);
   padding: 12px 14px 10px;
   box-shadow: var(--shadow-md);
@@ -386,7 +386,7 @@
 }
 
 .chartSwatchLead {
-  background: #1496f3;
+  background: #22C55E;
 }
 
 .chartSwatchApp {
@@ -400,7 +400,7 @@
   gap: 3px;
   height: 132px;
   padding: 4px 2px 0;
-  border-top: 1px solid rgba(23, 44, 113, 0.06);
+  border-top: 1px solid rgba(15, 39, 72, 0.06);
 }
 
 .chartCol {
@@ -440,7 +440,7 @@
 }
 
 .barLead {
-  background: linear-gradient(180deg, #4db5f5, #1496f3);
+  background: linear-gradient(180deg, #4db5f5, #22C55E);
 }
 
 .barApp {
@@ -477,20 +477,20 @@
   align-items: center;
   padding: 8px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(23, 44, 113, 0.14);
+  border: 1px solid rgba(15, 39, 72, 0.14);
   background: rgba(255, 255, 255, 0.92);
   font-size: 0.82rem;
   font-weight: 800;
-  color: var(--brand-navy, #172c71);
+  color: var(--brand-navy, #0F2748);
   text-decoration: none;
-  box-shadow: var(--shadow-sm, 0 1px 2px rgba(23, 44, 113, 0.06));
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(15, 39, 72, 0.06));
   transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 
 .quickLink:hover {
   transform: translateY(-1px);
-  border-color: rgba(20, 150, 243, 0.35);
-  background: rgba(20, 150, 243, 0.06);
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.06);
 }
 
 .dashboardMeta {
@@ -501,7 +501,7 @@
   gap: 10px;
   padding: 10px 14px;
   border-radius: 8px;
-  border: 1px dashed rgba(23, 44, 113, 0.18);
+  border: 1px dashed rgba(15, 39, 72, 0.18);
   background: rgba(247, 251, 255, 0.85);
   font-size: 0.78rem;
   font-weight: 600;
@@ -512,16 +512,16 @@
   margin-left: auto;
   padding: 6px 12px;
   border-radius: 8px;
-  border: 1px solid rgba(23, 44, 113, 0.2);
+  border: 1px solid rgba(15, 39, 72, 0.2);
   background: #fff;
   font-size: 0.78rem;
   font-weight: 800;
-  color: var(--brand-navy, #172c71);
+  color: var(--brand-navy, #0F2748);
   cursor: pointer;
 }
 
 .refreshBtn:hover {
-  border-color: rgba(20, 150, 243, 0.45);
+  border-color: rgba(34, 197, 94, 0.45);
   color: var(--brand-blue-deep, #0b5cab);
 }
 
@@ -550,7 +550,7 @@
   position: relative;
   overflow: hidden;
   border-radius: 10px;
-  border: 1px solid rgba(23, 44, 113, 0.12);
+  border: 1px solid rgba(15, 39, 72, 0.12);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(240, 246, 255, 0.92));
   box-shadow: var(--shadow-md);
@@ -559,10 +559,10 @@
 .heroCard {
   padding: 20px 22px;
   background:
-    radial-gradient(circle at top right, rgba(255, 197, 25, 0.3), transparent 20rem),
-    linear-gradient(160deg, rgba(23, 44, 113, 0.98), rgba(20, 150, 243, 0.94));
+    radial-gradient(circle at top right, rgba(34, 197, 94, 0.3), transparent 20rem),
+    linear-gradient(160deg, rgba(15, 39, 72, 0.98), rgba(34, 197, 94, 0.94));
   color: #f8fbff;
-  box-shadow: 0 12px 32px rgba(23, 44, 113, 0.22);
+  box-shadow: 0 12px 32px rgba(15, 39, 72, 0.22);
 }
 
 .heroCard::after {
@@ -597,7 +597,7 @@
 }
 
 .eyebrowLight {
-  background: rgba(20, 150, 243, 0.08);
+  background: rgba(34, 197, 94, 0.08);
   color: var(--brand-blue-deep);
 }
 
@@ -607,7 +607,7 @@
   height: 7px;
   border-radius: 999px;
   background: var(--brand-gold);
-  box-shadow: 0 0 0 4px rgba(255, 197, 25, 0.18);
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.18);
 }
 
 .heroTitle {
@@ -701,7 +701,7 @@
 .actionItem {
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid rgba(23, 44, 113, 0.1);
+  border: 1px solid rgba(15, 39, 72, 0.1);
   background: rgba(255, 255, 255, 0.82);
 }
 
@@ -738,7 +738,7 @@
   justify-content: center;
   padding: 3px 10px;
   border-radius: 999px;
-  background: rgba(20, 150, 243, 0.1);
+  background: rgba(34, 197, 94, 0.1);
   color: var(--brand-blue-deep);
   font-size: 0.76rem;
   font-weight: 800;
@@ -746,7 +746,7 @@
 }
 
 .pillGold {
-  background: rgba(255, 197, 25, 0.2);
+  background: rgba(34, 197, 94, 0.2);
 }
 
 .pillSuccess {
@@ -795,7 +795,7 @@
 .pipelineCard {
   padding: 10px 14px;
   border-radius: 8px;
-  border: 1px solid rgba(23, 44, 113, 0.1);
+  border: 1px solid rgba(15, 39, 72, 0.1);
   background: rgba(255, 255, 255, 0.84);
 }
 
@@ -828,7 +828,7 @@
   width: 100%;
   height: 5px;
   border-radius: 999px;
-  background: rgba(20, 150, 243, 0.08);
+  background: rgba(34, 197, 94, 0.08);
   overflow: hidden;
 }
 
@@ -855,14 +855,14 @@
   width: 100%;
   height: 5px;
   border-radius: 999px;
-  background: rgba(255, 197, 25, 0.16);
+  background: rgba(34, 197, 94, 0.16);
   overflow: hidden;
 }
 
 .signalBar {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(135deg, #ffc519, #1496f3);
+  background: linear-gradient(135deg, #4ADE80, #22C55E);
 }
 
 .timelineMeta {
@@ -871,7 +871,7 @@
   gap: 6px;
   padding: 3px 10px;
   border-radius: 999px;
-  background: rgba(20, 150, 243, 0.08);
+  background: rgba(34, 197, 94, 0.08);
   color: var(--brand-blue-deep);
   font-size: 0.76rem;
   font-weight: 800;

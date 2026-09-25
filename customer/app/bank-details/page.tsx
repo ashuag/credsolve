@@ -119,6 +119,14 @@ export default function BankDetailsPage() {
       router.replace('/kyc');
       return;
     }
+    if (session.journey.bankNameReviewPending) {
+      router.replace(
+        session.journey.referencesCompleted && session.journey.loanDocumentsAccepted
+          ? '/thank-you'
+          : '/references',
+      );
+      return;
+    }
     if (
       isBankVerificationRetryExhausted(session) &&
       session.journey.referencesCompleted &&
@@ -137,8 +145,6 @@ export default function BankDetailsPage() {
   const attemptsRemaining = verificationProgress
     ? Math.max(0, verificationProgress.attemptsAllowed - verificationProgress.attemptsUsed)
     : null;
-  const nameReviewPending =
-    session?.authenticated === true && session.journey.bankNameReviewPending === true;
 
   const normalizedIfsc = ifscCode.trim().toUpperCase();
   const ifscValidationError = getIfscValidationError(ifscCode, {
@@ -269,9 +275,6 @@ export default function BankDetailsPage() {
       }
       setConfirmOpen(false);
       await refresh();
-      if (res.nameMatchPendingReview || res.applicationStatus === 'UNDER_REVIEW') {
-        return;
-      }
       router.replace('/references');
     } catch (e) {
       setConfirmOpen(false);
@@ -281,33 +284,10 @@ export default function BankDetailsPage() {
     }
   }
 
-  const journeyPanel = nameReviewPending ? (
+  const journeyPanel = retryLimitReached ? (
     <div className="h-full flex flex-col justify-center">
       <div className="mb-6">
-        <h1 className="text-2xl md:text-[2.2rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">
-          Bank name under review
-        </h1>
-        <p className="m-0 text-[0.95rem] leading-relaxed text-slate-600">
-          We verified your account, but the name on the bank account does not closely match the name on your
-          application. Our credit team is reviewing it.
-        </p>
-        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-semibold text-amber-950 leading-relaxed">
-          You can continue to the next step once credit approves the name match. Please check back shortly, or we
-          will notify you.
-        </div>
-        <button
-          type="button"
-          className="mt-6 mc-btn-primary py-3 px-6"
-          onClick={() => void refresh()}
-        >
-          Check status
-        </button>
-      </div>
-    </div>
-  ) : retryLimitReached ? (
-    <div className="h-full flex flex-col justify-center">
-      <div className="mb-6">
-        <h1 className="text-2xl md:text-[2.2rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">
+        <h1 className="text-2xl md:text-[2.2rem] font-bold text-brand-navy mb-4 tracking-tight leading-[1.1]">
           Continue your application
         </h1>
         <p className="m-0 text-[0.95rem] leading-relaxed text-slate-600">
@@ -328,7 +308,7 @@ export default function BankDetailsPage() {
   ) : (
     <div className="h-full flex flex-col justify-center">
       <div className="mb-6">
-        <h1 className="text-2xl md:text-[2.2rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">
+        <h1 className="text-2xl md:text-[2.2rem] font-bold text-brand-navy mb-4 tracking-tight leading-[1.1]">
           Verify your bank details
         </h1>
 
@@ -473,7 +453,7 @@ export default function BankDetailsPage() {
           aria-labelledby="bank-confirm-title"
         >
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl border border-slate-200 grid gap-4">
-            <h2 id="bank-confirm-title" className="m-0 text-lg font-black text-brand-navy">
+            <h2 id="bank-confirm-title" className="m-0 text-lg font-bold text-brand-navy">
               Confirm details
             </h2>
             <p className="m-0 text-sm text-slate-600 leading-relaxed">
@@ -527,7 +507,7 @@ export default function BankDetailsPage() {
 
   return (
     <CustomerJourneyGuard>
-      <div className="flex min-h-screen w-full flex-col selection:bg-[#ffc519]/30 bg-[#fffdf8] lg:min-h-0 lg:bg-transparent">
+      <div className="flex min-h-screen w-full flex-col selection:bg-[#22c55e]/30 bg-[#f7fbf9] lg:min-h-0 lg:bg-transparent">
         <main className="relative flex grow flex-col items-center justify-center p-0">
           <div className="pointer-events-none absolute inset-0 overflow-hidden lg:hidden">
             <div className="absolute top-0 left-1/2 h-[600px] w-[100vw] -translate-x-1/2 bg-[radial-gradient(ellipse_at_top,_rgba(20,150,243,0.06)_0%,_transparent_60%)]" />

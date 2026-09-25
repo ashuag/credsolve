@@ -307,7 +307,7 @@ export default function LoanSelectionPage() {
   const journeyPanel = (
     <div className="h-full flex flex-col justify-center">
       <div className="mb-8">
-        <h1 className="text-2xl md:text-[2.2rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">
+        <h1 className="text-2xl md:text-[2.2rem] font-bold text-brand-navy mb-4 tracking-tight leading-[1.1]">
           Customize your loan
         </h1>
         <p className="text-[0.95rem] text-slate-500 mb-8 leading-relaxed">

@@ -35,7 +35,7 @@ export default function ActiveLoanPage() {
   const journeyPanel = (
     <div className="h-full flex flex-col justify-center">
       <div className="mb-6">
-        <h1 className="text-2xl md:text-[2.5rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">
+        <h1 className="text-2xl md:text-[2.5rem] font-bold text-brand-navy mb-4 tracking-tight leading-[1.1]">
           You already have an active loan.
         </h1>
         <p className="text-[1rem] text-slate-500 mb-8 leading-relaxed">
@@ -91,7 +91,7 @@ export default function ActiveLoanPage() {
 
   return (
     <CustomerJourneyGuard>
-      <div className="min-h-screen bg-[linear-gradient(135deg,#fffbeb,#e6f0ff)] flex items-center justify-center p-4 sm:p-6 md:p-8">
+      <div className="min-h-screen bg-[linear-gradient(135deg,#f0fdf4,#e6f0ff)] flex items-center justify-center p-4 sm:p-6 md:p-8">
         <LoanLandingShell
           showSpeedometer={false}
           journeyPanel={journeyPanel}

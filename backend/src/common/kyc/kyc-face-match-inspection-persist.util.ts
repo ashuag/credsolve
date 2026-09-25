@@ -13,6 +13,16 @@ export type KycFaceMatchSideResult = {
   imageHeight: number;
   faceCount?: number;
   dualFaceDetected?: boolean;
+  childLikeness?: number | null;
+  ageBand?: string | null;
+  estimatedAge?: number | null;
+  gender?: 'male' | 'female' | null;
+};
+
+export type PersistedFaceMatchChecks = {
+  descriptor?: { passed?: boolean; strength?: string; distance?: number; maxDistance?: number };
+  geometry?: { passed?: boolean; applied?: boolean; reason?: string };
+  ageEstimate?: { passed?: boolean; applied?: boolean; reason?: string };
 };
 
 export type PersistedFaceMatch = {
@@ -24,6 +34,7 @@ export type PersistedFaceMatch = {
   reason: string | null;
   reference: KycFaceMatchSideResult | null;
   probe: KycFaceMatchSideResult | null;
+  checks: PersistedFaceMatchChecks | null;
 };
 
 export function toPersistedFaceMatchInspection(
@@ -39,6 +50,7 @@ export function toPersistedFaceMatchInspection(
     productionValidationDisabled: inspection.productionValidationDisabled,
     reference: inspection.reference,
     probe: inspection.probe,
+    checks: inspection.checks ?? null,
     checkedAt: new Date().toISOString(),
   };
 }
@@ -53,6 +65,10 @@ function parseSide(value: unknown): KycFaceMatchSideResult | null {
     imageHeight: typeof row.imageHeight === 'number' ? row.imageHeight : 0,
     faceCount: typeof row.faceCount === 'number' ? row.faceCount : undefined,
     dualFaceDetected: typeof row.dualFaceDetected === 'boolean' ? row.dualFaceDetected : undefined,
+    childLikeness: typeof row.childLikeness === 'number' ? row.childLikeness : undefined,
+    ageBand: typeof row.ageBand === 'string' ? row.ageBand : undefined,
+    estimatedAge: typeof row.estimatedAge === 'number' ? row.estimatedAge : undefined,
+    gender: row.gender === 'male' || row.gender === 'female' ? row.gender : undefined,
   };
 }
 
@@ -86,7 +102,13 @@ export function parsePersistedFaceMatch(json: unknown): PersistedFaceMatch | nul
     reason: typeof row.reason === 'string' ? row.reason : null,
     reference: parseSide(row.reference),
     probe: parseSide(row.probe),
+    checks: parseChecks(row.checks),
   };
+}
+
+function parseChecks(value: unknown): PersistedFaceMatchChecks | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as PersistedFaceMatchChecks;
 }
 
 /** MoneyCash local face match from `application_kyc.liveness_vendor_json`. */

@@ -1,22 +1,23 @@
-import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import type { Response } from 'express';
 import { Prisma, type PrismaClient } from '@prisma/client';
-import { APPLICATION_STATUS } from '../../../common/constants/application.constants';
 import { BUREAU_FETCHED } from '../../../common/constants/bureau-fetch.constants';
 import { LEAD_STATUS } from '../../../common/constants/lead.constants';
 import { REJECTION_REASON, toRejectionReasonDto } from '../../../common/constants/rejection-reason.constants';
 import { PAN_VERIFIED } from '../../../common/constants/pan-verification.constants';
 import { generateLeadNumber } from '../../../common/loan/application-number.util';
 import { customerHasOpenLoan } from '../../../common/loan/customer-open-loan.util';
-import { computeTenureDays, istCalendarDateUtc } from '../../../common/loan/loan-calculation.util';
-import { resolveRepaymentDueDateUtc } from '../../../common/loan/repayment-due-date.util';
+import { loadBreSettings } from '../../../common/bre/bre-settings.loader';
+import { PreBreCheckService } from '../../../common/bre/pre-bre-check.service';
 import { BureauReportPdfService } from '../../../common/cibil/bureau-report-pdf.service';
 import { CibilCreditAssessmentService } from '../../../common/cibil/cibil-credit-assessment.service';
 import { KycFilesService } from '../../../common/kyc/kyc-files.service';
+import { SmsService } from '../../../common/sms/sms.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
 import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 import { TENACIO_SERVICE_PAN_NAME_DOB } from '../../../common/vendor/tenacio/tenacio-client.service';
+import { resolveCibilVendorDisplayName } from '../../../common/vendor/cibil-vendor.util';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -125,11 +126,15 @@ const LEAD_DUMP_HEADERS = [
 
 @Injectable()
 export class LosLeadService {
+  private readonly logger = new Logger(LosLeadService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly bureauReportPdf: BureauReportPdfService,
     private readonly kycFiles: KycFilesService,
     private readonly cibilCreditAssessment: CibilCreditAssessmentService,
+    private readonly preBreCheck: PreBreCheckService,
+    private readonly sms: SmsService,
   ) {}
 
   async listLeads() {
@@ -156,6 +161,7 @@ export class LosLeadService {
             panVerified: true,
             occupation: { select: { name: true } },
             city: { select: { name: true, state: { select: { code: true } } } },
+            emailId: true,
             bureauReport: { select: { cibilScore: true } },
           },
         },
@@ -189,7 +195,7 @@ export class LosLeadService {
         fullName: formatLosPersonName(detail?.fullName),
         panNumber: detail?.panNumber?.trim().toUpperCase() || null,
         mobileNumber: lead.customer.mobileNumber,
-        email: lead.applications[0]?.details?.emailId ?? null,
+        email: detail?.emailId?.trim() || lead.applications[0]?.details?.emailId || null,
         occupation: detail?.occupation?.name ?? null,
         city,
         cibilScore,
@@ -256,7 +262,7 @@ export class LosLeadService {
             gender: { select: { name: true } },
             occupation: { select: { name: true } },
             bureauReport: {
-              select: { id: true, uuid: true, cibilScore: true, createdAt: true },
+              select: { id: true, uuid: true, cibilScore: true, createdAt: true, vendorName: true },
             },
           },
         },
@@ -293,7 +299,7 @@ export class LosLeadService {
       leadNumber: lead.leadNumber,
       customerUuid: lead.customer.uuid,
       mobileNumber: lead.customer.mobileNumber,
-      email: lead.applications[0]?.details?.emailId ?? null,
+      email: detail?.emailId?.trim() || lead.applications[0]?.details?.emailId || null,
       statusCode: lead.leadStatus.name,
       statusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
       panVerified: detail?.panVerified ?? 0,
@@ -325,6 +331,7 @@ export class LosLeadService {
             pincode: detail.pincode,
             addressLine1: detail.addressLine1,
             addressLine2: detail.addressLine2,
+            emailId: detail.emailId?.trim() || null,
             city: detail.city?.name ?? null,
             state: detail.city?.state?.name ?? null,
             stateCode: detail.city?.state?.code ?? null,
@@ -342,6 +349,7 @@ export class LosLeadService {
             uuid: currentBureau.uuid,
             cibilScore: currentBureau.cibilScore,
             fetchedAt: currentBureau.createdAt.toISOString(),
+            vendorName: resolveCibilVendorDisplayName({ storedVendorName: currentBureau.vendorName }),
           }
         : null,
       applications: lead.applications.map((application) => ({
@@ -371,6 +379,7 @@ export class LosLeadService {
                 uuid: true,
                 rawPayload: true,
                 createdAt: true,
+                vendorName: true,
               },
             },
           },
@@ -406,6 +415,10 @@ export class LosLeadService {
     return {
       bureauReportUuid: bureauReportRow.uuid,
       fetchedAt: bureauReportRow.createdAt.toISOString(),
+      vendorName: resolveCibilVendorDisplayName({
+        storedVendorName: bureauReportRow.vendorName,
+        vendorBody: bureauReportRow.rawPayload,
+      }),
       reportPdfUrl: this.resolveBureauReportPdfUrl(leadUuid, pdfResult, true),
       rawPayload: bureauReportRow.rawPayload,
       report,
@@ -429,6 +442,7 @@ export class LosLeadService {
     const pdfResult = await this.bureauReportPdf.ensurePdfForLead({
       leadId: lead.id,
       customerUuid: lead.customer.uuid,
+      force: true,
     });
     if (!pdfResult?.relativePath) {
       throw new NotFoundException('Bureau report PDF is not available for this lead.');
@@ -512,10 +526,10 @@ export class LosLeadService {
   }
 
   /**
-   * Admin-only: open a new NEW lead from a rejected case, copy profile/PAN where safe,
-   * and deactivate the rejected lead. Bureau / KYC / bank are not copied.
-   * Loan amount/purpose are copied when present; repay date is always recomputed from
-   * today (1–15 → this month-end, 16+ → next month-end, plus any LOS due-date override).
+   * Admin-only: open a new NEW lead from a rejected case, copy profile/PAN number
+   * where safe, and deactivate the rejected lead. Bureau, KYC, bank, and loan
+   * selection are not copied — pre-BRE runs here, then the customer must re-submit
+   * PAN so post-BRE (and CIBIL reuse/fetch) run again.
    */
   async restartRejectedJourney(leadUuid: string) {
     return this.createRestartedLeadFromRejected({ leadUuid });
@@ -540,11 +554,6 @@ export class LosLeadService {
         rejectionReason: { select: { name: true } },
         leadDetail: true,
         leadUtms: { orderBy: { createdAt: 'desc' }, take: 1 },
-        applications: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          include: { details: true },
-        },
       },
     });
     if (!source) {
@@ -587,10 +596,6 @@ export class LosLeadService {
       source.rejectionReason?.name === REJECTION_REASON.PAN_VERIFICATION_FAILED ||
       source.rejectionReason?.name === REJECTION_REASON.PAN_ALREADY_LINKED_TO_PHONE;
     const detail = source.leadDetail;
-    const keepPanVerified =
-      !panRejection &&
-      detail != null &&
-      (detail.panVerified === PAN_VERIFIED.VERIFIED || detail.panVerified === PAN_VERIFIED.API_DISABLED);
 
     const cloned = await this.prisma.client.$transaction(async (tx) => {
       await tx.lead.updateMany({
@@ -608,7 +613,6 @@ export class LosLeadService {
 
       const copiedFields: string[] = [];
       if (detail) {
-        const panVerified = keepPanVerified ? detail.panVerified : PAN_VERIFIED.NOT_CHECKED;
         await tx.leadDetail.create({
           data: {
             leadId: created.id,
@@ -619,14 +623,15 @@ export class LosLeadService {
             pincode: detail.pincode,
             addressLine1: detail.addressLine1,
             addressLine2: detail.addressLine2,
+            emailId: detail.emailId,
             occupationId: detail.occupationId,
             netMonthlyIncome: detail.netMonthlyIncome,
             annualTurnover: detail.annualTurnover,
             annualProfit: detail.annualProfit,
             cibilConsentAt: detail.cibilConsentAt,
-            panNumber: detail.panNumber,
-            panVerified,
-            panVerifiedAt: keepPanVerified ? detail.panVerifiedAt : null,
+            panNumber: panRejection ? null : detail.panNumber,
+            panVerified: PAN_VERIFIED.NOT_CHECKED,
+            panVerifiedAt: null,
             panValidationAttempts: 0,
             bureauFetched: BUREAU_FETCHED.NOT_FETCHED,
             bureauFetchedAt: null,
@@ -638,9 +643,10 @@ export class LosLeadService {
         if (detail.dateOfBirth) copiedFields.push('date of birth');
         if (detail.genderId) copiedFields.push('gender');
         if (detail.cityId || detail.pincode || detail.addressLine1) copiedFields.push('address');
+        if (detail.emailId?.trim()) copiedFields.push('email');
         if (detail.occupationId) copiedFields.push('occupation');
         if (detail.netMonthlyIncome != null || detail.annualTurnover != null) copiedFields.push('income');
-        if (detail.panNumber) copiedFields.push(keepPanVerified ? 'verified PAN' : 'PAN number');
+        if (!panRejection && detail.panNumber) copiedFields.push('PAN number');
         if (detail.cibilConsentAt) copiedFields.push('bureau consent');
       }
 
@@ -659,43 +665,13 @@ export class LosLeadService {
         copiedFields.push('UTM');
       }
 
-      const sourceDetails = source.applications[0]?.details;
-      if (sourceDetails?.selectedLoanAmount != null && sourceDetails.reasonForLoanId != null) {
-        const tenureEndDate = await resolveRepaymentDueDateUtc(tx);
-        const tenureDays = computeTenureDays(istCalendarDateUtc(), tenureEndDate);
-        const draftStatus = tenureDays <= 62
-          ? await tx.applicationStatus.findFirst({
-              where: { name: APPLICATION_STATUS.DRAFT, isActive: true },
-              select: { id: true },
-            })
-          : null;
-        if (draftStatus) {
-          const application = await tx.application.create({
-            data: {
-              customerId: source.customerId,
-              leadId: created.id,
-              applicationStatusId: draftStatus.id,
-              applicationNumber: created.leadNumber,
-            },
-          });
-          await tx.applicationDetail.create({
-            data: {
-              applicationId: application.id,
-              selectedLoanAmount: sourceDetails.selectedLoanAmount,
-              interestRate: sourceDetails.interestRate,
-              processingFeePercentage: sourceDetails.processingFeePercentage,
-              gstPercentage: sourceDetails.gstPercentage,
-              reasonForLoanId: sourceDetails.reasonForLoanId,
-              expectedRepaymentDays: tenureDays,
-              expectedRepaymentDate: tenureEndDate,
-            },
-          });
-          copiedFields.push('loan amount', 'repay date');
-        }
-      }
-
       return { created, copiedFields };
     });
+
+    const preBreRejected = await this.runPreBreForRestartedLead(cloned.created.id);
+    if (preBreRejected) {
+      cloned.copiedFields.push('pre-BRE rejected');
+    }
 
     return {
       success: true as const,
@@ -704,7 +680,85 @@ export class LosLeadService {
       newLeadUuid: cloned.created.uuid,
       newLeadNumber: cloned.created.leadNumber,
       copiedFields: cloned.copiedFields,
+      preBreRejected,
     };
+  }
+
+  private async runPreBreForRestartedLead(leadId: bigint): Promise<boolean> {
+    const lead = await this.prisma.client.lead.findUnique({
+      where: { id: leadId },
+      select: {
+        id: true,
+        customer: { select: { mobileNumber: true } },
+        leadDetail: {
+          select: {
+            dateOfBirth: true,
+            genderId: true,
+            occupationId: true,
+            pincode: true,
+            cityId: true,
+            gender: { select: { name: true } },
+            occupation: { select: { name: true } },
+            city: { select: { id: true, name: true, stateId: true, state: { select: { code: true } } } },
+          },
+        },
+      },
+    });
+    const detail = lead?.leadDetail;
+    if (!detail) return false;
+
+    const breSettings = await loadBreSettings(this.prisma);
+    const preBreResult = await this.preBreCheck.run(
+      {
+        dateOfBirth: detail.dateOfBirth,
+        genderId: detail.genderId,
+        occupationId: detail.occupationId,
+        genderDisplay: detail.gender?.name,
+        occupationDisplay: detail.occupation?.name,
+        pincode: detail.pincode,
+        cityId: detail.city?.id ?? detail.cityId,
+        stateId: detail.city?.stateId ?? null,
+        cityName: detail.city?.name ?? null,
+        stateCode: detail.city?.state?.code ?? null,
+      },
+      breSettings,
+    );
+    if (preBreResult.passed) return false;
+
+    this.logger.log(
+      `Pre-BRE rejected restarted lead ${leadId.toString()}: ${preBreResult.rejectionReasonCode ?? 'unknown'}`,
+    );
+    const [rejected, reason] = await Promise.all([
+      this.prisma.client.leadStatus.findFirst({
+        where: { name: LEAD_STATUS.REJECTED, isActive: true },
+        select: { id: true },
+      }),
+      preBreResult.rejectionReasonCode
+        ? this.prisma.client.rejectionReason.findFirst({
+            where: { name: preBreResult.rejectionReasonCode, isActive: true },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+    ]);
+    if (!rejected) {
+      this.logger.warn('LeadStatus REJECTED not found — skipping pre-BRE rejection on reapply.');
+      return true;
+    }
+    await this.prisma.client.lead.update({
+      where: { id: leadId },
+      data: {
+        leadStatusId: rejected.id,
+        leadStatusNote: (preBreResult.rejectReason ?? 'BRE check failed').slice(0, 256),
+        ...(reason ? { rejectionReasonId: reason.id } : {}),
+      },
+    });
+    const mobile = lead?.customer.mobileNumber?.trim();
+    if (mobile) {
+      void this.sms.sendRejectionSms(mobile, leadId).catch((err) => {
+        this.logger.error('Failed to send rejection SMS', err instanceof Error ? err.stack : err);
+      });
+    }
+    return true;
   }
 
   private async insertLeadWithUniqueNumber(

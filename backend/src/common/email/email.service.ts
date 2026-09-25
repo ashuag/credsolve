@@ -13,6 +13,7 @@ import {
   isEmailConfigured,
   resolveEmailFromConfig,
   resolveEmailTransportConfig,
+  resolveLoanDocumentsEmailFromConfig,
   shouldUseZeptomailEmailApi,
 } from './email-env.util';
 import type { EmailAttachment, SendEmailAuditContext, SendEmailOptions } from './email.types';
@@ -86,12 +87,22 @@ export class EmailService {
     return `${this.transportConfig.host}:${this.transportConfig.port}`;
   }
 
-  private formatFrom(): string {
+  private formatFrom(override?: { address: string; name?: string }): string {
+    if (override?.address?.trim()) {
+      const name = override.name?.trim() || 'MoneyCash';
+      return `"${name}" <${override.address.trim()}>`;
+    }
     const cfg = this.useZeptomailApi ? resolveEmailFromConfig(this.config) : this.transportConfig;
     if (!cfg?.fromAddress) {
       throw new Error('Set EMAIL_FROM, MAIL_FROM_ADDRESS, or SMTP_USER for outbound email.');
     }
     return `"${cfg.fromName}" <${cfg.fromAddress}>`;
+  }
+
+  private loanDocumentsFrom(): { address: string; name?: string } | undefined {
+    const cfg = resolveLoanDocumentsEmailFromConfig(this.config);
+    if (!cfg?.fromAddress) return undefined;
+    return { address: cfg.fromAddress, name: cfg.fromName };
   }
 
   /**
@@ -105,6 +116,7 @@ export class EmailService {
         text: options.text,
         html: options.html ?? options.text,
         attachments: options.attachments,
+        from: options.from,
         audit: options.audit,
       });
       return;
@@ -118,7 +130,7 @@ export class EmailService {
       throw new Error('Email transport is not configured (set EMAIL_HOST or SMTP_HOST).');
     }
 
-    const from = this.formatFrom();
+    const from = this.formatFrom(options.from);
     const requestedAt = new Date();
     const auditPath = buildEmailSmtpAuditPath(this.transportConfig.host, this.transportConfig.port);
     const providerName = resolveEmailProviderName(this.config);
@@ -251,6 +263,7 @@ export class EmailService {
       text,
       html,
       attachments,
+      from: this.loanDocumentsFrom(),
       audit: { serviceName: 'email-loan-documents', leadId: audit?.leadId ?? null },
     });
   }
@@ -285,6 +298,7 @@ export class EmailService {
       text,
       html,
       attachments,
+      from: this.loanDocumentsFrom(),
       audit: { serviceName: 'email-kyc-letter', leadId: audit?.leadId ?? null },
     });
   }
@@ -319,6 +333,7 @@ export class EmailService {
       text,
       html,
       attachments,
+      from: this.loanDocumentsFrom(),
       audit: { serviceName: 'email-sanctioned-letter', leadId: audit?.leadId ?? null },
     });
   }
@@ -332,14 +347,14 @@ export class EmailService {
     const text = [
       'Good news — your MoneyCash loan has been disbursed.',
       '',
-      'Attached is your final Sanction letter cum Key Fact Statement for your records.',
+      'Attached is your final Sanction letter cum Key Fact Statement, including the Loan cum Commercial Terms, for your records.',
       '',
       'If you have any questions, please contact support.',
     ].join('\n');
 
     const html = `
       <p>Good news — your MoneyCash loan has been <strong>disbursed</strong>.</p>
-      <p>Attached is your final <strong>Sanction letter cum Key Fact Statement</strong> for your records.</p>
+      <p>Attached is your final <strong>Sanction letter cum Key Fact Statement</strong>, including the <strong>Loan cum Commercial Terms</strong>, for your records.</p>
       <p style="color:#555;font-size:0.85em;">If you have any questions, please contact support.</p>
     `.trim();
 
@@ -349,7 +364,40 @@ export class EmailService {
       text,
       html,
       attachments,
+      from: this.loanDocumentsFrom(),
       audit: { serviceName: 'email-final-sanction-letter', leadId: audit?.leadId ?? null },
+    });
+  }
+
+  /** NOC / loan closure letter after full repayment. */
+  async sendNocLetterEmail(
+    to: string,
+    attachments: EmailAttachment[],
+    audit?: Pick<SendEmailAuditContext, 'leadId'>,
+  ): Promise<void> {
+    const subject = 'Your MoneyCash loan closure / NOC letter';
+    const text = [
+      'Your MoneyCash loan has been fully repaid and closed.',
+      '',
+      'Attached is your No Objection Certificate (loan closure letter) for your records.',
+      '',
+      'If you have any questions, please contact support@aasrafincorp.com.',
+    ].join('\n');
+
+    const html = `
+      <p>Your MoneyCash loan has been <strong>fully repaid and closed</strong>.</p>
+      <p>Attached is your <strong>No Objection Certificate (loan closure letter)</strong> for your records.</p>
+      <p style="color:#555;font-size:0.85em;">If you have any questions, please contact support@aasrafincorp.com.</p>
+    `.trim();
+
+    await this.sendEmail({
+      to,
+      subject,
+      text,
+      html,
+      attachments,
+      from: this.loanDocumentsFrom(),
+      audit: { serviceName: 'email-noc-letter', leadId: audit?.leadId ?? null },
     });
   }
 

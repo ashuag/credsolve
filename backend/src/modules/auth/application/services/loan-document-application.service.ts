@@ -384,7 +384,7 @@ export class LoanDocumentApplicationService {
     return this.generator.renderPreviewHtml(merge);
   }
 
-  /** Loan cum Commercial Terms PDF, generated fresh (not persisted) for email attachment. */
+  /** Loan cum Commercial Terms PDF, generated fresh for the post-acceptance email attachment. */
   async generateCommercialTermsPdf(merge: LoanDocumentMergeInput): Promise<Buffer> {
     return this.generator.generateCommercialTermsPdf(merge);
   }
@@ -394,7 +394,7 @@ export class LoanDocumentApplicationService {
       return 'Sanction letter cum Key Fact Statement (acceptance)';
     }
     if (docType === LOAN_DOCUMENT_TYPE.KEY_FACT_DISBURSEMENT) {
-      return 'Sanction letter cum Key Fact Statement (disbursement)';
+      return 'Sanction letter cum Key Fact Statement and Loan cum Commercial Terms (disbursement)';
     }
     return 'Loan Agreement';
   }

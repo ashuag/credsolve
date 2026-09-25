@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   checkEasyCollectLoanBinding,
+  easebuzzPaymentVendorRef,
   easebuzzRepayLoanLookupKeys,
   isEasyCollectWebhookPayload,
   parseEasebuzzAddedOn,
@@ -43,6 +44,21 @@ describe('isEasyCollectWebhookPayload', () => {
         productinfo: 'EasyCollect Payment',
         surl: 'https://pay.easebuzz.in/easy_collect/surl/abc',
         furl: 'https://pay.easebuzz.in/easy_collect/furl/abc',
+      }),
+      true,
+    );
+  });
+
+  it('detects a live EasyCollect success webhook that reuses the application number', () => {
+    assert.equal(
+      isEasyCollectWebhookPayload({
+        txnid: 'APP2026AEMXW',
+        udf1: 'APP2026AEMXW',
+        productinfo: 'EasyCollect Payment',
+        surl: 'https://pay.easebuzz.in/easy_collect/surl/a97b522f8e264e79a7c396f202820a78',
+        furl: 'https://pay.easebuzz.in/easy_collect/furl/a97b522f8e264e79a7c396f202820a78',
+        status: 'success',
+        amount: '29250.0',
       }),
       true,
     );
@@ -98,5 +114,21 @@ describe('parseEasebuzzAddedOn', () => {
     const parsed = parseEasebuzzAddedOn('2026-09-08 06:02:18.000000');
     assert.ok(parsed instanceof Date);
     assert.equal(Number.isNaN(parsed.getTime()), false);
+  });
+});
+
+describe('easebuzzPaymentVendorRef', () => {
+  it('uses easepayid for EasyCollect payloads that reuse the loan number as txnid', () => {
+    assert.equal(
+      easebuzzPaymentVendorRef({
+        txnid: 'APP2026AEMXW',
+        udf1: 'APP2026AEMXW',
+        easepayid: 'E260909161FWZQ',
+        bank_ref_num: '675043113583',
+        status: 'success',
+        amount: '29250.0',
+      }),
+      'E260909161FWZQ',
+    );
   });
 });

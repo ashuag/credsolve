@@ -11,6 +11,16 @@ describe('resolveLeadReportRepaymentStatus', () => {
     ).toEqual({ code: 'NOT_APPLICABLE', label: '—' });
   });
 
+  it('maps a settled loan to paid with a settled label', () => {
+    expect(
+      resolveLeadReportRepaymentStatus({
+        hasLoan: true,
+        loanStatusCode: 'SETTLED',
+        latestRepaymentStatus: 'SUCCESS',
+      }),
+    ).toEqual({ code: 'PAID', label: 'Settled' });
+  });
+
   it('maps a closed loan to paid', () => {
     expect(
       resolveLeadReportRepaymentStatus({
@@ -51,14 +61,24 @@ describe('resolveLeadReportRepaymentStatus', () => {
     ).toEqual({ code: 'FAILED', label: 'Failed' });
   });
 
-  it('maps a successful repayment on an active loan to paid', () => {
+  it('maps a successful repayment on an active loan to partially paid', () => {
     expect(
       resolveLeadReportRepaymentStatus({
         hasLoan: true,
         loanStatusCode: 'ACTIVE',
         latestRepaymentStatus: 'SUCCESS',
       }),
-    ).toEqual({ code: 'PAID', label: 'Paid' });
+    ).toEqual({ code: 'PARTIALLY_PAID', label: 'Partially paid' });
+  });
+
+  it('maps a partial repayment on an active loan', () => {
+    expect(
+      resolveLeadReportRepaymentStatus({
+        hasLoan: true,
+        loanStatusCode: 'ACTIVE',
+        latestRepaymentStatus: 'PARTIAL',
+      }),
+    ).toEqual({ code: 'PARTIALLY_PAID', label: 'Partially paid' });
   });
 
   it('maps an active loan with no repayment as pending', () => {

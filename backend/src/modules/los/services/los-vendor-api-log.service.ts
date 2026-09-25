@@ -1,10 +1,56 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma, VendorHttpMethod } from '@prisma/client';
 import { classifyVendorApiLogOutcome } from '../../../common/vendor/vendor-api-log-outcome.util';
+import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 import { PrismaService } from '../../../prisma/prisma.service';
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+/** Excel cells max out near 32,767 chars — truncate payloads so the workbook stays openable. */
+const EXCEL_CELL_TEXT_LIMIT = 32000;
+
+/** Fields that gate the export — at least one must be set so a dump can't be pulled unfiltered. */
+const EXPORT_FILTER_KEYS = [
+  'providerName',
+  'serviceName',
+  'requestMethod',
+  'httpStatus',
+  'id',
+  'leadId',
+  'applicationNumber',
+  'requestPath',
+  'outcome',
+  'requestedFrom',
+  'requestedTo',
+] as const;
+
+const VENDOR_API_LOG_DUMP_HEADERS = [
+  'UUID',
+  'Application ID',
+  'Provider',
+  'Service',
+  'Method',
+  'HTTP status',
+  'Outcome',
+  'Requested at',
+  'Responded at',
+  'Duration (ms)',
+  'Request payload',
+  'Response payload',
+] as const;
+
+function stringifyPayload(value: unknown): string | null {
+  if (value == null) return null;
+  let text: string;
+  try {
+    text = JSON.stringify(value);
+  } catch {
+    text = String(value);
+  }
+  return text.length > EXCEL_CELL_TEXT_LIMIT
+    ? `${text.slice(0, EXCEL_CELL_TEXT_LIMIT)}…(truncated)`
+    : text;
+}
 
 const SORT_KEYS = [
   'id',
@@ -152,6 +198,65 @@ export class LosVendorApiLogService {
       requestPayload: row.requestPayload ?? null,
       responsePayload: row.responsePayload ?? null,
     };
+  }
+
+  /** Dump export: requires at least one filter (see EXPORT_FILTER_KEYS) to avoid unbounded loads. */
+  async exportWorkbook(query: ListVendorApiLogsQuery): Promise<Buffer> {
+    const hasFilter = EXPORT_FILTER_KEYS.some((key) => query[key]?.toString().trim());
+    if (!hasFilter) {
+      throw new BadRequestException('Apply at least one filter before downloading the vendor API log dump.');
+    }
+
+    const where = this.buildWhere(query);
+    const rows = await this.prisma.read.vendorApiLog.findMany({
+      where,
+      orderBy: { requestedAt: 'desc' },
+      select: {
+        uuid: true,
+        providerName: true,
+        serviceName: true,
+        requestMethod: true,
+        httpStatus: true,
+        requestedAt: true,
+        respondedAt: true,
+        requestPayload: true,
+        responsePayload: true,
+        lead: {
+          select: {
+            applications: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: { applicationNumber: true },
+            },
+          },
+        },
+      },
+    });
+
+    const sheetRows: SimpleXlsxCell[][] = [
+      [...VENDOR_API_LOG_DUMP_HEADERS],
+      ...rows.map((row) => {
+        const durationMs = Math.max(0, row.respondedAt.getTime() - row.requestedAt.getTime());
+        const outcome = classifyVendorApiLogOutcome(row.httpStatus, row.responsePayload);
+        const application = row.lead?.applications[0] ?? null;
+        return [
+          row.uuid,
+          application?.applicationNumber ?? null,
+          row.providerName,
+          row.serviceName,
+          row.requestMethod,
+          row.httpStatus,
+          outcome,
+          row.requestedAt,
+          row.respondedAt,
+          durationMs,
+          stringifyPayload(row.requestPayload),
+          stringifyPayload(row.responsePayload),
+        ];
+      }),
+    ];
+
+    return buildSimpleXlsxWorkbook(sheetRows, 'Vendor API Logs');
   }
 
   private toListItem(

@@ -15,5 +15,7 @@ export type SendEmailOptions = {
   text: string;
   html?: string;
   attachments?: EmailAttachment[];
+  /** Override default EMAIL_FROM (used for sanction / NOC letters). */
+  from?: { address: string; name?: string };
   audit?: SendEmailAuditContext;
 };

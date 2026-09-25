@@ -1,6 +1,7 @@
 import './globals.css';
 import type {Metadata, Viewport} from 'next';
 import localFont from 'next/font/local';
+import { Caveat } from 'next/font/google';
 import {ReactNode} from 'react';
 import {CustomerUtmBootstrap} from '@/components/auth/customer-utm-bootstrap';
 import { LayoutWrapper } from '@/components/layout/LayoutWrapper';
@@ -8,20 +9,33 @@ import {CustomerSessionProvider} from '@/components/providers/customer-session-p
 import {RejectedLeadSessionGate} from '@/components/auth/rejected-lead-session-gate';
 import { MAX_LOAN_DISPLAY } from '@/lib/brand';
 
-const inter = localFont({
-    src: './fonts/Inter-Variable.ttf',
-    weight: '100 900',
+const poppins = localFont({
+    src: [
+        { path: './fonts/Poppins-Regular.ttf', weight: '400', style: 'normal' },
+        { path: './fonts/Poppins-Medium.ttf', weight: '500', style: 'normal' },
+        { path: './fonts/Poppins-SemiBold.ttf', weight: '600', style: 'normal' },
+        { path: './fonts/Poppins-Bold.ttf', weight: '700', style: 'normal' },
+        { path: './fonts/Poppins-ExtraBold.ttf', weight: '800', style: 'normal' },
+        { path: './fonts/Poppins-Black.ttf', weight: '900', style: 'normal' },
+    ],
     display: 'swap',
-    variable: '--font-inter',
+    variable: '--font-poppins',
     adjustFontFallback: 'Arial',
+});
+
+const caveat = Caveat({
+    subsets: ['latin'],
+    weight: ['600', '700'],
+    variable: '--font-caveat',
+    display: 'swap',
 });
 
 export const metadata: Metadata = {
     title: {
-        default: `Get Instant Loan Up to ${MAX_LOAN_DISPLAY} | MoneyCash`,
-        template: '%s | MoneyCash'
+        default: `Credit Made Easy — Instant Loans up to ${MAX_LOAN_DISPLAY} | CredSolve`,
+        template: '%s | CredSolve'
     },
-    description: 'MoneyCash customer portal for secure OTP login, account access, payments, and loan application progress.',
+    description: 'CredSolve — instant personal loans with RBI-registered NBFC partners. Apply with PAN & get a decision in minutes. 100% paperless. No charges before disbursal.',
     icons: {
         icon: [
             { url: '/favicon.ico', sizes: '16x16 32x32 48x48', type: 'image/x-icon' },
@@ -34,14 +48,14 @@ export const metadata: Metadata = {
     },
     appleWebApp: {
         capable: true,
-        title: 'MoneyCash',
+        title: 'CredSolve',
         statusBarStyle: 'black-translucent',
     },
     openGraph: {
-        title: 'MoneyCash Customer Portal',
-        description: 'MoneyCash customer portal for secure OTP login, account access, payments, and loan application progress.',
+        title: 'CredSolve | Credit Made Easy',
+        description: 'Instant personal loans with RBI-registered NBFC partners. Apply with PAN & get a decision in minutes.',
         type: 'website',
-        siteName: 'MoneyCash'
+        siteName: 'CredSolve'
     }
 };
 
@@ -49,12 +63,12 @@ export const viewport: Viewport = {
     width: 'device-width',
     initialScale: 1,
     viewportFit: 'cover',
-    themeColor: '#1C347D',
+    themeColor: '#0F2748',
 };
 
 export default function RootLayout({children}: Readonly<{ children: ReactNode }>) {
     return (
-        <html lang="en" className={inter.variable}>
+        <html lang="en" className={`${poppins.variable} ${caveat.variable}`}>
         <body suppressHydrationWarning>
             <CustomerSessionProvider>
                 <CustomerUtmBootstrap/>

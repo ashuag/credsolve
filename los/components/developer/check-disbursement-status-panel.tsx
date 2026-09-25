@@ -9,7 +9,7 @@ import { FormEvent, useState } from 'react';
 import { cx, getLosToken } from '@/components/eligibility/eligibility-ui';
 
 const INPUT_CLASS =
-  'rounded-[10px] border border-[rgba(23,44,113,0.12)] px-3 py-2 text-[0.88rem] font-normal';
+  'rounded-[10px] border border-[rgba(15,39,72,0.12)] px-3 py-2 text-[0.88rem] font-normal';
 
 function formatDateTime(iso: string): string {
   if (!iso) return '—';
@@ -101,7 +101,7 @@ export function CheckDisbursementStatusPanel() {
 
       <form
         onSubmit={handleSubmit}
-        className="grid gap-4 rounded-[16px] border border-[rgba(23,44,113,0.1)] bg-white p-5"
+        className="grid gap-4 rounded-[16px] border border-[rgba(15,39,72,0.1)] bg-white p-5"
       >
         <div className="flex flex-wrap gap-4 text-[0.84rem] font-bold text-brand-navy">
           <label className="inline-flex cursor-pointer items-center gap-2">
@@ -197,10 +197,10 @@ export function CheckDisbursementStatusPanel() {
           </p>
 
           {result.rows.length > 0 ? (
-            <div className="overflow-x-auto rounded-[14px] border border-[rgba(23,44,113,0.1)] bg-white">
+            <div className="overflow-x-auto rounded-[14px] border border-[rgba(15,39,72,0.1)] bg-white">
               <table className="w-full min-w-[720px] border-collapse text-left text-[0.82rem]">
                 <thead>
-                  <tr className="border-b border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.9)] text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
+                  <tr className="border-b border-[rgba(15,39,72,0.08)] bg-[rgba(248,250,255,0.9)] text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
                     <th className="px-3 py-2">Application ID</th>
                     <th className="px-3 py-2">UTR</th>
                     <th className="px-3 py-2">Loan status</th>
@@ -213,7 +213,7 @@ export function CheckDisbursementStatusPanel() {
                     const utr = row.apiUtr || row.storedUtr;
                     const key = row.applicationUuid;
                     return (
-                      <tr key={key} className="border-b border-[rgba(23,44,113,0.06)] align-top">
+                      <tr key={key} className="border-b border-[rgba(15,39,72,0.06)] align-top">
                         <td className="px-3 py-2">
                           <div className="font-extrabold text-brand-navy">{row.applicationNumber}</div>
                           <div className="mt-0.5 text-[0.72rem] text-brand-muted">
@@ -235,7 +235,7 @@ export function CheckDisbursementStatusPanel() {
                         <td className="px-3 py-2">
                           <button
                             type="button"
-                            className="cursor-pointer rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-2 py-1 text-[0.72rem] font-bold text-brand-navy"
+                            className="cursor-pointer rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-2 py-1 text-[0.72rem] font-bold text-brand-navy"
                             onClick={() => setOpenBody((prev) => (prev === key ? null : key))}
                           >
                             {openBody === key ? 'Hide' : 'Show'} JSON

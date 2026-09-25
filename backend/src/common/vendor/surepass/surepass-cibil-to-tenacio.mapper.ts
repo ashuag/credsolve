@@ -14,7 +14,8 @@
  * This mapper re-keys the Surepass payload into that shape so BRE rules and
  * the report renderer are untouched when the vendor is switched.
  */
-import { ACCOUNT_TYPE_LABELS } from '../../cibil/cibil-tuef.constants';
+import { ACCOUNT_TYPE_LABELS, cibilAccountTypeToTuefSymbol } from '../../cibil/cibil-tuef.constants';
+import { unwrapVendorApiLogPayload } from '../vendor-api-log-payload.util';
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   return v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -76,8 +77,7 @@ function normalizeAccountTypeLabel(label: string): string {
 export function surepassAccountTypeToTuefSymbol(raw: unknown): string | null {
   const s = str(raw);
   if (!s) return null;
-  if (/^\d+$/.test(s)) return s.padStart(2, '0');
-  return ACCOUNT_TYPE_SYMBOL_BY_LABEL[normalizeAccountTypeLabel(s)] ?? null;
+  return cibilAccountTypeToTuefSymbol(s) ?? ACCOUNT_TYPE_SYMBOL_BY_LABEL[normalizeAccountTypeLabel(s)] ?? null;
 }
 
 type MonthlyStatusEntry = { date: string; status: string };
@@ -345,8 +345,16 @@ function mapTrueLinkCreditReport(data: Record<string, unknown>): Record<string, 
           inquiryDate,
           // TUEF enquiry purpose codes ("05" personal loan, "10" credit card, …)
           // — same code set the post-BRE enquiry rules already understand.
-          inquiryType: str(rec.enquiryPurpose),
-          subscriberName: str(rec.memberShortName),
+          inquiryType:
+            surepassAccountTypeToTuefSymbol(rec.enquiryPurpose ?? rec.enquiry_purpose) ??
+            str(rec.enquiryPurpose) ??
+            str(rec.enquiry_purpose),
+          subscriberName:
+            str(rec.memberShortName) ??
+            str(rec.member_short_name) ??
+            str(rec.memberName) ??
+            str(rec.member_name) ??
+            str(rec.member),
           amount: amountOrNull(rec.enquiryAmount),
         },
       };
@@ -369,7 +377,7 @@ export function mapSurepassCibilToTenacioEnvelope(
   rawBody: unknown,
   httpStatus: number | null,
 ): Record<string, unknown> {
-  const root = asRecord(rawBody);
+  const root = asRecord(unwrapVendorApiLogPayload(rawBody));
   const data = root ? asRecord(root.data) : null;
   const statusCode =
     root && typeof root.status_code === 'number' && Number.isFinite(root.status_code)

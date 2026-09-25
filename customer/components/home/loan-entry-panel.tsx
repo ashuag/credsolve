@@ -8,8 +8,6 @@ import { useCustomerSession } from '@/components/providers/customer-session-prov
 import { Spinner } from '@/components/ui/spinner';
 import type { SendOtpResponse } from '@/lib/api/auth';
 import { getCustomerJourneyResumePath, hasActiveLoanLead, hasOpenCustomerLoan } from '@/lib/api/customer-session';
-import { BRAND_TAGLINE } from '@/lib/brand';
-
 export function LoanEntryPanel() {
   const router = useRouter();
   const { loading, session, refresh } = useCustomerSession();
@@ -80,24 +78,10 @@ export function LoanEntryPanel() {
   }
 
   return (
-    <section className="h-full flex flex-col justify-center" aria-labelledby="entry-heading">
-      <div className="mb-8">
-        <h2 id="entry-heading" className="text-2xl md:text-[1.8rem] font-extrabold text-brand-navy mb-6 tracking-tight leading-[1.1] whitespace-nowrap">
-          Unlock Your <span className="text-brand-blue">Instant Loan</span>
-        </h2>
-        
-        {/* Premium Info Box */}
-        <div className="flex items-start gap-4 p-4 mb-2 rounded-2xl bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border border-blue-100/60 shadow-sm">
-          <div className="p-2 bg-white rounded-xl shadow-sm text-blue-600 shrink-0">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-          </div>
-          <p className="text-[0.95rem] text-slate-600 leading-relaxed m-0 pt-0.5">
-            Enter your mobile number to begin. We'll send a <strong className="text-slate-900 font-bold">secure 6-digit OTP</strong> to verify your identity.
-          </p>
-        </div>
-      </div>
+    <section className="flex h-full flex-col justify-center" aria-labelledby="entry-heading">
+      <h2 id="entry-heading" className="mb-6 text-[1.75rem] font-[800] leading-tight tracking-tight text-[#0F2748]">
+        Enter your mobile number
+      </h2>
 
       <Suspense
         fallback={
@@ -109,17 +93,6 @@ export function LoanEntryPanel() {
         <MobileEntryForm onSuccess={setOtpRequest} />
       </Suspense>
 
-      {/* Trust & Legal Footer */}
-      <div className="mt-8 pt-6 border-t border-slate-100">
-        <div className="flex items-center justify-center gap-4 mb-4">
-           <div className="flex items-center gap-1.5 text-[0.7rem] font-extrabold text-slate-400 uppercase tracking-widest">
-             <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-             </svg>
-             {BRAND_TAGLINE}
-           </div>
-        </div>
-      </div>
     </section>
   );
 }

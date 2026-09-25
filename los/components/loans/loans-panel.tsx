@@ -7,10 +7,11 @@ import {
   LOS_LISTING_PAGE_SIZE_OPTIONS,
   type DataTableColumn,
 } from '@/components/ui/data-table';
-import { getLoans, markApplicationInternalTesting, refreshLoanPayment, type LosLoan } from '@/lib/api';
+import { getLoans, markApplicationInternalTesting, refreshLoanPayment, sendLoanNocLetter, type LosLoan } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
 import { RefreshPaymentButton, useCanRefreshLoanPayment } from '@/components/loans/refresh-payment-button';
+import { loanNeedsNoc, SendNocButton, useCanSendLoanNoc } from '@/components/loans/send-noc-button';
 import { MarkInternalTestingButton, useCanMarkInternalTesting } from '@/components/shared/mark-internal-testing-button';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -70,7 +71,7 @@ function istCalendarYmd(asOf: Date): string {
 function isLoanPastDue(loan: LosLoan, asOf: Date = new Date()): boolean {
   if (loan.closedAt) return false;
   const code = loan.loanStatusCode.toUpperCase();
-  if (code === 'CLOSED' || code.includes('WRITE')) return false;
+  if (code === 'CLOSED' || code === 'SETTLED' || code.includes('WRITE')) return false;
   if (code === 'OVERDUE') return true;
   const maturityYmd = loan.loanMaturityDate?.slice(0, 10);
   if (!maturityYmd || !/^\d{4}-\d{2}-\d{2}$/.test(maturityYmd)) return false;
@@ -82,24 +83,50 @@ function effectiveStatusCode(loan: LosLoan): string {
   return loan.loanStatusCode;
 }
 
+const GRADE_TONE: Record<string, { background: string; color: string }> = {
+  A: { background: 'rgba(16,185,129,0.1)', color: '#10b981' },
+  B: { background: 'rgba(16,185,129,0.1)', color: '#10b981' },
+  C: { background: 'rgba(16,185,129,0.1)', color: '#10b981' },
+  D: { background: 'rgba(245,158,11,0.1)', color: '#f59e0b' },
+  E: { background: 'rgba(245,158,11,0.1)', color: '#f59e0b' },
+  F: { background: 'rgba(245,158,11,0.1)', color: '#f59e0b' },
+  G: { background: 'rgba(239,68,68,0.1)', color: '#ef4444' },
+  H: { background: 'rgba(239,68,68,0.1)', color: '#ef4444' },
+};
+
+function GradeBadge({ category }: { category: string | null | undefined }) {
+  if (!category) return <span className="text-brand-muted">—</span>;
+  const style = GRADE_TONE[category] ?? { background: 'rgba(99,102,241,0.12)', color: '#4f46e5' };
+  return (
+    <span className="inline-flex items-center justify-center min-w-[32px] h-7 px-2 rounded-[7px] text-[0.8rem] font-extrabold" style={style}>
+      {category}
+    </span>
+  );
+}
+
 function StatusPill({ label, code }: { label: string; code?: string }) {
   const s = (code ?? label).toUpperCase();
+  const isSettled = s === 'SETTLED';
   const isClosed = s.includes('CLOSED') || s.includes('WRITE') || s === 'PAID';
   const isOverdue = s.includes('OVERDUE');
   const isActive = s === 'ACTIVE' || s.includes('DISBURS');
   const style = isOverdue
     ? { background: 'rgba(239,68,68,0.14)', color: '#b91c1c', border: '1px solid rgba(239,68,68,0.28)' }
-    : isClosed
-      ? { background: 'rgba(16,185,129,0.14)', color: '#047857', border: '1px solid rgba(16,185,129,0.3)' }
-      : isActive
-        ? { background: 'rgba(14,165,233,0.14)', color: '#0369a1', border: '1px solid rgba(14,165,233,0.28)' }
-        : { background: 'rgba(99,102,241,0.12)', color: '#4338ca', border: '1px solid rgba(99,102,241,0.22)' };
+    : isSettled
+      ? { background: 'rgba(79,70,229,0.14)', color: '#3730a3', border: '1px solid rgba(79,70,229,0.28)' }
+      : isClosed
+        ? { background: 'rgba(16,185,129,0.14)', color: '#047857', border: '1px solid rgba(16,185,129,0.3)' }
+        : isActive
+          ? { background: 'rgba(14,165,233,0.14)', color: '#0369a1', border: '1px solid rgba(14,165,233,0.28)' }
+          : { background: 'rgba(99,102,241,0.12)', color: '#4338ca', border: '1px solid rgba(99,102,241,0.22)' };
   const display =
-    isClosed && !s.includes('WRITE')
-      ? 'Paid fully'
-      : isOverdue
-        ? 'Overdue'
-        : label;
+    isSettled
+      ? 'Settled'
+      : isClosed && !s.includes('WRITE')
+        ? 'Paid fully'
+        : isOverdue
+          ? 'Overdue'
+          : label;
   return (
     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[0.7rem] font-bold whitespace-nowrap" style={style}>
       {display}
@@ -132,6 +159,7 @@ export function LoansPanel() {
   const [actionMessage, setActionMessage] = useState<{ tone: 'ok' | 'warn' | 'err'; text: string } | null>(null);
   const canMarkTesting = useCanMarkInternalTesting();
   const canRefreshPayment = useCanRefreshLoanPayment();
+  const canSendNoc = useCanSendLoanNoc();
 
   const loadLoans = useCallback(async () => {
     setLoading(true);
@@ -168,6 +196,36 @@ export function LoansPanel() {
       setLoans((prev) => prev.filter((row) => row.uuid !== loan.uuid));
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Failed to mark loan as internal testing');
+    } finally {
+      setBusyUuid(null);
+    }
+  }, []);
+
+  const sendNoc = useCallback(async (loan: LosLoan) => {
+    const token = getToken();
+    if (!token) {
+      setFetchError('Session expired — please log in again.');
+      return;
+    }
+    setBusyUuid(loan.uuid);
+    setFetchError(null);
+    setActionMessage(null);
+    try {
+      const updated = await sendLoanNocLetter(token, loan.uuid);
+      setLoans((prev) =>
+        prev.map((row) =>
+          row.uuid === loan.uuid ? { ...row, isNocSent: updated.isNocSent } : row,
+        ),
+      );
+      setActionMessage({
+        tone: 'ok',
+        text: `NOC sent for ${loan.loanNumber}.`,
+      });
+    } catch (err) {
+      setActionMessage({
+        tone: 'err',
+        text: err instanceof Error ? err.message : 'Failed to send NOC letter',
+      });
     } finally {
       setBusyUuid(null);
     }
@@ -251,6 +309,19 @@ export function LoansPanel() {
       },
     },
     {
+      key: 'grade',
+      label: 'Grade',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.cibilCreditAssessmentCategory ?? '',
+      getSortValue: (row) => row.cibilCreditAssessmentCategory ?? '',
+      filter: {
+        type: 'select',
+        options: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((g) => ({ value: g, label: g })),
+        matches: (row, value) => row.cibilCreditAssessmentCategory === value,
+      },
+      render: (loan) => <GradeBadge category={loan.cibilCreditAssessmentCategory} />,
+    },
+    {
       key: 'principal',
       label: 'Principal',
       headerClassName: 'whitespace-nowrap',
@@ -295,9 +366,19 @@ export function LoansPanel() {
             <div className={hasPenal ? 'font-bold text-[#b91c1c]' : 'font-bold text-brand-text'}>
               {formatINR(loan.totalRepaymentWithPenalAmount)}
             </div>
-            {hasPenal ? (
+            {hasPenal || Number(loan.overdueInterestInr) > 0 || Number(loan.waivedAmountInr) > 0 ? (
               <div className="text-[0.72rem] text-brand-muted mt-0.5">
-                incl. {formatINR(loan.penalAmount)} penal charge
+                {[
+                  Number(loan.overdueInterestInr) > 0
+                    ? `${formatINR(loan.overdueInterestInr)} overdue interest`
+                    : null,
+                  hasPenal ? `${formatINR(loan.penalAmount)} penal` : null,
+                  Number(loan.waivedAmountInr) > 0
+                    ? `${formatINR(loan.waivedAmountInr)} waived`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </div>
             ) : null}
           </>
@@ -320,6 +401,24 @@ export function LoansPanel() {
           </span>
         );
       },
+    },
+    {
+      key: 'waived',
+      label: 'Waived',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.waivedAmountInr ?? '',
+      getSortValue: (row) => {
+        const n = Number(row.waivedAmountInr);
+        return Number.isFinite(n) ? n : 0;
+      },
+      filter: false,
+      cellClassName: 'whitespace-nowrap',
+      render: (loan) =>
+        Number(loan.waivedAmountInr) > 0 ? (
+          <span className="font-bold text-[#3730a3]">{formatINR(loan.waivedAmountInr)}</span>
+        ) : (
+          <span className="text-brand-muted">—</span>
+        ),
     },
     {
       key: 'overdueDays',
@@ -377,6 +476,9 @@ export function LoansPanel() {
               onClick={() => void refreshPayment(loan)}
             />
           ) : null}
+          {loanNeedsNoc(loan) ? (
+            <SendNocButton busy={busyUuid === loan.uuid} onClick={() => void sendNoc(loan)} />
+          ) : null}
           <MarkInternalTestingButton
             busy={busyUuid === loan.uuid}
             onConfirm={() => void markAsInternalTesting(loan)}
@@ -384,9 +486,9 @@ export function LoansPanel() {
         </div>
       ),
     },
-  ], [busyUuid, markAsInternalTesting, refreshPayment]);
+  ], [busyUuid, markAsInternalTesting, refreshPayment, sendNoc]);
 
-  const columns = canMarkTesting || canRefreshPayment
+  const columns = canMarkTesting || canRefreshPayment || canSendNoc
     ? allColumns
     : allColumns.filter((column) => column.key !== 'actions');
 
@@ -398,7 +500,7 @@ export function LoansPanel() {
     <div className="flex flex-col gap-4">
       {!loading && !fetchError ? (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard label="Total Loans" value={loans.length} color="#1496f3" />
+          <StatCard label="Total Loans" value={loans.length} color="#22C55E" />
           <StatCard label="Active" value={activeCount} color="#10b981" sub={`of ${loans.length}`} />
           <StatCard label="Overdue" value={overdueCount} color="#ef4444" />
           <StatCard
@@ -446,7 +548,7 @@ export function LoansPanel() {
           <button
             type="button"
             onClick={() => void loadLoans()}
-            className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+            className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)]"
           >
             ↺ Refresh
           </button>

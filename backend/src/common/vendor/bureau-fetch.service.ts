@@ -6,8 +6,14 @@ import { extractVendorServiceError } from './vendor-api-error.util';
 import { isTenacioBureauSuccessPayload } from './tenacio-bureau-payload.mapper';
 import { TENACIO_BUREAU_MOCK_VENDOR_BODY } from './tenacio-bureau-mock.fixture';
 import { SurepassCibilService } from './surepass/surepass-cibil.service';
+import { Cibil07CibilService } from './cibil07/cibil07-cibil.service';
 import { VendorApiService } from './vendor-api.service';
 import { VendorApiConfigService } from './vendor-api-config.service';
+import { type CibilVendorKind, mapCibilVendorName } from './cibil-vendor.util';
+import { formatBureauInquiryName } from '../utils/person-name.util';
+
+export type { CibilVendorKind } from './cibil-vendor.util';
+export { mapCibilVendorName } from './cibil-vendor.util';
 
 /**
  * Default relative path when `VENDOR_HOST` is `…/api/v1/services` and
@@ -46,6 +52,8 @@ export type BureauFetchResult = {
   isNewToCredit: boolean;
   /** Vendor `serviceError.message` when present (for audit notes). */
   serviceErrorMessage: string | null;
+  /** Integration that produced this result (`null` when no vendor was attempted). */
+  vendorKind: CibilVendorKind | null;
 };
 
 /**
@@ -61,6 +69,7 @@ export class BureauFetchService {
     private readonly vendorApi: VendorApiService,
     private readonly vendorApiConfig: VendorApiConfigService,
     private readonly surepassCibil: SurepassCibilService,
+    private readonly cibil07Cibil: Cibil07CibilService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -93,6 +102,7 @@ export class BureauFetchService {
         dummyPayload: true,
         isNewToCredit: false,
         serviceErrorMessage: null,
+        vendorKind: 'tenacio',
       };
     }
 
@@ -110,16 +120,21 @@ export class BureauFetchService {
         dummyPayload: false,
         isNewToCredit: false,
         serviceErrorMessage: null,
+        vendorKind: null,
       };
     }
 
     let lastResult: BureauFetchResult | null = null;
     for (let i = 0; i < vendorChain.length; i++) {
       const vendor = vendorChain[i];
-      const result =
-        vendor === 'surepass'
+      const result = {
+        ...(vendor === 'surepass'
           ? await this.fetchBureauFromSurepass(body, leadId)
-          : await this.fetchDirectFromTenacio(body, leadId);
+          : vendor === 'cibil07'
+            ? await this.fetchBureauFromCibil07(body, leadId)
+            : await this.fetchDirectFromTenacio(body, leadId)),
+        vendorKind: vendor,
+      };
 
       if (this.isBureauFetchSuccess(result)) {
         return result;
@@ -143,18 +158,18 @@ export class BureauFetchService {
   }
 
   /**
-   * ACTIVE `cibil_fetch` vendors ordered by priority, mapped to the two
-   * supported integrations. Defaults to Tenacio → Surepass when no
-   * `vendor_api_config` rows exist for `cibil_fetch`.
+   * ACTIVE `cibil_fetch` vendors ordered by priority, mapped to the supported
+   * integrations. Defaults to Tenacio → Surepass when no `vendor_api_config`
+   * rows exist for `cibil_fetch`.
    */
-  private async resolveCibilVendorChain(): Promise<Array<'tenacio' | 'surepass'>> {
+  private async resolveCibilVendorChain(): Promise<CibilVendorKind[]> {
     const hasCibilConfig = await this.vendorApiConfig.hasAnyForApi(VENDOR_API_CODE.CIBIL_FETCH);
     if (!hasCibilConfig) return ['tenacio', 'surepass'];
 
     const activeVendors = await this.vendorApiConfig.listActive(VENDOR_API_CODE.CIBIL_FETCH);
-    const chain: Array<'tenacio' | 'surepass'> = [];
+    const chain: CibilVendorKind[] = [];
     for (const row of activeVendors) {
-      const kind = row.vendorName.trim().toLowerCase() === 'surepass' ? 'surepass' : 'tenacio';
+      const kind = mapCibilVendorName(row.vendorName);
       if (!chain.includes(kind)) chain.push(kind);
     }
     return chain;
@@ -227,6 +242,7 @@ export class BureauFetchService {
         dummyPayload: false,
         isNewToCredit: false,
         serviceErrorMessage: null,
+        vendorKind: 'tenacio',
       };
     }
 
@@ -243,6 +259,7 @@ export class BureauFetchService {
         dummyPayload: false,
         isNewToCredit: false,
         serviceErrorMessage: null,
+        vendorKind: 'tenacio',
       };
     }
 
@@ -251,7 +268,7 @@ export class BureauFetchService {
         ...body.input,
         panNumber: body.input.panNumber.trim().toUpperCase(),
         mobileNumber: body.input.mobileNumber.trim(),
-        name: body.input.name.trim(),
+        name: formatBureauInquiryName(body.input.name),
         consent: body.input.consent,
       },
     };
@@ -298,6 +315,7 @@ export class BureauFetchService {
       dummyPayload: false,
       isNewToCredit,
       serviceErrorMessage: serviceError?.message ?? null,
+      vendorKind: 'tenacio',
     };
   }
 
@@ -327,7 +345,7 @@ export class BureauFetchService {
       {
         mobileNumber: body.input.mobileNumber,
         panNumber: body.input.panNumber,
-        name: body.input.name,
+        name: formatBureauInquiryName(body.input.name),
         gender,
       },
       leadId,
@@ -343,6 +361,7 @@ export class BureauFetchService {
         dummyPayload: false,
         isNewToCredit: false,
         serviceErrorMessage: null,
+        vendorKind: 'surepass',
       };
     }
 
@@ -368,6 +387,75 @@ export class BureauFetchService {
       dummyPayload: false,
       isNewToCredit,
       serviceErrorMessage: serviceError?.message ?? null,
+      vendorKind: 'surepass',
+    };
+  }
+
+  /**
+   * CIBIL07 bureau path — CIBIL07 API `POST /api/cibil/soft-pull`
+   * (PayMe India merchant). `Cibil07CibilService` reads name / DOB /
+   * gender / email / pincode / address from `lead_detail` and wraps the raw
+   * soft-pull response into the Tenacio envelope, so the New-To-Credit
+   * classification below and every downstream consumer work unchanged.
+   */
+  async fetchDirectFromCibil07(
+    body: BureauTenacioRequestBody,
+    leadId: bigint | null,
+  ): Promise<BureauFetchResult> {
+    return this.fetchBureauFromCibil07(body, leadId);
+  }
+
+  private async fetchBureauFromCibil07(
+    body: BureauTenacioRequestBody,
+    leadId: bigint | null,
+  ): Promise<BureauFetchResult> {
+    const result = await this.cibil07Cibil.fetchCreditReport(
+      {
+        mobileNumber: body.input.mobileNumber,
+        panNumber: body.input.panNumber,
+        name: body.input.name,
+        consent: body.input.consent,
+      },
+      leadId,
+    );
+
+    if (!result.configured) {
+      return {
+        configured: false,
+        skipReason: result.skipReason,
+        ok: false,
+        httpStatus: null,
+        vendorBody: null,
+        dummyPayload: false,
+        isNewToCredit: false,
+        serviceErrorMessage: null,
+        vendorKind: 'cibil07',
+      };
+    }
+
+    const serviceError = extractVendorServiceError(result.vendorBody);
+    const isNewToCredit =
+      serviceError != null &&
+      (serviceError.serviceStatusCode == null || serviceError.serviceStatusCode < 500);
+
+    if (serviceError) {
+      this.logger.warn(
+        `CIBIL07 bureau service error (leadId=${leadId?.toString() ?? 'n/a'}): ` +
+          `serviceStatusCode=${serviceError.serviceStatusCode ?? 'n/a'} ntc=${isNewToCredit} ` +
+          `message=${serviceError.message ?? 'n/a'}`,
+      );
+    }
+
+    return {
+      configured: true,
+      ok: result.ok,
+      httpStatus: result.httpStatus,
+      vendorBody: result.vendorBody,
+      error: result.error,
+      dummyPayload: false,
+      isNewToCredit,
+      serviceErrorMessage: serviceError?.message ?? null,
+      vendorKind: 'cibil07',
     };
   }
 

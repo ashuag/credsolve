@@ -94,7 +94,7 @@ function LoanDocumentsContent() {
           {!pdfViewing ? (
           <div>
             <p className="mc-chip mb-3">Sanction letter</p>
-            <h1 className="mb-2 text-2xl font-extrabold leading-[1.1] tracking-tight text-brand-navy md:text-[2.1rem]">
+            <h1 className="mb-2 text-2xl font-bold leading-[1.1] tracking-tight text-brand-navy md:text-[2.1rem]">
               Review your sanction letter
             </h1>
             {error ? (
@@ -163,7 +163,7 @@ function LoanDocumentsContent() {
   );
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-[#fffdf8] selection:bg-[#ffc519]/30 lg:h-full lg:min-h-0 lg:bg-transparent">
+    <div className="flex min-h-screen w-full flex-col bg-[#f7fbf9] selection:bg-[#22c55e]/30 lg:h-full lg:min-h-0 lg:bg-transparent">
       <LoanDocumentsProgressSync />
       <main className="relative flex w-full grow flex-col items-center justify-start p-0 lg:h-full lg:min-h-0 lg:justify-center">
         <div className="pointer-events-none absolute inset-0 overflow-hidden lg:hidden">

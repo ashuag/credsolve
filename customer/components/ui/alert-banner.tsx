@@ -5,7 +5,7 @@ type AlertVariant = 'error' | 'success' | 'warn';
 const VARIANT_CLASSES: Record<AlertVariant, string> = {
   error:   'text-[#b2372d] bg-[rgba(193,57,43,0.08)]   border-[rgba(193,57,43,0.18)]',
   success: 'text-[#17624a] bg-[rgba(36,168,111,0.1)]   border-[rgba(36,168,111,0.18)]',
-  warn:    'text-brand-navy bg-[rgba(255,197,25,0.18)]  border-[rgba(255,197,25,0.28)]',
+  warn:    'text-brand-navy bg-[rgba(34,197,94,0.18)]  border-[rgba(34,197,94,0.28)]',
 };
 
 type AlertBannerProps = {

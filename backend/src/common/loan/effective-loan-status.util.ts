@@ -1,4 +1,4 @@
-import { LOAN_STATUS } from '../constants/loan.constants';
+import { isClosedLoanStatus, LOAN_STATUS } from '../constants/loan.constants';
 import { isRepaymentPastDue } from './bounce-charge.util';
 
 /**
@@ -15,7 +15,10 @@ export function resolveEffectiveLoanStatus(input: {
   const code = input.statusName;
   const label = input.statusDisplayName?.trim() || code;
 
-  if (input.closedAt != null || code === LOAN_STATUS.CLOSED || code === LOAN_STATUS.WRITTEN_OFF) {
+  if (input.closedAt != null || isClosedLoanStatus(code)) {
+    if (code === LOAN_STATUS.SETTLED) {
+      return { code: LOAN_STATUS.SETTLED, label: input.statusDisplayName?.trim() || 'Settled' };
+    }
     return { code, label };
   }
 

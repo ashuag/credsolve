@@ -9,6 +9,10 @@ export const LANDING_LOAN_PRODUCT_PURPOSE: Record<string, string> = {
   emergency: 'Emergency Expense',
   medical: 'Emergency Expense',
   education: 'Improving Credit History',
+  business: 'Business Purpose',
+  purchase: 'Appliance Purchase',
+  travel: 'Vacation Goals',
+  all: 'Debt Consolidation',
 };
 
 const VALID_LOAN_PURPOSES = new Set(CUSTOMER_LOAN_PURPOSE_OPTIONS.map((option) => option.value));

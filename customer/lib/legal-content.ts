@@ -27,7 +27,7 @@ export type LegalDocumentContent = {
   navLabel: string;
   title: string;
   description: string;
-  registeredOffice: string;
+  registeredOffice?: string;
   contactEmail: string;
   generatedAt: string;
   sections: LegalSection[];

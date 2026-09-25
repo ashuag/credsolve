@@ -1,22 +1,23 @@
 'use client';
 
+import { CheckCibilScorePanel, CibilHitLogsPanel } from '@/components/applications/check-cibil-score-panel';
 import { CibilReportViewer } from '@/components/applications/cibil-report-viewer';
 import { cx } from '@/components/eligibility/eligibility-ui';
 import { PostBreResultsSummary } from '@/components/eligibility/post-bureau-bre-panel';
 import {
-  createApplicationCibilReport,
   getApplicationCibilReport,
   getApplicationDetails,
   getLeadCibilReport,
   resolveLosKycPhotoSrc,
   runPostBureauBreCheck,
   type LosApplicationCibilReportPayload,
+  type LosCheckCibilResult,
   type PostBreDryRunResult,
 } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-type CibilReportView = 'report' | 'json' | 'bre';
+type CibilReportView = 'report' | 'bre' | 'hits';
 
 type ApplicationCibilReportTabProps = {
   applicationUuid?: string;
@@ -37,138 +38,6 @@ function getToken(): string | null {
   } catch {
     return null;
   }
-}
-
-function formatJson(value: unknown): string {
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-}
-
-function CibilJsonViewer({ rawPayload }: { rawPayload: unknown }) {
-  const formatted = useMemo(() => formatJson(rawPayload), [rawPayload]);
-  const [copied, setCopied] = useState(false);
-
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(formatted);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
-    }
-  }
-
-  return (
-    <div className="los-card overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.85)] px-5 py-3">
-        <div>
-          <h3 className="m-0 text-[0.95rem] font-extrabold text-brand-navy">Bureau JSON</h3>
-          <p className="m-0 mt-0.5 text-[0.78rem] text-brand-muted">Raw Tenacio / TrueLink payload stored on the bureau report.</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void handleCopy()}
-          className="inline-flex min-h-[34px] items-center rounded-full border border-[rgba(23,44,113,0.12)] bg-white px-4 text-[0.78rem] font-bold text-brand-navy hover:border-[rgba(20,150,243,0.35)]"
-        >
-          {copied ? 'Copied' : 'Copy JSON'}
-        </button>
-      </div>
-      <pre className="m-0 max-h-[min(72vh,900px)] overflow-auto bg-[#0f172a] p-4 text-[0.72rem] leading-relaxed text-[#e2e8f0]">
-        <code>{formatted}</code>
-      </pre>
-    </div>
-  );
-}
-
-function CibilReportUnavailable({
-  applicationUuid,
-  leadUuid,
-  mobileNumber,
-  fullName,
-  panNumber,
-  onCreated,
-}: {
-  applicationUuid?: string;
-  leadUuid?: string;
-  mobileNumber?: string;
-  fullName?: string | null;
-  panNumber?: string | null;
-  onCreated?: () => void;
-}) {
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleDownloadReport() {
-    const token = getToken();
-    if (!token) {
-      setError('Session expired — please log in again.');
-      return;
-    }
-
-    setCreating(true);
-    setError(null);
-
-    try {
-      let resolvedLeadUuid = leadUuid?.trim() || '';
-      let resolvedMobile = mobileNumber?.trim() || '';
-      let resolvedName = fullName?.trim() || '';
-      let resolvedPan = panNumber?.trim().toUpperCase() || '';
-
-      if (applicationUuid && (!resolvedLeadUuid || !resolvedMobile || !resolvedName || !resolvedPan)) {
-        const details = await getApplicationDetails(token, applicationUuid);
-        const profile = details.lead.profile;
-        resolvedLeadUuid = details.leadUuid;
-        resolvedMobile = details.mobileNumber;
-        resolvedName = profile?.fullName?.trim() || resolvedName;
-        resolvedPan = details.lead.panNumber?.trim().toUpperCase() || resolvedPan;
-      }
-
-      if (!resolvedLeadUuid || !resolvedName || !resolvedPan) {
-        setError('Full name and PAN are required on the lead profile before fetching a CIBIL report.');
-        return;
-      }
-
-      await createApplicationCibilReport(token, {
-        leadUuid: resolvedLeadUuid,
-        mobileNumber: resolvedMobile,
-        fullName: resolvedName,
-        panNumber: resolvedPan,
-      });
-
-      onCreated?.();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to download CIBIL report.');
-    } finally {
-      setCreating(false);
-    }
-  }
-
-  return (
-    <div className="los-card border border-dashed border-[rgba(23,44,113,0.18)] bg-[rgba(248,250,255,0.88)] p-6 md:p-8">
-      <span className="los-chip mb-3">CIBIL report</span>
-      <h3 className="m-0 text-[1.05rem] font-extrabold tracking-[-0.02em] text-brand-navy">
-        No bureau report on file
-      </h3>
-      <p className="m-0 mt-2 max-w-[52ch] text-[0.88rem] leading-relaxed text-brand-muted">
-        Pull the customer&apos;s CIBIL bureau report from Tenacio. Once downloaded, you can view the formatted report
-        and raw JSON here.
-      </p>
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          className="los-btn-primary min-h-[40px] px-4"
-          disabled={creating}
-          onClick={() => void handleDownloadReport()}
-        >
-          {creating ? 'Downloading report…' : 'Download CIBIL report'}
-        </button>
-      </div>
-      {error ? <p className="m-0 mt-4 text-[0.82rem] font-semibold text-[#8d3434]">{error}</p> : null}
-    </div>
-  );
 }
 
 function PostBreView({
@@ -225,7 +94,9 @@ function PostBreView({
       <div className="los-card flex flex-wrap items-center justify-between gap-3 p-4">
         <div>
           <h3 className="m-0 text-[0.95rem] font-extrabold text-brand-navy">Post-BRE eligibility check</h3>
-          <p className="m-0 mt-0.5 text-[0.8rem] text-brand-muted">Runs all post-bureau rules against the stored bureau payload.</p>
+          <p className="m-0 mt-0.5 text-[0.8rem] text-brand-muted">
+            Dry-run inspector against the stored bureau payload. Use Check CIBIL score to persist rejection on failure.
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <label className="grid gap-1">
@@ -273,8 +144,6 @@ export function ApplicationCibilReportTab({
   applicationUuid,
   leadUuid,
   mobileNumber,
-  fullName,
-  panNumber,
   onReportCreated,
 }: ApplicationCibilReportTabProps) {
   const [payload, setPayload] = useState<LosApplicationCibilReportPayload | null>(null);
@@ -282,6 +151,7 @@ export function ApplicationCibilReportTab({
   const [missingReport, setMissingReport] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<CibilReportView>('report');
+  const [checkResult, setCheckResult] = useState<LosCheckCibilResult | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -326,7 +196,8 @@ export function ApplicationCibilReportTab({
     void load();
   }, [load]);
 
-  function handleReportCreated() {
+  function handleCibilChecked(result: LosCheckCibilResult) {
+    setCheckResult(result);
     onReportCreated?.();
     void load();
   }
@@ -335,9 +206,9 @@ export function ApplicationCibilReportTab({
     return (
       <div className="los-card p-8">
         <div className="mx-auto max-w-md animate-pulse space-y-4">
-          <div className="h-4 w-48 rounded bg-[rgba(23,44,113,0.08)]" />
-          <div className="h-24 rounded-xl bg-[rgba(23,44,113,0.05)]" />
-          <div className="h-40 rounded-xl bg-[rgba(23,44,113,0.05)]" />
+          <div className="h-4 w-48 rounded bg-[rgba(15,39,72,0.08)]" />
+          <div className="h-24 rounded-xl bg-[rgba(15,39,72,0.05)]" />
+          <div className="h-40 rounded-xl bg-[rgba(15,39,72,0.05)]" />
         </div>
       </div>
     );
@@ -345,13 +216,12 @@ export function ApplicationCibilReportTab({
 
   if (missingReport) {
     return (
-      <CibilReportUnavailable
+      <CheckCibilScorePanel
         applicationUuid={applicationUuid}
         leadUuid={leadUuid}
-        mobileNumber={mobileNumber}
-        fullName={fullName}
-        panNumber={panNumber}
-        onCreated={handleReportCreated}
+        emptyState
+        lastResult={checkResult}
+        onCompleted={handleCibilChecked}
       />
     );
   }
@@ -388,42 +258,58 @@ export function ApplicationCibilReportTab({
   const viewTabs: Array<{ id: CibilReportView; label: string }> = [
     { id: 'report', label: 'View CIBIL report' },
     { id: 'bre', label: 'Post BRE check' },
-    { id: 'json', label: 'View JSON' },
+    { id: 'hits', label: 'CIBIL hit logs & JSON' },
   ];
 
   return (
     <div className="grid gap-4">
-      <nav
-        className="los-card flex flex-wrap gap-1 p-1.5"
-        aria-label="CIBIL report views"
-      >
-        {viewTabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveView(tab.id)}
-            className={cx(
-              'min-h-[38px] flex-1 rounded-[10px] px-4 text-[0.82rem] font-extrabold transition-colors sm:flex-none',
-              activeView === tab.id
-                ? 'bg-brand-navy text-white shadow-sm'
-                : 'text-brand-navy hover:bg-[rgba(23,44,113,0.06)]',
-            )}
-            aria-current={activeView === tab.id ? 'page' : undefined}
+      <CheckCibilScorePanel
+        applicationUuid={applicationUuid}
+        leadUuid={leadUuid}
+        compact
+        hideHitLogs
+        lastResult={checkResult}
+        onCompleted={handleCibilChecked}
+        buttonClassName="los-btn-primary min-h-[38px] shrink-0 whitespace-nowrap px-4 text-[0.82rem]"
+        renderToolbarButton={(button) => (
+          <nav
+            className="flex flex-wrap items-center gap-2"
+            aria-label="CIBIL report views"
           >
-            {tab.label}
-          </button>
-        ))}
-        {pdfDownloadUrl ? (
-          <a
-            href={pdfDownloadUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="ml-auto inline-flex min-h-[38px] items-center rounded-[10px] border border-[rgba(23,44,113,0.12)] bg-white px-4 text-[0.82rem] font-bold text-brand-blue no-underline hover:border-[rgba(20,150,243,0.35)]"
-          >
-            Download CIBIL report
-          </a>
-        ) : null}
-      </nav>
+            <div className="los-card flex min-w-0 flex-wrap items-center gap-1 p-1.5">
+              {viewTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveView(tab.id)}
+                  className={cx(
+                    'min-h-[38px] flex-1 whitespace-nowrap rounded-[10px] px-3 text-[0.82rem] font-extrabold transition-colors sm:flex-none sm:px-4',
+                    activeView === tab.id
+                      ? 'bg-brand-navy text-white shadow-sm'
+                      : 'text-brand-navy hover:bg-[rgba(15,39,72,0.06)]',
+                  )}
+                  aria-current={activeView === tab.id ? 'page' : undefined}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <div className="ml-auto flex flex-wrap items-center gap-1.5">
+              {button}
+              {pdfDownloadUrl ? (
+                <a
+                  href={pdfDownloadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-[38px] shrink-0 items-center whitespace-nowrap rounded-[10px] border border-[rgba(15,39,72,0.12)] bg-white px-4 text-[0.82rem] font-bold text-brand-blue no-underline hover:border-[rgba(34,197,94,0.35)]"
+                >
+                  Download CIBIL report
+                </a>
+              ) : null}
+            </div>
+          </nav>
+        )}
+      />
 
       {activeView === 'report' ? <CibilReportViewer payload={payload} pdfDownloadUrl={pdfDownloadUrl} /> : null}
       {activeView === 'bre' ? (
@@ -433,7 +319,13 @@ export function ApplicationCibilReportTab({
           applicationUuid={applicationUuid}
         />
       ) : null}
-      {activeView === 'json' ? <CibilJsonViewer rawPayload={payload.rawPayload} /> : null}
+      {activeView === 'hits' ? (
+        <CibilHitLogsPanel
+          applicationUuid={applicationUuid}
+          leadUuid={leadUuid}
+          refreshKey={checkResult?.hitCount ?? payload.bureauReportUuid}
+        />
+      ) : null}
     </div>
   );
 }

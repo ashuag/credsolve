@@ -30,7 +30,7 @@ const CATEGORY_LABELS: Record<PostBreRuleCatalogEntry['category'], string> = {
 
 function CriteriaTable({ rows }: { rows: PostBreCriteriaConfigRow[] }) {
   return (
-    <div className="overflow-x-auto rounded-[12px] border border-[rgba(23,44,113,0.1)]">
+    <div className="overflow-x-auto rounded-[12px] border border-[rgba(15,39,72,0.1)]">
       <table className="w-full min-w-[720px] border-collapse text-left text-[0.78rem]">
         <thead>
           <tr className="bg-[rgba(248,250,255,0.95)] text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
@@ -43,7 +43,7 @@ function CriteriaTable({ rows }: { rows: PostBreCriteriaConfigRow[] }) {
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.key} className="border-t border-[rgba(23,44,113,0.06)]">
+            <tr key={row.key} className="border-t border-[rgba(15,39,72,0.06)]">
               <td className="px-3 py-2.5 font-mono font-semibold text-brand-navy">{row.key}</td>
               <td className="px-3 py-2.5">
                 <p className="m-0 font-semibold text-brand-navy">{row.label}</p>
@@ -81,7 +81,7 @@ function RuleCard({ rule, criteriaByKey }: { rule: PostBreRuleCatalogEntry; crit
     (rule.toggleCriteriaKey ? criteriaByKey.get(rule.toggleCriteriaKey)?.ruleEnabled : true);
 
   return (
-    <article className="rounded-[14px] border border-[rgba(23,44,113,0.1)] bg-white p-4 shadow-[0_4px_16px_rgba(23,44,113,0.04)]">
+    <article className="rounded-[14px] border border-[rgba(15,39,72,0.1)] bg-white p-4 shadow-[0_4px_16px_rgba(15,39,72,0.04)]">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h3 className="m-0 text-[0.95rem] font-extrabold text-brand-navy">{rule.label}</h3>
@@ -92,7 +92,7 @@ function RuleCard({ rule, criteriaByKey }: { rule: PostBreRuleCatalogEntry; crit
             {CATEGORY_LABELS[rule.category]}
           </span>
           {rule.informationalOnly ? (
-            <span className="inline-flex rounded-full bg-[rgba(20,150,243,0.1)] px-2 py-0.5 text-[0.68rem] font-extrabold text-brand-blue">
+            <span className="inline-flex rounded-full bg-[rgba(34,197,94,0.1)] px-2 py-0.5 text-[0.68rem] font-extrabold text-brand-blue">
               Info only
             </span>
           ) : null}
@@ -177,7 +177,7 @@ function UnsecuredExposureSection({ guide }: { guide: PostBreUnsecuredExposureGu
         </p>
       </div>
 
-      <div className="grid gap-2 rounded-[12px] border border-[rgba(20,150,243,0.18)] bg-[rgba(20,150,243,0.05)] p-4 text-[0.8rem] leading-[1.5] text-brand-text">
+      <div className="grid gap-2 rounded-[12px] border border-[rgba(34,197,94,0.18)] bg-[rgba(34,197,94,0.05)] p-4 text-[0.8rem] leading-[1.5] text-brand-text">
         <p className="m-0">
           <strong className="text-brand-navy">Max open exposure (inspection):</strong> {guide.maxExposureDefinition}
         </p>
@@ -207,7 +207,7 @@ function UnsecuredExposureSection({ guide }: { guide: PostBreUnsecuredExposureGu
           <code className="text-[0.76rem]">no_active_mfi</code> instead.
         </p>
       </div>
-      <div className="overflow-x-auto rounded-[12px] border border-[rgba(23,44,113,0.1)]">
+      <div className="overflow-x-auto rounded-[12px] border border-[rgba(15,39,72,0.1)]">
         <table className="w-full min-w-[640px] border-collapse text-left text-[0.76rem]">
           <thead>
             <tr className="bg-[rgba(248,250,255,0.95)] text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
@@ -218,7 +218,7 @@ function UnsecuredExposureSection({ guide }: { guide: PostBreUnsecuredExposureGu
           </thead>
           <tbody>
             {guide.accountTypes.map((row) => (
-              <tr key={row.symbol} className="border-t border-[rgba(23,44,113,0.06)]">
+              <tr key={row.symbol} className="border-t border-[rgba(15,39,72,0.06)]">
                 <td className="px-2.5 py-2 font-mono font-semibold text-brand-navy">{row.symbol}</td>
                 <td className="px-2.5 py-2 font-semibold text-brand-text">{row.label}</td>
                 <td className="px-2.5 py-2 text-brand-muted">{row.exposureBasis}</td>
@@ -238,7 +238,7 @@ function UnsecuredExposureSection({ guide }: { guide: PostBreUnsecuredExposureGu
           . {activeTiers.length} active tier(s).
         </p>
       </div>
-      <div className="overflow-x-auto rounded-[12px] border border-[rgba(23,44,113,0.1)]">
+      <div className="overflow-x-auto rounded-[12px] border border-[rgba(15,39,72,0.1)]">
         <table className="w-full min-w-[560px] border-collapse text-left text-[0.76rem]">
           <thead>
             <tr className="bg-[rgba(248,250,255,0.95)] text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-brand-muted">
@@ -253,7 +253,7 @@ function UnsecuredExposureSection({ guide }: { guide: PostBreUnsecuredExposureGu
               <tr
                 key={tier.id}
                 className={cx(
-                  'border-t border-[rgba(23,44,113,0.06)]',
+                  'border-t border-[rgba(15,39,72,0.06)]',
                   !tier.isActive && 'opacity-60',
                 )}
               >
@@ -342,7 +342,7 @@ export function PostBreRulesPanel() {
 
   if (loading) {
     return (
-      <p className="m-0 rounded-[12px] border border-[rgba(23,44,113,0.08)] bg-white p-6 text-center text-[0.88rem] text-brand-muted">
+      <p className="m-0 rounded-[12px] border border-[rgba(15,39,72,0.08)] bg-white p-6 text-center text-[0.88rem] text-brand-muted">
         Loading post-BRE rules…
       </p>
     );

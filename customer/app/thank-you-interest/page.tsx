@@ -44,7 +44,7 @@ export default function ThankYouInterestPage() {
   const journeyPanel = (
     <div className="h-full flex flex-col justify-center">
       <div className="mb-6">
-        <h1 className="text-2xl md:text-[2.5rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">
+        <h1 className="text-2xl md:text-[2.5rem] font-bold text-brand-navy mb-4 tracking-tight leading-[1.1]">
           Thank You for Your Interest
         </h1>
 
@@ -82,11 +82,11 @@ export default function ThankYouInterestPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(135deg,#fffbeb,#fef3c7)] flex items-center justify-center p-4 sm:p-6 md:p-8">
+    <div className="min-h-screen bg-[linear-gradient(135deg,#f0fdf4,#fef3c7)] flex items-center justify-center p-4 sm:p-6 md:p-8">
       <LoanLandingShell
         journeyPanel={journeyPanel}
         leftTitle={<>Thank <span className="text-amber-400">You!</span></>}
-        leftDescription="We appreciate your interest in MoneyCash. We look forward to serving you in the future."
+        leftDescription="We appreciate your interest in CredSolve. We look forward to serving you in the future."
         leftInfographic={
           <svg viewBox="0 0 400 400" className="w-full h-full drop-shadow-2xl" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>

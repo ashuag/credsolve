@@ -195,7 +195,7 @@ export function PersonalLoanEmiCalculator() {
       <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr] lg:items-start">
         {/* Inputs card */}
         <div className="rounded-[28px] border border-brand-navy/8 bg-white p-6 shadow-[0_24px_60px_rgba(18,36,79,0.07)] sm:p-8">
-          <h2 className="text-lg font-[900] tracking-tight text-brand-navy sm:text-xl">
+          <h2 className="text-lg font-[700] tracking-tight text-brand-navy sm:text-xl">
             Calculate Your Personal Loan EMI
           </h2>
 
@@ -369,7 +369,7 @@ export function PersonalLoanEmiCalculator() {
 
       {/* ── What does this mean? ── */}
       <div>
-        <h2 className="text-lg font-[900] tracking-tight text-brand-navy sm:text-xl">What Does This Mean?</h2>
+        <h2 className="text-lg font-[700] tracking-tight text-brand-navy sm:text-xl">What Does This Mean?</h2>
         <p className="mt-1 text-sm text-[#12244f]/55">Your EMI explained in simple language.</p>
 
         <div className="mt-4 grid gap-4 lg:grid-cols-2">

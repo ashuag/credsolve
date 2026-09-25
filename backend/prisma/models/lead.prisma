@@ -47,6 +47,8 @@ model LeadDetail {
   pincode          String?   @db.Char(6)
   addressLine1     String?   @map("address_line_1") @db.TinyText
   addressLine2     String?   @map("address_line_2") @db.TinyText
+  /// Contact email from the address step. Not OTP-verified; may differ from `application_detail.email_id`.
+  emailId          String?   @map("email_id") @db.VarChar(150)
   occupationId     Int?      @map("occupation_id") @db.SmallInt
   netMonthlyIncome Decimal?  @map("net_monthly_income") @db.Decimal(12, 2)
   annualTurnover   Decimal?  @map("annual_turnover") @db.Decimal(12, 2)
@@ -102,6 +104,7 @@ model VendorApiLog {
   @@index([leadId, serviceName, respondedAt])
   @@index([providerName, requestedAt])
   @@index([requestedAt])
+  @@index([respondedAt])
   @@index([httpStatus, requestedAt])
   @@map("vendor_api_log")
 }
@@ -119,7 +122,6 @@ model LeadUtm {
 
   lead Lead @relation(fields: [leadId], references: [id])
 
-  @@index([leadId])
-  @@index([createdAt])
+  @@index([leadId, createdAt])
   @@map("lead_utm")
 }
