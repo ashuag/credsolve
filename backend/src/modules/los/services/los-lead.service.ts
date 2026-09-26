@@ -19,6 +19,7 @@ import { streamXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/si
 import { TENACIO_SERVICE_PAN_NAME_DOB } from '../../../common/vendor/tenacio/tenacio-client.service';
 import { resolveCibilVendorDisplayName } from '../../../common/vendor/cibil-vendor.util';
 import {
+  matchesExportTextFilter,
   parseExportIstDayRange,
   requireAtLeastOneExportFilter,
 } from '../../../common/xlsx/export-row-filter.util';
@@ -235,11 +236,14 @@ export class LosLeadService {
 
   /**
    * Dump export for LOS Leads → Download dump. Mirrors the LOS Leads table's own column filters
-   * (same field names as the table's column keys). "Rejection reason" is a derived label (joins
-   * the stored reason code with its display label and the free-text status note), so it's applied
-   * as a JS filter on the already-narrowed, mapped rows instead of a Prisma `where` condition.
-   * Requires at least one filter, same as the button staying disabled until a filter matches a lead.
-   * Streams straight to `res`, cursor-paged from the DB in batches.
+   * (same field names as the table's column keys). "Rejection reason", "City" and "Source" are
+   * derived labels in the table (e.g. `"<city>, <state code>"`, `"<name> · <type>"`, or the literal
+   * `Unattributed`) rather than raw DB columns, so they're applied as JS filters on the
+   * already-narrowed, mapped rows instead of a Prisma `where` condition — otherwise a search that
+   * matches the grid's combined label (a state code, or the literal `Unattributed`) would drop rows
+   * the export's `where` can't see. Requires at least one filter, same as the button staying
+   * disabled until a filter matches a lead. Streams straight to `res`, cursor-paged from the DB in
+   * batches.
    */
   async exportLeadsWorkbook(query: ExportLeadsQueryDto, res: Response): Promise<void> {
     const { access_token: _accessToken, ...filterFields } = query;
@@ -249,17 +253,21 @@ export class LosLeadService {
     );
     const where = this.buildExportWhere(query);
     const reason = query.reason?.trim().toLowerCase();
+    const city = query.city?.trim();
+    const source = query.source?.trim();
 
     await streamXlsxWorkbook(res, {
       sheetName: 'Leads',
       headers: LEAD_DUMP_HEADERS,
-      rows: this.streamLeadsForExport(where, reason),
+      rows: this.streamLeadsForExport(where, reason, city, source),
     });
   }
 
   private async *streamLeadsForExport(
     extraWhere: Prisma.LeadWhereInput,
     reason: string | undefined,
+    city: string | undefined,
+    source: string | undefined,
   ): AsyncGenerator<SimpleXlsxCell[]> {
     let cursorId: bigint | undefined;
     const where = this.leadQueueWhere(extraWhere);
@@ -283,6 +291,8 @@ export class LosLeadService {
             .toLowerCase();
           if (!haystack.includes(reason)) continue;
         }
+        if (city && !matchesExportTextFilter(lead.city, city)) continue;
+        if (source && !matchesExportTextFilter(leadSourceLabel(lead) ?? 'Unattributed', source)) continue;
         yield [
           lead.leadNumber,
           lead.applicationNumber,
@@ -343,11 +353,6 @@ export class LosLeadService {
       and.push({ leadDetail: { occupation: { name: { contains: occupationText } } } });
     }
 
-    const cityText = query.city?.trim();
-    if (cityText) {
-      and.push({ leadDetail: { city: { name: { contains: cityText } } } });
-    }
-
     const cibilText = query.cibil?.trim();
     if (cibilText) {
       const cibilScore = Number(cibilText);
@@ -369,17 +374,6 @@ export class LosLeadService {
     const statusText = query.status?.trim();
     if (statusText) {
       and.push({ leadStatus: { name: statusText } });
-    }
-
-    const sourceText = query.source?.trim();
-    if (sourceText) {
-      and.push({
-        OR: [
-          { source: { name: { contains: sourceText } } },
-          { leadUtms: { some: { utmSource: { contains: sourceText } } } },
-          { leadUtms: { some: { utmMedium: { contains: sourceText } } } },
-        ],
-      });
     }
 
     const createdRange = parseExportIstDayRange(query.created, 'created');

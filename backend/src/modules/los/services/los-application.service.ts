@@ -71,6 +71,7 @@ import {
 } from '../../../common/vendor/pan-nsdl-snapshot.util';
 import { CIBIL_CATEGORY_SET, type CibilCategory } from '../../../common/cibil/cibil-credit-assessment.engine';
 import {
+  matchesExportTextFilter,
   parseExportIstDayRange,
   requireAtLeastOneExportFilter,
 } from '../../../common/xlsx/export-row-filter.util';
@@ -745,10 +746,13 @@ export class LosApplicationService {
   /**
    * Dump export for LOS Applications → Download dump. Mirrors the LOS Applications table's own
    * column filters (same field names as the table's column keys). "Stage" and "Rejection reason"
-   * are derived labels (computed from many raw signals, not stored columns), so they're applied as
-   * a JS filter on the already-narrowed, mapped rows instead of a Prisma `where` condition. Requires
-   * at least one filter, same as the button staying disabled until a filter matches at least one row.
-   * Streams straight to `res`, cursor-paged from the DB in batches.
+   * are derived labels (computed from many raw signals, not stored columns), and "Name" falls back
+   * to the literal `Details pending` label for a blank name, so they're applied as a JS filter on
+   * the already-narrowed, mapped rows instead of a Prisma `where` condition — otherwise filtering by
+   * `Details pending` (which the grid shows for a blank name) would look for that literal text in
+   * the raw `fullName` column and never match. Requires at least one filter, same as the button
+   * staying disabled until a filter matches at least one row. Streams straight to `res`,
+   * cursor-paged from the DB in batches.
    */
   async exportApplicationsWorkbook(query: ExportApplicationsQueryDto, res: Response): Promise<void> {
     const { access_token: _accessToken, ...filterFields } = query;
@@ -759,11 +763,12 @@ export class LosApplicationService {
     const where = this.buildExportWhere(query);
     const stage = query.stage?.trim();
     const reason = query.reason?.trim().toLowerCase();
+    const name = query.name?.trim();
 
     await streamXlsxWorkbook(res, {
       sheetName: 'Applications',
       headers: APPLICATION_DUMP_HEADERS,
-      rows: this.streamApplicationsForExport(where, stage, reason),
+      rows: this.streamApplicationsForExport(where, stage, reason, name),
     });
   }
 
@@ -771,6 +776,7 @@ export class LosApplicationService {
     extraWhere: Prisma.ApplicationWhereInput,
     stage: string | undefined,
     reason: string | undefined,
+    name: string | undefined,
   ): AsyncGenerator<SimpleXlsxCell[]> {
     let cursorId: bigint | undefined;
     const where = this.applicationQueueWhere(extraWhere);
@@ -796,6 +802,7 @@ export class LosApplicationService {
             .toLowerCase();
           if (!haystack.includes(reason)) continue;
         }
+        if (name && !matchesExportTextFilter(app.fullName ?? 'Details pending', name)) continue;
         yield this.applicationRowCells(app);
       }
 
@@ -818,11 +825,6 @@ export class LosApplicationService {
           { lead: { uuid: { contains: appIdText } } },
         ],
       });
-    }
-
-    const nameText = query.name?.trim();
-    if (nameText) {
-      and.push({ lead: { leadDetail: { fullName: { contains: nameText } } } });
     }
 
     const mobileText = query.mobile?.trim();

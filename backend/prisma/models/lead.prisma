@@ -104,6 +104,8 @@ model VendorApiLog {
   @@index([leadId])
   @@index([leadId, serviceName, respondedAt])
   @@index([providerName, requestedAt])
+  @@index([serviceName, requestedAt])
+  @@index([requestMethod, requestedAt])
   @@index([requestedAt])
   @@index([respondedAt])
   @@index([httpStatus, requestedAt])

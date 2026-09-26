@@ -1,4 +1,4 @@
-import { authorizedLosRequest, buildExportFilterParams, cachedAuthorizedLosGet, resolveLosClientApiUrl } from './_shared';
+import { authorizedLosRequest, cachedAuthorizedLosGet, downloadAuthenticatedWorkbook } from './_shared';
 
 export type LosLoan = {
   uuid: string;
@@ -118,11 +118,22 @@ export async function getLoans(token: string): Promise<LosLoan[]> {
   return cachedAuthorizedLosGet<LosLoan[]>(token, '/loans', 'Failed to fetch loans');
 }
 
-/** URL for the loans dump workbook download. Caller must pass the table's active column filters (same keys as the Loans table's columns) — the backend rejects an empty set. */
-export function getLoansExportUrl(token: string, filters: Partial<Record<string, string>>): string {
-  const params = buildExportFilterParams(filters);
-  params.set('access_token', token);
-  return `${resolveLosClientApiUrl('/loans/export')}?${params.toString()}`;
+/**
+ * Authenticated workbook download for the loans dump. Caller must pass the table's active column
+ * filters (same keys as the Loans table's columns) — the backend rejects an empty set.
+ */
+export async function downloadLoansExport(
+  token: string,
+  filters: Partial<Record<string, string>>,
+): Promise<void> {
+  return downloadAuthenticatedWorkbook({
+    token,
+    path: '/loans/export',
+    filters,
+    timeoutMessage: 'Download timed out while building the loans workbook. Please try again.',
+    fallbackErrorMessage: 'Failed to download loans',
+    fallbackFilename: 'Loans.xlsx',
+  });
 }
 
 export async function getLoanDetails(token: string, loanUuid: string): Promise<LosLoanDetails> {

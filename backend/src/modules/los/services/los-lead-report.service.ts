@@ -1,8 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { Response } from 'express';
+import { LOAN_STATUS } from '../../../common/constants/loan.constants';
 import { resolveEffectiveLoanStatus } from '../../../common/loan/effective-loan-status.util';
-import { resolveLeadReportRepaymentStatus } from '../../../common/loan/lead-report-repayment-status.util';
+import {
+  LEAD_REPORT_REPAYMENT_STATUS,
+  resolveLeadReportRepaymentStatus,
+} from '../../../common/loan/lead-report-repayment-status.util';
 import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbursement-view.util';
 import { overlayLiveRepaymentDueDateIfSelected, resolveRepaymentDueDateUtc } from '../../../common/loan/repayment-due-date.util';
 import { TENACIO_SERVICE_PAN_NAME_DOB } from '../../../common/vendor/tenacio/tenacio-client.service';
@@ -93,6 +97,42 @@ function extractPanCardName(input: {
     if (name) return name;
   }
   return input.fallback;
+}
+
+/**
+ * Safe-superset raw `loan_status.name` values for an effective loan-status filter value.
+ * `resolveEffectiveLoanStatus` only ever relabels a raw ACTIVE loan past maturity as OVERDUE — every
+ * other effective value maps 1:1 onto the same raw name — so this is exhaustive, not a guess.
+ */
+function loanStatusRawSuperset(effective: string): string[] {
+  return effective.toUpperCase() === LOAN_STATUS.OVERDUE
+    ? [LOAN_STATUS.OVERDUE, LOAN_STATUS.ACTIVE]
+    : [effective];
+}
+
+/**
+ * Safe-superset raw `loan_status.name` values for a Lead Report repayment-status filter value —
+ * the reverse of `resolveLeadReportRepaymentStatus`'s branches. `null` means there's no safe
+ * stored-column equivalent (`NOT_APPLICABLE` means "no loan at all"), so that value's rows stay
+ * entirely on the JS pass.
+ */
+function repaymentStatusRawLoanStatusSuperset(effective: string): string[] | null {
+  switch (effective.toUpperCase()) {
+    case LEAD_REPORT_REPAYMENT_STATUS.WRITTEN_OFF:
+      return [LOAN_STATUS.WRITTEN_OFF];
+    case LEAD_REPORT_REPAYMENT_STATUS.PAID:
+      return [LOAN_STATUS.SETTLED, LOAN_STATUS.CLOSED];
+    case LEAD_REPORT_REPAYMENT_STATUS.OVERDUE:
+      return [LOAN_STATUS.OVERDUE, LOAN_STATUS.ACTIVE];
+    // FAILED / PARTIALLY_PAID / PENDING are only reached when the effective loan status is
+    // ACTIVE (not past maturity) — the raw repayment status further narrows within the JS pass.
+    case LEAD_REPORT_REPAYMENT_STATUS.FAILED:
+    case LEAD_REPORT_REPAYMENT_STATUS.PARTIALLY_PAID:
+    case LEAD_REPORT_REPAYMENT_STATUS.PENDING:
+      return [LOAN_STATUS.ACTIVE];
+    default:
+      return null;
+  }
 }
 
 const leadReportInclude = {
@@ -485,11 +525,13 @@ export class LosLeadReportService {
    * column, so the JS matcher pass (`matchesExportFilters`) stays the source of truth for every
    * field, exactly as before. But most fields here *do* map 1:1 (or as a safe superset, via a
    * relation `some`) onto a real column, so `buildExportWhere` pushes those down as a Prisma
-   * `where` to shrink what the batched fetch pulls back — filters that don't have a safe SQL
-   * equivalent (derived `customer`/panCardName fallback, synthetic `loanStatus`/`repaymentStatus`)
-   * are simply left out of the `where` and still decided purely by the JS pass. Requires at least
-   * one filter, same as the download button staying disabled until a filter matches a row. Streams
-   * straight to `res`, cursor-paged from the DB in batches.
+   * `where` to shrink what the batched fetch pulls back — including `loanStatus` and
+   * `repaymentStatus`, via the exhaustive raw-`loan_status.name` supersets in
+   * `loanStatusRawSuperset` / `repaymentStatusRawLoanStatusSuperset`. Only `customer` has no safe
+   * SQL equivalent at all (it falls back to a panCardName parsed from a vendor-log JSON payload) and
+   * is left entirely to the JS pass. Requires at least one filter, same as the download button
+   * staying disabled until a filter matches a row. Streams straight to `res`, cursor-paged from the
+   * DB in batches.
    */
   async exportLeadReportsWorkbook(query: ExportLeadReportsQueryDto, res: Response): Promise<void> {
     requireAtLeastOneExportFilter(
@@ -619,16 +661,33 @@ export class LosLeadReportService {
     const createdRange = parseExportDatetimeRange(query.created, 'created');
     if (createdRange) and.push({ createdAt: { gte: createdRange.start, lte: createdRange.end } });
 
+    // `loanStatus` and `repaymentStatus` are derived labels, not stored columns, but each maps onto
+    // a known, exhaustive superset of raw `loan_status.name` values (see the two helpers above) —
+    // pushing that superset down still shrinks what the batched fetch pulls back, and
+    // `matchesExportFilters` re-checks the exact effective value on every row afterward, so this can
+    // only ever over-fetch, never silently drop a row that should be in the report.
+    const loanStatusValues = this.multiSelectSqlValues(query.loanStatus);
+    if (loanStatusValues) {
+      const rawStatuses = [...new Set(loanStatusValues.flatMap((value) => loanStatusRawSuperset(value)))];
+      and.push({ applications: { some: { loanAccount: { loanStatus: { name: { in: rawStatuses } } } } } });
+    }
+
+    const repaymentStatusValues = this.multiSelectSqlValues(query.repaymentStatus);
+    if (repaymentStatusValues) {
+      const rawSupersets = repaymentStatusValues.map((value) => repaymentStatusRawLoanStatusSuperset(value));
+      // Any value with no safe superset (`NOT_APPLICABLE` — no loan at all) forces the whole filter
+      // back onto the JS pass instead of risking a `some` that can't express "no loan".
+      if (rawSupersets.every((set) => set != null)) {
+        const rawStatuses = [...new Set(rawSupersets.flatMap((set) => set as string[]))];
+        and.push({ applications: { some: { loanAccount: { loanStatus: { name: { in: rawStatuses } } } } } });
+      }
+    }
+
     // Not pushed to SQL — no safe stored-column equivalent, JS pass (`matchesExportFilters`)
     // stays the only judge:
     //  - `customer`: matches panCardName (parsed from a vendor-log JSON payload) falling back to
     //    fullName — a DB `contains` on fullName alone could exclude rows that only match via
     //    panCardName.
-    //  - `loanStatus`: the report's status is the *effective* status (`resolveEffectiveLoanStatus`
-    //    synthesizes "Overdue" from an ACTIVE loan past maturity) — filtering on the raw stored
-    //    `loan_status.name` would silently miss those.
-    //  - `repaymentStatus`: computed by `resolveLeadReportRepaymentStatus` from loan status +
-    //    latest repayment, not a stored column.
 
     return and.length > 0 ? { AND: and } : {};
   }

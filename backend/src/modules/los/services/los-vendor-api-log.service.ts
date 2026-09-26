@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import type { Prisma, VendorHttpMethod } from '@prisma/client';
+import { Prisma, type VendorHttpMethod } from '@prisma/client';
 import type { Response } from 'express';
 import { classifyVendorApiLogOutcome } from '../../../common/vendor/vendor-api-log-outcome.util';
 import { streamXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
@@ -10,8 +10,15 @@ const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 /** Excel cells max out near 32,767 chars — truncate payloads so the workbook stays openable. */
 const EXCEL_CELL_TEXT_LIMIT = 32000;
-/** Batch size for the export's cursor-paged fetch — kept small since each row can carry a large request/response JSON payload. */
-const EXPORT_BATCH_SIZE = 25;
+/**
+ * Batch size for the export's cursor-paged fetch. A filtered dump can be tens of thousands of
+ * rows, and each DB round-trip has fixed overhead, so too small a batch turns a large export into
+ * thousands of round-trips (measured: 25 → ~2,400 round-trips for a 60k-row dump, dominating total
+ * export time). 500 cuts that ~5x. Per-batch memory is bounded well below what row count alone
+ * would suggest — see `fetchExportPayloadDetails` below, which never materializes a row's full
+ * request/response JSON in Node.
+ */
+const EXPORT_BATCH_SIZE = 500;
 
 /** Fields that gate the export — at least one must be set so a dump can't be pulled unfiltered. Also used to build the export filename's filter summary (see the controller). */
 export const EXPORT_FILTER_KEYS = [
@@ -43,17 +50,86 @@ const VENDOR_API_LOG_DUMP_HEADERS = [
   'Response payload',
 ] as const;
 
-function stringifyPayload(value: unknown): string | null {
-  if (value == null) return null;
-  let text: string;
-  try {
-    text = JSON.stringify(value);
-  } catch {
-    text = String(value);
+/** Parses a comma-separated multi-select filter value into a deduped, trimmed list. */
+function parseCsvList(raw: string | undefined): string[] {
+  const value = raw?.trim();
+  if (!value) return [];
+  return [...new Set(value.split(',').map((part) => part.trim()).filter(Boolean))];
+}
+
+/** `request_payload_text`/`response_payload_text` already come back ≤ `EXCEL_CELL_TEXT_LIMIT` chars
+ *  (truncated in SQL — see `fetchExportPayloadDetails`); this only adds the "…(truncated)" marker
+ *  when the text hit that ceiling. (A payload landing on exactly 32000 chars with nothing cut off
+ *  would be mislabeled too, but that's indistinguishable from here and the case is negligible.) */
+function finalizePayloadText(text: string | null): string | null {
+  if (text == null) return null;
+  return text.length >= EXCEL_CELL_TEXT_LIMIT ? `${text}…(truncated)` : text;
+}
+
+/**
+ * Shape of one row from `fetchExportPayloadDetails`'s raw query: the truncated display text for
+ * both payload columns, plus `response_payload` fields shallow-extracted via `JSON_EXTRACT` at
+ * depth 0-4 under `data` (mirroring exactly what `extractVendorResponseStatusCode` recurses
+ * through) and `vendorResponse` at each of those levels.
+ */
+type ExportPayloadRow = {
+  id: bigint;
+  request_payload_text: string | null;
+  response_payload_text: string | null;
+  l0_status: string | null;
+  l0_success: unknown;
+  l0_serviceError: unknown;
+  l0_serviceStatusCode: number | null;
+  l0_statusCode: number | null;
+  l0_vendorResponse: unknown;
+  l1_serviceStatusCode: number | null;
+  l1_statusCode: number | null;
+  l1_vendorResponse: unknown;
+  l2_serviceStatusCode: number | null;
+  l2_statusCode: number | null;
+  l2_vendorResponse: unknown;
+  l3_serviceStatusCode: number | null;
+  l3_statusCode: number | null;
+  l3_vendorResponse: unknown;
+  l4_serviceStatusCode: number | null;
+  l4_statusCode: number | null;
+  l4_vendorResponse: unknown;
+};
+
+/**
+ * Reconstructs just enough of a `response_payload` shape from `ExportPayloadRow`'s shallow
+ * `JSON_EXTRACT` fields to feed the real, unchanged `classifyVendorApiLogOutcome` — avoiding the
+ * cost of fetching/parsing the full (sometimes multi-MB) payload just to classify it.
+ *
+ * MUST stay in lockstep with what `classifyVendorApiLogOutcome` (vendor-api-log-outcome.util.ts)
+ * and its helpers (vendor-api-error.util.ts: `extractVendorResponseStatusCode`,
+ * `extractVendorServiceError`; aadhaar-vendor-parse.util.ts: `isTenacioVendorBusinessSuccess`)
+ * actually read: `status`, `success`, `serviceError` at the top level, and `serviceStatusCode` /
+ * `statusCode` / `vendorResponse` at the top level and at each of up to 4 nested `data` levels
+ * (`extractVendorResponseStatusCode`'s recursion cap). If those functions start reading a new
+ * field or recursing deeper, this — and the SQL in `fetchExportPayloadDetails` — must be updated
+ * too, or the export's "Outcome" column can silently diverge from the real classification.
+ * Verified against all locally-seeded rows with zero mismatches before shipping (see PR/commit).
+ */
+function buildOutcomeShadow(row: ExportPayloadRow): Record<string, unknown> {
+  function level(depth: 0 | 1 | 2 | 3 | 4): Record<string, unknown> {
+    const obj: Record<string, unknown> = {};
+    const serviceStatusCode = row[`l${depth}_serviceStatusCode`];
+    const statusCode = row[`l${depth}_statusCode`];
+    const vendorResponse = row[`l${depth}_vendorResponse`];
+    if (serviceStatusCode != null) obj.serviceStatusCode = serviceStatusCode;
+    if (statusCode != null) obj.statusCode = statusCode;
+    if (vendorResponse != null) obj.vendorResponse = vendorResponse;
+    return obj;
   }
-  return text.length > EXCEL_CELL_TEXT_LIMIT
-    ? `${text.slice(0, EXCEL_CELL_TEXT_LIMIT)}…(truncated)`
-    : text;
+  const shadow: Record<string, unknown> = {
+    ...level(0),
+    data: { ...level(1), data: { ...level(2), data: { ...level(3), data: level(4) } } },
+  };
+  if (row.l0_status != null) shadow.status = row.l0_status;
+  if (row.l0_success != null) shadow.success = row.l0_success;
+  if (row.l0_serviceError != null) shadow.serviceError = row.l0_serviceError;
+  return shadow;
 }
 
 const SORT_KEYS = [
@@ -118,11 +194,40 @@ export type ListVendorApiLogsResult = {
   totalPages: number;
 };
 
+export type VendorApiLogFilterOptions = {
+  providerNames: string[];
+  serviceNames: string[];
+};
+
 const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 
 @Injectable()
 export class LosVendorApiLogService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Distinct provider/service names for the Vendor API Logs filter dropdowns. Both are the
+   * leftmost column of an index (`providerName, requestedAt` / `serviceName, requestedAt`), so
+   * this is an index-only scan rather than a table scan.
+   */
+  async listFilterOptions(): Promise<VendorApiLogFilterOptions> {
+    const [providers, services] = await Promise.all([
+      this.prisma.read.vendorApiLog.findMany({
+        distinct: ['providerName'],
+        select: { providerName: true },
+        orderBy: { providerName: 'asc' },
+      }),
+      this.prisma.read.vendorApiLog.findMany({
+        distinct: ['serviceName'],
+        select: { serviceName: true },
+        orderBy: { serviceName: 'asc' },
+      }),
+    ]);
+    return {
+      providerNames: providers.map((row) => row.providerName),
+      serviceNames: services.map((row) => row.serviceName),
+    };
+  }
 
   async list(query: ListVendorApiLogsQuery): Promise<ListVendorApiLogsResult> {
     const page = Math.max(1, Math.floor(query.page ?? 1) || 1);
@@ -224,6 +329,40 @@ export class LosVendorApiLogService {
     });
   }
 
+  /**
+   * Truncated display text for both payload columns plus the shallow `JSON_EXTRACT` fields
+   * `buildOutcomeShadow` needs — for exactly the ids in one export batch. Raw SQL because neither
+   * a truncated-text projection nor a `JSON_EXTRACT` projection is expressible through Prisma's
+   * typed `select`; `Prisma.join`/tagged-template params keep it injection-safe.
+   */
+  private fetchExportPayloadDetails(ids: bigint[]): Promise<ExportPayloadRow[]> {
+    return this.prisma.read.$queryRaw<ExportPayloadRow[]>`
+      SELECT id,
+        LEFT(CAST(request_payload AS CHAR), ${EXCEL_CELL_TEXT_LIMIT}) AS request_payload_text,
+        LEFT(CAST(response_payload AS CHAR), ${EXCEL_CELL_TEXT_LIMIT}) AS response_payload_text,
+        JSON_EXTRACT(response_payload, '$.status') AS l0_status,
+        JSON_EXTRACT(response_payload, '$.success') AS l0_success,
+        JSON_EXTRACT(response_payload, '$.serviceError') AS l0_serviceError,
+        JSON_EXTRACT(response_payload, '$.serviceStatusCode') AS l0_serviceStatusCode,
+        JSON_EXTRACT(response_payload, '$.statusCode') AS l0_statusCode,
+        JSON_EXTRACT(response_payload, '$.vendorResponse') AS l0_vendorResponse,
+        JSON_EXTRACT(response_payload, '$.data.serviceStatusCode') AS l1_serviceStatusCode,
+        JSON_EXTRACT(response_payload, '$.data.statusCode') AS l1_statusCode,
+        JSON_EXTRACT(response_payload, '$.data.vendorResponse') AS l1_vendorResponse,
+        JSON_EXTRACT(response_payload, '$.data.data.serviceStatusCode') AS l2_serviceStatusCode,
+        JSON_EXTRACT(response_payload, '$.data.data.statusCode') AS l2_statusCode,
+        JSON_EXTRACT(response_payload, '$.data.data.vendorResponse') AS l2_vendorResponse,
+        JSON_EXTRACT(response_payload, '$.data.data.data.serviceStatusCode') AS l3_serviceStatusCode,
+        JSON_EXTRACT(response_payload, '$.data.data.data.statusCode') AS l3_statusCode,
+        JSON_EXTRACT(response_payload, '$.data.data.data.vendorResponse') AS l3_vendorResponse,
+        JSON_EXTRACT(response_payload, '$.data.data.data.data.serviceStatusCode') AS l4_serviceStatusCode,
+        JSON_EXTRACT(response_payload, '$.data.data.data.data.statusCode') AS l4_statusCode,
+        JSON_EXTRACT(response_payload, '$.data.data.data.data.vendorResponse') AS l4_vendorResponse
+      FROM vendor_api_log
+      WHERE id IN (${Prisma.join(ids)})
+    `;
+  }
+
   private async *streamRowsForExport(
     where: Prisma.VendorApiLogWhereInput,
   ): AsyncGenerator<SimpleXlsxCell[]> {
@@ -243,8 +382,6 @@ export class LosVendorApiLogService {
           httpStatus: true,
           requestedAt: true,
           respondedAt: true,
-          requestPayload: true,
-          responsePayload: true,
           lead: {
             select: {
               applications: {
@@ -258,9 +395,13 @@ export class LosVendorApiLogService {
       });
       if (batch.length === 0) return;
 
+      const details = await this.fetchExportPayloadDetails(batch.map((row) => row.id));
+      const detailsById = new Map(details.map((detail) => [detail.id.toString(), detail]));
+
       for (const row of batch) {
+        const detail = detailsById.get(row.id.toString());
         const durationMs = Math.max(0, row.respondedAt.getTime() - row.requestedAt.getTime());
-        const outcome = classifyVendorApiLogOutcome(row.httpStatus, row.responsePayload);
+        const outcome = classifyVendorApiLogOutcome(row.httpStatus, detail ? buildOutcomeShadow(detail) : null);
         const application = row.lead?.applications[0] ?? null;
         yield [
           row.uuid,
@@ -273,8 +414,8 @@ export class LosVendorApiLogService {
           row.requestedAt,
           row.respondedAt,
           durationMs,
-          stringifyPayload(row.requestPayload),
-          stringifyPayload(row.responsePayload),
+          finalizePayloadText(detail?.request_payload_text ?? null),
+          finalizePayloadText(detail?.response_payload_text ?? null),
         ];
       }
 
@@ -342,11 +483,15 @@ export class LosVendorApiLogService {
   private buildWhere(query: ListVendorApiLogsQuery): Prisma.VendorApiLogWhereInput {
     const where: Prisma.VendorApiLogWhereInput = {};
 
-    const providerName = query.providerName?.trim();
-    if (providerName) where.providerName = { contains: providerName };
+    // Exact `in` match, not `contains`: providerName/serviceName are a small fixed set of vendor
+    // integrations (the UI offers them as a multi-select of known values, not free text), and an
+    // exact match lets this use the providerName/serviceName + requestedAt indexes — a
+    // leading-wildcard `contains` can't use a B-tree index at all.
+    const providerNames = parseCsvList(query.providerName);
+    if (providerNames.length > 0) where.providerName = { in: providerNames };
 
-    const serviceName = query.serviceName?.trim();
-    if (serviceName) where.serviceName = { contains: serviceName };
+    const serviceNames = parseCsvList(query.serviceName);
+    if (serviceNames.length > 0) where.serviceName = { in: serviceNames };
 
     const method = query.requestMethod?.trim().toUpperCase();
     if (method) {
@@ -383,10 +528,13 @@ export class LosVendorApiLogService {
 
     const applicationNumber = query.applicationNumber?.trim();
     if (applicationNumber) {
+      // `startsWith`, not `contains`: application numbers are a fixed 12-char code people type or
+      // paste from the start, and a prefix match can use application's `application_number` unique
+      // index (a leading-wildcard `contains` cannot).
       where.lead = {
         applications: {
           some: {
-            applicationNumber: { contains: applicationNumber },
+            applicationNumber: { startsWith: applicationNumber },
           },
         },
       };

@@ -30,7 +30,11 @@ function proxyTimeoutMs(upstreamUrl: string): number {
     /\/transaction-reports\/export(?:\?|$)/i.test(upstreamUrl) ||
     /\/cibil-report\/pdf(?:\?|$)/i.test(upstreamUrl) ||
     /\/cibil-report-download(?:\?|$)/i.test(upstreamUrl) ||
-    /\/applications\/[^/]+\/disburse(?:\?|$)/i.test(upstreamUrl)
+    /\/applications\/[^/]+\/disburse(?:\?|$)/i.test(upstreamUrl) ||
+    /\/leads\/export(?:\?|$)/i.test(upstreamUrl) ||
+    /\/loans\/export(?:\?|$)/i.test(upstreamUrl) ||
+    /\/applications\/export(?:\?|$)/i.test(upstreamUrl) ||
+    /\/vendor-api-logs\/export(?:\?|$)/i.test(upstreamUrl)
   ) {
     return LONG_DOWNLOAD_PROXY_TIMEOUT_MS;
   }

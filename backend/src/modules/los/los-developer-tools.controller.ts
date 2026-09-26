@@ -101,6 +101,12 @@ export class LosDeveloperToolsController {
     await this.vendorApiLogs.exportWorkbook(query, res);
   }
 
+  @Get('vendor-api-logs/filter-options')
+  @ApiOperation({ summary: 'Distinct provider/service names for the Vendor API Logs filter dropdowns' })
+  getVendorApiLogFilterOptions() {
+    return this.vendorApiLogs.listFilterOptions();
+  }
+
   @Get('vendor-api-logs/:uuid')
   @ApiOperation({ summary: 'Get one vendor_api_log row including request/response payloads' })
   getVendorApiLog(@Param('uuid') uuid: string) {

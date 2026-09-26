@@ -30,6 +30,7 @@ import { formatLosPersonName } from '../format-los-person-name';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { streamXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 import {
+  matchesExportTextFilter,
   parseExportDateOnly,
   parseExportIstDayRange,
   requireAtLeastOneExportFilter,
@@ -315,9 +316,13 @@ export class LosLoanService {
    * Dump export for LOS Loans → Download dump. Mirrors the LOS Loans table's own column filters
    * (same field names as the table's column keys) as real Prisma `where` conditions — including
    * "Overdue", which isn't a stored value but derived from maturity date vs. today — so the query
-   * itself narrows the result at the database. Requires at least one filter, same as the button
-   * staying disabled until a filter matches at least one loan. Streams straight to `res`,
-   * cursor-paged from the DB in batches.
+   * itself narrows the result at the database. "Loan" and "Borrower" are the exception: the table
+   * searches them as one combined string per row (`"<loanNumber> <applicationNumber>"` /
+   * `"<name> <mobile> <email>"`), so a search term spanning two of those fields can match on screen
+   * without any single column containing it — they're applied as a JS filter on the already-mapped
+   * rows, exactly like the table, instead of a per-column Prisma `where`. Requires at least one
+   * filter, same as the button staying disabled until a filter matches at least one loan. Streams
+   * straight to `res`, cursor-paged from the DB in batches.
    */
   async exportLoansWorkbook(query: ExportLoansQueryDto, res: Response): Promise<void> {
     const { access_token: _accessToken, ...filterFields } = query;
@@ -326,16 +331,20 @@ export class LosLoanService {
       'Apply at least one filter before downloading the loans dump.',
     );
     const where = this.buildExportWhere(query);
+    const loanText = query.loan?.trim();
+    const borrowerText = query.borrower?.trim();
 
     await streamXlsxWorkbook(res, {
       sheetName: 'Loans',
       headers: LOAN_DUMP_HEADERS,
-      rows: this.streamLoansForExport(where),
+      rows: this.streamLoansForExport(where, loanText, borrowerText),
     });
   }
 
   private async *streamLoansForExport(
     extraWhere: Prisma.LoanAccountWhereInput,
+    loanText: string | undefined,
+    borrowerText: string | undefined,
   ): AsyncGenerator<SimpleXlsxCell[]> {
     let cursorId: bigint | undefined;
     const where = this.loanQueueWhere(extraWhere);
@@ -353,6 +362,18 @@ export class LosLoanService {
 
       const loans = await this.toLoanListItems(batch, penal);
       for (const loan of loans) {
+        if (loanText && !matchesExportTextFilter(`${loan.loanNumber} ${loan.applicationNumber}`, loanText)) {
+          continue;
+        }
+        if (
+          borrowerText &&
+          !matchesExportTextFilter(
+            [loan.fullName, loan.mobileNumber, loan.email].filter(Boolean).join(' '),
+            borrowerText,
+          )
+        ) {
+          continue;
+        }
         yield this.loanRowCells(loan);
       }
 
@@ -364,28 +385,6 @@ export class LosLoanService {
   /** Builds the export's Prisma `where` from the LOS Loans table's own filters. Throws when none are set. */
   private buildExportWhere(query: ExportLoansQueryDto): Prisma.LoanAccountWhereInput {
     const and: Prisma.LoanAccountWhereInput[] = [];
-
-    const loanText = query.loan?.trim();
-    if (loanText) {
-      and.push({
-        OR: [
-          { loanNumber: { contains: loanText } },
-          { loanAccountNumber: { contains: loanText } },
-          { application: { applicationNumber: { contains: loanText } } },
-        ],
-      });
-    }
-
-    const borrowerText = query.borrower?.trim();
-    if (borrowerText) {
-      and.push({
-        OR: [
-          { application: { lead: { leadDetail: { fullName: { contains: borrowerText } } } } },
-          { customer: { mobileNumber: { contains: borrowerText } } },
-          { application: { details: { emailId: { contains: borrowerText } } } },
-        ],
-      });
-    }
 
     const grade = query.grade?.trim().toUpperCase();
     if (grade) {
