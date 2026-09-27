@@ -13,7 +13,7 @@ import {
   parseExportNumberRange,
   requireAtLeastOneExportFilter,
 } from '../../../common/xlsx/export-row-filter.util';
-import { CIBIL_CATEGORY_SET, type CibilCategory } from '../../../common/cibil/cibil-credit-assessment.engine';
+import { CIBIL_GRADE_SET, type CibilGrade } from '../../../common/cibil/cibil-credit-assessment.engine';
 import type { ExportBureauReportsQueryDto } from '../los-data.controller';
 
 const EXPORT_BATCH_SIZE = 25;
@@ -188,7 +188,7 @@ export class LosBureauReportService {
     if (gradeText) {
       const grades = [...new Set(gradeText.split(',').map((g) => g.trim().toUpperCase()).filter(Boolean))];
       for (const grade of grades) {
-        if (!CIBIL_CATEGORY_SET.has(grade as CibilCategory)) {
+        if (!CIBIL_GRADE_SET.has(grade as CibilGrade)) {
           throw new BadRequestException('grade must be a comma-separated list of A-H.');
         }
       }

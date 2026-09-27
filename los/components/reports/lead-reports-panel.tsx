@@ -13,7 +13,7 @@ import { losStatusPillStyles } from '@/components/shared/los-status-pill';
 import { downloadLeadReportsExport, getLeadReports, type LosLeadReportListItem } from '@/lib/api';
 import { formatCibilScoreLabel, formatReviewDateOnly, formatReviewInr, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { getLosToken } from '@/lib/auth';
-import { CIBIL_GRADE_FILTER_OPTIONS } from '@/lib/constants/cibil-grades';
+import { CUSTOMER_GRADE_FILTER_OPTIONS } from '@/lib/constants/customer-grades';
 import { formatPersonName } from '@/lib/format-person-name';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -330,7 +330,7 @@ export function LeadReportsPanel() {
       filter: {
         type: 'multi-select',
         placeholder: 'Grades',
-        options: CIBIL_GRADE_FILTER_OPTIONS,
+        options: CUSTOMER_GRADE_FILTER_OPTIONS,
       },
       cellClassName: 'whitespace-nowrap',
       render: (row) => <GradeBadge category={row.cibilCreditAssessmentCategory} />,

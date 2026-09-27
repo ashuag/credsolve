@@ -13,7 +13,7 @@ import { getApplications, downloadApplicationsExport, getMasters, markApplicatio
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { getLosToken as getToken } from '@/lib/auth';
 import { APPLICATION_JOURNEY_STAGE_FILTER_OPTIONS } from '@/lib/constants/application-journey-stages';
-import { CIBIL_GRADE_FILTER_OPTIONS } from '@/lib/constants/cibil-grades';
+import { CUSTOMER_GRADE_FILTER_OPTIONS } from '@/lib/constants/customer-grades';
 import { resolveApplicationStageLabel } from '@/lib/customer-journey';
 import { formatPersonName } from '@/lib/format-person-name';
 import { BANK_DETAIL_FAILED_LABEL, PENNY_DROP_FAILED_LABEL } from '@/lib/penny-drop-grant-retry-eligibility';
@@ -344,7 +344,7 @@ export function ApplicationsPanel() {
       getSortValue: (row) => row.cibilCreditAssessmentCategory ?? '',
       filter: {
         type: 'select',
-        options: CIBIL_GRADE_FILTER_OPTIONS,
+        options: CUSTOMER_GRADE_FILTER_OPTIONS,
         matches: (row, value) => row.cibilCreditAssessmentCategory === value,
       },
       render: (app) => <GradeBadge category={app.cibilCreditAssessmentCategory} />,

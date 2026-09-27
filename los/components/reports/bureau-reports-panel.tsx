@@ -12,7 +12,7 @@ import { DownloadDumpButton } from '@/components/ui/download-dump-button';
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { downloadBureauReportsExport, getBureauReports, type LosBureauReportListItem } from '@/lib/api';
 import { getLosToken } from '@/lib/auth';
-import { CIBIL_GRADE_FILTER_OPTIONS } from '@/lib/constants/cibil-grades';
+import { CUSTOMER_GRADE_FILTER_OPTIONS } from '@/lib/constants/customer-grades';
 import { formatPersonName } from '@/lib/format-person-name';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -199,7 +199,7 @@ export function BureauReportsPanel() {
       filter: {
         type: 'multi-select',
         placeholder: 'Grades',
-        options: CIBIL_GRADE_FILTER_OPTIONS,
+        options: CUSTOMER_GRADE_FILTER_OPTIONS,
       },
       cellClassName: 'whitespace-nowrap',
       render: (row) => <GradeBadge category={row.cibilCreditAssessmentCategory} />,

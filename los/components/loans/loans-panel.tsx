@@ -11,7 +11,7 @@ import {
 import { DownloadDumpButton } from '@/components/ui/download-dump-button';
 import { getLoans, downloadLoansExport, markApplicationInternalTesting, refreshLoanPayment, type LosLoan, sendLoanNocLetter } from '@/lib/api';
 import { getLosToken as getToken } from '@/lib/auth';
-import { CIBIL_GRADE_FILTER_OPTIONS } from '@/lib/constants/cibil-grades';
+import { CUSTOMER_GRADE_FILTER_OPTIONS } from '@/lib/constants/customer-grades';
 import { formatPersonName } from '@/lib/format-person-name';
 import { RefreshPaymentButton, useCanRefreshLoanPayment } from '@/components/loans/refresh-payment-button';
 import { loanNeedsNoc, SendNocButton, useCanSendLoanNoc } from '@/components/loans/send-noc-button';
@@ -309,7 +309,7 @@ export function LoansPanel() {
       getSortValue: (row) => row.cibilCreditAssessmentCategory ?? '',
       filter: {
         type: 'select',
-        options: CIBIL_GRADE_FILTER_OPTIONS,
+        options: CUSTOMER_GRADE_FILTER_OPTIONS,
         matches: (row, value) => row.cibilCreditAssessmentCategory === value,
       },
       render: (loan) => <GradeBadge category={loan.cibilCreditAssessmentCategory} />,

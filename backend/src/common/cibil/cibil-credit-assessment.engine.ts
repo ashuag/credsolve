@@ -14,15 +14,15 @@
  */
 import type { CibilAssessmentSignals } from './cibil-bureau-rules.parser';
 
-export type CibilCategory = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
+export type CibilGrade = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
 
 /** Every grade, best (A) to worst (H) — the single source of truth other modules should filter/validate/list against instead of re-declaring the letters. */
-export const CIBIL_CATEGORIES: readonly CibilCategory[] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
+export const CIBIL_GRADES: readonly CibilGrade[] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
 
-/** Same set as {@link CIBIL_CATEGORIES}, for O(1) membership checks (e.g. validating a query filter). */
-export const CIBIL_CATEGORY_SET: ReadonlySet<CibilCategory> = new Set(CIBIL_CATEGORIES);
+/** Same set as {@link CIBIL_GRADES}, for O(1) membership checks (e.g. validating a query filter). */
+export const CIBIL_GRADE_SET: ReadonlySet<CibilGrade> = new Set(CIBIL_GRADES);
 
-const CATEGORY_MEANING: Record<CibilCategory, string> = {
+const GRADE_MEANING: Record<CibilGrade, string> = {
   A: 'Credit-active prime borrower — heavy credit user with long bureau history.',
   B: 'Near-prime active borrower — active borrower with wide credit footprint.',
   C: 'Mid-prime borrower — moderate credit user.',
@@ -34,7 +34,7 @@ const CATEGORY_MEANING: Record<CibilCategory, string> = {
 };
 
 /** §4 primary rule — total loan count buckets, checked highest category first. */
-const CATEGORY_LOAN_COUNT_BANDS: { category: CibilCategory; minLoans: number; rangeLabel: string }[] = [
+const GRADE_LOAN_COUNT_BANDS: { category: CibilGrade; minLoans: number; rangeLabel: string }[] = [
   { category: 'A', minLoans: 66, rangeLabel: '> 65' },
   { category: 'B', minLoans: 44, rangeLabel: '44 – 65' },
   { category: 'C', minLoans: 35, rangeLabel: '35 – 44' },
@@ -45,9 +45,9 @@ const CATEGORY_LOAN_COUNT_BANDS: { category: CibilCategory; minLoans: number; ra
   { category: 'H', minLoans: 0, rangeLabel: '<= 10' },
 ];
 
-export function assignCibilCategory(signals: CibilAssessmentSignals): { category: CibilCategory; description: string } {
-  const band = CATEGORY_LOAN_COUNT_BANDS.find((b) => signals.noOfLoans >= b.minLoans) ?? CATEGORY_LOAN_COUNT_BANDS[CATEGORY_LOAN_COUNT_BANDS.length - 1];
-  const description = `Category ${band.category}: ${CATEGORY_MEANING[band.category]} no_of_loans=${signals.noOfLoans} falls in the ${band.rangeLabel} range.`;
+export function assignCibilGrade(signals: CibilAssessmentSignals): { category: CibilGrade; description: string } {
+  const band = GRADE_LOAN_COUNT_BANDS.find((b) => signals.noOfLoans >= b.minLoans) ?? GRADE_LOAN_COUNT_BANDS[GRADE_LOAN_COUNT_BANDS.length - 1];
+  const description = `Category ${band.category}: ${GRADE_MEANING[band.category]} no_of_loans=${signals.noOfLoans} falls in the ${band.rangeLabel} range.`;
   return { category: band.category, description };
 }
 
@@ -59,7 +59,7 @@ export type CibilCreditDecision = {
 /** §5 — hard rejection rules (automatic, no override) + conditional rejection rules. */
 export function evaluateCibilCreditDecision(
   signals: CibilAssessmentSignals,
-  category: CibilCategory,
+  category: CibilGrade,
 ): CibilCreditDecision {
   const reasons: string[] = [];
 
@@ -114,7 +114,7 @@ function basePaymentProbability(riskScore: number | null): number {
 }
 
 /** §6 — category adjustment applied after per-tradeline deductions. */
-const CATEGORY_ADJUSTMENT: Record<CibilCategory, number> = {
+const GRADE_ADJUSTMENT: Record<CibilGrade, number> = {
   A: 4,
   B: 2,
   C: 0,
@@ -161,17 +161,17 @@ function computePaymentProbabilityDeductions(signals: CibilAssessmentSignals): n
 }
 
 /** §6 — final payment probability, clamped to [5, 98]. */
-export function computePaymentProbabilityPct(signals: CibilAssessmentSignals, category: CibilCategory): number {
+export function computePaymentProbabilityPct(signals: CibilAssessmentSignals, category: CibilGrade): number {
   const raw =
     basePaymentProbability(signals.riskScore) +
     computePaymentProbabilityDeductions(signals) +
-    CATEGORY_ADJUSTMENT[category];
+    GRADE_ADJUSTMENT[category];
   const clamped = Math.min(98, Math.max(5, raw));
   return Math.round(clamped * 100) / 100;
 }
 
 export type CibilCreditAssessmentResult = {
-  category: CibilCategory;
+  category: CibilGrade;
   categoryDescription: string;
   creditStatus: 'Approved' | 'Rejected';
   rejectionReasons: string | null;
@@ -185,7 +185,7 @@ const RECOMMENDATION_THRESHOLD_PCT = 75;
 
 /** Runs the full §4-§6 pipeline over pre-computed bureau signals. */
 export function runCibilCreditAssessment(signals: CibilAssessmentSignals): CibilCreditAssessmentResult {
-  const { category, description: categoryDescription } = assignCibilCategory(signals);
+  const { category, description: categoryDescription } = assignCibilGrade(signals);
   const decision = evaluateCibilCreditDecision(signals, category);
   const paymentProbabilityPct = computePaymentProbabilityPct(signals, category);
 

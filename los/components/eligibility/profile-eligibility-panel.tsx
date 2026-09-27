@@ -17,7 +17,7 @@ import {
   parseCibilLoanTypeIds,
   serializeCibilLoanTypeIds,
 } from '@/lib/cibil-account-types';
-import { CIBIL_GRADES } from '@/lib/constants/cibil-grades';
+import { CUSTOMER_GRADES } from '@/lib/constants/customer-grades';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   cx,
@@ -35,7 +35,7 @@ const REJECTED_CREDIT_ASSESSMENT_GRADE_KEYS = new Set([
 
 const REJECT_LOAN_TYPE_KEYS = new Set(['REJECT_OPEN_LOAN_TYPES', 'REJECT_LOAN_TYPES']);
 
-const CREDIT_ASSESSMENT_GRADE_LABEL: Record<(typeof CIBIL_GRADES)[number], string> = {
+const CREDIT_ASSESSMENT_GRADE_LABEL: Record<(typeof CUSTOMER_GRADES)[number], string> = {
   A: 'Credit-active prime',
   B: 'Near-prime active',
   C: 'Mid-prime',
@@ -51,13 +51,13 @@ function parseCreditAssessmentGrades(value: string): string[] {
     value
       .split(',')
       .map((part) => part.trim().toUpperCase())
-      .filter((part) => CIBIL_GRADES.includes(part as (typeof CIBIL_GRADES)[number])),
+      .filter((part) => CUSTOMER_GRADES.includes(part as (typeof CUSTOMER_GRADES)[number])),
   );
-  return CIBIL_GRADES.filter((grade) => selected.has(grade));
+  return CUSTOMER_GRADES.filter((grade) => selected.has(grade));
 }
 
 function serializeCreditAssessmentGrades(grades: string[]) {
-  return CIBIL_GRADES.filter((grade) => grades.includes(grade)).join(',');
+  return CUSTOMER_GRADES.filter((grade) => grades.includes(grade)).join(',');
 }
 
 function GradeValuePills({ value }: { value: string }) {
@@ -211,7 +211,7 @@ function ProfileCriterionModal({
               Applications whose credit-assessment category matches a selected grade are rejected.
             </p>
             <div className="grid gap-2 sm:grid-cols-2">
-              {CIBIL_GRADES.map((grade) => {
+              {CUSTOMER_GRADES.map((grade) => {
                 const checked = selectedGrades.includes(grade);
                 return (
                   <label

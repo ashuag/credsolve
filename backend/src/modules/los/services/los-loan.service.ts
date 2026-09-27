@@ -35,7 +35,7 @@ import {
   parseExportIstDayRange,
   requireAtLeastOneExportFilter,
 } from '../../../common/xlsx/export-row-filter.util';
-import { CIBIL_CATEGORY_SET, type CibilCategory } from '../../../common/cibil/cibil-credit-assessment.engine';
+import { CIBIL_GRADE_SET, type CibilGrade } from '../../../common/cibil/cibil-credit-assessment.engine';
 import type { ExportLoansQueryDto } from '../los-data.controller';
 import { LosLoanRepaymentSyncService } from './los-loan-repayment-sync.service';
 
@@ -388,7 +388,7 @@ export class LosLoanService {
 
     const grade = query.grade?.trim().toUpperCase();
     if (grade) {
-      if (!CIBIL_CATEGORY_SET.has(grade as CibilCategory)) {
+      if (!CIBIL_GRADE_SET.has(grade as CibilGrade)) {
         throw new BadRequestException('grade must be one of A-H.');
       }
       and.push({

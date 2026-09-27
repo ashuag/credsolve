@@ -69,7 +69,7 @@ import {
   extractPanNsdlSnapshot,
   panNsdlVendorServiceNames,
 } from '../../../common/vendor/pan-nsdl-snapshot.util';
-import { CIBIL_CATEGORY_SET, type CibilCategory } from '../../../common/cibil/cibil-credit-assessment.engine';
+import { CIBIL_GRADE_SET, type CibilGrade } from '../../../common/cibil/cibil-credit-assessment.engine';
 import {
   matchesExportTextFilter,
   parseExportIstDayRange,
@@ -853,7 +853,7 @@ export class LosApplicationService {
 
     const grade = query.grade?.trim().toUpperCase();
     if (grade) {
-      if (!CIBIL_CATEGORY_SET.has(grade as CibilCategory)) {
+      if (!CIBIL_GRADE_SET.has(grade as CibilGrade)) {
         throw new BadRequestException('grade must be one of A-H.');
       }
       and.push({
