@@ -63,11 +63,6 @@ export class ListVendorApiLogsQueryDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
-  requestPath?: string;
-
-  @IsOptional()
-  @IsString()
   @MaxLength(20)
   outcome?: string;
 

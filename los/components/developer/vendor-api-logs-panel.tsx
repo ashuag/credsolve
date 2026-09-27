@@ -67,13 +67,6 @@ function formatDateTime(iso: string): string {
   });
 }
 
-function truncatePath(path: string | null, max = 64): string {
-  if (!path?.trim()) return '—';
-  const value = path.trim();
-  if (value.length <= max) return value;
-  return `${value.slice(0, max - 1)}…`;
-}
-
 function formatJson(value: unknown): string {
   if (value == null) return '—';
   try {
@@ -294,7 +287,6 @@ export function VendorApiLogsPanel() {
         id: debouncedFilters.id,
         leadId: debouncedFilters.leadId,
         applicationNumber: debouncedFilters.applicationNumber,
-        requestPath: debouncedFilters.requestPath,
         outcome: debouncedFilters.outcome,
         requestedFrom: debouncedFilters.requestedFrom,
         requestedTo: debouncedFilters.requestedTo,
@@ -368,7 +360,6 @@ export function VendorApiLogsPanel() {
         id: debouncedFilters.id,
         leadId: debouncedFilters.leadId,
         applicationNumber: debouncedFilters.applicationNumber,
-        requestPath: debouncedFilters.requestPath,
         outcome: debouncedFilters.outcome,
         requestedFrom: debouncedFilters.requestedFrom,
         requestedTo: debouncedFilters.requestedTo,
@@ -547,17 +538,6 @@ export function VendorApiLogsPanel() {
                   </th>
                   <th className="px-3 py-2 align-bottom">
                     <span className="block text-[0.68rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted">
-                      Path
-                    </span>
-                    <DataTableColumnFilter
-                      value={columnFilters.requestPath ?? ''}
-                      onChange={(value) => setColumnFilter('requestPath', value)}
-                      placeholder="Path…"
-                      aria-label="Filter path"
-                    />
-                  </th>
-                  <th className="px-3 py-2 align-bottom">
-                    <span className="block text-[0.68rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted">
                       Ms
                     </span>
                   </th>
@@ -571,14 +551,14 @@ export function VendorApiLogsPanel() {
               <tbody>
                 {loading && items.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-4 py-8 text-center text-brand-muted">
+                    <td colSpan={11} className="px-4 py-8 text-center text-brand-muted">
                       Loading logs…
                     </td>
                   </tr>
                 ) : null}
                 {!loading && items.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-4 py-8 text-center text-brand-muted">
+                    <td colSpan={11} className="px-4 py-8 text-center text-brand-muted">
                       No vendor API logs match the current filters.
                     </td>
                   </tr>
@@ -618,9 +598,6 @@ export function VendorApiLogsPanel() {
                     <td className="px-3 py-2.5 font-mono">{row.httpStatus ?? '—'}</td>
                     <td className="px-3 py-2.5">
                       <OutcomeBadge outcome={row.outcome} />
-                    </td>
-                    <td className="max-w-[240px] px-3 py-2.5" title={row.requestPath ?? undefined}>
-                      <span className="font-mono text-[0.72rem] text-brand-muted">{truncatePath(row.requestPath)}</span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5 font-mono text-[0.78rem]">{row.durationMs}</td>
                     <td className="px-3 py-2.5">

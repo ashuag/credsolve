@@ -29,7 +29,6 @@ export const EXPORT_FILTER_KEYS = [
   'id',
   'leadId',
   'applicationNumber',
-  'requestPath',
   'outcome',
   'requestedFrom',
   'requestedTo',
@@ -157,7 +156,6 @@ export type ListVendorApiLogsQuery = {
   id?: string;
   leadId?: string;
   applicationNumber?: string;
-  requestPath?: string;
   outcome?: string;
   requestedFrom?: string;
   requestedTo?: string;
@@ -539,9 +537,6 @@ export class LosVendorApiLogService {
         },
       };
     }
-
-    const requestPath = query.requestPath?.trim();
-    if (requestPath) where.requestPath = { contains: requestPath };
 
     // Exact httpStatus wins over coarse outcome filter.
     const outcome = query.outcome?.trim().toLowerCase();
