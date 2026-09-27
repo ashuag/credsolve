@@ -1,7 +1,8 @@
 'use client';
 
-import { getLoanDetails, markApplicationInternalTesting, refreshLoanPayment, waiveLoanCharges, type LosLoanDetails } from '@/lib/api';
+import { getLoanDetails, fetchLoanNocPdfBlob, markApplicationInternalTesting, refreshLoanPayment, sendLoanNocLetter, waiveLoanCharges, type LosLoanDetails } from '@/lib/api';
 import { canWaiveLoanCharges } from '@/lib/access';
+import { useCanSendLoanNoc } from '@/components/loans/send-noc-button';
 import { getLosStoredUser, LOS_STORAGE_KEY } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
 import { RefreshPaymentButton } from '@/components/loans/refresh-payment-button';
@@ -215,7 +216,25 @@ function ActionBtn({
 
 function isClosedLoan(closedAt: string | null | undefined, statusCode: string): boolean {
   const code = statusCode.toUpperCase();
-  return Boolean(closedAt) || code.includes('CLOSED') || code === 'WRITTEN_OFF';
+  return (
+    Boolean(closedAt) ||
+    code === 'CLOSED' ||
+    code === 'SETTLED' ||
+    code.includes('CLOSED') ||
+    code === 'WRITTEN_OFF'
+  );
+}
+
+/** Fully repaid and eligible for manual NOC send (matches backend CLOSED/SETTLED + closedAt). */
+function canSendNocLetter(row: {
+  isNocSent: boolean;
+  closedAt: string | null;
+  loanStatusCode: string;
+}): boolean {
+  if (row.isNocSent) return false;
+  const code = row.loanStatusCode.toUpperCase();
+  if (code === 'WRITTEN_OFF') return false;
+  return Boolean(row.closedAt) || code === 'CLOSED' || code === 'SETTLED';
 }
 
 function maturityMeta(daysToMaturity: number, closed: boolean, statusCode = '') {
@@ -707,7 +726,10 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
   const [error, setError] = useState<string | null>(null);
   const [markingInternal, setMarkingInternal] = useState(false);
   const [refreshingPayment, setRefreshingPayment] = useState(false);
+  const [openingNoc, setOpeningNoc] = useState(false);
+  const [sendingNoc, setSendingNoc] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ tone: 'ok' | 'warn' | 'err'; text: string } | null>(null);
+  const canSendNoc = useCanSendLoanNoc();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -791,6 +813,53 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
     }
   }, [row, loanUuid]);
 
+  const openNocPdf = useCallback(async () => {
+    if (!row?.isNocSent) return;
+    const token = getToken();
+    if (!token) {
+      setError('Session expired — please log in again.');
+      return;
+    }
+    setOpeningNoc(true);
+    setError(null);
+    try {
+      const blob = await fetchLoanNocPdfBlob(token, loanUuid);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener');
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to open NOC letter.');
+    } finally {
+      setOpeningNoc(false);
+    }
+  }, [row?.isNocSent, loanUuid]);
+
+  const sendNoc = useCallback(async () => {
+    if (!row || row.isNocSent) return;
+    const token = getToken();
+    if (!token) {
+      setError('Session expired — please log in again.');
+      return;
+    }
+    setSendingNoc(true);
+    setError(null);
+    setStatusMessage(null);
+    try {
+      const updated = await sendLoanNocLetter(token, loanUuid);
+      setRow(updated);
+      setStatusMessage({
+        tone: 'ok',
+        text: updated.nocSentAt
+          ? `NOC letter sent at ${formatDateTime(updated.nocSentAt)}.`
+          : 'NOC letter sent.',
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to send NOC letter.');
+    } finally {
+      setSendingNoc(false);
+    }
+  }, [row, loanUuid]);
+
   const name = useMemo(
     () => (row ? formatPersonName(row.fullName, 'Borrower (name pending)') : ''),
     [row],
@@ -835,6 +904,7 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
   }
 
   const closed = isClosedLoan(row.closedAt, row.loanStatusCode);
+  const showSendNoc = canSendNoc && canSendNocLetter(row);
   const maturity = maturityMeta(row.daysToMaturity, closed, row.loanStatusCode);
   const statusStyles = losStatusPillStyles(row.loanStatusCode);
   const transfer = row.disbursementTransfer;
@@ -938,6 +1008,16 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
             </ActionBtn>
             {!row.closedAt ? (
               <RefreshPaymentButton busy={refreshingPayment} onClick={() => void refreshPayment()} />
+            ) : null}
+            {showSendNoc ? (
+              <button
+                type="button"
+                disabled={sendingNoc}
+                onClick={() => void sendNoc()}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[rgba(16,185,129,0.4)] bg-[rgba(16,185,129,0.12)] px-3 py-1.5 text-[0.72rem] font-extrabold text-[#047857] hover:bg-[rgba(16,185,129,0.2)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {sendingNoc ? 'Sending NOC…' : 'Send NOC'}
+              </button>
             ) : null}
             <MarkInternalTestingButton busy={markingInternal} onConfirm={() => void markAsInternalTesting()} />
           </div>
@@ -1326,6 +1406,78 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+      </SectionCard>
+
+      <SectionCard
+        title="NOC / closure letter"
+        subtitle="Loan closure NOC emailed to the borrower after full repayment"
+        action={
+          row.isNocSent ? (
+            <button
+              type="button"
+              disabled={openingNoc}
+              onClick={() => void openNocPdf()}
+              className="cursor-pointer rounded-full border border-[rgba(20,150,243,0.28)] bg-[rgba(20,150,243,0.08)] px-3.5 py-1.5 text-[0.72rem] font-extrabold text-brand-blue hover:bg-[rgba(20,150,243,0.14)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {openingNoc ? 'Opening…' : 'View NOC PDF'}
+            </button>
+          ) : showSendNoc ? (
+            <button
+              type="button"
+              disabled={sendingNoc}
+              onClick={() => void sendNoc()}
+              className="cursor-pointer rounded-full border border-[rgba(16,185,129,0.35)] bg-[rgba(16,185,129,0.1)] px-3.5 py-1.5 text-[0.72rem] font-extrabold text-[#047857] hover:bg-[rgba(16,185,129,0.18)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {sendingNoc ? 'Sending…' : 'Send NOC'}
+            </button>
+          ) : null
+        }
+      >
+        {row.isNocSent ? (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-[14px] border border-[rgba(16,185,129,0.22)] bg-[rgba(16,185,129,0.06)] px-4 py-3">
+              <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-[#047857]">Status</p>
+              <p className="m-0 mt-1 text-[1rem] font-extrabold text-[#047857]">Sent</p>
+            </div>
+            <div className="rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[#fbfcff] px-4 py-3">
+              <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
+                Sent at
+              </p>
+              <p className="m-0 mt-1 text-[0.95rem] font-extrabold text-brand-navy">
+                {row.nocSentAt ? formatDateTime(row.nocSentAt) : '—'}
+              </p>
+            </div>
+            <div className="rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[#fbfcff] px-4 py-3">
+              <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
+                Letter number
+              </p>
+              <p className="m-0 mt-1 break-all font-mono text-[0.88rem] font-extrabold text-brand-navy">
+                {row.nocLetterNumber ?? '—'}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-[14px] border border-dashed border-[rgba(23,44,113,0.16)] bg-[#f8fafc] px-4 py-5 text-center">
+            <p className="m-0 text-[0.9rem] font-bold text-brand-navy">
+              {showSendNoc ? 'NOC not sent yet' : 'Not available yet'}
+            </p>
+            <p className="mt-1 mb-0 text-[0.8rem] font-semibold text-brand-muted">
+              {showSendNoc
+                ? 'Loan is fully repaid. Use Send NOC to generate the letter, store it, and email the borrower.'
+                : 'The NOC letter and sent timestamp appear here after the loan is fully repaid.'}
+            </p>
+            {showSendNoc ? (
+              <button
+                type="button"
+                disabled={sendingNoc}
+                onClick={() => void sendNoc()}
+                className="mt-4 cursor-pointer rounded-full border border-[rgba(16,185,129,0.35)] bg-[rgba(16,185,129,0.12)] px-4 py-2 text-[0.78rem] font-extrabold text-[#047857] hover:bg-[rgba(16,185,129,0.2)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {sendingNoc ? 'Sending NOC…' : 'Send NOC'}
+              </button>
+            ) : null}
           </div>
         )}
       </SectionCard>

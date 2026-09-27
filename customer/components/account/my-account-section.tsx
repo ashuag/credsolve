@@ -450,9 +450,7 @@ function ActiveLoanCard({
   const router = useRouter();
   const { refresh } = useCustomerSession();
   const remaining = loan.outstandingInr ?? loan.amountDueToday ?? loan.totalRepayment;
-  const amountAtMaturity = loan.amountDueAtMaturity ?? loan.totalRepayment;
   const remainingN = parseAmount(remaining);
-  const maturityN = parseAmount(amountAtMaturity);
   const paidN = parseAmount(loan.totalPaidInr);
   const minPayN = parseAmount(minPayAmountInr) ?? 100;
   const bounceN = parseAmount(loan.bounceFeeInr);
@@ -462,11 +460,6 @@ function ActiveLoanCard({
   const overdueDays = loan.overdueDays != null && loan.overdueDays > 0 ? loan.overdueDays : 0;
   const overdueInterestN = parseAmount(loan.overdueInterestInr);
   const showOverdueInterest = overdueDays > 0 && overdueInterestN != null && overdueInterestN > 0;
-  const savings =
-    remainingN != null && maturityN != null && (paidN == null || paidN <= 0)
-      ? Math.round((maturityN - remainingN) * 100) / 100
-      : null;
-  const showSavings = loan.usedFullTenureInterest !== true && savings != null && savings > 0.009;
   const daysUntilDue = calendarDaysFromToday(loan.maturityDate);
   const isOverdue = loan.status.toUpperCase() === 'OVERDUE' || (daysUntilDue != null && daysUntilDue < 0);
   const timing = dueTiming(daysUntilDue, isOverdue, loan.maturityDate);
@@ -768,12 +761,7 @@ function ActiveLoanCard({
           </p>
         ) : null}
 
-        {showSavings ? (
-          <p className="mt-3 rounded-xl bg-emerald-50 px-3.5 py-2.5 text-[0.78rem] font-semibold text-emerald-800 ring-1 ring-emerald-100">
-            Paying today saves {formatInr(savings.toFixed(2))} versus waiting until{' '}
-            {formatFriendlyDate(loan.maturityDate)}.
-          </p>
-        ) : showOverdueInterest ? (
+        {showOverdueInterest ? (
           <p className="mt-3 rounded-xl bg-[#f4f8ff] px-3.5 py-2.5 text-[0.78rem] font-medium leading-relaxed text-slate-600 ring-1 ring-[rgba(20,150,243,0.1)]">
             Past the due date — interest is the
             {loan.tenureDays != null ? ` full ${loan.tenureDays}-day` : ' full'} tenure plus{' '}
@@ -789,7 +777,7 @@ function ActiveLoanCard({
           </p>
         ) : daysUsed != null ? (
           <p className="mt-3 rounded-xl bg-[#f4f8ff] px-3.5 py-2.5 text-[0.78rem] font-medium leading-relaxed text-slate-600 ring-1 ring-[rgba(20,150,243,0.1)]">
-            Still in the early-repay window — interest is charged only for the {daysUsed} day
+            Interest is charged only for the {daysUsed} day
             {daysUsed === 1 ? '' : 's'} used so far.
           </p>
         ) : null}
@@ -821,10 +809,6 @@ function ActiveLoanCard({
     </article>
   );
 }
-
-/* =========================================================================
-   ENHANCED IN-PROGRESS PIPELINE CARD
-   ========================================================================= */
 
 function InProgressLoanCard({ loan }: { loan: CustomerLoanCard }) {
   const [copied, setCopied] = useState(false);

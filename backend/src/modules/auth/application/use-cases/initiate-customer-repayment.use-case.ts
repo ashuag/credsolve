@@ -41,6 +41,7 @@ import { PrismaService } from '../../../../prisma/prisma.service';
 import { CustomerRepository } from '../../infrastructure/repositories/customer.repository';
 import { LeadRepository } from '../../infrastructure/repositories/lead.repository';
 import { SettingsRepository } from '../../infrastructure/repositories/settings.repository';
+import { NocLetterService } from '../../../../common/noc/noc-letter.service';
 
 const REPAY_LOCK_TTL_SEC = 90;
 
@@ -67,6 +68,7 @@ export class InitiateCustomerRepaymentUseCase {
     private readonly redis: RedisService,
     private readonly bounceChargeTiers: BounceChargeTierResolverService,
     private readonly settings: SettingsRepository,
+    private readonly nocLetter: NocLetterService,
   ) {}
 
   async execute(
@@ -394,14 +396,14 @@ export class InitiateCustomerRepaymentUseCase {
       `;
 
       if (closesLoan && closedStatus) {
-        const collected = Math.round((totalPaid + totalDue) * 100) / 100;
+        const bookedRepayable = Math.round((principal + due.interestAmount) * 100) / 100;
         await tx.loanAccount.update({
           where: { id: loan.id },
           data: {
             loanStatusId: closedStatus.id,
             closedAt: paidAt,
             interestAmount: due.interestAmount.toFixed(2),
-            totalRepaymentAmount: collected.toFixed(2),
+            totalRepaymentAmount: bookedRepayable.toFixed(2),
           },
         });
 
@@ -422,6 +424,10 @@ export class InitiateCustomerRepaymentUseCase {
       `[repay] Success loan=${loan.loanNumber} amount=${amountInr} vendor=${vendor} ` +
         `repayment=${repaymentUuid} ${closesLoan ? 'closed' : 'partial'}`,
     );
+
+    if (closesLoan) {
+      this.nocLetter.scheduleIssueIfNeeded(loan.id);
+    }
 
     return {
       success: true as const,

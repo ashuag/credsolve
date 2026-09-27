@@ -15,6 +15,7 @@ import { BUREAU_FETCHED } from '../../../common/constants/bureau-fetch.constants
 import { LEAD_STATUS } from '../../../common/constants/lead.constants';
 import { REJECTION_REASON, toRejectionReasonDto } from '../../../common/constants/rejection-reason.constants';
 import { generateLeadNumber } from '../../../common/loan/application-number.util';
+import { isCustomerJourneyComplete } from '../../../common/loan/customer-journey-complete.util';
 import { SmsService } from '../../../common/sms/sms.service';
 import { BureauFetchService } from '../../../common/vendor/bureau-fetch.service';
 import { mapCibilVendorName } from '../../../common/vendor/cibil-vendor.util';
@@ -34,6 +35,21 @@ import { BureauReportRepository } from '../../auth/infrastructure/repositories/b
 const INDIAN_MOBILE = /^[6-9]\d{9}$/;
 
 const CONVERTIBLE_LEAD_STATUSES = new Set<string>([LEAD_STATUS.NEW, LEAD_STATUS.IN_PROGRESS]);
+
+const BUREAU_SOFT_PULL_FAIL_NOTE = 'Bureau soft-pull failed: credit bureau returned a non-success response.';
+
+/** True when this lead was auto-rejected for a recoverable bureau soft-pull failure. */
+export function isRecoverableBureauSoftPullRejection(lead: {
+  leadStatus: { name: string };
+  leadStatusNote?: string | null;
+  rejectionReason?: { name: string } | null;
+}): boolean {
+  if (lead.leadStatus.name !== LEAD_STATUS.REJECTED) return false;
+  if (lead.rejectionReason?.name === REJECTION_REASON.BUREAU_SOFT_PULL_FAILED) return true;
+  const note = lead.leadStatusNote?.trim() ?? '';
+  // Legacy auto-rejects used REJECTED_BY_CLIENTS with this soft-pull note.
+  return note.startsWith('Bureau soft-pull failed');
+}
 
 export const CIBIL_HIT_SERVICE_NAME_FILTERS = ['cibil', 'experian', 'credit-report'] as const;
 
@@ -246,8 +262,8 @@ export class LosCheckCibilService {
     await this.rejectLeadAndApplication({
       leadId: lead.id,
       customerId: lead.customerId,
-      note: 'Bureau soft-pull failed: credit bureau returned a non-success response.',
-      rejectionReasonCode: REJECTION_REASON.REJECTED_BY_CLIENTS,
+      note: BUREAU_SOFT_PULL_FAIL_NOTE,
+      rejectionReasonCode: REJECTION_REASON.BUREAU_SOFT_PULL_FAILED,
       ineligibleReason: note,
     });
     return this.buildResult(lead.uuid, {
@@ -423,7 +439,32 @@ export class LosCheckCibilService {
       });
     }
 
-    if (CONVERTIBLE_LEAD_STATUSES.has(lead.leadStatus.name)) {
+    const recoverableSoftPull = isRecoverableBureauSoftPullRejection(lead);
+
+    if (recoverableSoftPull) {
+      try {
+        const restored = await this.restoreAfterBureauSoftPullSuccess(lead);
+        return this.buildResult(lead.uuid, {
+          ok: true,
+          rejected: false,
+          outcome: 'fetched_and_passed',
+          message: restored.journeyComplete
+            ? 'CIBIL re-fetched and post-BRE passed. Journey is complete — application moved to IN_REVIEW.'
+            : 'CIBIL re-fetched and post-BRE passed. Lead restored so the customer can continue where they left off.',
+          cibilScore: postBre.cibilScore,
+          postBre: {
+            passed: true,
+            rejectReason: null,
+            rejectionReasonCode: null,
+          },
+        });
+      } catch (err) {
+        this.logger.error(
+          `Post-BRE passed but soft-pull recovery failed (leadId=${lead.id.toString()}).`,
+          err instanceof Error ? err.stack : err,
+        );
+      }
+    } else if (CONVERTIBLE_LEAD_STATUSES.has(lead.leadStatus.name)) {
       try {
         await this.convertLeadWithOffer(lead.id, lead.customerId);
       } catch (err) {
@@ -446,6 +487,122 @@ export class LosCheckCibilService {
         rejectionReasonCode: null,
       },
     });
+  }
+
+  /**
+   * After a recoverable bureau soft-pull rejection, a successful re-fetch + post-BRE
+   * clears the reject and resumes the journey. If every customer stage is already done,
+   * the application (and lead handoff) land in IN_REVIEW.
+   */
+  private async restoreAfterBureauSoftPullSuccess(
+    lead: Awaited<ReturnType<LosCheckCibilService['loadLead']>>,
+  ): Promise<{ journeyComplete: boolean }> {
+    const application = await this.prisma.client.application.findFirst({
+      where: { leadId: lead.id, customerId: lead.customerId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        kyc: { select: { kycStatus: true, kycCompletedAt: true } },
+        details: {
+          select: {
+            selectedLoanAmount: true,
+            emailVerifiedAt: true,
+            loanDocumentsAcceptedAt: true,
+            bankAccountNumber: true,
+          },
+        },
+        _count: { select: { references: true } },
+      },
+    });
+
+    const journeyComplete = isCustomerJourneyComplete({
+      fullName: lead.leadDetail.fullName,
+      panVerified: lead.leadDetail.panVerified,
+      bureauFetched: BUREAU_FETCHED.SUCCESS,
+      hasBureauReport: true,
+      selectedLoanAmount: application?.details?.selectedLoanAmount,
+      emailVerifiedAt: application?.details?.emailVerifiedAt,
+      loanDocumentsAcceptedAt: application?.details?.loanDocumentsAcceptedAt,
+      kycStatus: application?.kyc?.kycStatus,
+      kycCompletedAt: application?.kyc?.kycCompletedAt,
+      bankAccountNumber: application?.details?.bankAccountNumber,
+      referencesCount: application?._count.references ?? 0,
+    });
+
+    // Resume past the offer stage when the customer already progressed beyond it.
+    const progressedPastOffer = Boolean(
+      application?.details?.bankAccountNumber?.trim() ||
+        application?.details?.emailVerifiedAt ||
+        application?.kyc?.kycCompletedAt ||
+        application?.details?.loanDocumentsAcceptedAt ||
+        (application?._count.references ?? 0) > 0,
+    );
+
+    const [convertedLeadStatus, draftAppStatus, inReviewAppStatus] = await Promise.all([
+      this.prisma.client.leadStatus.findFirst({
+        where: { name: LEAD_STATUS.CONVERTED, isActive: true },
+        select: { id: true },
+      }),
+      this.prisma.client.applicationStatus.findFirst({
+        where: { name: APPLICATION_STATUS.DRAFT, isActive: true },
+        select: { id: true },
+      }),
+      this.prisma.client.applicationStatus.findFirst({
+        where: { name: APPLICATION_STATUS.IN_REVIEW, isActive: true },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!convertedLeadStatus) {
+      throw new BadRequestException('Lead status CONVERTED is not configured.');
+    }
+    if (!draftAppStatus || !inReviewAppStatus) {
+      throw new BadRequestException('Application statuses DRAFT / IN_REVIEW are not configured.');
+    }
+
+    const rawPayload = await this.bureauReports.findLatestRawPayloadForLead(lead.id);
+    let approved: Prisma.Decimal | null = null;
+    if (rawPayload != null) {
+      const { totalUnsecuredExposureInr } = computeOpenUnsecuredExposureBreakdown(rawPayload);
+      const tier = await this.creditLimitTiers.resolveMaxBulletLoan(totalUnsecuredExposureInr);
+      if (tier) {
+        approved = new Prisma.Decimal(tier.maxBulletLoan);
+      }
+    }
+
+    const appStatusId =
+      journeyComplete || progressedPastOffer ? inReviewAppStatus.id : draftAppStatus.id;
+    const appStatusName =
+      journeyComplete || progressedPastOffer ? APPLICATION_STATUS.IN_REVIEW : APPLICATION_STATUS.DRAFT;
+
+    await this.prisma.client.$transaction(async (tx) => {
+      await tx.lead.update({
+        where: { id: lead.id },
+        data: {
+          leadStatusId: convertedLeadStatus.id,
+          leadStatusNote: null,
+          rejectionReasonId: null,
+        },
+      });
+
+      const app = application ?? (await this.ensureDraftApplication(tx, lead.id, lead.customerId));
+      await tx.application.update({
+        where: { id: app.id },
+        data: {
+          applicationStatusId: appStatusId,
+          applicationStatusNote: null,
+          rejectionReasonId: null,
+          ...(approved ? { preApprovedLoanAmount: approved } : {}),
+        },
+      });
+    });
+
+    this.logger.log(
+      `Recovered lead after bureau soft-pull re-fetch (leadId=${lead.id.toString()}): ` +
+        `journeyComplete=${journeyComplete} appStatus=${appStatusName}`,
+    );
+
+    return { journeyComplete };
   }
 
   private async convertLeadWithOffer(leadId: bigint, customerId: bigint): Promise<void> {
@@ -671,6 +828,7 @@ export class LosCheckCibilService {
         uuid: true,
         customerId: true,
         createdAt: true,
+        leadStatusNote: true,
         customer: { select: { uuid: true, mobileNumber: true } },
         leadStatus: { select: { name: true, displayName: true } },
         rejectionReason: { select: { name: true } },
@@ -678,6 +836,7 @@ export class LosCheckCibilService {
           select: {
             fullName: true,
             panNumber: true,
+            panVerified: true,
             bureauFetched: true,
           },
         },

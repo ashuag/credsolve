@@ -270,10 +270,7 @@ export function LandingFooter() {
             <p className="text-[0.65rem] font-[600] leading-relaxed text-white">
               © {new Date().getFullYear()} MoneyCash. All rights reserved.
             </p>
-            <p className="max-w-2xl text-[0.6rem] font-[500] leading-relaxed text-white/70">
-            MoneyCash is a Digital Lending Platform Registered under the name of CredSolve Technologies Private Limited | CIN: U63111UW2026PTC251327
-            *T&C Apply | Loan disbursal is subject to credit appraisal and approval.
-            </p>
+           
           </div>
         </div>
       </div>

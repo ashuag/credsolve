@@ -19,6 +19,7 @@ import { InitiateRepaymentDto } from '../application/dto/initiate-repayment.dto'
 import { InitiateCustomerRepaymentUseCase } from '../application/use-cases/initiate-customer-repayment.use-case';
 import { HandleEasebuzzRepaymentCallbackUseCase } from '../application/use-cases/handle-easebuzz-repayment-callback.use-case';
 import { RefreshCustomerRepaymentUseCase } from '../application/use-cases/refresh-customer-repayment.use-case';
+import { ServeCustomerNocPdfUseCase } from '../application/use-cases/serve-customer-noc-pdf.use-case';
 import { LogoutUseCase } from '../application/use-cases/logout.use-case';
 import { SendOtpUseCase } from '../application/use-cases/send-otp.use-case';
 import { SaveLeadDetailsUseCase } from '../application/use-cases/save-lead-details.use-case';
@@ -65,6 +66,7 @@ export class AuthController {
     private readonly customerPaymentHistory: GetCustomerPaymentHistoryUseCase,
     private readonly initiateCustomerRepayment: InitiateCustomerRepaymentUseCase,
     private readonly refreshCustomerRepayment: RefreshCustomerRepaymentUseCase,
+    private readonly serveCustomerNocPdf: ServeCustomerNocPdfUseCase,
     private readonly handleEasebuzzRepaymentCallback: HandleEasebuzzRepaymentCallbackUseCase,
     private readonly logoutFlow: LogoutUseCase,
     private readonly customerGoogleOauth: CustomerGoogleOauthService,
@@ -269,6 +271,17 @@ export class AuthController {
   })
   refreshLoanPayment(@Req() req: Request, @Param('applicationUuid') applicationUuid: string) {
     return this.refreshCustomerRepayment.execute(req, applicationUuid);
+  }
+
+  @Get('my-loans/:applicationUuid/noc')
+  @UseGuards(RequiredCustomerSessionGuard)
+  @ApiOperation({ summary: 'Download the sent NOC / loan-closure PDF for a closed loan' })
+  async myLoanNocPdf(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Param('applicationUuid') applicationUuid: string,
+  ): Promise<void> {
+    await this.serveCustomerNocPdf.execute(req, res, applicationUuid);
   }
 
   @All('repayments/easebuzz/success')

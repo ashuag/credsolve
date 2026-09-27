@@ -9,11 +9,12 @@ import {
   type DataTableColumn,
 } from '@/components/ui/data-table';
 import { DownloadDumpButton } from '@/components/ui/download-dump-button';
-import { getLoans, getLoansExportUrl, markApplicationInternalTesting, refreshLoanPayment, type LosLoan } from '@/lib/api';
+import { getLoans, getLoansExportUrl, markApplicationInternalTesting, refreshLoanPayment, sendLoanNocLetter, type LosLoan } from '@/lib/api';
 import { getLosToken as getToken } from '@/lib/auth';
 import { CIBIL_GRADE_FILTER_OPTIONS } from '@/lib/constants/cibil-grades';
 import { formatPersonName } from '@/lib/format-person-name';
 import { RefreshPaymentButton, useCanRefreshLoanPayment } from '@/components/loans/refresh-payment-button';
+import { loanNeedsNoc, SendNocButton, useCanSendLoanNoc } from '@/components/loans/send-noc-button';
 import { MarkInternalTestingButton, useCanMarkInternalTesting } from '@/components/shared/mark-internal-testing-button';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -151,6 +152,7 @@ export function LoansPanel() {
   const { filteredCount, filtersActive, activeColumnFilters, onFilteredItemsChange } = useDataTableFilterState();
   const canMarkTesting = useCanMarkInternalTesting();
   const canRefreshPayment = useCanRefreshLoanPayment();
+  const canSendNoc = useCanSendLoanNoc();
 
   const loadLoans = useCallback(async () => {
     setLoading(true);
@@ -187,6 +189,36 @@ export function LoansPanel() {
       setLoans((prev) => prev.filter((row) => row.uuid !== loan.uuid));
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Failed to mark loan as internal testing');
+    } finally {
+      setBusyUuid(null);
+    }
+  }, []);
+
+  const sendNoc = useCallback(async (loan: LosLoan) => {
+    const token = getToken();
+    if (!token) {
+      setFetchError('Session expired — please log in again.');
+      return;
+    }
+    setBusyUuid(loan.uuid);
+    setFetchError(null);
+    setActionMessage(null);
+    try {
+      const updated = await sendLoanNocLetter(token, loan.uuid);
+      setLoans((prev) =>
+        prev.map((row) =>
+          row.uuid === loan.uuid ? { ...row, isNocSent: updated.isNocSent } : row,
+        ),
+      );
+      setActionMessage({
+        tone: 'ok',
+        text: `NOC sent for ${loan.loanNumber}.`,
+      });
+    } catch (err) {
+      setActionMessage({
+        tone: 'err',
+        text: err instanceof Error ? err.message : 'Failed to send NOC letter',
+      });
     } finally {
       setBusyUuid(null);
     }
@@ -437,6 +469,9 @@ export function LoansPanel() {
               onClick={() => void refreshPayment(loan)}
             />
           ) : null}
+          {loanNeedsNoc(loan) ? (
+            <SendNocButton busy={busyUuid === loan.uuid} onClick={() => void sendNoc(loan)} />
+          ) : null}
           <MarkInternalTestingButton
             busy={busyUuid === loan.uuid}
             onConfirm={() => void markAsInternalTesting(loan)}
@@ -444,9 +479,9 @@ export function LoansPanel() {
         </div>
       ),
     },
-  ], [busyUuid, markAsInternalTesting, refreshPayment]);
+  ], [busyUuid, markAsInternalTesting, refreshPayment, sendNoc]);
 
-  const columns = canMarkTesting || canRefreshPayment
+  const columns = canMarkTesting || canRefreshPayment || canSendNoc
     ? allColumns
     : allColumns.filter((column) => column.key !== 'actions');
 

@@ -44,6 +44,18 @@ export class LoanDocumentHtmlPdfGeneratorService {
     return this.normalizePdfForSigning(rawPdf);
   }
 
+  /** Render arbitrary HTML to an A4 PDF (used by NOC and other letterheads). */
+  async generatePdfFromHtml(html: string): Promise<Buffer> {
+    try {
+      return await this.htmlToPdfBuffer(html);
+    } catch (err) {
+      this.logger.error(err instanceof Error ? err.message : String(err));
+      throw new InternalServerErrorException(
+        'Failed to generate PDF from HTML. Ensure Chromium is available (see assets/loan-documents/README.md).',
+      );
+    }
+  }
+
   async renderPreviewHtml(
     merge: LoanDocumentMergeInput,
     options: LoanDocumentRenderOptions = {},
