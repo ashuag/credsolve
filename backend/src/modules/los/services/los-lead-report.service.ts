@@ -1,17 +1,26 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import type { Response } from 'express';
+import { LOAN_STATUS } from '../../../common/constants/loan.constants';
 import { resolveEffectiveLoanStatus } from '../../../common/loan/effective-loan-status.util';
-import { resolveLeadReportRepaymentStatus } from '../../../common/loan/lead-report-repayment-status.util';
+import {
+  LEAD_REPORT_REPAYMENT_STATUS,
+  resolveLeadReportRepaymentStatus,
+} from '../../../common/loan/lead-report-repayment-status.util';
 import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbursement-view.util';
 import { overlayLiveRepaymentDueDateIfSelected, resolveRepaymentDueDateUtc } from '../../../common/loan/repayment-due-date.util';
 import { TENACIO_SERVICE_PAN_NAME_DOB } from '../../../common/vendor/tenacio/tenacio-client.service';
-import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
+import { streamXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 import {
+  EXPORT_EMPTY_FILTER_VALUE,
   matchesExportDateFilter,
   matchesExportDatetimeRangeFilter,
   matchesExportMultiSelectFilter,
   matchesExportNumberRangeFilter,
   matchesExportTextFilter,
+  parseExportDateOnly,
+  parseExportDatetimeRange,
+  parseExportNumberRange,
   requireAtLeastOneExportFilter,
 } from '../../../common/xlsx/export-row-filter.util';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -90,6 +99,42 @@ function extractPanCardName(input: {
   return input.fallback;
 }
 
+/**
+ * Safe-superset raw `loan_status.name` values for an effective loan-status filter value.
+ * `resolveEffectiveLoanStatus` only ever relabels a raw ACTIVE loan past maturity as OVERDUE — every
+ * other effective value maps 1:1 onto the same raw name — so this is exhaustive, not a guess.
+ */
+function loanStatusRawSuperset(effective: string): string[] {
+  return effective.toUpperCase() === LOAN_STATUS.OVERDUE
+    ? [LOAN_STATUS.OVERDUE, LOAN_STATUS.ACTIVE]
+    : [effective];
+}
+
+/**
+ * Safe-superset raw `loan_status.name` values for a Lead Report repayment-status filter value —
+ * the reverse of `resolveLeadReportRepaymentStatus`'s branches. `null` means there's no safe
+ * stored-column equivalent (`NOT_APPLICABLE` means "no loan at all"), so that value's rows stay
+ * entirely on the JS pass.
+ */
+function repaymentStatusRawLoanStatusSuperset(effective: string): string[] | null {
+  switch (effective.toUpperCase()) {
+    case LEAD_REPORT_REPAYMENT_STATUS.WRITTEN_OFF:
+      return [LOAN_STATUS.WRITTEN_OFF];
+    case LEAD_REPORT_REPAYMENT_STATUS.PAID:
+      return [LOAN_STATUS.SETTLED, LOAN_STATUS.CLOSED];
+    case LEAD_REPORT_REPAYMENT_STATUS.OVERDUE:
+      return [LOAN_STATUS.OVERDUE, LOAN_STATUS.ACTIVE];
+    // FAILED / PARTIALLY_PAID / PENDING are only reached when the effective loan status is
+    // ACTIVE (not past maturity) — the raw repayment status further narrows within the JS pass.
+    case LEAD_REPORT_REPAYMENT_STATUS.FAILED:
+    case LEAD_REPORT_REPAYMENT_STATUS.PARTIALLY_PAID:
+    case LEAD_REPORT_REPAYMENT_STATUS.PENDING:
+      return [LOAN_STATUS.ACTIVE];
+    default:
+      return null;
+  }
+}
+
 const leadReportInclude = {
   customer: { select: { uuid: true, mobileNumber: true } },
   leadStatus: { select: { name: true, displayName: true } },
@@ -119,6 +164,11 @@ const leadReportInclude = {
     orderBy: [{ respondedAt: 'desc' as const }, { id: 'desc' as const }],
     take: 1,
     select: { requestPayload: true, responsePayload: true },
+  },
+  leadUtms: {
+    orderBy: { createdAt: 'desc' as const },
+    take: 1,
+    select: { utmSource: true, utmMedium: true, utmCampaign: true, utmTerm: true, utmContent: true },
   },
   applications: {
     orderBy: { createdAt: 'desc' as const },
@@ -165,6 +215,9 @@ const leadReportInclude = {
 
 type LeadReportRecord = Prisma.LeadGetPayload<{ include: typeof leadReportInclude }>;
 
+/** Batch size for the export's cursor-paged fetch. */
+const EXPORT_BATCH_SIZE = 100;
+
 function moneyOrNull(value: number | null | undefined): string | null {
   if (value == null || !Number.isFinite(value)) return null;
   return (Math.round(value * 100) / 100).toFixed(2);
@@ -195,6 +248,7 @@ function mapLeadReport(lead: LeadReportRecord, liveRepayDate?: Date | null) {
   });
   const enteredName = formatLosPersonName(profile?.fullName);
   const panLog = lead.vendorApiLogs[0];
+  const latestUtm = lead.leadUtms[0] ?? null;
   const fees = computeFeeAmountsFromLoanDetail(
     details
       ? {
@@ -235,6 +289,11 @@ function mapLeadReport(lead: LeadReportRecord, liveRepayDate?: Date | null) {
     cibilCreditAssessmentCategory: profile?.bureauReport?.cibilCreditAssessment?.category ?? null,
     leadStatusCode: lead.leadStatus.name,
     leadStatusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
+    utmSource: latestUtm?.utmSource ?? null,
+    utmMedium: latestUtm?.utmMedium ?? null,
+    utmCampaign: latestUtm?.utmCampaign ?? null,
+    utmTerm: latestUtm?.utmTerm ?? null,
+    utmContent: latestUtm?.utmContent ?? null,
     applicationUuid: application?.uuid ?? null,
     applicationNumber: application?.applicationNumber ?? null,
     applicationStatusCode: application?.applicationStatus.name ?? null,
@@ -300,6 +359,11 @@ const LEAD_REPORT_HEADERS = [
   'Expected repay date',
   'Repayment amount',
   'Lead status',
+  'UTM source',
+  'UTM medium',
+  'UTM campaign',
+  'UTM term',
+  'UTM content',
   'Application ID',
   'Application status',
   'Loan ID',
@@ -349,126 +413,325 @@ export class LosLeadReportService {
     return mapLeadReport(lead, liveRepayDate);
   }
 
+  private matchesExportFilters(
+    row: ReturnType<typeof mapLeadReport>,
+    query: ExportLeadReportsQueryDto,
+  ): boolean {
+    if (query.lead && !matchesExportTextFilter(row.leadNumber, query.lead)) return false;
+    if (query.customer && !matchesExportTextFilter(row.panCardName ?? row.fullName, query.customer))
+      return false;
+    if (query.mobile && !matchesExportTextFilter(row.mobileNumber, query.mobile)) return false;
+    if (query.pan && !matchesExportTextFilter(row.panNumber, query.pan)) return false;
+    if (query.dob && !matchesExportDateFilter(row.dateOfBirth, query.dob)) return false;
+    if (query.city && !matchesExportMultiSelectFilter(row.city, query.city)) return false;
+    if (query.state && !matchesExportMultiSelectFilter(row.state, query.state)) return false;
+    if (query.purpose && !matchesExportMultiSelectFilter(row.purposeOfLoan, query.purpose)) return false;
+    if (
+      query.offerAmount &&
+      !matchesExportNumberRangeFilter(row.loanOfferAmount, query.offerAmount, 'offerAmount')
+    )
+      return false;
+    if (
+      query.selectedAmount &&
+      !matchesExportNumberRangeFilter(row.loanSelectedAmount, query.selectedAmount, 'selectedAmount')
+    )
+      return false;
+    if (query.cibil && !matchesExportNumberRangeFilter(row.cibilScore, query.cibil, 'cibil')) return false;
+    if (query.grade && !matchesExportMultiSelectFilter(row.cibilCreditAssessmentCategory, query.grade))
+      return false;
+    if (query.leadStatus && !matchesExportMultiSelectFilter(row.leadStatusCode, query.leadStatus))
+      return false;
+    if (query.utmSource && !matchesExportTextFilter(row.utmSource, query.utmSource)) return false;
+    if (query.utmMedium && !matchesExportTextFilter(row.utmMedium, query.utmMedium)) return false;
+    if (query.utmCampaign && !matchesExportTextFilter(row.utmCampaign, query.utmCampaign)) return false;
+    if (query.utmTerm && !matchesExportTextFilter(row.utmTerm, query.utmTerm)) return false;
+    if (query.utmContent && !matchesExportTextFilter(row.utmContent, query.utmContent)) return false;
+    if (
+      query.applicationStatus &&
+      !matchesExportMultiSelectFilter(row.applicationStatusCode, query.applicationStatus)
+    )
+      return false;
+    if (query.loanStatus && !matchesExportMultiSelectFilter(row.loanStatusCode, query.loanStatus))
+      return false;
+    if (
+      query.repaymentStatus &&
+      !matchesExportMultiSelectFilter(row.repaymentStatusCode, query.repaymentStatus)
+    )
+      return false;
+    if (query.created && !matchesExportDatetimeRangeFilter(row.createdAt, query.created, 'created'))
+      return false;
+    return true;
+  }
+
+  private leadReportRowCells(row: ReturnType<typeof mapLeadReport>): SimpleXlsxCell[] {
+    return [
+      row.leadNumber,
+      row.panCardName,
+      row.fullName,
+      row.mobileNumber,
+      row.email,
+      toExcelDate(row.dateOfBirth),
+      row.panNumber,
+      row.gender,
+      row.occupation,
+      row.city,
+      row.state,
+      row.pincode,
+      row.address,
+      toExcelNumber(row.netMonthlyIncome),
+      toExcelNumber(row.cibilScore),
+      row.cibilCreditAssessmentCategory,
+      row.purposeOfLoan,
+      toExcelNumber(row.loanOfferAmount),
+      toExcelNumber(row.loanSelectedAmount),
+      row.expectedRepaymentDays,
+      toExcelNumber(row.interestRate),
+      toExcelNumber(row.processingFeePercent),
+      toExcelNumber(row.processingFeeAmount),
+      toExcelNumber(row.gstPercent),
+      toExcelNumber(row.gstAmount),
+      toExcelDate(row.expectedRepaymentDate),
+      toExcelNumber(row.repaymentAmount),
+      row.leadStatusLabel,
+      row.utmSource,
+      row.utmMedium,
+      row.utmCampaign,
+      row.utmTerm,
+      row.utmContent,
+      samePublicId(row.leadNumber, row.applicationNumber) ? null : row.applicationNumber,
+      row.applicationStatusLabel,
+      samePublicId(row.leadNumber, row.loanNumber) ? null : row.loanNumber,
+      row.loanStatusLabel,
+      toExcelNumber(row.principalAmount),
+      toExcelNumber(row.netDisbursedAmount),
+      toExcelNumber(row.interestAmount),
+      toExcelDate(row.disbursedAt),
+      toExcelDate(row.loanMaturityDate),
+      row.repaymentStatusCode === 'NOT_APPLICABLE' ? null : row.repaymentStatusLabel,
+      toExcelNumber(row.latestRepaymentAmount),
+      toExcelDate(row.latestRepaymentAt),
+      toExcelDate(row.createdAt),
+      row.uuid,
+      row.customerUuid,
+      row.applicationUuid,
+      row.loanUuid,
+    ];
+  }
+
   /**
    * Mirrors the LOS Lead Report table's own column filters (same field names as the table's
    * column keys). Almost every column here is a derived label computed by `mapLeadReport` (loan
-   * status, repayment status, …) rather than a stored DB column, so — unlike the Loans/Leads/
-   * Applications exports — this filters the already-mapped in-memory rows with the same matcher
-   * functions the frontend `DataTable` uses, instead of building a Prisma `where`. Requires at
-   * least one filter, same as the download button staying disabled until a filter matches a row.
+   * status, repayment status, panCardName's vendor-log fallback, …) rather than a plain stored
+   * column, so the JS matcher pass (`matchesExportFilters`) stays the source of truth for every
+   * field, exactly as before. But most fields here *do* map 1:1 (or as a safe superset, via a
+   * relation `some`) onto a real column, so `buildExportWhere` pushes those down as a Prisma
+   * `where` to shrink what the batched fetch pulls back — including `loanStatus` and
+   * `repaymentStatus`, via the exhaustive raw-`loan_status.name` supersets in
+   * `loanStatusRawSuperset` / `repaymentStatusRawLoanStatusSuperset`. Only `customer` has no safe
+   * SQL equivalent at all (it falls back to a panCardName parsed from a vendor-log JSON payload) and
+   * is left entirely to the JS pass. Requires at least one filter, same as the download button
+   * staying disabled until a filter matches a row. Streams straight to `res`, cursor-paged from the
+   * DB in batches.
    */
-  async exportLeadReportsWorkbook(query: ExportLeadReportsQueryDto): Promise<Buffer> {
+  async exportLeadReportsWorkbook(query: ExportLeadReportsQueryDto, res: Response): Promise<void> {
     requireAtLeastOneExportFilter(
       Object.values(query),
       'Apply at least one filter before downloading the lead report dump.',
     );
-    const all = await this.listLeadReports();
-    const rows = all.filter((row) => {
-      if (query.lead && !matchesExportTextFilter(row.leadNumber, query.lead)) return false;
-      if (
-        query.customer &&
-        !matchesExportTextFilter(row.panCardName ?? row.fullName, query.customer)
-      )
-        return false;
-      if (query.mobile && !matchesExportTextFilter(row.mobileNumber, query.mobile)) return false;
-      if (query.pan && !matchesExportTextFilter(row.panNumber, query.pan)) return false;
-      if (query.dob && !matchesExportDateFilter(row.dateOfBirth, query.dob)) return false;
-      if (query.city && !matchesExportMultiSelectFilter(row.city, query.city)) return false;
-      if (query.state && !matchesExportMultiSelectFilter(row.state, query.state)) return false;
-      if (query.purpose && !matchesExportMultiSelectFilter(row.purposeOfLoan, query.purpose)) return false;
-      if (
-        query.offerAmount &&
-        !matchesExportNumberRangeFilter(row.loanOfferAmount, query.offerAmount, 'offerAmount')
-      )
-        return false;
-      if (
-        query.selectedAmount &&
-        !matchesExportNumberRangeFilter(row.loanSelectedAmount, query.selectedAmount, 'selectedAmount')
-      )
-        return false;
-      if (query.cibil && !matchesExportNumberRangeFilter(row.cibilScore, query.cibil, 'cibil')) return false;
-      if (
-        query.grade &&
-        !matchesExportMultiSelectFilter(row.cibilCreditAssessmentCategory, query.grade)
-      )
-        return false;
-      if (
-        query.leadStatus &&
-        !matchesExportMultiSelectFilter(row.leadStatusCode, query.leadStatus)
-      )
-        return false;
-      if (
-        query.applicationStatus &&
-        !matchesExportMultiSelectFilter(row.applicationStatusCode, query.applicationStatus)
-      )
-        return false;
-      if (
-        query.loanStatus &&
-        !matchesExportMultiSelectFilter(row.loanStatusCode, query.loanStatus)
-      )
-        return false;
-      if (
-        query.repaymentStatus &&
-        !matchesExportMultiSelectFilter(row.repaymentStatusCode, query.repaymentStatus)
-      )
-        return false;
-      if (
-        query.created &&
-        !matchesExportDatetimeRangeFilter(row.createdAt, query.created, 'created')
-      )
-        return false;
-      return true;
+    const where = this.buildExportWhere(query);
+
+    await streamXlsxWorkbook(res, {
+      sheetName: 'Lead report',
+      headers: LEAD_REPORT_HEADERS,
+      rows: this.streamLeadReportsForExport(where, query),
     });
-    const sheet: SimpleXlsxCell[][] = [
-      [...LEAD_REPORT_HEADERS],
-      ...rows.map((row) => [
-        row.leadNumber,
-        row.panCardName,
-        row.fullName,
-        row.mobileNumber,
-        row.email,
-        toExcelDate(row.dateOfBirth),
-        row.panNumber,
-        row.gender,
-        row.occupation,
-        row.city,
-        row.state,
-        row.pincode,
-        row.address,
-        toExcelNumber(row.netMonthlyIncome),
-        toExcelNumber(row.cibilScore),
-        row.cibilCreditAssessmentCategory,
-        row.purposeOfLoan,
-        toExcelNumber(row.loanOfferAmount),
-        toExcelNumber(row.loanSelectedAmount),
-        row.expectedRepaymentDays,
-        toExcelNumber(row.interestRate),
-        toExcelNumber(row.processingFeePercent),
-        toExcelNumber(row.processingFeeAmount),
-        toExcelNumber(row.gstPercent),
-        toExcelNumber(row.gstAmount),
-        toExcelDate(row.expectedRepaymentDate),
-        toExcelNumber(row.repaymentAmount),
-        row.leadStatusLabel,
-        samePublicId(row.leadNumber, row.applicationNumber) ? null : row.applicationNumber,
-        row.applicationStatusLabel,
-        samePublicId(row.leadNumber, row.loanNumber) ? null : row.loanNumber,
-        row.loanStatusLabel,
-        toExcelNumber(row.principalAmount),
-        toExcelNumber(row.netDisbursedAmount),
-        toExcelNumber(row.interestAmount),
-        toExcelDate(row.disbursedAt),
-        toExcelDate(row.loanMaturityDate),
-        row.repaymentStatusCode === 'NOT_APPLICABLE' ? null : row.repaymentStatusLabel,
-        toExcelNumber(row.latestRepaymentAmount),
-        toExcelDate(row.latestRepaymentAt),
-        toExcelDate(row.createdAt),
-        row.uuid,
-        row.customerUuid,
-        row.applicationUuid,
-        row.loanUuid,
-      ]),
-    ];
-    return buildSimpleXlsxWorkbook(sheet, 'Lead report');
+  }
+
+  /**
+   * Best-effort SQL pre-filter for `exportLeadReportsWorkbook` — every condition here is either an
+   * exact 1:1 mapping to a stored column, or (for `applications`/`leadUtms`, which the report only
+   * reads the *latest* row of) a `some` match that's a safe superset of the JS pass's real
+   * condition. Either way `matchesExportFilters` still re-checks every row afterward, so a bug here
+   * can only ever over-fetch, never silently drop a row that should be in the report.
+   */
+  private buildExportWhere(query: ExportLeadReportsQueryDto): Prisma.LeadWhereInput {
+    const and: Prisma.LeadWhereInput[] = [];
+
+    const leadText = query.lead?.trim();
+    if (leadText) and.push({ leadNumber: { contains: leadText } });
+
+    const mobileText = query.mobile?.trim();
+    if (mobileText) and.push({ customer: { mobileNumber: { contains: mobileText } } });
+
+    const panText = query.pan?.trim();
+    if (panText) and.push({ leadDetail: { panNumber: { contains: panText } } });
+
+    const dob = parseExportDateOnly(query.dob, 'dob');
+    if (dob) and.push({ leadDetail: { dateOfBirth: dob } });
+
+    const cityValues = this.multiSelectSqlValues(query.city);
+    if (cityValues) and.push({ leadDetail: { city: { name: { in: cityValues } } } });
+
+    const stateValues = this.multiSelectSqlValues(query.state);
+    if (stateValues) and.push({ leadDetail: { city: { state: { name: { in: stateValues } } } } });
+
+    const purposeValues = this.multiSelectSqlValues(query.purpose);
+    if (purposeValues) {
+      and.push({
+        applications: { some: { details: { reasonForLoan: { name: { in: purposeValues } } } } },
+      });
+    }
+
+    const offerAmountRange = parseExportNumberRange(query.offerAmount, 'offerAmount');
+    if (offerAmountRange) {
+      and.push({
+        applications: {
+          some: {
+            preApprovedLoanAmount: {
+              ...(offerAmountRange.min != null ? { gte: offerAmountRange.min } : {}),
+              ...(offerAmountRange.max != null ? { lte: offerAmountRange.max } : {}),
+            },
+          },
+        },
+      });
+    }
+
+    const selectedAmountRange = parseExportNumberRange(query.selectedAmount, 'selectedAmount');
+    if (selectedAmountRange) {
+      and.push({
+        applications: {
+          some: {
+            details: {
+              selectedLoanAmount: {
+                ...(selectedAmountRange.min != null ? { gte: selectedAmountRange.min } : {}),
+                ...(selectedAmountRange.max != null ? { lte: selectedAmountRange.max } : {}),
+              },
+            },
+          },
+        },
+      });
+    }
+
+    const cibilRange = parseExportNumberRange(query.cibil, 'cibil');
+    if (cibilRange) {
+      and.push({
+        leadDetail: {
+          bureauReport: {
+            cibilScore: {
+              ...(cibilRange.min != null ? { gte: cibilRange.min } : {}),
+              ...(cibilRange.max != null ? { lte: cibilRange.max } : {}),
+            },
+          },
+        },
+      });
+    }
+
+    const gradeValues = this.multiSelectSqlValues(query.grade);
+    if (gradeValues) {
+      and.push({
+        leadDetail: { bureauReport: { cibilCreditAssessment: { category: { in: gradeValues } } } },
+      });
+    }
+
+    const leadStatusValues = this.multiSelectSqlValues(query.leadStatus);
+    if (leadStatusValues) and.push({ leadStatus: { name: { in: leadStatusValues } } });
+
+    const applicationStatusValues = this.multiSelectSqlValues(query.applicationStatus);
+    if (applicationStatusValues) {
+      and.push({
+        applications: { some: { applicationStatus: { name: { in: applicationStatusValues } } } },
+      });
+    }
+
+    const utmSourceText = query.utmSource?.trim();
+    if (utmSourceText) and.push({ leadUtms: { some: { utmSource: { contains: utmSourceText } } } });
+
+    const utmMediumText = query.utmMedium?.trim();
+    if (utmMediumText) and.push({ leadUtms: { some: { utmMedium: { contains: utmMediumText } } } });
+
+    const utmCampaignText = query.utmCampaign?.trim();
+    if (utmCampaignText) and.push({ leadUtms: { some: { utmCampaign: { contains: utmCampaignText } } } });
+
+    const utmTermText = query.utmTerm?.trim();
+    if (utmTermText) and.push({ leadUtms: { some: { utmTerm: { contains: utmTermText } } } });
+
+    const utmContentText = query.utmContent?.trim();
+    if (utmContentText) and.push({ leadUtms: { some: { utmContent: { contains: utmContentText } } } });
+
+    const createdRange = parseExportDatetimeRange(query.created, 'created');
+    if (createdRange) and.push({ createdAt: { gte: createdRange.start, lte: createdRange.end } });
+
+    // `loanStatus` and `repaymentStatus` are derived labels, not stored columns, but each maps onto
+    // a known, exhaustive superset of raw `loan_status.name` values (see the two helpers above) —
+    // pushing that superset down still shrinks what the batched fetch pulls back, and
+    // `matchesExportFilters` re-checks the exact effective value on every row afterward, so this can
+    // only ever over-fetch, never silently drop a row that should be in the report.
+    const loanStatusValues = this.multiSelectSqlValues(query.loanStatus);
+    if (loanStatusValues) {
+      const rawStatuses = [...new Set(loanStatusValues.flatMap((value) => loanStatusRawSuperset(value)))];
+      and.push({ applications: { some: { loanAccount: { loanStatus: { name: { in: rawStatuses } } } } } });
+    }
+
+    const repaymentStatusValues = this.multiSelectSqlValues(query.repaymentStatus);
+    if (repaymentStatusValues) {
+      const rawSupersets = repaymentStatusValues.map((value) => repaymentStatusRawLoanStatusSuperset(value));
+      // Any value with no safe superset (`NOT_APPLICABLE` — no loan at all) forces the whole filter
+      // back onto the JS pass instead of risking a `some` that can't express "no loan".
+      if (rawSupersets.every((set) => set != null)) {
+        const rawStatuses = [...new Set(rawSupersets.flatMap((set) => set as string[]))];
+        and.push({ applications: { some: { loanAccount: { loanStatus: { name: { in: rawStatuses } } } } } });
+      }
+    }
+
+    // Not pushed to SQL — no safe stored-column equivalent, JS pass (`matchesExportFilters`)
+    // stays the only judge:
+    //  - `customer`: matches panCardName (parsed from a vendor-log JSON payload) falling back to
+    //    fullName — a DB `contains` on fullName alone could exclude rows that only match via
+    //    panCardName.
+
+    return and.length > 0 ? { AND: and } : {};
+  }
+
+  /**
+   * Parses a comma-separated multi-select filter value into the list to use in a SQL `in`. Returns
+   * null (meaning: don't add a SQL condition, leave this field entirely to the JS pass) when the
+   * filter is unset, or when it includes the "(blank)" sentinel — matching that would require an
+   * `OR field IS NULL` this helper doesn't attempt, and skipping is always safe (over-fetch only).
+   */
+  private multiSelectSqlValues(filterValue: string | undefined): string[] | null {
+    const trimmed = filterValue?.trim();
+    if (!trimmed) return null;
+    const selected = [...new Set(trimmed.split(',').map((v) => v.trim()).filter(Boolean))];
+    if (selected.length === 0) return null;
+    if (selected.some((v) => v.toLowerCase() === EXPORT_EMPTY_FILTER_VALUE.toLowerCase())) return null;
+    return selected;
+  }
+
+  private async *streamLeadReportsForExport(
+    where: Prisma.LeadWhereInput,
+    query: ExportLeadReportsQueryDto,
+  ): AsyncGenerator<SimpleXlsxCell[]> {
+    let cursorId: bigint | undefined;
+    const liveRepayDate = await resolveRepaymentDueDateUtc(this.prisma.client);
+
+    for (;;) {
+      const batch = await this.prisma.read.lead.findMany({
+        take: EXPORT_BATCH_SIZE,
+        ...(cursorId != null ? { skip: 1, cursor: { id: cursorId } } : {}),
+        where: { isInternalTesting: false, ...where },
+        orderBy: { id: 'desc' },
+        include: leadReportInclude,
+      });
+      if (batch.length === 0) return;
+
+      for (const record of batch) {
+        const row = mapLeadReport(record, liveRepayDate);
+        if (!this.matchesExportFilters(row, query)) continue;
+        yield this.leadReportRowCells(row);
+      }
+
+      cursorId = batch[batch.length - 1]!.id;
+      if (batch.length < EXPORT_BATCH_SIZE) return;
+    }
   }
 }

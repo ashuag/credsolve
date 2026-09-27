@@ -1,4 +1,4 @@
-import { authorizedLosRequest, buildExportFilterParams, cachedAuthorizedLosGet, clientApiUrl, fetchWithTimeout, invalidateClientReadCache, messageFromBody, parseJsonResponse, resolveLosClientApiUrl } from './_shared';
+import { authorizedLosRequest, cachedAuthorizedLosGet, clientApiUrl, downloadAuthenticatedWorkbook, fetchWithTimeout, invalidateClientReadCache, messageFromBody, parseJsonResponse } from './_shared';
 
 export type LosLead = {
   uuid: string;
@@ -498,22 +498,44 @@ export async function getNewLeads(token: string): Promise<LosLead[]> {
   return cachedAuthorizedLosGet<LosLead[]>(token, '/leads/new', 'Failed to fetch new leads');
 }
 
-/** URL for the leads dump workbook download. Caller must pass the table's active column filters (same keys as the Leads table's columns) — the backend rejects an empty set. */
-export function getLeadsExportUrl(token: string, filters: Partial<Record<string, string>>): string {
-  const params = buildExportFilterParams(filters);
-  params.set('access_token', token);
-  return `${resolveLosClientApiUrl('/leads/export')}?${params.toString()}`;
+/**
+ * Authenticated workbook download for the leads dump. Caller must pass the table's active column
+ * filters (same keys as the Leads table's columns) — the backend rejects an empty set.
+ */
+export async function downloadLeadsExport(
+  token: string,
+  filters: Partial<Record<string, string>>,
+): Promise<void> {
+  return downloadAuthenticatedWorkbook({
+    token,
+    path: '/leads/export',
+    filters,
+    timeoutMessage: 'Download timed out while building the leads workbook. Please try again.',
+    fallbackErrorMessage: 'Failed to download leads',
+    fallbackFilename: 'Leads.xlsx',
+  });
 }
 
 export async function getApplications(token: string): Promise<LosApplication[]> {
   return cachedAuthorizedLosGet<LosApplication[]>(token, '/applications', 'Failed to fetch applications');
 }
 
-/** URL for the applications dump workbook download. Caller must pass the table's active column filters (same keys as the Applications table's columns) — the backend rejects an empty set. */
-export function getApplicationsExportUrl(token: string, filters: Partial<Record<string, string>>): string {
-  const params = buildExportFilterParams(filters);
-  params.set('access_token', token);
-  return `${resolveLosClientApiUrl('/applications/export')}?${params.toString()}`;
+/**
+ * Authenticated workbook download for the applications dump. Caller must pass the table's active
+ * column filters (same keys as the Applications table's columns) — the backend rejects an empty set.
+ */
+export async function downloadApplicationsExport(
+  token: string,
+  filters: Partial<Record<string, string>>,
+): Promise<void> {
+  return downloadAuthenticatedWorkbook({
+    token,
+    path: '/applications/export',
+    filters,
+    timeoutMessage: 'Download timed out while building the applications workbook. Please try again.',
+    fallbackErrorMessage: 'Failed to download applications',
+    fallbackFilename: 'Applications.xlsx',
+  });
 }
 
 export async function getLeadDetails(token: string, leadUuid: string): Promise<LosLeadDetails> {

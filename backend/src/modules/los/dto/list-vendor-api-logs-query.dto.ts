@@ -24,14 +24,16 @@ export class ListVendorApiLogsQueryDto {
   @IsIn(['asc', 'desc', 'ASC', 'DESC'])
   sortDir?: string;
 
+  /** Comma-separated list of exact provider names (multi-select filter). */
   @IsOptional()
   @IsString()
-  @MaxLength(100)
+  @MaxLength(500)
   providerName?: string;
 
+  /** Comma-separated list of exact service names (multi-select filter). */
   @IsOptional()
   @IsString()
-  @MaxLength(120)
+  @MaxLength(1000)
   serviceName?: string;
 
   @IsOptional()
@@ -58,11 +60,6 @@ export class ListVendorApiLogsQueryDto {
   @IsString()
   @MaxLength(20)
   applicationNumber?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  requestPath?: string;
 
   @IsOptional()
   @IsString()

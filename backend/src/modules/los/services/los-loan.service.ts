@@ -28,13 +28,14 @@ import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbu
 import { NocLetterService } from '../../../common/noc/noc-letter.service';
 import { formatLosPersonName } from '../format-los-person-name';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
+import { streamXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 import {
+  matchesExportTextFilter,
   parseExportDateOnly,
   parseExportIstDayRange,
   requireAtLeastOneExportFilter,
 } from '../../../common/xlsx/export-row-filter.util';
-import { CIBIL_CATEGORY_SET, type CibilCategory } from '../../../common/cibil/cibil-credit-assessment.engine';
+import { CIBIL_GRADE_SET, type CibilGrade } from '../../../common/cibil/cibil-credit-assessment.engine';
 import type { ExportLoansQueryDto } from '../los-data.controller';
 import { LosLoanRepaymentSyncService } from './los-loan-repayment-sync.service';
 
@@ -87,6 +88,9 @@ function displayName(name: string, displayNameValue: string | null | undefined):
   return displayNameValue?.trim() || name;
 }
 
+/** Batch size for the export's cursor-paged fetch. */
+const EXPORT_BATCH_SIZE = 200;
+
 function maskAccountNumber(value: string | null | undefined): string | null {
   const raw = value?.trim();
   if (!raw) return null;
@@ -104,48 +108,38 @@ export class LosLoanService {
     private readonly nocLetter: NocLetterService,
   ) {}
 
-  /** `extraWhere`, when given, further restricts the result (used by the filtered export dump). */
-  async listLoans(extraWhere?: Prisma.LoanAccountWhereInput) {
-    const loans = await this.prisma.read.loanAccount.findMany({
-      where: {
-        application: { lead: { isInternalTesting: false } },
-        ...(extraWhere ?? {}),
-      },
-      orderBy: { disbursedAt: 'desc' },
-      include: {
-        loanStatus: { select: { name: true, displayName: true } },
-        waivedByUser: { select: { fullName: true } },
-        customer: { select: { uuid: true, mobileNumber: true } },
-        application: {
+  private readonly loanListInclude = {
+    loanStatus: { select: { name: true, displayName: true } },
+    waivedByUser: { select: { fullName: true } },
+    customer: { select: { uuid: true, mobileNumber: true } },
+    application: {
+      select: {
+        uuid: true,
+        applicationNumber: true,
+        applicationStatus: { select: { name: true, displayName: true } },
+        details: {
           select: {
+            emailId: true,
+            bankName: true,
+            bankAccountNumber: true,
+            ifscCode: true,
+            selectedLoanAmount: true,
+            processingFeePercentage: true,
+            gstPercentage: true,
+            interestRate: true,
+            expectedRepaymentDays: true,
+          },
+        },
+        lead: {
+          select: {
+            id: true,
             uuid: true,
-            applicationNumber: true,
-            applicationStatus: { select: { name: true, displayName: true } },
-            details: {
+            leadDetail: {
               select: {
-                emailId: true,
-                bankName: true,
-                bankAccountNumber: true,
-                ifscCode: true,
-                selectedLoanAmount: true,
-                processingFeePercentage: true,
-                gstPercentage: true,
-                interestRate: true,
-                expectedRepaymentDays: true,
-              },
-            },
-            lead: {
-              select: {
-                id: true,
-                uuid: true,
-                leadDetail: {
+                fullName: true,
+                bureauReport: {
                   select: {
-                    fullName: true,
-                    bureauReport: {
-                      select: {
-                        cibilCreditAssessment: { select: { category: true } },
-                      },
-                    },
+                    cibilCreditAssessment: { select: { category: true } },
                   },
                 },
               },
@@ -153,9 +147,13 @@ export class LosLoanService {
           },
         },
       },
-    });
+    },
+  } satisfies Prisma.LoanAccountInclude;
 
-    const penal = await this.bounceChargeTiers.loadPenalConfig();
+  private async toLoanListItems(
+    loans: Array<Prisma.LoanAccountGetPayload<{ include: LosLoanService['loanListInclude'] }>>,
+    penal: Awaited<ReturnType<BounceChargeTierResolverService['loadPenalConfig']>>,
+  ) {
     const unsettledByLoanId = await this.repaymentSync.unsettledFlagsByLoanId(loans);
 
     return loans.map((loan) => {
@@ -261,88 +259,136 @@ export class LosLoanService {
     });
   }
 
+  private loanQueueWhere(extraWhere?: Prisma.LoanAccountWhereInput): Prisma.LoanAccountWhereInput {
+    return {
+      application: { lead: { isInternalTesting: false } },
+      ...(extraWhere ?? {}),
+    };
+  }
+
+  /** `extraWhere`, when given, further restricts the result (used by the filtered export dump). */
+  async listLoans(extraWhere?: Prisma.LoanAccountWhereInput) {
+    const loans = await this.prisma.read.loanAccount.findMany({
+      where: this.loanQueueWhere(extraWhere),
+      orderBy: { disbursedAt: 'desc' },
+      include: this.loanListInclude,
+    });
+    const penal = await this.bounceChargeTiers.loadPenalConfig();
+    return this.toLoanListItems(loans, penal);
+  }
+
+  private loanRowCells(loan: Awaited<ReturnType<LosLoanService['toLoanListItems']>>[number]): SimpleXlsxCell[] {
+    return [
+      loan.loanNumber,
+      loan.applicationNumber,
+      loan.fullName,
+      loan.mobileNumber,
+      loan.email,
+      loan.cibilCreditAssessmentCategory,
+      toExcelNumber(loan.principalAmount),
+      toExcelNumber(loan.netDisbursedAmount),
+      toExcelNumber(loan.interestRate),
+      toExcelNumber(loan.totalRepaymentAmount),
+      toExcelNumber(loan.totalRepaymentWithPenalAmount),
+      toExcelNumber(loan.overdueInterestInr),
+      toExcelNumber(loan.penalAmount),
+      toExcelNumber(loan.waivedAmountInr),
+      loan.waivedByName,
+      loan.overdueDays,
+      toExcelNumber(loan.processingFeeAmount),
+      toExcelNumber(loan.gstAmount),
+      loan.bankName,
+      loan.bankAccountMasked,
+      loan.ifscCode,
+      loan.utr,
+      loan.loanStatusLabel,
+      loan.applicationStatusLabel,
+      toExcelDate(loan.disbursedAt),
+      loan.loanMaturityDate,
+      toExcelDate(loan.closedAt),
+      loan.uuid,
+      loan.applicationUuid,
+      loan.customerUuid,
+    ];
+  }
+
   /**
    * Dump export for LOS Loans → Download dump. Mirrors the LOS Loans table's own column filters
    * (same field names as the table's column keys) as real Prisma `where` conditions — including
    * "Overdue", which isn't a stored value but derived from maturity date vs. today — so the query
-   * itself narrows the result at the database. Requires at least one filter, same as the button
-   * staying disabled until a filter matches at least one loan.
+   * itself narrows the result at the database. "Loan" and "Borrower" are the exception: the table
+   * searches them as one combined string per row (`"<loanNumber> <applicationNumber>"` /
+   * `"<name> <mobile> <email>"`), so a search term spanning two of those fields can match on screen
+   * without any single column containing it — they're applied as a JS filter on the already-mapped
+   * rows, exactly like the table, instead of a per-column Prisma `where`. Requires at least one
+   * filter, same as the button staying disabled until a filter matches at least one loan. Streams
+   * straight to `res`, cursor-paged from the DB in batches.
    */
-  async exportLoansWorkbook(query: ExportLoansQueryDto): Promise<Buffer> {
+  async exportLoansWorkbook(query: ExportLoansQueryDto, res: Response): Promise<void> {
     const { access_token: _accessToken, ...filterFields } = query;
     requireAtLeastOneExportFilter(
       Object.values(filterFields),
       'Apply at least one filter before downloading the loans dump.',
     );
     const where = this.buildExportWhere(query);
-    const loans = await this.listLoans(where);
-    const rows: SimpleXlsxCell[][] = [
-      [...LOAN_DUMP_HEADERS],
-      ...loans.map((loan) => [
-        loan.loanNumber,
-        loan.applicationNumber,
-        loan.fullName,
-        loan.mobileNumber,
-        loan.email,
-        loan.cibilCreditAssessmentCategory,
-        toExcelNumber(loan.principalAmount),
-        toExcelNumber(loan.netDisbursedAmount),
-        toExcelNumber(loan.interestRate),
-        toExcelNumber(loan.totalRepaymentAmount),
-        toExcelNumber(loan.totalRepaymentWithPenalAmount),
-        toExcelNumber(loan.overdueInterestInr),
-        toExcelNumber(loan.penalAmount),
-        toExcelNumber(loan.waivedAmountInr),
-        loan.waivedByName,
-        loan.overdueDays,
-        toExcelNumber(loan.processingFeeAmount),
-        toExcelNumber(loan.gstAmount),
-        loan.bankName,
-        loan.bankAccountMasked,
-        loan.ifscCode,
-        loan.utr,
-        loan.loanStatusLabel,
-        loan.applicationStatusLabel,
-        toExcelDate(loan.disbursedAt),
-        loan.loanMaturityDate,
-        toExcelDate(loan.closedAt),
-        loan.uuid,
-        loan.applicationUuid,
-        loan.customerUuid,
-      ]),
-    ];
-    return buildSimpleXlsxWorkbook(rows, 'Loans');
+    const loanText = query.loan?.trim();
+    const borrowerText = query.borrower?.trim();
+
+    await streamXlsxWorkbook(res, {
+      sheetName: 'Loans',
+      headers: LOAN_DUMP_HEADERS,
+      rows: this.streamLoansForExport(where, loanText, borrowerText),
+    });
+  }
+
+  private async *streamLoansForExport(
+    extraWhere: Prisma.LoanAccountWhereInput,
+    loanText: string | undefined,
+    borrowerText: string | undefined,
+  ): AsyncGenerator<SimpleXlsxCell[]> {
+    let cursorId: bigint | undefined;
+    const where = this.loanQueueWhere(extraWhere);
+    const penal = await this.bounceChargeTiers.loadPenalConfig();
+
+    for (;;) {
+      const batch = await this.prisma.read.loanAccount.findMany({
+        take: EXPORT_BATCH_SIZE,
+        ...(cursorId != null ? { skip: 1, cursor: { id: cursorId } } : {}),
+        where,
+        orderBy: { id: 'desc' },
+        include: this.loanListInclude,
+      });
+      if (batch.length === 0) return;
+
+      const loans = await this.toLoanListItems(batch, penal);
+      for (const loan of loans) {
+        if (loanText && !matchesExportTextFilter(`${loan.loanNumber} ${loan.applicationNumber}`, loanText)) {
+          continue;
+        }
+        if (
+          borrowerText &&
+          !matchesExportTextFilter(
+            [loan.fullName, loan.mobileNumber, loan.email].filter(Boolean).join(' '),
+            borrowerText,
+          )
+        ) {
+          continue;
+        }
+        yield this.loanRowCells(loan);
+      }
+
+      cursorId = batch[batch.length - 1]!.id;
+      if (batch.length < EXPORT_BATCH_SIZE) return;
+    }
   }
 
   /** Builds the export's Prisma `where` from the LOS Loans table's own filters. Throws when none are set. */
   private buildExportWhere(query: ExportLoansQueryDto): Prisma.LoanAccountWhereInput {
     const and: Prisma.LoanAccountWhereInput[] = [];
 
-    const loanText = query.loan?.trim();
-    if (loanText) {
-      and.push({
-        OR: [
-          { loanNumber: { contains: loanText } },
-          { loanAccountNumber: { contains: loanText } },
-          { application: { applicationNumber: { contains: loanText } } },
-        ],
-      });
-    }
-
-    const borrowerText = query.borrower?.trim();
-    if (borrowerText) {
-      and.push({
-        OR: [
-          { application: { lead: { leadDetail: { fullName: { contains: borrowerText } } } } },
-          { customer: { mobileNumber: { contains: borrowerText } } },
-          { application: { details: { emailId: { contains: borrowerText } } } },
-        ],
-      });
-    }
-
     const grade = query.grade?.trim().toUpperCase();
     if (grade) {
-      if (!CIBIL_CATEGORY_SET.has(grade as CibilCategory)) {
+      if (!CIBIL_GRADE_SET.has(grade as CibilGrade)) {
         throw new BadRequestException('grade must be one of A-H.');
       }
       and.push({

@@ -1,4 +1,4 @@
-import { authorizedLosRequest, resolveLosClientApiUrl } from './_shared';
+import { authorizedLosRequest, buildExportFilterParams, cachedAuthorizedLosGet, downloadAuthenticatedWorkbook } from './_shared';
 
 export type VendorApiLogOutcome = 'success' | 'failure';
 
@@ -51,15 +51,13 @@ export type ListVendorApiLogsResponse = {
   totalPages: number;
 };
 
+export type VendorApiLogFilterOptions = {
+  providerNames: string[];
+  serviceNames: string[];
+};
+
 function buildQuery(params: ListVendorApiLogsParams): string {
-  const q = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value == null) continue;
-    const text = String(value).trim();
-    if (!text) continue;
-    q.set(key, text);
-  }
-  const s = q.toString();
+  const s = buildExportFilterParams(params).toString();
   return s ? `?${s}` : '';
 }
 
@@ -75,20 +73,31 @@ export async function listVendorApiLogs(
   );
 }
 
-/** URL for the vendor API logs dump workbook download. Caller must pass at least one filter — the backend rejects an unfiltered export. */
-export function getVendorApiLogsExportUrl(
+/**
+ * Authenticated workbook download for the vendor API logs dump. Caller must pass at least one
+ * filter — the backend rejects an unfiltered export.
+ */
+export async function downloadVendorApiLogsExport(
   token: string,
-  params: ListVendorApiLogsParams = {},
-): string {
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value == null) continue;
-    const text = String(value).trim();
-    if (!text) continue;
-    query.set(key, text);
-  }
-  query.set('access_token', token);
-  return `${resolveLosClientApiUrl('/developer-tools/vendor-api-logs/export')}?${query.toString()}`;
+  filters: Partial<Record<string, string>>,
+): Promise<void> {
+  return downloadAuthenticatedWorkbook({
+    token,
+    path: '/developer-tools/vendor-api-logs/export',
+    filters,
+    timeoutMessage: 'Download timed out while building the vendor API logs workbook. Please try again.',
+    fallbackErrorMessage: 'Failed to download vendor API logs',
+    fallbackFilename: 'Vendor API Logs.xlsx',
+  });
+}
+
+/** Distinct provider/service names for the Provider/Service filter dropdowns. */
+export async function getVendorApiLogFilterOptions(token: string): Promise<VendorApiLogFilterOptions> {
+  return cachedAuthorizedLosGet<VendorApiLogFilterOptions>(
+    token,
+    '/developer-tools/vendor-api-logs/filter-options',
+    'Unable to load vendor API log filter options.',
+  );
 }
 
 export async function getVendorApiLog(

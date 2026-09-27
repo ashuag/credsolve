@@ -9,9 +9,9 @@ import {
   type DataTableColumn,
 } from '@/components/ui/data-table';
 import { DownloadDumpButton } from '@/components/ui/download-dump-button';
-import { getLoans, getLoansExportUrl, markApplicationInternalTesting, refreshLoanPayment, sendLoanNocLetter, type LosLoan } from '@/lib/api';
+import { getLoans, downloadLoansExport, markApplicationInternalTesting, refreshLoanPayment, type LosLoan, sendLoanNocLetter } from '@/lib/api';
 import { getLosToken as getToken } from '@/lib/auth';
-import { CIBIL_GRADE_FILTER_OPTIONS } from '@/lib/constants/cibil-grades';
+import { CUSTOMER_GRADE_FILTER_OPTIONS } from '@/lib/constants/customer-grades';
 import { formatPersonName } from '@/lib/format-person-name';
 import { RefreshPaymentButton, useCanRefreshLoanPayment } from '@/components/loans/refresh-payment-button';
 import { loanNeedsNoc, SendNocButton, useCanSendLoanNoc } from '@/components/loans/send-noc-button';
@@ -309,7 +309,7 @@ export function LoansPanel() {
       getSortValue: (row) => row.cibilCreditAssessmentCategory ?? '',
       filter: {
         type: 'select',
-        options: CIBIL_GRADE_FILTER_OPTIONS,
+        options: CUSTOMER_GRADE_FILTER_OPTIONS,
         matches: (row, value) => row.cibilCreditAssessmentCategory === value,
       },
       render: (loan) => <GradeBadge category={loan.cibilCreditAssessmentCategory} />,
@@ -544,8 +544,9 @@ export function LoansPanel() {
               filtersActive={filtersActive}
               loading={loading}
               resultCount={filteredCount}
-              buildUrl={(token) => getLoansExportUrl(token, activeColumnFilters)}
+              onDownload={(token) => downloadLoansExport(token, activeColumnFilters)}
               onSessionExpired={() => setFetchError('Session expired — please log in again.')}
+              onError={(message) => setFetchError(message)}
               className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
             />
             <button

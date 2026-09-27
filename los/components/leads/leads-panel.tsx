@@ -9,7 +9,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui/data-table';
 import { DownloadDumpButton } from '@/components/ui/download-dump-button';
-import { getNewLeads, getLeadsExportUrl, getMasters, markLeadInternalTesting, type LosLead } from '@/lib/api';
+import { getNewLeads, downloadLeadsExport, getMasters, markLeadInternalTesting, type LosLead } from '@/lib/api';
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { getLosToken as getToken } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
@@ -410,8 +410,9 @@ export function LeadsPanel() {
               filtersActive={filtersActive}
               loading={loading}
               resultCount={filteredCount}
-              buildUrl={(token) => getLeadsExportUrl(token, activeColumnFilters)}
+              onDownload={(token) => downloadLeadsExport(token, activeColumnFilters)}
               onSessionExpired={() => setFetchError('Session expired — please log in again.')}
+              onError={(message) => setFetchError(message)}
               className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
             />
             <button

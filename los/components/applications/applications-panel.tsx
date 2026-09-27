@@ -9,11 +9,11 @@ import {
   type DataTableColumn,
 } from '@/components/ui/data-table';
 import { DownloadDumpButton } from '@/components/ui/download-dump-button';
-import { getApplications, getApplicationsExportUrl, getMasters, markApplicationInternalTesting, type LosApplication } from '@/lib/api';
+import { getApplications, downloadApplicationsExport, getMasters, markApplicationInternalTesting, type LosApplication } from '@/lib/api';
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { getLosToken as getToken } from '@/lib/auth';
 import { APPLICATION_JOURNEY_STAGE_FILTER_OPTIONS } from '@/lib/constants/application-journey-stages';
-import { CIBIL_GRADE_FILTER_OPTIONS } from '@/lib/constants/cibil-grades';
+import { CUSTOMER_GRADE_FILTER_OPTIONS } from '@/lib/constants/customer-grades';
 import { resolveApplicationStageLabel } from '@/lib/customer-journey';
 import { formatPersonName } from '@/lib/format-person-name';
 import { BANK_DETAIL_FAILED_LABEL, PENNY_DROP_FAILED_LABEL } from '@/lib/penny-drop-grant-retry-eligibility';
@@ -183,7 +183,8 @@ function StageCell({ app }: { app: LosApplication }) {
 }
 
 function RejectionReasonCell({ app }: { app: LosApplication }) {
-  const note = app.leadStatusNote?.trim().toLowerCase() ?? '';
+  const noteRaw = app.leadStatusNote?.trim() ?? '';
+  const note = noteRaw.toLowerCase();
   const pennyDropFailed =
     app.statusCode.toUpperCase() === 'PENNYDROP_FAILED' ||
     app.leadRejectionReason?.code === 'PENNYDROP_FAILED' ||
@@ -194,17 +195,26 @@ function RejectionReasonCell({ app }: { app: LosApplication }) {
       ? rejectionReasonDisplayLabel(app.leadRejectionReason.code)
       : app.leadRejectionReason?.label?.trim()) ||
     (pennyDropFailed ? PENNY_DROP_FAILED_LABEL : '');
-  if (!label) {
+  // Don't repeat the note when it's the exact text the synthetic penny-drop/bank-detail label came from.
+  const showNote = Boolean(noteRaw) && note !== label.toLowerCase();
+
+  if (!label && !showNote) {
     return <span className="text-brand-muted">—</span>;
   }
 
   return (
-    <p
-      className="m-0 min-w-[140px] max-w-[220px] text-[0.72rem] font-extrabold uppercase tracking-[0.04em] text-[#991b1b] line-clamp-2"
-      title={label}
-    >
-      {label}
-    </p>
+    <div className="min-w-[140px] max-w-[220px]" title={[label, showNote ? noteRaw : null].filter(Boolean).join(' — ')}>
+      {label ? (
+        <p className="m-0 text-[0.72rem] font-extrabold uppercase tracking-[0.04em] text-[#991b1b] line-clamp-2">
+          {label}
+        </p>
+      ) : null}
+      {showNote ? (
+        <p className={`m-0 text-[0.72rem] font-semibold leading-snug text-brand-muted line-clamp-2 ${label ? 'mt-0.5' : ''}`}>
+          {noteRaw}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -334,7 +344,7 @@ export function ApplicationsPanel() {
       getSortValue: (row) => row.cibilCreditAssessmentCategory ?? '',
       filter: {
         type: 'select',
-        options: CIBIL_GRADE_FILTER_OPTIONS,
+        options: CUSTOMER_GRADE_FILTER_OPTIONS,
         matches: (row, value) => row.cibilCreditAssessmentCategory === value,
       },
       render: (app) => <GradeBadge category={app.cibilCreditAssessmentCategory} />,
@@ -397,7 +407,7 @@ export function ApplicationsPanel() {
         type: 'text',
         placeholder: 'Search reason…',
         matches: (row, value) => {
-          const reasonText = [row.leadRejectionReason?.code, row.leadRejectionReason?.label]
+          const reasonText = [row.leadRejectionReason?.code, row.leadRejectionReason?.label, row.leadStatusNote]
             .filter(Boolean)
             .join(' ')
             .toLowerCase();
@@ -485,8 +495,9 @@ export function ApplicationsPanel() {
               filtersActive={filtersActive}
               loading={loading}
               resultCount={filteredCount}
-              buildUrl={(token) => getApplicationsExportUrl(token, activeColumnFilters)}
+              onDownload={(token) => downloadApplicationsExport(token, activeColumnFilters)}
               onSessionExpired={() => setFetchError('Session expired — please log in again.')}
+              onError={(message) => setFetchError(message)}
               className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
             />
             <button

@@ -13,7 +13,7 @@ import { losStatusPillStyles } from '@/components/shared/los-status-pill';
 import { downloadLeadReportsExport, getLeadReports, type LosLeadReportListItem } from '@/lib/api';
 import { formatCibilScoreLabel, formatReviewDateOnly, formatReviewInr, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { getLosToken } from '@/lib/auth';
-import { CIBIL_GRADE_FILTER_OPTIONS } from '@/lib/constants/cibil-grades';
+import { CUSTOMER_GRADE_FILTER_OPTIONS } from '@/lib/constants/customer-grades';
 import { formatPersonName } from '@/lib/format-person-name';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -330,7 +330,7 @@ export function LeadReportsPanel() {
       filter: {
         type: 'multi-select',
         placeholder: 'Grades',
-        options: CIBIL_GRADE_FILTER_OPTIONS,
+        options: CUSTOMER_GRADE_FILTER_OPTIONS,
       },
       cellClassName: 'whitespace-nowrap',
       render: (row) => <GradeBadge category={row.cibilCreditAssessmentCategory} />,
@@ -344,6 +344,56 @@ export function LeadReportsPanel() {
       filter: { type: 'multi-select', placeholder: 'Statuses', options: leadStatusOptions },
       cellClassName: 'whitespace-nowrap',
       render: (row) => <StatusBadge code={row.leadStatusCode} label={row.leadStatusLabel} />,
+    },
+    {
+      key: 'utmSource',
+      label: 'UTM source',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.utmSource ?? '',
+      getSortValue: (row) => (row.utmSource ?? '').toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search source…' },
+      cellClassName: 'text-brand-muted text-[0.82rem] whitespace-nowrap',
+      render: (row) => row.utmSource ?? '—',
+    },
+    {
+      key: 'utmMedium',
+      label: 'UTM medium',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.utmMedium ?? '',
+      getSortValue: (row) => (row.utmMedium ?? '').toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search medium…' },
+      cellClassName: 'text-brand-muted text-[0.82rem] whitespace-nowrap',
+      render: (row) => row.utmMedium ?? '—',
+    },
+    {
+      key: 'utmCampaign',
+      label: 'UTM campaign',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.utmCampaign ?? '',
+      getSortValue: (row) => (row.utmCampaign ?? '').toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search campaign…' },
+      cellClassName: 'text-brand-muted text-[0.82rem] whitespace-nowrap',
+      render: (row) => row.utmCampaign ?? '—',
+    },
+    {
+      key: 'utmTerm',
+      label: 'UTM term',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.utmTerm ?? '',
+      getSortValue: (row) => (row.utmTerm ?? '').toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search term…' },
+      cellClassName: 'text-brand-muted text-[0.82rem] whitespace-nowrap',
+      render: (row) => row.utmTerm ?? '—',
+    },
+    {
+      key: 'utmContent',
+      label: 'UTM content',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.utmContent ?? '',
+      getSortValue: (row) => (row.utmContent ?? '').toLowerCase(),
+      filter: { type: 'text', placeholder: 'Search content…' },
+      cellClassName: 'text-brand-muted text-[0.82rem] whitespace-nowrap',
+      render: (row) => row.utmContent ?? '—',
     },
     {
       key: 'applicationStatus',
@@ -418,7 +468,7 @@ export function LeadReportsPanel() {
         onRetry={() => void load()}
         emptyMessage="No leads have been recorded yet."
         noResultsMessage="No leads match your filters."
-        minWidth="2070px"
+        minWidth="2670px"
         pageSize={LOS_LISTING_PAGE_SIZE}
         pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         initialSort={{ key: 'created', dir: 'desc' }}
