@@ -21,6 +21,12 @@ import {
 } from '../../../common/loan/bounce-charge.util';
 import { BounceChargeTierResolverService } from '../../../common/loan/bounce-charge-tier.resolver';
 import { billDueNowAfterWaiverInr, waivedAmountFromLoan } from '../../../common/loan/loan-charge-waiver.util';
+import {
+  CUSTOMER_TYPE_LABEL,
+  loadClosedLoanLeadIdsByCustomer,
+  resolveCustomerType,
+  type ClosedLoanLeadIdsByCustomer,
+} from '../../../common/loan/customer-recurring-status.util';
 import { resolveEffectiveLoanStatus } from '../../../common/loan/effective-loan-status.util';
 import { roundInr2 } from '../../../common/loan/loan-repayment-outstanding.util';
 import { isCollectedRepaymentStatus } from '../../../common/constants/loan-repayment.constants';
@@ -30,6 +36,7 @@ import { formatLosPersonName } from '../format-los-person-name';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { streamXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 import {
+  matchesExportMultiSelectFilter,
   matchesExportTextFilter,
   parseExportDateOnly,
   parseExportIstDayRange,
@@ -58,6 +65,7 @@ const LOAN_DUMP_HEADERS = [
   'Mobile',
   'Email',
   'Grade',
+  'Customer type',
   'Principal',
   'Net disbursed',
   'Interest rate %',
@@ -153,10 +161,12 @@ export class LosLoanService {
   private async toLoanListItems(
     loans: Array<Prisma.LoanAccountGetPayload<{ include: LosLoanService['loanListInclude'] }>>,
     penal: Awaited<ReturnType<BounceChargeTierResolverService['loadPenalConfig']>>,
+    closedLoanLeadIds: ClosedLoanLeadIdsByCustomer,
   ) {
     const unsettledByLoanId = await this.repaymentSync.unsettledFlagsByLoanId(loans);
 
     return loans.map((loan) => {
+      const customerType = resolveCustomerType(closedLoanLeadIds, loan.customerId, loan.application.lead.id);
       const details = loan.application.details;
       const fees = computeFeeAmountsFromLoanDetail(
         details
@@ -217,6 +227,8 @@ export class LosLoanService {
         fullName: formatLosPersonName(loan.application.lead.leadDetail?.fullName),
         cibilCreditAssessmentCategory:
           loan.application.lead.leadDetail?.bureauReport?.cibilCreditAssessment?.category ?? null,
+        customerType,
+        customerTypeLabel: CUSTOMER_TYPE_LABEL[customerType],
         mobileNumber: loan.customer.mobileNumber,
         email: details?.emailId ?? null,
         principalAmount: loan.principalAmount.toString(),
@@ -273,8 +285,11 @@ export class LosLoanService {
       orderBy: { disbursedAt: 'desc' },
       include: this.loanListInclude,
     });
-    const penal = await this.bounceChargeTiers.loadPenalConfig();
-    return this.toLoanListItems(loans, penal);
+    const [penal, closedLoanLeadIds] = await Promise.all([
+      this.bounceChargeTiers.loadPenalConfig(),
+      loadClosedLoanLeadIdsByCustomer(this.prisma.read),
+    ]);
+    return this.toLoanListItems(loans, penal, closedLoanLeadIds);
   }
 
   private loanRowCells(loan: Awaited<ReturnType<LosLoanService['toLoanListItems']>>[number]): SimpleXlsxCell[] {
@@ -285,6 +300,7 @@ export class LosLoanService {
       loan.mobileNumber,
       loan.email,
       loan.cibilCreditAssessmentCategory,
+      loan.customerTypeLabel,
       toExcelNumber(loan.principalAmount),
       toExcelNumber(loan.netDisbursedAmount),
       toExcelNumber(loan.interestRate),
@@ -333,11 +349,12 @@ export class LosLoanService {
     const where = this.buildExportWhere(query);
     const loanText = query.loan?.trim();
     const borrowerText = query.borrower?.trim();
+    const customerType = query.customerType?.trim();
 
     await streamXlsxWorkbook(res, {
       sheetName: 'Loans',
       headers: LOAN_DUMP_HEADERS,
-      rows: this.streamLoansForExport(where, loanText, borrowerText),
+      rows: this.streamLoansForExport(where, loanText, borrowerText, customerType),
     });
   }
 
@@ -345,10 +362,14 @@ export class LosLoanService {
     extraWhere: Prisma.LoanAccountWhereInput,
     loanText: string | undefined,
     borrowerText: string | undefined,
+    customerTypeFilter: string | undefined,
   ): AsyncGenerator<SimpleXlsxCell[]> {
     let cursorId: bigint | undefined;
     const where = this.loanQueueWhere(extraWhere);
-    const penal = await this.bounceChargeTiers.loadPenalConfig();
+    const [penal, closedLoanLeadIds] = await Promise.all([
+      this.bounceChargeTiers.loadPenalConfig(),
+      loadClosedLoanLeadIdsByCustomer(this.prisma.read),
+    ]);
 
     for (;;) {
       const batch = await this.prisma.read.loanAccount.findMany({
@@ -360,7 +381,7 @@ export class LosLoanService {
       });
       if (batch.length === 0) return;
 
-      const loans = await this.toLoanListItems(batch, penal);
+      const loans = await this.toLoanListItems(batch, penal, closedLoanLeadIds);
       for (const loan of loans) {
         if (loanText && !matchesExportTextFilter(`${loan.loanNumber} ${loan.applicationNumber}`, loanText)) {
           continue;
@@ -372,6 +393,9 @@ export class LosLoanService {
             borrowerText,
           )
         ) {
+          continue;
+        }
+        if (customerTypeFilter && !matchesExportMultiSelectFilter(loan.customerType, customerTypeFilter)) {
           continue;
         }
         yield this.loanRowCells(loan);

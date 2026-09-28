@@ -57,6 +57,12 @@ import {
   syncExpectedRepaymentDateUntilDisbursed,
 } from '../../../common/loan/repayment-due-date.util';
 import { overdueDaysFromMaturity } from '../../../common/loan/bounce-charge.util';
+import {
+  CUSTOMER_TYPE_LABEL,
+  loadClosedLoanLeadIdsByCustomer,
+  resolveCustomerType,
+  type ClosedLoanLeadIdsByCustomer,
+} from '../../../common/loan/customer-recurring-status.util';
 import { resolveEffectiveLoanStatus } from '../../../common/loan/effective-loan-status.util';
 import { APPLICATION_KYC_STATUS, APPLICATION_STATUS } from '../../../common/constants/application.constants';
 import { BANK_DETAIL_FAILED_NOTE, isBankNameMatchReviewPending, PENNY_DROP_FAILED_NOTE } from '../../../common/constants/bank.constants';
@@ -71,6 +77,7 @@ import {
 } from '../../../common/vendor/pan-nsdl-snapshot.util';
 import { CIBIL_GRADE_SET, type CibilGrade } from '../../../common/cibil/cibil-credit-assessment.engine';
 import {
+  matchesExportMultiSelectFilter,
   matchesExportTextFilter,
   parseExportIstDayRange,
   requireAtLeastOneExportFilter,
@@ -498,6 +505,7 @@ const APPLICATION_DUMP_HEADERS = [
   'Email',
   'CIBIL score',
   'Grade',
+  'Customer type',
   'Eligible loan amount',
   'Selected loan amount',
   'Repay date',
@@ -617,8 +625,10 @@ export class LosApplicationService {
   private toApplicationListItem(
     application: Prisma.ApplicationGetPayload<{ include: LosApplicationService['applicationListInclude'] }>,
     liveRepayDate: Date | null,
+    closedLoanLeadIds: ClosedLoanLeadIdsByCustomer,
   ) {
     const loanAccount = application.loanAccount;
+      const customerType = resolveCustomerType(closedLoanLeadIds, application.customerId, application.leadId);
       const appDetails = loanAccount
         ? application.details
         : overlayLiveRepaymentDueDateIfSelected(application.details, liveRepayDate) ?? application.details;
@@ -647,6 +657,8 @@ export class LosApplicationService {
         fullName: formatLosPersonName(application.lead.leadDetail?.fullName),
         cibilScore: application.lead.leadDetail?.bureauReport?.cibilScore ?? null,
         cibilCreditAssessmentCategory: application.lead.leadDetail?.bureauReport?.cibilCreditAssessment?.category ?? null,
+        customerType,
+        customerTypeLabel: CUSTOMER_TYPE_LABEL[customerType],
         eligibleLoanAmount,
         selectedLoanAmount: appDetails?.selectedLoanAmount?.toString() ?? null,
         repayDate: loanAccount
@@ -706,8 +718,11 @@ export class LosApplicationService {
       orderBy: { createdAt: 'desc' },
       include: this.applicationListInclude,
     });
-    const liveRepayDate = await resolveRepaymentDueDateUtc(this.prisma.client);
-    return applications.map((application) => this.toApplicationListItem(application, liveRepayDate));
+    const [liveRepayDate, closedLoanLeadIds] = await Promise.all([
+      resolveRepaymentDueDateUtc(this.prisma.client),
+      loadClosedLoanLeadIdsByCustomer(this.prisma.read),
+    ]);
+    return applications.map((application) => this.toApplicationListItem(application, liveRepayDate, closedLoanLeadIds));
   }
 
   private applicationRowCells(app: ReturnType<LosApplicationService['toApplicationListItem']>): SimpleXlsxCell[] {
@@ -719,6 +734,7 @@ export class LosApplicationService {
       app.email,
       toExcelNumber(app.cibilScore),
       app.cibilCreditAssessmentCategory,
+      app.customerTypeLabel,
       toExcelNumber(app.eligibleLoanAmount),
       toExcelNumber(app.selectedLoanAmount),
       app.repayDate,
@@ -764,11 +780,12 @@ export class LosApplicationService {
     const stage = query.stage?.trim();
     const reason = query.reason?.trim().toLowerCase();
     const name = query.name?.trim();
+    const customerType = query.customerType?.trim();
 
     await streamXlsxWorkbook(res, {
       sheetName: 'Applications',
       headers: APPLICATION_DUMP_HEADERS,
-      rows: this.streamApplicationsForExport(where, stage, reason, name),
+      rows: this.streamApplicationsForExport(where, stage, reason, name, customerType),
     });
   }
 
@@ -777,10 +794,14 @@ export class LosApplicationService {
     stage: string | undefined,
     reason: string | undefined,
     name: string | undefined,
+    customerType: string | undefined,
   ): AsyncGenerator<SimpleXlsxCell[]> {
     let cursorId: bigint | undefined;
     const where = this.applicationQueueWhere(extraWhere);
-    const liveRepayDate = await resolveRepaymentDueDateUtc(this.prisma.client);
+    const [liveRepayDate, closedLoanLeadIds] = await Promise.all([
+      resolveRepaymentDueDateUtc(this.prisma.client),
+      loadClosedLoanLeadIdsByCustomer(this.prisma.read),
+    ]);
 
     for (;;) {
       const batch = await this.prisma.read.application.findMany({
@@ -793,7 +814,7 @@ export class LosApplicationService {
       if (batch.length === 0) return;
 
       for (const record of batch) {
-        const app = this.toApplicationListItem(record, liveRepayDate);
+        const app = this.toApplicationListItem(record, liveRepayDate, closedLoanLeadIds);
         if (stage && dumpApplicationStageLabel(app) !== stage) continue;
         if (reason) {
           const haystack = [app.leadRejectionReason?.code, app.leadRejectionReason?.label, app.leadStatusNote]
@@ -803,6 +824,7 @@ export class LosApplicationService {
           if (!haystack.includes(reason)) continue;
         }
         if (name && !matchesExportTextFilter(app.fullName ?? 'Details pending', name)) continue;
+        if (customerType && !matchesExportMultiSelectFilter(app.customerType, customerType)) continue;
         yield this.applicationRowCells(app);
       }
 

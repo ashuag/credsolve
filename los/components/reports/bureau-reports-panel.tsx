@@ -9,10 +9,12 @@ import {
   type DataTableColumn,
 } from '@/components/ui/data-table';
 import { DownloadDumpButton } from '@/components/ui/download-dump-button';
+import { CustomerTypeBadge } from '@/components/shared/customer-type-badge';
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { downloadBureauReportsExport, getBureauReports, type LosBureauReportListItem } from '@/lib/api';
 import { getLosToken } from '@/lib/auth';
 import { CUSTOMER_GRADE_FILTER_OPTIONS } from '@/lib/constants/customer-grades';
+import { CUSTOMER_TYPE_FILTER_OPTIONS } from '@/lib/constants/customer-type';
 import { formatPersonName } from '@/lib/format-person-name';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -205,6 +207,16 @@ export function BureauReportsPanel() {
       render: (row) => <GradeBadge category={row.cibilCreditAssessmentCategory} />,
     },
     {
+      key: 'customerType',
+      label: 'Customer type',
+      headerClassName: 'min-w-[120px] whitespace-nowrap',
+      getFilterValue: (row) => row.customerType,
+      getSortValue: (row) => row.customerTypeLabel.toLowerCase(),
+      filter: { type: 'multi-select', placeholder: 'Type', options: CUSTOMER_TYPE_FILTER_OPTIONS },
+      cellClassName: 'whitespace-nowrap',
+      render: (row) => <CustomerTypeBadge customerType={row.customerType} label={row.customerTypeLabel} />,
+    },
+    {
       key: 'source',
       label: 'Source',
       headerClassName: 'whitespace-nowrap',
@@ -270,7 +282,7 @@ export function BureauReportsPanel() {
         onRetry={() => void load()}
         emptyMessage="No bureau reports have been stored yet."
         noResultsMessage="No bureau reports match your filters."
-        minWidth="1080px"
+        minWidth="1200px"
         pageSize={LOS_LISTING_PAGE_SIZE}
         pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         initialSort={{ key: 'fetched', dir: 'desc' }}

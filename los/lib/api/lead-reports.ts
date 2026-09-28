@@ -21,8 +21,14 @@ export type LosLeadReportListItem = {
   cibilScore: number | null;
   /** CIBIL credit-assessment grade (A–H) from the current bureau report. */
   cibilCreditAssessmentCategory: string | null;
+  /** 'NEW' (no prior repaid loan) or 'RECURRING' (has a fully repaid loan under a different lead). */
+  customerType: 'NEW' | 'RECURRING';
+  customerTypeLabel: string;
   leadStatusCode: string;
   leadStatusLabel: string;
+  rejectionReasonCode: string | null;
+  rejectionReasonLabel: string | null;
+  rejectionNote: string | null;
   utmSource: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;

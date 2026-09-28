@@ -9,11 +9,13 @@ import {
   type DataTableColumn,
 } from '@/components/ui/data-table';
 import { DownloadDumpButton } from '@/components/ui/download-dump-button';
+import { CustomerTypeBadge } from '@/components/shared/customer-type-badge';
 import { getApplications, downloadApplicationsExport, getMasters, markApplicationInternalTesting, type LosApplication } from '@/lib/api';
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { getLosToken as getToken } from '@/lib/auth';
 import { APPLICATION_JOURNEY_STAGE_FILTER_OPTIONS } from '@/lib/constants/application-journey-stages';
 import { CUSTOMER_GRADE_FILTER_OPTIONS } from '@/lib/constants/customer-grades';
+import { CUSTOMER_TYPE_FILTER_OPTIONS } from '@/lib/constants/customer-type';
 import { resolveApplicationStageLabel } from '@/lib/customer-journey';
 import { formatPersonName } from '@/lib/format-person-name';
 import { BANK_DETAIL_FAILED_LABEL, PENNY_DROP_FAILED_LABEL } from '@/lib/penny-drop-grant-retry-eligibility';
@@ -350,6 +352,19 @@ export function ApplicationsPanel() {
       render: (app) => <GradeBadge category={app.cibilCreditAssessmentCategory} />,
     },
     {
+      key: 'customerType',
+      label: 'Customer type',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.customerType,
+      getSortValue: (row) => row.customerTypeLabel.toLowerCase(),
+      filter: {
+        type: 'select',
+        options: CUSTOMER_TYPE_FILTER_OPTIONS,
+        matches: (row, value) => row.customerType === value,
+      },
+      render: (row) => <CustomerTypeBadge customerType={row.customerType} label={row.customerTypeLabel} />,
+    },
+    {
       key: 'loan',
       label: 'Loan amount',
       headerClassName: 'whitespace-nowrap',
@@ -480,7 +495,7 @@ export function ApplicationsPanel() {
         onRetry={() => void loadApplications()}
         emptyMessage="No applications available right now."
         noResultsMessage="No applications match your filters or sort."
-        minWidth="1480px"
+        minWidth="1600px"
         pageSize={LOS_LISTING_PAGE_SIZE}
         pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         renderRowClassName={(app) =>

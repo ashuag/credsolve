@@ -9,9 +9,11 @@ import {
   type DataTableColumn,
 } from '@/components/ui/data-table';
 import { DownloadDumpButton } from '@/components/ui/download-dump-button';
+import { CustomerTypeBadge } from '@/components/shared/customer-type-badge';
 import { getLoans, downloadLoansExport, markApplicationInternalTesting, refreshLoanPayment, type LosLoan, sendLoanNocLetter } from '@/lib/api';
 import { getLosToken as getToken } from '@/lib/auth';
 import { CUSTOMER_GRADE_FILTER_OPTIONS } from '@/lib/constants/customer-grades';
+import { CUSTOMER_TYPE_FILTER_OPTIONS } from '@/lib/constants/customer-type';
 import { formatPersonName } from '@/lib/format-person-name';
 import { RefreshPaymentButton, useCanRefreshLoanPayment } from '@/components/loans/refresh-payment-button';
 import { loanNeedsNoc, SendNocButton, useCanSendLoanNoc } from '@/components/loans/send-noc-button';
@@ -313,6 +315,19 @@ export function LoansPanel() {
         matches: (row, value) => row.cibilCreditAssessmentCategory === value,
       },
       render: (loan) => <GradeBadge category={loan.cibilCreditAssessmentCategory} />,
+    },
+    {
+      key: 'customerType',
+      label: 'Customer type',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.customerType,
+      getSortValue: (row) => row.customerTypeLabel.toLowerCase(),
+      filter: {
+        type: 'select',
+        options: CUSTOMER_TYPE_FILTER_OPTIONS,
+        matches: (row, value) => row.customerType === value,
+      },
+      render: (row) => <CustomerTypeBadge customerType={row.customerType} label={row.customerTypeLabel} />,
     },
     {
       key: 'principal',

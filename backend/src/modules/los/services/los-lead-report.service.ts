@@ -1,7 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { Response } from 'express';
+import { APPLICATION_STATUS } from '../../../common/constants/application.constants';
 import { LOAN_STATUS } from '../../../common/constants/loan.constants';
+import { REJECTION_REASON, toRejectionReasonDto } from '../../../common/constants/rejection-reason.constants';
+import {
+  CUSTOMER_TYPE_LABEL,
+  loadClosedLoanLeadIdsByCustomer,
+  resolveCustomerType,
+  type ClosedLoanLeadIdsByCustomer,
+} from '../../../common/loan/customer-recurring-status.util';
 import { resolveEffectiveLoanStatus } from '../../../common/loan/effective-loan-status.util';
 import {
   LEAD_REPORT_REPAYMENT_STATUS,
@@ -52,6 +60,24 @@ function samePublicId(left: string | null | undefined, right: string | null | un
 function isoDateOnly(d: Date | null | undefined): string | null {
   if (!d) return null;
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Same fallback as the Applications table's `mapLeadRejectionReason`: a penny-drop failure only
+ * sets `rejectionReasonId` on the application, not the lead, so a lead with no `rejectionReason`
+ * of its own still needs the synthetic "Penny drop failed" label when its latest application
+ * status says so — otherwise that row's rejection reason reads blank.
+ */
+function mapLeadRejectionReason(
+  reason: { name: string } | null | undefined,
+  applicationStatusName?: string | null,
+): { code: string; label: string } | null {
+  const mapped = toRejectionReasonDto(reason ?? null);
+  if (mapped) return mapped;
+  if (applicationStatusName === APPLICATION_STATUS.PENNYDROP_FAILED) {
+    return toRejectionReasonDto({ name: REJECTION_REASON.PENNYDROP_FAILED });
+  }
+  return null;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -138,6 +164,7 @@ function repaymentStatusRawLoanStatusSuperset(effective: string): string[] | nul
 const leadReportInclude = {
   customer: { select: { uuid: true, mobileNumber: true } },
   leadStatus: { select: { name: true, displayName: true } },
+  rejectionReason: { select: { name: true } },
   leadDetail: {
     select: {
       fullName: true,
@@ -223,7 +250,11 @@ function moneyOrNull(value: number | null | undefined): string | null {
   return (Math.round(value * 100) / 100).toFixed(2);
 }
 
-function mapLeadReport(lead: LeadReportRecord, liveRepayDate?: Date | null) {
+function mapLeadReport(
+  lead: LeadReportRecord,
+  liveRepayDate: Date | null | undefined,
+  closedLoanLeadIds: ClosedLoanLeadIdsByCustomer,
+) {
   const profile = lead.leadDetail;
   const application = lead.applications[0] ?? null;
   const loan = application?.loanAccount ?? null;
@@ -247,6 +278,8 @@ function mapLeadReport(lead: LeadReportRecord, liveRepayDate?: Date | null) {
     latestRepaymentStatus: latestRepayment?.status ?? null,
   });
   const enteredName = formatLosPersonName(profile?.fullName);
+  const rejectionReason = mapLeadRejectionReason(lead.rejectionReason, application?.applicationStatus.name);
+  const customerType = resolveCustomerType(closedLoanLeadIds, lead.customerId, lead.id);
   const panLog = lead.vendorApiLogs[0];
   const latestUtm = lead.leadUtms[0] ?? null;
   const fees = computeFeeAmountsFromLoanDetail(
@@ -289,6 +322,11 @@ function mapLeadReport(lead: LeadReportRecord, liveRepayDate?: Date | null) {
     cibilCreditAssessmentCategory: profile?.bureauReport?.cibilCreditAssessment?.category ?? null,
     leadStatusCode: lead.leadStatus.name,
     leadStatusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
+    rejectionReasonCode: rejectionReason?.code ?? null,
+    rejectionReasonLabel: rejectionReason?.label ?? null,
+    rejectionNote: lead.leadStatusNote?.trim() || null,
+    customerType,
+    customerTypeLabel: CUSTOMER_TYPE_LABEL[customerType],
     utmSource: latestUtm?.utmSource ?? null,
     utmMedium: latestUtm?.utmMedium ?? null,
     utmCampaign: latestUtm?.utmCampaign ?? null,
@@ -347,6 +385,7 @@ const LEAD_REPORT_HEADERS = [
   'Monthly income',
   'CIBIL',
   'Grade',
+  'Customer type',
   'Purpose of loan',
   'Loan offer amount',
   'Loan selected amount',
@@ -359,11 +398,8 @@ const LEAD_REPORT_HEADERS = [
   'Expected repay date',
   'Repayment amount',
   'Lead status',
-  'UTM source',
-  'UTM medium',
-  'UTM campaign',
-  'UTM term',
-  'UTM content',
+  'Rejection reason',
+  'Rejection note',
   'Application ID',
   'Application status',
   'Loan ID',
@@ -376,6 +412,11 @@ const LEAD_REPORT_HEADERS = [
   'Repayment status',
   'Latest repayment amount',
   'Latest repayment at',
+  'UTM source',
+  'UTM medium',
+  'UTM campaign',
+  'UTM term',
+  'UTM content',
   'Created',
   'Lead UUID',
   'Customer UUID',
@@ -388,29 +429,31 @@ export class LosLeadReportService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listLeadReports() {
-    const [leads, liveRepayDate] = await Promise.all([
+    const [leads, liveRepayDate, closedLoanLeadIds] = await Promise.all([
       this.prisma.read.lead.findMany({
         where: { isInternalTesting: false },
         orderBy: { createdAt: 'desc' },
         include: leadReportInclude,
       }),
       resolveRepaymentDueDateUtc(this.prisma.client),
+      loadClosedLoanLeadIdsByCustomer(this.prisma.read),
     ]);
-    return leads.map((lead) => mapLeadReport(lead, liveRepayDate));
+    return leads.map((lead) => mapLeadReport(lead, liveRepayDate, closedLoanLeadIds));
   }
 
   async getLeadReportDetails(leadUuid: string) {
-    const [lead, liveRepayDate] = await Promise.all([
+    const [lead, liveRepayDate, closedLoanLeadIds] = await Promise.all([
       this.prisma.read.lead.findUnique({
         where: { uuid: leadUuid },
         include: leadReportInclude,
       }),
       resolveRepaymentDueDateUtc(this.prisma.client),
+      loadClosedLoanLeadIdsByCustomer(this.prisma.read),
     ]);
     if (!lead) {
       throw new NotFoundException('Lead not found');
     }
-    return mapLeadReport(lead, liveRepayDate);
+    return mapLeadReport(lead, liveRepayDate, closedLoanLeadIds);
   }
 
   private matchesExportFilters(
@@ -439,8 +482,17 @@ export class LosLeadReportService {
     if (query.cibil && !matchesExportNumberRangeFilter(row.cibilScore, query.cibil, 'cibil')) return false;
     if (query.grade && !matchesExportMultiSelectFilter(row.cibilCreditAssessmentCategory, query.grade))
       return false;
+    if (query.customerType && !matchesExportMultiSelectFilter(row.customerType, query.customerType))
+      return false;
     if (query.leadStatus && !matchesExportMultiSelectFilter(row.leadStatusCode, query.leadStatus))
       return false;
+    if (query.reason) {
+      const haystack = [row.rejectionReasonCode, row.rejectionReasonLabel, row.rejectionNote]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      if (!haystack.includes(query.reason.trim().toLowerCase())) return false;
+    }
     if (query.utmSource && !matchesExportTextFilter(row.utmSource, query.utmSource)) return false;
     if (query.utmMedium && !matchesExportTextFilter(row.utmMedium, query.utmMedium)) return false;
     if (query.utmCampaign && !matchesExportTextFilter(row.utmCampaign, query.utmCampaign)) return false;
@@ -481,6 +533,7 @@ export class LosLeadReportService {
       toExcelNumber(row.netMonthlyIncome),
       toExcelNumber(row.cibilScore),
       row.cibilCreditAssessmentCategory,
+      row.customerTypeLabel,
       row.purposeOfLoan,
       toExcelNumber(row.loanOfferAmount),
       toExcelNumber(row.loanSelectedAmount),
@@ -493,11 +546,8 @@ export class LosLeadReportService {
       toExcelDate(row.expectedRepaymentDate),
       toExcelNumber(row.repaymentAmount),
       row.leadStatusLabel,
-      row.utmSource,
-      row.utmMedium,
-      row.utmCampaign,
-      row.utmTerm,
-      row.utmContent,
+      row.rejectionReasonLabel,
+      row.rejectionNote,
       samePublicId(row.leadNumber, row.applicationNumber) ? null : row.applicationNumber,
       row.applicationStatusLabel,
       samePublicId(row.leadNumber, row.loanNumber) ? null : row.loanNumber,
@@ -510,6 +560,11 @@ export class LosLeadReportService {
       row.repaymentStatusCode === 'NOT_APPLICABLE' ? null : row.repaymentStatusLabel,
       toExcelNumber(row.latestRepaymentAmount),
       toExcelDate(row.latestRepaymentAt),
+      row.utmSource,
+      row.utmMedium,
+      row.utmCampaign,
+      row.utmTerm,
+      row.utmContent,
       toExcelDate(row.createdAt),
       row.uuid,
       row.customerUuid,
@@ -688,6 +743,9 @@ export class LosLeadReportService {
     //  - `customer`: matches panCardName (parsed from a vendor-log JSON payload) falling back to
     //    fullName — a DB `contains` on fullName alone could exclude rows that only match via
     //    panCardName.
+    //  - `reason`: matches across rejection reason code, label, *and* the free-text lead status
+    //    note (plus the synthetic penny-drop fallback) — same rationale as the Applications
+    //    table's own `reason` filter.
 
     return and.length > 0 ? { AND: and } : {};
   }
@@ -712,7 +770,10 @@ export class LosLeadReportService {
     query: ExportLeadReportsQueryDto,
   ): AsyncGenerator<SimpleXlsxCell[]> {
     let cursorId: bigint | undefined;
-    const liveRepayDate = await resolveRepaymentDueDateUtc(this.prisma.client);
+    const [liveRepayDate, closedLoanLeadIds] = await Promise.all([
+      resolveRepaymentDueDateUtc(this.prisma.client),
+      loadClosedLoanLeadIdsByCustomer(this.prisma.read),
+    ]);
 
     for (;;) {
       const batch = await this.prisma.read.lead.findMany({
@@ -725,7 +786,7 @@ export class LosLeadReportService {
       if (batch.length === 0) return;
 
       for (const record of batch) {
-        const row = mapLeadReport(record, liveRepayDate);
+        const row = mapLeadReport(record, liveRepayDate, closedLoanLeadIds);
         if (!this.matchesExportFilters(row, query)) continue;
         yield this.leadReportRowCells(row);
       }

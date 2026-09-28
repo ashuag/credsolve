@@ -168,6 +168,10 @@ async function bootstrap() {
       credentials: true,
       methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
+      // Without this, a cross-origin `fetch()` can't read `Content-Disposition` via
+      // `response.headers.get(...)` — it's not in the CORS response-header safelist — so
+      // filtered-export downloads silently lose their filter-derived filename.
+      exposedHeaders: ['Content-Disposition'],
       maxAge: 86400,
     });
   }
