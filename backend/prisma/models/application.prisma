@@ -65,6 +65,8 @@ model ApplicationDetail {
   loanDocumentsReviewedIp      String?                @map("loan_documents_reviewed_ip") @db.VarChar(45)
   pennyDropAttempts            Int                    @default(0) @map("penny_drop_attempts") @db.SmallInt
   pennyDropVendorJson          Json?                  @map("penny_drop_vendor_json")
+  /// Easebuzz unique_request_number for the latest disbursement payout.
+  disbursementUniqueRequestNumber String?             @map("disbursement_unique_request_number") @db.VarChar(40)
   /** 12-digit Aadhaar number entered by the customer on OTP KYC. */
   aadhaarNumber                String?                @map("aadhaar_number") @db.Char(12)
   createdAt                    DateTime               @default(now()) @map("created_at") @db.DateTime(3)

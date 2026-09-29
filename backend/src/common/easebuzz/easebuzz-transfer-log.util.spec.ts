@@ -1,5 +1,6 @@
 import {
   buildDisbursementUniqueRequestNumber,
+  classifyEasebuzzDisbursementStatus,
   isEasebuzzDuplicateUniqueRequestNumber,
   isEasebuzzFailedVendorStatus,
   isEasebuzzRejectedEnvelope,
@@ -102,6 +103,27 @@ describe('isEasebuzzFailedVendorStatus', () => {
     expect(isEasebuzzFailedVendorStatus('failure')).toBe(true);
     expect(isEasebuzzFailedVendorStatus('pending')).toBe(false);
     expect(isEasebuzzFailedVendorStatus(null)).toBe(false);
+  });
+});
+
+describe('classifyEasebuzzDisbursementStatus', () => {
+  it('treats only Success as disbursed', () => {
+    expect(classifyEasebuzzDisbursementStatus('Success')).toBe('success');
+    expect(classifyEasebuzzDisbursementStatus('successful')).toBe('success');
+  });
+
+  it('keeps Accepted, In Process, Pending, and Unapproved in process', () => {
+    expect(classifyEasebuzzDisbursementStatus('Accepted')).toBe('in_process');
+    expect(classifyEasebuzzDisbursementStatus('In Process')).toBe('in_process');
+    expect(classifyEasebuzzDisbursementStatus('Pending')).toBe('in_process');
+    expect(classifyEasebuzzDisbursementStatus('Unapproved')).toBe('in_process');
+  });
+
+  it('marks Reversed, Cancelled, Failure, and Rejected as failed', () => {
+    expect(classifyEasebuzzDisbursementStatus('Reversed')).toBe('failed');
+    expect(classifyEasebuzzDisbursementStatus('Cancelled')).toBe('failed');
+    expect(classifyEasebuzzDisbursementStatus('Failure')).toBe('failed');
+    expect(classifyEasebuzzDisbursementStatus('Rejected')).toBe('failed');
   });
 });
 

@@ -31,6 +31,7 @@ function proxyTimeoutMs(upstreamUrl: string): number {
     /\/cibil-report\/pdf(?:\?|$)/i.test(upstreamUrl) ||
     /\/cibil-report-download(?:\?|$)/i.test(upstreamUrl) ||
     /\/applications\/[^/]+\/disburse(?:\?|$)/i.test(upstreamUrl) ||
+    /\/applications\/[^/]+\/check-disbursement-status(?:\?|$)/i.test(upstreamUrl) ||
     /\/leads\/export(?:\?|$)/i.test(upstreamUrl) ||
     /\/loans\/export(?:\?|$)/i.test(upstreamUrl) ||
     /\/applications\/export(?:\?|$)/i.test(upstreamUrl) ||

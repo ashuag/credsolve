@@ -92,6 +92,6 @@ import { KycCompletionService } from '../../common/kyc/kyc-completion.service';
     KycCompletionService,
     LosCheckCibilService,
   ],
-  exports: [LosSessionService, LosLoanRepaymentSyncService],
+  exports: [LosSessionService, LosLoanRepaymentSyncService, LosDisbursementService],
 })
 export class LosModule {}

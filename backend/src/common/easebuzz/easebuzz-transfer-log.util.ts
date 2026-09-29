@@ -142,7 +142,54 @@ export type EasebuzzQuickTransferParse = {
 };
 
 export function isEasebuzzFailedVendorStatus(status: string | null | undefined): boolean {
-  return Boolean(status && QUICK_TRANSFER_FAILED_STATUSES.has(status.toLowerCase()));
+  return classifyEasebuzzDisbursementStatus(status) === 'failed';
+}
+
+export type EasebuzzDisbursementPhase = 'success' | 'in_process' | 'failed' | 'unknown';
+
+/** Collapse Easebuzz labels such as "In Process" and "in_process" to one token. */
+function normalizeEasebuzzTransferStatus(status: string): string {
+  return status.trim().toLowerCase().replace(/[\s_-]+/g, '');
+}
+
+const DISBURSAL_SUCCESS_STATUSES = new Set(['success', 'successful']);
+
+/** Accepted, In Process, Pending, Unapproved — payout exists but is not credited yet. */
+const DISBURSAL_IN_PROCESS_STATUSES = new Set([
+  'accepted',
+  'inprocess',
+  'pending',
+  'unapproved',
+  'queued',
+  'initiated',
+  'processing',
+]);
+
+/** Reversed, Cancelled, Failure, Rejected. */
+const DISBURSAL_FAILED_STATUSES = new Set([
+  'reversed',
+  'cancelled',
+  'canceled',
+  'failure',
+  'failed',
+  'rejected',
+  'declined',
+  'bounced',
+]);
+
+/**
+ * Loan is disbursed only on Success.
+ * In-flight bank statuses stay disbursal-in-process; terminal bank failures are disbursal-failed.
+ */
+export function classifyEasebuzzDisbursementStatus(
+  status: string | null | undefined,
+): EasebuzzDisbursementPhase {
+  if (!status?.trim()) return 'unknown';
+  const normalized = normalizeEasebuzzTransferStatus(status);
+  if (DISBURSAL_SUCCESS_STATUSES.has(normalized)) return 'success';
+  if (DISBURSAL_FAILED_STATUSES.has(normalized)) return 'failed';
+  if (DISBURSAL_IN_PROCESS_STATUSES.has(normalized)) return 'in_process';
+  return 'unknown';
 }
 
 function isRejectedFlag(value: unknown): boolean {
