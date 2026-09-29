@@ -7,8 +7,8 @@ import {
   buildCibilAssessmentExportRow,
   CIBIL_ASSESSMENT_EXPORT_HEADERS,
 } from '../../../common/cibil/cibil-assessment-export';
+import { CUSTOMER_TYPE_LABEL } from '../../../common/constants/customer-type.constants';
 import {
-  CUSTOMER_TYPE_LABEL,
   loadClosedLoanLeadIdsByCustomer,
   resolveCustomerType,
   type ClosedLoanLeadIdsByCustomer,

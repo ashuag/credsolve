@@ -10,10 +10,9 @@ import {
 } from '@/components/ui/data-table';
 import { DownloadDumpButton } from '@/components/ui/download-dump-button';
 import { CustomerTypeBadge } from '@/components/shared/customer-type-badge';
-import { getLoans, downloadLoansExport, markApplicationInternalTesting, refreshLoanPayment, type LosLoan, sendLoanNocLetter } from '@/lib/api';
+import { getLoans, downloadLoansExport, getMasters, markApplicationInternalTesting, refreshLoanPayment, type LosLoan, sendLoanNocLetter } from '@/lib/api';
 import { getLosToken as getToken } from '@/lib/auth';
 import { CUSTOMER_GRADE_FILTER_OPTIONS } from '@/lib/constants/customer-grades';
-import { CUSTOMER_TYPE_FILTER_OPTIONS } from '@/lib/constants/customer-type';
 import { formatPersonName } from '@/lib/format-person-name';
 import { RefreshPaymentButton, useCanRefreshLoanPayment } from '@/components/loans/refresh-payment-button';
 import { loanNeedsNoc, SendNocButton, useCanSendLoanNoc } from '@/components/loans/send-noc-button';
@@ -151,6 +150,7 @@ export function LoansPanel() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [busyUuid, setBusyUuid] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ tone: 'ok' | 'warn' | 'err'; text: string } | null>(null);
+  const [customerTypeOptions, setCustomerTypeOptions] = useState<Array<{ value: string; label: string }>>([]);
   const { filteredCount, filtersActive, activeColumnFilters, onFilteredItemsChange } = useDataTableFilterState();
   const canMarkTesting = useCanMarkInternalTesting();
   const canRefreshPayment = useCanRefreshLoanPayment();
@@ -166,7 +166,9 @@ export function LoansPanel() {
       return;
     }
     try {
-      setLoans(await getLoans(token));
+      const [loansRes, masters] = await Promise.all([getLoans(token), getMasters(token)]);
+      setLoans(loansRes);
+      setCustomerTypeOptions(masters.customerTypes);
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Failed to load loans');
     } finally {
@@ -324,7 +326,7 @@ export function LoansPanel() {
       getSortValue: (row) => row.customerTypeLabel.toLowerCase(),
       filter: {
         type: 'select',
-        options: CUSTOMER_TYPE_FILTER_OPTIONS,
+        options: customerTypeOptions,
         matches: (row, value) => row.customerType === value,
       },
       render: (row) => <CustomerTypeBadge customerType={row.customerType} label={row.customerTypeLabel} />,
@@ -494,7 +496,7 @@ export function LoansPanel() {
         </div>
       ),
     },
-  ], [busyUuid, markAsInternalTesting, refreshPayment, sendNoc]);
+  ], [customerTypeOptions, busyUuid, markAsInternalTesting, refreshPayment, sendNoc]);
 
   const columns = canMarkTesting || canRefreshPayment || canSendNoc
     ? allColumns

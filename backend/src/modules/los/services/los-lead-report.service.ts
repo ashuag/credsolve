@@ -4,8 +4,8 @@ import type { Response } from 'express';
 import { APPLICATION_STATUS } from '../../../common/constants/application.constants';
 import { LOAN_STATUS } from '../../../common/constants/loan.constants';
 import { REJECTION_REASON, toRejectionReasonDto } from '../../../common/constants/rejection-reason.constants';
+import { CUSTOMER_TYPE_LABEL } from '../../../common/constants/customer-type.constants';
 import {
-  CUSTOMER_TYPE_LABEL,
   loadClosedLoanLeadIdsByCustomer,
   resolveCustomerType,
   type ClosedLoanLeadIdsByCustomer,

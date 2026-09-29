@@ -57,8 +57,8 @@ import {
   syncExpectedRepaymentDateUntilDisbursed,
 } from '../../../common/loan/repayment-due-date.util';
 import { overdueDaysFromMaturity } from '../../../common/loan/bounce-charge.util';
+import { CUSTOMER_TYPE_LABEL } from '../../../common/constants/customer-type.constants';
 import {
-  CUSTOMER_TYPE_LABEL,
   loadClosedLoanLeadIdsByCustomer,
   resolveCustomerType,
   type ClosedLoanLeadIdsByCustomer,

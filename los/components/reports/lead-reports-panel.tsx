@@ -15,7 +15,6 @@ import { downloadLeadReportsExport, getLeadReports, type LosLeadReportListItem }
 import { formatCibilScoreLabel, formatReviewDateOnly, formatReviewInr, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { getLosToken } from '@/lib/auth';
 import { CUSTOMER_GRADE_FILTER_OPTIONS } from '@/lib/constants/customer-grades';
-import { CUSTOMER_TYPE_FILTER_OPTIONS } from '@/lib/constants/customer-type';
 import { formatPersonName } from '@/lib/format-person-name';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -220,6 +219,10 @@ export function LeadReportsPanel() {
     () => uniqueValueOptions(reports, (row) => row.repaymentStatusCode, (row) => row.repaymentStatusLabel),
     [reports],
   );
+  const customerTypeOptions = useMemo(
+    () => uniqueValueOptions(reports, (row) => row.customerType, (row) => row.customerTypeLabel),
+    [reports],
+  );
 
   const columns = useMemo((): DataTableColumn<LosLeadReportListItem>[] => [
     {
@@ -369,7 +372,7 @@ export function LeadReportsPanel() {
       headerClassName: 'min-w-[120px] whitespace-nowrap',
       getFilterValue: (row) => row.customerType,
       getSortValue: (row) => row.customerTypeLabel.toLowerCase(),
-      filter: { type: 'multi-select', placeholder: 'Type', options: CUSTOMER_TYPE_FILTER_OPTIONS },
+      filter: { type: 'multi-select', placeholder: 'Type', options: customerTypeOptions },
       cellClassName: 'whitespace-nowrap',
       render: (row) => <CustomerTypeBadge customerType={row.customerType} label={row.customerTypeLabel} />,
     },
@@ -496,7 +499,7 @@ export function LeadReportsPanel() {
       cellClassName: 'text-brand-muted text-[0.78rem] whitespace-nowrap',
       render: (row) => formatDateTime(row.createdAt),
     },
-  ], [applicationStatusOptions, cityOptions, leadStatusOptions, loanStatusOptions, purposeOptions, repaymentStatusOptions, stateOptions]);
+  ], [applicationStatusOptions, cityOptions, customerTypeOptions, leadStatusOptions, loanStatusOptions, purposeOptions, repaymentStatusOptions, stateOptions]);
 
   const withApplication = reports.filter((row) => row.applicationUuid).length;
   const disbursed = reports.filter((row) => row.loanUuid).length;

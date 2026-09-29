@@ -62,6 +62,11 @@ export type LosRepaymentDueDateMaster = {
   isActive: boolean;
 };
 
+export type LosCustomerTypeMaster = {
+  value: 'NEW' | 'RECURRING';
+  label: string;
+};
+
 export type LosMastersPayload = {
   leadStatuses: LosStatusMaster[];
   applicationStatuses: LosStatusMaster[];
@@ -75,6 +80,7 @@ export type LosMastersPayload = {
   rejectionReasons: LosNamedMaster[];
   sourceUtms: LosSourceUtmMaster[];
   repaymentDueDates: LosRepaymentDueDateMaster[];
+  customerTypes: LosCustomerTypeMaster[];
 };
 
 export type LosEligibilityCriterion = {

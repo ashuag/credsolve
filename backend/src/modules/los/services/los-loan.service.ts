@@ -21,8 +21,8 @@ import {
 } from '../../../common/loan/bounce-charge.util';
 import { BounceChargeTierResolverService } from '../../../common/loan/bounce-charge-tier.resolver';
 import { billDueNowAfterWaiverInr, waivedAmountFromLoan } from '../../../common/loan/loan-charge-waiver.util';
+import { CUSTOMER_TYPE_LABEL } from '../../../common/constants/customer-type.constants';
 import {
-  CUSTOMER_TYPE_LABEL,
   loadClosedLoanLeadIdsByCustomer,
   resolveCustomerType,
   type ClosedLoanLeadIdsByCustomer,

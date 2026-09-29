@@ -1,16 +1,5 @@
 import { LOAN_STATUS } from '../constants/loan.constants';
-
-export const CUSTOMER_TYPE = {
-  NEW: 'NEW',
-  RECURRING: 'RECURRING',
-} as const;
-
-export type CustomerType = (typeof CUSTOMER_TYPE)[keyof typeof CUSTOMER_TYPE];
-
-export const CUSTOMER_TYPE_LABEL: Record<CustomerType, string> = {
-  [CUSTOMER_TYPE.NEW]: 'New',
-  [CUSTOMER_TYPE.RECURRING]: 'Recurring',
-};
+import { CUSTOMER_TYPE, type CustomerType } from '../constants/customer-type.constants';
 
 /** customerId -> every lead id (across that customer's journeys) that owns a fully repaid (CLOSED) loan. */
 export type ClosedLoanLeadIdsByCustomer = Map<bigint, Set<bigint>>;

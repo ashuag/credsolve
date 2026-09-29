@@ -11,10 +11,9 @@ import {
 import { DownloadDumpButton } from '@/components/ui/download-dump-button';
 import { CustomerTypeBadge } from '@/components/shared/customer-type-badge';
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
-import { downloadBureauReportsExport, getBureauReports, type LosBureauReportListItem } from '@/lib/api';
+import { downloadBureauReportsExport, getBureauReports, getMasters, type LosBureauReportListItem } from '@/lib/api';
 import { getLosToken } from '@/lib/auth';
 import { CUSTOMER_GRADE_FILTER_OPTIONS } from '@/lib/constants/customer-grades';
-import { CUSTOMER_TYPE_FILTER_OPTIONS } from '@/lib/constants/customer-type';
 import { formatPersonName } from '@/lib/format-person-name';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -88,6 +87,7 @@ export function BureauReportsPanel() {
   const [reports, setReports] = useState<LosBureauReportListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [customerTypeOptions, setCustomerTypeOptions] = useState<Array<{ value: string; label: string }>>([]);
   const { filteredCount, filtersActive, activeColumnFilters, onFilteredItemsChange } = useDataTableFilterState();
 
   const load = useCallback(async () => {
@@ -100,7 +100,9 @@ export function BureauReportsPanel() {
       return;
     }
     try {
-      setReports(await getBureauReports(token));
+      const [reportsRes, masters] = await Promise.all([getBureauReports(token), getMasters(token)]);
+      setReports(reportsRes);
+      setCustomerTypeOptions(masters.customerTypes);
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Failed to load bureau reports');
     } finally {
@@ -212,7 +214,7 @@ export function BureauReportsPanel() {
       headerClassName: 'min-w-[120px] whitespace-nowrap',
       getFilterValue: (row) => row.customerType,
       getSortValue: (row) => row.customerTypeLabel.toLowerCase(),
-      filter: { type: 'multi-select', placeholder: 'Type', options: CUSTOMER_TYPE_FILTER_OPTIONS },
+      filter: { type: 'multi-select', placeholder: 'Type', options: customerTypeOptions },
       cellClassName: 'whitespace-nowrap',
       render: (row) => <CustomerTypeBadge customerType={row.customerType} label={row.customerTypeLabel} />,
     },
@@ -253,7 +255,7 @@ export function BureauReportsPanel() {
       cellClassName: 'text-brand-muted text-[0.78rem] whitespace-nowrap',
       render: (row) => formatDateTime(row.fetchedAt),
     },
-  ], []);
+  ], [customerTypeOptions]);
 
   const todayCount = reports.filter((row) => {
     const d = new Date(row.fetchedAt);

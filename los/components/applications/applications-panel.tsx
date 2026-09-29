@@ -15,7 +15,6 @@ import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/applicati
 import { getLosToken as getToken } from '@/lib/auth';
 import { APPLICATION_JOURNEY_STAGE_FILTER_OPTIONS } from '@/lib/constants/application-journey-stages';
 import { CUSTOMER_GRADE_FILTER_OPTIONS } from '@/lib/constants/customer-grades';
-import { CUSTOMER_TYPE_FILTER_OPTIONS } from '@/lib/constants/customer-type';
 import { resolveApplicationStageLabel } from '@/lib/customer-journey';
 import { formatPersonName } from '@/lib/format-person-name';
 import { BANK_DETAIL_FAILED_LABEL, PENNY_DROP_FAILED_LABEL } from '@/lib/penny-drop-grant-retry-eligibility';
@@ -235,6 +234,7 @@ export function ApplicationsPanel() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Array<{ code: string; displayName: string }>>([]);
+  const [customerTypeOptions, setCustomerTypeOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [busyUuid, setBusyUuid] = useState<string | null>(null);
   const { filteredCount, filtersActive, activeColumnFilters, onFilteredItemsChange } = useDataTableFilterState();
   const canMarkTesting = useCanMarkInternalTesting();
@@ -248,6 +248,7 @@ export function ApplicationsPanel() {
       const [appsRes, masters] = await Promise.all([getApplications(token), getMasters(token)]);
       setApplications(appsRes);
       setStatuses(masters.applicationStatuses.filter((s) => s.isActive).map((s) => ({ code: s.code, displayName: s.displayName })));
+      setCustomerTypeOptions(masters.customerTypes);
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Failed to load applications');
     } finally { setLoading(false); }
@@ -359,7 +360,7 @@ export function ApplicationsPanel() {
       getSortValue: (row) => row.customerTypeLabel.toLowerCase(),
       filter: {
         type: 'select',
-        options: CUSTOMER_TYPE_FILTER_OPTIONS,
+        options: customerTypeOptions,
         matches: (row, value) => row.customerType === value,
       },
       render: (row) => <CustomerTypeBadge customerType={row.customerType} label={row.customerTypeLabel} />,
@@ -464,7 +465,7 @@ export function ApplicationsPanel() {
         />
       ),
     },
-  ], [statuses, busyUuid, markAsInternalTesting]);
+  ], [statuses, customerTypeOptions, busyUuid, markAsInternalTesting]);
 
   const columns = canMarkTesting
     ? allColumns
