@@ -9,6 +9,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui/data-table';
 import { DownloadDumpButton } from '@/components/ui/download-dump-button';
+import { CustomerTypeBadge } from '@/components/shared/customer-type-badge';
 import { getApplications, downloadApplicationsExport, getMasters, markApplicationInternalTesting, type LosApplication } from '@/lib/api';
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { getLosToken as getToken } from '@/lib/auth';
@@ -233,6 +234,7 @@ export function ApplicationsPanel() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Array<{ code: string; displayName: string }>>([]);
+  const [customerTypeOptions, setCustomerTypeOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [busyUuid, setBusyUuid] = useState<string | null>(null);
   const { filteredCount, filtersActive, activeColumnFilters, onFilteredItemsChange } = useDataTableFilterState();
   const canMarkTesting = useCanMarkInternalTesting();
@@ -246,6 +248,7 @@ export function ApplicationsPanel() {
       const [appsRes, masters] = await Promise.all([getApplications(token), getMasters(token)]);
       setApplications(appsRes);
       setStatuses(masters.applicationStatuses.filter((s) => s.isActive).map((s) => ({ code: s.code, displayName: s.displayName })));
+      setCustomerTypeOptions(masters.customerTypes);
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Failed to load applications');
     } finally { setLoading(false); }
@@ -350,6 +353,19 @@ export function ApplicationsPanel() {
       render: (app) => <GradeBadge category={app.cibilCreditAssessmentCategory} />,
     },
     {
+      key: 'customerType',
+      label: 'Customer type',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.customerType,
+      getSortValue: (row) => row.customerTypeLabel.toLowerCase(),
+      filter: {
+        type: 'select',
+        options: customerTypeOptions,
+        matches: (row, value) => row.customerType === value,
+      },
+      render: (row) => <CustomerTypeBadge customerType={row.customerType} label={row.customerTypeLabel} />,
+    },
+    {
       key: 'loan',
       label: 'Loan amount',
       headerClassName: 'whitespace-nowrap',
@@ -449,7 +465,7 @@ export function ApplicationsPanel() {
         />
       ),
     },
-  ], [statuses, busyUuid, markAsInternalTesting]);
+  ], [statuses, customerTypeOptions, busyUuid, markAsInternalTesting]);
 
   const columns = canMarkTesting
     ? allColumns
@@ -480,7 +496,7 @@ export function ApplicationsPanel() {
         onRetry={() => void loadApplications()}
         emptyMessage="No applications available right now."
         noResultsMessage="No applications match your filters or sort."
-        minWidth="1480px"
+        minWidth="1600px"
         pageSize={LOS_LISTING_PAGE_SIZE}
         pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         renderRowClassName={(app) =>

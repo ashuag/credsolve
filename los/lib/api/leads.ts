@@ -39,6 +39,9 @@ export type LosApplication = {
   cibilScore: number | null;
   /** Rule-based CIBIL credit-assessment category (A best .. H worst); null if not yet computed. */
   cibilCreditAssessmentCategory: string | null;
+  /** 'NEW' (no prior repaid loan) or 'RECURRING' (has a fully repaid loan under a different lead). */
+  customerType: 'NEW' | 'RECURRING';
+  customerTypeLabel: string;
   eligibleLoanAmount: string | null;
   selectedLoanAmount: string | null;
   repayDate: string | null;

@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/data-table';
 import { DownloadDumpButton } from '@/components/ui/download-dump-button';
 import { losStatusPillStyles } from '@/components/shared/los-status-pill';
+import { CustomerTypeBadge } from '@/components/shared/customer-type-badge';
 import { downloadLeadReportsExport, getLeadReports, type LosLeadReportListItem } from '@/lib/api';
 import { formatCibilScoreLabel, formatReviewDateOnly, formatReviewInr, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
 import { getLosToken } from '@/lib/auth';
@@ -122,6 +123,32 @@ function StatusBadge({ code, label }: { code: string | null; label: string | nul
   );
 }
 
+function RejectionReasonCell({ row }: { row: LosLeadReportListItem }) {
+  const label = row.rejectionReasonLabel?.trim() ?? '';
+  const noteRaw = row.rejectionNote?.trim() ?? '';
+  // Don't repeat the note when it's the exact text the reason label came from.
+  const showNote = Boolean(noteRaw) && noteRaw.toLowerCase() !== label.toLowerCase();
+
+  if (!label && !showNote) {
+    return <span className="text-brand-muted">—</span>;
+  }
+
+  return (
+    <div className="min-w-[140px] max-w-[220px]" title={[label, showNote ? noteRaw : null].filter(Boolean).join(' — ')}>
+      {label ? (
+        <p className="m-0 text-[0.72rem] font-extrabold uppercase tracking-[0.04em] text-[#991b1b] line-clamp-2">
+          {label}
+        </p>
+      ) : null}
+      {showNote ? (
+        <p className={`m-0 text-[0.72rem] font-semibold leading-snug text-brand-muted line-clamp-2 ${label ? 'mt-0.5' : ''}`}>
+          {noteRaw}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function SummaryCard({ label, value }: { label: string; value: number }) {
   return (
     <article
@@ -190,6 +217,10 @@ export function LeadReportsPanel() {
   );
   const repaymentStatusOptions = useMemo(
     () => uniqueValueOptions(reports, (row) => row.repaymentStatusCode, (row) => row.repaymentStatusLabel),
+    [reports],
+  );
+  const customerTypeOptions = useMemo(
+    () => uniqueValueOptions(reports, (row) => row.customerType, (row) => row.customerTypeLabel),
     [reports],
   );
 
@@ -336,6 +367,16 @@ export function LeadReportsPanel() {
       render: (row) => <GradeBadge category={row.cibilCreditAssessmentCategory} />,
     },
     {
+      key: 'customerType',
+      label: 'Customer type',
+      headerClassName: 'min-w-[120px] whitespace-nowrap',
+      getFilterValue: (row) => row.customerType,
+      getSortValue: (row) => row.customerTypeLabel.toLowerCase(),
+      filter: { type: 'multi-select', placeholder: 'Type', options: customerTypeOptions },
+      cellClassName: 'whitespace-nowrap',
+      render: (row) => <CustomerTypeBadge customerType={row.customerType} label={row.customerTypeLabel} />,
+    },
+    {
       key: 'leadStatus',
       label: 'Lead status',
       headerClassName: 'min-w-[128px] whitespace-nowrap',
@@ -344,6 +385,59 @@ export function LeadReportsPanel() {
       filter: { type: 'multi-select', placeholder: 'Statuses', options: leadStatusOptions },
       cellClassName: 'whitespace-nowrap',
       render: (row) => <StatusBadge code={row.leadStatusCode} label={row.leadStatusLabel} />,
+    },
+    {
+      key: 'reason',
+      label: 'Rejection reason',
+      headerClassName: 'min-w-[160px]',
+      getFilterValue: (row) => row.rejectionReasonLabel ?? '',
+      getSortValue: (row) => (row.rejectionReasonLabel ?? '').toLowerCase(),
+      filter: {
+        type: 'text',
+        placeholder: 'Search reason…',
+        matches: (row, value) => {
+          const reasonText = [row.rejectionReasonCode, row.rejectionReasonLabel, row.rejectionNote]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          return reasonText.includes(value.toLowerCase());
+        },
+      },
+      render: (row) => <RejectionReasonCell row={row} />,
+    },
+    {
+      key: 'applicationStatus',
+      label: 'Application status',
+      headerClassName: 'min-w-[148px] whitespace-nowrap',
+      getFilterValue: (row) => emptyAwareValue(row.applicationStatusCode),
+      getSortValue: (row) => (row.applicationStatusLabel ?? '').toLowerCase(),
+      filter: { type: 'multi-select', placeholder: 'Statuses', options: applicationStatusOptions },
+      cellClassName: 'whitespace-nowrap',
+      render: (row) => (
+        <StatusBadge code={row.applicationStatusCode} label={row.applicationStatusLabel} />
+      ),
+    },
+    {
+      key: 'loanStatus',
+      label: 'Loan status',
+      headerClassName: 'min-w-[128px] whitespace-nowrap',
+      getFilterValue: (row) => emptyAwareValue(row.loanStatusCode),
+      getSortValue: (row) => (row.loanStatusLabel ?? '').toLowerCase(),
+      filter: { type: 'multi-select', placeholder: 'Statuses', options: loanStatusOptions },
+      cellClassName: 'whitespace-nowrap',
+      render: (row) => <StatusBadge code={row.loanStatusCode} label={row.loanStatusLabel} />,
+    },
+    {
+      key: 'repaymentStatus',
+      label: 'Repayment status',
+      headerClassName: 'min-w-[148px] whitespace-nowrap',
+      getFilterValue: (row) => emptyAwareValue(row.repaymentStatusCode),
+      getSortValue: (row) => row.repaymentStatusLabel.toLowerCase(),
+      filter: { type: 'multi-select', placeholder: 'Statuses', options: repaymentStatusOptions },
+      cellClassName: 'whitespace-nowrap',
+      render: (row) => (
+        <StatusBadge code={row.repaymentStatusCode} label={row.repaymentStatusLabel} />
+      ),
     },
     {
       key: 'utmSource',
@@ -396,40 +490,6 @@ export function LeadReportsPanel() {
       render: (row) => row.utmContent ?? '—',
     },
     {
-      key: 'applicationStatus',
-      label: 'Application status',
-      headerClassName: 'min-w-[148px] whitespace-nowrap',
-      getFilterValue: (row) => emptyAwareValue(row.applicationStatusCode),
-      getSortValue: (row) => (row.applicationStatusLabel ?? '').toLowerCase(),
-      filter: { type: 'multi-select', placeholder: 'Statuses', options: applicationStatusOptions },
-      cellClassName: 'whitespace-nowrap',
-      render: (row) => (
-        <StatusBadge code={row.applicationStatusCode} label={row.applicationStatusLabel} />
-      ),
-    },
-    {
-      key: 'loanStatus',
-      label: 'Loan status',
-      headerClassName: 'min-w-[128px] whitespace-nowrap',
-      getFilterValue: (row) => emptyAwareValue(row.loanStatusCode),
-      getSortValue: (row) => (row.loanStatusLabel ?? '').toLowerCase(),
-      filter: { type: 'multi-select', placeholder: 'Statuses', options: loanStatusOptions },
-      cellClassName: 'whitespace-nowrap',
-      render: (row) => <StatusBadge code={row.loanStatusCode} label={row.loanStatusLabel} />,
-    },
-    {
-      key: 'repaymentStatus',
-      label: 'Repayment status',
-      headerClassName: 'min-w-[148px] whitespace-nowrap',
-      getFilterValue: (row) => emptyAwareValue(row.repaymentStatusCode),
-      getSortValue: (row) => row.repaymentStatusLabel.toLowerCase(),
-      filter: { type: 'multi-select', placeholder: 'Statuses', options: repaymentStatusOptions },
-      cellClassName: 'whitespace-nowrap',
-      render: (row) => (
-        <StatusBadge code={row.repaymentStatusCode} label={row.repaymentStatusLabel} />
-      ),
-    },
-    {
       key: 'created',
       label: 'Created',
       headerClassName: 'min-w-[188px] whitespace-nowrap',
@@ -439,7 +499,7 @@ export function LeadReportsPanel() {
       cellClassName: 'text-brand-muted text-[0.78rem] whitespace-nowrap',
       render: (row) => formatDateTime(row.createdAt),
     },
-  ], [applicationStatusOptions, cityOptions, leadStatusOptions, loanStatusOptions, purposeOptions, repaymentStatusOptions, stateOptions]);
+  ], [applicationStatusOptions, cityOptions, customerTypeOptions, leadStatusOptions, loanStatusOptions, purposeOptions, repaymentStatusOptions, stateOptions]);
 
   const withApplication = reports.filter((row) => row.applicationUuid).length;
   const disbursed = reports.filter((row) => row.loanUuid).length;
@@ -468,7 +528,7 @@ export function LeadReportsPanel() {
         onRetry={() => void load()}
         emptyMessage="No leads have been recorded yet."
         noResultsMessage="No leads match your filters."
-        minWidth="2670px"
+        minWidth="2950px"
         pageSize={LOS_LISTING_PAGE_SIZE}
         pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         initialSort={{ key: 'created', dir: 'desc' }}

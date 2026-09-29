@@ -51,6 +51,12 @@ export class ExportLoansQueryDto {
   @MaxLength(10)
   grade?: string;
 
+  /** Comma-separated `NEW`/`RECURRING`. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  customerType?: string;
+
   /** YYYY-MM-DD */
   @IsOptional()
   @IsString()
@@ -81,6 +87,7 @@ function describeLoansExportFilters(query: ExportLoansQueryDto): string | null {
     query.loan ? `loan ${cleanExportFilterValue(query.loan)}` : null,
     query.borrower ? `borrower ${cleanExportFilterValue(query.borrower)}` : null,
     query.grade ? `grade ${cleanExportFilterValue(query.grade, 1)?.toUpperCase()}` : null,
+    query.customerType ? `customer type ${cleanExportFilterValue(query.customerType, 40)}` : null,
     query.repayBy ? `repay by ${cleanExportFilterValue(query.repayBy, 10)}` : null,
     query.status ? `status ${cleanExportFilterValue(query.status)}` : null,
     query.disbursed ? `disbursed ${cleanExportFilterValue(query.disbursed, 10)}` : null,
@@ -122,6 +129,12 @@ export class ExportApplicationsQueryDto {
   @IsString()
   @MaxLength(10)
   grade?: string;
+
+  /** Comma-separated `NEW`/`RECURRING`. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  customerType?: string;
 
   @IsOptional()
   @IsString()
@@ -171,6 +184,7 @@ function describeApplicationsExportFilters(query: ExportApplicationsQueryDto): s
     query.email ? `email ${cleanExportFilterValue(query.email)}` : null,
     query.cibil ? `cibil ${cleanExportFilterValue(query.cibil, 6)}` : null,
     query.grade ? `grade ${cleanExportFilterValue(query.grade, 1)?.toUpperCase()}` : null,
+    query.customerType ? `customer type ${cleanExportFilterValue(query.customerType, 40)}` : null,
     query.loan ? `loan ${cleanExportFilterValue(query.loan, 12)}` : null,
     query.stage ? `stage ${cleanExportFilterValue(query.stage)}` : null,
     query.status ? `status ${cleanExportFilterValue(query.status)}` : null,
@@ -317,6 +331,12 @@ export class ExportBureauReportsQueryDto {
   @MaxLength(10)
   source?: string;
 
+  /** Comma-separated `NEW`/`RECURRING`. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  customerType?: string;
+
   /** `YYYY-MM-DDTHH:mm|YYYY-MM-DDTHH:mm` (IST wall-clock). */
   @IsOptional()
   @IsString()
@@ -334,6 +354,7 @@ function describeBureauReportsExportFilters(query: ExportBureauReportsQueryDto):
     query.cibil ? `cibil ${cleanExportFilterValue(query.cibil, 20)}` : null,
     query.grade ? `grade ${cleanExportFilterValue(query.grade, 20)?.toUpperCase()}` : null,
     query.source ? `source ${cleanExportFilterValue(query.source, 10)}` : null,
+    query.customerType ? `customer type ${cleanExportFilterValue(query.customerType, 40)}` : null,
     query.fetched ? `fetched ${cleanExportFilterValue(query.fetched, 40)}` : null,
   ]);
 }
@@ -359,7 +380,9 @@ export class ExportLeadReportsQueryDto {
   @IsOptional() @IsString() @MaxLength(20) selectedAmount?: string;
   @IsOptional() @IsString() @MaxLength(20) cibil?: string;
   @IsOptional() @IsString() @MaxLength(40) grade?: string;
+  @IsOptional() @IsString() @MaxLength(40) customerType?: string;
   @IsOptional() @IsString() @MaxLength(200) leadStatus?: string;
+  @IsOptional() @IsString() @MaxLength(120) reason?: string;
   @IsOptional() @IsString() @MaxLength(100) utmSource?: string;
   @IsOptional() @IsString() @MaxLength(100) utmMedium?: string;
   @IsOptional() @IsString() @MaxLength(100) utmCampaign?: string;

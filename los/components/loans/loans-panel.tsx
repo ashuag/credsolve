@@ -9,7 +9,8 @@ import {
   type DataTableColumn,
 } from '@/components/ui/data-table';
 import { DownloadDumpButton } from '@/components/ui/download-dump-button';
-import { getLoans, downloadLoansExport, markApplicationInternalTesting, refreshLoanPayment, type LosLoan, sendLoanNocLetter } from '@/lib/api';
+import { CustomerTypeBadge } from '@/components/shared/customer-type-badge';
+import { getLoans, downloadLoansExport, getMasters, markApplicationInternalTesting, refreshLoanPayment, type LosLoan, sendLoanNocLetter } from '@/lib/api';
 import { getLosToken as getToken } from '@/lib/auth';
 import { CUSTOMER_GRADE_FILTER_OPTIONS } from '@/lib/constants/customer-grades';
 import { formatPersonName } from '@/lib/format-person-name';
@@ -149,6 +150,7 @@ export function LoansPanel() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [busyUuid, setBusyUuid] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ tone: 'ok' | 'warn' | 'err'; text: string } | null>(null);
+  const [customerTypeOptions, setCustomerTypeOptions] = useState<Array<{ value: string; label: string }>>([]);
   const { filteredCount, filtersActive, activeColumnFilters, onFilteredItemsChange } = useDataTableFilterState();
   const canMarkTesting = useCanMarkInternalTesting();
   const canRefreshPayment = useCanRefreshLoanPayment();
@@ -164,7 +166,9 @@ export function LoansPanel() {
       return;
     }
     try {
-      setLoans(await getLoans(token));
+      const [loansRes, masters] = await Promise.all([getLoans(token), getMasters(token)]);
+      setLoans(loansRes);
+      setCustomerTypeOptions(masters.customerTypes);
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Failed to load loans');
     } finally {
@@ -313,6 +317,19 @@ export function LoansPanel() {
         matches: (row, value) => row.cibilCreditAssessmentCategory === value,
       },
       render: (loan) => <GradeBadge category={loan.cibilCreditAssessmentCategory} />,
+    },
+    {
+      key: 'customerType',
+      label: 'Customer type',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.customerType,
+      getSortValue: (row) => row.customerTypeLabel.toLowerCase(),
+      filter: {
+        type: 'select',
+        options: customerTypeOptions,
+        matches: (row, value) => row.customerType === value,
+      },
+      render: (row) => <CustomerTypeBadge customerType={row.customerType} label={row.customerTypeLabel} />,
     },
     {
       key: 'principal',
@@ -479,7 +496,7 @@ export function LoansPanel() {
         </div>
       ),
     },
-  ], [busyUuid, markAsInternalTesting, refreshPayment, sendNoc]);
+  ], [customerTypeOptions, busyUuid, markAsInternalTesting, refreshPayment, sendNoc]);
 
   const columns = canMarkTesting || canRefreshPayment || canSendNoc
     ? allColumns

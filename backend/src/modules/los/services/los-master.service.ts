@@ -15,6 +15,7 @@ import type { UpdateCreditLimitTierDto } from '../dto/update-credit-limit-tier.d
 import type { UpdateSmsTemplateDto } from '../dto/update-sms-template.dto';
 import type { UpdateSettingDto } from '../dto/update-setting.dto';
 import { CIBIL_GRADES, CIBIL_GRADE_SET, type CibilGrade } from '../../../common/cibil/cibil-credit-assessment.engine';
+import { CUSTOMER_TYPE, CUSTOMER_TYPE_LABEL } from '../../../common/constants/customer-type.constants';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -203,6 +204,10 @@ export class LosMasterService {
       })),
       sourceUtms: (sourceUtms as LosSourceUtmRow[]).map((item) => this.mapSourceUtm(item)),
       repaymentDueDates: repaymentDueDates.map((item) => this.mapRepaymentDueDate(item)),
+      customerTypes: Object.values(CUSTOMER_TYPE).map((value) => ({
+        value,
+        label: CUSTOMER_TYPE_LABEL[value],
+      })),
     };
   }
 

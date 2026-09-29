@@ -7,8 +7,15 @@ import {
   buildCibilAssessmentExportRow,
   CIBIL_ASSESSMENT_EXPORT_HEADERS,
 } from '../../../common/cibil/cibil-assessment-export';
+import { CUSTOMER_TYPE_LABEL } from '../../../common/constants/customer-type.constants';
+import {
+  loadClosedLoanLeadIdsByCustomer,
+  resolveCustomerType,
+  type ClosedLoanLeadIdsByCustomer,
+} from '../../../common/loan/customer-recurring-status.util';
 import { streamXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 import {
+  matchesExportMultiSelectFilter,
   parseExportDatetimeRange,
   parseExportNumberRange,
   requireAtLeastOneExportFilter,
@@ -25,42 +32,48 @@ export class LosBureauReportService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listBureauReports() {
-    const reports = await this.prisma.read.bureauReport.findMany({
-      orderBy: { createdAt: 'desc' },
-      // Uncapped listing: select only list columns (never `include` the parent row —
-      // Prisma would pull `raw_payload` / full CIBIL JSON and stall this endpoint).
-      select: {
-        uuid: true,
-        cibilScore: true,
-        dummyFetched: true,
-        createdAt: true,
-        customer: { select: { uuid: true, mobileNumber: true } },
-        leadDetails: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: {
-            fullName: true,
-            panNumber: true,
-            lead: {
-              select: {
-                uuid: true,
-                leadNumber: true,
-                applications: {
-                  orderBy: { createdAt: 'desc' },
-                  take: 1,
-                  select: { uuid: true, applicationNumber: true },
+    const [reports, closedLoanLeadIds] = await Promise.all([
+      this.prisma.read.bureauReport.findMany({
+        orderBy: { createdAt: 'desc' },
+        // Uncapped listing: select only list columns (never `include` the parent row —
+        // Prisma would pull `raw_payload` / full CIBIL JSON and stall this endpoint).
+        select: {
+          uuid: true,
+          customerId: true,
+          cibilScore: true,
+          dummyFetched: true,
+          createdAt: true,
+          customer: { select: { uuid: true, mobileNumber: true } },
+          leadDetails: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: {
+              fullName: true,
+              panNumber: true,
+              lead: {
+                select: {
+                  id: true,
+                  uuid: true,
+                  leadNumber: true,
+                  applications: {
+                    orderBy: { createdAt: 'desc' },
+                    take: 1,
+                    select: { uuid: true, applicationNumber: true },
+                  },
                 },
               },
             },
           },
+          cibilCreditAssessment: { select: { category: true } },
         },
-        cibilCreditAssessment: { select: { category: true } },
-      },
-    });
+      }),
+      loadClosedLoanLeadIdsByCustomer(this.prisma.read),
+    ]);
 
     return reports.map((row) => {
       const attached = row.leadDetails[0] ?? null;
       const lead = attached?.lead ?? null;
+      const customerType = this.resolveRowCustomerType(closedLoanLeadIds, row.customerId, lead?.id ?? null);
       return {
         uuid: row.uuid,
         leadUuid: lead?.uuid ?? null,
@@ -73,6 +86,8 @@ export class LosBureauReportService {
         panNumber: attached?.panNumber?.trim().toUpperCase() || null,
         cibilScore: row.cibilScore,
         cibilCreditAssessmentCategory: row.cibilCreditAssessment?.category ?? null,
+        customerType,
+        customerTypeLabel: CUSTOMER_TYPE_LABEL[customerType],
         dummyFetched: Boolean(row.dummyFetched),
         fetchedAt: row.createdAt.toISOString(),
       };
@@ -96,18 +111,37 @@ export class LosBureauReportService {
 
     await streamXlsxWorkbook(res, {
       sheetName: 'Sheet1',
-      headers: ['Lead ID', ...CIBIL_ASSESSMENT_EXPORT_HEADERS],
-      rows: this.streamRowsForExport(where),
+      headers: ['Lead ID', 'Customer type', ...CIBIL_ASSESSMENT_EXPORT_HEADERS],
+      rows: this.streamRowsForExport(where, query.customerType),
     });
+  }
+
+  /**
+   * "Customer type" (New/Recurring) has no SQL equivalent — it's derived by cross-referencing every
+   * *other* lead's closed loans for this customer (see `customer-recurring-status.util.ts`) — so
+   * unlike every other Bureau Report export filter it's applied as a JS pass here instead of a
+   * Prisma `where` condition.
+   */
+  private resolveRowCustomerType(
+    closedLoanLeadIds: ClosedLoanLeadIdsByCustomer,
+    customerId: bigint,
+    leadId: bigint | null,
+  ) {
+    if (leadId == null) {
+      return closedLoanLeadIds.has(customerId) ? 'RECURRING' : ('NEW' as const);
+    }
+    return resolveCustomerType(closedLoanLeadIds, customerId, leadId);
   }
 
   // Batch so we never load every `raw_payload` CIBIL JSON into memory at once
   // (that query stalls, OOMs, and 500s the Next proxy after ~30s).
   private async *streamRowsForExport(
     where: Prisma.BureauReportWhereInput,
+    customerTypeFilter: string | undefined,
   ): AsyncGenerator<SimpleXlsxCell[]> {
     let cursorId: bigint | undefined;
     let index = 0;
+    const closedLoanLeadIds = await loadClosedLoanLeadIdsByCustomer(this.prisma.read);
 
     for (;;) {
       const batch = await this.prisma.read.bureauReport.findMany({
@@ -117,32 +151,39 @@ export class LosBureauReportService {
         orderBy: { id: 'desc' },
         select: {
           id: true,
+          customerId: true,
           rawPayload: true,
           cibilScore: true,
           customer: { select: { mobileNumber: true } },
           leadDetails: {
             orderBy: { createdAt: 'desc' },
             take: 1,
-            select: { lead: { select: { leadNumber: true } } },
+            select: { lead: { select: { id: true, leadNumber: true } } },
           },
         },
       });
       if (batch.length === 0) return;
 
       for (const report of batch) {
+        const lead = report.leadDetails[0]?.lead ?? null;
+        const customerType = this.resolveRowCustomerType(closedLoanLeadIds, report.customerId, lead?.id ?? null);
+        if (customerTypeFilter && !matchesExportMultiSelectFilter(customerType, customerTypeFilter)) {
+          continue;
+        }
+
         index += 1;
         let featureCells: SimpleXlsxCell[];
         try {
           featureCells = buildCibilAssessmentExportRow(report.rawPayload, index, report.cibilScore);
         } catch (err) {
           this.logger.warn(
-            `Skipping malformed bureau payload in export (lead=${report.leadDetails[0]?.lead.leadNumber ?? 'n/a'}): ${
+            `Skipping malformed bureau payload in export (lead=${lead?.leadNumber ?? 'n/a'}): ${
               err instanceof Error ? err.message : String(err)
             }`,
           );
           featureCells = CIBIL_ASSESSMENT_EXPORT_HEADERS.map(() => null);
         }
-        yield [report.leadDetails[0]?.lead.leadNumber ?? '', ...featureCells];
+        yield [lead?.leadNumber ?? '', CUSTOMER_TYPE_LABEL[customerType], ...featureCells];
       }
 
       cursorId = batch[batch.length - 1]!.id;
