@@ -9,12 +9,19 @@ import {
   type ColumnFilters,
   type SortState,
 } from '@/components/ui/data-table';
+import { DownloadDumpButton } from '@/components/ui/download-dump-button';
 import {
+  downloadVendorApiLogsExport,
   getVendorApiLog,
+<<<<<<< HEAD
   getVendorApiLogsExportUrl,
+=======
+  getVendorApiLogFilterOptions,
+>>>>>>> refs/remotes/moneycash/main
   listVendorApiLogs,
   type LosVendorApiLogDetail,
   type LosVendorApiLogListItem,
+  type VendorApiLogFilterOptions,
 } from '@/lib/api';
 import { formatApplicationDisplayId } from '@/lib/application-review-format';
 import { getLosToken } from '@/lib/auth';
@@ -47,6 +54,10 @@ const OUTCOME_OPTIONS = [
   { value: 'failure', label: 'Failure' },
 ];
 
+function toSelectOptions(values: string[]): Array<{ value: string; label: string }> {
+  return values.map((value) => ({ value, label: value }));
+}
+
 function formatDateTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
@@ -58,13 +69,6 @@ function formatDateTime(iso: string): string {
     minute: '2-digit',
     second: '2-digit',
   });
-}
-
-function truncatePath(path: string | null, max = 64): string {
-  if (!path?.trim()) return '—';
-  const value = path.trim();
-  if (value.length <= max) return value;
-  return `${value.slice(0, max - 1)}…`;
 }
 
 function formatJson(value: unknown): string {
@@ -231,6 +235,8 @@ export function VendorApiLogsPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [filterOptions, setFilterOptions] = useState<VendorApiLogFilterOptions | null>(null);
+
   const [detailOpen, setDetailOpen] = useState(false);
   const [detail, setDetail] = useState<LosVendorApiLogDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -285,7 +291,6 @@ export function VendorApiLogsPanel() {
         id: debouncedFilters.id,
         leadId: debouncedFilters.leadId,
         applicationNumber: debouncedFilters.applicationNumber,
-        requestPath: debouncedFilters.requestPath,
         outcome: debouncedFilters.outcome,
         requestedFrom: debouncedFilters.requestedFrom,
         requestedTo: debouncedFilters.requestedTo,
@@ -305,6 +310,16 @@ export function VendorApiLogsPanel() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const token = getLosToken();
+    if (!token) return;
+    getVendorApiLogFilterOptions(token)
+      .then(setFilterOptions)
+      .catch(() => {
+        // Non-fatal: the Provider/Service dropdowns just fall back to empty ("All" only).
+      });
+  }, []);
 
   async function openDetail(row: LosVendorApiLogListItem) {
     const token = getLosToken();
@@ -336,6 +351,7 @@ export function VendorApiLogsPanel() {
 
   const filtersActive = hasActiveColumnFilters(columnFilters);
   const filtersSettled = columnFilters === debouncedFilters;
+<<<<<<< HEAD
   const canDownloadDump = filtersActive && filtersSettled && !loading && total > 0;
 
   const downloadDump = useCallback(() => {
@@ -365,6 +381,27 @@ export function VendorApiLogsPanel() {
     link.click();
     link.remove();
   }, [sort, debouncedFilters]);
+=======
+
+  const downloadExport = useCallback(
+    (token: string) =>
+      downloadVendorApiLogsExport(token, {
+        sortBy: sort?.key ?? 'requestedAt',
+        sortDir: sort?.dir ?? 'desc',
+        providerName: debouncedFilters.providerName,
+        serviceName: debouncedFilters.serviceName,
+        requestMethod: debouncedFilters.requestMethod,
+        httpStatus: debouncedFilters.httpStatus,
+        id: debouncedFilters.id,
+        leadId: debouncedFilters.leadId,
+        applicationNumber: debouncedFilters.applicationNumber,
+        outcome: debouncedFilters.outcome,
+        requestedFrom: debouncedFilters.requestedFrom,
+        requestedTo: debouncedFilters.requestedTo,
+      }),
+    [sort, debouncedFilters],
+  );
+>>>>>>> refs/remotes/moneycash/main
 
   return (
     <>
@@ -377,6 +414,7 @@ export function VendorApiLogsPanel() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+<<<<<<< HEAD
             <button
               type="button"
               onClick={downloadDump}
@@ -394,6 +432,17 @@ export function VendorApiLogsPanel() {
             >
               ⬇ Download dump
             </button>
+=======
+            <DownloadDumpButton
+              filtersActive={filtersActive}
+              loading={!filtersSettled || loading}
+              resultCount={total}
+              onDownload={downloadExport}
+              onSessionExpired={() => setError('Session expired - please log in again.')}
+              onError={(message) => setError(message)}
+              className="min-h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            />
+>>>>>>> refs/remotes/moneycash/main
             {filtersActive ? (
               <button
                 type="button"
@@ -447,7 +496,7 @@ export function VendorApiLogsPanel() {
                     <DataTableColumnFilter
                       value={columnFilters.applicationNumber ?? ''}
                       onChange={(value) => setColumnFilter('applicationNumber', value)}
-                      placeholder="App id…"
+                      placeholder="App id starts with…"
                       aria-label="Filter application id"
                     />
                   </th>
@@ -488,9 +537,11 @@ export function VendorApiLogsPanel() {
                   <th className="px-3 py-2 align-bottom">
                     <DataTableColumnHeader label="Provider" sortKey="providerName" sort={sort} onSort={toggleSort}>
                       <DataTableColumnFilter
+                        type="multi-select"
                         value={columnFilters.providerName ?? ''}
                         onChange={(value) => setColumnFilter('providerName', value)}
-                        placeholder="Provider…"
+                        options={toSelectOptions(filterOptions?.providerNames ?? [])}
+                        placeholder="Providers"
                         aria-label="Filter provider"
                       />
                     </DataTableColumnHeader>
@@ -498,9 +549,11 @@ export function VendorApiLogsPanel() {
                   <th className="px-3 py-2 align-bottom">
                     <DataTableColumnHeader label="Service" sortKey="serviceName" sort={sort} onSort={toggleSort}>
                       <DataTableColumnFilter
+                        type="multi-select"
                         value={columnFilters.serviceName ?? ''}
                         onChange={(value) => setColumnFilter('serviceName', value)}
-                        placeholder="Service…"
+                        options={toSelectOptions(filterOptions?.serviceNames ?? [])}
+                        placeholder="Services"
                         aria-label="Filter service"
                       />
                     </DataTableColumnHeader>
@@ -541,17 +594,6 @@ export function VendorApiLogsPanel() {
                   </th>
                   <th className="px-3 py-2 align-bottom">
                     <span className="block text-[0.68rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted">
-                      Path
-                    </span>
-                    <DataTableColumnFilter
-                      value={columnFilters.requestPath ?? ''}
-                      onChange={(value) => setColumnFilter('requestPath', value)}
-                      placeholder="Path…"
-                      aria-label="Filter path"
-                    />
-                  </th>
-                  <th className="px-3 py-2 align-bottom">
-                    <span className="block text-[0.68rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted">
                       Ms
                     </span>
                   </th>
@@ -565,14 +607,14 @@ export function VendorApiLogsPanel() {
               <tbody>
                 {loading && items.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-4 py-8 text-center text-brand-muted">
+                    <td colSpan={11} className="px-4 py-8 text-center text-brand-muted">
                       Loading logs…
                     </td>
                   </tr>
                 ) : null}
                 {!loading && items.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-4 py-8 text-center text-brand-muted">
+                    <td colSpan={11} className="px-4 py-8 text-center text-brand-muted">
                       No vendor API logs match the current filters.
                     </td>
                   </tr>
@@ -612,9 +654,6 @@ export function VendorApiLogsPanel() {
                     <td className="px-3 py-2.5 font-mono">{row.httpStatus ?? '—'}</td>
                     <td className="px-3 py-2.5">
                       <OutcomeBadge outcome={row.outcome} />
-                    </td>
-                    <td className="max-w-[240px] px-3 py-2.5" title={row.requestPath ?? undefined}>
-                      <span className="font-mono text-[0.72rem] text-brand-muted">{truncatePath(row.requestPath)}</span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5 font-mono text-[0.78rem]">{row.durationMs}</td>
                     <td className="px-3 py-2.5">

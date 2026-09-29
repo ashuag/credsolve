@@ -24,6 +24,7 @@ model BureauReport {
 
   @@index([customerId, createdAt])
   @@index([createdAt])
+  @@index([cibilScore])
   @@map("bureau_report")
 }
 
@@ -55,5 +56,6 @@ model CibilCreditAssessment {
 
   bureauReport BureauReport @relation(fields: [bureauReportId], references: [id])
 
+  @@index([category])
   @@map("cibil_credit_assessment")
 }

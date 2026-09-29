@@ -5,11 +5,15 @@ import {
   isoDateTimestamp,
   LOS_LISTING_PAGE_SIZE,
   LOS_LISTING_PAGE_SIZE_OPTIONS,
+  useDataTableFilterState,
   type DataTableColumn,
 } from '@/components/ui/data-table';
+import { DownloadDumpButton } from '@/components/ui/download-dump-button';
+import { CustomerTypeBadge } from '@/components/shared/customer-type-badge';
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
-import { downloadBureauReportsExport, getBureauReports, type LosBureauReportListItem } from '@/lib/api';
+import { downloadBureauReportsExport, getBureauReports, getMasters, type LosBureauReportListItem } from '@/lib/api';
 import { getLosToken } from '@/lib/auth';
+import { CUSTOMER_GRADE_FILTER_OPTIONS } from '@/lib/constants/customer-grades';
 import { formatPersonName } from '@/lib/format-person-name';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -82,8 +86,9 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
 export function BureauReportsPanel() {
   const [reports, setReports] = useState<LosBureauReportListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [downloading, setDownloading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [customerTypeOptions, setCustomerTypeOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const { filteredCount, filtersActive, activeColumnFilters, onFilteredItemsChange } = useDataTableFilterState();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,7 +100,9 @@ export function BureauReportsPanel() {
       return;
     }
     try {
-      setReports(await getBureauReports(token));
+      const [reportsRes, masters] = await Promise.all([getBureauReports(token), getMasters(token)]);
+      setReports(reportsRes);
+      setCustomerTypeOptions(masters.customerTypes);
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Failed to load bureau reports');
     } finally {
@@ -196,10 +203,20 @@ export function BureauReportsPanel() {
       filter: {
         type: 'multi-select',
         placeholder: 'Grades',
-        options: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((g) => ({ value: g, label: g })),
+        options: CUSTOMER_GRADE_FILTER_OPTIONS,
       },
       cellClassName: 'whitespace-nowrap',
       render: (row) => <GradeBadge category={row.cibilCreditAssessmentCategory} />,
+    },
+    {
+      key: 'customerType',
+      label: 'Customer type',
+      headerClassName: 'min-w-[120px] whitespace-nowrap',
+      getFilterValue: (row) => row.customerType,
+      getSortValue: (row) => row.customerTypeLabel.toLowerCase(),
+      filter: { type: 'multi-select', placeholder: 'Type', options: customerTypeOptions },
+      cellClassName: 'whitespace-nowrap',
+      render: (row) => <CustomerTypeBadge customerType={row.customerType} label={row.customerTypeLabel} />,
     },
     {
       key: 'source',
@@ -238,7 +255,7 @@ export function BureauReportsPanel() {
       cellClassName: 'text-brand-muted text-[0.78rem] whitespace-nowrap',
       render: (row) => formatDateTime(row.fetchedAt),
     },
-  ], []);
+  ], [customerTypeOptions]);
 
   const todayCount = reports.filter((row) => {
     const d = new Date(row.fetchedAt);
@@ -267,12 +284,14 @@ export function BureauReportsPanel() {
         onRetry={() => void load()}
         emptyMessage="No bureau reports have been stored yet."
         noResultsMessage="No bureau reports match your filters."
-        minWidth="1080px"
+        minWidth="1200px"
         pageSize={LOS_LISTING_PAGE_SIZE}
         pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         initialSort={{ key: 'fetched', dir: 'desc' }}
+        onFilteredItemsChange={onFilteredItemsChange}
         toolbarActions={
           <div className="flex items-center gap-2">
+<<<<<<< HEAD
             <button
               type="button"
               disabled={downloading}
@@ -294,6 +313,18 @@ export function BureauReportsPanel() {
             >
               {downloading ? 'Downloading…' : '⬇ Download'}
             </button>
+=======
+            <DownloadDumpButton
+              filtersActive={filtersActive}
+              loading={loading}
+              resultCount={filteredCount}
+              onDownload={(token) => downloadBureauReportsExport(token, activeColumnFilters)}
+              onSessionExpired={() => setFetchError('Session expired — please log in again.')}
+              onError={(message) => setFetchError(message)}
+              label="⬇ Download"
+              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            />
+>>>>>>> refs/remotes/moneycash/main
             <button
               type="button"
               onClick={() => void load()}

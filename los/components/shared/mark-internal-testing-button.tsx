@@ -29,7 +29,11 @@ export function MarkInternalTestingButton({
   return null;
   /*
   const BUTTON_CLASS =
+<<<<<<< HEAD
     'h-[28px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-2 text-[0.72rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)] disabled:cursor-not-allowed disabled:opacity-50';
+=======
+    'h-[28px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-2 text-[0.72rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-50';
+>>>>>>> refs/remotes/moneycash/main
 
   const allowed = useCanMarkInternalTesting();
   if (!allowed) return null;

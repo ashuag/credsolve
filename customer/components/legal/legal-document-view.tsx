@@ -142,10 +142,12 @@ export function LegalDocumentView({ document }: LegalDocumentViewProps) {
               <p className="legal-meta-label">Platform</p>
               <p className="legal-meta-value">CredSolve</p>
             </div>
-            <div className="legal-meta-card">
-              <p className="legal-meta-label">Registered office</p>
-              <p className="legal-meta-value">{document.registeredOffice}</p>
-            </div>
+            {document.registeredOffice ? (
+              <div className="legal-meta-card">
+                <p className="legal-meta-label">Registered office</p>
+                <p className="legal-meta-value">{document.registeredOffice}</p>
+              </div>
+            ) : null}
             <div className="legal-meta-card">
               <p className="legal-meta-label">Contact</p>
               <p className="legal-meta-value">

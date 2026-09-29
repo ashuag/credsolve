@@ -87,6 +87,74 @@ export function HeroSection() {
               >
                 Get Loan
               </Link>
+<<<<<<< HEAD
+=======
+              <Link
+                href="/#how-it-works"
+                className="inline-flex items-center justify-center gap-1 text-[0.92rem] font-[800] text-[#1496f3] transition-colors hover:text-[#2388e5] hover:underline"
+              >
+                Read borrower stories
+                <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+                  <path d="M4 8h8M9 5l3 3-3 3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </Link>
+            </div>
+
+            {/* Social proof */}
+            <div
+              className="animate-fade-in-up mt-7 flex items-center gap-3.5"
+              style={{ animationDelay: '200ms' }}
+            >
+              <div className="flex -space-x-2.5">
+                {[
+                  { initials: 'AR', from: '#1496f3', to: '#2388e5' },
+                  { initials: 'SK', from: '#10b981', to: '#059669' },
+                  { initials: 'PV', from: '#f4b400', to: '#e5a800' },
+                  { initials: 'MJ', from: '#8b5cf6', to: '#6d28d9' },
+                ].map((a) => (
+                  <span
+                    key={a.initials}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white text-[0.58rem] font-[900] text-white shadow-[0_2px_8px_rgba(18,36,79,0.12)]"
+                    style={{ backgroundImage: `linear-gradient(135deg, ${a.from}, ${a.to})` }}
+                  >
+                    {a.initials}
+                  </span>
+                ))}
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-0.5 text-[#f4b400]">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <svg key={i} viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="currentColor" aria-hidden>
+                      <path d="M9.05 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.957a1 1 0 00.95.69h4.162c.969 0 1.371 1.24.588 1.81l-3.368 2.447a1 1 0 00-.364 1.118l1.287 3.957c.3.922-.755 1.688-1.54 1.118l-3.367-2.447a1 1 0 00-1.176 0l-3.367 2.447c-.784.57-1.838-.196-1.539-1.118l1.287-3.957a1 1 0 00-.364-1.118L2.075 9.384c-.783-.57-.38-1.81.588-1.81h4.162a1 1 0 00.951-.69l1.286-3.957z" />
+                    </svg>
+                  ))}
+                </div>
+                <span className="text-[0.72rem] font-[700] text-[#12244f]/65">
+                  <strong className="font-[900] text-[#12244f]">4.9/5</strong> from 5,000+ happy customers
+                </span>
+              </div>
+            </div>
+
+            {/* Stats row */}
+            <div
+              className="animate-fade-in-up mt-7 grid grid-cols-2 gap-4 border-t border-[#12244f]/8 pt-7 sm:grid-cols-4 sm:gap-6"
+              style={{ animationDelay: '240ms' }}
+            >
+              {[
+                { label: 'Happy Customers', value: '5,000+' },
+                { label: 'Disbursed', value: '₹5Cr+' },
+                { label: 'Avg. Approval', value: '2 min' },
+              ].map((stat) => (
+                <div key={stat.label} className="flex flex-col">
+                  <span className="text-[0.62rem] font-[800] uppercase tracking-[0.14em] text-[#12244f]/40">
+                    {stat.label}
+                  </span>
+                  <span className="mt-1 text-2xl font-[900] text-brand-navy sm:text-3xl">
+                    {stat.value}
+                  </span>
+                </div>
+              ))}
+>>>>>>> refs/remotes/moneycash/main
             </div>
           </div>
 

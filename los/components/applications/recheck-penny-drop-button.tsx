@@ -66,7 +66,11 @@ export function RecheckPennyDropButton({
       {eligible ? (
         <button
           type="button"
+<<<<<<< HEAD
           className="min-h-[38px] rounded-[8px] border border-[rgba(15,39,72,0.22)] bg-white px-4 text-[0.82rem] font-bold text-brand-navy hover:bg-[rgba(15,39,72,0.04)] disabled:cursor-not-allowed disabled:opacity-55"
+=======
+          className="min-h-[38px] rounded-[8px] border border-[rgba(23,44,113,0.22)] bg-white px-4 text-[0.82rem] font-bold text-brand-navy hover:bg-[rgba(23,44,113,0.04)] disabled:cursor-not-allowed disabled:opacity-55"
+>>>>>>> refs/remotes/moneycash/main
           disabled={!authToken || busy}
           onClick={() => void handleRecheck()}
         >

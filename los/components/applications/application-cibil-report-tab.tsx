@@ -286,7 +286,11 @@ export function ApplicationCibilReportTab({
                     'min-h-[38px] flex-1 whitespace-nowrap rounded-[10px] px-3 text-[0.82rem] font-extrabold transition-colors sm:flex-none sm:px-4',
                     activeView === tab.id
                       ? 'bg-brand-navy text-white shadow-sm'
+<<<<<<< HEAD
                       : 'text-brand-navy hover:bg-[rgba(15,39,72,0.06)]',
+=======
+                      : 'text-brand-navy hover:bg-[rgba(23,44,113,0.06)]',
+>>>>>>> refs/remotes/moneycash/main
                   )}
                   aria-current={activeView === tab.id ? 'page' : undefined}
                 >
@@ -301,7 +305,11 @@ export function ApplicationCibilReportTab({
                   href={pdfDownloadUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+<<<<<<< HEAD
                   className="inline-flex min-h-[38px] shrink-0 items-center whitespace-nowrap rounded-[10px] border border-[rgba(15,39,72,0.12)] bg-white px-4 text-[0.82rem] font-bold text-brand-blue no-underline hover:border-[rgba(34,197,94,0.35)]"
+=======
+                  className="inline-flex min-h-[38px] shrink-0 items-center whitespace-nowrap rounded-[10px] border border-[rgba(23,44,113,0.12)] bg-white px-4 text-[0.82rem] font-bold text-brand-blue no-underline hover:border-[rgba(20,150,243,0.35)]"
+>>>>>>> refs/remotes/moneycash/main
                 >
                   Download CIBIL report
                 </a>

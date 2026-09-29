@@ -14,7 +14,11 @@ import {
 } from '@/lib/form-styles';
 import { cn } from '@/lib/cn';
 
+<<<<<<< HEAD
 const CONTACT_EMAIL = 'hello@credsolve.in';
+=======
+const CONTACT_EMAIL = 'contact@moneycash.in';
+>>>>>>> refs/remotes/moneycash/main
 const CONTACT_PHONE_DISPLAY = '+91-9650111801';
 const CONTACT_PHONE_TEL = '+91-9650111801';
 const CONTACT_ADDRESS =

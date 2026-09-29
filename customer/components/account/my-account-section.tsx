@@ -55,6 +55,8 @@ function statusBadgeClass(status: string): string {
   }
   // Application journey statuses
   if (s === 'DISBURSED') return 'bg-indigo-50 text-indigo-700 border-indigo-200 ring-1 ring-indigo-500/20';
+  if (s === 'DISBURSAL_INPROCESS') return 'bg-amber-50 text-amber-800 border-amber-200/80 ring-1 ring-amber-500/30';
+  if (s === 'DISBURSAL_FAILED') return 'bg-rose-50 text-rose-700 border-rose-200 ring-1 ring-rose-500/20';
   if (s === 'IN_REVIEW' || s === 'UNDER_REVIEW') return 'bg-amber-50 text-amber-800 border-amber-200/80 ring-1 ring-amber-500/30';
   if (s === 'APPROVED') return 'bg-sky-50 text-sky-700 border-sky-200 ring-1 ring-sky-500/20';
   if (s === 'PENNYDROP_FAILED') {
@@ -75,6 +77,8 @@ function statusBadgeLabel(status: string): string {
   if (s === 'ACTIVE') return 'Active loan';
   if (s === 'WRITTEN_OFF') return 'Written off';
   if (s === 'IN_REVIEW' || s === 'UNDER_REVIEW') return 'In review';
+  if (s === 'DISBURSAL_INPROCESS') return 'Disbursal in process';
+  if (s === 'DISBURSAL_FAILED') return 'Disbursal failed';
   if (s === 'PENNYDROP_FAILED') return 'We will call you';
   return status.replace(/_/g, ' ');
 }
@@ -284,7 +288,11 @@ function JourneyTracker({ steps }: { steps: CustomerJourneyProgressStep[] }) {
                     : done
                       ? 'bg-emerald-500 text-white shadow-[0_6px_14px_rgba(16,185,129,0.28)]'
                       : current
+<<<<<<< HEAD
                         ? 'bg-gradient-to-br from-[#22c55e] to-[#16a34a] text-[#12244f] shadow-[0_8px_18px_rgba(34,197,94,0.38)] ring-4 ring-[#22c55e]/25'
+=======
+                        ? 'bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-[#12244f] shadow-[0_8px_18px_rgba(246,180,0,0.38)] ring-4 ring-[#ffc519]/25'
+>>>>>>> refs/remotes/moneycash/main
                         : 'bg-[#eef2f8] text-slate-400',
                 )}
                 aria-current={current ? 'step' : undefined}
@@ -450,9 +458,7 @@ function ActiveLoanCard({
   const router = useRouter();
   const { refresh } = useCustomerSession();
   const remaining = loan.outstandingInr ?? loan.amountDueToday ?? loan.totalRepayment;
-  const amountAtMaturity = loan.amountDueAtMaturity ?? loan.totalRepayment;
   const remainingN = parseAmount(remaining);
-  const maturityN = parseAmount(amountAtMaturity);
   const paidN = parseAmount(loan.totalPaidInr);
   const minPayN = parseAmount(minPayAmountInr) ?? 100;
   const bounceN = parseAmount(loan.bounceFeeInr);
@@ -462,11 +468,14 @@ function ActiveLoanCard({
   const overdueDays = loan.overdueDays != null && loan.overdueDays > 0 ? loan.overdueDays : 0;
   const overdueInterestN = parseAmount(loan.overdueInterestInr);
   const showOverdueInterest = overdueDays > 0 && overdueInterestN != null && overdueInterestN > 0;
+<<<<<<< HEAD
   const savings =
     remainingN != null && maturityN != null && (paidN == null || paidN <= 0)
       ? Math.round((maturityN - remainingN) * 100) / 100
       : null;
   const showSavings = loan.usedFullTenureInterest !== true && savings != null && savings > 0.009;
+=======
+>>>>>>> refs/remotes/moneycash/main
   const daysUntilDue = calendarDaysFromToday(loan.maturityDate);
   const isOverdue = loan.status.toUpperCase() === 'OVERDUE' || (daysUntilDue != null && daysUntilDue < 0);
   const timing = dueTiming(daysUntilDue, isOverdue, loan.maturityDate);
@@ -768,10 +777,11 @@ function ActiveLoanCard({
           </p>
         ) : null}
 
-        {showSavings ? (
-          <p className="mt-3 rounded-xl bg-emerald-50 px-3.5 py-2.5 text-[0.78rem] font-semibold text-emerald-800 ring-1 ring-emerald-100">
-            Paying today saves {formatInr(savings.toFixed(2))} versus waiting until{' '}
-            {formatFriendlyDate(loan.maturityDate)}.
+        {showOverdueInterest ? (
+          <p className="mt-3 rounded-xl bg-[#f4f8ff] px-3.5 py-2.5 text-[0.78rem] font-medium leading-relaxed text-slate-600 ring-1 ring-[rgba(20,150,243,0.1)]">
+            Past the due date — interest is the
+            {loan.tenureDays != null ? ` full ${loan.tenureDays}-day` : ' full'} tenure plus{' '}
+            {overdueDays} overdue day{overdueDays === 1 ? '' : 's'}.
           </p>
         ) : showOverdueInterest ? (
           <p className="mt-3 rounded-xl bg-[#f4f8ff] px-3.5 py-2.5 text-[0.78rem] font-medium leading-relaxed text-slate-600 ring-1 ring-[rgba(20,150,243,0.1)]">
@@ -789,7 +799,7 @@ function ActiveLoanCard({
           </p>
         ) : daysUsed != null ? (
           <p className="mt-3 rounded-xl bg-[#f4f8ff] px-3.5 py-2.5 text-[0.78rem] font-medium leading-relaxed text-slate-600 ring-1 ring-[rgba(20,150,243,0.1)]">
-            Still in the early-repay window — interest is charged only for the {daysUsed} day
+            Interest is charged only for the {daysUsed} day
             {daysUsed === 1 ? '' : 's'} used so far.
           </p>
         ) : null}
@@ -821,10 +831,6 @@ function ActiveLoanCard({
     </article>
   );
 }
-
-/* =========================================================================
-   ENHANCED IN-PROGRESS PIPELINE CARD
-   ========================================================================= */
 
 function InProgressLoanCard({ loan }: { loan: CustomerLoanCard }) {
   const [copied, setCopied] = useState(false);

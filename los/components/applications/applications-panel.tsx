@@ -5,12 +5,16 @@ import {
   isoDateTimestamp,
   LOS_LISTING_PAGE_SIZE,
   LOS_LISTING_PAGE_SIZE_OPTIONS,
+  useDataTableFilterState,
   type DataTableColumn,
 } from '@/components/ui/data-table';
-import { getApplications, getApplicationsExportUrl, getMasters, markApplicationInternalTesting, type LosApplication } from '@/lib/api';
+import { DownloadDumpButton } from '@/components/ui/download-dump-button';
+import { CustomerTypeBadge } from '@/components/shared/customer-type-badge';
+import { getApplications, downloadApplicationsExport, getMasters, markApplicationInternalTesting, type LosApplication } from '@/lib/api';
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
-import { LOS_STORAGE_KEY } from '@/lib/auth';
+import { getLosToken as getToken } from '@/lib/auth';
 import { APPLICATION_JOURNEY_STAGE_FILTER_OPTIONS } from '@/lib/constants/application-journey-stages';
+import { CUSTOMER_GRADE_FILTER_OPTIONS } from '@/lib/constants/customer-grades';
 import { resolveApplicationStageLabel } from '@/lib/customer-journey';
 import { formatPersonName } from '@/lib/format-person-name';
 import { BANK_DETAIL_FAILED_LABEL, PENNY_DROP_FAILED_LABEL } from '@/lib/penny-drop-grant-retry-eligibility';
@@ -18,15 +22,6 @@ import { rejectionReasonDisplayLabel } from '@/lib/rejection-reason-label';
 import { MarkInternalTestingButton, useCanMarkInternalTesting } from '@/components/shared/mark-internal-testing-button';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-
-function getToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.localStorage.getItem(LOS_STORAGE_KEY);
-    if (!raw) return null;
-    return (JSON.parse(raw) as { token?: string }).token ?? null;
-  } catch { return null; }
-}
 
 function formatINR(value: string | null | undefined) {
   if (!value) return '—';
@@ -189,7 +184,8 @@ function StageCell({ app }: { app: LosApplication }) {
 }
 
 function RejectionReasonCell({ app }: { app: LosApplication }) {
-  const note = app.leadStatusNote?.trim().toLowerCase() ?? '';
+  const noteRaw = app.leadStatusNote?.trim() ?? '';
+  const note = noteRaw.toLowerCase();
   const pennyDropFailed =
     app.statusCode.toUpperCase() === 'PENNYDROP_FAILED' ||
     app.leadRejectionReason?.code === 'PENNYDROP_FAILED' ||
@@ -200,17 +196,26 @@ function RejectionReasonCell({ app }: { app: LosApplication }) {
       ? rejectionReasonDisplayLabel(app.leadRejectionReason.code)
       : app.leadRejectionReason?.label?.trim()) ||
     (pennyDropFailed ? PENNY_DROP_FAILED_LABEL : '');
-  if (!label) {
+  // Don't repeat the note when it's the exact text the synthetic penny-drop/bank-detail label came from.
+  const showNote = Boolean(noteRaw) && note !== label.toLowerCase();
+
+  if (!label && !showNote) {
     return <span className="text-brand-muted">—</span>;
   }
 
   return (
-    <p
-      className="m-0 min-w-[140px] max-w-[220px] text-[0.72rem] font-extrabold uppercase tracking-[0.04em] text-[#991b1b] line-clamp-2"
-      title={label}
-    >
-      {label}
-    </p>
+    <div className="min-w-[140px] max-w-[220px]" title={[label, showNote ? noteRaw : null].filter(Boolean).join(' — ')}>
+      {label ? (
+        <p className="m-0 text-[0.72rem] font-extrabold uppercase tracking-[0.04em] text-[#991b1b] line-clamp-2">
+          {label}
+        </p>
+      ) : null}
+      {showNote ? (
+        <p className={`m-0 text-[0.72rem] font-semibold leading-snug text-brand-muted line-clamp-2 ${label ? 'mt-0.5' : ''}`}>
+          {noteRaw}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -229,7 +234,9 @@ export function ApplicationsPanel() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Array<{ code: string; displayName: string }>>([]);
+  const [customerTypeOptions, setCustomerTypeOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [busyUuid, setBusyUuid] = useState<string | null>(null);
+  const { filteredCount, filtersActive, activeColumnFilters, onFilteredItemsChange } = useDataTableFilterState();
   const canMarkTesting = useCanMarkInternalTesting();
 
   const loadApplications = useCallback(async () => {
@@ -241,6 +248,7 @@ export function ApplicationsPanel() {
       const [appsRes, masters] = await Promise.all([getApplications(token), getMasters(token)]);
       setApplications(appsRes);
       setStatuses(masters.applicationStatuses.filter((s) => s.isActive).map((s) => ({ code: s.code, displayName: s.displayName })));
+      setCustomerTypeOptions(masters.customerTypes);
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Failed to load applications');
     } finally { setLoading(false); }
@@ -339,10 +347,23 @@ export function ApplicationsPanel() {
       getSortValue: (row) => row.cibilCreditAssessmentCategory ?? '',
       filter: {
         type: 'select',
-        options: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((g) => ({ value: g, label: g })),
+        options: CUSTOMER_GRADE_FILTER_OPTIONS,
         matches: (row, value) => row.cibilCreditAssessmentCategory === value,
       },
       render: (app) => <GradeBadge category={app.cibilCreditAssessmentCategory} />,
+    },
+    {
+      key: 'customerType',
+      label: 'Customer type',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.customerType,
+      getSortValue: (row) => row.customerTypeLabel.toLowerCase(),
+      filter: {
+        type: 'select',
+        options: customerTypeOptions,
+        matches: (row, value) => row.customerType === value,
+      },
+      render: (row) => <CustomerTypeBadge customerType={row.customerType} label={row.customerTypeLabel} />,
     },
     {
       key: 'loan',
@@ -402,7 +423,7 @@ export function ApplicationsPanel() {
         type: 'text',
         placeholder: 'Search reason…',
         matches: (row, value) => {
-          const reasonText = [row.leadRejectionReason?.code, row.leadRejectionReason?.label]
+          const reasonText = [row.leadRejectionReason?.code, row.leadRejectionReason?.label, row.leadStatusNote]
             .filter(Boolean)
             .join(' ')
             .toLowerCase();
@@ -444,7 +465,7 @@ export function ApplicationsPanel() {
         />
       ),
     },
-  ], [statuses, busyUuid, markAsInternalTesting]);
+  ], [statuses, customerTypeOptions, busyUuid, markAsInternalTesting]);
 
   const columns = canMarkTesting
     ? allColumns
@@ -475,7 +496,7 @@ export function ApplicationsPanel() {
         onRetry={() => void loadApplications()}
         emptyMessage="No applications available right now."
         noResultsMessage="No applications match your filters or sort."
-        minWidth="1480px"
+        minWidth="1600px"
         pageSize={LOS_LISTING_PAGE_SIZE}
         pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         renderRowClassName={(app) =>
@@ -483,8 +504,10 @@ export function ApplicationsPanel() {
             ? 'border-l-[3px] border-l-[#ef4444] bg-[rgba(254,242,242,0.55)] hover:bg-[rgba(254,226,226,0.65)]'
             : undefined
         }
+        onFilteredItemsChange={onFilteredItemsChange}
         toolbarActions={
           <div className="flex items-center gap-2">
+<<<<<<< HEAD
             <button
               type="button"
               onClick={() => {
@@ -504,6 +527,17 @@ export function ApplicationsPanel() {
             >
               ⬇ Download dump
             </button>
+=======
+            <DownloadDumpButton
+              filtersActive={filtersActive}
+              loading={loading}
+              resultCount={filteredCount}
+              onDownload={(token) => downloadApplicationsExport(token, activeColumnFilters)}
+              onSessionExpired={() => setFetchError('Session expired — please log in again.')}
+              onError={(message) => setFetchError(message)}
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            />
+>>>>>>> refs/remotes/moneycash/main
             <button
               type="button"
               onClick={() => void loadApplications()}

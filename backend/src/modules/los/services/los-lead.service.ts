@@ -15,9 +15,18 @@ import { KycFilesService } from '../../../common/kyc/kyc-files.service';
 import { SmsService } from '../../../common/sms/sms.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
-import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
+import { streamXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 import { TENACIO_SERVICE_PAN_NAME_DOB } from '../../../common/vendor/tenacio/tenacio-client.service';
 import { resolveCibilVendorDisplayName } from '../../../common/vendor/cibil-vendor.util';
+<<<<<<< HEAD
+=======
+import {
+  matchesExportTextFilter,
+  parseExportIstDayRange,
+  requireAtLeastOneExportFilter,
+} from '../../../common/xlsx/export-row-filter.util';
+import type { ExportLeadsQueryDto } from '../los-data.controller';
+>>>>>>> refs/remotes/moneycash/main
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -99,6 +108,9 @@ function leadSourceLabel(lead: {
   return null;
 }
 
+/** Batch size for the export's cursor-paged fetch. */
+const EXPORT_BATCH_SIZE = 200;
+
 const LEAD_DUMP_HEADERS = [
   'Lead ID',
   'Application ID',
@@ -137,18 +149,90 @@ export class LosLeadService {
     private readonly sms: SmsService,
   ) {}
 
-  async listLeads() {
-    const leads = await this.prisma.read.lead.findMany({
-      where: {
-        isActive: true,
-        isInternalTesting: false,
-        // Handed off to Applications — hide from lead queue once converted with an app row.
-        NOT: {
-          leadStatus: { name: LEAD_STATUS.CONVERTED },
-          applications: { some: {} },
-        },
+  private readonly leadListInclude = {
+    customer: { select: { uuid: true, mobileNumber: true } },
+    leadStatus: { select: { name: true, displayName: true } },
+    rejectionReason: { select: { name: true } },
+    source: { select: { name: true, type: true } },
+    leadDetail: {
+      select: {
+        fullName: true,
+        panNumber: true,
+        panVerified: true,
+        occupation: { select: { name: true } },
+        city: { select: { name: true, state: { select: { code: true } } } },
+        emailId: true,
+        bureauReport: { select: { cibilScore: true } },
       },
+    },
+    leadUtms: { select: { utmSource: true, utmMedium: true, utmCampaign: true }, orderBy: { createdAt: 'desc' as const }, take: 1 },
+    applications: {
+      orderBy: { createdAt: 'desc' as const },
+      take: 1,
+      select: {
+        applicationNumber: true,
+        details: { select: { emailId: true } },
+      },
+    },
+  } satisfies Prisma.LeadInclude;
+
+  private toLeadListItem(lead: Prisma.LeadGetPayload<{ include: LosLeadService['leadListInclude'] }>) {
+    const latestUtm = lead.leadUtms[0];
+    const detail = lead.leadDetail;
+    const cityName = detail?.city?.name ?? null;
+    const stateCode = detail?.city?.state?.code ?? null;
+    const city = cityName != null ? (stateCode ? `${cityName}, ${stateCode}` : cityName) : null;
+    const cibilScore = detail?.bureauReport?.cibilScore ?? null;
+
+    return {
+      id: Number(lead.id),
+      uuid: lead.uuid,
+      leadNumber: lead.leadNumber,
+      customerUuid: lead.customer.uuid,
+      applicationNumber: lead.applications[0]?.applicationNumber ?? null,
+      fullName: formatLosPersonName(detail?.fullName),
+      panNumber: detail?.panNumber?.trim().toUpperCase() || null,
+      mobileNumber: lead.customer.mobileNumber,
+      email: detail?.emailId?.trim() || lead.applications[0]?.details?.emailId || null,
+      occupation: detail?.occupation?.name ?? null,
+      city,
+      cibilScore,
+      panVerified: detail?.panVerified ?? 0,
+      panVerifiedLabel: panVerifiedStatusLabel(detail?.panVerified ?? 0),
+      rejectionReason: toRejectionReasonDto(lead.rejectionReason),
+      leadStatusNote: lead.leadStatusNote?.trim() || null,
+      statusCode: lead.leadStatus.name,
+      statusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
+      sourceName: lead.source?.name ?? null,
+      sourceType: lead.source?.type ?? null,
+      utmSource: latestUtm?.utmSource ?? null,
+      utmMedium: latestUtm?.utmMedium ?? null,
+      utmCampaign: latestUtm?.utmCampaign ?? null,
+      createdAt: lead.createdAt.toISOString(),
+      updatedAt: lead.updatedAt.toISOString(),
+    };
+  }
+
+  /** Baseline restriction shared by the lead queue and the filtered export dump. */
+  private leadQueueWhere(extraWhere?: Prisma.LeadWhereInput): Prisma.LeadWhereInput {
+    return {
+      isActive: true,
+      isInternalTesting: false,
+      // Handed off to Applications — hide from lead queue once converted with an app row.
+      NOT: {
+        leadStatus: { name: LEAD_STATUS.CONVERTED },
+        applications: { some: {} },
+      },
+      ...(extraWhere ?? {}),
+    };
+  }
+
+  /** `extraWhere`, when given, further restricts the result (used by the filtered export dump). */
+  async listLeads(extraWhere?: Prisma.LeadWhereInput) {
+    const leads = await this.prisma.read.lead.findMany({
+      where: this.leadQueueWhere(extraWhere),
       orderBy: { createdAt: 'desc' },
+<<<<<<< HEAD
       include: {
         customer: { select: { uuid: true, mobileNumber: true } },
         leadStatus: { select: { name: true, displayName: true } },
@@ -175,17 +259,36 @@ export class LosLeadService {
           },
         },
       },
+=======
+      include: this.leadListInclude,
+>>>>>>> refs/remotes/moneycash/main
     });
+    return leads.map((lead) => this.toLeadListItem(lead));
+  }
 
-    return leads.map((lead) => {
-      const latestUtm = lead.leadUtms[0];
-      const detail = lead.leadDetail;
-      const cityName = detail?.city?.name ?? null;
-      const stateCode = detail?.city?.state?.code ?? null;
-      const city =
-        cityName != null ? (stateCode ? `${cityName}, ${stateCode}` : cityName) : null;
-      const cibilScore = detail?.bureauReport?.cibilScore ?? null;
+  /**
+   * Dump export for LOS Leads → Download dump. Mirrors the LOS Leads table's own column filters
+   * (same field names as the table's column keys). "Rejection reason", "City" and "Source" are
+   * derived labels in the table (e.g. `"<city>, <state code>"`, `"<name> · <type>"`, or the literal
+   * `Unattributed`) rather than raw DB columns, so they're applied as JS filters on the
+   * already-narrowed, mapped rows instead of a Prisma `where` condition — otherwise a search that
+   * matches the grid's combined label (a state code, or the literal `Unattributed`) would drop rows
+   * the export's `where` can't see. Requires at least one filter, same as the button staying
+   * disabled until a filter matches a lead. Streams straight to `res`, cursor-paged from the DB in
+   * batches.
+   */
+  async exportLeadsWorkbook(query: ExportLeadsQueryDto, res: Response): Promise<void> {
+    const { access_token: _accessToken, ...filterFields } = query;
+    requireAtLeastOneExportFilter(
+      Object.values(filterFields),
+      'Apply at least one filter before downloading the leads dump.',
+    );
+    const where = this.buildExportWhere(query);
+    const reason = query.reason?.trim().toLowerCase();
+    const city = query.city?.trim();
+    const source = query.source?.trim();
 
+<<<<<<< HEAD
       return {
         id: Number(lead.id),
         uuid: lead.uuid,
@@ -213,40 +316,134 @@ export class LosLeadService {
         createdAt: lead.createdAt.toISOString(),
         updatedAt: lead.updatedAt.toISOString(),
       };
+=======
+    await streamXlsxWorkbook(res, {
+      sheetName: 'Leads',
+      headers: LEAD_DUMP_HEADERS,
+      rows: this.streamLeadsForExport(where, reason, city, source),
+>>>>>>> refs/remotes/moneycash/main
     });
   }
 
-  /** Builds a leads dump workbook for LOS Leads → Download dump. */
-  async exportLeadsWorkbook(): Promise<Buffer> {
-    const leads = await this.listLeads();
-    const rows: SimpleXlsxCell[][] = [
-      [...LEAD_DUMP_HEADERS],
-      ...leads.map((lead) => [
-        lead.leadNumber,
-        lead.applicationNumber,
-        lead.fullName,
-        lead.mobileNumber,
-        lead.email,
-        lead.panNumber,
-        lead.panVerifiedLabel,
-        toExcelNumber(lead.cibilScore),
-        lead.occupation,
-        lead.city,
-        lead.statusLabel,
-        lead.rejectionReason?.label ?? null,
-        lead.leadStatusNote,
-        leadSourceLabel(lead),
-        lead.sourceType,
-        lead.utmSource,
-        lead.utmMedium,
-        lead.utmCampaign,
-        toExcelDate(lead.createdAt),
-        toExcelDate(lead.updatedAt),
-        lead.uuid,
-        lead.customerUuid,
-      ]),
-    ];
-    return buildSimpleXlsxWorkbook(rows, 'Leads');
+  private async *streamLeadsForExport(
+    extraWhere: Prisma.LeadWhereInput,
+    reason: string | undefined,
+    city: string | undefined,
+    source: string | undefined,
+  ): AsyncGenerator<SimpleXlsxCell[]> {
+    let cursorId: bigint | undefined;
+    const where = this.leadQueueWhere(extraWhere);
+
+    for (;;) {
+      const batch = await this.prisma.read.lead.findMany({
+        take: EXPORT_BATCH_SIZE,
+        ...(cursorId != null ? { skip: 1, cursor: { id: cursorId } } : {}),
+        where,
+        orderBy: { id: 'desc' },
+        include: this.leadListInclude,
+      });
+      if (batch.length === 0) return;
+
+      for (const record of batch) {
+        const lead = this.toLeadListItem(record);
+        if (reason) {
+          const haystack = [lead.rejectionReason?.code, lead.rejectionReason?.label, lead.leadStatusNote]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          if (!haystack.includes(reason)) continue;
+        }
+        if (city && !matchesExportTextFilter(lead.city, city)) continue;
+        if (source && !matchesExportTextFilter(leadSourceLabel(lead) ?? 'Unattributed', source)) continue;
+        yield [
+          lead.leadNumber,
+          lead.applicationNumber,
+          lead.fullName,
+          lead.mobileNumber,
+          lead.email,
+          lead.panNumber,
+          lead.panVerifiedLabel,
+          toExcelNumber(lead.cibilScore),
+          lead.occupation,
+          lead.city,
+          lead.statusLabel,
+          lead.rejectionReason?.label ?? null,
+          lead.leadStatusNote,
+          leadSourceLabel(lead),
+          lead.sourceType,
+          lead.utmSource,
+          lead.utmMedium,
+          lead.utmCampaign,
+          toExcelDate(lead.createdAt),
+          toExcelDate(lead.updatedAt),
+          lead.uuid,
+          lead.customerUuid,
+        ];
+      }
+
+      cursorId = batch[batch.length - 1]!.id;
+      if (batch.length < EXPORT_BATCH_SIZE) return;
+    }
+  }
+
+  /** Builds the export's Prisma `where` from the LOS Leads table's own filters. Throws when none are set. */
+  private buildExportWhere(query: ExportLeadsQueryDto): Prisma.LeadWhereInput {
+    const and: Prisma.LeadWhereInput[] = [];
+
+    const leadIdText = query['lead-id']?.trim();
+    if (leadIdText) {
+      and.push({ leadNumber: { contains: leadIdText } });
+    }
+
+    const customerText = query.customer?.trim();
+    if (customerText) {
+      and.push({ leadDetail: { fullName: { contains: customerText } } });
+    }
+
+    const panText = query['pan-number']?.trim();
+    if (panText) {
+      and.push({ leadDetail: { panNumber: { contains: panText } } });
+    }
+
+    const mobileText = query.mobile?.trim();
+    if (mobileText) {
+      and.push({ customer: { mobileNumber: { contains: mobileText } } });
+    }
+
+    const occupationText = query.occupation?.trim();
+    if (occupationText) {
+      and.push({ leadDetail: { occupation: { name: { contains: occupationText } } } });
+    }
+
+    const cibilText = query.cibil?.trim();
+    if (cibilText) {
+      const cibilScore = Number(cibilText);
+      if (!Number.isFinite(cibilScore)) {
+        throw new BadRequestException('cibil must be a number.');
+      }
+      and.push({ leadDetail: { bureauReport: { cibilScore } } });
+    }
+
+    const panVerifiedText = query['pan-verified']?.trim();
+    if (panVerifiedText) {
+      const panVerified = Number(panVerifiedText);
+      if (!Number.isFinite(panVerified)) {
+        throw new BadRequestException('pan-verified must be a number.');
+      }
+      and.push({ leadDetail: { panVerified } });
+    }
+
+    const statusText = query.status?.trim();
+    if (statusText) {
+      and.push({ leadStatus: { name: statusText } });
+    }
+
+    const createdRange = parseExportIstDayRange(query.created, 'created');
+    if (createdRange) {
+      and.push({ createdAt: { gte: createdRange.start, lt: createdRange.end } });
+    }
+
+    return and.length > 0 ? { AND: and } : {};
   }
 
   async getLeadDetails(leadUuid: string, db: PrismaClient = this.prisma.read) {

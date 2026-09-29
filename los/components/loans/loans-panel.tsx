@@ -5,27 +5,25 @@ import {
   isoDateTimestamp,
   LOS_LISTING_PAGE_SIZE,
   LOS_LISTING_PAGE_SIZE_OPTIONS,
+  useDataTableFilterState,
   type DataTableColumn,
 } from '@/components/ui/data-table';
+<<<<<<< HEAD
 import { getLoans, markApplicationInternalTesting, refreshLoanPayment, sendLoanNocLetter, type LosLoan } from '@/lib/api';
 import { LOS_STORAGE_KEY } from '@/lib/auth';
+=======
+import { DownloadDumpButton } from '@/components/ui/download-dump-button';
+import { CustomerTypeBadge } from '@/components/shared/customer-type-badge';
+import { getLoans, downloadLoansExport, getMasters, markApplicationInternalTesting, refreshLoanPayment, type LosLoan, sendLoanNocLetter } from '@/lib/api';
+import { getLosToken as getToken } from '@/lib/auth';
+import { CUSTOMER_GRADE_FILTER_OPTIONS } from '@/lib/constants/customer-grades';
+>>>>>>> refs/remotes/moneycash/main
 import { formatPersonName } from '@/lib/format-person-name';
 import { RefreshPaymentButton, useCanRefreshLoanPayment } from '@/components/loans/refresh-payment-button';
 import { loanNeedsNoc, SendNocButton, useCanSendLoanNoc } from '@/components/loans/send-noc-button';
 import { MarkInternalTestingButton, useCanMarkInternalTesting } from '@/components/shared/mark-internal-testing-button';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-
-function getToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.localStorage.getItem(LOS_STORAGE_KEY);
-    if (!raw) return null;
-    return (JSON.parse(raw) as { token?: string }).token ?? null;
-  } catch {
-    return null;
-  }
-}
 
 function formatINR(value: string | null | undefined) {
   if (!value) return '—';
@@ -157,6 +155,8 @@ export function LoansPanel() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [busyUuid, setBusyUuid] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ tone: 'ok' | 'warn' | 'err'; text: string } | null>(null);
+  const [customerTypeOptions, setCustomerTypeOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const { filteredCount, filtersActive, activeColumnFilters, onFilteredItemsChange } = useDataTableFilterState();
   const canMarkTesting = useCanMarkInternalTesting();
   const canRefreshPayment = useCanRefreshLoanPayment();
   const canSendNoc = useCanSendLoanNoc();
@@ -171,7 +171,9 @@ export function LoansPanel() {
       return;
     }
     try {
-      setLoans(await getLoans(token));
+      const [loansRes, masters] = await Promise.all([getLoans(token), getMasters(token)]);
+      setLoans(loansRes);
+      setCustomerTypeOptions(masters.customerTypes);
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Failed to load loans');
     } finally {
@@ -316,12 +318,32 @@ export function LoansPanel() {
       getSortValue: (row) => row.cibilCreditAssessmentCategory ?? '',
       filter: {
         type: 'select',
+<<<<<<< HEAD
         options: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((g) => ({ value: g, label: g })),
+=======
+        options: CUSTOMER_GRADE_FILTER_OPTIONS,
+>>>>>>> refs/remotes/moneycash/main
         matches: (row, value) => row.cibilCreditAssessmentCategory === value,
       },
       render: (loan) => <GradeBadge category={loan.cibilCreditAssessmentCategory} />,
     },
     {
+<<<<<<< HEAD
+=======
+      key: 'customerType',
+      label: 'Customer type',
+      headerClassName: 'whitespace-nowrap',
+      getFilterValue: (row) => row.customerType,
+      getSortValue: (row) => row.customerTypeLabel.toLowerCase(),
+      filter: {
+        type: 'select',
+        options: customerTypeOptions,
+        matches: (row, value) => row.customerType === value,
+      },
+      render: (row) => <CustomerTypeBadge customerType={row.customerType} label={row.customerTypeLabel} />,
+    },
+    {
+>>>>>>> refs/remotes/moneycash/main
       key: 'principal',
       label: 'Principal',
       headerClassName: 'whitespace-nowrap',
@@ -486,7 +508,11 @@ export function LoansPanel() {
         </div>
       ),
     },
+<<<<<<< HEAD
   ], [busyUuid, markAsInternalTesting, refreshPayment, sendNoc]);
+=======
+  ], [customerTypeOptions, busyUuid, markAsInternalTesting, refreshPayment, sendNoc]);
+>>>>>>> refs/remotes/moneycash/main
 
   const columns = canMarkTesting || canRefreshPayment || canSendNoc
     ? allColumns
@@ -544,7 +570,9 @@ export function LoansPanel() {
             ? 'border-b border-[rgba(239,68,68,0.12)] bg-[rgba(239,68,68,0.06)] transition-colors hover:bg-[rgba(239,68,68,0.1)]'
             : undefined
         }
+        onFilteredItemsChange={onFilteredItemsChange}
         toolbarActions={
+<<<<<<< HEAD
           <button
             type="button"
             onClick={() => void loadLoans()}
@@ -552,6 +580,26 @@ export function LoansPanel() {
           >
             ↺ Refresh
           </button>
+=======
+          <div className="flex items-center gap-2">
+            <DownloadDumpButton
+              filtersActive={filtersActive}
+              loading={loading}
+              resultCount={filteredCount}
+              onDownload={(token) => downloadLoansExport(token, activeColumnFilters)}
+              onSessionExpired={() => setFetchError('Session expired — please log in again.')}
+              onError={(message) => setFetchError(message)}
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            />
+            <button
+              type="button"
+              onClick={() => void loadLoans()}
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+            >
+              ↺ Refresh
+            </button>
+          </div>
+>>>>>>> refs/remotes/moneycash/main
         }
       />
     </div>

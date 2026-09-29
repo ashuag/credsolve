@@ -35,6 +35,77 @@ export function isFetchTimeoutError(err: unknown): boolean {
   );
 }
 
+/** Builds a query string from a filters/params object — same keys as the table's active column filters, blank/nullish values dropped. Used by every filtered-list and filtered-export endpoint (Loans, Leads, Applications, Vendor API Logs, the LOS Reports dumps). */
+export function buildExportFilterParams(filters: Partial<Record<string, string | number>>): URLSearchParams {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value == null) continue;
+    const text = String(value).trim();
+    if (text) params.set(key, text);
+  }
+  return params;
+}
+
+/** Reads a filename out of a `Content-Disposition: attachment; filename="…"` (or RFC 5987 `filename*=`) header. */
+export function filenameFromContentDisposition(header: string | null): string | null {
+  if (!header) return null;
+  const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (utf8?.[1]) return decodeURIComponent(utf8[1].trim());
+  const quoted = /filename="([^"]+)"/i.exec(header);
+  if (quoted?.[1]) return quoted[1];
+  const plain = /filename=([^;]+)/i.exec(header);
+  return plain?.[1]?.trim() ?? null;
+}
+
+/**
+ * Authenticated workbook download shared by every LOS Reports dump (Bureau Report, Lead Report,
+ * Transaction Report): fetches `path` with the token as a Bearer header (not a query token) and the
+ * table's active column filters as query params, then saves the response blob under the filename
+ * the server names in `Content-Disposition` (falling back to `fallbackFilename`).
+ */
+export async function downloadAuthenticatedWorkbook(options: {
+  token: string;
+  path: string;
+  filters: Partial<Record<string, string>>;
+  timeoutMessage: string;
+  fallbackErrorMessage: string;
+  fallbackFilename: string;
+}): Promise<void> {
+  const { token, path, filters, timeoutMessage, fallbackErrorMessage, fallbackFilename } = options;
+  const params = buildExportFilterParams(filters);
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(
+      `${resolveLosClientApiUrl(path)}?${params.toString()}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+      WORKBOOK_DOWNLOAD_TIMEOUT_MS,
+    );
+  } catch (err) {
+    if (isFetchTimeoutError(err)) {
+      throw new Error(timeoutMessage);
+    }
+    throw err;
+  }
+
+  if (!response.ok) {
+    const body = await parseJsonResponse(response);
+    if (response.status === 401) {
+      throw new Error('Session expired — please log in again.');
+    }
+    throw new Error(messageFromBody(body) ?? fallbackErrorMessage);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filenameFromContentDisposition(response.headers.get('Content-Disposition')) ?? fallbackFilename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function clientApiUrl() {
   return getLosClientApiBase();
 }

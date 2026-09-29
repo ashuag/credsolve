@@ -5,8 +5,10 @@ import {
   isoDateTimestamp,
   LOS_LISTING_PAGE_SIZE,
   LOS_LISTING_PAGE_SIZE_OPTIONS,
+  useDataTableFilterState,
   type DataTableColumn,
 } from '@/components/ui/data-table';
+import { DownloadDumpButton } from '@/components/ui/download-dump-button';
 import {
   downloadTransactionReportsExport,
   getTransactionReports,
@@ -112,6 +114,7 @@ export function TransactionReportsPanel() {
   const [reports, setReports] = useState<LosTransactionReportListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const { filteredCount, filtersActive, activeColumnFilters, onFilteredItemsChange } = useDataTableFilterState();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -309,8 +312,10 @@ export function TransactionReportsPanel() {
         pageSize={LOS_LISTING_PAGE_SIZE}
         pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         initialSort={{ key: 'disbursedAt', dir: 'desc' }}
+        onFilteredItemsChange={onFilteredItemsChange}
         toolbarActions={
           <div className="flex items-center gap-2">
+<<<<<<< HEAD
             <button
               type="button"
               onClick={() => {
@@ -327,6 +332,18 @@ export function TransactionReportsPanel() {
             >
               ⬇ Download
             </button>
+=======
+            <DownloadDumpButton
+              filtersActive={filtersActive}
+              loading={loading}
+              resultCount={filteredCount}
+              onDownload={(token) => downloadTransactionReportsExport(token, activeColumnFilters)}
+              onSessionExpired={() => setFetchError('Session expired — please log in again.')}
+              onError={(message) => setFetchError(message)}
+              label="⬇ Download"
+              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            />
+>>>>>>> refs/remotes/moneycash/main
             <button
               type="button"
               onClick={() => void load()}

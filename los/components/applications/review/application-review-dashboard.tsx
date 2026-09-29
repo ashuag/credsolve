@@ -27,6 +27,7 @@ import {
   approveApplication,
   approveAadhaarNameMatch,
   approveBankNameMatch,
+  checkDisbursementStatus,
   disburseApplication,
   getApplicationCibilReport,
   type LosApplicationDetails,
@@ -85,6 +86,8 @@ export function ApplicationReviewDashboard({
   const [approveNameMatchBusy, setApproveNameMatchBusy] = useState(false);
   const [approveAadhaarNameBusy, setApproveAadhaarNameBusy] = useState(false);
   const [disburseBusy, setDisburseBusy] = useState(false);
+  const [checkDisbursalBusy, setCheckDisbursalBusy] = useState(false);
+  const [actionNote, setActionNote] = useState<string | null>(null);
   const [canDecide] = useState(() => {
     const user = getLosStoredUser();
     return canDecideLosApplication(user?.roleName ?? user?.role, user?.hierarchyLevel);
@@ -110,12 +113,23 @@ export function ApplicationReviewDashboard({
     journeyComplete &&
     statusCode !== 'APPROVED' &&
     statusCode !== 'DISBURSED' &&
+<<<<<<< HEAD
+=======
+    statusCode !== 'DISBURSAL_INPROCESS' &&
+    statusCode !== 'DISBURSAL_FAILED' &&
+>>>>>>> refs/remotes/moneycash/main
     !row.aadhaarNameMatchPendingReview &&
     !nameReviewPending;
   const canApproveNameMatch =
     canDecide && (Boolean(row.nameMatchPendingReview) || statusCode === 'UNDER_REVIEW');
   const canApproveAadhaarName = canDecide && Boolean(row.aadhaarNameMatchPendingReview);
+<<<<<<< HEAD
   const canDisburse = canDecide && statusCode === 'APPROVED' && !row.loanAccount;
+=======
+  const canDisburse =
+    canDecide && !row.loanAccount && (statusCode === 'APPROVED' || statusCode === 'DISBURSAL_FAILED');
+  const canCheckDisbursal = canDecide && statusCode === 'DISBURSAL_INPROCESS' && !row.loanAccount;
+>>>>>>> refs/remotes/moneycash/main
   const canReject = canDecide && canRejectApplicationStatus(row.statusCode);
 
   const loadBureauPan = useCallback(async () => {
@@ -212,20 +226,50 @@ export function ApplicationReviewDashboard({
   const handleDisburse = useCallback(async () => {
     if (!authToken || disburseBusy) return;
     const confirmed = window.confirm(
-      `Disburse loan for ${row.applicationNumber}?\n\nThis sends one IMPS payout, creates the loan account (loan number = application number), sets status to DISBURSED, and emails the final sanction letter.`,
+      statusCode === 'DISBURSAL_FAILED'
+        ? `Retry disbursement for ${row.applicationNumber}?\n\nThis sends a new IMPS payout. The loan is marked disbursed only when Easebuzz reports Success.`
+        : `Disburse loan for ${row.applicationNumber}?\n\nThis sends one IMPS payout. The loan is created and marked DISBURSED only when Easebuzz reports Success. Until then the application stays Disbursal in process.`,
     );
     if (!confirmed) return;
     setDisburseBusy(true);
     setActionError(null);
+    setActionNote(null);
     try {
-      await disburseApplication(authToken, applicationUuid);
+      const result = await disburseApplication(authToken, applicationUuid);
       onRefresh();
+      if (result.statusCode === 'DISBURSAL_FAILED') {
+        setActionError(result.message ?? 'Disbursal failed at the bank.');
+      } else if (result.statusCode === 'DISBURSAL_INPROCESS') {
+        setActionNote(result.message ?? 'Payout is with the bank. The loan is disbursed only after Success.');
+      }
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Failed to disburse loan.');
     } finally {
       setDisburseBusy(false);
     }
-  }, [applicationUuid, authToken, disburseBusy, onRefresh, row.applicationNumber]);
+  }, [applicationUuid, authToken, disburseBusy, onRefresh, row.applicationNumber, statusCode]);
+
+  const handleCheckDisbursal = useCallback(async () => {
+    if (!authToken || checkDisbursalBusy) return;
+    setCheckDisbursalBusy(true);
+    setActionError(null);
+    setActionNote(null);
+    try {
+      const result = await checkDisbursementStatus(authToken, applicationUuid);
+      onRefresh();
+      if (result.statusCode === 'DISBURSAL_FAILED') {
+        setActionError(result.message ?? 'Disbursal failed at the bank.');
+      } else if (result.statusCode === 'DISBURSED') {
+        setActionNote('Easebuzz reported Success. The loan is disbursed.');
+      } else if (result.message) {
+        setActionNote(result.message);
+      }
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Failed to check disbursal status.');
+    } finally {
+      setCheckDisbursalBusy(false);
+    }
+  }, [applicationUuid, authToken, checkDisbursalBusy, onRefresh]);
 
   const tabs: Array<{ id: ReviewTab; label: string; badge?: React.ReactNode }> = [
     { id: 'personal', label: 'Personal details' },
@@ -278,6 +322,11 @@ export function ApplicationReviewDashboard({
           {actionError}
         </div>
       ) : null}
+      {actionNote ? (
+        <div className="mb-4 rounded-[10px] border border-[rgba(245,158,11,0.45)] bg-[#fffbeb] px-4 py-3 text-[0.85rem] font-semibold text-[#92400e]" role="status">
+          {actionNote}
+        </div>
+      ) : null}
 
       <RejectRecordModal
         open={rejectOpen}
@@ -327,6 +376,9 @@ export function ApplicationReviewDashboard({
             approveBusy={approveBusy}
             onDisburse={canDisburse ? () => void handleDisburse() : undefined}
             disburseBusy={disburseBusy}
+            disburseLabel={statusCode === 'DISBURSAL_FAILED' ? 'Disburse again' : 'Disburse'}
+            onCheckDisbursal={canCheckDisbursal ? () => void handleCheckDisbursal() : undefined}
+            checkDisbursalBusy={checkDisbursalBusy}
           />
         </div>
       </div>

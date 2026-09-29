@@ -295,9 +295,15 @@ function lifecycleTone(state: 'done' | 'active' | 'pending' | 'danger') {
       };
     case 'active':
       return {
+<<<<<<< HEAD
         dot: '#22C55E',
         ring: 'rgba(34,197,94,0.22)',
         line: 'rgba(34,197,94,0.4)',
+=======
+        dot: '#1496f3',
+        ring: 'rgba(20,150,243,0.22)',
+        line: 'rgba(20,150,243,0.4)',
+>>>>>>> refs/remotes/moneycash/main
         text: 'text-brand-navy',
         badge: 'border-sky-200 bg-sky-50 text-brand-navy',
       };
@@ -431,7 +437,11 @@ function HeroStat({
 }) {
   return (
     <div
+<<<<<<< HEAD
       className="min-w-[7.25rem] rounded-[12px] border bg-white px-3.5 py-2.5 shadow-[0_1px_10px_rgba(15,39,72,0.06)]"
+=======
+      className="min-w-[7.25rem] rounded-[12px] border bg-white px-3.5 py-2.5 shadow-[0_1px_10px_rgba(23,44,113,0.06)]"
+>>>>>>> refs/remotes/moneycash/main
       style={{ borderColor: `${accent}33`, background: `linear-gradient(180deg, #fff, ${accent}0d)` }}
     >
       <p className="m-0 text-[0.58rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">{label}</p>
@@ -445,7 +455,11 @@ function HeroStat({
 
 function ContactChip({ href, children }: { href?: string; children: ReactNode }) {
   const className =
+<<<<<<< HEAD
     'inline-flex items-center rounded-full border border-[rgba(15,39,72,0.1)] bg-white px-2.5 py-1 text-[0.74rem] font-semibold text-brand-text no-underline transition-colors hover:border-brand-blue/30 hover:text-brand-blue';
+=======
+    'inline-flex items-center rounded-full border border-[rgba(23,44,113,0.1)] bg-white px-2.5 py-1 text-[0.74rem] font-semibold text-brand-text no-underline transition-colors hover:border-brand-blue/30 hover:text-brand-blue';
+>>>>>>> refs/remotes/moneycash/main
   if (href) {
     return (
       <a href={href} className={className}>
@@ -481,7 +495,11 @@ function RepaymentProgress({
           {formatINR(totalPaid)} paid · {formatINR(outstanding)} due
         </p>
       </div>
+<<<<<<< HEAD
       <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[rgba(15,39,72,0.08)]">
+=======
+      <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[rgba(23,44,113,0.08)]">
+>>>>>>> refs/remotes/moneycash/main
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{
@@ -695,7 +713,11 @@ function WaiverCard({
               step="0.01"
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
+<<<<<<< HEAD
               className="h-10 rounded-[10px] border border-[rgba(15,39,72,0.14)] bg-white px-3 text-[0.9rem] font-bold text-brand-navy"
+=======
+              className="h-10 rounded-[10px] border border-[rgba(23,44,113,0.14)] bg-white px-3 text-[0.9rem] font-bold text-brand-navy"
+>>>>>>> refs/remotes/moneycash/main
             />
           </label>
           <button
@@ -868,10 +890,22 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
   if (loading) {
     return (
       <div className="flex animate-pulse flex-col gap-4">
+<<<<<<< HEAD
         <div className="h-[280px] rounded-[14px] bg-[rgba(15,39,72,0.06)]" />
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
           {[0, 1, 2, 3, 4].map((i) => (
             <div key={i} className="h-[96px] rounded-[16px] bg-[rgba(15,39,72,0.06)]" />
+=======
+        <div className="h-[280px] rounded-[14px] bg-[rgba(23,44,113,0.06)]" />
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-[96px] rounded-[16px] bg-[rgba(23,44,113,0.06)]" />
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-[96px] rounded-[16px] bg-[rgba(23,44,113,0.06)]" />
+>>>>>>> refs/remotes/moneycash/main
           ))}
         </div>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -931,7 +965,11 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
         </p>
       ) : null}
       {/* Hero */}
+<<<<<<< HEAD
       <header className="overflow-hidden rounded-[14px] border border-[rgba(15,39,72,0.1)] bg-gradient-to-b from-white to-[#f4f8ff] shadow-[0_8px_28px_rgba(15,39,72,0.05)]">
+=======
+      <header className="overflow-hidden rounded-[14px] border border-[rgba(23,44,113,0.1)] bg-gradient-to-b from-white to-[#f4f8ff] shadow-[0_8px_28px_rgba(23,44,113,0.05)]">
+>>>>>>> refs/remotes/moneycash/main
         <div
           className="h-[2px] w-full"
           style={{ background: `linear-gradient(90deg, ${statusStyles.text}, ${statusStyles.text}55)` }}
@@ -942,7 +980,11 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
             <div className="flex min-w-0 items-start gap-3">
               <div
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] text-[0.82rem] font-extrabold text-white"
+<<<<<<< HEAD
                 style={{ background: `linear-gradient(135deg, ${statusStyles.text}, #0F2748)` }}
+=======
+                style={{ background: `linear-gradient(135deg, ${statusStyles.text}, #1c347d)` }}
+>>>>>>> refs/remotes/moneycash/main
                 aria-hidden
               >
                 {getInitials(name)}
@@ -968,7 +1010,11 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
                   <button
                     type="button"
                     onClick={() => copyText(row.loanNumber)}
+<<<<<<< HEAD
                     className="rounded-full border border-[rgba(15,39,72,0.1)] bg-white px-2 py-1 text-[0.62rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted transition-colors hover:border-brand-blue/30 hover:text-brand-blue"
+=======
+                    className="rounded-full border border-[rgba(23,44,113,0.1)] bg-white px-2 py-1 text-[0.62rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted transition-colors hover:border-brand-blue/30 hover:text-brand-blue"
+>>>>>>> refs/remotes/moneycash/main
                     title="Copy loan number"
                   >
                     Copy
@@ -991,12 +1037,20 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
                 label="Outstanding"
                 value={formatINR(row.outstandingAmount)}
                 hint={closed ? 'Nothing due' : 'Balance remaining'}
+<<<<<<< HEAD
                 accent={closed || Number(row.outstandingAmount) <= 0 ? '#047857' : row.daysToMaturity < 0 ? '#b91c1c' : '#0F2748'}
+=======
+                accent={closed || Number(row.outstandingAmount) <= 0 ? '#047857' : row.daysToMaturity < 0 ? '#b91c1c' : '#1c347d'}
+>>>>>>> refs/remotes/moneycash/main
               />
             </div>
           </div>
 
+<<<<<<< HEAD
           <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-[rgba(15,39,72,0.07)] pt-3">
+=======
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-[rgba(23,44,113,0.07)] pt-3">
+>>>>>>> refs/remotes/moneycash/main
             <ActionBtn href="/loans" size="sm">
               ← All loans
             </ActionBtn>
@@ -1023,7 +1077,11 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
           </div>
         </div>
 
+<<<<<<< HEAD
         <div className="border-t border-[rgba(15,39,72,0.07)] bg-[rgba(248,250,255,0.7)] px-4 py-4 sm:px-5">
+=======
+        <div className="border-t border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.7)] px-4 py-4 sm:px-5">
+>>>>>>> refs/remotes/moneycash/main
           <p className="m-0 mb-3 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
             Loan lifecycle
           </p>
@@ -1036,7 +1094,11 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
               statusCode={row.loanStatusCode}
             />
           </div>
+<<<<<<< HEAD
           <div className="mt-4 border-t border-[rgba(15,39,72,0.06)] pt-3">
+=======
+          <div className="mt-4 border-t border-[rgba(23,44,113,0.06)] pt-3">
+>>>>>>> refs/remotes/moneycash/main
             <p className="m-0 mb-2 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
               Collection progress
             </p>
@@ -1055,7 +1117,11 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
           label="Principal" 
           value={formatINR(row.principalAmount)} 
           hint="Sanctioned amount" 
+<<<<<<< HEAD
           accent="#0F2748" 
+=======
+          accent="#1c347d" 
+>>>>>>> refs/remotes/moneycash/main
         />
         <MoneyTile label="Net disbursed" value={formatINR(row.netDisbursedAmount)} hint="Credited to borrower" accent="#047857" />
         
@@ -1080,7 +1146,11 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
           label="Repay date"
           value={formatDate(row.loanMaturityDate)}
           hint="Loan maturity"
+<<<<<<< HEAD
           accent="#0F2748"
+=======
+          accent="#1c347d"
+>>>>>>> refs/remotes/moneycash/main
         />
 
       </div>
@@ -1109,7 +1179,11 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
           label="Total repay amount"
           value={formatINR(String(totalRepayAmountInr.toFixed(2)))}
           hint="Principal + interest + overdue + penal"
+<<<<<<< HEAD
           accent="#0F2748"
+=======
+          accent="#1c347d"
+>>>>>>> refs/remotes/moneycash/main
         />
         <MoneyTile
           label="Amount paid"
@@ -1419,7 +1493,11 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
               type="button"
               disabled={openingNoc}
               onClick={() => void openNocPdf()}
+<<<<<<< HEAD
               className="cursor-pointer rounded-full border border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.08)] px-3.5 py-1.5 text-[0.72rem] font-extrabold text-brand-blue hover:bg-[rgba(34,197,94,0.14)] disabled:cursor-not-allowed disabled:opacity-60"
+=======
+              className="cursor-pointer rounded-full border border-[rgba(20,150,243,0.28)] bg-[rgba(20,150,243,0.08)] px-3.5 py-1.5 text-[0.72rem] font-extrabold text-brand-blue hover:bg-[rgba(20,150,243,0.14)] disabled:cursor-not-allowed disabled:opacity-60"
+>>>>>>> refs/remotes/moneycash/main
             >
               {openingNoc ? 'Opening…' : 'View NOC PDF'}
             </button>
@@ -1441,7 +1519,11 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
               <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-[#047857]">Status</p>
               <p className="m-0 mt-1 text-[1rem] font-extrabold text-[#047857]">Sent</p>
             </div>
+<<<<<<< HEAD
             <div className="rounded-[14px] border border-[rgba(15,39,72,0.08)] bg-[#fbfcff] px-4 py-3">
+=======
+            <div className="rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[#fbfcff] px-4 py-3">
+>>>>>>> refs/remotes/moneycash/main
               <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
                 Sent at
               </p>
@@ -1449,7 +1531,11 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
                 {row.nocSentAt ? formatDateTime(row.nocSentAt) : '—'}
               </p>
             </div>
+<<<<<<< HEAD
             <div className="rounded-[14px] border border-[rgba(15,39,72,0.08)] bg-[#fbfcff] px-4 py-3">
+=======
+            <div className="rounded-[14px] border border-[rgba(23,44,113,0.08)] bg-[#fbfcff] px-4 py-3">
+>>>>>>> refs/remotes/moneycash/main
               <p className="m-0 text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-brand-muted">
                 Letter number
               </p>
@@ -1459,7 +1545,11 @@ export function LoanDetailsPanel({ loanUuid }: { loanUuid: string }) {
             </div>
           </div>
         ) : (
+<<<<<<< HEAD
           <div className="rounded-[14px] border border-dashed border-[rgba(15,39,72,0.16)] bg-[#f8fafc] px-4 py-5 text-center">
+=======
+          <div className="rounded-[14px] border border-dashed border-[rgba(23,44,113,0.16)] bg-[#f8fafc] px-4 py-5 text-center">
+>>>>>>> refs/remotes/moneycash/main
             <p className="m-0 text-[0.9rem] font-bold text-brand-navy">
               {showSendNoc ? 'NOC not sent yet' : 'Not available yet'}
             </p>

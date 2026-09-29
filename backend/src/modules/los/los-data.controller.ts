@@ -1,5 +1,11 @@
+<<<<<<< HEAD
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+=======
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
+>>>>>>> refs/remotes/moneycash/main
 import type { Request, Response } from 'express';
 import { LosAuthGuard } from './auth/los-auth.guard';
 import { LosDenyAgentGuard } from './auth/los-deny-agent.guard';
@@ -21,8 +27,428 @@ import { LosBureauReportService } from './services/los-bureau-report.service';
 import { LosLeadReportService } from './services/los-lead-report.service';
 import { LosTransactionReportService } from './services/los-transaction-report.service';
 import { LosCheckCibilService } from './services/los-check-cibil.service';
+<<<<<<< HEAD
 
 type LosRequest = Request & { losUser: LosSessionPayload };
+=======
+import {
+  buildFilteredExportFilename,
+  cleanExportFilterValue,
+  joinExportFilterSummary,
+} from '../../common/xlsx/export-filename.util';
+
+type LosRequest = Request & { losUser: LosSessionPayload };
+
+/**
+ * Mirrors the LOS Loans table's column filters (same keys as the table's column `key`s) so the
+ * export can push the exact same filter the user applied down into the Prisma query — no per-row
+ * data (e.g. a UUID list) travels from the browser, which matters at production loan volumes.
+ */
+export class ExportLoansQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  loan?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  borrower?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  grade?: string;
+
+  /** Comma-separated `NEW`/`RECURRING`. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  customerType?: string;
+
+  /** YYYY-MM-DD */
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  repayBy?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  status?: string;
+
+  /** YYYY-MM-DD */
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  disbursed?: string;
+
+  /** Only used by the export endpoint (download link can't set an Authorization header); ignored otherwise. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  access_token?: string;
+}
+
+/** Builds the "(grade A, status Overdue)" part of the export filename from the applied filters. */
+function describeLoansExportFilters(query: ExportLoansQueryDto): string | null {
+  return joinExportFilterSummary([
+    query.loan ? `loan ${cleanExportFilterValue(query.loan)}` : null,
+    query.borrower ? `borrower ${cleanExportFilterValue(query.borrower)}` : null,
+    query.grade ? `grade ${cleanExportFilterValue(query.grade, 1)?.toUpperCase()}` : null,
+    query.customerType ? `customer type ${cleanExportFilterValue(query.customerType, 40)}` : null,
+    query.repayBy ? `repay by ${cleanExportFilterValue(query.repayBy, 10)}` : null,
+    query.status ? `status ${cleanExportFilterValue(query.status)}` : null,
+    query.disbursed ? `disbursed ${cleanExportFilterValue(query.disbursed, 10)}` : null,
+  ]);
+}
+
+/**
+ * Mirrors the LOS Applications table's own column filters (same keys as the table's column `key`s),
+ * including the hyphenated `app-id` key, so the export can push the same filter the user applied
+ * down into the Prisma query.
+ */
+export class ExportApplicationsQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  'app-id'?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  mobile?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  cibil?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  grade?: string;
+
+  /** Comma-separated `NEW`/`RECURRING`. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  customerType?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  loan?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  stage?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  reason?: string;
+
+  /** YYYY-MM-DD */
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  created?: string;
+
+  /** YYYY-MM-DD */
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  modified?: string;
+
+  /** Only used by the export endpoint (download link can't set an Authorization header); ignored otherwise. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  access_token?: string;
+}
+
+/** Builds the export filename's filter summary from the LOS Applications table's applied filters. */
+function describeApplicationsExportFilters(query: ExportApplicationsQueryDto): string | null {
+  return joinExportFilterSummary([
+    query['app-id'] ? `app ${cleanExportFilterValue(query['app-id'])}` : null,
+    query.name ? `name ${cleanExportFilterValue(query.name)}` : null,
+    query.mobile ? `mobile ${cleanExportFilterValue(query.mobile)}` : null,
+    query.email ? `email ${cleanExportFilterValue(query.email)}` : null,
+    query.cibil ? `cibil ${cleanExportFilterValue(query.cibil, 6)}` : null,
+    query.grade ? `grade ${cleanExportFilterValue(query.grade, 1)?.toUpperCase()}` : null,
+    query.customerType ? `customer type ${cleanExportFilterValue(query.customerType, 40)}` : null,
+    query.loan ? `loan ${cleanExportFilterValue(query.loan, 12)}` : null,
+    query.stage ? `stage ${cleanExportFilterValue(query.stage)}` : null,
+    query.status ? `status ${cleanExportFilterValue(query.status)}` : null,
+    query.reason ? `reason ${cleanExportFilterValue(query.reason)}` : null,
+    query.created ? `created ${cleanExportFilterValue(query.created, 10)}` : null,
+    query.modified ? `modified ${cleanExportFilterValue(query.modified, 10)}` : null,
+  ]);
+}
+
+/**
+ * Mirrors the LOS Leads table's own column filters (same keys as the table's column `key`s,
+ * including hyphenated keys like `lead-id`).
+ */
+export class ExportLeadsQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  'lead-id'?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  customer?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  'pan-number'?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  mobile?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  occupation?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  cibil?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4)
+  'pan-verified'?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  reason?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  source?: string;
+
+  /** YYYY-MM-DD */
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  created?: string;
+
+  /** Only used by the export endpoint (download link can't set an Authorization header); ignored otherwise. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  access_token?: string;
+}
+
+/** Builds the export filename's filter summary from the LOS Leads table's applied filters. */
+function describeLeadsExportFilters(query: ExportLeadsQueryDto): string | null {
+  return joinExportFilterSummary([
+    query['lead-id'] ? `lead ${cleanExportFilterValue(query['lead-id'])}` : null,
+    query.customer ? `customer ${cleanExportFilterValue(query.customer)}` : null,
+    query['pan-number'] ? `pan ${cleanExportFilterValue(query['pan-number'])}` : null,
+    query.mobile ? `mobile ${cleanExportFilterValue(query.mobile)}` : null,
+    query.occupation ? `occupation ${cleanExportFilterValue(query.occupation)}` : null,
+    query.city ? `city ${cleanExportFilterValue(query.city)}` : null,
+    query.cibil ? `cibil ${cleanExportFilterValue(query.cibil, 6)}` : null,
+    query['pan-verified'] ? `pan status ${cleanExportFilterValue(query['pan-verified'], 4)}` : null,
+    query.status ? `status ${cleanExportFilterValue(query.status)}` : null,
+    query.reason ? `reason ${cleanExportFilterValue(query.reason)}` : null,
+    query.source ? `source ${cleanExportFilterValue(query.source)}` : null,
+    query.created ? `created ${cleanExportFilterValue(query.created, 10)}` : null,
+  ]);
+}
+
+/**
+ * Mirrors the LOS Bureau Report table's own column filters. `cibil` and `fetched` carry the raw
+ * serialized value from the table's `number-range` / `datetime-range` filter controls (a
+ * `min|max` pair and an ISO `from|to` pair respectively); `grade` is a comma-separated multi-select.
+ * This endpoint is called via an authenticated `fetch` (Bearer header), not a plain download link,
+ * so — unlike the other export DTOs — it takes no `access_token` field.
+ */
+export class ExportBureauReportsQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  lead?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  customer?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  mobile?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  pan?: string;
+
+  /** `min|max`, either side optional. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  cibil?: string;
+
+  /** Comma-separated grades, e.g. `A,B,C`. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  grade?: string;
+
+  /** `live` or `dummy`. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  source?: string;
+
+  /** Comma-separated `NEW`/`RECURRING`. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  customerType?: string;
+
+  /** `YYYY-MM-DDTHH:mm|YYYY-MM-DDTHH:mm` (IST wall-clock). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  fetched?: string;
+}
+
+/** Builds the export filename's filter summary from the LOS Bureau Report table's applied filters. */
+function describeBureauReportsExportFilters(query: ExportBureauReportsQueryDto): string | null {
+  return joinExportFilterSummary([
+    query.lead ? `lead ${cleanExportFilterValue(query.lead)}` : null,
+    query.customer ? `customer ${cleanExportFilterValue(query.customer)}` : null,
+    query.mobile ? `mobile ${cleanExportFilterValue(query.mobile)}` : null,
+    query.pan ? `pan ${cleanExportFilterValue(query.pan)}` : null,
+    query.cibil ? `cibil ${cleanExportFilterValue(query.cibil, 20)}` : null,
+    query.grade ? `grade ${cleanExportFilterValue(query.grade, 20)?.toUpperCase()}` : null,
+    query.source ? `source ${cleanExportFilterValue(query.source, 10)}` : null,
+    query.customerType ? `customer type ${cleanExportFilterValue(query.customerType, 40)}` : null,
+    query.fetched ? `fetched ${cleanExportFilterValue(query.fetched, 40)}` : null,
+  ]);
+}
+
+/**
+ * Mirrors the LOS Lead Report table's own column filters. `city`/`state`/`purpose`/`grade`/
+ * `leadStatus`/`applicationStatus`/`loanStatus`/`repaymentStatus` are comma-separated multi-select
+ * values (`__none__` selects rows with no value); `offerAmount`/`selectedAmount`/`cibil` are
+ * `min|max` range values; `created` is an ISO `from|to` datetime range; `dob` is `YYYY-MM-DD`.
+ * This endpoint is called via an authenticated `fetch` (Bearer header), so it takes no
+ * `access_token` field.
+ */
+export class ExportLeadReportsQueryDto {
+  @IsOptional() @IsString() @MaxLength(60) lead?: string;
+  @IsOptional() @IsString() @MaxLength(120) customer?: string;
+  @IsOptional() @IsString() @MaxLength(20) mobile?: string;
+  @IsOptional() @IsString() @MaxLength(20) pan?: string;
+  @IsOptional() @IsString() @MaxLength(10) dob?: string;
+  @IsOptional() @IsString() @MaxLength(300) city?: string;
+  @IsOptional() @IsString() @MaxLength(300) state?: string;
+  @IsOptional() @IsString() @MaxLength(300) purpose?: string;
+  @IsOptional() @IsString() @MaxLength(20) offerAmount?: string;
+  @IsOptional() @IsString() @MaxLength(20) selectedAmount?: string;
+  @IsOptional() @IsString() @MaxLength(20) cibil?: string;
+  @IsOptional() @IsString() @MaxLength(40) grade?: string;
+  @IsOptional() @IsString() @MaxLength(40) customerType?: string;
+  @IsOptional() @IsString() @MaxLength(200) leadStatus?: string;
+  @IsOptional() @IsString() @MaxLength(120) reason?: string;
+  @IsOptional() @IsString() @MaxLength(100) utmSource?: string;
+  @IsOptional() @IsString() @MaxLength(100) utmMedium?: string;
+  @IsOptional() @IsString() @MaxLength(100) utmCampaign?: string;
+  @IsOptional() @IsString() @MaxLength(100) utmTerm?: string;
+  @IsOptional() @IsString() @MaxLength(100) utmContent?: string;
+  @IsOptional() @IsString() @MaxLength(200) applicationStatus?: string;
+  @IsOptional() @IsString() @MaxLength(200) loanStatus?: string;
+  @IsOptional() @IsString() @MaxLength(200) repaymentStatus?: string;
+  @IsOptional() @IsString() @MaxLength(40) created?: string;
+}
+
+/** Builds the export filename's filter summary from the LOS Lead Report table's applied filters. */
+function describeLeadReportsExportFilters(query: ExportLeadReportsQueryDto): string | null {
+  return joinExportFilterSummary(
+    Object.entries(query).map(([key, value]) =>
+      value ? `${key} ${cleanExportFilterValue(value, 60)}` : null,
+    ),
+  );
+}
+
+/**
+ * Mirrors the LOS Transaction Report table's own column filters. `disbursedAt`/`repaymentAt` are
+ * ISO `from|to` datetime range values; `dob`/`dueDate` are `YYYY-MM-DD`; the rest are plain
+ * text/number filters. This endpoint is called via an authenticated `fetch` (Bearer header), so it
+ * takes no `access_token` field.
+ */
+export class ExportTransactionReportsQueryDto {
+  @IsOptional() @IsString() @MaxLength(60) transaction?: string;
+  @IsOptional() @IsString() @MaxLength(20) application?: string;
+  @IsOptional() @IsString() @MaxLength(120) customer?: string;
+  @IsOptional() @IsString() @MaxLength(20) mobile?: string;
+  @IsOptional() @IsString() @MaxLength(120) email?: string;
+  @IsOptional() @IsString() @MaxLength(10) dob?: string;
+  @IsOptional() @IsString() @MaxLength(20) pan?: string;
+  @IsOptional() @IsString() @MaxLength(40) disbursedAt?: string;
+  @IsOptional() @IsString() @MaxLength(20) disbursedAmount?: string;
+  @IsOptional() @IsString() @MaxLength(20) interestReceived?: string;
+  @IsOptional() @IsString() @MaxLength(20) interestRate?: string;
+  @IsOptional() @IsString() @MaxLength(20) processingFeePercent?: string;
+  @IsOptional() @IsString() @MaxLength(20) processingFeeAmount?: string;
+  @IsOptional() @IsString() @MaxLength(20) gstOnPfPercent?: string;
+  @IsOptional() @IsString() @MaxLength(20) gstAmount?: string;
+  @IsOptional() @IsString() @MaxLength(10) dueDate?: string;
+  @IsOptional() @IsString() @MaxLength(40) repaymentAt?: string;
+  @IsOptional() @IsString() @MaxLength(10) daysExceeded?: string;
+  @IsOptional() @IsString() @MaxLength(20) penalCharges?: string;
+}
+
+/** Builds the export filename's filter summary from the LOS Transaction Report table's applied filters. */
+function describeTransactionReportsExportFilters(query: ExportTransactionReportsQueryDto): string | null {
+  return joinExportFilterSummary(
+    Object.entries(query).map(([key, value]) =>
+      value ? `${key} ${cleanExportFilterValue(value, 60)}` : null,
+    ),
+  );
+}
+>>>>>>> refs/remotes/moneycash/main
 
 @ApiTags('LOS Data')
 @Controller('los')
@@ -60,16 +486,26 @@ export class LosDataController {
 
   @Get('bureau-reports/export')
   @UseGuards(LosDenyAgentGuard)
-  @ApiOperation({ summary: 'Download stored CIBIL bureau reports as a Credit Assessment data workbook (.xlsx)' })
-  async bureauReportsExport(@Res() res: Response): Promise<void> {
-    const buffer = await this.losBureauReport.exportBureauReportsWorkbook();
+  @ApiOperation({
+    summary: 'Download filtered stored CIBIL bureau reports as a Credit Assessment data workbook (.xlsx)',
+    description:
+      'Requires at least one filter (lead, customer, mobile, PAN, CIBIL range, grade, source, or a fetched date/time range) to avoid an unbounded dump — the button stays disabled until a filter matches at least one report.',
+  })
+  async bureauReportsExport(
+    @Query() query: ExportBureauReportsQueryDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    const filename = buildFilteredExportFilename(
+      'Credit Assessment data',
+      describeBureauReportsExportFilters(query),
+    );
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-    res.setHeader('Content-Disposition', 'attachment; filename="Credit Assessment data.xlsx"');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    res.send(buffer);
+    await this.losBureauReport.exportBureauReportsWorkbook(query, res);
   }
 
   @Get('lead-reports')
@@ -81,16 +517,26 @@ export class LosDataController {
 
   @Get('lead-reports/export')
   @UseGuards(LosDenyAgentGuard)
-  @ApiOperation({ summary: 'Download the lead report as an Excel workbook (.xlsx)' })
-  async leadReportsExport(@Res() res: Response): Promise<void> {
-    const buffer = await this.losLeadReport.exportLeadReportsWorkbook();
+  @ApiOperation({
+    summary: 'Download the filtered lead report as an Excel workbook (.xlsx)',
+    description:
+      'Requires at least one filter to avoid an unbounded dump — the button stays disabled until a filter matches at least one row.',
+  })
+  async leadReportsExport(
+    @Query() query: ExportLeadReportsQueryDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    const filename = buildFilteredExportFilename(
+      'Lead report',
+      describeLeadReportsExportFilters(query),
+    );
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-    res.setHeader('Content-Disposition', 'attachment; filename="Lead report.xlsx"');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    res.send(buffer);
+    await this.losLeadReport.exportLeadReportsWorkbook(query, res);
   }
 
   @Get('lead-reports/:leadUuid')
@@ -111,16 +557,26 @@ export class LosDataController {
 
   @Get('transaction-reports/export')
   @UseGuards(LosDenyAgentGuard)
-  @ApiOperation({ summary: 'Download the transaction report as an Excel workbook (.xlsx)' })
-  async transactionReportsExport(@Res() res: Response): Promise<void> {
-    const buffer = await this.losTransactionReport.exportTransactionReportsWorkbook();
+  @ApiOperation({
+    summary: 'Download the filtered transaction report as an Excel workbook (.xlsx)',
+    description:
+      'Requires at least one filter to avoid an unbounded dump — the button stays disabled until a filter matches at least one row.',
+  })
+  async transactionReportsExport(
+    @Query() query: ExportTransactionReportsQueryDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    const filename = buildFilteredExportFilename(
+      'Transaction report',
+      describeTransactionReportsExportFilters(query),
+    );
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-    res.setHeader('Content-Disposition', 'attachment; filename="Transaction report.xlsx"');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    res.send(buffer);
+    await this.losTransactionReport.exportTransactionReportsWorkbook(query, res);
   }
 
   @Get('leads/new')
@@ -132,16 +588,20 @@ export class LosDataController {
   }
 
   @Get('leads/export')
-  @ApiOperation({ summary: 'Download LOS leads as an Excel dump workbook (.xlsx)' })
-  async leadsExport(@Res() res: Response): Promise<void> {
-    const buffer = await this.losLead.exportLeadsWorkbook();
+  @ApiOperation({
+    summary: 'Download filtered LOS leads as an Excel dump workbook (.xlsx)',
+    description:
+      'Requires at least one filter (lead id, customer, PAN, mobile, occupation, city, CIBIL, PAN status, status, rejection reason, source, or a created date) to avoid an unbounded dump — the button stays disabled until a filter matches at least one lead.',
+  })
+  async leadsExport(@Query() query: ExportLeadsQueryDto, @Res() res: Response): Promise<void> {
+    const filename = buildFilteredExportFilename('Leads dump', describeLeadsExportFilters(query));
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-    res.setHeader('Content-Disposition', 'attachment; filename="Leads dump.xlsx"');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    res.send(buffer);
+    await this.losLead.exportLeadsWorkbook(query, res);
   }
 
   @Get('applications')
@@ -151,22 +611,49 @@ export class LosDataController {
   }
 
   @Get('applications/export')
-  @ApiOperation({ summary: 'Download LOS applications as an Excel dump workbook (.xlsx)' })
-  async applicationsExport(@Res() res: Response): Promise<void> {
-    const buffer = await this.losApplication.exportApplicationsWorkbook();
+  @ApiOperation({
+    summary: 'Download filtered LOS applications as an Excel dump workbook (.xlsx)',
+    description:
+      'Requires at least one filter (app id, name, mobile, email, CIBIL, grade, loan amount, stage, status, rejection reason, or a created/modified date) to avoid an unbounded dump — the button stays disabled until a filter matches at least one application.',
+  })
+  async applicationsExport(
+    @Query() query: ExportApplicationsQueryDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    const filename = buildFilteredExportFilename(
+      'Applications dump',
+      describeApplicationsExportFilters(query),
+    );
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-    res.setHeader('Content-Disposition', 'attachment; filename="Applications dump.xlsx"');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    res.send(buffer);
+    await this.losApplication.exportApplicationsWorkbook(query, res);
   }
 
   @Get('loans')
   @ApiOperation({ summary: 'List disbursed loans for LOS loan management' })
   loans() {
     return this.losLoan.listLoans();
+  }
+
+  @Get('loans/export')
+  @ApiOperation({
+    summary: 'Download filtered LOS loans as an Excel dump workbook (.xlsx)',
+    description:
+      'Requires at least one filter (loan/application number, borrower, grade, status, or a repay-by/disbursed date) to avoid an unbounded dump — the button stays disabled until a filter matches at least one loan.',
+  })
+  async loansExport(@Query() query: ExportLoansQueryDto, @Res() res: Response): Promise<void> {
+    const filename = buildFilteredExportFilename('Loans dump', describeLoansExportFilters(query));
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    await this.losLoan.exportLoansWorkbook(query, res);
   }
 
   @Get('loans/:loanUuid')
@@ -286,10 +773,20 @@ export class LosDataController {
   @UseGuards(LosDenyAgentGuard)
   @ApiOperation({
     summary:
-      'Disburse an APPROVED application: one Easebuzz IMPS payout (URN = application number + timestamp), create loan_account, set DISBURSED, email final sanction letter',
+      'Disburse an APPROVED application: one Easebuzz IMPS payout. Loan is created and status becomes DISBURSED only when Easebuzz reports Success. Accepted, In Process, Pending, and Unapproved become DISBURSAL_INPROCESS.',
   })
   disburseApplication(@Param('applicationUuid') applicationUuid: string) {
     return this.losDisbursement.disburseApplication(applicationUuid);
+  }
+
+  @Post('applications/:applicationUuid/check-disbursement-status')
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({
+    summary:
+      'Poll Easebuzz GET /transfers/{unique_request_number}/ for a DISBURSAL_INPROCESS application. Success disburses the loan; Reversed, Cancelled, Failure, and Rejected set DISBURSAL_FAILED.',
+  })
+  checkApplicationDisbursementStatus(@Param('applicationUuid') applicationUuid: string) {
+    return this.losDisbursement.checkDisbursementStatus(applicationUuid);
   }
 
   @Post('applications/:applicationUuid/kyc/enable-re-kyc')

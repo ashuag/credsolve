@@ -52,6 +52,10 @@ model LoanAccount {
   @@index([customerId, loanStatusId])
   @@index([disbursedAt])
   @@index([loanStatusId, closedAt, loanMaturityDate])
+<<<<<<< HEAD
+=======
+  @@index([loanMaturityDate])
+>>>>>>> refs/remotes/moneycash/main
   @@index([waivedByUserId])
   @@map("loan_account")
 }

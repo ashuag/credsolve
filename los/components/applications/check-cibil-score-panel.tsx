@@ -66,7 +66,11 @@ function JsonViewButton({ label, value }: { label: string; value: unknown }) {
     <>
       <button
         type="button"
+<<<<<<< HEAD
         className="inline-flex min-h-[30px] items-center rounded-[8px] border border-[rgba(15,39,72,0.12)] bg-white px-2.5 text-[0.72rem] font-bold text-brand-blue hover:border-[rgba(34,197,94,0.35)]"
+=======
+        className="inline-flex min-h-[30px] items-center rounded-[8px] border border-[rgba(23,44,113,0.12)] bg-white px-2.5 text-[0.72rem] font-bold text-brand-blue hover:border-[rgba(20,150,243,0.35)]"
+>>>>>>> refs/remotes/moneycash/main
         onClick={() => setOpen(true)}
       >
         View
@@ -80,22 +84,37 @@ function JsonViewButton({ label, value }: { label: string; value: unknown }) {
           onClick={() => setOpen(false)}
         >
           <div
+<<<<<<< HEAD
             className="flex max-h-[min(82vh,880px)] w-full max-w-[720px] flex-col overflow-hidden rounded-[16px] border border-[rgba(15,39,72,0.12)] bg-white shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-3 border-b border-[rgba(15,39,72,0.08)] px-4 py-3">
+=======
+            className="flex max-h-[min(82vh,880px)] w-full max-w-[720px] flex-col overflow-hidden rounded-[16px] border border-[rgba(23,44,113,0.12)] bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-[rgba(23,44,113,0.08)] px-4 py-3">
+>>>>>>> refs/remotes/moneycash/main
               <h3 className="m-0 text-[0.92rem] font-extrabold text-brand-navy">{label}</h3>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
+<<<<<<< HEAD
                   className="inline-flex min-h-[32px] items-center rounded-full border border-[rgba(15,39,72,0.12)] bg-white px-3 text-[0.74rem] font-bold text-brand-navy hover:border-[rgba(34,197,94,0.35)]"
+=======
+                  className="inline-flex min-h-[32px] items-center rounded-full border border-[rgba(23,44,113,0.12)] bg-white px-3 text-[0.74rem] font-bold text-brand-navy hover:border-[rgba(20,150,243,0.35)]"
+>>>>>>> refs/remotes/moneycash/main
                   onClick={() => void handleCopy()}
                 >
                   {copied ? 'Copied' : 'Copy JSON'}
                 </button>
                 <button
                   type="button"
+<<<<<<< HEAD
                   className="inline-flex min-h-[32px] items-center rounded-full border border-[rgba(15,39,72,0.12)] bg-white px-3 text-[0.74rem] font-bold text-brand-muted hover:text-brand-navy"
+=======
+                  className="inline-flex min-h-[32px] items-center rounded-full border border-[rgba(23,44,113,0.12)] bg-white px-3 text-[0.74rem] font-bold text-brand-muted hover:text-brand-navy"
+>>>>>>> refs/remotes/moneycash/main
                   onClick={() => setOpen(false)}
                 >
                   Close
@@ -115,7 +134,11 @@ function JsonViewButton({ label, value }: { label: string; value: unknown }) {
 function CibilHitLogs({ hits }: { hits: LosCibilHitLog[] }) {
   if (hits.length === 0) {
     return (
+<<<<<<< HEAD
       <div className="los-card border border-dashed border-[rgba(15,39,72,0.16)] bg-[rgba(248,250,255,0.88)] p-6">
+=======
+      <div className="los-card border border-dashed border-[rgba(23,44,113,0.16)] bg-[rgba(248,250,255,0.88)] p-6">
+>>>>>>> refs/remotes/moneycash/main
         <h3 className="m-0 text-[0.95rem] font-extrabold text-brand-navy">No CIBIL hit logs yet</h3>
         <p className="m-0 mt-1 max-w-[52ch] text-[0.82rem] leading-relaxed text-brand-muted">
           Bureau pulls for this lead will appear here, with the original vendor JSON and the
@@ -127,7 +150,11 @@ function CibilHitLogs({ hits }: { hits: LosCibilHitLog[] }) {
 
   return (
     <div className="los-card overflow-hidden">
+<<<<<<< HEAD
       <div className="border-b border-[rgba(15,39,72,0.08)] bg-[rgba(248,250,255,0.85)] px-4 py-3">
+=======
+      <div className="border-b border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.85)] px-4 py-3">
+>>>>>>> refs/remotes/moneycash/main
         <p className="m-0 text-[0.62rem] font-extrabold uppercase tracking-[0.14em] text-brand-muted">
           Bureau pulls
         </p>
@@ -142,7 +169,11 @@ function CibilHitLogs({ hits }: { hits: LosCibilHitLog[] }) {
       <div className="overflow-x-auto">
         <table className="w-full min-w-[780px] border-collapse text-left text-[0.78rem]">
           <thead>
+<<<<<<< HEAD
             <tr className="border-b border-[rgba(15,39,72,0.08)] bg-[rgba(255,255,255,0.7)] text-[0.66rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted">
+=======
+            <tr className="border-b border-[rgba(23,44,113,0.08)] bg-[rgba(255,255,255,0.7)] text-[0.66rem] font-extrabold uppercase tracking-[0.08em] text-brand-muted">
+>>>>>>> refs/remotes/moneycash/main
               <th className="px-4 py-2.5 font-extrabold">When</th>
               <th className="px-4 py-2.5 font-extrabold">Source</th>
               <th className="px-4 py-2.5 font-extrabold">Service</th>
@@ -154,7 +185,11 @@ function CibilHitLogs({ hits }: { hits: LosCibilHitLog[] }) {
           </thead>
           <tbody>
             {hits.map((hit) => (
+<<<<<<< HEAD
               <tr key={hit.id} className="border-b border-[rgba(15,39,72,0.06)] last:border-b-0">
+=======
+              <tr key={hit.id} className="border-b border-[rgba(23,44,113,0.06)] last:border-b-0">
+>>>>>>> refs/remotes/moneycash/main
                 <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-brand-navy">
                   {formatHitTime(hit.at)}
                 </td>
@@ -368,7 +403,11 @@ export function CheckCibilScorePanel({
 
   if (emptyState) {
     return (
+<<<<<<< HEAD
       <div className="los-card border border-dashed border-[rgba(15,39,72,0.18)] bg-[rgba(248,250,255,0.88)] p-6 md:p-8">
+=======
+      <div className="los-card border border-dashed border-[rgba(23,44,113,0.18)] bg-[rgba(248,250,255,0.88)] p-6 md:p-8">
+>>>>>>> refs/remotes/moneycash/main
         <span className="los-chip mb-3">CIBIL report</span>
         <h3 className="m-0 text-[1.05rem] font-extrabold tracking-[-0.02em] text-brand-navy">
           No bureau report on file
@@ -444,8 +483,13 @@ export function CibilHitLogsPanel({ applicationUuid, leadUuid, refreshKey }: Cib
     return (
       <div className="los-card p-6">
         <div className="animate-pulse space-y-3">
+<<<<<<< HEAD
           <div className="h-4 w-40 rounded bg-[rgba(15,39,72,0.08)]" />
           <div className="h-24 rounded-xl bg-[rgba(15,39,72,0.05)]" />
+=======
+          <div className="h-4 w-40 rounded bg-[rgba(23,44,113,0.08)]" />
+          <div className="h-24 rounded-xl bg-[rgba(23,44,113,0.05)]" />
+>>>>>>> refs/remotes/moneycash/main
         </div>
       </div>
     );

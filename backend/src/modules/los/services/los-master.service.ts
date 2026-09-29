@@ -14,6 +14,8 @@ import type { UpdateEligibilityCriterionDto } from '../dto/update-eligibility-cr
 import type { UpdateCreditLimitTierDto } from '../dto/update-credit-limit-tier.dto';
 import type { UpdateSmsTemplateDto } from '../dto/update-sms-template.dto';
 import type { UpdateSettingDto } from '../dto/update-setting.dto';
+import { CIBIL_GRADES, CIBIL_GRADE_SET, type CibilGrade } from '../../../common/cibil/cibil-credit-assessment.engine';
+import { CUSTOMER_TYPE, CUSTOMER_TYPE_LABEL } from '../../../common/constants/customer-type.constants';
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -41,16 +43,13 @@ function slugMasterKey(name: string, maxLen: number): string {
   return slug || 'ITEM';
 }
 
-const CREDIT_ASSESSMENT_GRADES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
-const CREDIT_ASSESSMENT_GRADE_SET = new Set<string>(CREDIT_ASSESSMENT_GRADES);
-
 function normalizeRejectedCreditAssessmentGrades(value: string): string {
   const seen = new Set<string>();
   const invalid: string[] = [];
   for (const part of value.split(',')) {
     const grade = part.trim().toUpperCase();
     if (!grade) continue;
-    if (!CREDIT_ASSESSMENT_GRADE_SET.has(grade)) {
+    if (!CIBIL_GRADE_SET.has(grade as CibilGrade)) {
       invalid.push(part.trim());
       continue;
     }
@@ -62,7 +61,34 @@ function normalizeRejectedCreditAssessmentGrades(value: string): string {
   if (!seen.size) {
     throw new BadRequestException('Select at least one credit-assessment grade.');
   }
-  return CREDIT_ASSESSMENT_GRADES.filter((grade) => seen.has(grade)).join(',');
+  return CIBIL_GRADES.filter((grade) => seen.has(grade)).join(',');
+}
+
+function normalizeRejectedLoanTypeIds(value: string): string {
+  const seen = new Set<string>();
+  const invalid: string[] = [];
+  const ids: string[] = [];
+  for (const part of value.split(',')) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    if (!/^\d{1,2}$/.test(trimmed)) {
+      invalid.push(trimmed);
+      continue;
+    }
+    const symbol = trimmed.padStart(2, '0');
+    if (seen.has(symbol)) continue;
+    seen.add(symbol);
+    ids.push(symbol);
+  }
+  if (invalid.length) {
+    throw new BadRequestException(
+      `Invalid CIBIL loan type id(s): ${invalid.join(', ')}. Use numeric TUEF account type codes (e.g. 05, 10, 69).`,
+    );
+  }
+  if (!ids.length) {
+    throw new BadRequestException('Select at least one loan type, or deactivate the rule instead.');
+  }
+  return ids.join(',');
 }
 
 function normalizeRejectedLoanTypeIds(value: string): string {
@@ -205,6 +231,10 @@ export class LosMasterService {
       })),
       sourceUtms: (sourceUtms as LosSourceUtmRow[]).map((item) => this.mapSourceUtm(item)),
       repaymentDueDates: repaymentDueDates.map((item) => this.mapRepaymentDueDate(item)),
+      customerTypes: Object.values(CUSTOMER_TYPE).map((value) => ({
+        value,
+        label: CUSTOMER_TYPE_LABEL[value],
+      })),
     };
   }
 

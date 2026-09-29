@@ -1,36 +1,4 @@
-curl --location 'https://api.onexaura.com/oapi/send_sms' \
-
---header 'apikey: LrnfWcXi' \
-
---header 'Content-Type: application/json' \
-
---header 'Authorization: Basic SUNJQ0lfUHJ1ZGVudGlhbF9BTUNfTGltaXRlZDoxbjRpNEFmUQ==' \
-
---data '{
-
-"sms": [
-
-{
-
-"sender": "CREDPT",
-
-"recipient": "8882911939",
-
-"type": "SI",
-
-"messageBody": "Dear Customer, Your MoneyCash login OTP is 123456. Enter it to complete sign-in. Valid for 30 seconds. Do not share this code. Regards, MoneyCash",
-
-"unicode": 0, 
-
-"custRef1": "CustomReference1"
-
-}
-
-]
-
-}
-
-'
+curl --location 'https://api.onexaura.com/oapi/send_sms' --header 'apikey: LrnfWcXi' --header 'Content-Type: application/json' --header 'Authorization: Basic SUNJQ0lfUHJ1ZGVudGlhbF9BTUNfTGltaXRlZDoxbjRpNEFmUQ==' --data '{"sms": [{"sender": "CREDPT","recipient": "8882911939","type": "SI","messageBody": "Dear Customer, Your MoneyCash login OTP is 123456. Enter it to complete sign-in. Valid for 30 seconds. Do not share this code. Regards, MoneyCash","unicode": 0, "custRef1": "CustomReference1"}]}'
 
 
 https://onexaura.com
@@ -78,3 +46,66 @@ curl --location 'https://api.onexaura.com/oapi/send_sms' \
  niharika.chandra@onextel.com
  
  
+
+
+CREATE TABLE `cibil_request` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `client_ip` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `http_status` int DEFAULT NULL,
+  `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `error_message` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `client_request_payload` json DEFAULT NULL,
+  `client_response_payload` json DEFAULT NULL,
+  `client_requested_at` datetime(3) NOT NULL,
+  `client_responded_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `api_request_uuid_key` (`uuid`),
+  KEY `api_request_partner_id_customer_requested_at_idx` (`client_id`,`client_requested_at`),
+  KEY `api_request_api_product_id_customer_requested_at_idx` (`api_product_id`,`client_requested_at`),
+  KEY `api_request_status_customer_requested_at_idx` (`status`,`client_requested_at`),
+  KEY `api_request_customer_requested_at_idx` (`client_requested_at`),
+  KEY `api_request_partner_product_req_at_idx` (`client_id`,`api_product_id`,`client_requested_at`),
+  KEY `api_request_partner_status_req_at_idx` (`client_id`,`status`,`client_requested_at`),
+  KEY `api_request_http_status_req_at_idx` (`http_status`,`client_requested_at`),
+  KEY `api_request_client_ip_req_at_idx` (`client_ip`,`client_requested_at`),
+  CONSTRAINT `api_request_api_product_id_fkey` FOREIGN KEY (`api_product_id`) REFERENCES `api_product` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `api_request_partner_id_fkey` FOREIGN KEY (`client_id`) REFERENCES `client` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=239 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

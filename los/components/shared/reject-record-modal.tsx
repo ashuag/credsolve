@@ -212,10 +212,10 @@ export function canRejectLeadStatus(statusCode: string): boolean {
 
 export function canRejectApplicationStatus(statusCode: string): boolean {
   const code = statusCode.toUpperCase();
-  return !['REJECTED', 'KYC_FAILED', 'PENNYDROP_FAILED', 'CANCELLED', 'DISBURSED', 'ACTIVE'].includes(code);
+  return !['REJECTED', 'KYC_FAILED', 'PENNYDROP_FAILED', 'CANCELLED', 'DISBURSED', 'DISBURSAL_INPROCESS', 'ACTIVE'].includes(code);
 }
 
 export function canApproveApplicationStatus(statusCode: string): boolean {
   const code = statusCode.toUpperCase();
-  return !['APPROVED', 'REJECTED', 'KYC_FAILED', 'PENNYDROP_FAILED', 'CANCELLED', 'DISBURSED', 'ACTIVE'].includes(code);
+  return !['APPROVED', 'REJECTED', 'KYC_FAILED', 'PENNYDROP_FAILED', 'CANCELLED', 'DISBURSED', 'DISBURSAL_INPROCESS', 'DISBURSAL_FAILED', 'ACTIVE'].includes(code);
 }

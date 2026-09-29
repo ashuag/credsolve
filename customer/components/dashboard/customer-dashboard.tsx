@@ -33,6 +33,8 @@ function statusBadgeClass(status: string): string {
   if (s === 'ACTIVE') return 'bg-sky-100 text-sky-900 border-sky-300';
   if (s === 'WRITTEN_OFF') return 'bg-slate-200 text-slate-800 border-slate-300';
   if (s === 'DISBURSED') return 'bg-indigo-100 text-indigo-900 border-indigo-200';
+  if (s === 'DISBURSAL_INPROCESS') return 'bg-amber-100 text-amber-900 border-amber-200';
+  if (s === 'DISBURSAL_FAILED') return 'bg-rose-100 text-rose-900 border-rose-200';
   if (s === 'IN_REVIEW' || s === 'UNDER_REVIEW') return 'bg-amber-100 text-amber-900 border-amber-200';
   if (s === 'APPROVED') return 'bg-sky-100 text-sky-900 border-sky-200';
   if (s === 'REJECTED') return 'bg-rose-100 text-rose-900 border-rose-200';
@@ -45,6 +47,8 @@ function statusBadgeLabel(status: string): string {
   if (s === 'CLOSED') return 'Paid fully';
   if (s === 'OVERDUE') return 'Overdue';
   if (s === 'ACTIVE') return 'Active';
+  if (s === 'DISBURSAL_INPROCESS') return 'Disbursal in process';
+  if (s === 'DISBURSAL_FAILED') return 'Disbursal failed';
   return status.replace(/_/g, ' ');
 }
 
@@ -126,7 +130,11 @@ function JourneyTracker({
                     : done
                       ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 text-white ring-emerald-200'
                       : current
+<<<<<<< HEAD
                         ? 'animate-ring-pop bg-gradient-to-br from-[#22c55e] to-[#16a34a] text-[#12244f] ring-[#22c55e]/40'
+=======
+                        ? 'animate-ring-pop bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-[#12244f] ring-[#ffc519]/40'
+>>>>>>> refs/remotes/moneycash/main
                         : 'bg-white text-slate-400 ring-slate-200'
                 )}
                 aria-current={current ? 'step' : undefined}

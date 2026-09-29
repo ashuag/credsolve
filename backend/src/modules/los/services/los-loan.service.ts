@@ -1,4 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+<<<<<<< HEAD
+=======
+import type { Prisma } from '@prisma/client';
+>>>>>>> refs/remotes/moneycash/main
 import type { Response } from 'express';
 import { APPLICATION_STATUS } from '../../../common/constants/application.constants';
 import { isClosedLoanStatus, LOAN_STATUS } from '../../../common/constants/loan.constants';
@@ -10,6 +14,7 @@ import {
   computeInterestAmountInr,
   resolveContractedTenureDays,
   decimalToNumber,
+  istCalendarDateUtc,
 } from '../../../common/loan/loan-calculation.util';
 import { loadRepayCoolingPeriodDays } from '../../../common/loan/repay-cooling-period.util';
 import {
@@ -19,6 +24,15 @@ import {
 } from '../../../common/loan/bounce-charge.util';
 import { BounceChargeTierResolverService } from '../../../common/loan/bounce-charge-tier.resolver';
 import { billDueNowAfterWaiverInr, waivedAmountFromLoan } from '../../../common/loan/loan-charge-waiver.util';
+<<<<<<< HEAD
+=======
+import { CUSTOMER_TYPE_LABEL } from '../../../common/constants/customer-type.constants';
+import {
+  loadClosedLoanLeadIdsByCustomer,
+  resolveCustomerType,
+  type ClosedLoanLeadIdsByCustomer,
+} from '../../../common/loan/customer-recurring-status.util';
+>>>>>>> refs/remotes/moneycash/main
 import { resolveEffectiveLoanStatus } from '../../../common/loan/effective-loan-status.util';
 import { roundInr2 } from '../../../common/loan/loan-repayment-outstanding.util';
 import { isCollectedRepaymentStatus } from '../../../common/constants/loan-repayment.constants';
@@ -26,11 +40,70 @@ import { computeFeeAmountsFromLoanDetail } from '../../../common/loan/loan-disbu
 import { NocLetterService } from '../../../common/noc/noc-letter.service';
 import { formatLosPersonName } from '../format-los-person-name';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { streamXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
+import {
+  matchesExportMultiSelectFilter,
+  matchesExportTextFilter,
+  parseExportDateOnly,
+  parseExportIstDayRange,
+  requireAtLeastOneExportFilter,
+} from '../../../common/xlsx/export-row-filter.util';
+import { CIBIL_GRADE_SET, type CibilGrade } from '../../../common/cibil/cibil-credit-assessment.engine';
+import type { ExportLoansQueryDto } from '../los-data.controller';
 import { LosLoanRepaymentSyncService } from './los-loan-repayment-sync.service';
+
+function toExcelDate(iso: string | null | undefined): Date | null {
+  if (!iso) return null;
+  const parsed = new Date(iso);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
+function toExcelNumber(value: string | number | null | undefined): number | null {
+  if (value == null || value === '') return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+const LOAN_DUMP_HEADERS = [
+  'Loan number',
+  'Application ID',
+  'Name',
+  'Mobile',
+  'Email',
+  'Grade',
+  'Customer type',
+  'Principal',
+  'Net disbursed',
+  'Interest rate %',
+  'Repayment amount',
+  'Repayment + penal',
+  'Overdue interest',
+  'Penal amount',
+  'Waived amount',
+  'Waived by',
+  'Overdue days',
+  'Processing fee',
+  'GST',
+  'Bank name',
+  'Bank account (masked)',
+  'IFSC',
+  'UTR',
+  'Loan status',
+  'Application status',
+  'Disbursed at',
+  'Repay by',
+  'Closed at',
+  'Loan UUID',
+  'Application UUID',
+  'Customer UUID',
+] as const;
 
 function displayName(name: string, displayNameValue: string | null | undefined): string {
   return displayNameValue?.trim() || name;
 }
+
+/** Batch size for the export's cursor-paged fetch. */
+const EXPORT_BATCH_SIZE = 200;
 
 function maskAccountNumber(value: string | null | undefined): string | null {
   const raw = value?.trim();
@@ -49,6 +122,7 @@ export class LosLoanService {
     private readonly nocLetter: NocLetterService,
   ) {}
 
+<<<<<<< HEAD
   async listLoans() {
     const loans = await this.prisma.read.loanAccount.findMany({
       where: {
@@ -60,12 +134,37 @@ export class LosLoanService {
         waivedByUser: { select: { fullName: true } },
         customer: { select: { uuid: true, mobileNumber: true } },
         application: {
+=======
+  private readonly loanListInclude = {
+    loanStatus: { select: { name: true, displayName: true } },
+    waivedByUser: { select: { fullName: true } },
+    customer: { select: { uuid: true, mobileNumber: true } },
+    application: {
+      select: {
+        uuid: true,
+        applicationNumber: true,
+        applicationStatus: { select: { name: true, displayName: true } },
+        details: {
+>>>>>>> refs/remotes/moneycash/main
           select: {
+            emailId: true,
+            bankName: true,
+            bankAccountNumber: true,
+            ifscCode: true,
+            selectedLoanAmount: true,
+            processingFeePercentage: true,
+            gstPercentage: true,
+            interestRate: true,
+            expectedRepaymentDays: true,
+          },
+        },
+        lead: {
+          select: {
+            id: true,
             uuid: true,
-            applicationNumber: true,
-            applicationStatus: { select: { name: true, displayName: true } },
-            details: {
+            leadDetail: {
               select: {
+<<<<<<< HEAD
                 emailId: true,
                 bankName: true,
                 bankAccountNumber: true,
@@ -89,6 +188,12 @@ export class LosLoanService {
                         cibilCreditAssessment: { select: { category: true } },
                       },
                     },
+=======
+                fullName: true,
+                bureauReport: {
+                  select: {
+                    cibilCreditAssessment: { select: { category: true } },
+>>>>>>> refs/remotes/moneycash/main
                   },
                 },
               },
@@ -96,12 +201,18 @@ export class LosLoanService {
           },
         },
       },
-    });
+    },
+  } satisfies Prisma.LoanAccountInclude;
 
-    const penal = await this.bounceChargeTiers.loadPenalConfig();
+  private async toLoanListItems(
+    loans: Array<Prisma.LoanAccountGetPayload<{ include: LosLoanService['loanListInclude'] }>>,
+    penal: Awaited<ReturnType<BounceChargeTierResolverService['loadPenalConfig']>>,
+    closedLoanLeadIds: ClosedLoanLeadIdsByCustomer,
+  ) {
     const unsettledByLoanId = await this.repaymentSync.unsettledFlagsByLoanId(loans);
 
     return loans.map((loan) => {
+      const customerType = resolveCustomerType(closedLoanLeadIds, loan.customerId, loan.application.lead.id);
       const details = loan.application.details;
       const fees = computeFeeAmountsFromLoanDetail(
         details
@@ -162,6 +273,11 @@ export class LosLoanService {
         fullName: formatLosPersonName(loan.application.lead.leadDetail?.fullName),
         cibilCreditAssessmentCategory:
           loan.application.lead.leadDetail?.bureauReport?.cibilCreditAssessment?.category ?? null,
+<<<<<<< HEAD
+=======
+        customerType,
+        customerTypeLabel: CUSTOMER_TYPE_LABEL[customerType],
+>>>>>>> refs/remotes/moneycash/main
         mobileNumber: loan.customer.mobileNumber,
         email: details?.emailId ?? null,
         principalAmount: loan.principalAmount.toString(),
@@ -202,6 +318,209 @@ export class LosLoanService {
         unsettledPaymentLink: unsettledByLoanId.get(loan.id.toString()) === true,
       };
     });
+  }
+
+  private loanQueueWhere(extraWhere?: Prisma.LoanAccountWhereInput): Prisma.LoanAccountWhereInput {
+    return {
+      application: { lead: { isInternalTesting: false } },
+      ...(extraWhere ?? {}),
+    };
+  }
+
+  /** `extraWhere`, when given, further restricts the result (used by the filtered export dump). */
+  async listLoans(extraWhere?: Prisma.LoanAccountWhereInput) {
+    const loans = await this.prisma.read.loanAccount.findMany({
+      where: this.loanQueueWhere(extraWhere),
+      orderBy: { disbursedAt: 'desc' },
+      include: this.loanListInclude,
+    });
+    const [penal, closedLoanLeadIds] = await Promise.all([
+      this.bounceChargeTiers.loadPenalConfig(),
+      loadClosedLoanLeadIdsByCustomer(this.prisma.read),
+    ]);
+    return this.toLoanListItems(loans, penal, closedLoanLeadIds);
+  }
+
+  private loanRowCells(loan: Awaited<ReturnType<LosLoanService['toLoanListItems']>>[number]): SimpleXlsxCell[] {
+    return [
+      loan.loanNumber,
+      loan.applicationNumber,
+      loan.fullName,
+      loan.mobileNumber,
+      loan.email,
+      loan.cibilCreditAssessmentCategory,
+      loan.customerTypeLabel,
+      toExcelNumber(loan.principalAmount),
+      toExcelNumber(loan.netDisbursedAmount),
+      toExcelNumber(loan.interestRate),
+      toExcelNumber(loan.totalRepaymentAmount),
+      toExcelNumber(loan.totalRepaymentWithPenalAmount),
+      toExcelNumber(loan.overdueInterestInr),
+      toExcelNumber(loan.penalAmount),
+      toExcelNumber(loan.waivedAmountInr),
+      loan.waivedByName,
+      loan.overdueDays,
+      toExcelNumber(loan.processingFeeAmount),
+      toExcelNumber(loan.gstAmount),
+      loan.bankName,
+      loan.bankAccountMasked,
+      loan.ifscCode,
+      loan.utr,
+      loan.loanStatusLabel,
+      loan.applicationStatusLabel,
+      toExcelDate(loan.disbursedAt),
+      loan.loanMaturityDate,
+      toExcelDate(loan.closedAt),
+      loan.uuid,
+      loan.applicationUuid,
+      loan.customerUuid,
+    ];
+  }
+
+  /**
+   * Dump export for LOS Loans → Download dump. Mirrors the LOS Loans table's own column filters
+   * (same field names as the table's column keys) as real Prisma `where` conditions — including
+   * "Overdue", which isn't a stored value but derived from maturity date vs. today — so the query
+   * itself narrows the result at the database. "Loan" and "Borrower" are the exception: the table
+   * searches them as one combined string per row (`"<loanNumber> <applicationNumber>"` /
+   * `"<name> <mobile> <email>"`), so a search term spanning two of those fields can match on screen
+   * without any single column containing it — they're applied as a JS filter on the already-mapped
+   * rows, exactly like the table, instead of a per-column Prisma `where`. Requires at least one
+   * filter, same as the button staying disabled until a filter matches at least one loan. Streams
+   * straight to `res`, cursor-paged from the DB in batches.
+   */
+  async exportLoansWorkbook(query: ExportLoansQueryDto, res: Response): Promise<void> {
+    const { access_token: _accessToken, ...filterFields } = query;
+    requireAtLeastOneExportFilter(
+      Object.values(filterFields),
+      'Apply at least one filter before downloading the loans dump.',
+    );
+    const where = this.buildExportWhere(query);
+    const loanText = query.loan?.trim();
+    const borrowerText = query.borrower?.trim();
+    const customerType = query.customerType?.trim();
+
+    await streamXlsxWorkbook(res, {
+      sheetName: 'Loans',
+      headers: LOAN_DUMP_HEADERS,
+      rows: this.streamLoansForExport(where, loanText, borrowerText, customerType),
+    });
+  }
+
+  private async *streamLoansForExport(
+    extraWhere: Prisma.LoanAccountWhereInput,
+    loanText: string | undefined,
+    borrowerText: string | undefined,
+    customerTypeFilter: string | undefined,
+  ): AsyncGenerator<SimpleXlsxCell[]> {
+    let cursorId: bigint | undefined;
+    const where = this.loanQueueWhere(extraWhere);
+    const [penal, closedLoanLeadIds] = await Promise.all([
+      this.bounceChargeTiers.loadPenalConfig(),
+      loadClosedLoanLeadIdsByCustomer(this.prisma.read),
+    ]);
+
+    for (;;) {
+      const batch = await this.prisma.read.loanAccount.findMany({
+        take: EXPORT_BATCH_SIZE,
+        ...(cursorId != null ? { skip: 1, cursor: { id: cursorId } } : {}),
+        where,
+        orderBy: { id: 'desc' },
+        include: this.loanListInclude,
+      });
+      if (batch.length === 0) return;
+
+      const loans = await this.toLoanListItems(batch, penal, closedLoanLeadIds);
+      for (const loan of loans) {
+        if (loanText && !matchesExportTextFilter(`${loan.loanNumber} ${loan.applicationNumber}`, loanText)) {
+          continue;
+        }
+        if (
+          borrowerText &&
+          !matchesExportTextFilter(
+            [loan.fullName, loan.mobileNumber, loan.email].filter(Boolean).join(' '),
+            borrowerText,
+          )
+        ) {
+          continue;
+        }
+        if (customerTypeFilter && !matchesExportMultiSelectFilter(loan.customerType, customerTypeFilter)) {
+          continue;
+        }
+        yield this.loanRowCells(loan);
+      }
+
+      cursorId = batch[batch.length - 1]!.id;
+      if (batch.length < EXPORT_BATCH_SIZE) return;
+    }
+  }
+
+  /** Builds the export's Prisma `where` from the LOS Loans table's own filters. Throws when none are set. */
+  private buildExportWhere(query: ExportLoansQueryDto): Prisma.LoanAccountWhereInput {
+    const and: Prisma.LoanAccountWhereInput[] = [];
+
+    const grade = query.grade?.trim().toUpperCase();
+    if (grade) {
+      if (!CIBIL_GRADE_SET.has(grade as CibilGrade)) {
+        throw new BadRequestException('grade must be one of A-H.');
+      }
+      and.push({
+        application: {
+          lead: { leadDetail: { bureauReport: { cibilCreditAssessment: { category: grade } } } },
+        },
+      });
+    }
+
+    const repayByDate = parseExportDateOnly(query.repayBy, 'repayBy');
+    if (repayByDate) {
+      and.push({ loanMaturityDate: repayByDate });
+    }
+
+    const disbursedRange = parseExportIstDayRange(query.disbursed, 'disbursed');
+    if (disbursedRange) {
+      and.push({ disbursedAt: { gte: disbursedRange.start, lt: disbursedRange.end } });
+    }
+
+    const statusText = query.status?.trim();
+    if (statusText) {
+      and.push(this.buildStatusWhere(statusText));
+    }
+
+    return { AND: and };
+  }
+
+  /**
+   * "Overdue" isn't a stored status — it's an ACTIVE loan past its maturity date (see
+   * resolveEffectiveLoanStatus). Matches the table's status filter: substring against the
+   * effective label, with "Overdue" as a synthetic candidate alongside the stored display name.
+   */
+  private buildStatusWhere(statusText: string): Prisma.LoanAccountWhereInput {
+    const needle = statusText.toLowerCase();
+    const today = istCalendarDateUtc();
+    const overdueCondition: Prisma.LoanAccountWhereInput = {
+      closedAt: null,
+      loanMaturityDate: { lt: today },
+      loanStatus: { name: { in: [LOAN_STATUS.ACTIVE, LOAN_STATUS.OVERDUE] } },
+    };
+    const activeButOverdue: Prisma.LoanAccountWhereInput = {
+      closedAt: null,
+      loanMaturityDate: { lt: today },
+      loanStatus: { name: LOAN_STATUS.ACTIVE },
+    };
+
+    const or: Prisma.LoanAccountWhereInput[] = [];
+    if ('overdue'.includes(needle)) {
+      or.push(overdueCondition);
+    }
+    // Raw stored label, excluding ACTIVE rows that are actually displayed as "Overdue" above.
+    or.push({
+      AND: [
+        { OR: [{ loanStatus: { displayName: { contains: statusText } } }, { loanStatus: { name: { contains: statusText } } }] },
+        { NOT: activeButOverdue },
+      ],
+    });
+
+    return { OR: or };
   }
 
   async getLoanDetails(loanUuid: string) {

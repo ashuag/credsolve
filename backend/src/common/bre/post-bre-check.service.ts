@@ -33,7 +33,7 @@ import {
   type PostBreEnquiryInspectionRow,
   type PostBreTradelineInspectionRow,
 } from '../cibil/cibil-bureau-rules.parser';
-import { assignCibilCategory } from '../cibil/cibil-credit-assessment.engine';
+import { assignCibilGrade } from '../cibil/cibil-credit-assessment.engine';
 import {
   isCibilNewToCreditScore,
   parseTenacioBureauVendorBody,
@@ -1195,7 +1195,7 @@ export class PostBreCheckService {
   private resolveCreditAssessmentGrade(rawPayload: unknown, riskScore: number | null): string | null {
     try {
       const signals = computeCibilAssessmentSignals(rawPayload, riskScore);
-      return assignCibilCategory(signals).category;
+      return assignCibilGrade(signals).category;
     } catch {
       return null;
     }

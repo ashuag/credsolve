@@ -27,6 +27,10 @@ export type LegalDocumentContent = {
   navLabel: string;
   title: string;
   description: string;
+<<<<<<< HEAD
+=======
+  /** Optional; when omitted the registered-office meta card is hidden. */
+>>>>>>> refs/remotes/moneycash/main
   registeredOffice?: string;
   contactEmail: string;
   generatedAt: string;

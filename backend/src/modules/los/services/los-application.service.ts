@@ -43,7 +43,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { formatLosPersonName } from '../format-los-person-name';
 import { BUREAU_FETCHED } from '../../../common/constants/bureau-fetch.constants';
 import { PAN_VERIFIED } from '../../../common/constants/pan-verification.constants';
-import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
+import { streamXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 import { LoanDocumentApplicationService } from '../../auth/application/services/loan-document-application.service';
 import { LOAN_DOCUMENT_ACCEPTANCE_NAME, LOAN_DOCUMENT_TYPE, type LoanDocumentType } from '../../../common/constants/loan-document.constants';
 import {
@@ -57,6 +57,15 @@ import {
   syncExpectedRepaymentDateUntilDisbursed,
 } from '../../../common/loan/repayment-due-date.util';
 import { overdueDaysFromMaturity } from '../../../common/loan/bounce-charge.util';
+<<<<<<< HEAD
+=======
+import { CUSTOMER_TYPE_LABEL } from '../../../common/constants/customer-type.constants';
+import {
+  loadClosedLoanLeadIdsByCustomer,
+  resolveCustomerType,
+  type ClosedLoanLeadIdsByCustomer,
+} from '../../../common/loan/customer-recurring-status.util';
+>>>>>>> refs/remotes/moneycash/main
 import { resolveEffectiveLoanStatus } from '../../../common/loan/effective-loan-status.util';
 import { APPLICATION_KYC_STATUS, APPLICATION_STATUS } from '../../../common/constants/application.constants';
 import { BANK_DETAIL_FAILED_NOTE, isBankNameMatchReviewPending, PENNY_DROP_FAILED_NOTE } from '../../../common/constants/bank.constants';
@@ -69,6 +78,17 @@ import {
   extractPanNsdlSnapshot,
   panNsdlVendorServiceNames,
 } from '../../../common/vendor/pan-nsdl-snapshot.util';
+<<<<<<< HEAD
+=======
+import { CIBIL_GRADE_SET, type CibilGrade } from '../../../common/cibil/cibil-credit-assessment.engine';
+import {
+  matchesExportMultiSelectFilter,
+  matchesExportTextFilter,
+  parseExportIstDayRange,
+  requireAtLeastOneExportFilter,
+} from '../../../common/xlsx/export-row-filter.util';
+import type { ExportApplicationsQueryDto } from '../los-data.controller';
+>>>>>>> refs/remotes/moneycash/main
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -480,6 +500,9 @@ function toExcelNumber(value: string | number | null | undefined): number | null
   return Number.isFinite(n) ? n : null;
 }
 
+/** Batch size for the export's cursor-paged fetch. */
+const EXPORT_BATCH_SIZE = 100;
+
 const APPLICATION_DUMP_HEADERS = [
   'Lead ID',
   'Application ID',
@@ -488,6 +511,7 @@ const APPLICATION_DUMP_HEADERS = [
   'Email',
   'CIBIL score',
   'Grade',
+  'Customer type',
   'Eligible loan amount',
   'Selected loan amount',
   'Repay date',
@@ -522,6 +546,7 @@ export class LosApplicationService {
     private readonly kycCompletion: KycCompletionService,
   ) {}
 
+<<<<<<< HEAD
   async listApplications() {
     const applications = await this.prisma.read.application.findMany({
       where: {
@@ -539,14 +564,43 @@ export class LosApplicationService {
               select: { aadhaarVerifiedAt: true, aadhaarPhotoPath: true, aadhaarData: true },
             },
           },
+=======
+  private applicationQueueWhere(
+    extraWhere?: Prisma.ApplicationWhereInput,
+  ): Prisma.ApplicationWhereInput {
+    return {
+      lead: { isInternalTesting: false },
+      ...(extraWhere ?? {}),
+    };
+  }
+
+  private readonly applicationListInclude = {
+    customer: {
+      select: {
+        uuid: true,
+        mobileNumber: true,
+        customerKycs: {
+          orderBy: [{ aadhaarVerifiedAt: 'desc' }, { createdAt: 'desc' }],
+          take: 10,
+          select: { aadhaarVerifiedAt: true, aadhaarPhotoPath: true, aadhaarData: true },
+>>>>>>> refs/remotes/moneycash/main
         },
-        lead: {
+      },
+    },
+    lead: {
+      select: {
+        uuid: true,
+        leadNumber: true,
+        leadStatusNote: true,
+        leadDetail: {
           select: {
-            uuid: true,
-            leadNumber: true,
-            leadStatusNote: true,
-            leadDetail: {
+            fullName: true,
+            panVerified: true,
+            bureauFetched: true,
+            emailId: true,
+            bureauReport: {
               select: {
+<<<<<<< HEAD
                 fullName: true,
                 panVerified: true,
                 bureauFetched: true,
@@ -557,55 +611,63 @@ export class LosApplicationService {
                     cibilCreditAssessment: { select: { category: true } },
                   },
                 },
+=======
+                cibilScore: true,
+                cibilCreditAssessment: { select: { category: true } },
+>>>>>>> refs/remotes/moneycash/main
               },
             },
-            leadStatus: { select: { name: true, displayName: true } },
-            rejectionReason: { select: { name: true } },
           },
         },
-        applicationStatus: { select: { name: true, displayName: true } },
-        details: {
-          select: {
-            selectedLoanAmount: true,
-            processingFeePercentage: true,
-            gstPercentage: true,
-            expectedRepaymentDays: true,
-            expectedRepaymentDate: true,
-            bankAccountNumber: true,
-            ifscCode: true,
-            bankName: true,
-            interestRate: true,
-            emailId: true,
-            emailVerifiedAt: true,
-            loanDocumentsReviewedAt: true,
-            loanDocumentsAcceptedAt: true,
-          },
-        },
-        kyc: {
-          select: {
-            kycStatus: true,
-            kycCompletedAt: true,
-            livenessPassed: true,
-            livenessSelfiePath: true,
-          },
-        },
-        _count: { select: { references: true } },
-        loanAccount: {
-          select: {
-            totalRepaymentAmount: true,
-            loanMaturityDate: true,
-            disbursedAt: true,
-            principalAmount: true,
-            loanAccountNumber: true,
-          },
-        },
+        leadStatus: { select: { name: true, displayName: true } },
+        rejectionReason: { select: { name: true } },
       },
-    });
+    },
+    applicationStatus: { select: { name: true, displayName: true } },
+    details: {
+      select: {
+        selectedLoanAmount: true,
+        processingFeePercentage: true,
+        gstPercentage: true,
+        expectedRepaymentDays: true,
+        expectedRepaymentDate: true,
+        bankAccountNumber: true,
+        ifscCode: true,
+        bankName: true,
+        interestRate: true,
+        emailId: true,
+        emailVerifiedAt: true,
+        loanDocumentsReviewedAt: true,
+        loanDocumentsAcceptedAt: true,
+      },
+    },
+    kyc: {
+      select: {
+        kycStatus: true,
+        kycCompletedAt: true,
+        livenessPassed: true,
+        livenessSelfiePath: true,
+      },
+    },
+    _count: { select: { references: true } },
+    loanAccount: {
+      select: {
+        totalRepaymentAmount: true,
+        loanMaturityDate: true,
+        disbursedAt: true,
+        principalAmount: true,
+        loanAccountNumber: true,
+      },
+    },
+  } satisfies Prisma.ApplicationInclude;
 
-    const liveRepayDate = await resolveRepaymentDueDateUtc(this.prisma.client);
-
-    return applications.map((application) => {
-      const loanAccount = application.loanAccount;
+  private toApplicationListItem(
+    application: Prisma.ApplicationGetPayload<{ include: LosApplicationService['applicationListInclude'] }>,
+    liveRepayDate: Date | null,
+    closedLoanLeadIds: ClosedLoanLeadIdsByCustomer,
+  ) {
+    const loanAccount = application.loanAccount;
+      const customerType = resolveCustomerType(closedLoanLeadIds, application.customerId, application.leadId);
       const appDetails = loanAccount
         ? application.details
         : overlayLiveRepaymentDueDateIfSelected(application.details, liveRepayDate) ?? application.details;
@@ -634,6 +696,8 @@ export class LosApplicationService {
         fullName: formatLosPersonName(application.lead.leadDetail?.fullName),
         cibilScore: application.lead.leadDetail?.bureauReport?.cibilScore ?? null,
         cibilCreditAssessmentCategory: application.lead.leadDetail?.bureauReport?.cibilCreditAssessment?.category ?? null,
+        customerType,
+        customerTypeLabel: CUSTOMER_TYPE_LABEL[customerType],
         eligibleLoanAmount,
         selectedLoanAmount: appDetails?.selectedLoanAmount?.toString() ?? null,
         repayDate: loanAccount
@@ -684,46 +748,214 @@ export class LosApplicationService {
         createdAt: application.createdAt.toISOString(),
         updatedAt: application.updatedAt.toISOString(),
       };
+  }
+
+  /** `extraWhere`, when given, further restricts the result (used by the filtered export dump). */
+  async listApplications(extraWhere?: Prisma.ApplicationWhereInput) {
+    const applications = await this.prisma.read.application.findMany({
+      where: this.applicationQueueWhere(extraWhere),
+      orderBy: { createdAt: 'desc' },
+      include: this.applicationListInclude,
+    });
+    const [liveRepayDate, closedLoanLeadIds] = await Promise.all([
+      resolveRepaymentDueDateUtc(this.prisma.client),
+      loadClosedLoanLeadIdsByCustomer(this.prisma.read),
+    ]);
+    return applications.map((application) => this.toApplicationListItem(application, liveRepayDate, closedLoanLeadIds));
+  }
+
+  private applicationRowCells(app: ReturnType<LosApplicationService['toApplicationListItem']>): SimpleXlsxCell[] {
+    return [
+      app.leadNumber,
+      app.applicationNumber,
+      app.fullName,
+      app.mobileNumber,
+      app.email,
+      toExcelNumber(app.cibilScore),
+      app.cibilCreditAssessmentCategory,
+      app.customerTypeLabel,
+      toExcelNumber(app.eligibleLoanAmount),
+      toExcelNumber(app.selectedLoanAmount),
+      app.repayDate,
+      toExcelNumber(app.repaymentAmount),
+      toExcelNumber(app.processingFeePercent),
+      toExcelNumber(app.processingFeeAmount),
+      app.bankDetails,
+      dumpApplicationStageLabel(app),
+      dumpApplicationStatusLabel(app),
+      app.leadStatusLabel,
+      app.leadRejectionReason?.label ?? null,
+      app.leadStatusNote,
+      app.kycStatusLabel,
+      panVerifiedStatusLabel(app.panVerified),
+      bureauFetchedStatusLabel(app.bureauFetched),
+      toExcelDate(app.createdAt),
+      toExcelDate(app.updatedAt),
+      toExcelDate(app.disbursedAt),
+      app.uuid,
+      app.customerUuid,
+      app.leadUuid,
+    ];
+  }
+
+  /**
+   * Dump export for LOS Applications → Download dump. Mirrors the LOS Applications table's own
+   * column filters (same field names as the table's column keys). "Stage" and "Rejection reason"
+   * are derived labels (computed from many raw signals, not stored columns), and "Name" falls back
+   * to the literal `Details pending` label for a blank name, so they're applied as a JS filter on
+   * the already-narrowed, mapped rows instead of a Prisma `where` condition — otherwise filtering by
+   * `Details pending` (which the grid shows for a blank name) would look for that literal text in
+   * the raw `fullName` column and never match. Requires at least one filter, same as the button
+   * staying disabled until a filter matches at least one row. Streams straight to `res`,
+   * cursor-paged from the DB in batches.
+   */
+  async exportApplicationsWorkbook(query: ExportApplicationsQueryDto, res: Response): Promise<void> {
+    const { access_token: _accessToken, ...filterFields } = query;
+    requireAtLeastOneExportFilter(
+      Object.values(filterFields),
+      'Apply at least one filter before downloading the applications dump.',
+    );
+    const where = this.buildExportWhere(query);
+    const stage = query.stage?.trim();
+    const reason = query.reason?.trim().toLowerCase();
+    const name = query.name?.trim();
+    const customerType = query.customerType?.trim();
+
+    await streamXlsxWorkbook(res, {
+      sheetName: 'Applications',
+      headers: APPLICATION_DUMP_HEADERS,
+      rows: this.streamApplicationsForExport(where, stage, reason, name, customerType),
     });
   }
 
-  /** Builds an applications dump workbook for LOS Application → Download dump. */
-  async exportApplicationsWorkbook(): Promise<Buffer> {
-    const applications = await this.listApplications();
-    const rows: SimpleXlsxCell[][] = [
-      [...APPLICATION_DUMP_HEADERS],
-      ...applications.map((app) => [
-        app.leadNumber,
-        app.applicationNumber,
-        app.fullName,
-        app.mobileNumber,
-        app.email,
-        toExcelNumber(app.cibilScore),
-        app.cibilCreditAssessmentCategory,
-        toExcelNumber(app.eligibleLoanAmount),
-        toExcelNumber(app.selectedLoanAmount),
-        app.repayDate,
-        toExcelNumber(app.repaymentAmount),
-        toExcelNumber(app.processingFeePercent),
-        toExcelNumber(app.processingFeeAmount),
-        app.bankDetails,
-        dumpApplicationStageLabel(app),
-        dumpApplicationStatusLabel(app),
-        app.leadStatusLabel,
-        app.leadRejectionReason?.label ?? null,
-        app.leadStatusNote,
-        app.kycStatusLabel,
-        panVerifiedStatusLabel(app.panVerified),
-        bureauFetchedStatusLabel(app.bureauFetched),
-        toExcelDate(app.createdAt),
-        toExcelDate(app.updatedAt),
-        toExcelDate(app.disbursedAt),
-        app.uuid,
-        app.customerUuid,
-        app.leadUuid,
-      ]),
-    ];
-    return buildSimpleXlsxWorkbook(rows, 'Applications');
+  private async *streamApplicationsForExport(
+    extraWhere: Prisma.ApplicationWhereInput,
+    stage: string | undefined,
+    reason: string | undefined,
+    name: string | undefined,
+    customerType: string | undefined,
+  ): AsyncGenerator<SimpleXlsxCell[]> {
+    let cursorId: bigint | undefined;
+    const where = this.applicationQueueWhere(extraWhere);
+    const [liveRepayDate, closedLoanLeadIds] = await Promise.all([
+      resolveRepaymentDueDateUtc(this.prisma.client),
+      loadClosedLoanLeadIdsByCustomer(this.prisma.read),
+    ]);
+
+    for (;;) {
+      const batch = await this.prisma.read.application.findMany({
+        take: EXPORT_BATCH_SIZE,
+        ...(cursorId != null ? { skip: 1, cursor: { id: cursorId } } : {}),
+        where,
+        orderBy: { id: 'desc' },
+        include: this.applicationListInclude,
+      });
+      if (batch.length === 0) return;
+
+      for (const record of batch) {
+        const app = this.toApplicationListItem(record, liveRepayDate, closedLoanLeadIds);
+        if (stage && dumpApplicationStageLabel(app) !== stage) continue;
+        if (reason) {
+          const haystack = [app.leadRejectionReason?.code, app.leadRejectionReason?.label, app.leadStatusNote]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          if (!haystack.includes(reason)) continue;
+        }
+        if (name && !matchesExportTextFilter(app.fullName ?? 'Details pending', name)) continue;
+        if (customerType && !matchesExportMultiSelectFilter(app.customerType, customerType)) continue;
+        yield this.applicationRowCells(app);
+      }
+
+      cursorId = batch[batch.length - 1]!.id;
+      if (batch.length < EXPORT_BATCH_SIZE) return;
+    }
+  }
+
+  /** Builds the export's Prisma `where` from the LOS Applications table's own filters. Throws when none are set. */
+  private buildExportWhere(query: ExportApplicationsQueryDto): Prisma.ApplicationWhereInput {
+    const and: Prisma.ApplicationWhereInput[] = [];
+
+    const appIdText = query['app-id']?.trim();
+    if (appIdText) {
+      and.push({
+        OR: [
+          { applicationNumber: { contains: appIdText } },
+          { lead: { leadNumber: { contains: appIdText } } },
+          { uuid: { contains: appIdText } },
+          { lead: { uuid: { contains: appIdText } } },
+        ],
+      });
+    }
+
+    const mobileText = query.mobile?.trim();
+    if (mobileText) {
+      and.push({ customer: { mobileNumber: { contains: mobileText } } });
+    }
+
+    const emailText = query.email?.trim();
+    if (emailText) {
+      and.push({
+        OR: [
+          { details: { emailId: { contains: emailText } } },
+          { lead: { leadDetail: { emailId: { contains: emailText } } } },
+        ],
+      });
+    }
+
+    const cibilText = query.cibil?.trim();
+    if (cibilText) {
+      const cibilScore = Number(cibilText);
+      if (!Number.isFinite(cibilScore)) {
+        throw new BadRequestException('cibil must be a number.');
+      }
+      and.push({ lead: { leadDetail: { bureauReport: { cibilScore } } } });
+    }
+
+    const grade = query.grade?.trim().toUpperCase();
+    if (grade) {
+      if (!CIBIL_GRADE_SET.has(grade as CibilGrade)) {
+        throw new BadRequestException('grade must be one of A-H.');
+      }
+      and.push({
+        lead: { leadDetail: { bureauReport: { cibilCreditAssessment: { category: grade } } } },
+      });
+    }
+
+    const loanText = query.loan?.trim();
+    if (loanText) {
+      const loanAmount = Number(loanText);
+      if (!Number.isFinite(loanAmount)) {
+        throw new BadRequestException('loan must be a number.');
+      }
+      and.push({ details: { selectedLoanAmount: loanAmount } });
+    }
+
+    const statusText = query.status?.trim();
+    if (statusText) {
+      and.push(
+        statusText.toUpperCase() === 'REJECTED'
+          ? {
+              OR: [
+                { lead: { leadStatus: { name: { contains: 'REJECT' } } } },
+                { applicationStatus: { name: { contains: 'REJECT' } } },
+              ],
+            }
+          : { applicationStatus: { name: statusText } },
+      );
+    }
+
+    const createdRange = parseExportIstDayRange(query.created, 'created');
+    if (createdRange) {
+      and.push({ createdAt: { gte: createdRange.start, lt: createdRange.end } });
+    }
+
+    const modifiedRange = parseExportIstDayRange(query.modified, 'modified');
+    if (modifiedRange) {
+      and.push({ updatedAt: { gte: modifiedRange.start, lt: modifiedRange.end } });
+    }
+
+    return and.length > 0 ? { AND: and } : {};
   }
 
   async getApplicationDetails(applicationUuid: string) {

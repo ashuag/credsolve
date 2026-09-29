@@ -1,4 +1,4 @@
-import { cachedAuthorizedLosGet, fetchWithTimeout, isFetchTimeoutError, messageFromBody, parseJsonResponse, resolveLosClientApiUrl, WORKBOOK_DOWNLOAD_TIMEOUT_MS } from './_shared';
+import { cachedAuthorizedLosGet, downloadAuthenticatedWorkbook } from './_shared';
 
 export type LosLeadReportListItem = {
   uuid: string;
@@ -21,8 +21,22 @@ export type LosLeadReportListItem = {
   cibilScore: number | null;
   /** CIBIL credit-assessment grade (A–H) from the current bureau report. */
   cibilCreditAssessmentCategory: string | null;
+<<<<<<< HEAD
+=======
+  /** 'NEW' (no prior repaid loan) or 'RECURRING' (has a fully repaid loan under a different lead). */
+  customerType: 'NEW' | 'RECURRING';
+  customerTypeLabel: string;
+>>>>>>> refs/remotes/moneycash/main
   leadStatusCode: string;
   leadStatusLabel: string;
+  rejectionReasonCode: string | null;
+  rejectionReasonLabel: string | null;
+  rejectionNote: string | null;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  utmTerm: string | null;
+  utmContent: string | null;
   applicationUuid: string | null;
   applicationNumber: string | null;
   applicationStatusCode: string | null;
@@ -74,48 +88,21 @@ export async function getLeadReportDetails(token: string, leadUuid: string): Pro
   );
 }
 
-function filenameFromContentDisposition(header: string | null): string | null {
-  if (!header) return null;
-  const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(header);
-  if (utf8?.[1]) return decodeURIComponent(utf8[1].trim());
-  const quoted = /filename="([^"]+)"/i.exec(header);
-  if (quoted?.[1]) return quoted[1];
-  const plain = /filename=([^;]+)/i.exec(header);
-  return plain?.[1]?.trim() ?? null;
-}
-
-/** Authenticated workbook download — uses the Bearer header, not a query token. */
-export async function downloadLeadReportsExport(token: string): Promise<void> {
-  let response: Response;
-  try {
-    response = await fetchWithTimeout(
-      resolveLosClientApiUrl('/lead-reports/export'),
-      { headers: { Authorization: `Bearer ${token}` } },
-      WORKBOOK_DOWNLOAD_TIMEOUT_MS,
-    );
-  } catch (err) {
-    if (isFetchTimeoutError(err)) {
-      throw new Error('Download timed out while building the lead report. Please try again.');
-    }
-    throw err;
-  }
-
-  if (!response.ok) {
-    const body = await parseJsonResponse(response);
-    if (response.status === 401) {
-      throw new Error('Session expired — please log in again.');
-    }
-    throw new Error(messageFromBody(body) ?? 'Failed to download lead report');
-  }
-
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filenameFromContentDisposition(response.headers.get('Content-Disposition'))
-    ?? 'Lead report.xlsx';
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+/**
+ * Authenticated workbook download — uses the Bearer header, not a query token. Caller must pass the
+ * table's active column filters (same keys as the Lead Report table's columns) — the backend
+ * rejects an empty set.
+ */
+export async function downloadLeadReportsExport(
+  token: string,
+  filters: Partial<Record<string, string>>,
+): Promise<void> {
+  return downloadAuthenticatedWorkbook({
+    token,
+    path: '/lead-reports/export',
+    filters,
+    timeoutMessage: 'Download timed out while building the lead report. Please try again.',
+    fallbackErrorMessage: 'Failed to download lead report',
+    fallbackFilename: 'Lead report.xlsx',
+  });
 }

@@ -5,26 +5,17 @@ import {
   isoDateTimestamp,
   LOS_LISTING_PAGE_SIZE,
   LOS_LISTING_PAGE_SIZE_OPTIONS,
+  useDataTableFilterState,
   type DataTableColumn,
 } from '@/components/ui/data-table';
-import { getNewLeads, getLeadsExportUrl, getMasters, markLeadInternalTesting, type LosLead } from '@/lib/api';
+import { DownloadDumpButton } from '@/components/ui/download-dump-button';
+import { getNewLeads, downloadLeadsExport, getMasters, markLeadInternalTesting, type LosLead } from '@/lib/api';
 import { formatCibilScoreLabel, isDisplayedNtcCibilScore } from '@/lib/application-review-format';
-import { LOS_STORAGE_KEY } from '@/lib/auth';
+import { getLosToken as getToken } from '@/lib/auth';
 import { formatPersonName } from '@/lib/format-person-name';
 import { MarkInternalTestingButton, useCanMarkInternalTesting } from '@/components/shared/mark-internal-testing-button';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-
-function getToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.localStorage.getItem(LOS_STORAGE_KEY);
-    if (!raw) return null;
-    return (JSON.parse(raw) as { token?: string }).token ?? null;
-  } catch {
-    return null;
-  }
-}
 
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString('en-IN', {
@@ -142,6 +133,7 @@ export function LeadsPanel() {
   const [fetchError,       setFetchError]       = useState<string | null>(null);
   const [statuses,         setStatuses]         = useState<Array<{ code: string; displayName: string }>>([]);
   const [busyUuid,         setBusyUuid]         = useState<string | null>(null);
+  const { filteredCount, filtersActive, activeColumnFilters, onFilteredItemsChange } = useDataTableFilterState();
   const canMarkTesting = useCanMarkInternalTesting();
 
   const loadLeads = useCallback(async () => {
@@ -411,8 +403,10 @@ export function LeadsPanel() {
         minWidth="1480px"
         pageSize={LOS_LISTING_PAGE_SIZE}
         pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
+        onFilteredItemsChange={onFilteredItemsChange}
         toolbarActions={
           <div className="flex items-center gap-2">
+<<<<<<< HEAD
             <button
               type="button"
               onClick={() => {
@@ -432,6 +426,17 @@ export function LeadsPanel() {
             >
               ⬇ Download dump
             </button>
+=======
+            <DownloadDumpButton
+              filtersActive={filtersActive}
+              loading={loading}
+              resultCount={filteredCount}
+              onDownload={(token) => downloadLeadsExport(token, activeColumnFilters)}
+              onSessionExpired={() => setFetchError('Session expired — please log in again.')}
+              onError={(message) => setFetchError(message)}
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            />
+>>>>>>> refs/remotes/moneycash/main
             <button
               type="button"
               onClick={() => void loadLeads()}

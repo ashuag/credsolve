@@ -199,6 +199,9 @@ export function ApplicationReviewToolbar({
   onDisburse,
   disburseDisabled = false,
   disburseBusy = false,
+  disburseLabel = 'Disburse',
+  onCheckDisbursal,
+  checkDisbursalBusy = false,
 }: {
   onRefresh: () => void;
   onReject?: () => void;
@@ -213,6 +216,9 @@ export function ApplicationReviewToolbar({
   onDisburse?: () => void;
   disburseDisabled?: boolean;
   disburseBusy?: boolean;
+  disburseLabel?: string;
+  onCheckDisbursal?: () => void;
+  checkDisbursalBusy?: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
@@ -263,7 +269,17 @@ export function ApplicationReviewToolbar({
           disabled={disburseDisabled || disburseBusy}
           className="min-h-[38px] rounded-[8px] bg-[#0F2748] px-4 text-[0.82rem] font-bold text-[#4ADE80] hover:bg-[#0F2748] disabled:cursor-not-allowed disabled:opacity-55"
         >
-          {disburseBusy ? 'Disbursing…' : 'Disburse'}
+          {disburseBusy ? 'Disbursing…' : disburseLabel}
+        </button>
+      ) : null}
+      {onCheckDisbursal ? (
+        <button
+          type="button"
+          onClick={onCheckDisbursal}
+          disabled={checkDisbursalBusy}
+          className="min-h-[38px] rounded-[8px] bg-[#1c347d] px-4 text-[0.82rem] font-bold text-[#ffc519] hover:bg-[#12244f] disabled:cursor-not-allowed disabled:opacity-55"
+        >
+          {checkDisbursalBusy ? 'Checking…' : 'Check disbursal status'}
         </button>
       ) : null}
       <button type="button" onClick={onRefresh} className="los-btn-primary min-h-[38px] px-4 text-[0.82rem]">

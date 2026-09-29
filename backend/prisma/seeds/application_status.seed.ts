@@ -3,12 +3,18 @@ import { APPLICATION_STATUS } from '../../src/common/constants/application.const
 
 const LEGACY_APPLICATION_STATUS_NAMES = ['SUBMITTED', 'KYC_VERIFIED'] as const;
 
+const APPLICATION_STATUS_DISPLAY_NAMES: Partial<Record<string, string>> = {
+  [APPLICATION_STATUS.DISBURSAL_INPROCESS]: 'Disbursal in process',
+  [APPLICATION_STATUS.DISBURSAL_FAILED]: 'Disbursal failed',
+};
+
 export async function seedApplicationStatus(prisma: Prisma.TransactionClient) {
   for (const name of Object.values(APPLICATION_STATUS)) {
+    const displayName = APPLICATION_STATUS_DISPLAY_NAMES[name];
     await prisma.applicationStatus.upsert({
       where: { name },
-      create: { name, isActive: true },
-      update: { isActive: true },
+      create: { name, isActive: true, displayName },
+      update: displayName ? { isActive: true, displayName } : { isActive: true },
     });
   }
 
