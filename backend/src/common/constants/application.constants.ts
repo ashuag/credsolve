@@ -7,6 +7,10 @@ export const APPLICATION_STATUS = {
   REJECTED: 'REJECTED',
   KYC_FAILED: 'KYC_FAILED',
   PENNYDROP_FAILED: 'PENNYDROP_FAILED',
+  /** Easebuzz accepted the payout; money is not in the beneficiary account yet. */
+  DISBURSAL_INPROCESS: 'DISBURSAL_INPROCESS',
+  /** Easebuzz reported Reversed, Cancelled, Failure, or Rejected. */
+  DISBURSAL_FAILED: 'DISBURSAL_FAILED',
   DISBURSED: 'DISBURSED',
   CANCELLED: 'CANCELLED',
   ACTIVE: 'ACTIVE',

@@ -24,9 +24,12 @@ import {
 import {
   buildDisbursementUniqueRequestNumber,
   buildGatewayTransferJsonForPersist,
+  classifyEasebuzzDisbursementStatus,
   isEasebuzzDuplicateUniqueRequestNumber,
+  mapEasebuzzTransferLog,
   parseEasebuzzQuickTransferInitiate,
   uniqueRequestNumberFromVendorPayload,
+  type EasebuzzDisbursementPhase,
 } from '../../../common/easebuzz/easebuzz-transfer-log.util';
 import { EmailService } from '../../../common/email/email.service';
 import { KycCompletionService } from '../../../common/kyc/kyc-completion.service';
@@ -56,6 +59,17 @@ function maskAccount(account: string): string {
   return `${'*'.repeat(Math.max(0, digits.length - 4))}${digits.slice(-4)}`;
 }
 
+function disbursalStatusNote(vendorStatus: string | null, message: string | null): string | null {
+  const detail = (message || vendorStatus || '').trim();
+  if (!detail) return null;
+  return `Easebuzz: ${detail}`.slice(0, 256);
+}
+
+function disbursalFailureMessage(gatewayTransferJson: unknown, vendorStatus: string | null): string | null {
+  const logged = mapEasebuzzTransferLog(gatewayTransferJson);
+  return logged?.failureReason ?? (vendorStatus ? `Easebuzz status: ${vendorStatus}` : null);
+}
+
 @Injectable()
 export class LosDisbursementService {
   private readonly logger = new Logger(LosDisbursementService.name);
@@ -82,8 +96,18 @@ export class LosDisbursementService {
         alreadyApproved: true,
       };
     }
-    if (statusName === APPLICATION_STATUS.DISBURSED) {
-      throw new ConflictException('This application is already disbursed.');
+    if (
+      statusName === APPLICATION_STATUS.DISBURSED ||
+      statusName === APPLICATION_STATUS.DISBURSAL_INPROCESS ||
+      statusName === APPLICATION_STATUS.DISBURSAL_FAILED
+    ) {
+      throw new ConflictException(
+        statusName === APPLICATION_STATUS.DISBURSAL_INPROCESS
+          ? 'Disbursal is already in process for this application.'
+          : statusName === APPLICATION_STATUS.DISBURSAL_FAILED
+            ? 'Disbursal failed for this application. Retry disbursement instead of approving again.'
+            : 'This application is already disbursed.',
+      );
     }
     const nameReviewPending = isBankNameMatchReviewPending({
       statusName,
@@ -188,7 +212,15 @@ export class LosDisbursementService {
     if (statusName === APPLICATION_STATUS.DISBURSED) {
       throw new ConflictException('This application is already disbursed.');
     }
-    if (statusName !== APPLICATION_STATUS.APPROVED) {
+    if (statusName === APPLICATION_STATUS.DISBURSAL_INPROCESS) {
+      throw new ConflictException(
+        'Disbursal is already in process. Check the bank status instead of sending another payout.',
+      );
+    }
+    if (
+      statusName !== APPLICATION_STATUS.APPROVED &&
+      statusName !== APPLICATION_STATUS.DISBURSAL_FAILED
+    ) {
       throw new BadRequestException(
         'Application must be APPROVED before disbursement. Approve the application first.',
       );
@@ -276,6 +308,42 @@ export class LosDisbursementService {
       gatewayTransferJson = buildGatewayTransferJsonForPersist(transfer.rawBody);
     }
 
+    const phase: EasebuzzDisbursementPhase =
+      paymentGateway === 'skipped' ? 'success' : classifyEasebuzzDisbursementStatus(vendorStatus);
+
+    if (phase !== 'success') {
+      const statusCode =
+        phase === 'failed' ? APPLICATION_STATUS.DISBURSAL_FAILED : APPLICATION_STATUS.DISBURSAL_INPROCESS;
+      const failureMessage =
+        phase === 'failed'
+          ? disbursalFailureMessage(gatewayTransferJson, vendorStatus)
+          : null;
+      await this.markDisbursalPhase({
+        applicationId: application.id,
+        statusName: statusCode,
+        note: disbursalStatusNote(vendorStatus, failureMessage),
+        uniqueRequestNumber: uniqueRequestNumber || null,
+      });
+      if (phase === 'failed') {
+        await this.clearPendingUrn(applicationUuid);
+      }
+      return {
+        success: true as const,
+        applicationUuid,
+        statusCode,
+        message: failureMessage,
+        loan: null,
+        paymentGateway,
+        transfer: paymentGateway === 'easebuzz'
+          ? {
+              uniqueRequestNumber,
+              utr: transferUtr,
+              vendorStatus,
+            }
+          : null,
+      };
+    }
+
     const disbursedStatus = await this.prisma.client.applicationStatus.findFirst({
       where: { name: APPLICATION_STATUS.DISBURSED, isActive: true },
       select: { id: true },
@@ -319,7 +387,11 @@ export class LosDisbursementService {
           if (!row) {
             throw new NotFoundException('Application not found.');
           }
-          if (row.status_name !== APPLICATION_STATUS.APPROVED) {
+          if (
+            row.status_name !== APPLICATION_STATUS.APPROVED &&
+            row.status_name !== APPLICATION_STATUS.DISBURSAL_FAILED &&
+            row.status_name !== APPLICATION_STATUS.DISBURSAL_INPROCESS
+          ) {
             throw new ConflictException(
               `Application status changed to ${row.status_name}; disbursement aborted.`,
             );
@@ -433,6 +505,7 @@ export class LosDisbursementService {
       success: true as const,
       applicationUuid,
       statusCode: APPLICATION_STATUS.DISBURSED,
+      message: null,
       loan: {
         uuid: loanAccount.uuid,
         loanNumber: loanAccount.loanNumber,
@@ -670,6 +743,7 @@ export class LosDisbursementService {
             bankAccountNumber: true,
             ifscCode: true,
             bankName: true,
+            disbursementUniqueRequestNumber: true,
             loanDocumentsAcceptedAt: true,
             loanDocumentsAcceptedIp: true,
             keyFactPdfRelativePath: true,
@@ -710,6 +784,391 @@ export class LosDisbursementService {
       throw new NotFoundException('Application not found.');
     }
     return application;
+  }
+
+  /**
+   * Poll Easebuzz for an in-process payout. Success creates the loan and sends
+   * the final sanction letter. Terminal bank statuses become DISBURSAL_FAILED.
+   */
+  async checkDisbursementStatus(applicationUuid: string) {
+    const lockKey = `los:disburse:${applicationUuid}`;
+    const lockToken = randomUUID();
+    const acquired = await this.redis.client.set(
+      lockKey,
+      lockToken,
+      'EX',
+      DISBURSE_LOCK_TTL_SEC,
+      'NX',
+    );
+    if (acquired !== 'OK') {
+      throw new ConflictException(
+        'Disbursement status check is already in progress for this application. Please wait and try again.',
+      );
+    }
+
+    try {
+      return await this.checkDisbursementStatusLocked(applicationUuid);
+    } finally {
+      await this.releaseDisburseLock(lockKey, lockToken);
+    }
+  }
+
+  /** Poll every application currently waiting on the bank. */
+  async pollInProcessDisbursals(): Promise<{ checked: number; disbursed: number; failed: number }> {
+    const rows = await this.prisma.client.application.findMany({
+      where: {
+        applicationStatus: { name: APPLICATION_STATUS.DISBURSAL_INPROCESS, isActive: true },
+        loanAccount: null,
+      },
+      select: { uuid: true },
+      orderBy: { updatedAt: 'asc' },
+      take: 40,
+    });
+
+    let disbursed = 0;
+    let failed = 0;
+    for (const row of rows) {
+      try {
+        const result = await this.checkDisbursementStatus(row.uuid);
+        if (result.statusCode === APPLICATION_STATUS.DISBURSED) disbursed += 1;
+        if (result.statusCode === APPLICATION_STATUS.DISBURSAL_FAILED) failed += 1;
+      } catch (error) {
+        this.logger.warn(
+          `[disburse-status] ${row.uuid}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    if (rows.length > 0) {
+      this.logger.log(
+        `[disburse-status] checked=${rows.length} disbursed=${disbursed} failed=${failed}`,
+      );
+    }
+    return { checked: rows.length, disbursed, failed };
+  }
+
+  private async checkDisbursementStatusLocked(applicationUuid: string) {
+    const application = await this.loadApplicationForDecision(applicationUuid);
+    const statusName = application.applicationStatus.name;
+
+    if (statusName === APPLICATION_STATUS.DISBURSED) {
+      return {
+        success: true as const,
+        applicationUuid,
+        statusCode: APPLICATION_STATUS.DISBURSED,
+        message: null,
+        loan: null,
+        paymentGateway: 'easebuzz' as const,
+        transfer: null,
+      };
+    }
+    if (statusName !== APPLICATION_STATUS.DISBURSAL_INPROCESS) {
+      throw new BadRequestException(
+        'Disbursal status can be checked only while the application is disbursal in process.',
+      );
+    }
+    if (application.loanAccount) {
+      throw new ConflictException('A loan account already exists for this application.');
+    }
+
+    const uniqueRequestNumber = await this.resolveInProcessUrn(application);
+    if (!uniqueRequestNumber) {
+      throw new UnprocessableEntityException(
+        'No Easebuzz request number is stored for this disbursal. Cannot check status.',
+      );
+    }
+
+    const retrieved = await this.easebuzzWire.retrieveTransferStatus(uniqueRequestNumber, {
+      leadId: application.leadId,
+    });
+    const vendorStatus = retrieved.status;
+    const phase = classifyEasebuzzDisbursementStatus(vendorStatus);
+    const gatewayTransferJson = buildGatewayTransferJsonForPersist(retrieved.rawBody);
+    const transferUtr = retrieved.utr?.slice(0, 50) ?? null;
+
+    if (!retrieved.httpOk || phase === 'unknown' || phase === 'in_process') {
+      const note = disbursalStatusNote(vendorStatus, retrieved.message);
+      if (note) {
+        await this.prisma.client.application.update({
+          where: { id: application.id },
+          data: { applicationStatusNote: note },
+        });
+      }
+      return {
+        success: true as const,
+        applicationUuid,
+        statusCode: APPLICATION_STATUS.DISBURSAL_INPROCESS,
+        message: retrieved.httpOk
+          ? `Bank status is still ${vendorStatus ?? 'in process'}.`
+          : retrieved.message ?? 'Could not retrieve disbursal status from Easebuzz.',
+        loan: null,
+        paymentGateway: 'easebuzz' as const,
+        transfer: {
+          uniqueRequestNumber,
+          utr: transferUtr,
+          vendorStatus,
+        },
+      };
+    }
+
+    if (phase === 'failed') {
+      const failureMessage =
+        disbursalFailureMessage(gatewayTransferJson, vendorStatus) ?? retrieved.failureReason;
+      await this.markDisbursalPhase({
+        applicationId: application.id,
+        statusName: APPLICATION_STATUS.DISBURSAL_FAILED,
+        note: disbursalStatusNote(vendorStatus, failureMessage),
+        uniqueRequestNumber,
+      });
+      await this.clearPendingUrn(applicationUuid);
+      return {
+        success: true as const,
+        applicationUuid,
+        statusCode: APPLICATION_STATUS.DISBURSAL_FAILED,
+        message: failureMessage ?? 'Easebuzz reported the transfer as failed.',
+        loan: null,
+        paymentGateway: 'easebuzz' as const,
+        transfer: {
+          uniqueRequestNumber,
+          utr: transferUtr,
+          vendorStatus,
+        },
+      };
+    }
+
+    const details = application.details;
+    if (!details?.selectedLoanAmount || !details.expectedRepaymentDays || !details.expectedRepaymentDate) {
+      throw new BadRequestException('Loan selection is incomplete — cannot complete disbursement.');
+    }
+    if (!details.bankAccountNumber?.trim() || !details.ifscCode?.trim()) {
+      throw new BadRequestException('Bank account details are required before disbursement.');
+    }
+
+    const disbursedAt = new Date();
+    const liveRepayDate = await resolveRepaymentDueDateUtc(this.prisma.client, disbursedAt);
+    const liveTenureDays = computeTenureDays(istCalendarDateUtc(disbursedAt), liveRepayDate);
+    const fees = computeFeeAmountsFromLoanDetail(
+      {
+        ...details,
+        expectedRepaymentDate: liveRepayDate,
+        expectedRepaymentDays: liveTenureDays,
+      },
+      disbursedAt,
+    );
+    const principal = decimalToNumber(details.selectedLoanAmount);
+    const interestRate = decimalToNumber(details.interestRate);
+    if (principal == null || interestRate == null || fees.interestAmount == null || fees.disburseAmount == null) {
+      throw new BadRequestException('Unable to compute disbursement amounts from loan details.');
+    }
+    const vendorAmount = mapEasebuzzTransferLog(gatewayTransferJson)?.amount;
+    const netFromVendor = vendorAmount != null ? Number(vendorAmount) : NaN;
+    const netAmount = Number.isFinite(netFromVendor) && netFromVendor > 0 ? netFromVendor : fees.disburseAmount;
+    const loanNumber = resolveLoanAccountNumberAtDisbursement(application.applicationNumber);
+
+    const disbursedStatus = await this.prisma.client.applicationStatus.findFirst({
+      where: { name: APPLICATION_STATUS.DISBURSED, isActive: true },
+      select: { id: true },
+    });
+    const activeLoanStatus = await this.prisma.client.loanStatus.findFirst({
+      where: { name: LOAN_STATUS.ACTIVE, isActive: true },
+      select: { id: true },
+    });
+    if (!disbursedStatus) {
+      throw new NotFoundException('DISBURSED application status is not configured.');
+    }
+    if (!activeLoanStatus) {
+      throw new NotFoundException('ACTIVE loan status is not configured.');
+    }
+
+    const totalRepayment = principal + fees.interestAmount;
+    const loanUuid = randomUUID();
+    let loanAccount: {
+      uuid: string;
+      loanNumber: string;
+      loanAccountNumber: string;
+      principalAmount: string;
+      netDisbursedAmount: string;
+      disbursedAt: Date;
+    };
+
+    try {
+      loanAccount = await this.prisma.client.$transaction(
+        async (tx) => {
+          const locked = await tx.$queryRaw<Array<{ id: bigint; status_name: string }>>`
+            SELECT a.id, s.name AS status_name
+            FROM application a
+            INNER JOIN application_status s ON s.id = a.application_status_id
+            WHERE a.id = ${application.id}
+            FOR UPDATE
+          `;
+          const row = locked[0];
+          if (!row) throw new NotFoundException('Application not found.');
+          if (row.status_name !== APPLICATION_STATUS.DISBURSAL_INPROCESS) {
+            throw new ConflictException(
+              `Application status changed to ${row.status_name}; disbursement aborted.`,
+            );
+          }
+          const existingLoan = await tx.loanAccount.findUnique({
+            where: { applicationId: application.id },
+            select: { id: true },
+          });
+          if (existingLoan) {
+            throw new ConflictException('A loan account already exists for this application.');
+          }
+
+          await tx.$executeRaw`
+            INSERT INTO loan_account (
+              uuid,
+              application_id,
+              customer_id,
+              loan_number,
+              loan_account_number,
+              principal_amount,
+              net_disbursed_amount,
+              interest_rate,
+              interest_amount,
+              total_repayment_amount,
+              disbursed_at,
+              loan_maturity_date,
+              utr,
+              gateway_transfer_json,
+              bank_account_number,
+              ifsc_code,
+              loan_status_id,
+              closed_at,
+              created_at,
+              updated_at
+            ) VALUES (
+              ${loanUuid},
+              ${application.id},
+              ${application.customerId},
+              ${loanNumber},
+              ${loanNumber},
+              ${principal.toFixed(2)},
+              ${netAmount.toFixed(2)},
+              ${interestRate.toFixed(2)},
+              ${fees.interestAmount!.toFixed(2)},
+              ${totalRepayment.toFixed(2)},
+              ${disbursedAt},
+              ${liveRepayDate},
+              ${transferUtr},
+              ${gatewayTransferJson == null ? null : JSON.stringify(gatewayTransferJson)},
+              ${details.bankAccountNumber},
+              ${details.ifscCode},
+              ${activeLoanStatus.id},
+              ${null},
+              ${disbursedAt},
+              ${disbursedAt}
+            )
+          `;
+
+          await tx.application.update({
+            where: { id: application.id },
+            data: {
+              applicationStatusId: disbursedStatus.id,
+              applicationStatusNote: null,
+            },
+          });
+          await tx.applicationDetail.update({
+            where: { applicationId: application.id },
+            data: {
+              expectedRepaymentDays: liveTenureDays,
+              expectedRepaymentDate: liveRepayDate,
+            },
+          });
+
+          return {
+            uuid: loanUuid,
+            loanNumber,
+            loanAccountNumber: loanNumber,
+            principalAmount: principal.toFixed(2),
+            netDisbursedAmount: netAmount.toFixed(2),
+            disbursedAt,
+          };
+        },
+        { timeout: 20_000 },
+      );
+    } catch (error) {
+      this.logger.error(
+        `[disburse-status] CRITICAL: Easebuzz reports success but loan_account persistence failed ` +
+          `app=${applicationUuid} unique=${uniqueRequestNumber} utr=${transferUtr ?? 'n/a'}. Manual reconciliation required.`,
+        error instanceof Error ? error.stack : error,
+      );
+      throw error;
+    }
+
+    if (application.details) {
+      application.details.expectedRepaymentDate = liveRepayDate;
+      application.details.expectedRepaymentDays = liveTenureDays;
+    }
+    void this.emailFinalSanctionLetter(application);
+    await this.clearPendingUrn(applicationUuid);
+
+    return {
+      success: true as const,
+      applicationUuid,
+      statusCode: APPLICATION_STATUS.DISBURSED,
+      message: null,
+      loan: {
+        uuid: loanAccount.uuid,
+        loanNumber: loanAccount.loanNumber,
+        loanAccountNumber: loanAccount.loanAccountNumber,
+        principalAmount: loanAccount.principalAmount,
+        netDisbursedAmount: loanAccount.netDisbursedAmount,
+        disbursedAt: loanAccount.disbursedAt.toISOString(),
+      },
+      paymentGateway: 'easebuzz' as const,
+      transfer: {
+        uniqueRequestNumber,
+        utr: transferUtr,
+        vendorStatus,
+      },
+    };
+  }
+
+  private async resolveInProcessUrn(
+    application: Awaited<ReturnType<LosDisbursementService['loadApplicationForDecision']>>,
+  ): Promise<string | null> {
+    const stored = application.details?.disbursementUniqueRequestNumber?.trim();
+    if (stored) return stored;
+    return this.findExistingPaymentUrn({
+      applicationUuid: application.uuid,
+      applicationNumber: application.applicationNumber,
+      leadId: application.leadId,
+    });
+  }
+
+  private async markDisbursalPhase(input: {
+    applicationId: bigint;
+    statusName: typeof APPLICATION_STATUS.DISBURSAL_INPROCESS | typeof APPLICATION_STATUS.DISBURSAL_FAILED;
+    note: string | null;
+    uniqueRequestNumber: string | null;
+  }): Promise<void> {
+    const status = await this.prisma.client.applicationStatus.findFirst({
+      where: { name: input.statusName, isActive: true },
+      select: { id: true },
+    });
+    if (!status) {
+      throw new NotFoundException(`${input.statusName} application status is not configured.`);
+    }
+
+    await this.prisma.client.$transaction([
+      this.prisma.client.application.update({
+        where: { id: input.applicationId },
+        data: {
+          applicationStatusId: status.id,
+          applicationStatusNote: input.note,
+        },
+      }),
+      ...(input.uniqueRequestNumber
+        ? [
+            this.prisma.client.applicationDetail.update({
+              where: { applicationId: input.applicationId },
+              data: { disbursementUniqueRequestNumber: input.uniqueRequestNumber.slice(0, 40) },
+            }),
+          ]
+        : []),
+    ]);
   }
 
   private async emailFinalSanctionLetter(

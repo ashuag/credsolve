@@ -11,6 +11,7 @@ export type DisburseApplicationResult = {
   success: true;
   applicationUuid: string;
   statusCode: string;
+  message: string | null;
   loan: {
     uuid: string;
     loanNumber: string;
@@ -18,7 +19,7 @@ export type DisburseApplicationResult = {
     principalAmount: string;
     netDisbursedAmount: string;
     disbursedAt: string;
-  };
+  } | null;
   paymentGateway: 'easebuzz' | 'skipped';
   transfer: {
     uniqueRequestNumber: string;
@@ -72,6 +73,19 @@ export async function disburseApplication(
     `/applications/${encodeURIComponent(applicationUuid)}/disburse`,
     { method: 'POST' },
     'Failed to disburse loan.',
+    90_000,
+  );
+}
+
+export async function checkDisbursementStatus(
+  token: string,
+  applicationUuid: string,
+): Promise<DisburseApplicationResult> {
+  return authorizedLosRequest(
+    token,
+    `/applications/${encodeURIComponent(applicationUuid)}/check-disbursement-status`,
+    { method: 'POST' },
+    'Failed to check disbursal status.',
     90_000,
   );
 }

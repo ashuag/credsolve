@@ -55,6 +55,8 @@ function statusBadgeClass(status: string): string {
   }
   // Application journey statuses
   if (s === 'DISBURSED') return 'bg-indigo-50 text-indigo-700 border-indigo-200 ring-1 ring-indigo-500/20';
+  if (s === 'DISBURSAL_INPROCESS') return 'bg-amber-50 text-amber-800 border-amber-200/80 ring-1 ring-amber-500/30';
+  if (s === 'DISBURSAL_FAILED') return 'bg-rose-50 text-rose-700 border-rose-200 ring-1 ring-rose-500/20';
   if (s === 'IN_REVIEW' || s === 'UNDER_REVIEW') return 'bg-amber-50 text-amber-800 border-amber-200/80 ring-1 ring-amber-500/30';
   if (s === 'APPROVED') return 'bg-sky-50 text-sky-700 border-sky-200 ring-1 ring-sky-500/20';
   if (s === 'PENNYDROP_FAILED') {
@@ -75,6 +77,8 @@ function statusBadgeLabel(status: string): string {
   if (s === 'ACTIVE') return 'Active loan';
   if (s === 'WRITTEN_OFF') return 'Written off';
   if (s === 'IN_REVIEW' || s === 'UNDER_REVIEW') return 'In review';
+  if (s === 'DISBURSAL_INPROCESS') return 'Disbursal in process';
+  if (s === 'DISBURSAL_FAILED') return 'Disbursal failed';
   if (s === 'PENNYDROP_FAILED') return 'We will call you';
   return status.replace(/_/g, ' ');
 }

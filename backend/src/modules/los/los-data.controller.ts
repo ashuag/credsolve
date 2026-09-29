@@ -741,10 +741,20 @@ export class LosDataController {
   @UseGuards(LosDenyAgentGuard)
   @ApiOperation({
     summary:
-      'Disburse an APPROVED application: one Easebuzz IMPS payout (URN = application number + timestamp), create loan_account, set DISBURSED, email final sanction letter',
+      'Disburse an APPROVED application: one Easebuzz IMPS payout. Loan is created and status becomes DISBURSED only when Easebuzz reports Success. Accepted, In Process, Pending, and Unapproved become DISBURSAL_INPROCESS.',
   })
   disburseApplication(@Param('applicationUuid') applicationUuid: string) {
     return this.losDisbursement.disburseApplication(applicationUuid);
+  }
+
+  @Post('applications/:applicationUuid/check-disbursement-status')
+  @UseGuards(LosDenyAgentGuard)
+  @ApiOperation({
+    summary:
+      'Poll Easebuzz GET /transfers/{unique_request_number}/ for a DISBURSAL_INPROCESS application. Success disburses the loan; Reversed, Cancelled, Failure, and Rejected set DISBURSAL_FAILED.',
+  })
+  checkApplicationDisbursementStatus(@Param('applicationUuid') applicationUuid: string) {
+    return this.losDisbursement.checkDisbursementStatus(applicationUuid);
   }
 
   @Post('applications/:applicationUuid/kyc/enable-re-kyc')

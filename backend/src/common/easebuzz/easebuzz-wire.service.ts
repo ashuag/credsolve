@@ -11,6 +11,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { VendorApiService } from '../vendor/vendor-api.service';
 import {
+  classifyEasebuzzDisbursementStatus,
   isEasebuzzDuplicateUniqueRequestNumber,
   parseEasebuzzQuickTransferInitiate,
   parseEasebuzzQuickTransferRetrieve,
@@ -967,6 +968,18 @@ export class EasebuzzWireService {
           parsed.message ?? 'A disbursement payment already exists for this request number.',
         );
       }
+      // Bank-terminal statuses are returned so LOS can set DISBURSAL_FAILED.
+      // Envelope rejects (invalid key, empty body) never created a payout.
+      if (classifyEasebuzzDisbursementStatus(parsed.vendorStatus) === 'failed') {
+        return {
+          ok: true,
+          httpStatus: result.httpStatus,
+          transferId: parsed.transferId,
+          uniqueRequestNumber: input.uniqueRequestNumber,
+          vendorStatus: parsed.vendorStatus,
+          rawBody: result.body,
+        };
+      }
       throw new UnprocessableEntityException(
         parsed.message ?? 'Easebuzz transfer failed. Loan was not disbursed.',
       );
@@ -1086,6 +1099,70 @@ export class EasebuzzWireService {
       utr: parsed.transferId,
       failureReason: parsed.accepted ? null : parsed.message,
       message: httpOk ? parsed.message : result.error?.message ?? parsed.message ?? 'Transfer retrieve failed.',
+      rawBody: result.body,
+    };
+  }
+
+  /**
+   * Live status for one payout.
+   * GET /api/v1/transfers/{unique_request_number}/
+   * Authorization = SHA-512(key|unique_request_number|salt), plus WIRE-API-KEY.
+   */
+  async retrieveTransferStatus(
+    uniqueRequestNumber: string,
+    options?: { leadId?: bigint | null },
+  ): Promise<EasebuzzQuickTransferRetrieveResult> {
+    const cfg = this.assertTransferConfiguredOrThrow();
+    const urn = uniqueRequestNumber.trim().slice(0, 40);
+    if (!urn) {
+      return {
+        httpOk: false,
+        httpStatus: null,
+        retrieveUrl: cfg.retrieveUrl,
+        uniqueRequestNumber: '',
+        status: null,
+        utr: null,
+        failureReason: null,
+        message: 'unique_request_number is required.',
+        rawBody: null,
+      };
+    }
+
+    const retrieveUrl = `${cfg.retrieveUrl.replace(/\/+$/, '')}/${encodeURIComponent(urn)}/`;
+    const authorization = createHash('sha512').update(`${cfg.key}|${urn}|${cfg.salt}`, 'utf8').digest('hex');
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      Authorization: authorization,
+      'WIRE-API-KEY': cfg.key,
+    };
+
+    const result = await this.vendorApi.request<unknown, Record<string, unknown>>({
+      providerName: 'Easebuzz',
+      serviceName: 'transfer-status',
+      method: 'GET',
+      absoluteUrl: retrieveUrl,
+      headers,
+      body: {
+        key: cfg.key,
+        unique_request_number: urn,
+      },
+      leadId: options?.leadId ?? null,
+      timeoutMs: cfg.timeoutMs,
+      sensitiveHeaderNames: ['WIRE-API-KEY', 'Authorization'],
+    });
+
+    const parsed = parseEasebuzzQuickTransferRetrieve(result.body);
+    const httpOk = result.ok && result.httpStatus != null && result.httpStatus >= 200 && result.httpStatus < 300;
+
+    return {
+      httpOk,
+      httpStatus: result.httpStatus,
+      retrieveUrl,
+      uniqueRequestNumber: urn,
+      status: parsed.vendorStatus,
+      utr: parsed.transferId,
+      failureReason: parsed.accepted ? null : parsed.message,
+      message: httpOk ? parsed.message : result.error?.message ?? parsed.message ?? 'Transfer status check failed.',
       rawBody: result.body,
     };
   }

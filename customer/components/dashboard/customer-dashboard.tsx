@@ -33,6 +33,8 @@ function statusBadgeClass(status: string): string {
   if (s === 'ACTIVE') return 'bg-sky-100 text-sky-900 border-sky-300';
   if (s === 'WRITTEN_OFF') return 'bg-slate-200 text-slate-800 border-slate-300';
   if (s === 'DISBURSED') return 'bg-indigo-100 text-indigo-900 border-indigo-200';
+  if (s === 'DISBURSAL_INPROCESS') return 'bg-amber-100 text-amber-900 border-amber-200';
+  if (s === 'DISBURSAL_FAILED') return 'bg-rose-100 text-rose-900 border-rose-200';
   if (s === 'IN_REVIEW' || s === 'UNDER_REVIEW') return 'bg-amber-100 text-amber-900 border-amber-200';
   if (s === 'APPROVED') return 'bg-sky-100 text-sky-900 border-sky-200';
   if (s === 'REJECTED') return 'bg-rose-100 text-rose-900 border-rose-200';
@@ -45,6 +47,8 @@ function statusBadgeLabel(status: string): string {
   if (s === 'CLOSED') return 'Paid fully';
   if (s === 'OVERDUE') return 'Overdue';
   if (s === 'ACTIVE') return 'Active';
+  if (s === 'DISBURSAL_INPROCESS') return 'Disbursal in process';
+  if (s === 'DISBURSAL_FAILED') return 'Disbursal failed';
   return status.replace(/_/g, ' ');
 }
 

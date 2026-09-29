@@ -366,15 +366,19 @@ export class LosDashboardService {
       const title =
         app.applicationStatus.name === APPLICATION_STATUS.DISBURSED
           ? 'Disbursement recorded'
-          : app.applicationStatus.name === APPLICATION_STATUS.APPROVED
-            ? 'Loan sanctioned'
-            : app.kyc?.kycStatus === 1
-              ? 'KYC cleared'
-              : app.applicationStatus.name === APPLICATION_STATUS.UNDER_REVIEW
-                ? 'Bank name under review'
-                : app.applicationStatus.name === APPLICATION_STATUS.IN_REVIEW
-                ? 'Credit review queue'
-                : 'Application updated';
+          : app.applicationStatus.name === APPLICATION_STATUS.DISBURSAL_INPROCESS
+            ? 'Disbursal in process'
+            : app.applicationStatus.name === APPLICATION_STATUS.DISBURSAL_FAILED
+              ? 'Disbursal failed'
+              : app.applicationStatus.name === APPLICATION_STATUS.APPROVED
+                ? 'Loan sanctioned'
+                : app.kyc?.kycStatus === 1
+                  ? 'KYC cleared'
+                  : app.applicationStatus.name === APPLICATION_STATUS.UNDER_REVIEW
+                    ? 'Bank name under review'
+                    : app.applicationStatus.name === APPLICATION_STATUS.IN_REVIEW
+                      ? 'Credit review queue'
+                      : 'Application updated';
 
       return {
         id: app.uuid,
