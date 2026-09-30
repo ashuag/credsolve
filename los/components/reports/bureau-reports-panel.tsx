@@ -291,29 +291,6 @@ export function BureauReportsPanel() {
         onFilteredItemsChange={onFilteredItemsChange}
         toolbarActions={
           <div className="flex items-center gap-2">
-<<<<<<< HEAD
-            <button
-              type="button"
-              disabled={downloading}
-              onClick={() => {
-                const token = getLosToken();
-                if (!token) {
-                  setFetchError('Session expired — please log in again.');
-                  return;
-                }
-                setDownloading(true);
-                setFetchError(null);
-                void downloadBureauReportsExport(token)
-                  .catch((err) => {
-                    setFetchError(err instanceof Error ? err.message : 'Failed to download bureau reports');
-                  })
-                  .finally(() => setDownloading(false));
-              }}
-              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)] disabled:cursor-wait disabled:opacity-60"
-            >
-              {downloading ? 'Downloading…' : '⬇ Download'}
-            </button>
-=======
             <DownloadDumpButton
               filtersActive={filtersActive}
               loading={loading}
@@ -322,9 +299,8 @@ export function BureauReportsPanel() {
               onSessionExpired={() => setFetchError('Session expired — please log in again.')}
               onError={(message) => setFetchError(message)}
               label="⬇ Download"
-              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
             />
->>>>>>> refs/remotes/moneycash/main
             <button
               type="button"
               onClick={() => void load()}

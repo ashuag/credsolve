@@ -277,7 +277,7 @@ export function ApplicationReviewToolbar({
           type="button"
           onClick={onCheckDisbursal}
           disabled={checkDisbursalBusy}
-          className="min-h-[38px] rounded-[8px] bg-[#1c347d] px-4 text-[0.82rem] font-bold text-[#ffc519] hover:bg-[#12244f] disabled:cursor-not-allowed disabled:opacity-55"
+          className="min-h-[38px] rounded-[8px] bg-[#0F2748] px-4 text-[0.82rem] font-bold text-[#4ADE80] hover:bg-[#0F2748] disabled:cursor-not-allowed disabled:opacity-55"
         >
           {checkDisbursalBusy ? 'Checking…' : 'Check disbursal status'}
         </button>

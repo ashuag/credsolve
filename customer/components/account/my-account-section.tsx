@@ -288,11 +288,7 @@ function JourneyTracker({ steps }: { steps: CustomerJourneyProgressStep[] }) {
                     : done
                       ? 'bg-emerald-500 text-white shadow-[0_6px_14px_rgba(16,185,129,0.28)]'
                       : current
-<<<<<<< HEAD
                         ? 'bg-gradient-to-br from-[#22c55e] to-[#16a34a] text-[#12244f] shadow-[0_8px_18px_rgba(34,197,94,0.38)] ring-4 ring-[#22c55e]/25'
-=======
-                        ? 'bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-[#12244f] shadow-[0_8px_18px_rgba(246,180,0,0.38)] ring-4 ring-[#ffc519]/25'
->>>>>>> refs/remotes/moneycash/main
                         : 'bg-[#eef2f8] text-slate-400',
                 )}
                 aria-current={current ? 'step' : undefined}
@@ -468,14 +464,11 @@ function ActiveLoanCard({
   const overdueDays = loan.overdueDays != null && loan.overdueDays > 0 ? loan.overdueDays : 0;
   const overdueInterestN = parseAmount(loan.overdueInterestInr);
   const showOverdueInterest = overdueDays > 0 && overdueInterestN != null && overdueInterestN > 0;
-<<<<<<< HEAD
   const savings =
     remainingN != null && maturityN != null && (paidN == null || paidN <= 0)
       ? Math.round((maturityN - remainingN) * 100) / 100
       : null;
   const showSavings = loan.usedFullTenureInterest !== true && savings != null && savings > 0.009;
-=======
->>>>>>> refs/remotes/moneycash/main
   const daysUntilDue = calendarDaysFromToday(loan.maturityDate);
   const isOverdue = loan.status.toUpperCase() === 'OVERDUE' || (daysUntilDue != null && daysUntilDue < 0);
   const timing = dueTiming(daysUntilDue, isOverdue, loan.maturityDate);

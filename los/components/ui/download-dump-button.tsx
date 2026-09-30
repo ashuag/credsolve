@@ -4,7 +4,7 @@ import { getLosToken } from '@/lib/auth';
 import { useCallback, useState } from 'react';
 
 const DEFAULT_CLASS =
-  'min-h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent';
+  'min-h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent';
 
 export type DownloadDumpButtonProps = {
   /** Whether at least one filter is applied — the dump stays disabled until one is, to avoid an unbounded dump. */

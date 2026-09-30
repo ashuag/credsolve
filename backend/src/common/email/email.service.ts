@@ -211,7 +211,7 @@ export class EmailService {
     expiresAt: Date,
     audit?: Pick<SendEmailAuditContext, 'leadId'>,
   ): Promise<void> {
-    const subject = 'Your MoneyCash verification code';
+    const subject = 'Your Credsolve verification code';
     const text = [
       `Your verification code is ${code}.`,
       `It expires at ${expiresAt.toISOString()} (UTC).`,

@@ -186,12 +186,9 @@ export function LeadReportDetailPanel({ leadUuid }: { leadUuid: string }) {
                   { label: 'Email', value: row.email ?? '—' },
                   { label: 'CIBIL', value: formatCibilScoreLabel(row.cibilScore) },
                   { label: 'Grade', value: row.cibilCreditAssessmentCategory ?? '—' },
-<<<<<<< HEAD
-=======
                   { label: 'Customer type', value: row.customerTypeLabel },
                   { label: 'Rejection reason', value: row.rejectionReasonLabel ?? '—' },
                   { label: 'Rejection note', value: row.rejectionNote ?? '—' },
->>>>>>> refs/remotes/moneycash/main
                 ]}
               />
             </SectionCard>

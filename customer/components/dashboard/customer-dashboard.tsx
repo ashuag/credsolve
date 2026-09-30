@@ -130,11 +130,7 @@ function JourneyTracker({
                     : done
                       ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 text-white ring-emerald-200'
                       : current
-<<<<<<< HEAD
                         ? 'animate-ring-pop bg-gradient-to-br from-[#22c55e] to-[#16a34a] text-[#12244f] ring-[#22c55e]/40'
-=======
-                        ? 'animate-ring-pop bg-gradient-to-br from-[#ffc519] to-[#f6b400] text-[#12244f] ring-[#ffc519]/40'
->>>>>>> refs/remotes/moneycash/main
                         : 'bg-white text-slate-400 ring-slate-200'
                 )}
                 aria-current={current ? 'step' : undefined}

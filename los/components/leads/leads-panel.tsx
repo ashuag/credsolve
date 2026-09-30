@@ -406,27 +406,6 @@ export function LeadsPanel() {
         onFilteredItemsChange={onFilteredItemsChange}
         toolbarActions={
           <div className="flex items-center gap-2">
-<<<<<<< HEAD
-            <button
-              type="button"
-              onClick={() => {
-                const token = getToken();
-                if (!token) {
-                  setFetchError('Session expired — please log in again.');
-                  return;
-                }
-                const link = document.createElement('a');
-                link.href = getLeadsExportUrl(token);
-                link.rel = 'noopener';
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-              }}
-              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)]"
-            >
-              ⬇ Download dump
-            </button>
-=======
             <DownloadDumpButton
               filtersActive={filtersActive}
               loading={loading}
@@ -434,9 +413,8 @@ export function LeadsPanel() {
               onDownload={(token) => downloadLeadsExport(token, activeColumnFilters)}
               onSessionExpired={() => setFetchError('Session expired — please log in again.')}
               onError={(message) => setFetchError(message)}
-              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
             />
->>>>>>> refs/remotes/moneycash/main
             <button
               type="button"
               onClick={() => void loadLeads()}

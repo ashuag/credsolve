@@ -91,33 +91,6 @@ function normalizeRejectedLoanTypeIds(value: string): string {
   return ids.join(',');
 }
 
-function normalizeRejectedLoanTypeIds(value: string): string {
-  const seen = new Set<string>();
-  const invalid: string[] = [];
-  const ids: string[] = [];
-  for (const part of value.split(',')) {
-    const trimmed = part.trim();
-    if (!trimmed) continue;
-    if (!/^\d{1,2}$/.test(trimmed)) {
-      invalid.push(trimmed);
-      continue;
-    }
-    const symbol = trimmed.padStart(2, '0');
-    if (seen.has(symbol)) continue;
-    seen.add(symbol);
-    ids.push(symbol);
-  }
-  if (invalid.length) {
-    throw new BadRequestException(
-      `Invalid CIBIL loan type id(s): ${invalid.join(', ')}. Use numeric TUEF account type codes (e.g. 05, 10, 69).`,
-    );
-  }
-  if (!ids.length) {
-    throw new BadRequestException('Select at least one loan type, or deactivate the rule instead.');
-  }
-  return ids.join(',');
-}
-
 type LosSourceUtmRow = {
   id: number;
   leadSourceId: number;

@@ -1,8 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-<<<<<<< HEAD
-=======
 import type { Prisma } from '@prisma/client';
->>>>>>> refs/remotes/moneycash/main
 import type { Response } from 'express';
 import { APPLICATION_STATUS } from '../../../common/constants/application.constants';
 import { isClosedLoanStatus, LOAN_STATUS } from '../../../common/constants/loan.constants';
@@ -24,15 +21,12 @@ import {
 } from '../../../common/loan/bounce-charge.util';
 import { BounceChargeTierResolverService } from '../../../common/loan/bounce-charge-tier.resolver';
 import { billDueNowAfterWaiverInr, waivedAmountFromLoan } from '../../../common/loan/loan-charge-waiver.util';
-<<<<<<< HEAD
-=======
 import { CUSTOMER_TYPE_LABEL } from '../../../common/constants/customer-type.constants';
 import {
   loadClosedLoanLeadIdsByCustomer,
   resolveCustomerType,
   type ClosedLoanLeadIdsByCustomer,
 } from '../../../common/loan/customer-recurring-status.util';
->>>>>>> refs/remotes/moneycash/main
 import { resolveEffectiveLoanStatus } from '../../../common/loan/effective-loan-status.util';
 import { roundInr2 } from '../../../common/loan/loan-repayment-outstanding.util';
 import { isCollectedRepaymentStatus } from '../../../common/constants/loan-repayment.constants';
@@ -122,19 +116,6 @@ export class LosLoanService {
     private readonly nocLetter: NocLetterService,
   ) {}
 
-<<<<<<< HEAD
-  async listLoans() {
-    const loans = await this.prisma.read.loanAccount.findMany({
-      where: {
-        application: { lead: { isInternalTesting: false } },
-      },
-      orderBy: { disbursedAt: 'desc' },
-      include: {
-        loanStatus: { select: { name: true, displayName: true } },
-        waivedByUser: { select: { fullName: true } },
-        customer: { select: { uuid: true, mobileNumber: true } },
-        application: {
-=======
   private readonly loanListInclude = {
     loanStatus: { select: { name: true, displayName: true } },
     waivedByUser: { select: { fullName: true } },
@@ -145,7 +126,6 @@ export class LosLoanService {
         applicationNumber: true,
         applicationStatus: { select: { name: true, displayName: true } },
         details: {
->>>>>>> refs/remotes/moneycash/main
           select: {
             emailId: true,
             bankName: true,
@@ -164,36 +144,10 @@ export class LosLoanService {
             uuid: true,
             leadDetail: {
               select: {
-<<<<<<< HEAD
-                emailId: true,
-                bankName: true,
-                bankAccountNumber: true,
-                ifscCode: true,
-                selectedLoanAmount: true,
-                processingFeePercentage: true,
-                gstPercentage: true,
-                interestRate: true,
-                expectedRepaymentDays: true,
-              },
-            },
-            lead: {
-              select: {
-                id: true,
-                uuid: true,
-                leadDetail: {
-                  select: {
-                    fullName: true,
-                    bureauReport: {
-                      select: {
-                        cibilCreditAssessment: { select: { category: true } },
-                      },
-                    },
-=======
                 fullName: true,
                 bureauReport: {
                   select: {
                     cibilCreditAssessment: { select: { category: true } },
->>>>>>> refs/remotes/moneycash/main
                   },
                 },
               },
@@ -273,11 +227,8 @@ export class LosLoanService {
         fullName: formatLosPersonName(loan.application.lead.leadDetail?.fullName),
         cibilCreditAssessmentCategory:
           loan.application.lead.leadDetail?.bureauReport?.cibilCreditAssessment?.category ?? null,
-<<<<<<< HEAD
-=======
         customerType,
         customerTypeLabel: CUSTOMER_TYPE_LABEL[customerType],
->>>>>>> refs/remotes/moneycash/main
         mobileNumber: loan.customer.mobileNumber,
         email: details?.emailId ?? null,
         principalAmount: loan.principalAmount.toString(),

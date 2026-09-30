@@ -8,16 +8,11 @@ import {
   useDataTableFilterState,
   type DataTableColumn,
 } from '@/components/ui/data-table';
-<<<<<<< HEAD
-import { getLoans, markApplicationInternalTesting, refreshLoanPayment, sendLoanNocLetter, type LosLoan } from '@/lib/api';
-import { LOS_STORAGE_KEY } from '@/lib/auth';
-=======
 import { DownloadDumpButton } from '@/components/ui/download-dump-button';
 import { CustomerTypeBadge } from '@/components/shared/customer-type-badge';
 import { getLoans, downloadLoansExport, getMasters, markApplicationInternalTesting, refreshLoanPayment, type LosLoan, sendLoanNocLetter } from '@/lib/api';
 import { getLosToken as getToken } from '@/lib/auth';
 import { CUSTOMER_GRADE_FILTER_OPTIONS } from '@/lib/constants/customer-grades';
->>>>>>> refs/remotes/moneycash/main
 import { formatPersonName } from '@/lib/format-person-name';
 import { RefreshPaymentButton, useCanRefreshLoanPayment } from '@/components/loans/refresh-payment-button';
 import { loanNeedsNoc, SendNocButton, useCanSendLoanNoc } from '@/components/loans/send-noc-button';
@@ -318,18 +313,12 @@ export function LoansPanel() {
       getSortValue: (row) => row.cibilCreditAssessmentCategory ?? '',
       filter: {
         type: 'select',
-<<<<<<< HEAD
-        options: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((g) => ({ value: g, label: g })),
-=======
         options: CUSTOMER_GRADE_FILTER_OPTIONS,
->>>>>>> refs/remotes/moneycash/main
         matches: (row, value) => row.cibilCreditAssessmentCategory === value,
       },
       render: (loan) => <GradeBadge category={loan.cibilCreditAssessmentCategory} />,
     },
     {
-<<<<<<< HEAD
-=======
       key: 'customerType',
       label: 'Customer type',
       headerClassName: 'whitespace-nowrap',
@@ -343,7 +332,6 @@ export function LoansPanel() {
       render: (row) => <CustomerTypeBadge customerType={row.customerType} label={row.customerTypeLabel} />,
     },
     {
->>>>>>> refs/remotes/moneycash/main
       key: 'principal',
       label: 'Principal',
       headerClassName: 'whitespace-nowrap',
@@ -508,11 +496,7 @@ export function LoansPanel() {
         </div>
       ),
     },
-<<<<<<< HEAD
-  ], [busyUuid, markAsInternalTesting, refreshPayment, sendNoc]);
-=======
   ], [customerTypeOptions, busyUuid, markAsInternalTesting, refreshPayment, sendNoc]);
->>>>>>> refs/remotes/moneycash/main
 
   const columns = canMarkTesting || canRefreshPayment || canSendNoc
     ? allColumns
@@ -572,15 +556,6 @@ export function LoansPanel() {
         }
         onFilteredItemsChange={onFilteredItemsChange}
         toolbarActions={
-<<<<<<< HEAD
-          <button
-            type="button"
-            onClick={() => void loadLoans()}
-            className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)]"
-          >
-            ↺ Refresh
-          </button>
-=======
           <div className="flex items-center gap-2">
             <DownloadDumpButton
               filtersActive={filtersActive}
@@ -589,17 +564,16 @@ export function LoansPanel() {
               onDownload={(token) => downloadLoansExport(token, activeColumnFilters)}
               onSessionExpired={() => setFetchError('Session expired — please log in again.')}
               onError={(message) => setFetchError(message)}
-              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
             />
             <button
               type="button"
               onClick={() => void loadLoans()}
-              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)]"
+              className="h-[32px] cursor-pointer whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)]"
             >
               ↺ Refresh
             </button>
           </div>
->>>>>>> refs/remotes/moneycash/main
         }
       />
     </div>

@@ -88,23 +88,14 @@ export class LosDeveloperToolsController {
     @Query() query: ListVendorApiLogsQueryDto,
     @Res() res: Response,
   ): Promise<void> {
-<<<<<<< HEAD
-    const buffer = await this.vendorApiLogs.exportWorkbook(query);
-=======
     const filename = buildFilteredExportFilename(
       'Vendor API logs dump',
       describeVendorApiLogsExportFilters(query),
     );
->>>>>>> refs/remotes/moneycash/main
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-<<<<<<< HEAD
-    res.setHeader('Content-Disposition', 'attachment; filename="Vendor API logs dump.xlsx"');
-    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    res.send(buffer);
-=======
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     await this.vendorApiLogs.exportWorkbook(query, res);
@@ -114,7 +105,6 @@ export class LosDeveloperToolsController {
   @ApiOperation({ summary: 'Distinct provider/service names for the Vendor API Logs filter dropdowns' })
   getVendorApiLogFilterOptions() {
     return this.vendorApiLogs.listFilterOptions();
->>>>>>> refs/remotes/moneycash/main
   }
 
   @Get('vendor-api-logs/:uuid')

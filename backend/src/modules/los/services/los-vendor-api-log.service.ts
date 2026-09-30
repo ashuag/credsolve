@@ -2,23 +2,14 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma, type VendorHttpMethod } from '@prisma/client';
 import type { Response } from 'express';
 import { classifyVendorApiLogOutcome } from '../../../common/vendor/vendor-api-log-outcome.util';
-<<<<<<< HEAD
-import { buildSimpleXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
-=======
 import { streamXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 import { requireAtLeastOneExportFilter } from '../../../common/xlsx/export-row-filter.util';
->>>>>>> refs/remotes/moneycash/main
 import { PrismaService } from '../../../prisma/prisma.service';
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 /** Excel cells max out near 32,767 chars — truncate payloads so the workbook stays openable. */
 const EXCEL_CELL_TEXT_LIMIT = 32000;
-<<<<<<< HEAD
-
-/** Fields that gate the export — at least one must be set so a dump can't be pulled unfiltered. */
-const EXPORT_FILTER_KEYS = [
-=======
 /**
  * Batch size for the export's cursor-paged fetch. A filtered dump can be tens of thousands of
  * rows, and each DB round-trip has fixed overhead, so too small a batch turns a large export into
@@ -31,7 +22,6 @@ const EXPORT_BATCH_SIZE = 500;
 
 /** Fields that gate the export — at least one must be set so a dump can't be pulled unfiltered. Also used to build the export filename's filter summary (see the controller). */
 export const EXPORT_FILTER_KEYS = [
->>>>>>> refs/remotes/moneycash/main
   'providerName',
   'serviceName',
   'requestMethod',
@@ -39,10 +29,6 @@ export const EXPORT_FILTER_KEYS = [
   'id',
   'leadId',
   'applicationNumber',
-<<<<<<< HEAD
-  'requestPath',
-=======
->>>>>>> refs/remotes/moneycash/main
   'outcome',
   'requestedFrom',
   'requestedTo',
@@ -63,19 +49,6 @@ const VENDOR_API_LOG_DUMP_HEADERS = [
   'Response payload',
 ] as const;
 
-<<<<<<< HEAD
-function stringifyPayload(value: unknown): string | null {
-  if (value == null) return null;
-  let text: string;
-  try {
-    text = JSON.stringify(value);
-  } catch {
-    text = String(value);
-  }
-  return text.length > EXCEL_CELL_TEXT_LIMIT
-    ? `${text.slice(0, EXCEL_CELL_TEXT_LIMIT)}…(truncated)`
-    : text;
-=======
 /** Parses a comma-separated multi-select filter value into a deduped, trimmed list. */
 function parseCsvList(raw: string | undefined): string[] {
   const value = raw?.trim();
@@ -156,7 +129,6 @@ function buildOutcomeShadow(row: ExportPayloadRow): Record<string, unknown> {
   if (row.l0_success != null) shadow.success = row.l0_success;
   if (row.l0_serviceError != null) shadow.serviceError = row.l0_serviceError;
   return shadow;
->>>>>>> refs/remotes/moneycash/main
 }
 
 const SORT_KEYS = [
@@ -335,48 +307,6 @@ export class LosVendorApiLogService {
     };
   }
 
-<<<<<<< HEAD
-  /** Dump export: requires at least one filter (see EXPORT_FILTER_KEYS) to avoid unbounded loads. */
-  async exportWorkbook(query: ListVendorApiLogsQuery): Promise<Buffer> {
-    const hasFilter = EXPORT_FILTER_KEYS.some((key) => query[key]?.toString().trim());
-    if (!hasFilter) {
-      throw new BadRequestException('Apply at least one filter before downloading the vendor API log dump.');
-    }
-
-    const where = this.buildWhere(query);
-    const rows = await this.prisma.read.vendorApiLog.findMany({
-      where,
-      orderBy: { requestedAt: 'desc' },
-      select: {
-        uuid: true,
-        providerName: true,
-        serviceName: true,
-        requestMethod: true,
-        httpStatus: true,
-        requestedAt: true,
-        respondedAt: true,
-        requestPayload: true,
-        responsePayload: true,
-        lead: {
-          select: {
-            applications: {
-              orderBy: { createdAt: 'desc' },
-              take: 1,
-              select: { applicationNumber: true },
-            },
-          },
-        },
-      },
-    });
-
-    const sheetRows: SimpleXlsxCell[][] = [
-      [...VENDOR_API_LOG_DUMP_HEADERS],
-      ...rows.map((row) => {
-        const durationMs = Math.max(0, row.respondedAt.getTime() - row.requestedAt.getTime());
-        const outcome = classifyVendorApiLogOutcome(row.httpStatus, row.responsePayload);
-        const application = row.lead?.applications[0] ?? null;
-        return [
-=======
   /**
    * Dump export: requires at least one filter (see EXPORT_FILTER_KEYS) to avoid unbounded loads,
    * and streams the result straight to `res` — cursor-paged from the DB (never loads every row's
@@ -472,7 +402,6 @@ export class LosVendorApiLogService {
         const outcome = classifyVendorApiLogOutcome(row.httpStatus, detail ? buildOutcomeShadow(detail) : null);
         const application = row.lead?.applications[0] ?? null;
         yield [
->>>>>>> refs/remotes/moneycash/main
           row.uuid,
           application?.applicationNumber ?? null,
           row.providerName,
@@ -483,15 +412,6 @@ export class LosVendorApiLogService {
           row.requestedAt,
           row.respondedAt,
           durationMs,
-<<<<<<< HEAD
-          stringifyPayload(row.requestPayload),
-          stringifyPayload(row.responsePayload),
-        ];
-      }),
-    ];
-
-    return buildSimpleXlsxWorkbook(sheetRows, 'Vendor API Logs');
-=======
           finalizePayloadText(detail?.request_payload_text ?? null),
           finalizePayloadText(detail?.response_payload_text ?? null),
         ];
@@ -500,7 +420,6 @@ export class LosVendorApiLogService {
       cursorId = batch[batch.length - 1]!.id;
       if (batch.length < EXPORT_BATCH_SIZE) return;
     }
->>>>>>> refs/remotes/moneycash/main
   }
 
   private toListItem(

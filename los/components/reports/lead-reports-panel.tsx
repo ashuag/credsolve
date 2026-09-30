@@ -361,18 +361,12 @@ export function LeadReportsPanel() {
       filter: {
         type: 'multi-select',
         placeholder: 'Grades',
-<<<<<<< HEAD
-        options: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((g) => ({ value: g, label: g })),
-=======
         options: CUSTOMER_GRADE_FILTER_OPTIONS,
->>>>>>> refs/remotes/moneycash/main
       },
       cellClassName: 'whitespace-nowrap',
       render: (row) => <GradeBadge category={row.cibilCreditAssessmentCategory} />,
     },
     {
-<<<<<<< HEAD
-=======
       key: 'customerType',
       label: 'Customer type',
       headerClassName: 'min-w-[120px] whitespace-nowrap',
@@ -383,7 +377,6 @@ export function LeadReportsPanel() {
       render: (row) => <CustomerTypeBadge customerType={row.customerType} label={row.customerTypeLabel} />,
     },
     {
->>>>>>> refs/remotes/moneycash/main
       key: 'leadStatus',
       label: 'Lead status',
       headerClassName: 'min-w-[128px] whitespace-nowrap',
@@ -535,35 +528,13 @@ export function LeadReportsPanel() {
         onRetry={() => void load()}
         emptyMessage="No leads have been recorded yet."
         noResultsMessage="No leads match your filters."
-<<<<<<< HEAD
-        minWidth="2070px"
-=======
         minWidth="2950px"
->>>>>>> refs/remotes/moneycash/main
         pageSize={LOS_LISTING_PAGE_SIZE}
         pageSizeOptions={LOS_LISTING_PAGE_SIZE_OPTIONS}
         initialSort={{ key: 'created', dir: 'desc' }}
         onFilteredItemsChange={onFilteredItemsChange}
         toolbarActions={
           <div className="flex items-center gap-2">
-<<<<<<< HEAD
-            <button
-              type="button"
-              onClick={() => {
-                const token = getLosToken();
-                if (!token) {
-                  setFetchError('Session expired — please log in again.');
-                  return;
-                }
-                void downloadLeadReportsExport(token).catch((err) => {
-                  setFetchError(err instanceof Error ? err.message : 'Failed to download lead report');
-                });
-              }}
-              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)]"
-            >
-              ⬇ Download
-            </button>
-=======
             <DownloadDumpButton
               filtersActive={filtersActive}
               loading={loading}
@@ -572,9 +543,8 @@ export function LeadReportsPanel() {
               onSessionExpired={() => setFetchError('Session expired — please log in again.')}
               onError={(message) => setFetchError(message)}
               label="⬇ Download"
-              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(20,150,243,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+              className="inline-flex h-[32px] cursor-pointer items-center whitespace-nowrap rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-transparent px-3 text-[0.8rem] font-bold text-brand-text transition-colors hover:bg-[rgba(34,197,94,0.06)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
             />
->>>>>>> refs/remotes/moneycash/main
             <button
               type="button"
               onClick={() => void load()}

@@ -287,11 +287,7 @@ export default function BankDetailsPage() {
   const journeyPanel = retryLimitReached ? (
     <div className="h-full flex flex-col justify-center">
       <div className="mb-6">
-<<<<<<< HEAD
         <h1 className="text-2xl md:text-[2.2rem] font-bold text-brand-navy mb-4 tracking-tight leading-[1.1]">
-=======
-        <h1 className="text-2xl md:text-[2.2rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">
->>>>>>> refs/remotes/moneycash/main
           Continue your application
         </h1>
         <p className="m-0 text-[0.95rem] leading-relaxed text-slate-600">

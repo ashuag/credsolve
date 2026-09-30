@@ -87,11 +87,7 @@ function DetailGrid({
             'rounded-[8px] border px-3 py-2',
             row.highlight
               ? 'border-[rgba(245,158,11,0.35)] bg-[rgba(255,251,235,0.95)]'
-<<<<<<< HEAD
               : 'border-[rgba(15,39,72,0.07)] bg-[rgba(255,255,255,0.72)]',
-=======
-              : 'border-[rgba(23,44,113,0.07)] bg-[rgba(255,255,255,0.72)]',
->>>>>>> refs/remotes/moneycash/main
           )}
         >
           <dt
@@ -397,11 +393,7 @@ function CustomerProfilePanel({
               { label: 'Email ID', value: row.email?.trim() || profile.emailId || '—' },
             ]}
           />
-<<<<<<< HEAD
           <div className="mt-3 border-t border-[rgba(15,39,72,0.06)] pt-3">
-=======
-          <div className="mt-3 border-t border-[rgba(23,44,113,0.06)] pt-3">
->>>>>>> refs/remotes/moneycash/main
             <ProfileSubheading>
               Aadhaar details ({
                 aadhaar?.aadhaarKycProcessLabel
@@ -813,13 +805,8 @@ function KycDetailPanel({
         </div>
       </div>
 
-<<<<<<< HEAD
       <div className="overflow-hidden rounded-[10px] border border-[rgba(15,39,72,0.08)] bg-[rgba(248,250,255,0.65)]">
         <div className="flex items-center justify-between gap-2 border-b border-[rgba(15,39,72,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
-=======
-      <div className="overflow-hidden rounded-[10px] border border-[rgba(23,44,113,0.08)] bg-[rgba(248,250,255,0.65)]">
-        <div className="flex items-center justify-between gap-2 border-b border-[rgba(23,44,113,0.07)] bg-[rgba(248,250,255,0.9)] px-3 py-2">
->>>>>>> refs/remotes/moneycash/main
           <span className="text-[0.82rem] font-extrabold text-brand-navy">Aadhaar KYC</span>
           <span className="text-[0.72rem] font-bold text-brand-muted">
             {aadhaarComplete ? 'Complete' : identityFailure ? 'Failed' : 'Pending'}

@@ -17,10 +17,7 @@ import {
   parseCibilLoanTypeIds,
   serializeCibilLoanTypeIds,
 } from '@/lib/cibil-account-types';
-<<<<<<< HEAD
-=======
 import { CUSTOMER_GRADES } from '@/lib/constants/customer-grades';
->>>>>>> refs/remotes/moneycash/main
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   cx,
@@ -37,11 +34,6 @@ const REJECTED_CREDIT_ASSESSMENT_GRADE_KEYS = new Set([
 ]);
 
 const REJECT_LOAN_TYPE_KEYS = new Set(['REJECT_OPEN_LOAN_TYPES', 'REJECT_LOAN_TYPES']);
-<<<<<<< HEAD
-
-const CREDIT_ASSESSMENT_GRADES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
-=======
->>>>>>> refs/remotes/moneycash/main
 
 const CREDIT_ASSESSMENT_GRADE_LABEL: Record<(typeof CUSTOMER_GRADES)[number], string> = {
   A: 'Credit-active prime',
@@ -264,11 +256,7 @@ function ProfileCriterionModal({
                       'flex cursor-pointer items-start gap-2.5 rounded-[10px] border px-3 py-2.5',
                       checked
                         ? 'border-[rgba(239,68,68,0.28)] bg-[rgba(239,68,68,0.06)]'
-<<<<<<< HEAD
                         : 'border-[rgba(15,39,72,0.1)] bg-white',
-=======
-                        : 'border-[rgba(23,44,113,0.1)] bg-white',
->>>>>>> refs/remotes/moneycash/main
                     )}
                   >
                     <input
@@ -311,11 +299,7 @@ function ProfileCriterionModal({
               </label>
               <button
                 type="button"
-<<<<<<< HEAD
                 className="min-h-[40px] rounded-[8px] border border-[rgba(15,39,72,0.14)] bg-white px-3 font-bold text-brand-navy"
-=======
-                className="min-h-[40px] rounded-[8px] border border-[rgba(23,44,113,0.14)] bg-white px-3 font-bold text-brand-navy"
->>>>>>> refs/remotes/moneycash/main
                 onClick={addExtraLoanType}
               >
                 Add ID

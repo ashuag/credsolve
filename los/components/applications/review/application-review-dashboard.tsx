@@ -113,23 +113,16 @@ export function ApplicationReviewDashboard({
     journeyComplete &&
     statusCode !== 'APPROVED' &&
     statusCode !== 'DISBURSED' &&
-<<<<<<< HEAD
-=======
     statusCode !== 'DISBURSAL_INPROCESS' &&
     statusCode !== 'DISBURSAL_FAILED' &&
->>>>>>> refs/remotes/moneycash/main
     !row.aadhaarNameMatchPendingReview &&
     !nameReviewPending;
   const canApproveNameMatch =
     canDecide && (Boolean(row.nameMatchPendingReview) || statusCode === 'UNDER_REVIEW');
   const canApproveAadhaarName = canDecide && Boolean(row.aadhaarNameMatchPendingReview);
-<<<<<<< HEAD
-  const canDisburse = canDecide && statusCode === 'APPROVED' && !row.loanAccount;
-=======
   const canDisburse =
     canDecide && !row.loanAccount && (statusCode === 'APPROVED' || statusCode === 'DISBURSAL_FAILED');
   const canCheckDisbursal = canDecide && statusCode === 'DISBURSAL_INPROCESS' && !row.loanAccount;
->>>>>>> refs/remotes/moneycash/main
   const canReject = canDecide && canRejectApplicationStatus(row.statusCode);
 
   const loadBureauPan = useCallback(async () => {

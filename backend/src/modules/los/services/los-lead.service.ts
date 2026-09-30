@@ -18,15 +18,12 @@ import { formatLosPersonName } from '../format-los-person-name';
 import { streamXlsxWorkbook, type SimpleXlsxCell } from '../../../common/xlsx/simple-xlsx';
 import { TENACIO_SERVICE_PAN_NAME_DOB } from '../../../common/vendor/tenacio/tenacio-client.service';
 import { resolveCibilVendorDisplayName } from '../../../common/vendor/cibil-vendor.util';
-<<<<<<< HEAD
-=======
 import {
   matchesExportTextFilter,
   parseExportIstDayRange,
   requireAtLeastOneExportFilter,
 } from '../../../common/xlsx/export-row-filter.util';
 import type { ExportLeadsQueryDto } from '../los-data.controller';
->>>>>>> refs/remotes/moneycash/main
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -232,36 +229,7 @@ export class LosLeadService {
     const leads = await this.prisma.read.lead.findMany({
       where: this.leadQueueWhere(extraWhere),
       orderBy: { createdAt: 'desc' },
-<<<<<<< HEAD
-      include: {
-        customer: { select: { uuid: true, mobileNumber: true } },
-        leadStatus: { select: { name: true, displayName: true } },
-        rejectionReason: { select: { name: true } },
-        source: { select: { name: true, type: true } },
-        leadDetail: {
-          select: {
-            fullName: true,
-            panNumber: true,
-            panVerified: true,
-            occupation: { select: { name: true } },
-            city: { select: { name: true, state: { select: { code: true } } } },
-            emailId: true,
-            bureauReport: { select: { cibilScore: true } },
-          },
-        },
-        leadUtms: { select: { utmSource: true, utmMedium: true, utmCampaign: true }, orderBy: { createdAt: 'desc' }, take: 1 },
-        applications: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: {
-            applicationNumber: true,
-            details: { select: { emailId: true } },
-          },
-        },
-      },
-=======
       include: this.leadListInclude,
->>>>>>> refs/remotes/moneycash/main
     });
     return leads.map((lead) => this.toLeadListItem(lead));
   }
@@ -288,40 +256,10 @@ export class LosLeadService {
     const city = query.city?.trim();
     const source = query.source?.trim();
 
-<<<<<<< HEAD
-      return {
-        id: Number(lead.id),
-        uuid: lead.uuid,
-        leadNumber: lead.leadNumber,
-        customerUuid: lead.customer.uuid,
-        applicationNumber: lead.applications[0]?.applicationNumber ?? null,
-        fullName: formatLosPersonName(detail?.fullName),
-        panNumber: detail?.panNumber?.trim().toUpperCase() || null,
-        mobileNumber: lead.customer.mobileNumber,
-        email: detail?.emailId?.trim() || lead.applications[0]?.details?.emailId || null,
-        occupation: detail?.occupation?.name ?? null,
-        city,
-        cibilScore,
-        panVerified: detail?.panVerified ?? 0,
-        panVerifiedLabel: panVerifiedStatusLabel(detail?.panVerified ?? 0),
-        rejectionReason: toRejectionReasonDto(lead.rejectionReason),
-        leadStatusNote: lead.leadStatusNote?.trim() || null,
-        statusCode: lead.leadStatus.name,
-        statusLabel: displayName(lead.leadStatus.name, lead.leadStatus.displayName),
-        sourceName: lead.source?.name ?? null,
-        sourceType: lead.source?.type ?? null,
-        utmSource: latestUtm?.utmSource ?? null,
-        utmMedium: latestUtm?.utmMedium ?? null,
-        utmCampaign: latestUtm?.utmCampaign ?? null,
-        createdAt: lead.createdAt.toISOString(),
-        updatedAt: lead.updatedAt.toISOString(),
-      };
-=======
     await streamXlsxWorkbook(res, {
       sheetName: 'Leads',
       headers: LEAD_DUMP_HEADERS,
       rows: this.streamLeadsForExport(where, reason, city, source),
->>>>>>> refs/remotes/moneycash/main
     });
   }
 

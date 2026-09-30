@@ -1,11 +1,6 @@
-<<<<<<< HEAD
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
-=======
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
->>>>>>> refs/remotes/moneycash/main
 import type { Request, Response } from 'express';
 import { LosAuthGuard } from './auth/los-auth.guard';
 import { LosDenyAgentGuard } from './auth/los-deny-agent.guard';
@@ -27,10 +22,6 @@ import { LosBureauReportService } from './services/los-bureau-report.service';
 import { LosLeadReportService } from './services/los-lead-report.service';
 import { LosTransactionReportService } from './services/los-transaction-report.service';
 import { LosCheckCibilService } from './services/los-check-cibil.service';
-<<<<<<< HEAD
-
-type LosRequest = Request & { losUser: LosSessionPayload };
-=======
 import {
   buildFilteredExportFilename,
   cleanExportFilterValue,
@@ -448,7 +439,6 @@ function describeTransactionReportsExportFilters(query: ExportTransactionReports
     ),
   );
 }
->>>>>>> refs/remotes/moneycash/main
 
 @ApiTags('LOS Data')
 @Controller('los')

@@ -20,24 +20,10 @@ const LENDER_LINKS = [
   { label: 'Partner with us', href: '/contact-us' },
 ];
 
-<<<<<<< HEAD
 const COMPANY_LEGAL_LINKS = [
   { label: 'About', href: '/about-us' },
   { label: 'Contact', href: '/contact-us' },
   { label: 'Careers', href: '/about-us' },
-=======
-const LOAN_PRODUCTS = [
-  { label: 'Payday Advance', productId: 'payday' },
-  { label: 'Short Personal Loan', productId: 'emergency' },
-  { label: 'Medical Emergency Loan', productId: 'medical' },
-  { label: 'Education Fee Advance', productId: 'education' },
-] as const;
-
-const COMPANY_LINKS = [
-  { label: 'How It Works', href: '/#how-it-works' },
-  { label: 'About Us', href: '/about-us' },
-  { label: 'Contact Us', href: '/contact-us' },
->>>>>>> refs/remotes/moneycash/main
   { label: 'Privacy Policy', href: '/privacy-policy' },
   { label: 'Terms of Use', href: '/terms-and-conditions' },
   { label: 'Fair Practice Code', href: '/fair-practices-code' },
@@ -67,7 +53,6 @@ export function LandingFooter() {
               Credit Made Easy. Personal loans with RBI-registered NBFC partners, and the lending technology and recovery infrastructure behind them.
             </p>
 
-<<<<<<< HEAD
             <div className="mt-6 space-y-2 text-xs font-[600] text-white/80">
               <p>
                 <a href={`mailto:${BRAND.email}`} className="hover:text-[#22C55E] transition-colors">
@@ -82,29 +67,6 @@ export function LandingFooter() {
                 [Address line], Ghaziabad, Uttar Pradesh &mdash; [PIN]
               </p>
             </div>
-=======
-            {/* Contact cards */}
-            <div className="grid gap-3 sm:grid-cols-2">
-              <a
-                href="tel:+91-9650111801"
-                className="group flex items-start gap-3 rounded-2xl border border-white/6 bg-white/3 p-4 transition-all hover:border-brand-blue/25 hover:bg-brand-blue/8 sm:col-span-2"
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-blue/15 transition-colors group-hover:bg-brand-blue/25">
-                  <svg viewBox="0 0 24 24" className="h-4 w-4 text-brand-blue-light" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-                    <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.67A2 2 0 012 .96h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 15.92v1z" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[0.58rem] font-[800] uppercase tracking-[0.14em] text-white/25">Phone Support</div>
-                  <div className="mt-0.5 text-sm font-[800] text-white">+91-9650111801</div>
-                  <p className="mt-1 text-xs font-[600] leading-relaxed text-white/45">
-                    Hours: Monday–Saturday, 8:00 AM–5:00 PM
-                    <br />
-                    Excluding Public Holidays
-                  </p>
-                </div>
-              </a>
->>>>>>> refs/remotes/moneycash/main
 
             {/* Social Media Icons: in, YT, IG, X */}
             <div className="mt-6 flex items-center gap-2.5">
@@ -201,21 +163,9 @@ export function LandingFooter() {
             CredSolve Technologies Private Limited (CIN: [CIN]), registered office [Address line], Ghaziabad, Uttar Pradesh [PIN]. CredSolve is a Lending Service Provider (LSP) and is not a bank or NBFC. Credit is sanctioned, disbursed and held solely by our regulated lending partners (NBFCs and banks), at their sole discretion and in accordance with their credit policy and the RBI Digital Lending Directions. CredSolve does not lend on its own balance sheet and does not receive or hold borrower funds. Interest, fees and the annualised percentage rate are set by the lending partner and disclosed in the Key Fact Statement before acceptance. No charge is collected from a customer prior to disbursal. Loan approval is not guaranteed. Grievance Officer: [name], grievance@credsolve.in, +91 [phone] &mdash; acknowledged within 24 hours, resolved within 30 days, after which a complaint may be escalated under the Reserve Bank - Integrated Ombudsman Scheme, 2021. All calculators and examples shown are illustrative. Figures as on March 2026.
           </p>
 
-<<<<<<< HEAD
           <p className="mt-6 text-center text-xs font-[500] text-white/40">
             &copy; 2026 CredSolve Technologies Private Limited. All rights reserved.
           </p>
-=======
-      {/* Bottom bar */}
-      <div className="relative border-t border-white/6 bg-[#040a18]/80">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          <div className="flex flex-col items-center gap-4 text-center lg:flex-row lg:justify-between lg:text-left">
-            <p className="text-[0.65rem] font-[600] leading-relaxed text-white">
-              © {new Date().getFullYear()} MoneyCash. All rights reserved.
-            </p>
-           
-          </div>
->>>>>>> refs/remotes/moneycash/main
         </div>
       </div>
     </footer>

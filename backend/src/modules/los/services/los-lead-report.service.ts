@@ -385,10 +385,7 @@ const LEAD_REPORT_HEADERS = [
   'Monthly income',
   'CIBIL',
   'Grade',
-<<<<<<< HEAD
-=======
   'Customer type',
->>>>>>> refs/remotes/moneycash/main
   'Purpose of loan',
   'Loan offer amount',
   'Loan selected amount',
@@ -459,59 +456,6 @@ export class LosLeadReportService {
     return mapLeadReport(lead, liveRepayDate, closedLoanLeadIds);
   }
 
-<<<<<<< HEAD
-  async exportLeadReportsWorkbook(): Promise<Buffer> {
-    const rows = await this.listLeadReports();
-    const sheet: SimpleXlsxCell[][] = [
-      [...LEAD_REPORT_HEADERS],
-      ...rows.map((row) => [
-        row.leadNumber,
-        row.panCardName,
-        row.fullName,
-        row.mobileNumber,
-        row.email,
-        toExcelDate(row.dateOfBirth),
-        row.panNumber,
-        row.gender,
-        row.occupation,
-        row.city,
-        row.state,
-        row.pincode,
-        row.address,
-        toExcelNumber(row.netMonthlyIncome),
-        toExcelNumber(row.cibilScore),
-        row.cibilCreditAssessmentCategory,
-        row.purposeOfLoan,
-        toExcelNumber(row.loanOfferAmount),
-        toExcelNumber(row.loanSelectedAmount),
-        row.expectedRepaymentDays,
-        toExcelNumber(row.interestRate),
-        toExcelNumber(row.processingFeePercent),
-        toExcelNumber(row.processingFeeAmount),
-        toExcelNumber(row.gstPercent),
-        toExcelNumber(row.gstAmount),
-        toExcelDate(row.expectedRepaymentDate),
-        toExcelNumber(row.repaymentAmount),
-        row.leadStatusLabel,
-        samePublicId(row.leadNumber, row.applicationNumber) ? null : row.applicationNumber,
-        row.applicationStatusLabel,
-        samePublicId(row.leadNumber, row.loanNumber) ? null : row.loanNumber,
-        row.loanStatusLabel,
-        toExcelNumber(row.principalAmount),
-        toExcelNumber(row.netDisbursedAmount),
-        toExcelNumber(row.interestAmount),
-        toExcelDate(row.disbursedAt),
-        toExcelDate(row.loanMaturityDate),
-        row.repaymentStatusCode === 'NOT_APPLICABLE' ? null : row.repaymentStatusLabel,
-        toExcelNumber(row.latestRepaymentAmount),
-        toExcelDate(row.latestRepaymentAt),
-        toExcelDate(row.createdAt),
-        row.uuid,
-        row.customerUuid,
-        row.applicationUuid,
-        row.loanUuid,
-      ]),
-=======
   private matchesExportFilters(
     row: ReturnType<typeof mapLeadReport>,
     query: ExportLeadReportsQueryDto,
@@ -626,7 +570,6 @@ export class LosLeadReportService {
       row.customerUuid,
       row.applicationUuid,
       row.loanUuid,
->>>>>>> refs/remotes/moneycash/main
     ];
   }
 

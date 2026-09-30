@@ -11,12 +11,9 @@ export type LosLoan = {
   fullName: string | null;
   /** CIBIL credit-assessment grade (A–H) from the current bureau report. */
   cibilCreditAssessmentCategory: string | null;
-<<<<<<< HEAD
-=======
   /** 'NEW' (no prior repaid loan) or 'RECURRING' (has a fully repaid loan under a different lead). */
   customerType: 'NEW' | 'RECURRING';
   customerTypeLabel: string;
->>>>>>> refs/remotes/moneycash/main
   mobileNumber: string;
   email: string | null;
   principalAmount: string;

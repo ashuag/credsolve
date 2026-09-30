@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import { authorizedLosRequest, resolveLosClientApiUrl } from './_shared';
-=======
 import { authorizedLosRequest, buildExportFilterParams, cachedAuthorizedLosGet, downloadAuthenticatedWorkbook } from './_shared';
->>>>>>> refs/remotes/moneycash/main
 
 export type VendorApiLogOutcome = 'success' | 'failure';
 
@@ -77,22 +73,6 @@ export async function listVendorApiLogs(
   );
 }
 
-<<<<<<< HEAD
-/** URL for the vendor API logs dump workbook download. Caller must pass at least one filter — the backend rejects an unfiltered export. */
-export function getVendorApiLogsExportUrl(
-  token: string,
-  params: ListVendorApiLogsParams = {},
-): string {
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value == null) continue;
-    const text = String(value).trim();
-    if (!text) continue;
-    query.set(key, text);
-  }
-  query.set('access_token', token);
-  return `${resolveLosClientApiUrl('/developer-tools/vendor-api-logs/export')}?${query.toString()}`;
-=======
 /**
  * Authenticated workbook download for the vendor API logs dump. Caller must pass at least one
  * filter — the backend rejects an unfiltered export.
@@ -118,7 +98,6 @@ export async function getVendorApiLogFilterOptions(token: string): Promise<Vendo
     '/developer-tools/vendor-api-logs/filter-options',
     'Unable to load vendor API log filter options.',
   );
->>>>>>> refs/remotes/moneycash/main
 }
 
 export async function getVendorApiLog(

@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
-<<<<<<< HEAD
-=======
 import type { Response } from 'express';
 import type { Prisma } from '@prisma/client';
->>>>>>> refs/remotes/moneycash/main
 import { COLLECTED_REPAYMENT_STATUSES } from '../../../common/constants/loan-repayment.constants';
 import { BounceChargeTierResolverService } from '../../../common/loan/bounce-charge-tier.resolver';
 import { computePenalChargeInr } from '../../../common/loan/bounce-charge.util';
@@ -319,44 +316,8 @@ export class LosTransactionReportService {
     const loans = await this.prisma.read.loanAccount.findMany({
       where: { application: { lead: { isInternalTesting: false } } },
       orderBy: { disbursedAt: 'desc' },
-<<<<<<< HEAD
       take: 2000,
-      include: {
-        customer: { select: { uuid: true, mobileNumber: true } },
-        repayments: {
-          where: { status: { in: COLLECTED_REPAYMENT_STATUSES } },
-          orderBy: { paidAt: 'desc' },
-          take: 1,
-          select: { paidAt: true, utr: true },
-        },
-        application: {
-          select: {
-            uuid: true,
-            applicationNumber: true,
-            details: {
-              select: {
-                emailId: true,
-                selectedLoanAmount: true,
-                processingFeePercentage: true,
-                gstPercentage: true,
-                interestRate: true,
-                expectedRepaymentDays: true,
-              },
-            },
-            lead: {
-              select: {
-                uuid: true,
-                leadDetail: {
-                  select: { fullName: true, dateOfBirth: true, panNumber: true },
-                },
-              },
-            },
-          },
-        },
-      },
-=======
       include: transactionReportInclude,
->>>>>>> refs/remotes/moneycash/main
     });
     const penal = await this.bounceChargeTiers.loadPenalConfig();
     const coolingPeriodDays = await loadRepayCoolingPeriodDays(this.prisma.client);

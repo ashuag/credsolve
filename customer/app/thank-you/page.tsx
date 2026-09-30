@@ -61,11 +61,7 @@ function ThankYouContent() {
   const journeyPanel = (
     <div className="h-full flex flex-col justify-center">
       <div className="mb-6">
-<<<<<<< HEAD
         <h1 className="text-2xl md:text-[2.5rem] font-bold text-brand-navy mb-4 tracking-tight leading-[1.1]">
-=======
-        <h1 className="text-2xl md:text-[2.5rem] font-extrabold text-brand-navy mb-4 tracking-tight leading-[1.1]">
->>>>>>> refs/remotes/moneycash/main
           {pendingFollowUp ? 'Thank you.' : 'Application Received.'}
         </h1>
         <p className="text-[1rem] text-slate-500 mb-8 leading-relaxed">
@@ -146,13 +142,8 @@ function ThankYouContent() {
         leftDescription={
           pendingFollowUp
             ? aadhaarNameReviewPending
-<<<<<<< HEAD
               ? 'Your application is in. A CredSolve representative will contact you shortly for additional information.'
               : 'Your application is in. A CredSolve representative will contact you shortly about bank verification.'
-=======
-              ? 'Your application is in. A MoneyCash representative will contact you shortly for additional information.'
-              : 'Your application is in. A MoneyCash representative will contact you shortly about bank verification.'
->>>>>>> refs/remotes/moneycash/main
             : 'Your loan application journey is complete. Sit back and relax while we handle the rest.'
         }
         leftInfographic={

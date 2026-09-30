@@ -15,15 +15,8 @@ import { buildHrefWithSearch } from '@/lib/navigation';
 
 const NAV_LINKS = [
   { label: 'Home', href: '/', active: true },
-<<<<<<< HEAD
   { label: 'Services', href: '#loans' },
   { label: 'About', href: '/about-us' },
-=======
-  { label: 'How It Works', href: '/#how-it-works' },
-  { label: 'Loans', href: '#loans' },
-  { label: 'EMI Calculator', href: '/emi-calculator' },
-  { label: 'About Us', href: '/about-us' },
->>>>>>> refs/remotes/moneycash/main
   { label: 'Contact', href: '/contact-us' },
 ];
 

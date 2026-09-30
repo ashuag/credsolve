@@ -57,15 +57,12 @@ import {
   syncExpectedRepaymentDateUntilDisbursed,
 } from '../../../common/loan/repayment-due-date.util';
 import { overdueDaysFromMaturity } from '../../../common/loan/bounce-charge.util';
-<<<<<<< HEAD
-=======
 import { CUSTOMER_TYPE_LABEL } from '../../../common/constants/customer-type.constants';
 import {
   loadClosedLoanLeadIdsByCustomer,
   resolveCustomerType,
   type ClosedLoanLeadIdsByCustomer,
 } from '../../../common/loan/customer-recurring-status.util';
->>>>>>> refs/remotes/moneycash/main
 import { resolveEffectiveLoanStatus } from '../../../common/loan/effective-loan-status.util';
 import { APPLICATION_KYC_STATUS, APPLICATION_STATUS } from '../../../common/constants/application.constants';
 import { BANK_DETAIL_FAILED_NOTE, isBankNameMatchReviewPending, PENNY_DROP_FAILED_NOTE } from '../../../common/constants/bank.constants';
@@ -78,8 +75,6 @@ import {
   extractPanNsdlSnapshot,
   panNsdlVendorServiceNames,
 } from '../../../common/vendor/pan-nsdl-snapshot.util';
-<<<<<<< HEAD
-=======
 import { CIBIL_GRADE_SET, type CibilGrade } from '../../../common/cibil/cibil-credit-assessment.engine';
 import {
   matchesExportMultiSelectFilter,
@@ -88,7 +83,6 @@ import {
   requireAtLeastOneExportFilter,
 } from '../../../common/xlsx/export-row-filter.util';
 import type { ExportApplicationsQueryDto } from '../los-data.controller';
->>>>>>> refs/remotes/moneycash/main
 
 function displayName(name: string, custom: string | null): string {
   return (custom?.trim() || name).trim();
@@ -546,25 +540,6 @@ export class LosApplicationService {
     private readonly kycCompletion: KycCompletionService,
   ) {}
 
-<<<<<<< HEAD
-  async listApplications() {
-    const applications = await this.prisma.read.application.findMany({
-      where: {
-        lead: { isInternalTesting: false },
-      },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        customer: {
-          select: {
-            uuid: true,
-            mobileNumber: true,
-            customerKycs: {
-              orderBy: [{ aadhaarVerifiedAt: 'desc' }, { createdAt: 'desc' }],
-              take: 10,
-              select: { aadhaarVerifiedAt: true, aadhaarPhotoPath: true, aadhaarData: true },
-            },
-          },
-=======
   private applicationQueueWhere(
     extraWhere?: Prisma.ApplicationWhereInput,
   ): Prisma.ApplicationWhereInput {
@@ -583,7 +558,6 @@ export class LosApplicationService {
           orderBy: [{ aadhaarVerifiedAt: 'desc' }, { createdAt: 'desc' }],
           take: 10,
           select: { aadhaarVerifiedAt: true, aadhaarPhotoPath: true, aadhaarData: true },
->>>>>>> refs/remotes/moneycash/main
         },
       },
     },
@@ -600,21 +574,8 @@ export class LosApplicationService {
             emailId: true,
             bureauReport: {
               select: {
-<<<<<<< HEAD
-                fullName: true,
-                panVerified: true,
-                bureauFetched: true,
-                emailId: true,
-                bureauReport: {
-                  select: {
-                    cibilScore: true,
-                    cibilCreditAssessment: { select: { category: true } },
-                  },
-                },
-=======
                 cibilScore: true,
                 cibilCreditAssessment: { select: { category: true } },
->>>>>>> refs/remotes/moneycash/main
               },
             },
           },

@@ -27,14 +27,8 @@ export function losStatusPillStyles(code: string): { bg: string; text: string; r
   if (c === 'DISBURSAL_FAILED' || c === 'KYC_FAILED' || c === 'PENNYDROP_FAILED') {
     return { bg: 'rgba(231,95,95,0.14)', text: '#8d3434', ring: 'rgba(231,95,95,0.28)' };
   }
-<<<<<<< HEAD
-  if (c === 'IN_REVIEW' || c === 'UNDER_REVIEW' || c === 'INTERNAL_ERROR') {
-    return { bg: 'rgba(34,197,94,0.18)', text: '#6b4e00', ring: 'rgba(245,158,11,0.35)' };
-  }
-  return { bg: 'rgba(15,39,72,0.08)', text: '#0F2748', ring: 'rgba(15,39,72,0.16)' };
-=======
   if (c === 'DISBURSAL_INPROCESS' || c === 'IN_REVIEW' || c === 'UNDER_REVIEW' || c === 'INTERNAL_ERROR') {
-    return { bg: 'rgba(255,197,25,0.18)', text: '#6b4e00', ring: 'rgba(245,158,11,0.35)' };
+    return { bg: 'rgba(34,197,94,0.18)', text: '#6b4e00', ring: 'rgba(245,158,11,0.35)' };
   }
   if (c === 'CONVERTED' || c.includes('APPROVED') || c === 'DISBURSED') {
     return { bg: 'rgba(29,157,112,0.14)', text: '#14523a', ring: 'rgba(29,157,112,0.32)' };
@@ -42,8 +36,7 @@ export function losStatusPillStyles(code: string): { bg: string; text: string; r
   if (c.includes('REJECT') || c.includes('DECLIN') || c.includes('CANCEL')) {
     return { bg: 'rgba(231,95,95,0.14)', text: '#8d3434', ring: 'rgba(231,95,95,0.28)' };
   }
-  return { bg: 'rgba(23,44,113,0.08)', text: '#172c71', ring: 'rgba(23,44,113,0.16)' };
->>>>>>> refs/remotes/moneycash/main
+  return { bg: 'rgba(15,39,72,0.08)', text: '#0F2748', ring: 'rgba(15,39,72,0.16)' };
 }
 
 export function LosStatusPill({ code, label }: { code: string; label: string }) {
