@@ -455,6 +455,7 @@ function ActiveLoanCard({
   const { refresh } = useCustomerSession();
   const remaining = loan.outstandingInr ?? loan.amountDueToday ?? loan.totalRepayment;
   const remainingN = parseAmount(remaining);
+  const maturityN = parseAmount(loan.amountDueAtMaturity ?? loan.totalRepayment);
   const paidN = parseAmount(loan.totalPaidInr);
   const minPayN = parseAmount(minPayAmountInr) ?? 100;
   const bounceN = parseAmount(loan.bounceFeeInr);
